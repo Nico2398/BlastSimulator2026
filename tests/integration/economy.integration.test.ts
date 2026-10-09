@@ -11,7 +11,6 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import {
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
@@ -38,6 +37,13 @@ import { negotiateContract } from '../../src/core/economy/Negotiation.js';
 import { Random } from '../../src/core/math/Random.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { completeDemolition } from '../../src/core/engine/BuildingDemolition.js';
+import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
+import { destroyBuilding } from '../../src/core/entities/Building.js';
+import { t } from '../../src/core/i18n/I18n.js';
+import { addFreightWarehouse, ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
+import { ORE_PRICES as ALL_ORE_PRICES, FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
+const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
 
@@ -96,7 +102,7 @@ function pushStoredFragment(
     shapeSeed: id,
     origin: { x: 0, y: 0, z: 0 },
   };
-  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null });
+  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: ensureFreightWarehouse(ctx) });
   ctx.state!.logistics.storedMassKg += mass;
 }
 
@@ -272,7 +278,7 @@ describe('Economy', () => {
     // Initially empty
     expect(cs.available).toHaveLength(0);
 
-    generateContracts(cs, rng, 0);
+    generateContracts(cs, rng, 0, 1, ALL_ORES);
     expect(cs.available.length).toBeGreaterThan(0);
     expect(cs.lastRefreshTick).toBe(0);
 
@@ -290,7 +296,7 @@ describe('Economy', () => {
 
     // Consecutive calls within refresh interval should not generate more
     const countBefore = cs.available.length;
-    generateContracts(cs, rng, 5); // tick 5, still within interval
+    generateContracts(cs, rng, 5, 1, ALL_ORES); // tick 5, still within interval
     expect(cs.available).toHaveLength(countBefore);
   });
 
@@ -560,6 +566,7 @@ describe('Economy', () => {
   // names it by what it actually is instead.
 
   it('contract accept resolves a contract by material: selector, no id needed', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const result = contractCommand(ctx, ['accept'], { material: c.materialId });
     expect(result.success).toBe(true);
@@ -568,6 +575,7 @@ describe('Economy', () => {
   });
 
   it('contract accept resolves a contract by material: + type: selector together', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const result = contractCommand(ctx, ['accept'], { material: c.materialId, type: c.type });
     expect(result.success).toBe(true);
@@ -575,12 +583,14 @@ describe('Economy', () => {
   });
 
   it('contract accept by material: selector is refused when nothing matches, naming what was searched for', () => {
+    ensureFreightWarehouse(ctx);
     const result = contractCommand(ctx, ['accept'], { material: 'no_such_material' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('no_such_material');
   });
 
   it('contract accept with neither an id nor a material/type selector returns the usage message', () => {
+    ensureFreightWarehouse(ctx);
     const result = contractCommand(ctx, ['accept'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage');
@@ -596,6 +606,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver resolves an active contract by material: selector', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     expect(contractCommand(ctx, ['accept'], { material: c.materialId }).success).toBe(true);
     pushStoredFragment(ctx, 1, 500, 0.04, { [c.materialId]: 1.0 });
@@ -626,8 +637,9 @@ describe('Economy', () => {
   });
 
   it('contract accept by material: selector still finds a same-kind contract after the numeric id it started as has rotated out of the pool', () => {
+    ensureFreightWarehouse(ctx);
     const rng = new Random(7);
-    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount);
+    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount, 1, ALL_ORES);
     const target = ctx.state!.contracts.available[0]!;
     const evictedId = target.id;
 
@@ -636,7 +648,7 @@ describe('Economy', () => {
     let tick = ctx.state!.tickCount;
     while (ctx.state!.contracts.available.some(c => c.id === evictedId)) {
       tick += 20;
-      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick);
+      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick, 1, ALL_ORES);
     }
     expect(contractCommand(ctx, ['accept', String(evictedId)], {}).success).toBe(false);
 
@@ -652,6 +664,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver rejects a non-finite amount and leaves cash unchanged', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});
     expect(acceptResult.success).toBe(true);
@@ -666,6 +679,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver caps an over-request to the contract\'s outstanding quantity, leaving surplus stock untouched', () => {
+    ensureFreightWarehouse(ctx);
     // Contract needs only 100kg of blingite.
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});
@@ -706,6 +720,7 @@ describe('Economy', () => {
 
   // ── #1368: fractional-kg deliveries match what the panel now offers ──────
   it('contract deliver amount:99.6 succeeds with 99.6 kg in stock', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
     pushStoredFragment(ctx, 1, 99.6, 0.04, { [c.materialId]: 1.0 });
@@ -717,6 +732,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver amount:100 is refused with "Not enough" when only 99.6 kg is in stock', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
     pushStoredFragment(ctx, 1, 99.6, 0.04, { [c.materialId]: 1.0 });
@@ -775,9 +791,6 @@ describe('Economy', () => {
     });
     expect(chargeResult.success).toBe(true);
     driveChargePlanToCompletion(ctx);
-
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
 
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
@@ -979,7 +992,7 @@ describe('Economy', () => {
       shapeSeed: 9001,
       origin: { x: 18, y: 0, z: 19 },
     };
-    ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null });
+    ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null, warehouseId: null });
 
     // 4. Accept an ore_sale contract for exactly what the fragment yields
     // (volume × density × ORE_DENSITY_KG_M3 = 0.43 × 0.4 × 2500 = 430 kg),
@@ -1059,9 +1072,6 @@ describe('Economy', () => {
     expect(chargeResult.success).toBe(true);
     driveChargePlanToCompletion(ctx);
 
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
-
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
 
@@ -1104,12 +1114,10 @@ describe('Economy', () => {
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
-    expect(ctx.state!.logistics.storageCapacityKg).toBe(2000);
+    expect(ctx.state!.logistics.storageCapacityKg).toBe(FREIGHT_WAREHOUSE_CAPACITY_KG[1]);
 
-    // Bounded window: sandbox-measured convergence (warehouse permanently
-    // full at storedMassKg 1861/2000, no more deliveries possible, still
-    // unchanged 300+ ticks past this point) well inside 200 ticks on today's
-    // code.
+    // Bounded window: deliveries (ore first) land well inside 200 ticks; the
+    // assertions below hold whether or not the tier-1 warehouse fills.
     for (let i = 0; i < 200; i++) tickCommand(ctx, ['1'], {});
 
     const collectedOreTotal = Object.values(ctx.state!.collectedOre).reduce((sum, kg) => sum + kg, 0);
@@ -1119,5 +1127,462 @@ describe('Economy', () => {
     // generic spoil delivery entirely — some non-ore mass should still make
     // it into storage.
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
+  });
+});
+
+// ── Automatic contract delivery (#1367) ──────────────────────────────────────
+
+describe('Economy — automatic contract delivery (#1367)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    ensureFreightWarehouse(ctx); // ore_sale contracts need a freight warehouse to be accepted (#1372)
+  });
+
+  /** Insert + accept a fixture ore_sale contract (blingite unless overridden). */
+  function acceptFixture(quantityKg: number, pricePerKg: number, overrides?: Partial<Contract>): Contract {
+    const c = insertOreSaleContract(ctx.state!.contracts, quantityKg, pricePerKg, overrides);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    return ctx.state!.contracts.active.find(a => a.id === c.id)!;
+  }
+
+  /** Store `kg` of ore (volume x density x 2500 = kg) in one fragment. */
+  function storeOre(id: number, kg: number, material = 'blingite'): void {
+    pushStoredFragment(ctx, id, kg * 5, kg / 2500, { [material]: 1.0 });
+    ctx.state!.collectedOre[material] = (ctx.state!.collectedOre[material] ?? 0) + kg;
+  }
+
+  function incomeTotal(category: string): number {
+    const report = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount);
+    return report.incomeByCategory.find(c => c.category === category)?.total ?? 0;
+  }
+
+  function tick(n = 1): void {
+    for (let i = 0; i < n; i++) tickCommand(ctx, ['1'], {});
+  }
+
+  // ── delivery on tick ──
+
+  it('one tick delivers a fully covered ore_sale without `contract deliver`', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 100);
+    const cashBefore = ctx.state!.cash;
+
+    tick();
+
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)).toBeUndefined();
+    const done = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(done.completed).toBe(true);
+    expect(done.deliveredKg).toBeCloseTo(100, 6);
+    expect(ctx.state!.collectedOre['blingite']).toBeCloseTo(0, 6);
+    expect(ctx.state!.cash).toBeGreaterThan(cashBefore + 1000);
+  });
+
+  it('books payment under contracts and the early bonus under bonus', () => {
+    acceptFixture(100, 10);
+    storeOre(1, 100);
+
+    tick();
+
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+    expect(incomeTotal('bonus')).toBe(150);
+  });
+
+  it('pays no early bonus once 50% of the deadline has elapsed', () => {
+    const c = acceptFixture(100, 10);
+    ctx.state!.tickCount = 300;
+    c.acceptedAtTick = 0; // 300 of 500 ticks elapsed
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+    expect(incomeTotal('bonus')).toBe(0);
+  });
+
+  it('partial stock delivers partially and the contract stays active', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 40);
+
+    tick();
+
+    const live = ctx.state!.contracts.active.find(a => a.id === c.id)!;
+    expect(live.deliveredKg).toBeCloseTo(40, 6);
+    expect(live.completed).toBe(false);
+    expect(live.paidTotal).toBeCloseTo(400, 6);
+    expect(incomeTotal('contracts')).toBeCloseTo(400, 6);
+    expect(incomeTotal('bonus')).toBe(0);
+  });
+
+  it('a later tick tops a partially delivered contract up from new stock', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 40);
+    tick();
+    storeOre(2, 60);
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+  });
+
+  it('with two contracts for the same ore the nearest deadline is served first', () => {
+    const late = acceptFixture(100, 10, { deadlineTicks: 500 });
+    const soon = acceptFixture(100, 10, { deadlineTicks: 300 });
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.map(a => a.id)).toEqual([soon.id]);
+    expect(ctx.state!.contracts.active.find(a => a.id === late.id)!.deliveredKg).toBe(0);
+  });
+
+  it('a deadline tie goes to the lowest id', () => {
+    const first = acceptFixture(100, 10);
+    const second = acceptFixture(100, 10);
+    expect(first.id).toBeLessThan(second.id);
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.map(a => a.id)).toEqual([first.id]);
+    expect(ctx.state!.contracts.active.find(a => a.id === second.id)!.deliveredKg).toBe(0);
+  });
+
+  it('rubble_disposal auto-delivers from raw stored mass', () => {
+    const c = acceptFixture(300, 2, { type: 'rubble_disposal', materialId: '' });
+    pushStoredFragment(ctx, 1, 500, 0.04, {});
+
+    tick();
+
+    expect(incomeTotal('contracts')).toBeCloseTo(600, 6);
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+  });
+
+  it('supply contracts auto-deliver', () => {
+    const c = acceptFixture(100, 10, { type: 'supply' });
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+  });
+
+  it('delivery is reported in the tick output', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 100);
+    const out = tickCommand(ctx, ['1'], {}).output;
+    expect(out).toContain(`#${c.id}`);
+  });
+
+  // ── hold / release ──
+
+  it('a held contract is not auto-delivered', () => {
+    const c = acceptFixture(100, 10);
+    expect(contractCommand(ctx, ['hold', String(c.id)], {}).success).toBe(true);
+    expect(ctx.state!.contracts.active[0]!.held).toBe(true);
+    storeOre(1, 100);
+
+    tick(3);
+
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)!.deliveredKg).toBe(0);
+    expect(ctx.state!.collectedOre['blingite']).toBeCloseTo(100, 6);
+    expect(incomeTotal('contracts')).toBe(0);
+  });
+
+  it('manual `contract deliver` still works on a held contract', () => {
+    const c = acceptFixture(100, 10);
+    contractCommand(ctx, ['hold', String(c.id)], {});
+    storeOre(1, 100);
+
+    const result = contractCommand(ctx, ['deliver', String(c.id)], { amount: '100' });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('COMPLETED');
+  });
+
+  it('`contract release` resumes automatic delivery', () => {
+    const c = acceptFixture(100, 10);
+    contractCommand(ctx, ['hold', String(c.id)], {});
+    storeOre(1, 100);
+    tick();
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)!.deliveredKg).toBe(0);
+
+    expect(contractCommand(ctx, ['release', String(c.id)], {}).success).toBe(true);
+    expect(ctx.state!.contracts.active[0]!.held).toBeFalsy();
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+  });
+
+  it('holding one contract leaves the other to receive the stock', () => {
+    const held = acceptFixture(100, 10, { deadlineTicks: 300 });
+    const free = acceptFixture(100, 10, { deadlineTicks: 500 });
+    contractCommand(ctx, ['hold', String(held.id)], {});
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.map(a => a.id)).toEqual([free.id]);
+  });
+
+  it('`contract hold` accepts a material:/type: selector like the other subcommands', () => {
+    const c = acceptFixture(100, 10);
+    const result = contractCommand(ctx, ['hold'], { type: 'ore_sale', material: c.materialId });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.contracts.active[0]!.held).toBe(true);
+  });
+
+  it('`contract hold` / `release` refuse an unknown id cleanly', () => {
+    acceptFixture(100, 10);
+    const hold = contractCommand(ctx, ['hold', '999'], {});
+    const release = contractCommand(ctx, ['release', '999'], {});
+    expect(hold.success).toBe(false);
+    expect(hold.output).toContain('999');
+    expect(release.success).toBe(false);
+    expect(release.output).toContain('999');
+    expect(ctx.state!.contracts.active[0]!.held).toBeFalsy();
+  });
+
+  it('`contract hold` refuses an offer that has not been accepted', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['hold', String(c.id)], {});
+    expect(result.success).toBe(false);
+    expect(c.held).toBeFalsy();
+  });
+
+  it('`contract hold` with no id or selector returns usage, not a crash', () => {
+    acceptFixture(100, 10);
+    const result = contractCommand(ctx, ['hold'], {});
+    expect(result.success).toBe(false);
+    expect(result.output.length).toBeGreaterThan(0);
+  });
+
+  // ── expiry penalty ──
+
+  it('expiry with nothing delivered charges the full penalty', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    ctx.state!.tickCount = 5;
+
+    tick(); // tickCount 6: elapsed 6 > 5
+
+    const rec = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(rec.expired).toBe(true);
+    expect(rec.penaltyCharged).toBe(300);
+    const fines = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount).expensesByCategory.find(e => e.category === 'fines');
+    expect(fines?.total).toBe(300);
+  });
+
+  it('expiry after a part delivery charges round(penalty * undelivered share)', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    storeOre(1, 40);
+    tick(); // delivers 40 kg
+    ctx.state!.tickCount = 5;
+
+    tick(); // expires
+
+    const rec = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(rec.expired).toBe(true);
+    expect(rec.deliveredKg).toBeCloseTo(40, 6);
+    expect(rec.paidTotal).toBeCloseTo(400, 6);
+    expect(rec.penaltyCharged).toBe(180);
+    const fines = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount).expensesByCategory.find(e => e.category === 'fines');
+    expect(fines?.total).toBe(180);
+  });
+
+  it('stock on the final tick is delivered before the expiry check, so no penalty applies', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    ctx.state!.tickCount = 5;
+    storeOre(1, 100);
+
+    tick(); // tickCount 6 would expire it; delivery runs first
+
+    const rec = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(rec.completed).toBe(true);
+    expect(rec.expired).toBe(false);
+    expect(rec.penaltyCharged ?? 0).toBe(0);
+    const fines = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount).expensesByCategory.find(e => e.category === 'fines');
+    expect(fines?.total ?? 0).toBe(0);
+  });
+
+  it('a held contract with stock still expires with the full penalty', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    contractCommand(ctx, ['hold', String(c.id)], {});
+    ctx.state!.tickCount = 5;
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.penaltyCharged).toBe(300);
+  });
+});
+
+// ── Per-warehouse freight storage (#1372) ────────────────────────────────────
+
+describe('Economy — per-warehouse freight storage (#1372)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    ctx.state!.contracts.available = [];
+  });
+
+  function storedIn(warehouseId: number): number {
+    return ctx.state!.logistics.fragments
+      .filter(f => f.state === 'stored' && f.warehouseId === warehouseId)
+      .reduce((n, f) => n + f.fragment.mass, 0);
+  }
+
+  function stock(id: number, mass: number, warehouseId: number): void {
+    const fragment: FragmentData = {
+      id, position: { x: 0, y: 0, z: 0 }, volume: 0.4, mass, rockId: 'sandite',
+      oreDensities: { blingite: 0.5 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x: 0, y: 0, z: 0 },
+    };
+    ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId });
+    ctx.state!.logistics.storedMassKg += mass;
+    ctx.state!.collectedOre.blingite = (ctx.state!.collectedOre.blingite ?? 0) + 0.4 * 0.5 * 2500;
+  }
+
+  it('contract accept for an ore_sale is refused without a freight warehouse', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['accept', String(c.id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('economy.contract.needs_warehouse'));
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)).toBeUndefined();
+    expect(ctx.state!.contracts.available.find(a => a.id === c.id)).toBeDefined();
+  });
+
+  it('contract accept for an ore_sale succeeds once a freight warehouse exists', () => {
+    addFreightWarehouse(ctx);
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+  });
+
+  it('contract accept for rubble_disposal needs no warehouse', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 1, { type: 'rubble_disposal', materialId: '' });
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+  });
+
+  it('demolishing a warehouse holding ore empties its stock and shrinks the pool', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const b = addFreightWarehouse(ctx, 60, 20);
+    stock(1, 300, a);
+    stock(2, 200, b);
+    expect(ctx.state!.logistics.storedMassKg).toBe(500);
+    const capBefore = ctx.state!.logistics.storageCapacityKg;
+    const oreBefore = ctx.state!.collectedOre.blingite!;
+
+    const ordered = buildCommand(ctx, ['destroy', String(a)], {});
+    expect(ordered.success).toBe(true);
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+    });
+
+    expect(storedIn(a)).toBe(0);
+    expect(storedIn(b)).toBe(200);
+    expect(ctx.state!.logistics.storedMassKg).toBe(200);
+    expect(ctx.state!.logistics.storageCapacityKg).toBeLessThan(capBefore);
+    expect(ctx.state!.logistics.fragments.map(f => f.fragment.id)).toEqual([2]);
+    expect(ctx.state!.collectedOre.blingite!).toBeLessThan(oreBefore);
+    expect(ctx.state!.collectedOre.blingite!).toBeGreaterThanOrEqual(0);
+  });
+
+  it('completeDemolition of a stocked warehouse emits warehouse_stock_lost once with the kg', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    stock(1, 300, a);
+    stock(2, 100, a);
+    const events: Array<{ buildingId: number; massKg: number }> = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+    });
+    expect(events).toEqual([expect.objectContaining({ buildingId: a, massKg: 400 })]);
+  });
+
+  it('completeDemolition of an empty warehouse emits nothing', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const events: unknown[] = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+    });
+    expect(events).toEqual([]);
+  });
+
+  it('upgrading a stocked warehouse keeps its stock and emits no loss', () => {
+    const a = addFreightWarehouse(ctx, 9, 14);
+    stock(1, 300, a);
+    ctx.state!.cash = 1e9;
+    ctx.state!.buildings.unlockedTiers.freight_warehouse = 3;
+    const events: unknown[] = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+    const ordered = buildCommand(ctx, ['upgrade', String(a)], {});
+    expect(ordered.success, ordered.output).toBe(true);
+    const order = ctx.state!.plannedBuildings.find(pb => pb.buildingId === a)!;
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: order.id,
+    });
+    // Another building change mid-rebuild must not wipe it either.
+    refreshLogisticsCapacity(ctx.state!);
+    expect(events).toEqual([]);
+    expect(storedIn(a)).toBe(300);
+    expect(ctx.state!.logistics.storedMassKg).toBe(300);
+  });
+
+  it('moving a stocked warehouse keeps its stock', () => {
+    const a = addFreightWarehouse(ctx, 9, 14);
+    stock(1, 300, a);
+    ctx.state!.cash = 1e9;
+    const moved = buildCommand(ctx, ['move', String(a)], { to: '9,22' });
+    expect(moved.success, moved.output).toBe(true);
+    expect(storedIn(a)).toBe(300);
+    expect(ctx.state!.logistics.storedMassKg).toBe(300);
+  });
+
+  it('refreshLogisticsCapacity after a blast-style destruction reports the lost stock', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const b = addFreightWarehouse(ctx, 60, 20);
+    stock(1, 300, a);
+    stock(2, 200, b);
+    destroyBuilding(ctx.state!.buildings, a);
+    const losses = refreshLogisticsCapacity(ctx.state!);
+    expect(losses).toHaveLength(1);
+    expect(losses[0]!.buildingId).toBe(a);
+    expect(losses[0]!.massKg).toBe(300);
+    expect(ctx.state!.logistics.storedMassKg).toBe(200);
+  });
+
+  it('refreshLogisticsCapacity reports nothing when no stocked warehouse is lost', () => {
+    const a = addFreightWarehouse(ctx);
+    stock(1, 100, a);
+    expect(refreshLogisticsCapacity(ctx.state!)).toEqual([]);
+    expect(ctx.state!.logistics.storedMassKg).toBe(100);
+  });
+
+  it('selling ore draws from both warehouses and keeps pool and per-warehouse totals equal', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const b = addFreightWarehouse(ctx, 60, 20);
+    stock(1, 300, a);
+    stock(2, 200, b);
+    const total = ctx.state!.collectedOre.blingite!;
+    const sellKg = Math.floor(total * 0.8);
+    const c = insertOreSaleContract(ctx.state!.contracts, sellKg, 10);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    const res = contractCommand(ctx, ['deliver', String(c.id)], { amount: String(sellKg) });
+    expect(res.success, res.output).toBe(true);
+    expect(storedIn(a) + storedIn(b)).toBeCloseTo(ctx.state!.logistics.storedMassKg, 6);
+    expect(ctx.state!.logistics.storedMassKg).toBeLessThan(500);
+    expect(storedIn(a)).toBeLessThan(300);
+  });
+
+  it('save round trip keeps each fragment warehouseId', async () => {
+    const { serialize, deserialize } = await import('../../src/core/state/SaveLoad.js');
+    const a = addFreightWarehouse(ctx);
+    stock(1, 100, a);
+    const restored = deserialize(serialize(ctx.state!));
+    expect(restored.logistics.fragments[0]!.warehouseId).toBe(a);
   });
 });

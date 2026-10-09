@@ -16,6 +16,7 @@ import {
   type VehicleRole,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
+import { canAffordVehicleUpgrade, computeVehicleUpgradeCost, upgradeVehicle, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { findAvailableDriverForReposition } from '../../core/entities/VehicleDriverAssignment.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { alight, releaseOccupantsOfRemovedVehicles } from '../../core/engine/Mount.js';
@@ -186,6 +187,30 @@ export function vehicleCommand(
       state.cash += residualValue;
       addIncome(state.finances, residualValue, 'refund', `Scrap ${vehicle.type} #${id}`, state.tickCount);
       return { success: true, output: t('vehicle.scrap_success', { id, value: residualValue }) };
+    }
+    case 'upgrade': {
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
+      if (isNaN(id)) return { success: false, output: t('vehicle.upgrade_usage') };
+      const vehicle = state.vehicles.vehicles.find(v => v.id === id);
+      if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
+      const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
+      if (cost === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
+      // Cash is checked before upgradeVehicle, which mutates tier and hp.
+      if (!canAffordVehicleUpgrade(vehicle, state.cash)) {
+        return {
+          success: false,
+          output: t('console.insufficient_funds', { need: formatMoney(cost), have: formatMoney(state.cash) }),
+        };
+      }
+      // Max tier and cash were checked above, so the upgrade cannot fail here.
+      upgradeVehicle(vehicle);
+      state.cash -= cost;
+      addExpense(state.finances, cost, 'equipment', `Upgrade ${vehicle.type} #${id}`, state.tickCount);
+      let output = t('vehicle.upgrade_success', { id, tier: vehicle.tier, cost });
+      if (!rosterCanDriveVehicleTier(state.employees.employees, vehicle.type, vehicle.tier)) {
+        output += `\n${t('vehicle.upgrade_no_licensed')}`;
+      }
+      return { success: true, output };
     }
     case 'break': {
       const vehicleId = parseInt(args[1] ?? '', 10);

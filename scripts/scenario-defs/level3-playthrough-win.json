@@ -1722,7 +1722,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 768552,
+          "cash": 756132,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1733,7 +1733,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured)."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -1835,8 +1835,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "sequencedCount": 0
+          "holeCount": 24
         },
         "increased": [
           "orderedChargeCount"
@@ -1868,52 +1867,17 @@
           "surveyCount": 3,
           "holeCount": 24,
           "chargedCount": 24,
-          "sequencedCount": 0,
           "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 25
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 24
         }
       }
     },
     {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -1925,6 +1889,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
@@ -1947,8 +1916,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },
@@ -2017,8 +1985,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 50,
-          "ecology": 49.974440199652854,
-          "nuisance": 49.93610049913214
+          "ecology": 49.7635685061019,
+          "nuisance": 49.40892126525473
         }
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
@@ -2090,6 +2058,67 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "build freight_warehouse at:48,44",
+      "description": "#1372: ore_sale contracts are only accepted with a Freight Warehouse standing (ore is stored per warehouse), so the player builds one before accepting. Placed beside the living quarters, far from the blast pattern.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 48,
+          "z": 44,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "pickTile",
+          "x": 48,
+          "z": 44
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:600",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "#1372: wait for the crew to finish the freight warehouse the ore_sale contract below needs. Build duration differs by mode (command 20 ticks, interaction 31: the crew walks from a different spot after real clicks), so later steps assert no absolute tickCount/cash/wellBeing/ecology/nuisance -- those accrue with elapsed ticks and would pin one mode.",
+      "role": "setup",
+      "timeout": 150,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -2190,10 +2219,7 @@
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 99.95,
-          "safety": 0,
-          "ecology": 50,
-          "nuisance": 50
+          "safety": 0
         }
       },
       "description": "#1186: safety re-measured, 50 -> 0. Not a new incident -- deathCount stays 12, unchanged from pattern 1's own blast, and the blast's own fragmentedCount/detachedCount/liftedCount/projectionCount are byte-identical to origin/main (direct-verified). The cause is entirely upstream, at the 'tick 6' step: main's own PRNG stream happened to queue a pending event on the very first sub-tick after the blast, freezing tickCount there (0 of 6 ticks actually ran) before TickPipeline's own recentAccidents penalty (ScoreManager.ts: `sfDelta -= recentAccidents * 5`, a 10-tick lookback window) ever got a chance to see the 12 fresh death accidents from that same blast. This branch's SurveyCalc.ts fix (see the 'tick 6' step's own description) shifts the PRNG stream enough that no event happens to be pending there any more, so all 6 real ticks run for the first time -- and recentAccidents=12 (or more, counting destroyed vehicles) applied every one of those ticks crashes safety to its floor almost immediately, exactly as the formula says it should for a blast that just killed 12 of 15 employees. Re-measured, not loosened: the old 'safety: 50' value was only ever a byproduct of main's own tick call freezing at 0 ticks by coincidence, not of the blast being any less catastrophic."
@@ -2232,16 +2258,11 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 538,
-          "cash": 2300000,
           "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 50,
-          "nuisance": 50,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "completed",

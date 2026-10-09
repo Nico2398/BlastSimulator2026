@@ -9,16 +9,21 @@ import {
   tickWeather,
   forceAdvanceInState,
   ALL_WEATHER_STATES,
+  rainIntensity,
   type WeatherState,
 } from '../../../src/core/weather/WeatherCycle.js';
-import { WEATHER_HISTORY_MAX } from '../../../src/core/config/balance.js';
 import {
-  updateHoleFlooding,
+  WEATHER_HISTORY_MAX,
+  HOLE_WET_THRESHOLD,
+  GROUND_WETNESS_RISE_RATE,
+  GROUND_WETNESS_DECAY_RATE,
+} from '../../../src/core/config/balance.js';
+import {
+  advanceHoleWater,
+  advanceGroundWetness,
   isHoleFlooded,
-  willChargeFail,
-  type HoleFloodState,
+  type HoleWater,
 } from '../../../src/core/weather/WeatherEffects.js';
-import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 
 describe('WeatherCycle', () => {
   it('produces deterministic sequence from a given seed', () => {
@@ -148,51 +153,161 @@ describe('forecast', () => {
   });
 });
 
-describe('WeatherEffects', () => {
-  const testHole: DrillHole = { id: 'h1', x: 5, z: 5, depth: 8, diameter: 0.15 };
-
-  it('heavy rain on porous rock floods unfilled holes', () => {
-    let flood: HoleFloodState = { waterLevel: 0, hasTubing: false };
-
-    // Simulate heavy rain for many ticks on porous rock (porosity 0.35)
-    // Rate: 0.7 * 0.35 * 0.3 = 0.0735/tick. Need 2.4m (30% of 8m depth): ~33 ticks
-    for (let i = 0; i < 40; i++) {
-      flood = updateHoleFlooding(testHole, flood, 'heavy_rain', 0.35);
+describe('WeatherEffects — hole water (#1350)', () => {
+  const dry = (porosity: number): HoleWater => ({ level: 0, porosity });
+  const run = (hw: HoleWater, ticks: number, rain: number, ground: number, tubed: boolean): HoleWater => {
+    let cur = hw;
+    for (let i = 0; i < ticks; i++) cur = advanceHoleWater(cur, rain, ground, tubed);
+    return cur;
+  };
+  const ticksUntilDry = (start: HoleWater, rain: number, ground: number, max = 400): number => {
+    let cur = start;
+    for (let i = 1; i <= max; i++) {
+      cur = advanceHoleWater(cur, rain, ground, false);
+      if (cur.level <= 0) return i;
     }
+    return max + 1;
+  };
 
-    expect(flood.waterLevel).toBeGreaterThan(0);
-    expect(isHoleFlooded(flood, testHole.depth)).toBe(true);
+  it('a dry hole with no rain and dry ground stays at level 0', () => {
+    expect(run(dry(0.35), 50, 0, 0, false).level).toBe(0);
+    expect(run(dry(0.03), 50, 0, 0, false).level).toBe(0);
   });
 
-  it('tubing prevents hole flooding', () => {
-    let flood: HoleFloodState = { waterLevel: 0, hasTubing: true };
-
-    for (let i = 0; i < 50; i++) {
-      flood = updateHoleFlooding(testHole, flood, 'heavy_rain', 0.35);
-    }
-
-    expect(flood.waterLevel).toBe(0);
+  it('an untubed hole in a storm exceeds the wet threshold within 2 ticks', () => {
+    const hw = run(dry(0.03), 2, rainIntensity('storm'), 0, false);
+    expect(hw.level).toBeGreaterThan(HOLE_WET_THRESHOLD);
+    expect(isHoleFlooded(hw.level)).toBe(true);
   });
 
-  it('flooded hole + water-sensitive explosive → charge fails', () => {
-    const flood: HoleFloodState = { waterLevel: 5, hasTubing: false };
-    const charge = { explosiveId: 'boomite', amountKg: 3, stemmingM: 2 }; // boomite is water-sensitive
-
-    expect(willChargeFail(charge, flood, 8)).toBe(true);
+  it('light rain fills a hole slower than a storm', () => {
+    const light = run(dry(0.03), 2, rainIntensity('light_rain'), 0, false);
+    const storm = run(dry(0.03), 2, rainIntensity('storm'), 0, false);
+    expect(light.level).toBeGreaterThan(0);
+    expect(light.level).toBeLessThan(storm.level);
   });
 
-  it('flooded hole + water-resistant explosive → charge ok', () => {
-    const flood: HoleFloodState = { waterLevel: 5, hasTubing: false };
-    const charge = { explosiveId: 'krackle', amountKg: 3, stemmingM: 2 }; // krackle is water-resistant
-
-    expect(willChargeFail(charge, flood, 8)).toBe(false);
+  it('light rain still floods a hole if it keeps raining long enough', () => {
+    const hw = run(dry(0.03), 20, rainIntensity('light_rain'), 0, false);
+    expect(isHoleFlooded(hw.level)).toBe(true);
   });
 
-  it('tubed hole + water-sensitive explosive → charge ok', () => {
-    const flood: HoleFloodState = { waterLevel: 5, hasTubing: true };
-    const charge = { explosiveId: 'boomite', amountKg: 3, stemmingM: 2 };
+  it('the level never exceeds 1 (full) and never goes below 0', () => {
+    const full = run(dry(0.03), 100, 1, 1, false);
+    expect(full.level).toBeLessThanOrEqual(1);
+    const drained = run({ level: 0.1, porosity: 0.03 }, 100, 0, 0, false);
+    expect(drained.level).toBe(0);
+  });
 
-    expect(willChargeFail(charge, flood, 8)).toBe(false);
+  it('a tubed dry hole never rises, in a storm on soaked ground', () => {
+    const hw = run(dry(0.35), 100, 1, 1, true);
+    expect(hw.level).toBe(0);
+  });
+
+  it('a tubed already-wet hole keeps its level: no fill, no fade', () => {
+    const wet: HoleWater = { level: 0.6, porosity: 0.35 };
+    expect(run(wet, 50, 1, 1, true).level).toBe(0.6);
+    expect(run(wet, 50, 0, 0, true).level).toBe(0.6);
+  });
+
+  it('advanceHoleWater preserves the hole porosity and does not mutate its input', () => {
+    const input: HoleWater = { level: 0.2, porosity: 0.35 };
+    const out = advanceHoleWater(input, 1, 0, false);
+    expect(out.porosity).toBe(0.35);
+    expect(input).toEqual({ level: 0.2, porosity: 0.35 });
+  });
+
+  it('a porous hole (0.35) takes water from wet ground after the rain stops', () => {
+    const hw = run(dry(0.35), 100, 0, 1, false);
+    expect(hw.level).toBeGreaterThan(0);
+    expect(isHoleFlooded(hw.level)).toBe(true);
+  });
+
+  it('a tight hole (0.03) does not take water from wet ground', () => {
+    const hw = run(dry(0.03), 100, 0, 1, false);
+    expect(isHoleFlooded(hw.level)).toBe(false);
+  });
+
+  it('seep from wet ground is stronger on wetter ground', () => {
+    const damp = run(dry(0.35), 30, 0, 0.5, false);
+    const soaked = run(dry(0.35), 30, 0, 1, false);
+    expect(soaked.level).toBeGreaterThan(0);
+    expect(soaked.level).toBeGreaterThanOrEqual(damp.level);
+  });
+
+  it('a tubed porous hole takes nothing from wet ground', () => {
+    expect(run(dry(0.35), 100, 0, 1, true).level).toBe(0);
+  });
+
+  it('water fades to dry once rain stops and the ground is dry, in tight and porous rock', () => {
+    expect(ticksUntilDry({ level: 1, porosity: 0.03 }, 0, 0)).toBeLessThanOrEqual(400);
+    expect(ticksUntilDry({ level: 1, porosity: 0.35 }, 0, 0)).toBeLessThanOrEqual(400);
+  });
+
+  it('water fades slower in porous rock than in tight rock', () => {
+    const tight = ticksUntilDry({ level: 1, porosity: 0.03 }, 0, 0);
+    const porous = ticksUntilDry({ level: 1, porosity: 0.35 }, 0, 0);
+    expect(porous).toBeGreaterThan(tight);
+  });
+
+  it('fade is slower the higher the porosity (monotone)', () => {
+    const a = ticksUntilDry({ level: 1, porosity: 0.1 }, 0, 0);
+    const b = ticksUntilDry({ level: 1, porosity: 0.2 }, 0, 0);
+    const c = ticksUntilDry({ level: 1, porosity: 0.3 }, 0, 0);
+    expect(a).toBeLessThanOrEqual(b);
+    expect(b).toBeLessThanOrEqual(c);
+    expect(a).toBeLessThan(c);
+  });
+
+  it('a wet hole is drier next tick when nothing is arriving', () => {
+    const next = advanceHoleWater({ level: 0.8, porosity: 0.03 }, 0, 0, false);
+    expect(next.level).toBeLessThan(0.8);
+    expect(next.level).toBeGreaterThan(0);
+  });
+});
+
+describe('advanceGroundWetness (#1350)', () => {
+  it('rises with rain', () => {
+    expect(advanceGroundWetness(0, 1)).toBeGreaterThan(0);
+  });
+
+  it('rises faster in heavier rain', () => {
+    expect(advanceGroundWetness(0, rainIntensity('storm')))
+      .toBeGreaterThan(advanceGroundWetness(0, rainIntensity('light_rain')));
+  });
+
+  it('rises by GROUND_WETNESS_RISE_RATE per unit of rain from dry', () => {
+    expect(advanceGroundWetness(0, 1)).toBeCloseTo(GROUND_WETNESS_RISE_RATE, 6);
+  });
+
+  it('decays when it is not raining', () => {
+    const next = advanceGroundWetness(0.5, 0);
+    expect(next).toBeLessThan(0.5);
+    expect(next).toBeCloseTo(0.5 - GROUND_WETNESS_DECAY_RATE, 6);
+  });
+
+  it('is clamped to [0, 1]', () => {
+    expect(advanceGroundWetness(0.99, 1)).toBe(1);
+    expect(advanceGroundWetness(1, 1)).toBe(1);
+    expect(advanceGroundWetness(0.01, 0)).toBe(0);
+    expect(advanceGroundWetness(0, 0)).toBe(0);
+  });
+
+  it('soaks to 1 in a long storm and dries to 0 afterwards', () => {
+    let w = 0;
+    for (let i = 0; i < 40; i++) w = advanceGroundWetness(w, 1);
+    expect(w).toBe(1);
+    for (let i = 0; i < 100; i++) w = advanceGroundWetness(w, 0);
+    expect(w).toBe(0);
+  });
+});
+
+describe('isHoleFlooded (#1350)', () => {
+  it('is true past HOLE_WET_THRESHOLD and false at or below zero water', () => {
+    expect(isHoleFlooded(HOLE_WET_THRESHOLD + 0.01)).toBe(true);
+    expect(isHoleFlooded(1)).toBe(true);
+    expect(isHoleFlooded(HOLE_WET_THRESHOLD - 0.01)).toBe(false);
+    expect(isHoleFlooded(0)).toBe(false);
   });
 });
 

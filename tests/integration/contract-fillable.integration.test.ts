@@ -7,6 +7,7 @@ import { contractCommand } from '../../src/console/commands/economy.js';
 import type { Contract } from '../../src/core/economy/Contract.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
 
 function addOffer(ctx: GameContext, materialId: string, quantityKg: number): Contract {
   const state = ctx.state!.contracts;
@@ -44,7 +45,7 @@ function store(ctx: GameContext, materialId: string, kg: number): void {
     shapeSeed: 1,
     origin: { x: 0, y: 0, z: 0 },
   };
-  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null });
+  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: ensureFreightWarehouse(ctx) });
   ctx.state!.logistics.storedMassKg += kg;
 }
 
@@ -53,6 +54,7 @@ describe('contract fillable:true (#1338)', () => {
   beforeEach(() => {
     ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
     ctx.state!.contracts.available = [];
+    ensureFreightWarehouse(ctx);
   });
 
   it('accept picks the covered offer, skipping an earlier uncovered one', () => {

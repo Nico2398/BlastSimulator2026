@@ -168,14 +168,14 @@ describe('entities.ts — building_not_found (shared across destroy/upgrade/move
 
 // ── build_destroy_success ────────────────────────────────────────────────
 
-describe('entities.ts — build destroy success message', () => {
+describe('entities.ts — build destroy ordered message (#1392)', () => {
   it('matches the exact English literal, embedding the real id and raw demolishCost (no thousands separator)', () => {
     const ctx = makeCtx();
     const id = placeTestBuilding(ctx);
     const demolishCost = getBuildingDef('management_office', 1).demolishCost;
     const result = buildCommand(ctx, ['destroy', String(id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).toBe(`Building #${id} demolished. Cost: $${demolishCost}`);
+    expect(result.output).toBe(`Demolition of building #${id} ordered. Cost: $${demolishCost}`);
   });
 
   it('differs from the English literal under locale fr', () => {
@@ -185,7 +185,7 @@ describe('entities.ts — build destroy success message', () => {
     setLocale('fr');
     const result = buildCommand(ctx, ['destroy', String(id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toBe(`Building #${id} demolished. Cost: $${demolishCost}`);
+    expect(result.output).not.toBe(`Demolition of building #${id} ordered. Cost: $${demolishCost}`);
   });
 });
 
@@ -281,7 +281,7 @@ describe('entities.ts — build upgrade failure (re-placement rejected by an ove
 
 // ── build_upgrade_success ────────────────────────────────────────────────
 
-describe('entities.ts — build upgrade success message', () => {
+describe('entities.ts — build upgrade ordered message (#1392)', () => {
   function setupUpgradableBuilding(ctx: GameContext): number {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
     // Upgrade re-places through the real console path, which checks the
@@ -295,13 +295,14 @@ describe('entities.ts — build upgrade success message', () => {
   const NEW_DEF = getBuildingDef('management_office', 2);
   const TOTAL_COST = OLD_DEF.demolishCost + NEW_DEF.constructionCost;
 
-  it('matches the exact English literal, embedding the real type/id/tier/newId/cost', () => {
+  it('matches the exact English literal, naming the building id; cash is charged at order time', () => {
     const ctx = makeCtx();
     const id = setupUpgradableBuilding(ctx);
+    const cashBefore = ctx.state!.cash;
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
-    const newId = ctx.state!.buildings.buildings[0]!.id;
-    expect(result.output).toBe(`Upgraded management_office #${id} to T2 (new #${newId}). Cost: $${TOTAL_COST}`);
+    expect(result.output).toBe(`Upgrade of building #${id} ordered. Demolition first, then rebuild.`);
+    expect(ctx.state!.cash).toBe(cashBefore - TOTAL_COST);
   });
 
   it('differs from the English literal under locale fr', () => {
@@ -310,8 +311,8 @@ describe('entities.ts — build upgrade success message', () => {
     setLocale('fr');
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
-    const newId = ctx.state!.buildings.buildings[0]!.id;
-    expect(result.output).not.toBe(`Upgraded management_office #${id} to T2 (new #${newId}). Cost: $${TOTAL_COST}`);
+    expect(result.output).not.toBe(`Upgrade of building #${id} ordered. Demolition first, then rebuild.`);
+    expect(result.output).toContain(`#${id}`);
   });
 });
 
@@ -620,7 +621,7 @@ describe('employee fire — refusals', () => {
 describe('vehicle haul / break — refusals', () => {
   function makeFragment(id: number, x: number, z: number, volume: number): FragmentData {
     return {
-      id, position: { x, y: 0, z }, volume, mass: 1000, rockId: 'cruite', oreDensities: {},
+      id, position: { x, y: 0, z }, volume, mass: 1000, rockId: 'cruite', oreDensities: { blingite: 0.5 },
       initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
       shapeSeed: id, origin: { x, y: 0, z },
     };

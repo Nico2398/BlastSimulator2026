@@ -8,12 +8,14 @@ import {
 import {
   registerEvents,
   clearEvents,
+  getAllEvents,
   type EventDef,
 } from '../../../src/core/events/EventPool.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
 import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { UNQUALIFIED_CONTRACTOR_FEE } from '../../../src/core/config/balance.js';
+import { makeEffectWorld } from '../../helpers/eventEffectWorld.js';
 import { SURVEY_FEE, setupUnqualified, totalDebit } from '../../helpers/unqualifiedWorld.js';
 
 function makeTestEvent(): EventDef {
@@ -323,5 +325,118 @@ describe('resolveEvent — unqualified_task_error', () => {
     pending(s);
     resolveEvent(s.state.events, s.state.finances, s.state.scores, 2, 40, new Random(7));
     expect(s.state.pendingActions.some(a => a.id === s.actionId)).toBe(true);
+  });
+});
+
+// ── event effect spread reaches the world (#1538) ────────────────────────────
+
+describe('resolveEvent — spread declarative effects (#1538)', () => {
+  type Spec = { type: string };
+  const KIND_OF: Record<string, string> = {
+    work_stoppage: 'work_stoppage', work_rate: 'work_rate', morale_shift: 'morale_drift', salary: 'salary_factor',
+    recurring_charge: 'recurring_charge', contract_price: 'contract_price', forced_weather: 'forced_weather',
+    event_weight: 'event_weight',
+  };
+  const BAN_KIND = { blast: 'blast_ban', haul: 'haul_pause', drill: 'drill_ban' } as Record<string, string>;
+  const COST_KIND = { explosive: 'explosive_price', upkeep: 'upkeep_surcharge' } as Record<string, string>;
+  const modKind = (s: Spec & { what?: string | undefined }): string | undefined =>
+    s.type === 'ban' ? BAN_KIND[s.what!] : s.type === 'cost_factor' ? COST_KIND[s.what!] : KIND_OF[s.type];
+
+  beforeEach(() => {
+    clearEvents();
+    setupEvents();
+  });
+
+  /** First option of the event whose effects (main branch) include the type (and, optionally, a `what`). */
+  function findOption(eventId: string, type: string, what?: string): number {
+    const def = getAllEvents().find(e => e.id === eventId);
+    const idx = def?.consequences.findIndex(c => (c.effects ?? []).some(s => s.type === type && (what === undefined || (s as { what?: string }).what === what))) ?? -1;
+    expect(idx, `${eventId} has no option with effect ${type}${what ? ' ' + what : ''}`).toBeGreaterThanOrEqual(0);
+    return idx;
+  }
+
+  /** First main-pool event of the category with an option carrying a timed modifier effect. */
+  function firstTimedEvent(category: string): { id: string; type: string; what?: string | undefined } {
+    for (const e of getAllEvents()) {
+      if (e.category !== category || e.followUpOnly) continue;
+      for (const c of e.consequences) {
+        const s = (c.effects ?? []).find(x => modKind(x as Spec) !== undefined);
+        if (s) return { id: e.id, type: s.type, what: (s as { what?: string }).what };
+      }
+    }
+    throw new Error(`no ${category} event carries a timed effect`);
+  }
+
+  function resolveOn(eventId: string, option: number, empty = false) {
+    const fx = makeEffectWorld({ empty });
+    fx.state.events.pendingEvent = { eventId, firedAtTick: 10 };
+    const result = resolveEvent(fx.state.events, fx.state.finances, fx.state.scores, option, 10, new Random(7), fx.world)!;
+    return { fx, result };
+  }
+
+  function expectLasting(eventId: string, type: string, what?: string | undefined): void {
+    const opt = findOption(eventId, type, what);
+    const { fx, result } = resolveOn(eventId, opt);
+    expect(result).not.toBeNull();
+    const kind = modKind({ type, what });
+    const m = fx.state.events.activeModifiers.find(x => x.kind === kind && x.sourceEventId === eventId);
+    expect(m, `${eventId}: modifier ${kind}`).toBeDefined();
+    if (type === 'salary' && m!.endTick === null) {
+      expect(m!.endTick).toBeNull(); // permanent raise
+    } else {
+      expect(m!.endTick! - m!.startTick).toBeGreaterThan(0);
+    }
+    const chip = fx.state.events.lastOutcome!.effects.find(e => e.textKey?.startsWith(`ui.event.effect.${type}`));
+    expect(chip, `${eventId}: chip ui.event.effect.${type}`).toBeDefined();
+    expect(fx.state.events.lastOutcome!.eventId).toBe(eventId);
+  }
+
+  it.each(['union', 'politics', 'weather', 'mafia', 'lawsuit'])('a main-pool %s event applies its timed effect', cat => {
+    const { id, type, what } = firstTimedEvent(cat);
+    expectLasting(id, type, what);
+  });
+
+  it('union_strike_aftermath: salary, employee_joins and morale_shift reach the world', () => {
+    expectLasting('union_strike_aftermath', 'salary');
+    expectLasting('union_strike_aftermath', 'morale_shift');
+    const opt = findOption('union_strike_aftermath', 'employee_joins');
+    const before = makeEffectWorld().state.employees.employees.length;
+    const { fx } = resolveOn('union_strike_aftermath', opt);
+    expect(fx.state.employees.employees.length).toBeGreaterThan(before);
+    expect(fx.state.events.lastOutcome!.effects.some(e => e.textKey === 'ui.event.effect.employee_joins')).toBe(true);
+  });
+
+  it('lawsuit_dust_fashion_appeal: recurring_charge', () => {
+    expectLasting('lawsuit_dust_fashion_appeal', 'recurring_charge');
+  });
+
+  it('politics_diplomatic_incident: contract_price', () => {
+    expectLasting('politics_diplomatic_incident', 'contract_price');
+  });
+
+  it('weather_lawsuit_debris: haul ban and upkeep cost_factor', () => {
+    expectLasting('weather_lawsuit_debris', 'ban', 'haul');
+    expectLasting('weather_lawsuit_debris', 'cost_factor', 'upkeep');
+  });
+
+  it('mafia_police_investigation: blast ban and event_weight', () => {
+    expectLasting('mafia_police_investigation', 'ban', 'blast');
+    expectLasting('mafia_police_investigation', 'event_weight');
+  });
+
+  it('a main-pool weather event forces the weather', () => {
+    const def = getAllEvents().find(e => e.category === 'weather' && !e.followUpOnly
+      && e.consequences.some(c => (c.effects ?? []).some(s => s.type === 'forced_weather')));
+    expect(def, 'no main-pool weather event carries forced_weather').toBeDefined();
+    expectLasting(def!.id, 'forced_weather');
+  });
+
+  it('an _alt result text is used when the effect has no target (empty roster)', () => {
+    const def = getAllEvents().find(e => e.consequences.some(c => (c.effects ?? []).some(s => s.type === 'employee_leaves')));
+    expect(def, 'no event carries employee_leaves').toBeDefined();
+    const opt = findOption(def!.id, 'employee_leaves');
+    const { result, fx } = resolveOn(def!.id, opt, true);
+    expect(result.resultKey).toBe(`event.${def!.id}.res${opt}_alt`);
+    expect(fx.state.events.lastOutcome!.resultKey).toBe(`event.${def!.id}.res${opt}_alt`);
   });
 });

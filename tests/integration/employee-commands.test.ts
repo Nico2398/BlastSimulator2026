@@ -1,11 +1,13 @@
 // BlastSimulator2026 — Integration tests for employee and set_policy commands (task 3.15)
 
+import { addFreightWarehouse, sitesOf } from "../helpers/freightWarehouse.js";
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { drillPlanCommand, type MiningContext } from '../../src/console/commands/mining.js';
-import { killEmployee } from '../../src/core/entities/Employee.js';
+import { killEmployee, type EmployeeRole } from '../../src/core/entities/Employee.js';
+import { candidatesForRole } from '../../src/core/entities/HiringPool.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
@@ -236,11 +238,12 @@ describe('Console — set_policy', () => {
     expect(result.output).toContain('mode=continuous');
   });
 
-  it('updates policy to custom mode', () => {
+  it('refuses the removed custom mode and leaves the policy untouched (#1388)', () => {
+    const before = ctx.state!.sitePolicy.shiftMode;
     const result = setPolicyCommand(ctx, [], { mode: 'custom' });
 
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('mode=custom');
+    expect(result.success).toBe(false);
+    expect(ctx.state!.sitePolicy.shiftMode).toBe(before);
   });
 
   it('applies a fatigue threshold override', () => {
@@ -273,7 +276,7 @@ describe('Console — set_policy', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]',
+      'Usage: set_policy mode:(shift_8h|shift_12h|continuous) [fatigue:N]',
     );
   });
 
@@ -282,7 +285,7 @@ describe('Console — set_policy', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]',
+      'Usage: set_policy mode:(shift_8h|shift_12h|continuous) [fatigue:N]',
     );
   });
 
@@ -676,7 +679,12 @@ describe('Console — employee hire — spawn is on the grid\'s main climb-conne
 
 function hireNamed(ctx: GameContext, role: string): number {
   const before = new Set(ctx.state!.employees.employees.map(e => e.id));
-  const result = employeeCommand(ctx, ['hire'], { role });
+  // Prefer a non-union candidate (#1385): unionized hires cannot be fired.
+  const pick = candidatesForRole(ctx.state!.hiringPool, role as EmployeeRole).find(c => !c.unionized);
+  const named: Record<string, string> = { role };
+  if (pick) named['candidate'] = String(pick.id);
+  
+  const result = employeeCommand(ctx, ['hire'], named);
   if (!result.success) throw new Error(`Setup: hire failed — ${result.output}`);
   return ctx.state!.employees.employees.find(e => !before.has(e.id))!.id;
 }
@@ -760,14 +768,14 @@ describe('Console — employee fire releases the employee from the world (#1378)
 
   it('firing a driver mid-haul returns the carried payload to the ground', () => {
     const { driverId, vehicle } = driverAboardHauler(ctx);
-    ctx.state!.logistics.storageCapacityKg = 5000;
+    addFreightWarehouse(ctx);
     addBlastFragments(ctx.state!.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(ctx.state!.logistics, 1, String(vehicle.id));
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    pickupFragment(ctx.state!.logistics, 1, String(vehicle.id), sitesOf(ctx.state!), 0, 0);
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     employeeCommand(ctx, ['fire', String(driverId)], {});
 
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     const cargo = ctx.state!.logistics.fragments.find(f => f.fragment.id === 1)!;
     expect(cargo.state).toBe('on_ground');
     expect(vehicle.occupantIds).toEqual([]);

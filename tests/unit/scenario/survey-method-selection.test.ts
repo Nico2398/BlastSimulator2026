@@ -183,7 +183,7 @@ describe('survey-method-selection — command sequence', () => {
     const knownCommands = [
       'new_game', 'campaign', 'time', 'scores', 'finances',
       'employee', 'state', 'survey', 'tick', 'event',
-      'drill_plan', 'charge', 'sequence', 'blast', 'contract',
+      'drill_plan', 'charge', 'blast', 'contract',
       'build', 'vehicle', 'stats', 'inspect', 'zone',
       'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
       'fragments', 'preview', 'blast_preview', 'install_tubing',

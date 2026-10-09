@@ -5,20 +5,29 @@
 // returned TickReport into the same console lines as before.
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import type { GameContext } from './world.js';
+import type { MiningContext } from './mining/types.js';
+import { fireBlast } from './mining/blast.js';
+import { tickDetonation } from '../../core/engine/DetonationSequence.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { runTick, type TickReport, type RunTickOptions, type FiredEventReport } from '../../core/engine/TickPipeline.js';
 import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { openMovementTrails } from '../../core/engine/Locomotion.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
+import { SMUGGLING_EXPOSED_FINE } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
 import { pushEventOptionLines } from './eventResolution.js';
 import { formatTaskCompletion } from './tickTaskCompletion.js';
 import { formatGameOver } from './tickGameOver.js';
 
+/** Kilograms for a console line: whole numbers stay whole, fractions get one decimal. */
+function formatKg(kg: number): string {
+  return Number.isInteger(kg) ? String(kg) : kg.toFixed(1);
+}
+
 export function tickCommand(
-  ctx: GameContext,
+  ctx: MiningContext,
   args: string[],
   _named: Record<string, string>,
 ): CommandResult {
@@ -55,16 +64,26 @@ export function tickCommand(
     const report: TickReport = runTick(state, ctx.grid ?? null, rng, emitter, options);
     ticksAdvanced++;
 
-    for (const { penalty } of report.contractsExpired) {
-      lines.push(`[tick ${state.tickCount}] Contract expired! Penalty: $${penalty}`);
+    for (const d of report.contractsDelivered) {
+      const key = !d.completed ? 'tick.contract_delivered' : d.bonus > 0 ? 'tick.contract_completed_bonus' : 'tick.contract_completed';
+      lines.push(`[tick ${state.tickCount}] ${t(key, {
+        id: d.contractId, kg: formatKg(d.kg), payment: d.payment.toFixed(2), bonus: d.bonus.toFixed(2),
+      })}`);
+    }
+
+    for (const e of report.contractsExpired) {
+      const line = e.deliveredKg > 0
+        ? t('tick.contract_expired_partial', { id: e.contractId, penalty: e.penalty, kg: formatKg(e.deliveredKg), paid: e.paid.toFixed(2) })
+        : t('tick.contract_expired_full', { penalty: e.penalty });
+      lines.push(`[tick ${state.tickCount}] ${line}`);
     }
 
     if (report.smuggling.exposed) {
-      lines.push(`[tick ${state.tickCount}] SMUGGLING EXPOSED! Investigation incoming.`);
+      lines.push(`[tick ${state.tickCount}] ${t('tick.smuggling_exposed', { fine: formatMoney(SMUGGLING_EXPOSED_FINE) })}`);
     }
 
     if (report.mafiaExposed) {
-      lines.push(`[tick ${state.tickCount}] MAFIA EXPOSURE! Criminal charges may follow.`);
+      lines.push(`[tick ${state.tickCount}] ${t('tick.mafia_exposed')}`);
     }
 
     for (const fe of report.needEvents) {
@@ -72,8 +91,7 @@ export function tickCommand(
     }
 
     for (const done of report.trainingCompletions) {
-      const what = done.isNew ? 'qualified in' : 'promoted to level ' + done.level + ' in';
-      lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
+      lines.push(`[tick ${state.tickCount}] ${done.employeeName} qualified in ${done.skill}.`);
     }
 
     for (const cancelled of report.trainingCancellations ?? []) {
@@ -118,6 +136,14 @@ export function tickCommand(
         lines.push(`  ${t(def.descKey)}`);
         pushEventOptionLines(lines, def);
       }
+      break;
+    }
+
+    // Armed detonation (#1362): fire once the zone is clear, once, and stop the batch.
+    if (state.pendingDetonation !== null && tickDetonation(state).kind === 'ready') {
+      const fired = fireBlast(ctx);
+      lines.push(fired.output);
+      if (fired.success) lines.push(`[tick ${state.tickCount}] ${t('mining.blast.detonation_auto_fired')}`);
       break;
     }
 

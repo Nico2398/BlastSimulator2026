@@ -374,31 +374,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 9
-        }
-      }
-    },
-    {
       "command": "blast",
       "description": "Finding #40: the corrected 16-hole grid (vs. the originally-declared 9) is dense and energetic enough to kill both employees standing nearby -- confirmed via direct trace (state.damage.deathCount goes 0->2, both the surveyor and the driller, neither of whom this file ever dispatches away from the blast area first). This is a real, verified consequence of fixing the grid-spacing bug, not a scenario-authoring mistake to route around: the file's own later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally with a smaller, grimmer workforce -- exactly what a real player who dragged this same rectangle would experience. #949: deathCount stays 2, unchanged by the amount/stemming retune above -- blast.ts's own exact-hit check (\"Standing on the rock when it goes is not survivable, whatever the charge\") kills any employee standing on a column the blast clears regardless of charge tuning, and this file never adds an evacuate-zone step before this first blast (unlike the tutorial's own scripted flow, which now teaches evacuation before every shot). These two deaths are positional, not overload-related, so #949's retune of the shot's energy does not touch them.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -411,6 +392,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
@@ -426,7 +412,6 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 2
         },
         "changedBy": {
@@ -731,7 +716,7 @@
       }
     },
     {
-      "command": "contract accept type:ore_sale material:craktonite",
+      "command": "contract accept type:ore_sale material:rustite",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -739,11 +724,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"craktonite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"craktonite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -752,23 +737,47 @@
           "activeContractCount": 1
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"craktonite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time -- nothing between the two accept steps consumes a tick); #635 drops the numeric id entirely for the stable `type:ore_sale material:craktonite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time -- nothing between the two accept steps consumes a tick); #635 drops the numeric id entirely for the stable `type:ore_sale material:rustite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
     },
     {
-      "command": "contract deliver type:ore_sale material:craktonite amount:5000",
+      "command": "contract hold type:ore_sale material:rustite",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] [data-action=\"hold-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] [data-action=\"hold-toggle\"]"
+        }
+      ],
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. First contract of the pair.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:ore_sale material:rustite amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:ore_sale material:craktonite amount:5000"
+          "command": "contract deliver type:ore_sale material:rustite amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble, craktonite ore_sale), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. Still true post-#552: the debris_hauler, its licensed driver, and the freight_warehouse are all in place by now (steps 26-30), so a haul_debris PendingAction could in principle be claimed automatically -- but no `tick` step runs anywhere between the warehouse going up and this step, so the simulation has had zero ticks in which to actually drive/load/deliver anything. Storage is still genuinely empty, not merely un-ordered. The console command returns success:false (\"Not enough craktonite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make. #635: dropped the numeric id for `type:ore_sale material:craktonite`, matching the accept step above. #1335: the rubble_disposal accept/deliver pair that used to precede this is gone (the tutorial's contract-accept card was removed; sell-ore accepts the fillable ore offer), so activeContractCount counts ore contracts only.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble, rustite ore_sale), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. Still true post-#552: the debris_hauler, its licensed driver, and the freight_warehouse are all in place by now (steps 26-30), so a haul_debris PendingAction could in principle be claimed automatically -- but no `tick` step runs anywhere between the warehouse going up and this step, so the simulation has had zero ticks in which to actually drive/load/deliver anything. Storage is still genuinely empty, not merely un-ordered. The console command returns success:false (\"Not enough rustite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make. #635: dropped the numeric id for `type:ore_sale material:rustite`, matching the accept step above. #1335: the rubble_disposal accept/deliver pair that used to precede this is gone (the tutorial's contract-accept card was removed; sell-ore accepts the fillable ore offer), so activeContractCount counts ore contracts only.",
       "expect": {
         "equals": {
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"craktonite\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-deliver"
       },
       "role": "guard",
       "commandOutcome": "refused"
@@ -949,7 +958,7 @@
       }
     },
     {
-      "command": "contract accept type:ore_sale material:gloomium",
+      "command": "contract accept type:ore_sale material:dirtite",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -957,11 +966,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"gloomium\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"gloomium\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -970,23 +979,47 @@
           "activeContractCount": 2
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"gloomium\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:gloomium` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:dirtite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
     },
     {
-      "command": "contract deliver type:ore_sale material:gloomium amount:5000",
+      "command": "contract hold type:ore_sale material:dirtite",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        }
+      ],
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:ore_sale material:dirtite amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:ore_sale material:gloomium amount:5000"
+          "command": "contract deliver type:ore_sale material:dirtite amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:gloomium`, matching the accept step above.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough dirtite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:dirtite`, matching the accept step above.",
       "expect": {
         "equals": {
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"gloomium\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver"
       },
       "role": "guard",
       "commandOutcome": "refused"
@@ -1194,7 +1227,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -1232,36 +1265,11 @@
       }
     },
     {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 20
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "Explicitly switches to the Sequence tab (data-step=\"3\") first -- relying on the panel's own autoAdvance to land there was unverified and, per a real interaction-mode run, wrong here (element present but zero-size, i.e. a hidden inactive tab). Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) so a click can target it unambiguously. 1 decrement click: 25ms default -> 20 (DELAY_STEP_INCREMENT=5ms).",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -1274,6 +1282,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
@@ -1289,10 +1302,9 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 5
         },
-        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/sequence/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on \u2014 see the campaign-status step's own note.",
+        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on — see the campaign-status step's own note.",
         "decreased": [
           "vehicleCount"
         ]
@@ -1374,7 +1386,7 @@
           "employeeCount": 6,
           "holeCount": 0
         },
-        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note. #1151/#1166: \"vehicleCount: 0\" became \"atMost 1\". Under the 30-degree slope gate the crew's routes are long enough that command mode and interaction mode no longer park the three vehicles on the same cells at blast time: command mode still loses all three, interaction mode loses two and the third sits outside blast 2's danger-zone box. Neither is wrong \u2014 an absolute that only one trajectory arrives at is, which is what scripts/shared/interaction-goal-scope.ts's own doc warns against pinning. The blast step above now carries the step-local `decreased: ['vehicleCount']` that proves the shot really does destroy fleet in both channels, and this ceiling still refuses a run where the blast leaves the fleet intact.",
+        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note. #1151/#1166: \"vehicleCount: 0\" became \"atMost 1\". Under the 30-degree slope gate the crew's routes are long enough that command mode and interaction mode no longer park the three vehicles on the same cells at blast time: command mode still loses all three, interaction mode loses two and the third sits outside blast 2's danger-zone box. Neither is wrong — an absolute that only one trajectory arrives at is, which is what scripts/shared/interaction-goal-scope.ts's own doc warns against pinning. The blast step above now carries the step-local `decreased: ['vehicleCount']` that proves the shot really does destroy fleet in both channels, and this ceiling still refuses a run where the blast leaves the fleet intact.",
         "atMost": {
           "vehicleCount": 1
         }

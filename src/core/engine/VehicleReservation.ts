@@ -23,12 +23,15 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import type { Vehicle, VehicleRole, VehicleState } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
+import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
+import { licenceLevelOf, canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
+import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import type { HaulDestination } from '../economy/SpoilHeaps.js';
 import { alight } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 // Direct import from TaskLifecycleCore.ts, not TaskDispatch.ts (see this
@@ -131,23 +134,47 @@ export function hasClaimableSameRoleFollowUp(state: GameState, employee: Employe
  * once a depot does exist, so freeing the vehicle for them is never wasted.
  */
 export function hasBlockedQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
+  const hasDepotFor = createDepotCheck(state);
   return state.pendingActions.some(a =>
     a.status === 'queued'
     && a.requiredVehicleRole === role
     && a.targetEmployeeId !== employeeId
-    && (a.type !== 'haul_debris' || a.targetEmployeeId !== null || hasActiveFreightWarehouse(state)),
+    && (a.type !== 'haul_debris' || a.targetEmployeeId !== null || hasDepotFor(a)),
   );
 }
 
-/** Whether any active freight_warehouse exists anywhere on the map — the global precondition a fresh haul_debris action's own depot leg needs (findHaulDepotApproach, HaulingTask.ts). */
-function hasActiveFreightWarehouse(state: GameState): boolean {
-  return state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active);
+/**
+ * Lazy per-pass check that the depot a fresh haul_debris action's own depot leg needs exists
+ * anywhere on the map (findHaulDepotApproach, HaulingTask.ts): an active spoil_heap for barren
+ * rock (#1530), a freight_warehouse for ore. An action whose fragment is gone needs the warehouse,
+ * as before. Fragment index and per-type answers are built once on first use.
+ */
+function createDepotCheck(state: GameState): (action: PendingAction) => boolean {
+  let byId: Map<number, HaulDestination> | null = null;
+  const exists = new Map<string, boolean>();
+  return (action) => {
+    byId ??= new Map(state.logistics.fragments.map(f => [f.fragment.id, haulDestinationOf(f.fragment)]));
+    const fragmentId = action.payload['fragmentId'];
+    const depotType = typeof fragmentId === 'number' && byId.get(fragmentId) === 'spoil_heap' ? 'spoil_heap' : 'freight_warehouse';
+    let found = exists.get(depotType);
+    if (found === undefined) {
+      found = state.buildings.buildings.some(b => b.type === depotType && b.active);
+      exists.set(depotType, found);
+    }
+    return found;
+  };
 }
 
-/** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
+/** True when `employee` holds `role`'s licence at any level (licenceLevelOf > 0). Role-only, tier-blind: use canDriveTier for a specific vehicle tier. */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
-  const requiredLicence = ROLE_LICENCE_REQUIRED[role];
-  return employee.qualifications.some(q => q.category === requiredLicence);
+  return licenceLevelOf(employee, role) > 0;
+}
+
+/** Lowest tier among the fleet's vehicles of `role`, or null when it owns none (#1524). */
+export function lowestFleetTier(vehicles: readonly Vehicle[], role: VehicleRole): VehicleTier | null {
+  let lowest: VehicleTier | null = null;
+  for (const v of vehicles) if (v.type === role && (lowest === null || v.tier < lowest)) lowest = v.tier;
+  return lowest;
 }
 
 /**
@@ -186,7 +213,7 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
- * (reservedForActionId === null), not `broken`, and either undriven
+ * (reservedForActionId === null), not `broken`, not under an active repair order (#1393), and either undriven
  * (driverId === null) or already driven by `employee` themself (the
  * continuity case — lets a claim naturally re-pick the vehicle the employee
  * is already sitting in for their next same-role task). A vehicle already
@@ -215,8 +242,10 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
 
   const qualifying = state.vehicles.vehicles.filter(v =>
     v.type === role &&
+    canDriveTier(employee, role, v.tier) &&
     v.hp > 0 &&
     getVehicleReservation(state.vehicles, v.id) === null &&
+    !isVehicleUnderRepair(state.pendingActions, v.id) &&
     (vehicleDriverId(v) === null || vehicleDriverId(v) === employee.id),
   );
   if (qualifying.length === 0) return null;
@@ -260,14 +289,14 @@ function clearVehicleReservation(vehicleState: VehicleState, vehicleId: number):
  * releaseActionToOpenPool's own use of this, TaskCancellation.ts), and this
  * action is waiting to be reclaimed so its own remaining haul_unload leg can
  * finish the delivery. Always false for fragment_debris — breaking never
- * loads anything onto `vehicle.payload`, it splits the boulder in place.
+ * loads anything onto `vehicle.cargo`, it splits the boulder in place.
  */
 export function isCommittedToOwnCargo(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'haul_debris') return false;
   const fragmentId = action.payload['fragmentId'];
   if (typeof fragmentId !== 'number') return false;
   const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
-  return !!vehicle && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId;
+  return !!vehicle && vehicle.cargo.some(c => c.fragmentId === fragmentId);
 }
 
 /**
@@ -388,9 +417,10 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
  * isCommittedToOwnCargo-gated release (TaskCancellation.ts, VehicleReservation.ts).
  */
 function returnVehicleCargoToGround(state: GameState, vehicle: Vehicle): void {
-  if (vehicle.payload === null) return;
-  returnFragmentToGround(state.logistics, vehicle.payload.fragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
-  vehicle.payload = null;
+  for (const item of vehicle.cargo) {
+    returnFragmentToGround(state.logistics, item.fragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
+  }
+  vehicle.cargo = [];
 }
 
 /**

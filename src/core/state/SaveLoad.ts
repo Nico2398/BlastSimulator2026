@@ -8,6 +8,7 @@ import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
 import type { Employee, EmployeeRole } from '../entities/Employee.js';
 import { getStorageCapacity } from '../entities/Building.js';
+import { createHiringPool } from '../entities/HiringPool.js';
 import { createWeatherCycle, isWeatherState } from '../weather/WeatherCycle.js';
 import { WEATHER_HISTORY_MAX } from '../config/balance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
@@ -487,6 +488,12 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** #1407: a save from before bribe protections holds none. Idempotent; mutates `obj` in place. */
+function backfillProtections(obj: Record<string, unknown>): void {
+  const corruption = obj['corruption'] as Record<string, unknown> | undefined;
+  if (corruption && !Array.isArray(corruption['protections'])) corruption['protections'] = [];
+}
+
 /** #1380: an older save never raised an unqualified-task event. Idempotent; mutates `obj` in place. */
 function backfillRaisedUnqualified(obj: Record<string, unknown>): void {
   const events = obj['events'] as Record<string, unknown> | undefined;
@@ -524,6 +531,71 @@ export function backfillRaises(obj: Record<string, unknown>): void {
  * fresh cycle, a valid one has its history filtered to known states and capped.
  * Mutates `obj` in place.
  */
+/**
+ * v30 -> v31 (#1385): backfill `hiringPool`; a missing or malformed one is
+ * rebuilt from the saved seed and tick. Idempotent. Mutates `obj` in place.
+ */
+function migrateV30ToV31(obj: Record<string, unknown>): Record<string, unknown> {
+  const p = obj['hiringPool'];
+  const c = (typeof p === 'object' && p !== null ? p : {}) as
+    { candidates?: unknown; nextCandidateId?: unknown; lastRefreshTick?: unknown };
+  const valid = Array.isArray(c.candidates)
+    && typeof c.nextCandidateId === 'number' && Number.isFinite(c.nextCandidateId)
+    && typeof c.lastRefreshTick === 'number' && Number.isFinite(c.lastRefreshTick);
+  if (!valid) {
+    const seed = obj['seed'];
+    const tick = obj['tickCount'];
+    obj['hiringPool'] = createHiringPool(
+      typeof seed === 'number' && Number.isFinite(seed) ? seed : 0,
+      typeof tick === 'number' && Number.isFinite(tick) ? tick : 0,
+    );
+  }
+  return obj;
+}
+
+/**
+ * v31 -> v32 (#1350): backfill per-hole water and ground wetness. Idempotent.
+ * Mutates `obj` in place.
+ */
+function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> {
+  const hw = obj['holeWater'];
+  if (typeof hw !== 'object' || hw === null || Array.isArray(hw)) obj['holeWater'] = {};
+  const gw = obj['groundWetness'];
+  if (typeof gw !== 'number' || !Number.isFinite(gw)) obj['groundWetness'] = 0;
+  return obj;
+}
+
+/** v34 -> v35 (#1414): EventSystemState gains activeModifiers and nextModifierId. Idempotent. */
+function migrateV34ToV35(obj: Record<string, unknown>): Record<string, unknown> {
+  const events = obj['events'] as Record<string, unknown> | undefined;
+  if (events) {
+    if (!Array.isArray(events['activeModifiers'])) events['activeModifiers'] = [];
+    if (typeof events['nextModifierId'] !== 'number') events['nextModifierId'] = 1;
+  }
+  return obj;
+}
+
+/** v33 -> v34 (#1362): GameState.pendingDetonation defaults to null; an existing one is kept. Idempotent. */
+function migrateV33ToV34(obj: Record<string, unknown>): Record<string, unknown> {
+  const pd = obj['pendingDetonation'];
+  if (typeof pd !== 'object' || pd === null || Array.isArray(pd)) obj['pendingDetonation'] = null;
+  return obj;
+}
+
+/** v32 -> v33 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
+function migrateV32ToV33(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehicles = (obj['vehicles'] as { vehicles?: unknown[] } | undefined)?.vehicles;
+  if (!Array.isArray(vehicles)) return obj;
+  for (const raw of vehicles) {
+    const v = raw as Record<string, unknown>;
+    if (Array.isArray(v['cargo'])) continue;
+    const payload = v['payload'];
+    v['cargo'] = typeof payload === 'object' && payload !== null ? [payload] : [];
+    delete v['payload'];
+  }
+  return obj;
+}
+
 function migrateV29ToV30(obj: Record<string, unknown>): Record<string, unknown> {
   const w = obj['weather'];
   const c = (typeof w === 'object' && w !== null ? w : {}) as
@@ -560,7 +632,6 @@ function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> 
   addIds(obj['plannedDrillHoles']);
   addKeys(obj['chargesByHole']);
   addKeys(obj['plannedChargesByHole']);
-  addKeys(obj['sequenceDelays']);
   const installed = (obj['tubingState'] as { installedHoles?: unknown } | undefined)?.installedHoles;
   if (Array.isArray(installed) || installed instanceof Set) ids.push(...(installed as Iterable<string>));
   const next = 1 + maxHoleNumericId(ids);
@@ -842,9 +913,15 @@ export function deserialize(json: string): GameState {
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
   migrateV29ToV30(obj);
+  migrateV30ToV31(obj);
+  migrateV31ToV32(obj);
+  migrateV32ToV33(obj);
+  migrateV33ToV34(obj);
+  migrateV34ToV35(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
+  backfillProtections(obj);
   backfillRaises(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

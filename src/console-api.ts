@@ -1,12 +1,15 @@
 // BlastSimulator2026 — Public Node.js API for external consumers (scenario tests, CI tooling)
 // Exports the game engine's pure logic without browser dependencies.
 
+import { getMaxBuildingTier } from './core/entities/Building.js';
 import { createRunner, type RunnerWithContext } from './console/createRunner.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
+import { wetHoles } from './core/mining/WetHoles.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
@@ -36,13 +39,14 @@ export interface SerializableGameState {
   worldMinZ: number | null;
   drillHoles: unknown[];
   chargesByHole: Record<string, unknown>;
-  sequenceDelays: Record<string, unknown>;
   finances: { cash: number };
   holeCount: number;
   /** Holes ordered but not yet drilled (state.plannedDrillHoles.length) — proves a drill plan queues work instead of writing holes into state instantly (#553). */
   orderedHoleCount: number;
   /** Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length) — proves a charge order queues work instead of writing charges into state instantly (#554). */
   orderedChargeCount: number;
+  /** Drill holes whose water level is past the wet threshold (wetHoles, #1350). */
+  wetHoleCount: number;
   /** Remaining not-yet-`done` segments across every in-flight `state.plannedRamps` entry — proves a ramp order queues progressive excavation work instead of carving the whole corridor instantly (#555). A ramp is spliced out of `plannedRamps` entirely once its last segment lands, so this reaches 0 exactly when every ordered ramp has finished, not merely when the field would otherwise read 0 on an empty ramp. */
   orderedRampSegmentCount: number;
   /** Finished ramps (state.builtRamps.length, #1298). */
@@ -52,7 +56,6 @@ export interface SerializableGameState {
   /** Buildings ordered but not yet built (state.plannedBuildings.length) — proves a build order queues work instead of creating the building instantly (#556). */
   orderedBuildingCount: number;
   chargedCount: number;
-  sequencedCount: number;
   /** Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length) — proves a research task actually completed (reaches 0) rather than a `tick N` pad merely running, which a spontaneous mid-window event can silently cut short (tickCommand auto-pauses and refuses further ticks the instant one fires). */
   researchQueueLength: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
@@ -62,6 +65,8 @@ export interface SerializableGameState {
   /** Ghost previews drawn red because no actor able to perform their action can reach them (#1306). */
   unreachableGhostCount: number;
   buildingCount: number;
+  /** Highest tier among standing buildings, 0 when none (#1392). */
+  maxBuildingTier: number;
   vehicleCount: number;
   /** Active traffic jams at chokepoints, silencing ignored (findTrafficJams, #1208). */
   trafficJamCount: number;
@@ -135,18 +140,22 @@ export interface SerializableGameState {
   muckPile: MuckPileSummary | null;
   /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
   storedMassKg: number;
+  /** Barren rock (kg) dumped on spoil heaps (sum of Building.storedSpoilKg, #1530); never counted in storedMassKg. */
+  storedSpoilKg: number;
   /** Sum across every material key in state.collectedOre (kg) — proves a delivery actually landed ore, not just spoil, without pinning to one material id a scenario's own RNG/terrain didn't guarantee (#671). */
   collectedOreTotal: number;
   /**
    * Whether computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) is
-   * clear of every vehicle and living employee — the same check Fire.ts's
-   * `check_zone_clear` preflight row and its Sound the Horn button both use.
+   * clear of every vehicle and living employee — the same check the
+   * pre-flight zone row and the DETONATE sequence both use.
    * True when no drill plan exists yet (nothing to be clear of). Lets a
    * scenario's wait_until prove an evacuation genuinely finished — arrived
    * outside the padded zone — rather than merely that `zone clear` returned
    * (#557).
    */
   dangerZoneClear: boolean;
+  /** state.corruption.level, the 0-100 influence meter; flat so a scenario step goal can assert it (#1407). */
+  corruptionLevel: number;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -169,11 +178,11 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole as Record<string, unknown>,
-    sequenceDelays: s.sequenceDelays as Record<string, unknown>,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
     orderedHoleCount: s.plannedDrillHoles.length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    wetHoleCount: wetHoles(s).length,
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),
@@ -181,12 +190,12 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     builtRampWidth: s.builtRamps[0]?.width ?? 0,
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
-    sequencedCount: Object.keys(s.sequenceDelays).length,
     researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
     buildingCount: s.buildings.buildings.length,
+    maxBuildingTier: getMaxBuildingTier(s.buildings),
     vehicleCount: s.vehicles.vehicles.length,
     trafficJamCount: jams.length,
     trafficJams: jams.map(j => ({ kind: j.kind, rampId: j.rampId })),
@@ -203,7 +212,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
-    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, s.logistics.storedMassKg),
+    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,
@@ -222,7 +231,9 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
+    storedSpoilKg: totalSpoilKg(s.buildings.buildings),
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
     dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees),
+    corruptionLevel: s.corruption.level,
   };
 }

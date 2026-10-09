@@ -75,14 +75,14 @@ describe('command-mode runSteps honors a step\'s repeat field (issue #696)', () 
   it('repeat: N produces exactly ONE report/state-dump entry for the step, carrying the LAST iteration\'s output', () => {
     const results = run([
       { command: 'new_game seed:42' },
-      { command: 'employee hire role:driller', role: 'bootstrap', repeat: 5 },
+      { command: 'employee hire role:driller', role: 'bootstrap', repeat: 3 },
     ]);
     // One StepResult for the repeat step, not five.
     expect(results).toHaveLength(2);
     const gs = results[1]!.gameState as { employeeCount: number } | null;
     expect(gs).not.toBeNull();
-    // The LAST iteration's state: 5 drillers hired, not 1.
-    expect(gs!.employeeCount).toBe(5);
+    // The LAST iteration's state: 3 drillers hired (HIRING_POOL_SIZE candidates), not 1.
+    expect(gs!.employeeCount).toBe(3);
   });
 
   it('repeat: N — increased/decreased are evaluated against first-before vs last-after, not per-iteration', () => {
@@ -91,7 +91,7 @@ describe('command-mode runSteps honors a step\'s repeat field (issue #696)', () 
       {
         command: 'employee hire role:driller',
         role: 'bootstrap',
-        repeat: 4,
+        repeat: 3,
         expect: { increased: ['employeeCount'], decreased: ['cash'] },
       },
     ]);
@@ -99,17 +99,16 @@ describe('command-mode runSteps honors a step\'s repeat field (issue #696)', () 
   });
 
   it('commandOutcome is checked after EVERY iteration independently — a repeat block that starts failing partway through reports the failing iteration, not an aggregate pass', () => {
-    // manager hires cost $2,000 (HIRING_COSTS.manager) against a $50,000
-    // starting purse: exactly 25 succeed, driving cash to $0. Iteration 26
-    // is refused for insufficient funds — commandOutcome defaults to
-    // "must succeed", so this must surface as a failure naming the
-    // iteration, never silently absorbed because 25/26 succeeded.
+    // The manager candidate pool holds HIRING_POOL_SIZE (3) candidates until
+    // it refreshes: iterations 1-3 succeed, iteration 4 is refused (#1385) —
+    // commandOutcome defaults to "must succeed", so this must surface as a
+    // failure naming the iteration, never silently absorbed because 3/26 succeeded.
     const results = run([
       { command: 'new_game seed:42' },
       { command: 'employee hire role:manager', role: 'bootstrap', repeat: 26 },
     ]);
     expect(results[1]!.error).toBeDefined();
-    expect(results[1]!.error).toMatch(/26/);
+    expect(results[1]!.error).toMatch(/4\/26/);
   });
 
   it('repeat: 0 is invalid — the step fails immediately naming the step and the offending value, without running the command', () => {

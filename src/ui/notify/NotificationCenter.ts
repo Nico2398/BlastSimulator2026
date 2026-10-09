@@ -7,16 +7,19 @@
 //
 // Consumed by shell/Toasts.ts, shell/ActivityLog.ts and shell/TopBar.ts,
 // each of which polls this per UIManager.update() the same way every other
-// panel polls GameState — no event-callback wiring needed.
+// panel polls GameState — no event-callback wiring needed. One-off core events
+// (crew, research, corruption/mafia) reach notify() through ui/notify/*Notifications.ts.
 
 import type { IconName } from '../icons.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
 import { ARREST_EXPOSURE_THRESHOLD, ARREST_WARNING_EXPOSURE } from '../../core/campaign/CriminalArrest.js';
 import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
-import { WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
+import { CONTRACT_EXPIRY_WARNING_TICKS, WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
+import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
@@ -90,6 +93,8 @@ export class NotificationCenter {
   private readonly warnedContracts = new Set<number>();
   /** PendingAction ids already warned about being blocked, keyed to the reason last warned (#1061), so a re-classification to a different reason re-toasts but the same one doesn't repeat every frame. */
   private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
+  /** True while a charge-awaiting-funds episode has already been toasted (#1345). */
+  private chargeFundsWarned = false;
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
 
@@ -176,7 +181,8 @@ export class NotificationCenter {
     }
     const urgentContract = state.contracts.active.find(c => {
       const remaining = c.acceptedAtTick + c.deadlineTicks - state.tickCount;
-      return remaining <= 10 && remaining > 0;
+      return remaining <= CONTRACT_EXPIRY_WARNING_TICKS && remaining > 0
+        && contractShortOfStock(c, state.collectedOre, stateRubbleStockKg(state));
     });
     if (urgentContract) {
       const remaining = urgentContract.acceptedAtTick + urgentContract.deadlineTicks - state.tickCount;
@@ -188,7 +194,7 @@ export class NotificationCenter {
           severity: 'warn',
           icon: 'clock',
           title: t('notification.contract_expiring_title', { id: urgentContract.id }),
-          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(urgentContract.penaltyAmount) }),
+          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(outstandingPenalty(urgentContract)) }),
         });
       }
     }
@@ -267,6 +273,20 @@ export class NotificationCenter {
       });
     }
 
+    // One warn toast per awaiting-funds episode (#1345): re-arms once the list empties.
+    const awaiting = state.chargeAwaitingFunds?.length ?? 0;
+    if (awaiting > 0 && !this.chargeFundsWarned) {
+      this.chargeFundsWarned = true;
+      this.notify({
+        severity: 'warn',
+        icon: 'warn',
+        title: t('notification.title.order_blocked'),
+        body: t('notification.charge_awaiting_funds', { count: awaiting }),
+      });
+    } else if (awaiting === 0) {
+      this.chargeFundsWarned = false;
+    }
+
     return pips;
   }
 
@@ -290,6 +310,12 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_no_vehicle', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
     case 'no_licensed_driver':
       return t('notification.order_blocked_no_driver', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
+    case 'licence_level_too_low':
+      return t('notification.order_blocked_licence_level', {
+        order,
+        licence: t(`vehicle_type.${action.requiredVehicleRole}`),
+        level: action.blockedLicenceLevel ?? 1,
+      });
     case 'no_qualified_employee':
       return action.requiredSkill !== null
         ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })
@@ -304,6 +330,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_target_unreachable', { order });
     case 'no_freight_warehouse':
       return t('notification.order_blocked_no_warehouse', { order });
+    case 'no_spoil_heap':
+      return t('notification.order_blocked_no_spoil_heap', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
     case 'debris_out_of_reach':

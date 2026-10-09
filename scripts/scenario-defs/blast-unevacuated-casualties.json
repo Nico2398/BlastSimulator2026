@@ -1,6 +1,6 @@
 {
   "name": "blast-unevacuated-casualties",
-  "description": "The punishment path for issue #557: drill, charge and sequence a pattern, then fire WITHOUT ever running `zone clear` — the staffed driller/blaster crew and the drill_rig they drove out on are left standing exactly where their own work left them. Deterministic on seed 42: the crew dies, one vehicle is destroyed, and the incident record shows it. This is the cost the tutorial's evacuate-zone step (and blastCommand's tutorial-mode refusal) exist to prevent.",
+  "description": "The punishment path for issue #557: drill, charge a pattern, then fire WITHOUT ever running `zone clear` — the staffed driller/blaster crew and the drill_rig they drove out on are left standing exactly where their own work left them. Deterministic on seed 42: the crew dies, one vehicle is destroyed, and the incident record shows it. This is the cost the tutorial's evacuate-zone step (and blastCommand's tutorial-mode refusal) exist to prevent.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000 staffed:true",
@@ -134,30 +134,14 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "description": "The blast panel is already open (opened once in the drill_plan step and never closed) and, by the time the preceding charge order has drained, BlastWorkshop's own autoAdvance/suggestStep has already moved it to the Sequence tab on its own. A bare clickSelector on the toolbar's blast tab here would hit togglePanel's already-open branch and close the panel instead of a no-op, leaving the very next click on a hidden, zero-size auto-sequence button (UIManager.togglePanel, src/ui/UIManager.ts) — ensurePanel is idempotent and only clicks when the panel isn't already open.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 9
-        }
-      }
-    },
-    {
       "command": "blast",
       "description": "No `zone clear` anywhere in this file — the crew that drilled and charged this pattern is left standing exactly where its own work left it, and so is the drill_rig it drove out on. This is what the evacuate-zone tutorial step and blastCommand's tutorial-mode refusal exist to prevent (#557).",
       "timeout": 60,
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -169,6 +153,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",

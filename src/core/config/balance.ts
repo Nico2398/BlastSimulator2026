@@ -60,6 +60,10 @@ export const BASE_SALARIES = {
 export const CONTRACT_REFRESH_INTERVAL = 20;
 /** New contracts generated per refresh. */
 export const CONTRACTS_PER_REFRESH = 3;
+/** Number of most-common level ores that supply contracts may still ask for. */
+export const SUPPLY_COMMON_ORE_COUNT = 4;
+/** Ticks before a deadline at which an undelivered contract is flagged as about to expire. */
+export const CONTRACT_EXPIRY_WARNING_TICKS = 10;
 /** Max contracts available at once. */
 export const MAX_AVAILABLE_CONTRACTS = 8;
 
@@ -84,8 +88,45 @@ export const RUBBLE_DISPOSAL_PRICE_RANGE = { min: 0.5, max: 2.0 } as const;
 export const BRIBERY_BASE_SUCCESS = 0.7;
 /** Per-bribery reduction to success rate. */
 export const BRIBERY_HISTORY_PENALTY = 0.03;
-/** Number of bribes before mafia gets involved. */
-export const MAFIA_UNLOCK_THRESHOLD = 3;
+/** Corruption meter upper bound (meter runs 0..CORRUPTION_MAX) (#1407). */
+export const CORRUPTION_MAX = 100;
+/** Corruption level at which the mafia gets involved. */
+export const MAFIA_UNLOCK_THRESHOLD = 20;
+/** Corruption meter gap between mafia escalation tiers; tier 1 sits at the unlock threshold (#1407). */
+export const MAFIA_ESCALATION_STEP = 10;
+/** Shortest event timer reset (ticks) after score modulation, so a category never fires every tick. */
+export const MIN_EVENT_TIMER_TICKS = 5;
+
+/** Corruption meter increase per successful bribe, by target (#1407). */
+export const BRIBE_CORRUPTION_DELTA = {
+  judge: 15,
+  politician: 12,
+  union_leader: 8,
+  inspector: 5,
+  witness: 5,
+} as const;
+/** Days a successful bribe protects the player, by target; 0 = no timed protection (#1407). */
+export const BRIBE_PROTECTION_DAYS = {
+  judge: 5,
+  politician: 4,
+  union_leader: 4,
+  inspector: 3,
+  witness: 0,
+} as const;
+/** Bribe price per protection day ($), by target; witness is a flat price (#1407). */
+export const BRIBE_PRICE_PER_PROTECTION_DAY = {
+  judge: 10000,
+  politician: 7500,
+  union_leader: 3750,
+  inspector: 2700,
+  witness: 10000,
+} as const;
+/** Lawsuit category timer multiplier while a judge protection is active (#1407). */
+export const JUDGE_LAWSUIT_TIMER_STRETCH = 1.8;
+/** Exposure risk reduction (0-1) granted by a witness bribe (#1407). */
+export const WITNESS_EXPOSURE_REDUCTION = 0.25;
+/** Event tag marking inspection events, shielded by an inspector bribe (#1407). */
+export const INSPECTION_EVENT_TAG = 'inspection';
 
 /** Bribery target costs ($). Inspector: cheap; Council: expensive. */
 export const BRIBERY_COSTS = {
@@ -912,7 +953,8 @@ export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 /**
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
  * on-foot action class open to whoever is free — place_building, survey,
- * general_work, demolish_building) may sit waiting before it must win the
+ * general_work; demolish_building is not one of them since it requires a
+ * building_destroyer, #1392) may sit waiting before it must win the
  * next vehicle-gated completion's dispatch decision, overriding
  * tryContinueVehicleGatedAction's same-role continuity fast path
  * (VehicleContinuity.ts) regardless of cost ranking (#1000).
@@ -1038,8 +1080,8 @@ export const VEHICLE_TIER_MULTIPLIERS = {
 
 /** Tier-1 (base) stats for each vehicle role. Units: $, kg, m³, grid cells/tick. */
 export const VEHICLE_BASE_STATS = {
-  /** ~200 kg payload; cost scaled from real $1–5M dump trucks; diesel ~$150/hr scaled. */
-  debris_hauler:      { workRate: 10, purchaseCost: 25_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 200, speed: 3, maxHp: 100 },
+  /** 4000 kg cargo (T2 6400, T3 10000), several fragments per trip (#1370); cost scaled from real $1–5M dump trucks; diesel ~$150/hr scaled. */
+  debris_hauler:      { workRate: 10, purchaseCost: 25_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 4000, speed: 3, maxHp: 100 },
   /** ~8 m³/tick excavation; most expensive vehicle — the key production bottleneck. */
   rock_digger:        { workRate: 8,  purchaseCost: 50_000, maintenanceCostPerTick: 5, fuelCostPerTick: 8, capacity: 50,  speed: 1, maxHp: 150 },
   /** 5 progress units/tick per hole; capacity = 2 holes/tick. */
@@ -1057,6 +1099,9 @@ export const VEHICLE_BASE_STATS = {
  * structure down), scrapping a vehicle sells it for salvage.
  */
 export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
+
+/** Highest vehicle tier; `vehicle upgrade` is refused at this tier (#1401). */
+export const VEHICLE_MAX_TIER: VehicleTier = 3;
 
 /**
  * Base excavation voxels/tick for a tier-1 rock digger (#555 ramp
@@ -1124,6 +1169,20 @@ export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number>
  */
 export const BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1;
 
+/** Summed ore density of a fragment at or below which it counts as barren and goes to a spoil heap (#1530). */
+export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
+
+/**
+ * Freight Warehouse storage capacity in kg, by tier (#1531). BuildingDefs reads it for `capacity`.
+ *
+ * Sized against a measured blast: the level-1 Dusty Hollow 2x2 boomite shot (seed 1138) yields
+ * 57,061 kg of ore-bearing rock (largest single ore fragment ~6,600 kg; other shots reach ~18 t).
+ * Tier 1 holds ~40% of that blast and any single fragment; tier 2 holds all of it with ~10% margin;
+ * tier 3 holds at least 3 such blasts. To re-measure, fire that shot headlessly (console, seed 1138)
+ * and sum the mass of fragments with ore density above SPOIL_BARREN_ORE_FRACTION_THRESHOLD.
+ */
+export const FREIGHT_WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3, number> = { 1: 25000, 2: 65000, 3: 200000 };
+
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',
@@ -1175,6 +1234,38 @@ export interface StartingSiteVehicleSlot {
   readonly tier: VehicleTier;
 }
 
+export interface StartingBuildingSlot {
+  readonly type: BuildingType;
+  readonly tier: BuildingTier;
+}
+
+/** Driller, blaster and truck driver: the crew every starting site opens with. */
+const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
+  { role: 'driller', qualifications: [
+    { category: 'blasting', proficiencyLevel: 1 },
+    { category: 'driving.drill_rig', proficiencyLevel: 1 },
+  ] },
+  { role: 'blaster', qualifications: [
+    { category: 'blasting', proficiencyLevel: 1 },
+  ] },
+  { role: 'driver', qualifications: [
+    { category: 'driving.truck', proficiencyLevel: 1 },
+  ] },
+];
+
+/** Drill rig and debris hauler: the fleet every starting site opens with. */
+const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+  { role: 'drill_rig', tier: 1 },
+  { role: 'debris_hauler', tier: 1 },
+];
+
+/** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
+export interface StartingSiteComposition {
+  readonly employees: readonly StartingSiteEmployeeSlot[];
+  readonly vehicles: readonly StartingSiteVehicleSlot[];
+  readonly buildings: readonly StartingBuildingSlot[];
+}
+
 /**
  * Composition of the opt-in staffed starting site (`new_game staffed:true` /
  * `sandbox start staffed:true`). Covers the licences and vehicle roles the
@@ -1182,21 +1273,10 @@ export interface StartingSiteVehicleSlot {
  * ready-to-work site instead of hiring/purchasing through the UI in every
  * unrelated scenario. See issue #551.
  */
-export const STARTING_SITE_STAFFED_COMPOSITION: {
-  readonly employees: readonly StartingSiteEmployeeSlot[];
-  readonly vehicles: readonly StartingSiteVehicleSlot[];
-} = {
+export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
+  buildings: [],
   employees: [
-    { role: 'driller', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-      { category: 'driving.drill_rig', proficiencyLevel: 1 },
-    ] },
-    { role: 'blaster', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-    ] },
-    { role: 'driver', qualifications: [
-      { category: 'driving.truck', proficiencyLevel: 1 },
-    ] },
+    ...BASE_STARTING_EMPLOYEES,
     // Both excavator drivers also hold the rock fragmenter licence, so either
     // can crew the fragmenter (it has a licence of its own since #1339).
     { role: 'driver', qualifications: [
@@ -1209,12 +1289,42 @@ export const STARTING_SITE_STAFFED_COMPOSITION: {
     ] },
   ],
   vehicles: [
-    { role: 'drill_rig', tier: 1 },
-    { role: 'debris_hauler', tier: 1 },
+    ...BASE_STARTING_VEHICLES,
     { role: 'rock_digger', tier: 1 },
     { role: 'rock_fragmenter', tier: 1 },
   ],
 } as const;
+
+/**
+ * Metres from the starting crew, toward the site centre, where a level's
+ * opening buildings start their placement search. Close enough to walk to,
+ * far enough that a footprint cannot wall a vehicle into the crew's own pocket.
+ */
+export const STARTING_BUILDING_STANDOFF_M = 12;
+
+/** Dusty Hollow's own opening crew, fleet and warehouse (#1363). */
+export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
+  employees: BASE_STARTING_EMPLOYEES,
+  vehicles: BASE_STARTING_VEHICLES,
+  buildings: [{ type: 'freight_warehouse', tier: 1 }],
+};
+
+/**
+ * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
+ * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
+ * operating-profit target before wellbeing collapses into a revolt (~tick
+ * 450-630) or cash runs out. Bisected on headless console playthroughs of
+ * `campaign start level:dusty_hollow` (seed 1138; tick, drill_plan, charge,
+ * sequence, zone clear, blast, contract accept/deliver, event choose 0; five
+ * play styles: 2x2/2x3 patterns, boomite/pop_rock, with and without a Living
+ * Quarters): at 5.0 every style ends in revolt or bankruptcy, 7.0 wins the
+ * fast styles only, 8.0 wins all but the slowest style, 9.0 wins all five in
+ * ~220-300 ticks. Lower values hit the worker-revolt wall (payroll ~$200/tick,
+ * morale capped at 70 without Living Quarters); above 10 the level is won
+ * trivially. 9.5 sits near the top of that window (one 2x2 blast already
+ * wins it, ~tick 200-300).
+ */
+export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 9.5;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
@@ -1281,7 +1391,7 @@ export const BASE_TASK_DURATION_TICKS = 20;
  * (ROLE_STARTING_QUALIFICATIONS); the rock fragmenter licence is reachable only here.
  */
 export const TRAINING_BUILDING_SKILLS = {
-  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter'],
+  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter', 'repair'],
   blasting_academy: ['blasting'],
   management_office: ['management'],
   geology_lab: ['geology'],
@@ -1300,26 +1410,12 @@ export const TRAINING_TIER_SPEED: Record<1 | 2 | 3, number> = {
 /** Fee to teach a skill the employee does not hold yet ($). */
 export const TRAINING_BASE_FEE = 2500;
 
-/**
- * Fee and duration multiplier by the level being trained *to*. Reaching Master
- * costs several times what a first licence does, so raising one specialist is a
- * real alternative to hiring another body.
- */
-export const TRAINING_LEVEL_COST_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
-  1: 1,
-  2: 1.6,
-  3: 2.4,
-  4: 3.4,
-  5: 4.6,
-} as const;
-
 // ─── Research Center ───────────────────────────────────────────────────────────
 
 /**
  * Duration and cost of a Research Center task by the tier it unlocks. Tier 3
- * research costs and takes more than tier 2 — a straight step up mirrors the
- * training level multiplier so late-game tiers stay a real investment rather
- * than a rubber-stamp.
+ * research costs and takes more than tier 2 — a straight step up keeps
+ * late-game tiers a real investment rather than a rubber-stamp.
  */
 /** Cost, duration, and prerequisites for a single tier's research task. */
 export interface ResearchTaskDef {
@@ -1368,9 +1464,10 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
     2: { cost: 5000, ticks: 0, conditions: [] },
     3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'freight_warehouse', tier: 2 }] },
   },
-  vehicle_depot: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'vehicle_depot', tier: 2 }] },
+  // Single-tier: never researched (isSingleTierType); entry only satisfies the exhaustive Record (#1530).
+  spoil_heap: {
+    2: { cost: 0, ticks: 0, conditions: [] },
+    3: { cost: 0, ticks: 0, conditions: [] },
   },
 };
 
@@ -1629,14 +1726,8 @@ export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;
 /** Maximum vertical gap (metres) between two fragments' AABB extents for stacking. */
 export const FRAGMENT_SUPPORT_VERTICAL_GAP = 0.1;
 
-/** Width (ms) of one colour bucket for blast-plan overlay hole delay labels. */
-export const BLAST_DELAY_LABEL_COLOR_BUCKET_MS = 100;
-
-/**
- * Delay-label colours by bucket, slowest bucket last (clamped to the last
- * entry): white, cyan, yellow, orange, red.
- */
-export const BLAST_DELAY_LABEL_COLORS: readonly number[] = [0xffffff, 0x44ffff, 0xffff44, 0xff8844, 0xff4444];
+/** Delay (ms) between the blast boom and the post-blast rumble sound. */
+export const BLAST_RUMBLE_OFFSET_MS = 800;
 
 /**
  * Default volume (0–1) per audio channel, before any stored player setting applies.
@@ -1654,13 +1745,13 @@ export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'u
  * Score gain per unit of village vibration (#1343). The PPV law falls off as
  * distance^-1.5, so a Grumpstone Ridge village 445 m away sees only ~4e-4 mm/s
  * from an ordinary 6 x 10 kg blast (~1.4e-3 from an oversized 9 x 60 kg one).
- * Scaled so recordVibration plus the windowed per-tick term (~0.27 nuisance per
- * scaled unit in total) cost an ordinary blast ~1-3 nuisance points and an
+ * Scaled so recordVibration plus the windowed per-tick term (~0.27 neighbour-relations points lost per
+ * scaled unit in total) cost an ordinary blast ~1-3 points and an
  * oversized one ~5.
  */
 export const VILLAGE_VIBRATION_SCORE_GAIN = 15000;
 
-/** Nuisance added per projected fragment (#1343). */
+/** Neighbour-relations points lost per projected fragment (#1343). */
 export const BLAST_PROJECTION_NUISANCE_PER_PROJECTION = 0.5;
 
 /** Ticks over which vibration score effects are applied (#1343). */
@@ -1711,28 +1802,39 @@ export const CREW_TOAST_COOLDOWN_TICKS = 30;
 /** Ecology score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
 export const ENV_CAUSE_ECOLOGY_MAX = 45;
 
-/** Nuisance score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
+/** Neighbour-relations (nuisance) score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
 export const ENV_CAUSE_NUISANCE_MAX = 45;
 
 /** Max cached reachability fills in OrderReachability (#1427). One grid-sized Uint8Array per key, so memory is bounded by this cap. */
 export const ORDER_REACH_CACHE_MAX_KEYS = 64;
 
 /**
- * Contract price multiplier for the tutorial level (#959, #1328). The level's
- * single scripted blast and ~$300k of one-time setup mean market-rate prices
- * can never out-earn the mine's own drain; bisected on the full free-play
- * playthrough (tests/integration/tutorial.integration.test.ts, no fire/scrap
- * hacks): 40.0 goes bankrupt, 44.0 is the lowest winning value tried, 64.0 is
- * already won inside the guided part. 52.0 sits mid-window so one upstream
- * change does not make the tutorial unwinnable (or trivially won) again.
+ * Contract price multiplier for the tutorial level (#959, #1328, #1363). The
+ * level's single scripted blast means market-rate prices can never out-earn
+ * the mine's own payroll. The win counts operating profit (#1363: the ~$300k
+ * of one-time equipment/construction no longer counts against it), bisected on
+ * the full free-play playthrough (tests/integration/tutorial.integration.test.ts,
+ * no fire/scrap hacks): 14.0 goes bankrupt, 16.0 is the lowest winning value
+ * tried, 300.0 still wins only in free play, 500.0 is already won inside the
+ * guided part. 80.0 sits mid-window (geometric) so one upstream change does
+ * not make the tutorial unwinnable (or trivially won) again.
  */
-export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 52.0;
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 80.0;
 
 /** Trailing window (ticks) over which operating income per hour is averaged (#1375). */
 export const OPERATING_INCOME_WINDOW_TICKS = 72;
 
 /** Income categories that count as operating income (#1375). */
 export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
+
+/** Base demolition duration (ticks) per footprint cell, before tier scaling (#1392). */
+export const DEMOLITION_BASE_TICKS_PER_FOOTPRINT_CELL = 3;
+
+/** Demolition duration multiplier per building tier — sturdier buildings take longer (#1392). */
+export const DEMOLITION_TIER_MULTIPLIER = { 1: 1, 2: 1.5, 3: 2 } as const;
+
+/** Demolition speed factor per building_destroyer vehicle tier — bigger machines work faster (#1392). */
+export const DEMOLITION_VEHICLE_TIER_SPEED = { 1: 1, 2: 1.5, 3: 2.25 } as const;
 
 /**
  * Factor applied to a rock's breaking threshold per explosive tier it falls short of
@@ -1751,3 +1853,290 @@ export const INJURY_ON_FOOT_RECOVERY_RATE = 1;
 
 /** Recovery progress per tick by living-quarters tier (#1382). */
 export const INJURY_RECOVERY_RATE_BY_LQ_TIER: Record<1 | 2 | 3, number> = { 1: 2, 2: 3, 3: 4 };
+
+/** Fraction of the bribe cost levied as a fine when a bribe fails (#1411). */
+export const BRIBERY_FAILURE_FINE_FRACTION = 0.5;
+
+/** Neighbour-relations (nuisance) score hit on a failed bribe (#1411). */
+export const BRIBERY_FAILURE_NUISANCE_HIT = 8;
+
+/** Corruption level change on a failed bribe (#1411). */
+export const BRIBERY_FAILURE_CORRUPTION_DELTA = 2;
+
+/** Exposure risk added when a botched mafia action triggers an investigation (#1411). */
+export const INVESTIGATION_EXPOSURE_JUMP = 0.2;
+
+/** Event id queued as follow-up to a police investigation (#1411). */
+export const INVESTIGATION_FOLLOWUP_EVENT_ID = 'mafia_police_investigation';
+
+/** Ticks without mafia activity before exposure risk starts decaying (#1411). */
+export const EXPOSURE_CLEAN_GRACE_TICKS = 30;
+
+/** Exposure risk lost per tick once the clean grace period has passed (#1411). */
+export const EXPOSURE_DECAY_PER_TICK = 0.004;
+
+/** Fine levied when smuggling is exposed (#1411). */
+export const SMUGGLING_EXPOSED_FINE = 25000;
+
+/** Exposure risk added when smuggling is exposed (#1411). */
+export const SMUGGLING_EXPOSED_EXPOSURE_JUMP = 0.1;
+
+// ─── Hiring pool ────────────────────────────────────────────────────────────────
+
+/** Candidates offered per role. */
+export const HIRING_POOL_SIZE = 3;
+
+/** Ticks between candidate pool refreshes. */
+export const HIRING_POOL_REFRESH_INTERVAL = TICKS_PER_DAY;
+
+/** Chance a candidate is unionized. */
+export const CANDIDATE_UNION_CHANCE = 0.3;
+
+/** Chance a candidate has a bonus skill level over the role's starting qualifications. */
+export const CANDIDATE_SKILL_BONUS_CHANCE = 0.35;
+
+/** Maximum bonus levels a candidate may have. */
+export const CANDIDATE_SKILL_BONUS_MAX = 1;
+
+/** Radius (cells) around the primary fragment within which a haul batch gathers extras (#1370). */
+export const HAUL_BATCH_RADIUS_CELLS = 8;
+
+/** Most fragments one haul trip carries (#1370). */
+export const HAUL_BATCH_MAX_ITEMS = 6;
+
+/** Fewest stranded cells that make a placement report a cutoff (#1391). */
+export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
+
+// ─── Hole water (#1350) ─────────────────────────────────────────────────────────
+
+/** Water level (fraction of hole depth) above which a hole counts as wet. */
+export const HOLE_WET_THRESHOLD = 0.3;
+
+/**
+ * Level fraction a bare hole gains per tick per unit of rain intensity. Storm (1.0) fills a bare
+ * hole in 2 ticks, light rain (0.3) in ~7, so rain is felt within the first ticks of a downpour.
+ */
+export const HOLE_RAIN_FILL_RATE = 0.5;
+
+/**
+ * Level fraction per tick seeping in from wet ground, per unit of ground wetness and porosity.
+ * Tight rock (0.03) seeps less than it fades and never refills; porous rock (0.35) on saturated
+ * ground out-seeps its slowed fade (0.105 vs 0.03 per tick) and refills for the few ticks the ground stays wet.
+ */
+export const HOLE_SEEP_RATE = 0.3;
+
+/** Level fraction lost per tick when it is not raining, in tight rock: ~17 ticks from full. */
+export const HOLE_WATER_FADE_RATE = 0.06;
+
+/** How strongly porosity slows fading (fade = rate * (1 - porosity * this)): 0.35 porosity fades ~2x slower than 0.03. */
+export const HOLE_FADE_POROSITY_SLOWDOWN = 1.4;
+
+/** Ground wetness gained per tick per unit of rain intensity (storm saturates in 4 ticks). */
+export const GROUND_WETNESS_RISE_RATE = 0.25;
+
+/** Ground wetness lost per tick when it is not raining: saturated ground lingers ~5 ticks. */
+export const GROUND_WETNESS_DECAY_RATE = 0.2;
+
+/** Cash to drain one wet hole. */
+export const HOLE_DRAIN_COST_PER_HOLE = 20;
+
+/** Porosity at or below which an untubed hole cannot be drained (water returns at once). */
+export const HOLE_DRAIN_POROSITY_LIMIT = 0.15;
+
+/** Ticks between re-issued evacuation orders while a detonation is armed (#1362). */
+export const DETONATION_REEVACUATE_INTERVAL_TICKS = 10;
+
+/** Base ticks to repair one hp of a damaged vehicle (before proficiency scaling). */
+export const REPAIR_BASE_TICKS_PER_HP = 0.5;
+
+/** Parts cost charged per hp restored by a repair order. */
+export const REPAIR_PARTS_COST_PER_HP = 5;
+
+// ── Event effect catalog (#1414) ──
+
+/** Cap on simultaneously live event modifiers. */
+export const MAX_ACTIVE_MODIFIERS = 32;
+
+/** Lower bound a combined modifier factor may reach. */
+export const MODIFIER_FACTOR_MIN = 0.1;
+
+/** Upper bound a combined modifier factor may reach. */
+export const MODIFIER_FACTOR_MAX = 5;
+
+/** Default hp a closed building loses (building_closed effect). */
+export const EVENT_EFFECT_BUILDING_HP_LOSS = 10;
+
+/** Role an employee_joins effect hires when the spec names none. */
+export const EVENT_EFFECT_JOIN_DEFAULT_ROLE = 'driller' as const;
+
+/** Fatigue gauge value a fatigue_relief effect restores everyone to (100 = fully rested). */
+export const EVENT_EFFECT_FATIGUE_RELIEF_LEVEL = 100;
+
+/** Multiplier on contract price a special_contract offer pays above a regular one. */
+export const EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS = 1.5;
+
+/** Hours the whole crew stops when the union's bluff is called (union_strike_threat). */
+export const EVENT_STRIKE_HOURS = 24;
+
+/** Per-day cost and length of the emotional hazard stipend (union_hazard_emotional). */
+export const EVENT_HAZARD_STIPEND_PER_DAY = 400;
+export const EVENT_HAZARD_STIPEND_DAYS = 7;
+
+/** Hours operations stop while the site relocates (politics_mayor_wins). */
+export const EVENT_RELOCATE_PAUSE_HOURS = 24;
+
+/** Work-rate change (percent) and its length in hours under a partial mining ban (politics_mining_ban_vote). */
+export const EVENT_PARTIAL_BAN_WORK_PCT = -40;
+export const EVENT_PARTIAL_BAN_HOURS = 60;
+
+// ── Event effect variety (#1538) ──
+
+/** Hours all work stops in a brief stoppage (walkout, short shutdown). */
+export const EVENT_BRIEF_STOP_HOURS = 12;
+
+/** Hours all work stops in a long stoppage (lockdown, full cleanup). */
+export const EVENT_LONG_STOP_HOURS = 48;
+
+/** Hours an activity ban lasts when it is a short curfew. */
+export const EVENT_CURFEW_BAN_HOURS = 12;
+
+/** Hours an activity ban lasts while inspectors are on site. */
+export const EVENT_INSPECTION_BAN_HOURS = 24;
+
+/** Hours an activity ban lasts under an injunction or court order. */
+export const EVENT_INJUNCTION_BAN_HOURS = 48;
+
+/** Hours an activity ban lasts while a permit is held back. */
+export const EVENT_PERMIT_BAN_HOURS = 72;
+
+/** Work-rate change (percent) of a mild drag on output. */
+export const EVENT_DRAG_WORK_PCT = -20;
+
+/** Hours a mild drag on output lasts. */
+export const EVENT_DRAG_HOURS = 48;
+
+/** Work-rate change (percent) of a real slowdown. */
+export const EVENT_SLOWDOWN_WORK_PCT = -30;
+
+/** Hours a real slowdown lasts. */
+export const EVENT_SLOWDOWN_HOURS = 36;
+
+/** Work-rate change (percent) of a motivated surge in output. */
+export const EVENT_SURGE_WORK_PCT = 20;
+
+/** Hours a surge in output lasts. */
+export const EVENT_SURGE_HOURS = 48;
+
+/** Morale change per hour while the crew sulks. */
+export const EVENT_SULK_MORALE_PER_HOUR = -1;
+
+/** Hours the crew sulks. */
+export const EVENT_SULK_HOURS = 24;
+
+/** Morale change per hour under a sharp shock. */
+export const EVENT_GLOOM_MORALE_PER_HOUR = -2;
+
+/** Hours a sharp morale shock lasts. */
+export const EVENT_GLOOM_HOURS = 12;
+
+/** Morale change per hour while the crew is cheerful. */
+export const EVENT_CHEER_MORALE_PER_HOUR = 1;
+
+/** Hours the crew stays cheerful. */
+export const EVENT_CHEER_HOURS = 24;
+
+/** Salary change (percent) of a temporary raise. */
+export const EVENT_RAISE_SALARY_PCT = 15;
+
+/** Days a temporary raise or pay cut lasts. */
+export const EVENT_RAISE_DAYS = 7;
+
+/** Salary change (percent) of a temporary pay cut. */
+export const EVENT_PAYCUT_SALARY_PCT = -15;
+
+/** Salary change (percent) of a permanent raise. */
+export const EVENT_PERMANENT_RAISE_SALARY_PCT = 10;
+
+/** Dollars paid to every employee as a one-off bonus. */
+export const EVENT_BONUS_AMOUNT = 500;
+
+/** Dollars per day of a protection payment. */
+export const EVENT_PROTECTION_PER_DAY = 300;
+
+/** Days a protection payment runs. */
+export const EVENT_PROTECTION_DAYS = 10;
+
+/** Dollars per day of a retainer or extra payroll line. */
+export const EVENT_RETAINER_PER_DAY = 250;
+
+/** Days a retainer or extra payroll line runs. */
+export const EVENT_RETAINER_DAYS = 14;
+
+/** Dollars per day of a settlement instalment. */
+export const EVENT_SETTLEMENT_PER_DAY = 600;
+
+/** Days a settlement instalment runs. */
+export const EVENT_SETTLEMENT_DAYS = 7;
+
+/** Dollars per day of a heavy court-ordered penalty. */
+export const EVENT_PENALTY_PER_DAY = 1000;
+
+/** Days a heavy penalty runs. */
+export const EVENT_PENALTY_DAYS = 5;
+
+/** Explosive price change (percent) of a surcharge. */
+export const EVENT_EXPLOSIVE_SURCHARGE_PCT = 25;
+
+/** Days an explosive surcharge or discount lasts. */
+export const EVENT_EXPLOSIVE_SURCHARGE_DAYS = 7;
+
+/** Explosive price change (percent) of a discount. */
+export const EVENT_EXPLOSIVE_DISCOUNT_PCT = -15;
+
+/** Upkeep cost change (percent) of a surcharge. */
+export const EVENT_UPKEEP_SURCHARGE_PCT = 20;
+
+/** Days an upkeep surcharge lasts. */
+export const EVENT_UPKEEP_SURCHARGE_DAYS = 10;
+
+/** Upkeep cost change (percent) of a discount. */
+export const EVENT_UPKEEP_DISCOUNT_PCT = -15;
+
+/** Days an upkeep discount lasts. */
+export const EVENT_UPKEEP_DISCOUNT_DAYS = 7;
+
+/** Contract price change (percent) under a tariff or sagging market. */
+export const EVENT_TARIFF_PRICE_PCT = -20;
+
+/** Days a tariff or price boom lasts. */
+export const EVENT_TARIFF_DAYS = 7;
+
+/** Contract price change (percent) under a boycott. */
+export const EVENT_BOYCOTT_PRICE_PCT = -30;
+
+/** Days a boycott lasts. */
+export const EVENT_BOYCOTT_DAYS = 10;
+
+/** Contract price change (percent) in a price boom. */
+export const EVENT_BOOM_PRICE_PCT = 15;
+
+/** Frequency factor of an event category under scrutiny. */
+export const EVENT_SCRUTINY_WEIGHT_FACTOR = 2;
+
+/** Days a scrutiny frequency factor lasts. */
+export const EVENT_SCRUTINY_DAYS = 7;
+
+/** Frequency factor of an event category that has been quietened. */
+export const EVENT_CALM_WEIGHT_FACTOR = 0.5;
+
+/** Days a calmed frequency factor lasts. */
+export const EVENT_CALM_DAYS = 7;
+
+/** Hours a lingering weather front holds the sky. */
+export const EVENT_FRONT_HOURS = 36;
+
+/** Fee for a course raising a driving licence to level 2 or 3 (#1524): the base course fee times the target level. */
+export const LICENCE_COURSE_FEE: Record<2 | 3, number> = { 2: TRAINING_BASE_FEE * 2, 3: TRAINING_BASE_FEE * 3 };
+
+/** Course duration multiplier for raising a driving licence to level 2 or 3 (#1524). */
+export const LICENCE_COURSE_TICKS_MULT: Record<2 | 3, number> = { 2: 1.5, 3: 2 };

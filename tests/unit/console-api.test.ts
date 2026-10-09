@@ -8,6 +8,7 @@ import { createRunner, serializeGameState } from '../../src/console-api.js';
 import type { MiningContext } from '../../src/console-api.js';
 import { killEmployee } from '../../src/core/entities/Employee.js';
 import type { Contract } from '../../src/core/economy/Contract.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
 
 /** A minimal offered ore_sale contract — only the fields fillableOreSaleOffered reads carry meaning. */
 function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
@@ -90,13 +91,13 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
 const SERIALIZED_FIELDS = [
   'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount',
-  'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
+  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
+  'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
-  'storedMassKg', 'collectedOreTotal', 'dangerZoneClear',
+  'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel',
 ] as const;
 
 describe('console-api', () => {
@@ -109,6 +110,15 @@ describe('console-api', () => {
   describe('createRunner', () => {
     it('exposes a context whose state starts empty', () => {
       expect(runner.ctx.state).toBeNull();
+    });
+
+    it('the removed `sequence` command is unknown and absent from help (#1344)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const result = runner.runner.run('sequence auto delay_step:25');
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Unknown command');
+      const help = runner.runner.run('help');
+      expect(help.output).not.toMatch(/^\s*sequence\b/m);
     });
 
     it('executes a command against that context', () => {
@@ -190,7 +200,10 @@ describe('console-api', () => {
 
       expect(state.holeCount).toBe(0);
       expect(state.chargedCount).toBe(0);
-      expect(state.sequencedCount).toBe(0);
+      const raw = state as unknown as Record<string, unknown>;
+      expect('sequencedCount' in raw).toBe(false);
+      expect('sequenceDelays' in raw).toBe(false);
+      expect('sequenced' in raw).toBe(false);
       expect(state.levelEnded).toBe(false);
       expect(state.levelEndReason).toBeNull();
     });
@@ -322,13 +335,35 @@ describe('console-api', () => {
       const stuckState = serializeGameState(runner.ctx as MiningContext)!;
       expect(stuckState.stuckEmployeeCount).toBe(1);
 
-      runner.runner.run('build destroy 1');
-      runner.runner.run('build destroy 2');
-      runner.runner.run('build destroy 3');
-      runner.runner.run('tick 15');
+      // Demolition is Building Destroyer work now (#1392): fleet it, crew it,
+      // order all three, and tick until the demolitions have finished.
+      runner.ctx.state!.cash += 500_000;
+      expect(runner.runner.run('vehicle buy building_destroyer').success).toBe(true);
+      expect(runner.runner.run('employee hire role:driver').success).toBe(true);
+      expect(runner.runner.run('build destroy 1').success).toBe(true);
+      expect(runner.runner.run('build destroy 2').success).toBe(true);
+      expect(runner.runner.run('build destroy 3').success).toBe(true);
+      for (let i = 0; i < 1500 && runner.ctx.state!.buildings.buildings.length > 0; i++) {
+        holdWellBeing();
+        for (const e of runner.ctx.state!.employees.employees) e.fatigue = 100;
+        runner.runner.run('tick 1');
+      }
+      expect(runner.ctx.state!.buildings.buildings).toHaveLength(0);
 
       const freedState = serializeGameState(runner.ctx as MiningContext)!;
       expect(freedState.stuckEmployeeCount).toBe(0);
+    });
+
+    it('reports maxBuildingTier: 0 with no buildings, then the highest standing tier (#1392)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(0);
+
+      const state = runner.ctx.state!;
+      state.buildings.unlockedTiers.management_office = 3;
+      placeBuilding(state.buildings, 'management_office', 2, 0, 32, 32, 1, 0, 0);
+      expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(1);
+      placeBuilding(state.buildings, 'management_office', 10, 10, 32, 32, 2, 0, 0);
+      expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(2);
     });
 
     it('reports zero activeContractCount for a fresh game with no contracts accepted', () => {
@@ -340,7 +375,7 @@ describe('console-api', () => {
 
     it('counts an accepted contract as active (state.contracts.active)', () => {
       runner.runner.run('new_game seed:42');
-      runner.runner.run('campaign start level:dusty_hollow');
+      runner.runner.run('campaign start level:dusty_hollow staffed:false');
       runner.runner.run('contract accept id:1');
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
@@ -463,7 +498,6 @@ describe('console-api', () => {
         }
         runner.runner.run('tick 1');
       }
-      runner.runner.run('sequence auto delay_step:25');
       runner.runner.run('blast');
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
@@ -620,5 +654,21 @@ describe('console-api', () => {
 
       expect(serializeGameState(second.ctx as MiningContext)).toEqual(first);
     });
+  });
+});
+
+describe('serializeGameState — wetHoleCount (#1350)', () => {
+  it('counts holes whose water is past the wet threshold, so a scenario can assert on hole water', () => {
+    const runner = createRunner();
+    runner.runner.run('new_game seed:42');
+    const state = runner.ctx.state!;
+    state.drillHoles = [
+      { id: 'H1', x: 1, z: 1, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 2, z: 2, depth: 8, diameter: 0.15 },
+    ];
+    expect((serializeGameState(runner.ctx as MiningContext) as unknown as { wetHoleCount: number }).wetHoleCount).toBe(0);
+    state.holeWater['H1'] = { level: 0.9, porosity: 0.03 };
+    state.holeWater['H2'] = { level: 0.05, porosity: 0.03 };
+    expect((serializeGameState(runner.ctx as MiningContext) as unknown as { wetHoleCount: number }).wetHoleCount).toBe(1);
   });
 });

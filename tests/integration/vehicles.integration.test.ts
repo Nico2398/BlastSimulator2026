@@ -8,8 +8,9 @@ import { buildCommand, employeeCommand } from '../../src/console/commands/entiti
 import { buildRampCommand } from '../../src/console/commands/mining.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js';
+import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { createVehicleState, purchaseVehicle, destroyVehicle, getVehicleDefByTier, getAllVehicleRoles, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation, resolveVehicleDriver } from '../../src/core/entities/Vehicle.js';
-import { reserveVehicle, isLicensedForRole } from '../../src/core/engine/VehicleReservation.js';
+import { reserveVehicle, isLicensedForRole, findFreeVehicleForRole } from '../../src/core/engine/VehicleReservation.js';
 import { isVehicleRouteAcceptable } from '../../src/core/state/SpawnPlacement.js';
 import { board, alight } from '../../src/core/engine/Mount.js';
 import {
@@ -37,6 +38,7 @@ import {
   MOVE_STUCK_ABANDON_TICKS,
   ACTION_STARVATION_TICK_THRESHOLD,
   ACTION_STUCK_BACKOFF_TICKS,
+  REPAIR_PARTS_COST_PER_HP,
 } from '../../src/core/config/balance.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { createGame } from '../../src/core/state/GameState.js';
@@ -65,6 +67,7 @@ import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js'
 // time a console `tick` sequence against WORK_DURATION_TICKS exactly.
 import { interruptActiveAction } from '../../src/core/engine/TaskDispatch.js';
 import { forceShiftRestIfNeeded } from '../../src/core/engine/ForceShiftRest.js';
+import { setLocale, t } from '../../src/core/i18n/I18n.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -1278,7 +1281,7 @@ describe('Vehicle fleet', () => {
       // employee is now driving via their itinerary. Under the pre-#1089
       // design, either flag alone routed this vehicle through a second,
       // independent drive call in the same tick.
-      vehicle.payload = { fragmentId: 1, massKg: 100 };
+      vehicle.cargo = [{ fragmentId: 1, massKg: 100 }];
       reserveVehicle(ctx.state!.vehicles, vehicle.id, 999999);
 
       const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
@@ -2237,5 +2240,228 @@ describe('fast transport (#1093)', () => {
     runToArrival(ctx, action, employee);
 
     expect(state.vehicles.driverBoardingCount ?? 0).toBeGreaterThan(boardingCountBefore);
+  });
+});
+
+// ── Vehicle repair (#1393) ───────────────────────────────────────────────────
+//
+// A damaged, idle vehicle gets a self-dispatched `repair_vehicle` order
+// (RepairDispatch.ts). An employee holding the `repair` skill walks to it, hp
+// climbs each tick of the work, and the parts bill is charged per hp restored.
+// With nobody trained the order sits queued and blocked — never a modal or an
+// auto-pause. Red phase: the repair stubs do nothing, so the vehicle never heals.
+
+describe('vehicle repair (#1393)', () => {
+  const MAX_TICKS = 400;
+  const HP_LOST = 40;
+  const HAULER_MAX_HP = getVehicleDefByTier('debris_hauler', 1).maxHp;
+
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /** Flat, fully walkable 40x10 site with a damaged hauler at (20,5) and a repair-trained driller at (0,5). */
+  function buildRepairCtx(opts: { repairLevel?: 1 | 2 | 3 | 4 | 5 | null } = {}): {
+    ctx: GameContext; vehicle: Vehicle; employee: Employee;
+  } {
+    const width = 40;
+    const grid = new VoxelGrid(width, 10);
+    for (let x = 0; x < width; x++) {
+      for (let z = 0; z < 10; z++) grid.setVoxel(x, 0, z, solidVoxel());
+    }
+    const state = createGame({ seed: 42 });
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    state.cash = 1_000_000;
+    const ctx = makeEmptyGameContext({ state, grid });
+
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 0, 5);
+    const level = opts.repairLevel === undefined ? 1 : opts.repairLevel;
+    if (level !== null) assignSkill(state.employees, employee.id, 'repair', level);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 20, 5);
+    vehicle.hp = HAULER_MAX_HP - HP_LOST;
+    return { ctx, vehicle, employee };
+  }
+
+  function repairOrder(ctx: GameContext): PendingAction | undefined {
+    return ctx.state!.pendingActions.find(a => a.type === 'repair_vehicle');
+  }
+
+  /** Ticks until the vehicle is at full hp; returns the ticks spent and the hp after every tick. */
+  function tickUntilRepaired(ctx: GameContext, vehicle: Vehicle): { ticks: number; hpTrail: number[] } {
+    const hpTrail: number[] = [];
+    for (let i = 1; i <= MAX_TICKS; i++) {
+      tickCommand(ctx, ['1'], {});
+      hpTrail.push(vehicle.hp);
+      if (vehicle.hp >= HAULER_MAX_HP) return { ticks: i, hpTrail };
+    }
+    throw new Error(`vehicle never repaired within ${MAX_TICKS} ticks (hp ${vehicle.hp}/${HAULER_MAX_HP})`);
+  }
+
+  it('a damaged idle vehicle gets exactly one repair order after a tick', () => {
+    const { ctx, vehicle } = buildRepairCtx();
+    tickCommand(ctx, ['1'], {});
+    const orders = ctx.state!.pendingActions.filter(a => a.type === 'repair_vehicle');
+    expect(orders).toHaveLength(1);
+    expect(orders[0]!.payload['vehicleId']).toBe(vehicle.id);
+    expect(orders[0]!.requiredSkill).toBe('repair');
+  });
+
+  it('a trained employee walks to the vehicle and claims the repair order', () => {
+    const { ctx, vehicle, employee } = buildRepairCtx();
+    let claimed = false;
+    let closest = Infinity;
+    for (let i = 0; i < MAX_TICKS && !claimed; i++) {
+      tickCommand(ctx, ['1'], {});
+      const order = repairOrder(ctx);
+      if (order !== undefined && employee.activeActionId === order.id) {
+        claimed = true;
+        expect(order.holderId).toBe(employee.id);
+      }
+    }
+    expect(claimed).toBe(true);
+    for (let i = 0; i < MAX_TICKS; i++) {
+      tickCommand(ctx, ['1'], {});
+      closest = Math.min(closest, Math.hypot(employee.x - vehicle.x, employee.z - vehicle.z));
+      if (vehicle.hp > HAULER_MAX_HP - HP_LOST) break;
+    }
+    expect(closest).toBeLessThanOrEqual(2);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('hp rises over several ticks up to maxHp, never jumping past it and never dropping', () => {
+    const { ctx, vehicle } = buildRepairCtx();
+    const { hpTrail } = tickUntilRepaired(ctx, vehicle);
+    const rising = hpTrail.filter((hp, i) => hp > (i === 0 ? HAULER_MAX_HP - HP_LOST : hpTrail[i - 1]!));
+    expect(rising.length).toBeGreaterThan(2);
+    for (let i = 1; i < hpTrail.length; i++) expect(hpTrail[i]!).toBeGreaterThanOrEqual(hpTrail[i - 1]!);
+    expect(Math.max(...hpTrail)).toBeLessThanOrEqual(HAULER_MAX_HP);
+    expect(vehicle.hp).toBe(HAULER_MAX_HP);
+  });
+
+  it('a finished repair leaves no repair order, no ghost, and a free employee', () => {
+    const { ctx, vehicle, employee } = buildRepairCtx();
+    tickUntilRepaired(ctx, vehicle);
+    for (let i = 0; i < 5; i++) tickCommand(ctx, ['1'], {});
+    expect(repairOrder(ctx)).toBeUndefined();
+    expect(ctx.state!.ghostPreviews.some(g => g.type === 'repair_vehicle')).toBe(false);
+    // Free of the repair: it may legitimately be resting after the work (fatigue), but not claim a repair order.
+    const active = ctx.state!.pendingActions.find(a => a.id === employee.activeActionId);
+    expect(active?.type).not.toBe('repair_vehicle');
+    expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
+    expect(vehicle.occupantIds).toHaveLength(0);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('a healthy vehicle never gets a repair order', () => {
+    const { ctx, vehicle } = buildRepairCtx();
+    vehicle.hp = HAULER_MAX_HP;
+    for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
+    expect(repairOrder(ctx)).toBeUndefined();
+  });
+
+  it('charges REPAIR_PARTS_COST_PER_HP per hp restored, recorded as an expense', () => {
+    const { ctx, vehicle } = buildRepairCtx();
+    const state = ctx.state!;
+    const txBefore = state.finances.transactions.length;
+    tickUntilRepaired(ctx, vehicle);
+
+    const repairExpenses = state.finances.transactions
+      .slice(txBefore)
+      .filter(tx => tx.type === 'expense' && /repair/i.test(tx.description));
+    expect(repairExpenses.length).toBeGreaterThan(0);
+    const spent = repairExpenses.reduce((sum, tx) => sum + tx.amount, 0);
+    expect(spent).toBeCloseTo(REPAIR_PARTS_COST_PER_HP * HP_LOST, 6);
+  });
+
+  it('cash drops by at least the parts bill', () => {
+    const { ctx, vehicle } = buildRepairCtx();
+    const cashBefore = ctx.state!.cash;
+    tickUntilRepaired(ctx, vehicle);
+    expect(cashBefore - ctx.state!.cash).toBeGreaterThanOrEqual(REPAIR_PARTS_COST_PER_HP * HP_LOST);
+  });
+
+  it('is charged only for hp actually restored: a half-damaged vehicle costs half as much', () => {
+    const full = buildRepairCtx();
+    const half = buildRepairCtx();
+    half.vehicle.hp = HAULER_MAX_HP - HP_LOST / 2;
+    const sumRepair = (c: GameContext, from: number): number => c.state!.finances.transactions
+      .slice(from)
+      .filter(tx => tx.type === 'expense' && /repair/i.test(tx.description))
+      .reduce((s, tx) => s + tx.amount, 0);
+    tickUntilRepaired(full.ctx, full.vehicle);
+    tickUntilRepaired(half.ctx, half.vehicle);
+    expect(sumRepair(half.ctx, 0)).toBeCloseTo(sumRepair(full.ctx, 0) / 2, 6);
+  });
+
+  it('a higher repair proficiency finishes the job in fewer ticks', () => {
+    const rookie = buildRepairCtx({ repairLevel: 1 });
+    const master = buildRepairCtx({ repairLevel: 5 });
+    const rookieTicks = tickUntilRepaired(rookie.ctx, rookie.vehicle).ticks;
+    const masterTicks = tickUntilRepaired(master.ctx, master.vehicle).ticks;
+    expect(masterTicks).toBeLessThan(rookieTicks);
+  });
+
+  it('with nobody trained the order stays queued and blocked as no_qualified_employee', () => {
+    const { ctx, vehicle, employee } = buildRepairCtx({ repairLevel: null });
+    for (let i = 0; i < 80; i++) tickCommand(ctx, ['1'], {});
+    const order = repairOrder(ctx);
+    expect(order).toBeDefined();
+    expect(order!.status).toBe('queued');
+    expect(order!.blockedReason).toBe('no_qualified_employee');
+    expect(vehicle.hp).toBe(HAULER_MAX_HP - HP_LOST);
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  it('an untrained roster raises no unqualified-task modal and never auto-pauses', () => {
+    const { ctx } = buildRepairCtx({ repairLevel: null });
+    for (let i = 0; i < 80; i++) tickCommand(ctx, ['1'], {});
+    expect(repairOrder(ctx), 'the order exists and is simply blocked').toBeDefined();
+    expect(ctx.state!.events.pendingEvent).toBeNull();
+    expect(ctx.state!.isPaused).toBe(false);
+  });
+
+  it('the order is not cancelled for lack of skill, and starts once someone is trained', () => {
+    const { ctx, vehicle, employee } = buildRepairCtx({ repairLevel: null });
+    for (let i = 0; i < 30; i++) tickCommand(ctx, ['1'], {});
+    const orderId = repairOrder(ctx)!.id;
+
+    assignSkill(ctx.state!.employees, employee.id, 'repair', 1);
+    tickUntilRepaired(ctx, vehicle);
+    expect(vehicle.hp).toBe(HAULER_MAX_HP);
+    expect(ctx.state!.pendingActions.find(a => a.id === orderId)).toBeUndefined();
+  });
+
+  it('the repair skill and order labels exist in both locales', () => {
+    try {
+      for (const locale of ['en', 'fr'] as const) {
+        setLocale(locale);
+        expect(t('skill.repair'), `${locale} skill.repair`).not.toBe('skill.repair');
+        expect(t('ui.crew.action_repair_vehicle'), `${locale} action label`).not.toBe('ui.crew.action_repair_vehicle');
+      }
+    } finally {
+      setLocale('en');
+    }
+  });
+
+  it('a vehicle under repair is not offered to a licensed hauler driver; it is again once repaired', () => {
+    const { ctx, vehicle, employee } = buildRepairCtx();
+    const state = ctx.state!;
+    const { employee: driver } = hireEmployee(state.employees, 'driver', new Random(7), 2, 5);
+    expect(isLicensedForRole(driver, 'debris_hauler')).toBe(true);
+
+    let underRepair = false;
+    for (let i = 0; i < MAX_TICKS; i++) {
+      tickCommand(ctx, ['1'], {});
+      const order = repairOrder(ctx);
+      if (order !== undefined && order.holderId === employee.id) { underRepair = true; break; }
+    }
+    expect(underRepair).toBe(true);
+    expect(findFreeVehicleForRole(state, 'debris_hauler', driver)).toBeNull();
+    expect(vehicle.occupantIds).not.toContain(driver.id);
+
+    tickUntilRepaired(ctx, vehicle);
+    for (let i = 0; i < 3; i++) tickCommand(ctx, ['1'], {});
+    expect(findFreeVehicleForRole(state, 'debris_hauler', driver)?.id).toBe(vehicle.id);
   });
 });

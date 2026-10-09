@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { computeWeatherAdvisory } from '../../../src/core/weather/WeatherAdvisory.js';
 import type { WeatherState } from '../../../src/core/weather/WeatherCycle.js';
+import { setHoleWater } from '../../helpers/holeWater.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 
 function makeHole(id: string): DrillHole {
@@ -20,10 +21,11 @@ describe('computeWeatherAdvisory', () => {
     expect(advisory).toEqual({ kind: 'clear', uncoveredHoles: 0, consecutiveWetDays: 0, daysUntilChange: null });
   });
 
-  it('is wet when it is raining today, and counts uncovered holes', () => {
+  it('is wet when it is raining today, and counts holes that hold water', () => {
     const state = createGame({ seed: 1 });
     state.drillHoles = [makeHole('H1'), makeHole('H2')];
     state.tubingState.installedHoles = new Set(['H2']);
+    setHoleWater(state, ['H1']);
     const forecastDays: WeatherState[] = ['sunny', 'sunny', 'sunny'];
 
     const advisory = computeWeatherAdvisory(state, 'heavy_rain', forecastDays);

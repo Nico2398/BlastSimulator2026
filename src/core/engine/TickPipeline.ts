@@ -19,10 +19,13 @@ import type { CancelledResearch } from '../entities/Building.js';
 import type { ArrivalGateResult } from './ArrivalGate.js';
 import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
-import type { ExpenseCategory } from '../economy/Finance.js';
-import { addExpense, addIncome } from '../economy/Finance.js';
+import { addExpense, addIncome, chargeFine, deductExpense } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
+import { factorFor, holdForcedWeather, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
+import { tickHoleWater } from '../mining/WetHoles.js';
+import { dominantRockUnderHole } from '../mining/ExplosiveRockFit.js';
+import { getRock } from '../world/RockCatalog.js';
 import { buildTickEventContext } from './TickEventContext.js';
 import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
@@ -44,13 +47,21 @@ import {
   BASE_TICK_MS,
 } from './GameLoop.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
+import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
+import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, generateContracts } from '../economy/Contract.js';
+import { autoDeliverContracts, bookDeliveryIncome } from '../economy/ContractFulfilment.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
-import { CONTRACT_REFRESH_INTERVAL, SCORE_VIBRATION_WINDOW_TICKS, VILLAGE_VIBRATION_SCORE_GAIN } from '../config/balance.js';
-import { isExposed, processSmuggling } from '../events/MafiaActions.js';
-import { resolveContractPriceMultiplier } from '../campaign/Level.js';
+import {
+  CONTRACT_REFRESH_INTERVAL,
+  SCORE_VIBRATION_WINDOW_TICKS,
+  VILLAGE_VIBRATION_SCORE_GAIN,
+} from '../config/balance.js';
+import { isExposed, processSmuggling, applySmugglingExposure, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
+import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
+import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles } from './Mount.js';
@@ -87,7 +98,9 @@ export interface GameOverReport {
 /** Structured result of advancing the simulation by one tick. */
 export interface TickReport {
   tick: number;
-  contractsExpired: Array<{ contractId: number; penalty: number }>;
+  contractsExpired: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }>;
+  /** Stored ore automatically delivered to active contracts this tick. */
+  contractsDelivered: Array<{ contractId: number; kg: number; payment: number; bonus: number; completed: boolean }>;
   smuggling: { income: number; exposed: boolean };
   mafiaExposed: boolean;
   needEvents: FiredEventReport[];
@@ -122,18 +135,6 @@ function recentVillageVibration(state: GameState): number {
   return report.maxVibration * VILLAGE_VIBRATION_SCORE_GAIN;
 }
 
-/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
-function deductExpense(
-  state: GameState,
-  cost: number,
-  category: ExpenseCategory,
-  label: string,
-): void {
-  if (cost <= 0) return;
-  state.cash -= cost;
-  addExpense(state.finances, cost, category, label, state.tickCount);
-}
-
 /**
  * Advance `state` by exactly one tick, mutating it in place, and report what
  * happened. The single core-owned tick step (dev-architecture) — console and
@@ -156,24 +157,40 @@ export function runTick(
   state.tickCount++;
   state.time += BASE_TICK_MS;
 
-  // 0. Weather — own persisted rng stream, advanced before events read it
+  // 0a. Event modifiers (#1414) — lapsed ones drop, recurring charges and morale drift apply
+  tickModifiers(state);
+
+  // 0. Weather — own persisted rng stream, advanced before events read it; a forced
+  // weather overrides the result without drawing from that stream
   tickWeather(state.weather);
+  holdForcedWeather(state.weather, state.events.activeModifiers, state.tickCount);
+  tickHoleWater(state, state.weather.current, hole => {
+    const rock = grid ? dominantRockUnderHole(grid, hole) : null;
+    return rock ? (getRock(rock.rockId)?.porosity ?? 0) : 0;
+  });
 
   // 1. Event system
   const evCtx = buildTickEventContext(state);
   let fired = tickEventSystem(state.events, evCtx, rng);
 
   // 2. Payroll — processPayCycle increments ticksSincePayday internally
-  const paySalary = processPayCycle(state.employees);
+  const paySalary = processPayCycle(state.employees, role => salaryFactor(state.events.activeModifiers, role));
   deductExpense(state, paySalary, 'salaries', 'Payroll');
 
   // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
-  const buildingUpkeep = getTotalOperatingCost(state.buildings);
+  const upkeepFactor = factorFor(state.events.activeModifiers, 'upkeep_surcharge', state.tickCount);
+  const buildingUpkeep = getTotalOperatingCost(state.buildings) * upkeepFactor;
   deductExpense(state, buildingUpkeep, 'maintenance', 'Building upkeep');
-  deductExpense(state, getVehicleMaintenanceCostPerTick(state.vehicles), 'vehicle_maintenance', 'Vehicle maintenance');
-  deductExpense(state, getVehicleFuelCostPerTick(state.vehicles), 'fuel', 'Vehicle fuel');
+  deductExpense(state, getVehicleMaintenanceCostPerTick(state.vehicles) * upkeepFactor, 'vehicle_maintenance', 'Vehicle maintenance');
+  deductExpense(state, getVehicleFuelCostPerTick(state.vehicles) * upkeepFactor, 'fuel', 'Vehicle fuel');
 
-  // 3. Contract deadlines — expire overdue contracts and apply penalties
+  // 3. Contracts — stored ore is delivered first, so a deadline tick that stock
+  // can still fill pays out and completes before the penalty is assessed.
+  const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings);
+  for (const delivery of contractsDelivered) {
+    bookDeliveryIncome(state, delivery.contractId, delivery, state.tickCount);
+  }
+  // Expire overdue contracts and apply penalties
   const expired = checkDeadlines(state.contracts, state.tickCount);
   for (const { penalty } of expired) {
     state.cash -= penalty;
@@ -182,18 +199,34 @@ export function runTick(
 
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
-    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state));
+    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
+  }
+
+  // 4b. Rotate the hiring candidate pool on its interval
+  if (isHiringPoolDue(state.hiringPool, state.tickCount)) {
+    refreshHiringPool(state.hiringPool, state.seed, state.tickCount);
   }
 
   // 5. Smuggling income
-  const smugResult = processSmuggling(state.mafia, rng);
+  const smugResult = processSmuggling(state.mafia, rng, state.tickCount);
   if (smugResult.income > 0) {
     state.cash += smugResult.income;
     addIncome(state.finances, smugResult.income, 'smuggling', 'Smuggling', state.tickCount);
   }
+  if (smugResult.exposed) {
+    // Exposure costs a fine, raises exposure and ends the operation (#1411).
+    const { fine } = applySmugglingExposure(state.mafia, state.tickCount);
+    chargeFine(state, fine, 'Smuggling exposed', state.tickCount);
+    emitter.emit('mafia:smuggling_exposed', { fine });
+  }
 
   // 6. Mafia exposure check
   const mafiaExposed = state.mafia.exposureRisk > 0.3 && isExposed(state.mafia, rng);
+  if (mafiaExposed) {
+    applyInvestigation(state.mafia, state.events, state.tickCount);
+    emitter.emit('mafia:exposed', {});
+  }
+  decayExposure(state.mafia, state.tickCount);
 
   // 7. Score updates — decay + building/morale/vibration effects
   const avgMorale = computeAverageMorale(state.employees.employees);
@@ -260,6 +293,13 @@ export function runTick(
   // can be claimed the same tick it is queued.
   syncHaulDispatch(state);
 
+  // 8c-4. Repair dispatch (#1393): one repair_vehicle order per idle damaged
+  // vehicle, queued until someone trained in repair is free. An unqualified
+  // roster raises no unqualified_task_error modal for it (orders skip the
+  // qualification check), but the blocked-order notification
+  // (no_qualified_employee) still fires.
+  syncRepairDispatch(state);
+
   // 8d. Dispatch remaining pending actions to idle qualified employees. An
   // action requiring a skill nobody on the roster holds is not left to
   // queue silently forever — it raises the same unqualified_task_error
@@ -292,6 +332,8 @@ export function runTick(
     const completionReport = applyTaskCompletion(state, grid, emp, progress, emitter);
     taskCompletions.push({ employeeId: emp.id, report: completionReport });
   }
+  // Pattern auto-charges that were short of cash retry once per tick (#1345).
+  settleAwaitingFundsCharges(state);
 
   // 8f. Locomotion (#1089) — the only mover: walks every alive employee's
   // itinerary one tick's worth of movement, and writes a mounted employee's
@@ -381,6 +423,7 @@ export function runTick(
   return {
     tick: state.tickCount,
     contractsExpired: expired,
+    contractsDelivered,
     smuggling: smugResult,
     mafiaExposed,
     needEvents,

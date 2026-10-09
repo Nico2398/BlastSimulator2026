@@ -1,6 +1,6 @@
 {
   "name": "safety-projection-visual",
-  "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face/sequence, buildings/vehicles in projection path, and post-blast damage assessment.",
+  "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face, buildings/vehicles in projection path, and post-blast damage assessment.",
   "steps": [
     {
       "command": "new_game seed:42 cash:250000 staffed:true",
@@ -46,7 +46,7 @@
           "command": "zone clear x1:5 y1:5 x2:35 y2:35"
         }
       ],
-      "description": "Left unmarked, confirmed not equivalent (not merely unverified): Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using `currentZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)` -- a rectangle derived from the live drill plan, never a player-typed one. At this point in the file state.drillHoles is empty (the file's only drill_plan step runs later), so computeDangerZone returns null, this.currentZone is null, and the horn button is disabled outright (occupants defaults to [] when zone is null, and hornBtn.disabled = occupants.length === 0) -- soundHorn() itself also no-ops on a null zone (`if (!zone) return;`). A player cannot produce this command by clicking here: not a different rectangle, but a control that doesn't work yet at this point in the scenario. (Later in the file, once the 4x4/spacing:3 grid at (20,20) exists, computeDangerZone's own padding would still produce (5,5,44,44), not this step's literal (5,5,35,35) -- so even a same-moment click would diverge from this explicit rectangle.)",
+      "description": "Left unmarked, confirmed not equivalent (not merely unverified): the retired Sound the Horn button (replaced by DETONATE, #1362) sent `zone clear` using `currentZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)` -- a rectangle derived from the live drill plan, never a player-typed one. At this point in the file state.drillHoles is empty (the file's only drill_plan step runs later), so computeDangerZone returns null, this.currentZone is null, and no control could send it. A player cannot produce this command by clicking here: not a different rectangle, but a control that doesn't work yet at this point in the scenario. (Later in the file, once the 4x4/spacing:3 grid at (20,20) exists, computeDangerZone's own padding would still produce (5,5,44,44), not this step's literal (5,5,35,35) -- so even a same-moment click would diverge from this explicit rectangle.)",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -156,7 +156,7 @@
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -306,7 +306,7 @@
     },
     {
       "command": "tick 50",
-      "description": "Sixth and final chunk — all 16 holes should have landed by now. Two further chunks (300->400 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 16 holes already landed by tick 300 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding pushed wellBeing's already-zero streak (pinned at 0 since ~tick 300, REVOLT_TICKS=120, WorkerRevolt.ts) past the revolt threshold during the charge-order wait_until step below, ending the level via worker_revolt before the auto-sequence click ever got a chance to run as real, clickable UI -- the interaction-mode `[data-step=\"3\"]` click that surfaced the real CI failure needs the sequence panel to still be reachable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/sequence/blast to run as genuine player interaction, same fix and same reasoning as core-loop-visual.json's identical dead-padding-before-revolt finding.",
+      "description": "Sixth and final chunk — all 16 holes should have landed by now. Two further chunks (300->400 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 16 holes already landed by tick 300 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding pushed wellBeing's already-zero streak (pinned at 0 since ~tick 300, REVOLT_TICKS=120, WorkerRevolt.ts) past the revolt threshold during the charge-order wait_until step below, ending the level via worker_revolt before the auto-sequence click ever got a chance to run as real, clickable UI -- the interaction-mode `[data-step=\"3\"]` click that surfaced the real CI failure needs the sequence panel to still be reachable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/blast to run as genuine player interaction, same fix and same reasoning as core-loop-visual.json's identical dead-padding-before-revolt finding.",
       "interaction": [
         {
           "type": "command",
@@ -411,54 +411,166 @@
       }
     },
     {
-      "command": "sequence auto delay_step:10",
+      "command": "buy_software tier:1",
+      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 10
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
       ],
       "role": "player",
-      "description": "Sequence's delay-step stepper now carries data-field=\"delay-step\" (Sequence.ts, matching the drill grid tool's ParamStrip.ts convention) so a click can target it unambiguously -- the Charge step's amount/stemming steppers use the same unscoped .bsx-stepper markup and stayed indistinguishable without it. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "buy_software tier:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "buy_software tier:3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root. #553-followup: dropped the hardcoded `equals: {cash: 60430}` -- adding the employees-panel toolbar click to the Employee #6 hire step above (see that step's own note) is interaction-mode-only (command mode's own `employee hire role:driller` string is untouched), and processFrame ticks off the render loop's own wall clock while `time resume` is in effect (GameLoop.ts): one extra CDP round-trip before this checkpoint means interaction mode now accrues different payroll than command mode's fully tick-command-driven, unaffected 60430 (sandbox-measured: interaction mode lands on 60684 here, deterministic for a given host load, but not equal to command mode's own value). `decreased` alone still proves the tier-3 purchase actually spent cash in both modes, matching tier:1/tier:2's own steps above, which never asserted an exact figure to begin with."
+      }
+    },
+    {
+      "command": "blast_preview",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
+        }
+      ],
+      "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 16
+          "chargedCount": 16
+        },
+        "note": "a preview is read-only -- no cash or hole/charge count moves. #553-followup: switched the read-only proof from an exact cash figure to chargedCount -- cash is real-time-tick-sensitive in interaction mode (see buy_software tier:3's own note above) and no longer has a single value both modes agree on, while charge counts don't decay with elapsed ticks the way cash does, so they hold in both modes regardless of host timing."
+      }
+    },
+    {
+      "command": "preview projections",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "preview projections"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "weather set sunny",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "description": "Pin dry weather right before the blast: console ticks drift the weather (#1403), and rain would weaken the water-sensitive boomite charges.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until no hole holds standing water (#1350): wet holes weaken water-sensitive charges, and natural weather may have wetted them while the crew worked. Costs no ticks when the holes are already dry.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
         }
       }
     },
     {
-      "command": "zone clear x1:5 y1:5 x2:44 y2:44",
-      "description": "#557: the real evacuation walkout. Employees #6/#7 (the two relief hires above, idle since well before this point) spawned at the map centre (32,32)/(34,32) — squarely inside computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)'s own live box for this exact 4x4 grid, which the file's own drill-plan step comment already works out as (5,5) to (44,44). The literal x1/y1/x2/y2 here matches that box exactly, so it's the same rectangle Sound the Horn computes and sends, not a player-typed guess (contrast the very first `zone clear` step in this file, which is deliberately pre-drill-plan and NOT click-equivalent — see its own note). clearZone no longer teleports (#557): this only sets a destination on anyone inside the box, so the zone is not clear yet the instant this command returns — the wait_until step below is what proves the walk actually finishes.",
+      "command": "blast detonate",
+      "timeout": 90,
+      "role": "player",
+      "description": "#1362: DETONATE (arm) now sits right before the blast, after the preview steps, because the armed sequence fires on its own once the zone is clear and that consumes the holes. It sounds the horn itself.",
       "interaction": [
         {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
-        },
-        {
-          "type": "screenshot"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         }
       ],
-      "role": "player",
       "expect": {
-        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]",
-        "note": "clearZone sets destinations, not positions -- nothing else in the flat state dump moves on this exact tick, so the walkout itself is proven by the wait_until step immediately below."
+        "usable": "[data-action=\"preflight-fire-anyway\"]"
       }
     },
     {
@@ -495,7 +607,14 @@
         }
       ],
       "role": "setup",
-      "commandOutcome": "either"
+      "commandOutcome": "either",
+      "expect": {
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ],
+        "note": "#1362: the armed detonation auto-fires inside this tick batch once the zone is clear (tickCommand), so the blast's vibration dip in ecology/nuisance lands here."
+      }
     },
     {
       "command": "event choose 0",
@@ -535,136 +654,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "buy_software tier:1",
-      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "buy_software tier:2",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "buy_software tier:3",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root. #553-followup: dropped the hardcoded `equals: {cash: 60430}` -- adding the employees-panel toolbar click to the Employee #6 hire step above (see that step's own note) is interaction-mode-only (command mode's own `employee hire role:driller` string is untouched), and processFrame ticks off the render loop's own wall clock while `time resume` is in effect (GameLoop.ts): one extra CDP round-trip before this checkpoint means interaction mode now accrues different payroll than command mode's fully tick-command-driven, unaffected 60430 (sandbox-measured: interaction mode lands on 60684 here, deterministic for a given host load, but not equal to command mode's own value). `decreased` alone still proves the tier-3 purchase actually spent cash in both modes, matching tier:1/tier:2's own steps above, which never asserted an exact figure to begin with."
-      }
-    },
-    {
-      "command": "blast_preview",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "chargedCount": 16,
-          "sequencedCount": 16
-        },
-        "note": "a preview is read-only -- no cash or hole/charge/sequence count moves. #553-followup: switched the read-only proof from an exact cash figure to chargedCount/sequencedCount -- cash is real-time-tick-sensitive in interaction mode (see buy_software tier:3's own note above) and no longer has a single value both modes agree on, while charge/sequence counts don't decay with elapsed ticks the way cash does, so they hold in both modes regardless of host timing."
-      }
-    },
-    {
-      "command": "preview projections",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "preview projections"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "weather set sunny",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "weather set sunny"
-        }
-      ],
-      "description": "Pin dry weather right before the blast: console ticks drift the weather (#1403), and rain would weaken the water-sensitive boomite charges.",
-      "role": "bootstrap"
-    },
-    {
-      "command": "blast",
+      "command": "state",
       "timeout": 70,
       "frames": 6,
       "interval": 50,
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
         {
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]",
@@ -676,16 +670,12 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "buildingCount": 0,
           "deathCount": 0
         },
-        "decreased": [
-          "ecology",
-          "nuisance"
-        ],
         "note": "#557 (fixer pass, this issue): buildingCount is 0, not the pre-#557 1 -- the freight_warehouse no longer survives, and the 1.0 m -> 1.8 m stemming tuning below that used to guarantee it (closest landing 3.8 m against a then-exact 2.0 m HIT_RADIUS) no longer helps, because Damage.ts's processProjections now attenuates a hit out to the full BLAST_DANGER_MARGIN_M (15 m) instead of stopping dead at that 2.0 m radius -- a fragment landing 3.8 m away, comfortably outside the old radius, is squarely inside the new one (confirmed via direct trace: 4402 J at the closest landing, versus the building's 150 HP / ~7500 J-equivalent destruction threshold). Retuning attempted and exhausted before accepting this: stemming has no further room (BlastCalc.ts caps its effect at holeDepth*0.3 = 1.8 m for these 6 m holes -- 1.8, 2.0, 2.5, and 3.0 m all produced byte-identical blasts in direct trace); amount is only reachable in whole-kg steps through the real stepper control this step actually clicks, and 7 kg still destroys the building (3996 J at its closest landing) while 6 kg drops the blast to PERFECT, losing the CATASTROPHIC overcharge this file exists to visualise (the fractional 6.8 kg that direct trace confirms survives -- 0 building accidents -- is not reachable by any sequence of real clicks on an integer-only control, so it is not a player-reachable fix here). Moving the building was already measured moot pre-#557 (this step's own description: flyrock sprayed the whole 64x64 m site even at 1.0 m stemming) and would be more so now that hits reach 15 m instead of 2 m. This file's own building-placement/charge-size combination needs a genuine rebalance to restore true survival under the new attenuation range -- out of scope for this pass; ecology/nuisance and deathCount:0 (the zone-clear evacuation this issue's own feature adds) are unaffected and still verified below. deathCount stays 0 (#557): the real payoff of the zone-clear/wait_until walkout inserted above -- employees #6/#7 (spawned inside the same padded zone this blast fires into) are only safe because they genuinely left it before this step ran, not because of luck in where the flyrock happened to land."
-      }
+      },
+      "description": "#1362: the armed detonation already auto-fired during the walkout ticks above (the zone cleared, no stranded rig), so the player only dismisses the blast report; the holes are gone and nobody died."
     },
     {
       "command": "fragments",

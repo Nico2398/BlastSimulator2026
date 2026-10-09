@@ -60,6 +60,30 @@ export function addExpense(
   state.transactions.push({ tick, amount, type: 'expense', category, description });
 }
 
+/** Charge a fine: debits the flat `cash` and logs a 'fines' expense. No-op for amounts <= 0. */
+export function chargeFine(
+  state: { cash: number; finances: FinanceState },
+  amount: number,
+  description: string,
+  tick: number,
+): void {
+  if (amount <= 0) return;
+  state.cash -= amount;
+  addExpense(state.finances, amount, 'fines', description, tick);
+}
+
+/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
+export function deductExpense(
+  state: { cash: number; finances: FinanceState; tickCount: number },
+  cost: number,
+  category: ExpenseCategory,
+  label: string,
+): void {
+  if (cost <= 0) return;
+  state.cash -= cost;
+  addExpense(state.finances, cost, category, label, state.tickCount);
+}
+
 /** Get current balance. */
 export function getBalance(state: FinanceState): number {
   return state.cash;
@@ -72,7 +96,12 @@ export interface CategoryTotal {
   total: number;
 }
 
+/** Expense categories that buy assets rather than run the mine. */
+export const CAPITAL_EXPENSE_CATEGORIES: ReadonlySet<ExpenseCategory> = new Set<ExpenseCategory>(['equipment', 'construction']);
+
 export interface FinancialReport {
+  /** Income excluding refunds, minus expenses outside CAPITAL_EXPENSE_CATEGORIES. */
+  operatingProfit: number;
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
@@ -98,14 +127,17 @@ export function getFinancialReport(
   const expenseMap = new Map<string, number>();
   let totalIncome = 0;
   let totalExpenses = 0;
+  let operatingProfit = 0;
 
   for (const t of filtered) {
     if (t.type === 'income') {
       totalIncome += t.amount;
       incomeMap.set(t.category, (incomeMap.get(t.category) ?? 0) + t.amount);
+      if (t.category !== 'refund') operatingProfit += t.amount;
     } else {
       totalExpenses += t.amount;
       expenseMap.set(t.category, (expenseMap.get(t.category) ?? 0) + t.amount);
+      if (!CAPITAL_EXPENSE_CATEGORIES.has(t.category as ExpenseCategory)) operatingProfit -= t.amount;
     }
   }
 
@@ -113,8 +145,14 @@ export function getFinancialReport(
     totalIncome,
     totalExpenses,
     netProfit: totalIncome - totalExpenses,
+    operatingProfit,
     incomeByCategory: [...incomeMap.entries()].map(([category, total]) => ({ category, total })),
     expensesByCategory: [...expenseMap.entries()].map(([category, total]) => ({ category, total })),
     transactionCount: filtered.length,
   };
+}
+
+/** Operating profit over all transactions: income excluding 'refund' minus non-capital expenses. */
+export function getOperatingProfit(state: FinanceState): number {
+  return getFinancialReport(state, 0).operatingProfit;
 }

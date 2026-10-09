@@ -38,7 +38,7 @@ function makeFragment(id: number, x: number, z: number): FragmentData {
     volume: 0.3,
     mass: 1000,
     rockId: 'cruite',
-    oreDensities: {},
+    oreDensities: { blingite: 0.5 },
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
@@ -310,7 +310,7 @@ describe('runTick — fatal world invariant abort (#1091: FATAL_VIOLATION_KINDS)
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     // Payload names a fragment id that logistics never tracked 'in_transit' —
     // exactly the I8 desync (checkI8PayloadNotInTransit, WorldInvariants.ts).
-    vehicle.payload = { fragmentId: 999, massKg: 1000 };
+    vehicle.cargo = [{ fragmentId: 999, massKg: 1000 }];
 
     expect(() => runOneTick(state, emitter, true)).toThrow(/Fatal world invariant violation/);
   });

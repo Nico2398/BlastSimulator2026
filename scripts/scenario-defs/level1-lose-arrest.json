@@ -1,22 +1,22 @@
 {
   "name": "level1-lose-arrest",
-  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 18). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
+  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 24). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:80000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:122500",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:80000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:122500"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000
+          "cash": 122500
         }
       },
-      "description": "cash:80000 sits here because `campaign start` is the step that decides this level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on a `new_game` before it would be discarded. $80,000 covers the eight bribes below ($5,000 x5 + $10,000 x3 = $55,000) plus both hires ($1,000 driller + $1,500 blaster), keeping cash positive through the whole opening so the Crew panel's hire buttons stay enabled. The loss condition here is corruption-driven arrest, not money, so funding the level does not weaken what this scenario proves."
+      "description": "cash:100000 sits here because `campaign start` is the step that decides this level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on a `new_game` before it would be discarded. $80,000 covers the eight bribes below ($55,000 of cost plus a 50% failed-bribe fine each, #1411: $82,500) plus both hires ($1,000 driller + $1,500 blaster), keeping cash positive through the whole opening so the Crew panel's hire buttons stay enabled. The loss condition here is corruption-driven arrest, not money, so funding the level does not weaken what this scenario proves. #1407: the mafia now unlocks at corruption level 20 and every opening bribe here fails (+2 each), so the opening grew from eight to eleven bribes and the level's cash from $100,000 to $122,500 (the extra $22,500 of cost and fines), keeping the post-bribe balance unchanged."
     },
     {
       "command": "time resume",
@@ -44,7 +44,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         },
         "note": "the bribe's own success/scandal roll (attemptCorruption, corruptCommand -- events.ts) is RNG-driven and not asserted here, but the cost deduction (state.cash -= result.cost) happens unconditionally regardless of that roll, so cash is safe to assert exactly."
       },
@@ -61,7 +61,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         }
       },
       "role": "bootstrap"
@@ -77,7 +77,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         }
       },
       "role": "bootstrap"
@@ -93,7 +93,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         }
       },
       "role": "bootstrap"
@@ -109,7 +109,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         }
       },
       "role": "bootstrap"
@@ -125,7 +125,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -10000
+          "cash": -15000
         }
       },
       "role": "bootstrap"
@@ -141,7 +141,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -10000
+          "cash": -15000
         }
       },
       "role": "bootstrap"
@@ -157,9 +157,60 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -10000
+          "cash": -15000
         },
-        "note": "the eighth and last opening bribe: $55,000 of bribes against the level's $80,000, leaving $25,000 -- enough for both hires below to be real clicks on enabled buttons. `corrupt` itself still has no funds guard (only employee hire / vehicle buy / build got one), so this scenario no longer relies on that: it stays solvent by being funded, not by overdrawing."
+        "note": "the eighth of eleven opening bribes (#1407 added three more): $82,500 of failed bribes (cost plus fine, #1411) against the level's $100,000, leaving $17,500 -- enough for both hires below to be real clicks on enabled buttons. `corrupt` itself still has no funds guard (only employee hire / vehicle buy / build got one), so this scenario no longer relies on that: it stays solvent by being funded, not by overdrawing."
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:inspector cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
+      "expect": {
+        "changedBy": {
+          "cash": -7500
+        },
+        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:union_leader cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
+      "expect": {
+        "changedBy": {
+          "cash": -7500
+        },
+        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:politician cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:politician cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
+      "expect": {
+        "changedBy": {
+          "cash": -7500
+        },
+        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
       },
       "role": "bootstrap"
     },
@@ -317,12 +368,11 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 165080,
-          "tickCount": 18,
-          "levelEnded": true,
-          "levelEndReason": "completed"
+          "cash": 172160,
+          "tickCount": 20,
+          "levelEnded": false
         },
-        "note": "the level's own profit-threshold win condition fires here (tick 18), confirmed via direct trace -- smuggling income at $8000/tick pushes cumulative profit past dusty_hollow's unlock threshold. This \"losing scenario\" actually WINS first. #1313: the tick command stops on the tick the level ends, so this `tick 10` lands on tick 18 and the rest of its batch is not run."
+        "note": "#1411: failed bribes now also cost a fine (0.5 x cost) and a nuisance/corruption hit, so the opening cash is lower and the profit threshold is not yet crossed after the second batch: tick 20, level still running."
       }
     },
     {
@@ -347,15 +397,15 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 0,
-          "tickCount": 0
+          "cash": 32000,
+          "tickCount": 4
         },
         "equals": {
-          "tickCount": 18,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
+        "note": "the level's own profit-threshold win condition fires here (tick 24), confirmed via direct trace -- smuggling income at $8000/tick pushes cumulative profit past dusty_hollow's unlock threshold. This \"losing scenario\" actually WINS first. #1313: the tick command stops on the tick the level ends, so this `tick 10` lands on tick 24 and the rest of its batch is not run."
       }
     },
     {
@@ -400,7 +450,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         }
       },
       "role": "bootstrap"
@@ -416,7 +466,7 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -5000
+          "cash": -7500
         }
       },
       "role": "bootstrap"
@@ -436,11 +486,11 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 18,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
+        "note": "#1313: level already ended ('completed' at tick 24) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -469,12 +519,12 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 18,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed",
           "arrested": false
         },
-        "note": "#1313: the level already ended ('completed' at tick 18) and the mine is frozen: exposure stops accruing, so the arrest that used to trigger here never does. Nothing ticks."
+        "note": "#1313: the level already ended ('completed' at tick 24) and the mine is frozen: exposure stops accruing, so the arrest that used to trigger here never does. Nothing ticks."
       }
     },
     {
@@ -503,11 +553,11 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 18,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
+        "note": "#1313: level already ended ('completed' at tick 24) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -536,11 +586,11 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 18,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
+        "note": "#1313: level already ended ('completed' at tick 24) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -608,12 +658,12 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 18,
+          "tickCount": 24,
           "arrested": false,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "final state: the win at tick 18 froze the mine -- no arrest, tickCount still 18. #1313."
+        "note": "final state: the win at tick 24 froze the mine -- no arrest, tickCount still 24. #1313."
       }
     }
   ]

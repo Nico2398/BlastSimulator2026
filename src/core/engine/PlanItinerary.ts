@@ -9,7 +9,7 @@ import { isFootprintAction, isHoleAction, type GameState, type PendingAction } f
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -24,6 +24,11 @@ import { isOversized } from '../mining/BlastCalc.js';
 // — every edge is a function called from inside another function's body,
 // never evaluated at module-load time.
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
+import { findNearbyHaulableFragments } from '../economy/HaulDispatch.js';
+import { selectHaulBatch } from '../economy/HaulBatch.js';
+import { largestWarehouseFreeKg } from '../economy/FreightWarehouses.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import { haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -515,8 +520,11 @@ function planFragmentTaskItinerary(
   // earlier policy-driven interruption/pause left the reservation (and the
   // cargo) intact rather than releasing it (isCommittedToOwnCargo,
   // VehicleReservation.ts). Only the depot leg is left to plan.
-  if (action.type === 'haul_debris' && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId) {
-    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ);
+  if (action.type === 'haul_debris' && vehicle.cargo.some(c => c.fragmentId === fragmentId)) {
+    // The carried fragment's mass is already reserved in its warehouse, so ask
+    // for any warehouse not overbooked (0 kg) rather than counting it twice.
+    const carried = state.logistics.fragments.find(f => f.fragment.id === fragmentId);
+    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ, 0, carried ? haulDestinationOf(carried.fragment) : 'warehouse');
     if (depotApproach === null) return null;
 
     const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
@@ -548,10 +556,42 @@ function planFragmentTaskItinerary(
   // haul_debris: one more leg on to the depot — no active one means this
   // goal stays unresolvable, same "stays queued, retries next tick" contract
   // as every other null return in this file.
-  const depotApproach = findHaulDepotApproach(state, approach.x, approach.z);
+  // Extra pickups (#1370): nearby queued fragments that fit the tier's
+  // capacity and the depot's room ride the same trip, each its own load leg.
+  let lastX = approach.x;
+  let lastZ = approach.z;
+  // Only an 'exact' plan (the one actually committed) builds the batch: the
+  // 'estimate' used for ranking runs per idle driver x claimable haul action
+  // per tick, and the batch search scans the whole pool each time. Ranking on
+  // the primary leg alone also keeps extra legs from inflating a dense
+  // cluster's cost, which would invert nearest-first.
+  // A batch unloads at one depot; findNearbyHaulableFragments keeps it to the primary's destination (#1530).
+  const destination = haulDestinationOf(tracked.fragment);
+  const candidates = fidelity === 'exact'
+    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS)
+    : [];
+  const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
+  const batch = candidates.length === 0 ? [] : selectHaulBatch(
+    { fragmentId, massKg: tracked.fragment.mass },
+    candidates.map(c => ({ fragmentId: c.fragment.id, massKg: c.fragment.mass })),
+    def.capacity,
+    destination === 'spoil_heap' ? Infinity : largestWarehouseFreeKg(state.logistics, freightWarehouseSites(state.buildings)),
+    HAUL_BATCH_MAX_ITEMS,
+  );
+  for (const extra of batch.slice(1)) {
+    const extraTracked = candidateById.get(extra.fragmentId)!; // batch extras are drawn from candidates
+    const extraApproach = fragmentApproachCell(extraTracked.fragment, state, vehicle.id);
+    const extraLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, extraApproach.x, extraApproach.z, { kind: 'effect', effectId: 'haul_load', targetId: extra.fragmentId }, def, 'exact', false);
+    if (extraLeg === null) continue; // unreachable extra: the trip just carries less
+    legs.push(extraLeg);
+    lastX = extraApproach.x;
+    lastZ = extraApproach.z;
+  }
+
+  const depotApproach = findHaulDepotApproach(state, lastX, lastZ, tracked.fragment.mass, destination);
   if (depotApproach === null) return null;
 
-  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, approach.x, approach.z, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
+  const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
   if (toDepotLeg === null) return null;
   legs.push(toDepotLeg);
 

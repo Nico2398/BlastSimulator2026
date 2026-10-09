@@ -21,6 +21,8 @@ import { tickUntil } from './helpers.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { formatMoney } from '../../src/core/economy/formatMoney.js';
 import { t } from '../../src/core/i18n/I18n.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import { readFileSync } from 'node:fs';
 
 /** Drills a grid and waits for every hole to land in state.drillHoles. */
 function drillAndLand(
@@ -56,7 +58,7 @@ describe('charge hole:<id> — queues one charge_hole action instead of writing 
     expect(chargeActions[0]!.payload['holeId']).toBe(holeId);
   });
 
-  it('charge hole:* queues one charge_hole action per already-drilled hole only — an undrilled hole is skipped, not errored', () => {
+  it('charge hole:* queues one charge_hole action per already-drilled hole now; the undrilled hole is auto-charged once it lands (#1345)', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
 
@@ -69,6 +71,7 @@ describe('charge hole:<id> — queues one charge_hole action instead of writing 
     expect(state.drillHoles.length).toBeGreaterThanOrEqual(1);
     const drilledCountBefore = state.drillHoles.length;
     const stillPlannedCountBefore = state.plannedDrillHoles.length;
+    expect(stillPlannedCountBefore).toBeGreaterThan(0);
 
     const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
     expect(result.success).toBe(true);
@@ -78,11 +81,17 @@ describe('charge hole:<id> — queues one charge_hole action instead of writing 
     for (const drilled of state.drillHoles) {
       expect(chargeActions.some(a => a.payload['holeId'] === drilled.id)).toBe(true);
     }
-    // No charge_hole action targets a hole still sitting in plannedDrillHoles.
+    // No charge_hole action targets a hole still sitting in plannedDrillHoles yet.
     for (const stillPlanned of state.plannedDrillHoles) {
       expect(chargeActions.some(a => a.payload['holeId'] === stillPlanned.id)).toBe(false);
     }
-    expect(stillPlannedCountBefore).toBeGreaterThan(0);
+
+    // The late hole is charged by the pattern, with no further charge call.
+    tickUntil(run, () => state.plannedDrillHoles.length === 0 && Object.keys(state.chargesByHole).length === 2, 1500);
+    expect(Object.keys(state.chargesByHole).sort()).toEqual(['H1', 'H2']);
+    for (const c of Object.values(state.chargesByHole)) {
+      expect(c).toEqual({ explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    }
   });
 
   it('charging an undrilled hole by explicit id is refused with "has not been drilled yet" — no action queued (unchanged from #553)', () => {
@@ -384,7 +393,6 @@ describe('charge order cash cost (#1341)', () => {
     const holes = state.drillHoles.length;
     tickUntil(run, () => Object.keys(state.chargesByHole).length === holes, 600);
     expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
-    expect(run('sequence auto').success).toBe(true);
     const expected = holes * 5 * 12;
     expect(explosivesTotal(state)).toBe(expected);
 
@@ -476,18 +484,18 @@ describe('charge order cash cost (#1341)', () => {
     expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(1);
   });
 
-  it('hole:* batch is atomic: when the total is unaffordable no hole is charged', () => {
-    // 3 holes x $60 = $180 needed, only $119 on hand: two would fit, none may be taken.
-    const { run, state } = setupDrilled(1, 3, 119);
+  it('hole:* checks funds hole by hole: 2 of 3 affordable holes are ordered and paid, the third waits unpaid, the call succeeds (#1345)', () => {
+    // 3 holes x $60 = $180 needed, only $120 on hand.
+    const { run, state } = setupDrilled(1, 3, 120);
     expect(state.drillHoles).toHaveLength(3);
 
     const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('Insufficient funds');
-    expect(state.cash).toBe(119);
-    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
-    expect(state.plannedChargesByHole).toEqual({});
+    expect(result.success).toBe(true);
+    expect(state.cash).toBe(0);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole').map(a => a.payload['holeId'])).toEqual(['H1', 'H2']);
+    expect(Object.keys(state.plannedChargesByHole)).toEqual(['H1', 'H2']);
+    expect(state.chargeAwaitingFunds).toEqual(['H3']);
   });
 
   it('existing refusals (bad explosive, stemming, amount) stay free of cash and ledger side effects', () => {
@@ -632,5 +640,304 @@ describe('charge column overflow is refused at order time (#1361)', () => {
     expect(state.cash).toBe(cashBefore);
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(state.pendingActions.filter(a => a.type === 'charge_hole' || a.type === 'drill_hole')).toHaveLength(0);
+  });
+});
+
+// ── #1345: pattern-level charge settings ──
+
+const BOOMITE_5 = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+
+function newStaffed() {
+  const { runner, ctx } = createRunner();
+  const run = (cmd: string) => runner.run(cmd);
+  expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+  const state = ctx.state!;
+  state.cash = 500_000;
+  state.finances.cash = 500_000;
+  return { run, state };
+}
+
+const chargeActionsOf = (state: { pendingActions: Array<{ type: string }> }) =>
+  state.pendingActions.filter(a => a.type === 'charge_hole');
+
+describe('charge hole:* sets the pattern charge applied to every hole, including later-drilled ones (#1345)', () => {
+  it('3x3 grid: one charge hole:* before any hole lands charges all 9 holes without further charge calls', () => {
+    const { run, state } = newStaffed();
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:12,12').success).toBe(true);
+
+    const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
+    expect(result.success).toBe(true);
+    expect(state.patternCharge).toEqual(BOOMITE_5);
+
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 9, 4000);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(9);
+    for (const c of Object.values(state.chargesByHole)) expect(c).toEqual(BOOMITE_5);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+  });
+
+  it('4 of 9 drilled: charge hole:* orders 4, the rest are auto-charged as they land, and blast never reports "Missing charge"', () => {
+    const { run, state } = newStaffed();
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:12,12').success).toBe(true);
+    tickUntil(run, () => state.drillHoles.length >= 4, 3000);
+    const drilledNow = state.drillHoles.length;
+    expect(drilledNow).toBeGreaterThanOrEqual(4);
+    expect(drilledNow).toBeLessThan(9);
+
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(chargeActionsOf(state)).toHaveLength(drilledNow);
+
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 9, 4000);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(9);
+
+    const blast = run('blast');
+    expect(blast.success).toBe(true);
+    expect(blast.output).not.toContain('Missing charge');
+  });
+
+  it('a second charge hole:* with every hole covered orders nothing, spends nothing and is refused with mining.charge.nothing_to_charge', () => {
+    const { run, state } = setupDrilled(2, 2);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    const cashAfterFirst = state.cash;
+    const actionsAfterFirst = chargeActionsOf(state).length;
+    expect(actionsAfterFirst).toBe(4);
+
+    const second = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(second.success).toBe(false);
+    expect(second.output).toBe(t('mining.charge.nothing_to_charge'));
+    expect(state.cash).toBe(cashAfterFirst);
+    expect(chargeActionsOf(state)).toHaveLength(actionsAfterFirst);
+  });
+
+  it('a second charge hole:* after the charges landed also orders nothing', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 2, 800);
+    const cash = state.cash;
+
+    const again = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(again.success).toBe(false);
+    expect(state.cash).toBe(cash);
+    expect(chargeActionsOf(state)).toHaveLength(0);
+  });
+
+  it('partially covered: only the uncovered holes are ordered', () => {
+    const { run, state } = setupDrilled(1, 3);
+    expect(run('charge hole:H1 explosive:boomite amount:5 stemming:2').success).toBe(true);
+    const cashBefore = state.cash;
+
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+
+    expect(chargeActionsOf(state).map(a => (a as unknown as { payload: Record<string, unknown> }).payload['holeId']).sort()).toEqual(['H1', 'H2', 'H3']);
+    expect(state.cash).toBe(cashBefore - 2 * 60);
+  });
+
+  it('charge hole:* with no drilled and no planned holes is refused with a localized reason', () => {
+    const { run, state } = newStaffed();
+    const cashBefore = state.cash;
+
+    const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.charge.nothing_to_charge'));
+    expect(result.output).not.toBe('mining.charge.nothing_to_charge');
+    expect(state.cash).toBe(cashBefore);
+    expect(state.patternCharge ?? null).toBeNull();
+  });
+
+  it('charge hole:* with only planned (undrilled) holes succeeds and stores the pattern settings', () => {
+    const { run, state } = newStaffed();
+    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    expect(state.drillHoles).toHaveLength(0);
+
+    const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(result.success).toBe(true);
+    expect(state.patternCharge).toEqual(BOOMITE_5);
+    expect(chargeActionsOf(state)).toHaveLength(0);
+  });
+
+  it('per-hole charge hole:<id> leaves patternCharge unchanged', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:H1 explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(state.patternCharge ?? null).toBeNull();
+
+    expect(run('charge hole:* explosive:boomite amount:3 stemming:2').success).toBe(true);
+    expect(run('charge hole:H1 explosive:boomite amount:6 stemming:2').success).toBe(true);
+    expect(state.patternCharge).toEqual({ explosiveId: 'boomite', amountKg: 3, stemmingM: 2 });
+  });
+});
+
+describe('funds are checked hole by hole for pattern charges (#1345)', () => {
+  it('cash for 2 of 4 holes: 2 ordered and paid, 2 wait unpaid, call succeeds; they are ordered in id order once cash rises', () => {
+    const { run, state } = setupDrilled(1, 4, 120);
+
+    const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(result.success).toBe(true);
+    expect(state.cash).toBe(0);
+    expect(chargeActionsOf(state)).toHaveLength(2);
+    expect(state.chargeAwaitingFunds).toEqual(['H3', 'H4']);
+
+    // Per-tick upkeep trims cash below $60, so top up to just under two holes' worth.
+    state.cash = 100;
+    state.finances.cash = 100;
+    run('tick 1');
+
+    const orderedIds = Object.keys(state.plannedChargesByHole).concat(Object.keys(state.chargesByHole));
+    expect(orderedIds).toContain('H3');
+    expect(orderedIds).not.toContain('H4');
+    expect(state.chargeAwaitingFunds).toEqual(['H4']);
+  });
+
+  it('cash exactly equal to one hole cost is affordable for the pattern', () => {
+    const { run, state } = setupDrilled(1, 1, 60);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(state.cash).toBe(0);
+    expect(state.chargeAwaitingFunds ?? []).toEqual([]);
+    expect(chargeActionsOf(state)).toHaveLength(1);
+  });
+
+  it('removing a waiting hole drops it from chargeAwaitingFunds', () => {
+    const { run, state } = setupDrilled(1, 2, 60);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(state.chargeAwaitingFunds).toEqual(['H2']);
+
+    expect(run('drill_plan remove hole:H2').success).toBe(true);
+
+    expect(state.chargeAwaitingFunds ?? []).toEqual([]);
+  });
+
+  it('drill_plan clear empties chargeAwaitingFunds', () => {
+    const { run, state } = setupDrilled(1, 2, 60);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(state.chargeAwaitingFunds).toEqual(['H2']);
+
+    expect(run('drill_plan clear').success).toBe(true);
+
+    expect(state.chargeAwaitingFunds ?? []).toEqual([]);
+  });
+});
+
+describe('blast with nothing charged is refused (#1345)', () => {
+  it('blast with an empty plan: refused, blastCount, cash, grid and plan unchanged', () => {
+    const { run, state } = newStaffed();
+    const blastCount = state.damage.blastCount;
+    const cash = state.cash;
+
+    const result = run('blast');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.blast.no_charged_holes'));
+    expect(state.damage.blastCount).toBe(blastCount);
+    expect(state.cash).toBe(cash);
+    expect(state.drillHoles).toHaveLength(0);
+  });
+
+  it('blast with drilled but unloaded holes: refused, nothing changes', () => {
+    const { run, state } = setupDrilled(1, 2);
+    const blastCount = state.damage.blastCount;
+    const cash = state.cash;
+    const holes = state.drillHoles.map(h => h.id);
+
+    const result = run('blast');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.blast.no_charged_holes'));
+    expect(state.damage.blastCount).toBe(blastCount);
+    expect(state.cash).toBe(cash);
+    expect(state.drillHoles.map(h => h.id)).toEqual(holes);
+  });
+
+  it('blast with a loaded charge still fires and clears patternCharge afterwards', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 2, 800);
+    expect(state.patternCharge).toEqual(BOOMITE_5);
+
+    expect(run('blast').success).toBe(true);
+
+    expect(state.patternCharge ?? null).toBeNull();
+    expect(state.chargeAwaitingFunds ?? []).toEqual([]);
+  });
+});
+
+describe('drill_plan grid over a drilled or charged plan needs confirm:true (#1345)', () => {
+  const GRID = 'drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:20,20';
+
+  it('refused without confirm when holes are drilled; state unchanged', () => {
+    const { run, state } = setupDrilled(1, 2);
+    const holes = state.drillHoles.map(h => ({ ...h }));
+
+    const result = run(GRID);
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.drill_plan.confirm_replace', { drilled: 2, charged: 0 }));
+    expect(state.drillHoles).toEqual(holes);
+  });
+
+  it('refused without confirm when holes are charged; charges, pattern and cash unchanged', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 2, 800);
+    const cash = state.cash;
+
+    const result = run(GRID);
+
+    expect(result.success).toBe(false);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(2);
+    expect(state.patternCharge).toEqual(BOOMITE_5);
+    expect(state.cash).toBe(cash);
+  });
+
+  it('with confirm:true replaces the plan and clears the pattern charge', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+
+    const result = run(`${GRID} confirm:true`);
+
+    expect(result.success).toBe(true);
+    expect(state.drillHoles).toHaveLength(0);
+    expect(state.plannedDrillHoles).toHaveLength(2);
+    expect(state.chargesByHole).toEqual({});
+    expect(state.patternCharge ?? null).toBeNull();
+  });
+
+  it('a plan with only ordered (undrilled) holes is replaced without confirm', () => {
+    const { run, state } = newStaffed();
+    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    expect(state.drillHoles).toHaveLength(0);
+
+    expect(run(GRID).success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(2);
+  });
+});
+
+describe('pattern charge persistence (#1345)', () => {
+  it('save/load round-trips patternCharge and chargeAwaitingFunds', () => {
+    const { run, state } = setupDrilled(1, 2, 60);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(state.chargeAwaitingFunds).toEqual(['H2']);
+
+    const loaded = deserialize(serialize(state));
+
+    expect(loaded.patternCharge).toEqual(BOOMITE_5);
+    expect(loaded.chargeAwaitingFunds).toEqual(['H2']);
+  });
+});
+
+describe('localized keys (#1345)', () => {
+  it.each(['mining.charge.nothing_to_charge', 'mining.drill_plan.confirm_replace', 'mining.blast.no_charged_holes'])(
+    '%s resolves to a real string, not the key', key => {
+      expect(t(key)).not.toBe(key);
+    });
+
+  it.each(['en', 'fr'])('%s locale defines every new key', locale => {
+    const dir = new URL('../../src/core/i18n/locales/', import.meta.url);
+    const data = JSON.parse(readFileSync(new URL(`${locale}.json`, dir), 'utf8')) as Record<string, string>;
+    for (const key of ['mining.charge.nothing_to_charge', 'mining.drill_plan.confirm_replace', 'mining.blast.no_charged_holes']) {
+      expect(data[key], `${locale}:${key}`).toBeTypeOf('string');
+    }
   });
 });

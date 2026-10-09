@@ -78,7 +78,7 @@ function makeFragment(id: number, x: number, z: number, volume: number): Fragmen
     volume,
     mass: 1000,
     rockId: 'cruite',
-    oreDensities: {},
+    oreDensities: { blingite: 0.5 },
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
@@ -149,7 +149,7 @@ describe('vehicle.ts — English literal + fr divergence (table-driven)', () => 
     },
     {
       name: 'default/unknown subcommand usage',
-      englishLiteral: 'Usage: vehicle (list|buy|reposition|driver|haul|scrap|break)',
+      englishLiteral: 'Usage: vehicle (list|buy|upgrade|reposition|driver|haul|scrap|break)',
       run: (ctx) => vehicleCommand(ctx, ['bogus'], {}),
     },
   ];

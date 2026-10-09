@@ -13,7 +13,7 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100,
-    payload: null,
+    cargo: [],
     occupantIds: [],
     ...overrides,
   };
@@ -79,33 +79,60 @@ describe('fleetDetailSections — makeLoadGauge', () => {
   });
 
   it('reports 0% (fill width) and 0kg / capacity with no payload', () => {
-    const row = makeLoadGauge(makeVehicle({ type: 'debris_hauler', payload: null }))!;
+    const row = makeLoadGauge(makeVehicle({ type: 'debris_hauler', cargo: [] }))!;
     const fill = row.querySelector('.bsx-gauge-fill') as HTMLElement;
     const value = row.querySelector('.bsx-gauge-value') as HTMLElement;
     expect(fill.style.width).toBe('0%');
-    expect(value.textContent).toBe('0 / 200 kg');
+    expect(value.textContent).toBe('0 / 4000 kg');
   });
 
   it('reports the real percentage (fill width) and kg / capacity for a loaded payload', () => {
-    // debris_hauler tier1 capacity is 200kg (VEHICLE_BASE_STATS) — 100kg is 50%.
+    // debris_hauler tier1 capacity is 4000kg (VEHICLE_BASE_STATS, #1370) — 2000kg is 50%.
     const row = makeLoadGauge(makeVehicle({
-      type: 'debris_hauler', tier: 1, payload: { fragmentId: 7, massKg: 100 },
+      type: 'debris_hauler', tier: 1, cargo: [{ fragmentId: 7, massKg: 2000 }],
     }))!;
     const fill = row.querySelector('.bsx-gauge-fill') as HTMLElement;
     const value = row.querySelector('.bsx-gauge-value') as HTMLElement;
     expect(fill.style.width).toBe('50%');
-    expect(value.textContent).toBe('100 / 200 kg');
+    expect(value.textContent).toBe('2000 / 4000 kg');
   });
 
   it('clamps the fill width at 100% when payload mass exceeds rated capacity (#1092)', () => {
-    // debris_hauler tier1 capacity is 200kg — 500kg overshoots it, which a
+    // debris_hauler tier1 capacity is 4000kg — 5000kg overshoots it, which a
     // real fleet can reach mid-haul (a fragment heavier than the estimate
     // used at load time). The percentage shown must never exceed 100.
     const row = makeLoadGauge(makeVehicle({
-      type: 'debris_hauler', tier: 1, payload: { fragmentId: 7, massKg: 500 },
+      type: 'debris_hauler', tier: 1, cargo: [{ fragmentId: 7, massKg: 5000 }],
     }))!;
     const fill = row.querySelector('.bsx-gauge-fill') as HTMLElement;
     expect(fill.style.width).toBe('100%');
+  });
+
+  it('sums every cargo item into the load gauge (#1370)', () => {
+    const row = makeLoadGauge(makeVehicle({
+      type: 'debris_hauler', tier: 1,
+      cargo: [{ fragmentId: 1, massKg: 500 }, { fragmentId: 2, massKg: 700 }, { fragmentId: 3, massKg: 800 }],
+    }))!;
+    const fill = row.querySelector('.bsx-gauge-fill') as HTMLElement;
+    const value = row.querySelector('.bsx-gauge-value') as HTMLElement;
+    expect(fill.style.width).toBe('50%');
+    expect(value.textContent).toBe('2000 / 4000 kg');
+  });
+
+  it('clamps a multi-item load heavier than capacity at 100% (#1370)', () => {
+    const row = makeLoadGauge(makeVehicle({
+      type: 'debris_hauler', tier: 1,
+      cargo: [{ fragmentId: 1, massKg: 3000 }, { fragmentId: 2, massKg: 3000 }],
+    }))!;
+    expect((row.querySelector('.bsx-gauge-fill') as HTMLElement).style.width).toBe('100%');
+  });
+
+  it('shows tier 2 capacity of 6400 kg (#1370)', () => {
+    const row = makeLoadGauge(makeVehicle({
+      type: 'debris_hauler', tier: 2, cargo: [{ fragmentId: 1, massKg: 3200 }],
+    }))!;
+    expect((row.querySelector('.bsx-gauge-fill') as HTMLElement).style.width).toBe('50%');
+    expect((row.querySelector('.bsx-gauge-value') as HTMLElement).textContent).toBe('3200 / 6400 kg');
   });
 });
 

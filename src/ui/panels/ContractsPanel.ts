@@ -24,11 +24,14 @@ import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, pa
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { isFillableSaleOffer, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { contractAcceptBlocker, isFillableSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
+import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -91,9 +94,9 @@ export class ContractsPanel extends PanelBase {
 
   update(state: GameState): void {
     const signature = JSON.stringify({
-      stored: Math.round(state.logistics.storedMassKg), storedTenths: deliverableAmountKg(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
+      stored: Math.round(state.logistics.storedMassKg), spoil: Math.round(totalSpoilKg(state.buildings.buildings)), storedTenths: deliverableAmountKg(stateRubbleStockKg(state)), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre, oreTenths: Object.values(state.collectedOre).map(deliverableAmountKg),
-      active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}`),
+      active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}:${c.held ? 1 : 0}`),
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
@@ -117,6 +120,7 @@ export class ContractsPanel extends PanelBase {
 
   private render(state: GameState): void {
     const managerLevel = bestAvailableManagerLevel(state.employees.employees);
+    const siteOres = resolveContractOres(state);
     const sections: HTMLElement[] = [
       this.makeStorageStrip(state),
       sectionHeader(t('ui.contracts.active')),
@@ -130,7 +134,7 @@ export class ContractsPanel extends PanelBase {
       sectionHeader(t('ui.contracts.available')),
       scrollBoundedSection(
         state.contracts.available.length > 0
-          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel))
+          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel, siteOres))
           : [emptyState(t('ui.contracts.none'))],
         200,
         { gap: 10 },
@@ -149,7 +153,7 @@ export class ContractsPanel extends PanelBase {
 
   /** Kilograms of `materialId` available to deliver — collected ore by type, or raw stored mass for rubble ('' materialId). */
   private storedOf(materialId: string, state: GameState): number {
-    return materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0);
+    return materialId === '' ? stateRubbleStockKg(state) : (state.collectedOre[materialId] ?? 0);
   }
 
   private materialLabel(materialId: string): string {
@@ -214,8 +218,7 @@ export class ContractsPanel extends PanelBase {
     const color = this.urgencyColor(c, state.tickCount);
     const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
     const stored = this.storedOf(c.materialId, state);
-    const remainingKg = Math.max(0, c.quantityKg - c.deliveredKg);
-    const maxDeliverable = deliverableAmountKg(Math.min(remainingKg, stored));
+    const maxDeliverable = deliverableAmountKg(Math.min(Math.max(0, remainingKg(c)), stored));
 
     const headRow = el('div');
     headRow.style.cssText = 'display:flex;align-items:center;gap:8px';
@@ -223,6 +226,7 @@ export class ContractsPanel extends PanelBase {
       iconEl(TYPE_ICON[c.type], 14),
       el('span', { text: this.materialLabel(c.materialId), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui)' } }),
       el('span', { text: `#${c.id}`, attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
+      ...(c.held ? [el('span', { text: t('ui.contracts.held_badge'), attrs: { class: 'bs-contract-held', style: 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.1em;padding:3px 5px;border-radius:3px;background:rgba(255,255,255,.08);color:var(--bsx-amber)' } })] : []),
       el('span', {
         text: t('ui.contracts.time_left', { hours: remainingTicks }),
         attrs: { style: `margin-left:auto;display:flex;align-items:center;gap:4px;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:${color}` },
@@ -265,6 +269,13 @@ export class ContractsPanel extends PanelBase {
     deliverRow.style.cssText = 'display:flex;align-items:center;gap:7px';
     deliverRow.append(amountInput, maxBtn, deliverBtn);
 
+    const holdBtn = button('ghost', t(c.held ? 'ui.contracts.resume' : 'ui.contracts.hold'), {
+      dataAction: 'hold-toggle',
+      onClick: () => this.gameConsole?.(`contract ${c.held ? 'release' : 'hold'} ${c.id}`),
+    });
+    holdBtn.style.cssText = 'height:30px;padding:0 10px;font-size:10px';
+    deliverRow.append(holdBtn);
+
     const storedNote = el('span', {
       text: t('ui.contracts.stored_note', { kg: Math.round(stored).toLocaleString('en-US'), material: this.materialLabel(c.materialId) }),
       attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
@@ -280,7 +291,7 @@ export class ContractsPanel extends PanelBase {
 
   // ── Offered ──
 
-  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null): HTMLElement {
+  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null, siteOres: readonly string[]): HTMLElement {
     const stored = this.storedOf(c.materialId, state);
     const havePct = c.quantityKg > 0 ? Math.min(100, Math.round((stored / c.quantityKg) * 100)) : 0;
     const haveColor = stored >= c.quantityKg ? 'var(--bsx-positive)' : 'var(--bsx-amber)';
@@ -325,8 +336,10 @@ export class ContractsPanel extends PanelBase {
     const neg = state.contracts.lastNegotiation;
     const negBox = neg && neg.contractId === c.id && neg.changes.length > 0 ? this.makeNegotiateResult(neg) : null;
 
+    const blocked = contractAcceptBlocker(c, freightWarehouseSites(state.buildings).length > 0);
     const acceptBtn = button('primary', t('ui.contracts.accept'), {
       dataAction: 'accept',
+      ...(blocked === null ? {} : { disabled: true, title: t('economy.contract.needs_warehouse') }),
       onClick: () => this.gameConsole?.(`contract accept id:${c.id}`),
     });
     acceptBtn.classList.add('bs-contract-accept');
@@ -354,7 +367,11 @@ export class ContractsPanel extends PanelBase {
     btnRow.style.cssText = 'display:flex;gap:6px';
     btnRow.append(acceptBtn, negotiateBtn, declineBtn);
 
-    const cardEl = card([headRow, statRow, haveRow, termsRow, negBox, btnRow]);
+    const offSiteBadge = c.materialId === '' || siteOres.includes(c.materialId)
+      ? null
+      : el('span', { text: t('ui.contracts.not_on_site'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);color:var(--bsx-critical-text)' } });
+
+    const cardEl = card([headRow, offSiteBadge, statRow, haveRow, termsRow, negBox, btnRow]);
     cardEl.dataset['contractId'] = String(c.id);
     // data-contract-type/data-contract-material, alongside data-contract-id
     // (#554): a fixed id is a moving target once the tick-based offer pool
@@ -372,7 +389,9 @@ export class ContractsPanel extends PanelBase {
     // random (Contract.ts's generateContracts), so a scenario that must sell
     // what its own blast produced cannot name the material up front and stay
     // true across a re-timing that re-rolls the pool.
-    cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, state.logistics.storedMassKg));
+    const onSite = offSiteBadge === null;
+    cardEl.dataset['contractOnsite'] = String(onSite);
+    cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, stateRubbleStockKg(state)));
     return cardEl;
   }
 
@@ -405,15 +424,18 @@ export class ContractsPanel extends PanelBase {
     const ok = c.completed && !c.expired;
     const color = ok ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
     const outcome = ok
-      ? `+$${formatMoney(c.deliveredKg * c.pricePerKg)}`
-      : `-$${formatMoney(c.penaltyAmount)}`;
+      ? `+$${formatMoney(c.paidTotal ?? c.deliveredKg * c.pricePerKg)}`
+      : `-$${formatMoney(c.penaltyCharged ?? c.penaltyAmount)}`;
+    // An expired contract may still have paid for what was delivered before the deadline.
+    const paid = c.paidTotal ?? 0;
+    const detail = !ok && paid > 0 ? ` · ${t('ui.contracts.history_paid', { amount: formatMoney(paid) })}` : '';
     const row = el('div');
     row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:4px;background:var(--bsx-well)';
     const col = el('div');
     col.style.cssText = 'display:flex;flex-direction:column;gap:2px';
     col.append(
       el('span', { text: this.materialLabel(c.materialId), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-      el('span', { text: t(ok ? 'ui.contracts.history_completed' : 'ui.contracts.history_expired'), attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      el('span', { text: t(ok ? 'ui.contracts.history_completed' : 'ui.contracts.history_expired') + detail, attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
     );
     row.append(
       el('span', { text: `#${c.id}`, attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),

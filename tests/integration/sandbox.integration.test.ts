@@ -155,7 +155,6 @@ describe('sandbox mode', () => {
       }
       runner.run('tick 1');
     }
-    runner.run('sequence auto');
     const blast = runner.run('blast');
 
     expect(blast.success).toBe(true);

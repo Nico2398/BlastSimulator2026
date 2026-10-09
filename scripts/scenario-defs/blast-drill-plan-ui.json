@@ -123,7 +123,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20",
+      "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 confirm:true",
       "interaction": [
         {
           "type": "clickSelector",
@@ -159,10 +159,18 @@
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player",
-      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. #553: confirming a new grid cancels/wipes the fully-drilled previous plan (drillHoles) and the fresh 4 holes start out ordered, not drilled — holeCount drops back to 0.",
+      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. #553: confirming a new grid cancels/wipes the fully-drilled previous plan (drillHoles) and the fresh 4 holes start out ordered, not drilled — holeCount drops back to 0. #1345: replacing a drilled plan now asks first -- the confirm modal's Replace button is clicked, and the command-mode equivalent passes confirm:true.",
       "expect": {
         "equals": {
           "orderedHoleCount": 4,

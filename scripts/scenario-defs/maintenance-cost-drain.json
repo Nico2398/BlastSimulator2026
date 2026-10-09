@@ -91,11 +91,11 @@
       }
     },
     {
-      "command": "build vehicle_depot at:13,0",
+      "command": "build geology_lab at:13,0",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",

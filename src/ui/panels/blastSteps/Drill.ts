@@ -10,8 +10,8 @@ import { el, chip, emptyState, scrollBoundedSection, type ChipTone } from '../..
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
-import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { GameState } from '../../../core/state/GameState.js';
 import { gridCellPositions } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
@@ -20,6 +20,9 @@ import { hoverRefusal, type PlacementKit } from '../../scene/PlacementKit.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
+import type { ConfirmModalConfig } from '../ConfirmModal.js';
+import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
+import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
 } from '../../../core/config/balance.js';
@@ -45,6 +48,7 @@ export class DrillStep {
 
   private gameConsole?: GameConsoleFn;
   private placementKit: PlacementKit | null = null;
+  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
 
   private gridSpacing = DEFAULT_SPACING_M;
   private gridDepth = DEFAULT_DEPTH_M;
@@ -140,13 +144,13 @@ export class DrillStep {
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
-  update(state: GameState, weather: WeatherState | undefined): void {
+  update(state: GameState, _weather?: WeatherState): void {
     this.lastState = state;
     const holes = state.drillHoles;
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
     this.lastHoleCount = totalCount;
-    const wet = weather ? wetHoleIdsFor(state, weather) : new Set<string>();
+    const wet = wetHoleIdsFor(state);
 
     const signature = JSON.stringify({
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
@@ -234,7 +238,7 @@ export class DrillStep {
   /**
    * Row for a hole still in `state.plannedDrillHoles` — ordered but not yet
    * drilled (#553). No wet/tubed/dry status applies to a hole that hasn't
-   * been drilled, so it always shows the ORDERED chip; no charge/sequence
+   * been drilled, so it always shows the ORDERED chip; no charge
    * affordance either, since neither exists yet for it — only the remove
    * button (which cancels its queued `drill_hole` action).
    */
@@ -262,10 +266,14 @@ export class DrillStep {
   }
 
   private holeStatus(hole: DrillHole, state: GameState, wet: Set<string>): { label: string; tone: ChipTone } {
-    if (hasTubing(state.tubingState, hole.id)) return { label: t('ui.blast_workshop.drill.status_tubed'), tone: 'positive' };
+    // Water already inside wins over tubing: tubing keeps new water out but does not drain (#1350).
     if (wet.has(hole.id)) return { label: t('ui.blast_workshop.drill.status_wet'), tone: 'info' };
+    if (hasTubing(state.tubingState, hole.id)) return { label: t('ui.blast_workshop.drill.status_tubed'), tone: 'positive' };
     return { label: t('ui.blast_workshop.drill.status_dry'), tone: 'neutral' };
   }
+
+  /** UIManager wires this to its shared ConfirmModal's show(). */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
 
   /** Run a console command and show its output, so a refusal is never silent. */
   private runAndNotify(cmd: string): void {
@@ -366,11 +374,16 @@ export class DrillStep {
     }, (sel, overlay) => {
       const cols = Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1);
       const rows = Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1);
-      this.afterConfirm(
-        overlay,
-        `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`,
-        () => { this.lastGridPattern = { rows, cols }; },
-      );
+      const cmd = `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`;
+      const run = (command: string): void => this.afterConfirm(overlay, command, () => { this.lastGridPattern = { rows, cols }; });
+      // Replacing a drilled/charged pattern asks first (#1345).
+      const st = this.lastState;
+      const loss = st && this.onConfirmRequestCb ? planReplacementLoss(st) : null;
+      if (loss) {
+        this.onConfirmRequestCb?.(buildReplacePatternConfirm(loss, () => run(`${cmd} confirm:true`)));
+        return;
+      }
+      run(cmd);
     });
   }
 

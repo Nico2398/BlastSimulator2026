@@ -300,13 +300,14 @@ describe('build destroy — insufficient funds guard', () => {
     expect(ctx.state!.buildings.buildings[0]!.id).toBe(id);
   });
 
-  it('demolishes when cash exactly equals the demolish cost', () => {
+  it('orders the demolition when cash exactly equals the demolish cost (#1392: the building goes when the work completes)', () => {
     const ctx = makeCtx(DEMOLISH_COST);
     const id = placeTestBuilding(ctx);
     const result = buildCommand(ctx, ['destroy', String(id)], {});
     expect(result.success).toBe(true);
-    expect(ctx.state!.buildings.buildings).toHaveLength(0);
     expect(ctx.state!.cash).toBe(0);
+    expect(ctx.state!.pendingActions.some(a => a.type === 'demolish_building')).toBe(true);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
   });
 });
 
@@ -343,7 +344,7 @@ describe('build upgrade — insufficient funds guard', () => {
     expect(building.tier).toBe(1);
   });
 
-  it('upgrades when cash exactly equals the upgrade cost', () => {
+  it('orders the upgrade when cash exactly equals the upgrade cost (#1392: tier changes when the rebuild lands)', () => {
     const ctx = makeCtx(UPGRADE_COST);
     unlockTier2(ctx);
     // Upgrade re-places at (2,0), flat across T1/T2 footprints on this
@@ -351,9 +352,9 @@ describe('build upgrade — insufficient funds guard', () => {
     const id = placeTestBuilding(ctx, 'management_office', 1, 2, 0);
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
-    expect(ctx.state!.buildings.buildings).toHaveLength(1);
-    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
     expect(ctx.state!.cash).toBe(0);
+    expect(ctx.state!.pendingActions.some(a => a.type === 'demolish_building')).toBe(true);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
   });
 
   it('refuses a max-tier building for the tier-bound reason, not cost — even at cash 0', () => {

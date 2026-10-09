@@ -97,6 +97,8 @@ export function allModelIds(): string[] {
     for (const tier of VEHICLE_TIERS) ids.push(vehicleModelId(role, tier));
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
+    // TODO(#1572): spoil_heap has no Blender model yet and renders as a stand-in box. Drop this skip once #1572 adds it.
+    if (type === 'spoil_heap') continue;
     for (const tier of BUILDING_TIERS) ids.push(buildingModelId(type, tier));
   }
   ids.push(BUILDING_RUIN_MODEL_ID);

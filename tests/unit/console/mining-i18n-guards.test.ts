@@ -8,7 +8,6 @@ import {
   chargeCommand,
   drillPlanCommand,
   previewCommand,
-  sequenceCommand,
   surveyCommand,
   weatherCommand,
 } from '../../../src/console/commands/mining.js';
@@ -84,9 +83,13 @@ describe('mining.ts requireGame guard', () => {
 // ── formatBlastPlanErrors headers ────────────────────────────────────────
 
 describe('formatBlastPlanErrors — "Invalid plan" header (blastCommand)', () => {
+  // A blast with no loaded charge at all is refused earlier (#1345), so the
+  // invalid-plan path needs one charged hole beside an uncharged one.
   function makeUnchargedPlan(ctx: MiningContext): void {
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
   }
 
   it('starts the output with "Invalid plan:" in English', () => {
@@ -113,9 +116,13 @@ describe('formatBlastPlanErrors — "Invalid plan" header (blastCommand)', () =>
 });
 
 describe('formatBlastPlanErrors — "Validation issues" header (blastPlanCommand validate)', () => {
+  // A blast with no loaded charge at all is refused earlier (#1345), so the
+  // invalid-plan path needs one charged hole beside an uncharged one.
   function makeUnchargedPlan(ctx: MiningContext): void {
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
   }
 
   it('starts the output with "Validation issues:" in English', () => {
@@ -153,11 +160,6 @@ describe('mining.ts usage strings — English literal + fr divergence', () => {
       name: 'drill_plan usage',
       englishLiteral: 'Usage: drill_plan grid|add|remove|clear|show [options]',
       run: (ctx) => drillPlanCommand(ctx, ['bogus'], {}),
-    },
-    {
-      name: 'sequence usage',
-      englishLiteral: 'Usage: sequence auto|set|show [options]',
-      run: (ctx) => sequenceCommand(ctx, ['bogus'], {}),
     },
     {
       name: 'blast_plan usage',
@@ -237,7 +239,6 @@ describe('mining.ts "===" report headers — English literal + fr divergence', (
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
   it('blastCommand — output starts with "=== BLAST REPORT ===" in English', () => {
@@ -338,11 +339,6 @@ describe('mining.ts empty-state messages — English literal + fr divergence', (
       name: 'charge show — no charges',
       englishLiteral: 'No charges set.',
       run: (ctx) => chargeCommand(ctx, ['show'], {}),
-    },
-    {
-      name: 'sequence show — no delays',
-      englishLiteral: 'No sequence set.',
-      run: (ctx) => sequenceCommand(ctx, ['show'], {}),
     },
     {
       name: 'blast_plan list — no saved plans',
@@ -483,7 +479,6 @@ describe('mining.ts #797 blast execution failed (executeBlast mocked to null) �
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
   afterEach(() => {
@@ -522,7 +517,6 @@ describe('mining.ts #797 blast_plan validate success message — English literal
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
   it('matches the exact English literal by default', () => {

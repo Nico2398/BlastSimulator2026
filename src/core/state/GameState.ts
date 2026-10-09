@@ -4,9 +4,11 @@
 import {
   STARTING_CASH,
   STARTING_SITE_STAFFED_COMPOSITION,
+  type StartingSiteComposition,
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
 import type { TutorialProgress } from './TutorialProgress.js';
+import type { PendingDetonation } from '../engine/DetonationSequence.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
 import type { HoleCharge, PlannedCharge } from '../mining/ChargePlan.js';
@@ -16,6 +18,7 @@ import type { BlastReport } from '../mining/BlastExecution.js';
 import type { BlastPreviewSummary } from '../mining/Software.js';
 import type { TubingState } from '../mining/Tubing.js';
 import { createTubingState } from '../mining/Tubing.js';
+import type { HoleWater } from '../weather/WeatherEffects.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
@@ -29,7 +32,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState, purchaseVehicle } from '../entities/Vehicle.js';
-import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
+import type { EmployeeState, SkillCategory, LicenceLevel } from '../entities/Employee.js';
 import { createEmployeeState, hireEmployee, calculateSalary, qualificationAtLevel } from '../entities/Employee.js';
 import type { VehicleRole } from '../entities/Vehicle.js';
 import { Random } from '../math/Random.js';
@@ -59,6 +62,7 @@ import type { RevoltState } from '../campaign/WorkerRevolt.js';
 import { createRevoltState } from '../campaign/WorkerRevolt.js';
 import type { LevelStats } from '../campaign/SuccessTracker.js';
 import { createLevelStats } from '../campaign/SuccessTracker.js';
+import { createHiringPool, type HiringPoolState } from '../entities/HiringPool.js';
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
@@ -145,7 +149,11 @@ import type { RampWidth } from '../config/balance.js';
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
 // v28 -> v29: nextHoleId (#1352)
 // v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
-export const SAVE_VERSION = 30;
+// v31 -> v32: holeWater + groundWetness (#1350). See SaveLoad.ts's migrateV31ToV32.
+// v32 -> v33: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV32ToV33.
+// v33 -> v34: pendingDetonation (#1362). See SaveLoad.ts's migrateV33ToV34.
+// v34 -> v35: events.activeModifiers + nextModifierId (#1414). See SaveLoad.ts's migrateV34ToV35.
+export const SAVE_VERSION = 35;
 
 export interface GameConfig {
   seed: number;
@@ -163,6 +171,8 @@ export interface GameConfig {
   scoreDecayRate?: number;
   /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
   staffed?: boolean;
+  /** A level's own starting site; wins over `staffed` when set (#1363). */
+  startingSite?: StartingSiteComposition;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -171,12 +181,12 @@ export type ActionType =
   | 'charge_hole'
   | 'dig_ramp_segment'
   | 'level_ground'
-  | 'set_sequence'
   | 'place_building'
   | 'demolish_building'
   | 'survey'
   | 'fragment_debris'
   | 'haul_debris'
+  | 'repair_vehicle'
   | 'rest'
   | 'general_work';
 
@@ -218,7 +228,7 @@ export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
  * Why a PendingAction currently has nobody able to perform it — surfaced as a
  * non-blocking player warning rather than cancelling the order (#1061).
  */
-export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full';
+export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full' | 'licence_level_too_low' | 'no_spoil_heap';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {
@@ -277,6 +287,8 @@ export interface PendingAction {
    * or SAVE_VERSION bump applies. Always read with `!= null` (loose), not `!==`.
    */
   blockedReason?: BlockedOrderReason | null;
+  /** Licence level the blocking vehicle tier needs when `blockedReason` is 'licence_level_too_low' (#1524). Optional like `blockedReason`. */
+  blockedLicenceLevel?: LicenceLevel | null;
   /**
    * Tick after which this action becomes claimable again, stamped when a
    * vehicle abandons it as stuck. Null/absent = no backoff active.
@@ -401,8 +413,14 @@ export interface GameState {
   /** Charges ordered but not yet loaded — each queues one `charge_hole` action and lands in `chargesByHole` on completion (#554). */
   plannedChargesByHole: Record<string, PlannedCharge>;
 
-  /** Detonation sequence: hole ID → delay in ms. */
-  sequenceDelays: Record<string, number>;
+  /** Armed detonation awaiting evacuation; null = none (#1362). */
+  pendingDetonation: PendingDetonation | null;
+
+  /** Charge applied automatically to each newly drilled hole; null = none (#1345). */
+  patternCharge?: HoleCharge | null;
+
+  /** Hole ids whose auto-charge is waiting for funds (#1345). */
+  chargeAwaitingFunds?: string[];
 
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;
@@ -451,6 +469,8 @@ export interface GameState {
   levelStats: LevelStats;
   /** Site policy governing shift scheduling and rest thresholds. */
   sitePolicy: SitePolicy;
+  /** Candidate pool offered by the hiring UI. */
+  hiringPool: HiringPoolState;
   /** Whether the current level has ended (any game-over or completion). */
   levelEnded: boolean;
   /** Reason the level ended, or null if still active. */
@@ -475,6 +495,10 @@ export interface GameState {
   lastBlastPreview: BlastPreviewSummary | null;
   /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
   tubingState: TubingState;
+  /** Per-hole water state keyed by drill hole id (#1350). */
+  holeWater: Record<string, HoleWater>;
+  /** Ground wetness 0..1: built by rain, seeps into holes (#1350). */
+  groundWetness: number;
   /** Ramps ordered but not yet fully dug — each queues one `dig_ramp_segment` action per segment (#555). */
   plannedRamps: PlannedRamp[];
   /** Next ID to assign to a newly created PlannedRamp. */
@@ -538,7 +562,6 @@ export interface WorldState {
 export interface SavedBlastPlan {
   drillHoles: DrillHole[];
   chargesByHole: Record<string, HoleCharge>;
-  sequenceDelays: Record<string, number>;
 }
 
 /** A world state for a site that starts as the square `sizeX × sizeZ` at the origin, before any expansion (#473). */
@@ -572,7 +595,9 @@ export function createGame(config: GameConfig): GameState {
     plannedDrillHoles: [],
     chargesByHole: {},
     plannedChargesByHole: {},
-    sequenceDelays: {},
+    pendingDetonation: null,
+    patternCharge: null,
+    chargeAwaitingFunds: [],
     savedPlans: {},
     finances: createFinanceState(config.startingCash ?? STARTING_CASH),
     contracts: createContractState(),
@@ -594,6 +619,7 @@ export function createGame(config: GameConfig): GameState {
     revolt: createRevoltState(),
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
+    hiringPool: createHiringPool(config.seed, 0),
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],
@@ -605,6 +631,8 @@ export function createGame(config: GameConfig): GameState {
     softwareTier: 0,
     lastBlastPreview: null,
     tubingState: createTubingState(),
+    holeWater: {},
+    groundWetness: 0,
     plannedRamps: [],
     nextPlannedRampId: 1,
     builtRamps: [],
@@ -615,34 +643,35 @@ export function createGame(config: GameConfig): GameState {
     weather: createWeatherCycle(config.seed),
   };
 
-  if (config.staffed) {
-    applyStaffedComposition(state);
+  if (config.startingSite) {
+    applyStaffedComposition(state, config.startingSite);
+  } else if (config.staffed) {
+    applyStaffedComposition(state, STARTING_SITE_STAFFED_COMPOSITION);
   }
 
   return state;
 }
 
 /**
- * Hires STARTING_SITE_STAFFED_COMPOSITION.employees and purchases
- * STARTING_SITE_STAFFED_COMPOSITION.vehicles into `state`, for the opt-in
- * staffed starting site (#551). Called from `createGame` when `config.staffed`
- * is truthy; the roster and fleet composition are defined in
- * `STARTING_SITE_STAFFED_COMPOSITION` (src/core/config/balance.ts).
+ * Hires `composition.employees` and purchases `composition.vehicles` into
+ * `state`. Takes any composition: the global staffed one (#551) or a level's
+ * own starting site (#1363). Its buildings are not placed here — they need
+ * terrain, so they are placed in `regenerateGrid`.
  */
-function applyStaffedComposition(state: GameState): void {
+function applyStaffedComposition(state: GameState, composition: StartingSiteComposition): void {
   const rng = new Random(state.seed);
 
   // Small deterministic offsets near the site origin — no navGrid exists yet
   // (this runs before regenerateGrid), so there is no reachable-cell snap
   // available; simple staggered placement is all that's needed here.
-  STARTING_SITE_STAFFED_COMPOSITION.employees.forEach((slot, i) => {
+  composition.employees.forEach((slot, i) => {
     const { employee } = hireEmployee(state.employees, slot.role, rng, i * 2, 0, state.tickCount);
     // Staffing is free at game-open — hiringCost is intentionally not deducted from cash.
     employee.qualifications = slot.qualifications.map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
     employee.salary = calculateSalary(employee);
   });
 
-  STARTING_SITE_STAFFED_COMPOSITION.vehicles.forEach((slot, i) => {
+  composition.vehicles.forEach((slot, i) => {
     // Purchase cost is intentionally not deducted from cash, same as hiring above.
     // Single row, spaced SPAWN_TILE_SPACING apart (#591): the old i*2 spacing
     // put drill_rig at (0,2) exactly octile-tied with a route forced through

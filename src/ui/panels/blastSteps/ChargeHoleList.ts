@@ -3,10 +3,8 @@
 // Gap G3: `charge hole:<id> explosive:… amount:…kg stemming:…m` is a real
 // gameplay command that had no button at all — the Charge step only ever
 // exposed CHARGE ALL, so a player could not charge one hole differently from
-// the rest while the console could. This is the missing control, shaped like
-// the Sequence step's per-hole delay rows (`[data-hole="H1"]
-// [data-action="delay-inc"]`): one row per hole keyed by `data-hole`, with its
-// own commit button at `[data-hole="H1"] [data-action="charge-hole"]`.
+// the rest while the console could. This is the missing control: one row per
+// hole keyed by `data-hole`, with its own commit button at `[data-hole="H1"] [data-action="charge-hole"]`.
 //
 // Its own module rather than more of Charge.ts: that file was already over the
 // 300-line convention before these rows existed.
@@ -17,12 +15,28 @@
 // gesture as "select, then charge them all".
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, emptyState, scrollBoundedSection } from '../../dom.js';
+import { el, chip, emptyState, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import type { HoleCharge } from '../../../core/mining/ChargePlan.js';
+import type { DrainBlock } from '../../../core/mining/HoleDrain.js';
+
+/** One hole's water, for its row: wet or not, and why it cannot be drained (null = can). */
+export interface HoleDrainView {
+  wet: boolean;
+  block: DrainBlock | null;
+}
+
+/** Localized reason a drain control is disabled. */
+export function drainReasonText(block: DrainBlock): string {
+  switch (block) {
+    case 'porous_untubed': return t('ui.blast_workshop.charge.drain_porous_reason');
+    case 'insufficient_funds': return t('ui.blast_workshop.charge.drain_funds_reason');
+    default: return t('ui.blast_workshop.charge.drain_none_reason');
+  }
+}
 
 /**
  * One hole's charge state, flattened for an owner's render signature. A
@@ -38,10 +52,12 @@ export class ChargeHoleList {
   private readonly el: HTMLElement;
   private readonly listEl: HTMLElement;
   private readonly onCharge: (holeId: string) => void;
+  private readonly onDrain: (holeId: string) => void;
   private readonly locale = new LocaleTextRegistry();
 
-  constructor(onCharge: (holeId: string) => void) {
+  constructor(onCharge: (holeId: string) => void, onDrain: (holeId: string) => void) {
     this.onCharge = onCharge;
+    this.onDrain = onDrain;
 
     this.el = el('div');
     this.el.style.cssText = 'display:flex;flex-direction:column;gap:10px';
@@ -53,7 +69,7 @@ export class ChargeHoleList {
     );
 
     // Bounded + independently scrollable, same reasoning as the Charge step's
-    // product list and the Sequence step's hole rows: a full plan (16 holes)
+    // product list: a full plan (16 holes)
     // would otherwise push the tubing block past the panel's fold.
     this.listEl = scrollBoundedSection([], 160, { gap: 3 });
 
@@ -67,17 +83,21 @@ export class ChargeHoleList {
     charges: Record<string, HoleCharge>,
     /** Charges ordered but not yet loaded — the ordered/loading row state (#554). */
     plannedCharges?: Record<string, HoleCharge>,
+    /** Holes whose pattern auto-charge waits for cash (#1345). */
+    awaitingFunds: ReadonlySet<string> = new Set(),
+    /** Per-hole water and drain availability (#1350). */
+    drainViews: Readonly<Record<string, HoleDrainView>> = {},
   ): void {
     if (holes.length === 0) {
       this.listEl.replaceChildren(emptyState(t('ui.blast_workshop.charge.no_holes')));
       return;
     }
-    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id])));
+    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id], awaitingFunds.has(h.id), drainViews[h.id])));
   }
 
   refreshLocale(): void { this.locale.refresh(); }
 
-  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined): HTMLElement {
+  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined, awaiting: boolean, drain: HoleDrainView | undefined): HTMLElement {
     const charged = charge !== undefined;
     const ordered = !charged && planned !== undefined;
     const row = el('div');
@@ -95,6 +115,7 @@ export class ChargeHoleList {
     // scenario) can read.
     row.dataset['charged'] = String(charged);
     row.dataset['ordered'] = String(ordered);
+    row.dataset['awaitingFunds'] = String(awaiting);
 
     const tag = el('span', { text: hole.id, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-ore);width:24px' } });
 
@@ -116,10 +137,22 @@ export class ChargeHoleList {
     chargeBtn.dataset['action'] = 'charge-hole';
     chargeBtn.addEventListener('click', () => this.onCharge(hole.id));
 
+    const drainBlock = drain?.block ?? 'dry';
+    const drainBtn = el('button', { text: t('ui.blast_workshop.charge.drain_hole') });
+    drainBtn.style.cssText = chargeBtn.style.cssText;
+    chargeBtn.style.marginLeft = '0';
+    drainBtn.dataset['action'] = 'drain-hole';
+    drainBtn.disabled = drain === undefined || drain.block !== null;
+    if (drain?.block) drainBtn.title = drainReasonText(drainBlock);
+    drainBtn.addEventListener('click', () => this.onDrain(hole.id));
+    row.dataset['wet'] = String(drain?.wet ?? false);
+
     row.append(tag, status);
+    if (drain?.wet) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-info);display:flex' }, children: [iconEl('water', 11)] }));
+    if (awaiting && !charged && !ordered) row.appendChild(chip(t('ui.blast_workshop.charge.awaiting_funds'), 'warn'));
     if (charged) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-positive);display:flex' }, children: [iconEl('check', 11)] }));
     else if (ordered) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-amber);display:flex' }, children: [iconEl('clock', 11)] }));
-    row.appendChild(chargeBtn);
+    row.append(drainBtn, chargeBtn);
     return row;
   }
 

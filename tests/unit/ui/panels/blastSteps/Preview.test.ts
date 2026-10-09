@@ -27,7 +27,6 @@ function chargedPlan(): GameState {
   const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const charge = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in charge) state.chargesByHole[hole.id] = charge.charge;
-  state.sequenceDelays[hole.id] = 0;
   return state;
 }
 
@@ -99,12 +98,12 @@ describe('PreviewStep', () => {
   it('disables Run Analysis with a different reason when holes exist but the plan is incomplete', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15); // drilled, not charged/sequenced
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15); // drilled, not charged
     step.update(state);
 
     const runBtn = step.root.querySelector('[data-action="run-analysis"]') as HTMLButtonElement;
     expect(runBtn.disabled).toBe(true);
-    expect(step.root.textContent).toContain('Finish charging and sequencing');
+    expect(step.root.textContent).toContain('Finish charging every hole first');
   });
 
   it('enables Run Analysis once the plan is complete, and it dispatches blast_preview', () => {

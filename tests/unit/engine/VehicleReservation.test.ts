@@ -18,6 +18,7 @@
 // completeVehicleGatedActionIfApplicable as the sole vehicle-gated completion
 // entry point.
 
+import { setFreightRoom, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -91,6 +92,41 @@ describe('isLicensedForRole', () => {
     // Blaster's only starting qualification is 'blasting', not 'driving.drill_rig'.
 
     expect(isLicensedForRole(employee, 'drill_rig')).toBe(false);
+  });
+});
+
+describe('findFreeVehicleForRole — licence tier (#1524)', () => {
+  function setup(level: 1 | 2 | 3) {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    employee.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED.drill_rig)!.licenceLevel = level;
+    return { state, employee };
+  }
+
+  it('skips a tier-2 rig for a level-1 holder', () => {
+    const { state, employee } = setup(1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
+  });
+
+  it('picks the farther tier-1 rig over a nearer tier-2 rig for a level-1 holder', () => {
+    const { state, employee } = setup(1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+    const { vehicle: far } = purchaseVehicle(state.vehicles, 'drill_rig', 30, 30, 1);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)?.id).toBe(far.id);
+  });
+
+  it('returns the tier-2 rig for a level-2 holder', () => {
+    const { state, employee } = setup(2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)?.id).toBe(vehicle.id);
+  });
+
+  it('skips a tier-3 rig for a level-2 holder', () => {
+    const { state, employee } = setup(2);
+    purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 3);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
   });
 });
 
@@ -708,13 +744,14 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     reserveVehicle(state.vehicles, vehicle.id, 100);
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     releaseVehicleReservation(state, 100);
 
@@ -725,7 +762,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     // fragment-work abort's own cleanup (haul state, cargo) matters here now.
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     // The cargo already picked up is not permanently lost — back on the ground.
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
@@ -739,13 +776,14 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     reserveVehicle(state.vehicles, vehicle.id, 101);
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     releaseVehicleReservation(state, 101);
 
@@ -779,7 +817,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     // other reservation).
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 
   it('a vehicle with neither phase set: same claim-only release as the plain case (#1090)', () => {

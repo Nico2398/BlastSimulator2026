@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { getLevel, getAllLevels, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, resolveContractOres, type LevelDef, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { createGame } from '../../../src/core/state/GameState.js';
-import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../../../src/core/config/balance.js';
+import { createGame, createWorldState, type GameState } from '../../../src/core/state/GameState.js';
+import { generateTerrain, resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
+import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
+import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
+import { getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { sandboxLevelDef, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
+import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
   it('getLevel("dusty_hollow") returns valid level data with all required fields', () => {
@@ -205,5 +210,178 @@ describe('level explosive availability (#1357)', () => {
 describe('tutorial_pit contract price multiplier (#1328)', () => {
   it('Level.ts uses the balance.ts constant rather than a duplicate literal', () => {
     expect(getLevel('tutorial_pit')!.contractPriceMultiplier).toBe(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
+  });
+});
+
+
+describe('resolveContractOres (#1364)', () => {
+  const ALL_ORE_IDS = getAllOres().map(o => o.id);
+
+  function stateFor(level: LevelDef, activeLevelId: string | null): GameState {
+    const state = createGame({ seed: level.terrainSeed, mineType: level.biome });
+    state.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
+    state.world.mixedRockHardness = level.mixedRockHardness;
+    state.campaign.activeLevelId = activeLevelId;
+    return state;
+  }
+
+  /** Ore ids actually present (density > 0 voxel with ore density > 0) in a strided sample of the level's grid. */
+  function oresInGrid(level: LevelDef, seed: number = level.terrainSeed, climateBias: readonly [number, number] = level.climateBias): Set<string> {
+    const grid = generateTerrain({
+      sizeX: level.gridX, datum: level.datum, sizeZ: level.gridZ,
+      seed, climateBias,
+      mixedRockHardness: level.mixedRockHardness,
+    });
+    const found = new Set<string>();
+    for (let x = grid.minX; x < grid.maxX; x += 3) {
+      for (let z = grid.minZ; z < grid.maxZ; z += 3) {
+        for (let y = level.datum - 40; y <= level.datum + 5; y += 2) {
+          const v = grid.getVoxel(x, y, z);
+          if (!v || v.density <= 0) continue;
+          for (const [ore, d] of Object.entries(v.oreDensities)) if (d > 0) found.add(ore);
+        }
+      }
+    }
+    return found;
+  }
+
+  it('tutorial_pit offers only dirtite, rustite, blingite', () => {
+    const level = getLevel('tutorial_pit')!;
+    expect([...resolveContractOres(stateFor(level, level.id))].sort()).toEqual(['blingite', 'dirtite', 'rustite']);
+  });
+
+  it('dusty_hollow offers only dirtite, rustite, blingite', () => {
+    const level = getLevel('dusty_hollow')!;
+    expect([...resolveContractOres(stateFor(level, level.id))].sort()).toEqual(['blingite', 'dirtite', 'rustite']);
+  });
+
+  it('never includes sparkium or deeper ores on the desert levels', () => {
+    for (const id of ['tutorial_pit', 'dusty_hollow']) {
+      const level = getLevel(id)!;
+      const ores = resolveContractOres(stateFor(level, id));
+      for (const deep of ['gloomium', 'sparkium', 'craktonite', 'absurdium', 'treranium']) {
+        expect(ores).not.toContain(deep);
+      }
+    }
+  });
+
+  it('returns only known ore ids, no duplicates, in ore catalog order', () => {
+    for (const level of getAllLevels()) {
+      const ores = resolveContractOres(stateFor(level, level.id));
+      expect(ores.length).toBeGreaterThan(0);
+      expect(new Set(ores).size).toBe(ores.length);
+      expect(ores.every(o => ALL_ORE_IDS.includes(o))).toBe(true);
+      expect([...ores]).toEqual(ALL_ORE_IDS.filter(o => ores.includes(o)));
+    }
+  });
+
+  it('level 3 (mixed hardness) uses only its softest and hardest dominant rock', () => {
+    const level = getLevel('treranium_depths')!;
+    expect(level.mixedRockHardness).toBe(true);
+    const rocks = getBiome(level.biome)!.dominantRocks
+      .map(id => getRock(id)!)
+      .sort((a, b) => a.hardnessTier - b.hardnessTier);
+    const expected = oresYieldedByRocks([rocks[0]!.id, rocks[rocks.length - 1]!.id]);
+    expect([...resolveContractOres(stateFor(level, level.id))]).toEqual(expected);
+  });
+
+  it('mixed hardness never widens the ores relative to the same biome unmixed', () => {
+    const level = getLevel('treranium_depths')!;
+    const unmixed = stateFor({ ...level, mixedRockHardness: false }, level.id);
+    const mixed = stateFor(level, level.id);
+    const all = getBiome(level.biome)!.dominantRocks;
+    expect([...resolveContractOres(unmixed)]).toEqual(oresYieldedByRocks(all));
+    expect(resolveContractOres(mixed).length).toBeLessThanOrEqual(resolveContractOres(unmixed).length);
+  });
+
+  it('unknown biome falls back to every priced ore', () => {
+    const state = createGame({ seed: 1, mineType: 'no_such_biome' });
+    state.campaign.activeLevelId = null;
+    expect([...resolveContractOres(state)]).toEqual(ALL_ORE_IDS);
+  });
+
+  it('without a world, falls back to the declared biome rocks', () => {
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.world = null;
+    state.campaign.activeLevelId = null;
+    expect([...resolveContractOres(state)]).toEqual(oresYieldedByRocks(getBiome('desert')!.dominantRocks));
+  });
+
+  describe('new_game path (state.seed differs from any level terrainSeed)', () => {
+    for (const biome of getAllBiomes()) {
+      it(`biome ${biome.id}: offered covers the grid and is yieldable by the generated biome`, () => {
+        const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 12345 });
+        expect(level.terrainSeed).not.toBe(getLevel('tutorial_pit')!.terrainSeed);
+        const state = stateFor(level, null);
+        state.seed = 12345;
+        const offered = new Set(resolveContractOres(state));
+        for (const ore of oresInGrid(level, 12345, biome.climateCenter)) expect(offered.has(ore)).toBe(true);
+        const generated = resolveGeneratedBiome(12345, level.gridX, level.gridZ, biome.climateCenter);
+        const yieldable = new Set(oresYieldedByRocks(generated.dominantRocks));
+        for (const ore of offered) expect(yieldable.has(ore)).toBe(true);
+      });
+    }
+  });
+
+  describe('drift lock: result is a superset of ores generated into the grid', () => {
+    for (const level of getAllLevels()) {
+      it(`campaign level ${level.id}`, () => {
+        const offered = new Set(resolveContractOres(stateFor(level, level.id)));
+        const inGrid = oresInGrid(level);
+        expect(inGrid.size).toBeGreaterThan(0);
+        for (const ore of inGrid) expect(offered.has(ore)).toBe(true);
+      });
+    }
+
+    for (const biome of getAllBiomes()) {
+      it(`sandbox biome ${biome.id}`, () => {
+        const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 7 });
+        const offered = new Set(resolveContractOres(stateFor(level, SANDBOX_LEVEL_ID)));
+        const inGrid = oresInGrid(level);
+        for (const ore of inGrid) expect(offered.has(ore)).toBe(true);
+      });
+    }
+  });
+});
+
+describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
+  it('declares the dusty hollow starting site: crew, fleet, warehouse', () => {
+    expect(getLevel('dusty_hollow')!.startingSite).toBe(DUSTY_HOLLOW_STARTING_SITE);
+  });
+
+  it('the starting site is a driller, a blaster, a driver, a drill rig, a debris hauler and a T1 freight warehouse', () => {
+    expect(DUSTY_HOLLOW_STARTING_SITE.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
+    expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.map(v => v.role).sort()).toEqual(['debris_hauler', 'drill_rig']);
+    expect(DUSTY_HOLLOW_STARTING_SITE.buildings).toEqual([{ type: 'freight_warehouse', tier: 1 }]);
+  });
+
+  it('no other level declares a starting site', () => {
+    for (const level of getAllLevels()) {
+      if (level.id === 'dusty_hollow') continue;
+      expect(level.startingSite, level.id).toBeUndefined();
+    }
+  });
+
+  it('keeps the $50k starting cash: staffing is free', () => {
+    expect(getLevel('dusty_hollow')!.startingCash).toBe(50000);
+  });
+
+  it('dusty hollow uses DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER as its price multiplier', () => {
+    expect(getLevel('dusty_hollow')!.contractPriceMultiplier).toBe(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER);
+  });
+
+  // The multiplier is a tuning lever: it must be raised above the old 1.2
+  // placeholder (the level could not be won at 1.2) yet stay far below the
+  // tutorial's 52x, so Level 1 stays a real market. The upper bound of 10 is a
+  // deliberate sanity cap, not a target: a win bought with a runaway multiplier
+  // proves nothing about the economy.
+  it('DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER sits in the sensible mid-window (1.2, 10]', () => {
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeGreaterThan(1.2);
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThanOrEqual(10);
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThan(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
+  });
+
+  it('later levels stay tighter markets than dusty hollow', () => {
+    expect(getLevel('grumpstone_ridge')!.contractPriceMultiplier).toBeLessThan(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER);
   });
 });

@@ -34,7 +34,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,20",
-      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes, start:20,20) to 2x2 (4 holes) so the single driller/drill_rig lands the whole plan quickly -- this file's point is a full drill/charge/sequence/blast cycle actually working, not a specific hole count. #1151: moved from start:10,10 to start:14,17 for climb-reachability. #1263: moved again, from start:14,17 to start:15,20, after the CREW_SPAWN_AGENT_SEPARATION fix (this same issue) changed where the staffed roster's own five employees and four vehicles land under this seed -- one of them (the blaster) now spawns exactly on (14,17) itself, so a drill_rig sent to drill H1 there was blocked by an employee standing on its own destination cell forever (orderedHoleCount stuck at 1). start:15,20's four holes -- (15,20) (19,20) (15,24) (19,24) -- collide with no employee or vehicle spawn cell. Confirmed via a direct 6000-tick trace: all four land by tick 45 (this step's own max_ticks keeps its existing 600-tick headroom).",
+      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes, start:20,20) to 2x2 (4 holes) so the single driller/drill_rig lands the whole plan quickly -- this file's point is a full drill/charge/blast cycle actually working, not a specific hole count. #1151: moved from start:10,10 to start:14,17 for climb-reachability. #1263: moved again, from start:14,17 to start:15,20, after the CREW_SPAWN_AGENT_SEPARATION fix (this same issue) changed where the staffed roster's own five employees and four vehicles land under this seed -- one of them (the blaster) now spawns exactly on (14,17) itself, so a drill_rig sent to drill H1 there was blocked by an employee standing on its own destination cell forever (orderedHoleCount stuck at 1). start:15,20's four holes -- (15,20) (19,20) (15,24) (19,24) -- collide with no employee or vehicle spawn cell. Confirmed via a direct 6000-tick trace: all four land by tick 45 (this step's own max_ticks keeps its existing 600-tick headroom).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -158,24 +158,13 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "role": "player",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -187,6 +176,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
@@ -201,8 +195,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },

@@ -106,8 +106,8 @@ Handle all technical decisions autonomously (architecture, algorithms, tests, ba
 
 ## PR Rules
 
-- Reference issue number in PR body with "Closes #<number>"
-- Critical for auto-assign pipeline to work
+- A PR that closes an issue carries `Closes #<number>` on a line of its own in its body — the only shape the merge chain reads, and critical for the auto-assign pipeline to work
+- Body layout: `.github/pull_request_template.md`; a pipeline run uses `.github/PULL_REQUEST_TEMPLATE/pipeline.md` (`dev-finishing-work`)
 
 ## Code Review Rules
 

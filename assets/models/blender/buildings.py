@@ -31,7 +31,6 @@ TYPE_COLORS = {
     'living_quarters': 0x4488CC,
     'explosive_warehouse': 0xFF2222,
     'freight_warehouse': 0x888888,
-    'vehicle_depot': 0xDDAA22,
 }
 
 FLOOR_H = 1.45
@@ -642,53 +641,6 @@ def build_freight_warehouse(sx, sz, tier, ex, xx, m):
     pivot('Body', (0, 0, 0), parts)
 
 
-def build_vehicle_depot(sx, sz, tier, ex, xx, m):
-    parts, top, wsx, wsy = _base(sx, sz, tier, m, floors=1 + 0.35 * (tier - 1), window_rows=False, entry_x=ex, exit_x=xx)
-    parts += flat_roof(wsx, wsy, top, m)
-    # Open service bays on the front between the two doors, arched.
-    span = max(1.2, (xx - ex) - 1.3)
-    bays = max(1, int(span / 1.3))
-    bw = span / bays
-    for i in range(bays):
-        x = (ex + xx) / 2 - span / 2 + bw * (i + 0.5)
-        opening = box(f'Bay{i}', (bw - 0.25, 0.1, top * 0.62), loc=(x, wsy / 2 + 0.02, top * 0.34))
-        bevel(opening, 0.06, 3)
-        assign(opening, m['dark'])
-        parts.append(opening)
-        arch = torus(f'Bay{i}.Arch', (bw - 0.25) / 2, 0.05, loc=(x, wsy / 2 + 0.04, top * 0.62 + 0.02), rot=(90, 0, 0),
-                     major_segments=20, minor_segments=6)
-        import bmesh
-        bm = bmesh.new(); bm.from_mesh(arch.data)
-        bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.y < -0.02], context='VERTS')
-        bm.to_mesh(arch.data); bm.free()
-        assign(arch, m['stripe_y'])
-        parts.append(arch)
-    # Tyre stack, oil drums, fuel pump.
-    for i in range(3):
-        t = torus(f'Tyre{i}', 0.28, 0.1, loc=(sx / 2 + 0.4, -sz / 2 + 0.45, 0.1 + i * 0.2), major_segments=20, minor_segments=8)
-        assign(t, m['dark'])
-        parts.append(t)
-    parts += barrel('Drum1', (sx / 2 + 0.4, 0.3, 0), m, mat=m['stripe_y'])
-    pump = box('Pump', (0.35, 0.3, 0.9), loc=(-sx / 2 - 0.4, sz / 2 - 0.4, 0.45))
-    bevel(pump, 0.04, 2)
-    assign(pump, m['red'])
-    parts.append(pump)
-    screen = box('Pump.Screen', (0.05, 0.2, 0.18), loc=(-sx / 2 - 0.6, sz / 2 - 0.4, 0.7))
-    assign(screen, m['glass'])
-    parts.append(screen)
-    hose = capsule('Pump.Hose', 0.025, 0.5, loc=(-sx / 2 - 0.4, sz / 2 - 0.2, 0.55), axis='Z', segments=8, rings=4)
-    rotate(hose, x=25)
-    assign(hose, m['dark'])
-    parts.append(hose)
-    if tier >= 2:
-        parts += crate('Crate', (-sx / 2 - 0.4, -sz / 2 + 0.4, 0), 0.5, m, rot_z=10)
-        parts += sign_post('Sign', (sx / 2 + 0.4, sz / 2 + 0.3, 0), m, m['body'], h=1.8, plate=(0.9, 0.45))
-    if tier >= 3:
-        parts += lamp_post('Lamp', (0, sz / 2 + 0.5, 0), m, h=2.2)
-        parts += ac_units('AC', wsx, wsy, top + 0.26, m, count=2)
-    pivot('Body', (0, 0, 0), parts)
-
-
 def build_ruin(m):
     """A 2×2 rubble mound; the game scales it to the destroyed building's footprint."""
     rnd = random.Random(5)
@@ -726,7 +678,6 @@ TYPE_BUILDERS = {
     'living_quarters': build_living_quarters,
     'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
-    'vehicle_depot': build_vehicle_depot,
 }
 
 

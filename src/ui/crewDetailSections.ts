@@ -12,8 +12,9 @@ import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, isSchoolFull, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
-import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, PAY_CYCLE_TICKS } from '../core/config/balance.js';
+import { availableTrainingOffers, planTraining, isSchoolFull } from '../core/entities/EmployeeTraining.js';
+import { perHour } from '../core/economy/formatMoney.js';
+import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 
 /** Quick-raise amounts offered in the PAY block — flat $ presets, not derived from any per-role scale. */
@@ -44,12 +45,12 @@ export const ACTION_LABEL_KEY: Record<ActionType, string> = {
   charge_hole: 'ui.crew.action_charge_hole',
   dig_ramp_segment: 'ui.crew.action_dig_ramp_segment',
   level_ground: 'ui.crew.action_level_ground',
-  set_sequence: 'ui.crew.action_set_sequence',
   place_building: 'ui.crew.action_place_building',
   demolish_building: 'ui.crew.action_demolish_building',
   survey: 'ui.crew.action_survey',
   fragment_debris: 'ui.crew.action_fragment_debris',
   haul_debris: 'ui.crew.action_haul_debris',
+  repair_vehicle: 'ui.crew.action_repair_vehicle',
   rest: 'ui.crew.task_resting',
   general_work: 'ui.crew.action_general_work',
 };
@@ -79,19 +80,14 @@ function well(children: (Node | null | undefined)[]): HTMLElement {
   return el('div', { className: 'bsx-well', attrs: { style: 'padding:9px 10px;display:flex;flex-direction:column;gap:6px' }, children });
 }
 
-/**
- * A training-offer row that cannot be started right now — already at max
- * proficiency, or the school is full (#1203) — rendered as a title + reason
- * line with a disabled Train button. Both callers in makeTrainingSection
- * differ only in the title text and the reason line's i18n key/params.
- */
-function renderLockedTrainingRow(row: HTMLElement, titleText: string, reasonKey: string, reasonParams?: Record<string, string | number>): void {
+/** Title line over a detail line, the text block shared by every training-offer row. */
+function trainingInfoBlock(title: string, detail: string): HTMLElement {
   const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
   info.append(
-    el('span', { text: titleText, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-    el('span', { text: t(reasonKey, reasonParams), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+    el('span', { text: title, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+    el('span', { text: detail, attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
   );
-  row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+  return info;
 }
 
 // ── HIRED / LOCATION ──
@@ -236,10 +232,7 @@ export function makeSkillsSection(e: Employee): HTMLElement {
 
 // ── PAY ──
 
-/** Stored salary is per pay cycle; 1 tick = 1 game-hour, so the hourly rate is salary / PAY_CYCLE_TICKS (1 decimal, no trailing .0). */
-function perHour(perCycle: number): number {
-  return Math.round((perCycle / PAY_CYCLE_TICKS) * 10) / 10;
-}
+export { perHour };
 
 /**
  * A raise costs nothing upfront — giveRaise only raises the ongoing salary
@@ -317,19 +310,22 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     const plan = planTraining(e, skill, building.tier);
     const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
 
+    const title = t(`course.${skill}`);
+
     if (!plan) {
-      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) });
+      row.append(trainingInfoBlock(title, t('ui.crew.training_qualified')));
     } else if (isSchoolFull(state, building)) {
-      renderLockedTrainingRow(row, `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, 'ui.crew.training_school_full');
+      row.append(
+        trainingInfoBlock(title, t('ui.crew.training_school_full')),
+        button('locked', t('ui.crew.train'), { disabled: true }),
+      );
     } else {
       anyOffered = true;
-      const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
-      info.append(
-        el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-        el('span', {
-          text: t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks }),
-          attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
-        }),
+      const info = trainingInfoBlock(
+        title,
+        plan.raisesLicenceTo !== undefined
+          ? t('ui.crew.training_licence_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, level: plan.raisesLicenceTo })
+          : t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
       );
       const trainBtn = button('warn', t('ui.crew.train'), { disabled: state.cash < plan.fee || e.injured });
       trainBtn.classList.add('bs-train-btn');
@@ -342,7 +338,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   }
 
   if (e.injured) rows.push(reasonLine(t('ui.crew.training_injured'), true));
-  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) })));
+  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_qualified')));
 
   wrap.appendChild(well(rows));
   return wrap;

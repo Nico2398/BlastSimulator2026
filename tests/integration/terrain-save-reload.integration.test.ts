@@ -22,7 +22,6 @@ import { buildNavGridSyncTarget, type GameContext } from '../../src/console/comm
 import { subscribeNavGridToUpdates } from '../../src/core/nav/NavGridSync.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { computeVoxelColumnSurfaceY, MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
@@ -80,8 +79,7 @@ function runBlastAndExpansion(ctx: GameContext): void {
   for (const h of holes) holeDepths[h.id] = h.depth;
   // treranium_depths is tier 3 rock: a tier-matched explosive avoids the shortfall penalty (#1358).
   const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 8, 2);
-  const delays = autoVPattern(holes, 25);
-  const plan = assembleBlastPlan(holes, charges, delays);
+  const plan = assembleBlastPlan(holes, charges);
 
   const blastResult = executeBlast(plan, ctx.grid!, []);
   expect(blastResult).not.toBeNull();

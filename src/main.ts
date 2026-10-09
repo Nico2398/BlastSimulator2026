@@ -7,7 +7,9 @@ import { fetchModelBytes, preloadModels, yieldToEventLoop } from './renderer/mod
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
+import { wireLogisticsNotifications } from './ui/notify/logisticsNotifications.js';
 import { wireResearchNotifications } from './ui/notify/researchNotifications.js';
+import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { shouldAutoStartTutorial, shouldKeepTutorialRunning, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
@@ -21,6 +23,8 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
+import { canAffordVehicleUpgrade } from './core/entities/VehicleUpgrade.js';
+import { getMaxBuildingTier } from './core/entities/Building.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
@@ -29,7 +33,7 @@ import { AudioHooks } from './audio/AudioHooks.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
 import { loadCampaignProfile, saveCampaignProfile } from './persistence/CampaignProfileStore.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
-import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
+import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
@@ -37,6 +41,7 @@ import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
@@ -58,6 +63,7 @@ import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
 import { dominantRockUnderHole } from './core/mining/ExplosiveRockFit.js';
+import { wetHoles } from './core/mining/WetHoles.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
 // --- 3D Scene ---
@@ -473,6 +479,8 @@ emitter.on('blast:started', ({ originX, originZ }) => {
 
 wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
 wireResearchNotifications(emitter, n => uiManager.notify(n));
+wireLogisticsNotifications(emitter, n => uiManager.notify(n));
+wireCorruptionNotifications(emitter, n => uiManager.notify(n));
 
 let lastCommandOutput = '';
 const consoleLogs: string[] = [];
@@ -514,7 +522,7 @@ function onLevelStateReplaced(state: GameState): void {
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const prevState = ctx.state;
-  syncTutorialActive(ctx, tutorial.isActive);
+  const prevBlastReport = ctx.state?.lastBlastReport ?? null;
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -545,15 +553,18 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Trigger blast effects after a blast (terrain remesh already happened via
   // the terrain:updated subscription above, fired from inside executeBlast).
-  if (cmdName === 'blast' && result.success && ctx.state) {
+  // Keyed on a new blast report rather than the command name (#1362): a
+  // detonation can fire from inside `tick` once its zone clears, and a
+  // `blast` subcommand can succeed without firing anything.
+  if (!enteredNewLevel && ctx.state && ctx.state.lastBlastReport !== prevBlastReport && ctx.state.lastBlastReport !== null) {
     gameRenderer.onBlast(ctx);
-    audioHooks.onBlast(ctx.state.sequenceDelays);
+    audioHooks.onBlast();
   }
   // Show blast plan overlay during planning commands, and refresh it whenever
   // a preview command runs or software tier changes — otherwise the overlay's
   // softwareTier and preview data are frozen at whatever the last drill_plan/
-  // charge/sequence call baked in, and a purchased tier's overlay never appears.
-  if (['drill_plan', 'charge', 'sequence', 'preview', 'buy_software', 'blast_preview'].includes(cmdName)) {
+  // charge call baked in, and a purchased tier's overlay never appears.
+  if (['drill_plan', 'charge', 'preview', 'buy_software', 'blast_preview'].includes(cmdName)) {
     gameRenderer.showBlastPlanOverlay(ctx);
   }
   // UI click sound for any command
@@ -566,7 +577,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Update UI after every command
   if (ctx.state) {
-    uiManager.update(ctx.state, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
+    uiManager.update(ctx.state, gameRenderer.fragmentPlaybackDuration);
     // A game exists — reveal HUD chrome unless the player is looking at the
     // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
     // command so no entry point (button, console, scenario harness) can miss it.
@@ -607,7 +618,6 @@ window.__gameState = () => {
     worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole,
-    sequenceDelays: s.sequenceDelays,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
     // Holes ordered but not yet drilled (state.plannedDrillHoles.length) --
@@ -620,6 +630,7 @@ window.__gameState = () => {
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount above (#554).
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    wetHoleCount: wetHoles(s).length,
     // Remaining not-yet-`done` segments across every in-flight
     // state.plannedRamps entry -- mirrors serializeGameState's own field
     // (console-api.ts), same rationale as orderedHoleCount/orderedChargeCount
@@ -638,7 +649,6 @@ window.__gameState = () => {
     // rationale as orderedHoleCount/orderedRampSegmentCount above (#556).
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
-    sequencedCount: Object.keys(s.sequenceDelays).length,
     // Research tasks queued at a Research Center, in progress or pending --
     // mirrors serializeGameState's own field (console-api.ts). Proves a
     // research task actually completed (reaches 0) rather than a `tick N`
@@ -649,6 +659,7 @@ window.__gameState = () => {
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
     buildingCount: s.buildings.buildings.length,
+    maxBuildingTier: getMaxBuildingTier(s.buildings),
     vehicleCount: s.vehicles.vehicles.length,
     // Mirrors serializeGameState (console-api.ts): active jams, silencing ignored (#1208).
     trafficJamCount: jams.length,
@@ -681,7 +692,7 @@ window.__gameState = () => {
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors
     // console-api.ts's own field so both modes read the same thing.
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
-    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, s.logistics.storedMassKg),
+    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,
@@ -708,6 +719,7 @@ window.__gameState = () => {
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
+    storedSpoilKg: totalSpoilKg(s.buildings.buildings),
     // Sum across every material key in state.collectedOre (kg) -- mirrors
     // serializeGameState's own field (console-api.ts), same rationale as
     // orderedHoleCount above: a scenario asserting ore was actually
@@ -715,6 +727,7 @@ window.__gameState = () => {
     // increased/decreased/changedBy against (#671).
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
     dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees), // mirrors serializeGameState (#557)
+    corruptionLevel: s.corruption.level, // mirrors serializeGameState (#1407)
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
@@ -1041,11 +1054,20 @@ scenePicking.setHoverChangeHandler((hover) => {
 });
 /** Width of the selected ramp as last drawn (bar + corridor highlight); a widening that lands re-draws both (#1298). */
 let shownRampWidth: number | null = null;
+/** Tier and affordability of the selected vehicle's Upgrade button as last drawn; a change re-draws the bar (#1401). */
+let shownVehicleKey: string | null = null;
+function vehicleSelectionKey(entity: EntityPick, state: GameState): string | null {
+  if (entity.kind !== 'vehicle') return null;
+  const v = state.vehicles.vehicles.find(x => x.id === entity.id);
+  if (!v) return null;
+  return `${v.tier}:${canAffordVehicleUpgrade(v, state.cash)}`;
+}
 function showSelection(entity: EntityPick, state: GameState): void {
   selectionBar.show(entity, state);
   const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
   const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
   shownRampWidth = ramp?.width ?? null;
+  shownVehicleKey = vehicleSelectionKey(entity, state);
   if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
   else if (pos) entityHighlight.show(pos, entity.kind);
 }
@@ -1054,6 +1076,7 @@ scenePicking.setSelectChangeHandler((entity) => {
     showSelection(entity, ctx.state);
   } else {
     shownRampWidth = null;
+    shownVehicleKey = null;
     selectionBar.hide();
     entityHighlight.hide();
   }
@@ -1076,6 +1099,10 @@ uiManager.registerEscLayer(() => !uiManager.confirmOpen && !uiManager.eventModal
 function reportIfFailed(title: string, result: CommandResult): void {
   if (!result.success) uiManager.notify({ severity: 'warn', title, body: result.output });
 }
+/** Order-style actions finish later, so success says "ordered" (the command's own output) rather than staying silent (#1392). */
+function reportOrderResult(title: string, result: CommandResult): void {
+  uiManager.notify({ severity: result.success ? 'info' : 'warn', title, body: result.output });
+}
 selectionBar.setActionHandler((action, entity) => {
   switch (action) {
     case 'detail':
@@ -1093,6 +1120,9 @@ selectionBar.setActionHandler((action, entity) => {
       reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
       break;
     }
+    case 'upgrade_vehicle':
+      reportIfFailed(t('shell.selection.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
+      break;
     case 'move_here': {
       // Vehicle counterpart of Dispatch Here: drive to whatever tile the
       // player is currently pointing at. `vehicle reposition` takes its
@@ -1114,7 +1144,7 @@ selectionBar.setActionHandler((action, entity) => {
       break;
     }
     case 'upgrade':
-      reportIfFailed(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
+      reportOrderResult(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
       break;
     case 'move':
       // Move needs a tile picker — the in-scene placement layer is P3's job.
@@ -1131,8 +1161,7 @@ selectionBar.setActionHandler((action, entity) => {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;
       uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
-        reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
-        scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
+        reportOrderResult(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
       }));
       break;
     }
@@ -1210,6 +1239,8 @@ scene.start((dt) => {
     if (!pos) scenePicking.clearSelection();
     else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === scenePicking.selection?.id)?.width !== shownRampWidth) {
       showSelection(scenePicking.selection, ctx.state!);
+    } else if (shownVehicleKey !== null && ctx.state && vehicleSelectionKey(scenePicking.selection, ctx.state) !== shownVehicleKey) {
+      showSelection(scenePicking.selection, ctx.state);
     } else entityHighlight.setPosition(pos);
   }
 
@@ -1242,7 +1273,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
+    uiManager.update(ctx.state, gameRenderer.fragmentPlaybackDuration);
     if (!mainMenu.visible) uiManager.show();
     if (!fullScreenMenuUp()) savesModal.onTick(ctx.state);
   }

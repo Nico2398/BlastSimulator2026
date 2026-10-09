@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
+import { wetAllHoles } from '../../../helpers/holeWater.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { readFileSync } from 'node:fs';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -28,7 +30,6 @@ function chargedPlan(): GameState {
   const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const chargeResult = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-  state.sequenceDelays[hole.id] = 0;
   return state;
 }
 
@@ -68,15 +69,15 @@ describe('PreflightModal', () => {
     expect(gameConsole).not.toHaveBeenCalled();
   });
 
-  it('Detonate dispatches blast and hides the modal', () => {
+  it('Detonate dispatches `blast detonate` (arm the sequence), not a bare blast (#1362)', () => {
     const { modal, gameConsole } = makeModal();
     modal.show();
     modal.update(chargedPlan(), 'sunny');
 
     (modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement).click();
 
-    expect(gameConsole).toHaveBeenCalledWith('blast');
-    expect(modal.visible).toBe(false);
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith('blast detonate');
   });
 
   it('shows the "no preview" hint when state.lastBlastPreview is null', () => {
@@ -103,14 +104,16 @@ describe('PreflightModal', () => {
     expect(modal.root.textContent).toContain('projections — T3');
   });
 
-  it('warns about wet holes while raining, and shows the ok line once dry', () => {
+  it('warns about holes that hold water, and shows the ok line once they are dry', () => {
     const { modal } = makeModal();
     modal.show();
     const state = chargedPlan();
 
-    modal.update(state, 'heavy_rain');
+    wetAllHoles(state);
+    modal.update(state, 'sunny');
     expect(modal.root.textContent).toContain('1 holes are full of water');
 
+    state.holeWater = {};
     modal.update(state, 'sunny');
     expect(modal.root.textContent).toContain('All holes are dry or tubed');
   });
@@ -242,5 +245,146 @@ describe('PreflightModal — undrilled-holes warning (#1346)', () => {
     modal.update(state, 'sunny');
     const tpl = readLocale('en')[KEY]!.split('{count}')[1]!;
     expect(modal.root.textContent).not.toContain(tpl);
+  });
+});
+
+// ── #1362: waiting body while a detonation is armed ──────────────────────────
+
+describe('PreflightModal — armed detonation waiting body (#1362)', () => {
+  const FIRE_ANYWAY = '[data-action="preflight-fire-anyway"]';
+  const CANCEL_DET = '[data-action="preflight-cancel-detonation"]';
+  const NEW_KEYS = [
+    'ui.blast_workshop.preflight.detonating_title',
+    'ui.blast_workshop.preflight.detonating_remaining',
+    'ui.blast_workshop.preflight.stranded_names',
+    'ui.blast_workshop.preflight.fire_anyway',
+    'ui.blast_workshop.preflight.cancel_detonation',
+    'mining.blast.detonation_armed',
+    'mining.blast.detonation_cancelled',
+    'mining.blast.detonation_auto_fired',
+    'mining.blast.detonation_stranded',
+  ];
+  const readLocale = (l: string): Record<string, string> =>
+    JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+
+  function armedState(opts: { stranded?: boolean; workerAt?: [number, number] } = {}): { state: GameState; empId: number } {
+    const state = chargedPlan(); // hole at (10,10): danger zone (-5,-5)-(25,25)
+    const [x, z] = opts.workerAt ?? [11, 11];
+    state.employees.employees.push({
+      id: 7, name: 'Oz Trill', role: 'driller', salary: 500, morale: 60,
+      unionized: false, injured: false, alive: true, x, z,
+      qualifications: [], trainingState: null, activeActionId: null,
+      fatigue: 0, collapsing: false, interruptedActionPayload: null,
+      ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+      activeTaskSkill: null, destinationX: null, destinationZ: null,
+      moveConsecutiveFailures: 0, isMoveStuck: false,
+      pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+      pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+      taskQueue: [], locomotion: { kind: 'on_foot' },
+      itinerary: null, vehicleWaitingTicks: 0,
+    });
+    state.pendingDetonation = {
+      armedTick: 0, strandedEmployeeIds: opts.stranded ? [7] : [], strandedVehicleIds: [], lastEvacuationTick: 0,
+    };
+    return { state, empId: 7 };
+  }
+
+  it('en.json and fr.json define every new key, with different text', () => {
+    for (const key of NEW_KEYS) {
+      const en = readLocale('en')[key];
+      const fr = readLocale('fr')[key];
+      expect(en, `en ${key}`).toBeTruthy();
+      expect(fr, `fr ${key}`).toBeTruthy();
+      expect(en, key).not.toBe(fr);
+    }
+  });
+
+  it('shows no waiting controls while nothing is armed', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(chargedPlan(), 'sunny');
+    expect(modal.root.querySelector(FIRE_ANYWAY)).toBeNull();
+    expect(modal.root.querySelector(CANCEL_DET)).toBeNull();
+  });
+
+  it('shows the waiting title, the remaining count and both Fire anyway / Cancel buttons while evacuating', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(armedState().state, 'sunny');
+
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.detonating_title'));
+    expect(modal.root.querySelector(FIRE_ANYWAY)).not.toBeNull();
+    expect(modal.root.querySelector(CANCEL_DET)).not.toBeNull();
+    expect((modal.root.querySelector(FIRE_ANYWAY) as HTMLButtonElement).disabled).toBe(false);
+    expect((modal.root.querySelector(CANCEL_DET) as HTMLButtonElement).disabled).toBe(false);
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.detonating_remaining', { count: 1, remaining: 1 }));
+  });
+
+  it('names the stranded occupant and still offers both buttons', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(armedState({ stranded: true }).state, 'sunny');
+
+    expect(modal.root.textContent).toContain('Oz Trill');
+    expect(modal.root.querySelector(FIRE_ANYWAY)).not.toBeNull();
+    expect(modal.root.querySelector(CANCEL_DET)).not.toBeNull();
+  });
+
+  it('does not show stranded names while merely evacuating', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(armedState({ stranded: false }).state, 'sunny');
+    expect(modal.root.textContent).not.toContain('Oz Trill');
+  });
+
+  it('offers both buttons even when the zone is already clear (always both)', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(armedState({ workerAt: [200, 200] }).state, 'sunny');
+    expect(modal.root.querySelector(FIRE_ANYWAY)).not.toBeNull();
+    expect(modal.root.querySelector(CANCEL_DET)).not.toBeNull();
+  });
+
+  it('Fire anyway dispatches a plain `blast`', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    modal.update(armedState().state, 'sunny');
+
+    (modal.root.querySelector(FIRE_ANYWAY) as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith('blast');
+  });
+
+  it('Cancel detonation dispatches `blast cancel`, never `blast`', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    modal.update(armedState().state, 'sunny');
+
+    (modal.root.querySelector(CANCEL_DET) as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith('blast cancel');
+  });
+
+  it('closes once the armed detonation is gone (fired or cancelled)', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const { state } = armedState();
+    modal.update(state, 'sunny');
+    expect(modal.visible).toBe(true);
+
+    state.pendingDetonation = null;
+    modal.update(state, 'sunny');
+
+    expect(modal.visible).toBe(false);
+  });
+
+  it('the waiting body never replaces the pre-flight Cancel button, which still dispatches nothing', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    modal.update(chargedPlan(), 'sunny');
+    (modal.root.querySelector('[data-action="preflight-cancel"]') as HTMLButtonElement).click();
+    expect(gameConsole).not.toHaveBeenCalled();
   });
 });

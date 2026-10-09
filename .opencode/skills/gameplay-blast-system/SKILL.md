@@ -234,9 +234,22 @@ budget is ~300 ms.
 
 ## Loading a saved plan (#1342)
 
-`blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled), sequence delays are re-keyed to the new ids. Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isChargeHoleClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
+`blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled), Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isChargeHoleClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
 
 Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration backfills it) except `drill_plan grid`, which replaces the plan and restarts at H1; removing a hole never reuses an id (#1352).
+
+## Pattern charge settings (#1345)
+
+`charge hole:* explosive:X amount:N stemming:M` stores the settings on the pattern (`state.patternCharge`, repeat overwrites) and orders every drilled hole not yet covered; a hole drilled later is charged automatically the moment it lands (`autoChargeHole`, called by the `drill_hole` completion). Logic lives in `src/core/mining/ChargeOrder.ts` (core), the console only parses and formats.
+
+- **Skip covered.** A hole is covered when charged or holding an outstanding `charge_hole` order; Charge All and auto-charge skip it. A cancelled order is not re-ordered automatically: run Charge All again.
+- **Funds per hole.** Cost is paid at order time, hole by hole. A hole the player cannot afford is listed in `state.chargeAwaitingFunds` (nothing ordered, nothing deducted) and retried once per tick (`settleAwaitingFundsCharges`, id order, walks only that list) until affordable. The call still succeeds: "ordered N, skipped M already charged, waiting K". UI: awaiting-funds chip per hole, a reason line, one warn toast per episode.
+- **Refusals.** `charge hole:*` with no drilled and no planned hole, or with everything drilled already covered and nothing planned, is refused (`mining.charge.nothing_to_charge`). Only planned holes: succeeds and stores the settings. `blast` with no drilled hole holding a loaded (or loading) charge is refused (`mining.blast.no_charged_holes`); nothing mutates.
+- **Per-hole override.** `charge hole:<id>` does not touch the pattern; it re-orders that hole as before.
+- **Reset and edge cases.** `resetPlanState` (clear, post-blast) clears the pattern and the waiting list; removing a hole drops its id from the list. An explosive the level does not offer clears the pattern; a failing `createCharge` for one hole leaves it uncharged, never throws.
+- **Replacing a pattern.** `drill_plan grid` over drilled or charged holes is refused unless `confirm:true` (`mining.drill_plan.confirm_replace`, names the counts); the Drill step opens a ConfirmModal (`replacePatternConfirm.ts`) and re-runs with `confirm:true`. A plan of only ordered-not-yet-drilled holes needs no confirm.
+- **Tubing excluded.** `install_tubing` stays a separate per-hole action; it is not part of the pattern.
+- **Hole water (#1350).** Wetness is per-hole stored water (`state.holeWater`), not "is it raining now": it builds in rain and fades afterwards, slower in porous rock. Tubing blocks new water but does not remove old water; `drain_hole` does, at `HOLE_DRAIN_COST_PER_HOLE`, except an untubed hole in porous rock. Details in `gameplay-game-design` (Weather).
 
 ## Undrilled holes at fire time (#1346)
 
@@ -254,19 +267,24 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no
-preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in rained-on untubed holes are predicted weakened.
+preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in holes holding water (`state.holeWater`, #1350) are predicted weakened.
+
+### Detonation and Workshop steps
+
+No detonation sequence exists: every charge fires together at blast start (no per-hole order or delay). The Blast Workshop has 4 steps: Drill, Charge, Preview, Fire. A save carrying a stray `sequenceDelays` key ignores it.
 
 ### Village vibration (#1343)
 
 Villages come from the level's structure set (`PlayableArea.villages()`, the same set the renderer
 draws; ids `village-<i>`, ground level). Both `executeBlast` and `previewVibrations` measure from the
-mean hole position (distance clamped to 1 m) with ground factor = base x `averageVibrationMod`
+mean hole position (distance clamped to 1 m); every charge fires together, so vibration is
+`totalChargeKg(holes, charges)^0.7 / distance^1.5 x groundFactor` (scalar over all charged holes) with ground factor = base x `averageVibrationMod`
 (charged holes, equal weight, wet holes included), so preview equals blast; callers pass the factor.
-The blast report carries `maxVibration`; `blast` costs nuisance `maxVibration x
+The blast report carries `maxVibration`; `blast` lowers neighbour relations (`nuisance`) by `maxVibration x
 VILLAGE_VIBRATION_SCORE_GAIN` via `recordVibration`, separate from the projection term
 (`BLAST_PROJECTION_NUISANCE_PER_PROJECTION`). For `SCORE_VIBRATION_WINDOW_TICKS` ticks after the blast the tick pipeline
 also feeds the same scaled value to `updateScores`. The gain is large (15000) because PPV falls off as
-distance^-1.5 (~4e-4 mm/s at 445 m for an ordinary Grumpstone Ridge blast); it targets ~1-3 nuisance
+distance^-1.5 (~4e-4 mm/s at 445 m for an ordinary Grumpstone Ridge blast); it targets ~1-3 neighbour-relations
 points for an ordinary blast and ~5 for an oversized one.
 
 ## Working on this pipeline

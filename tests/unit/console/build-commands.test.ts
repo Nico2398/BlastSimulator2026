@@ -7,6 +7,7 @@ import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 
@@ -170,18 +171,23 @@ describe('build command — upgrade', () => {
     tickUntilConstructionDone(ctx);
   });
 
-  it('upgrades a T1 building to T2 and returns a new ID', () => {
+  it('orders an upgrade of a T1 building to T2; the building keeps its id (#1392)', () => {
     // #410: research-gated — unlock tier 2 for management_office before upgrading.
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+    equipDemolition(ctx);
     const originalId = ctx.state!.buildings.buildings[0]!.id;
     const result = buildCommand(ctx, ['upgrade', String(originalId)], {});
     expect(result.success).toBe(true);
-    expect(result.output).toContain('T2');
+    // Still tier 1 until the Building Destroyer has done its work.
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
+    tickUntilDemolished(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
+    expect(ctx.state!.buildings.buildings[0]!.id).toBe(originalId);
   });
 
-  it('deducts demolish + construction cost on upgrade', () => {
+  it('deducts demolish + construction cost at order time', () => {
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+    equipDemolition(ctx);
     const b = ctx.state!.buildings.buildings[0]!;
     const cashBefore = ctx.state!.cash;
     const oldDef = getBuildingDef(b.type, b.tier);
@@ -197,13 +203,15 @@ describe('build command — upgrade', () => {
     // Fund the two setup upgrades (funds-guarded, #511) so only the max-tier
     // rejection is under test here, not affordability.
     ctx.state!.cash += 100000;
-    // upgrade to T2 then T3
-    const id1 = ctx.state!.buildings.buildings[0]!.id;
-    buildCommand(ctx, ['upgrade', String(id1)], {});
-    const id2 = ctx.state!.buildings.buildings[0]!.id;
-    buildCommand(ctx, ['upgrade', String(id2)], {});
-    const id3 = ctx.state!.buildings.buildings[0]!.id;
-    const result = buildCommand(ctx, ['upgrade', String(id3)], {});
+    equipDemolition(ctx);
+    // upgrade to T2 then T3 — the id is stable across upgrades (#1392)
+    const id = ctx.state!.buildings.buildings[0]!.id;
+    buildCommand(ctx, ['upgrade', String(id)], {});
+    tickUntilDemolished(ctx);
+    buildCommand(ctx, ['upgrade', String(id)], {});
+    tickUntilDemolished(ctx);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('T3');
   });
@@ -244,18 +252,21 @@ describe('build command — research gate', () => {
 });
 
 describe('build command — demolish with cost', () => {
-  it('deducts demolish cost and removes the building', () => {
+  it('deducts demolish cost at order time and removes the building when the work completes', () => {
     const ctx = makeCtx();
     buildCommand(ctx, ['management_office'], { at: '2,0' });
     tickUntilConstructionDone(ctx);
+    equipDemolition(ctx);
     const b = ctx.state!.buildings.buildings[0]!;
     const cashBefore = ctx.state!.cash;
     const def = getBuildingDef(b.type, b.tier);
     const result = buildCommand(ctx, ['destroy', String(b.id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).toContain('demolished');
-    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    // Cash moves at order time; the building stands until the work completes (#1392).
     expect(ctx.state!.cash).toBe(cashBefore - def.demolishCost);
+    expect(ctx.state!.buildings.buildings.length).toBe(1);
+    tickUntilDemolished(ctx);
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
   });
 
   it('returns error for unknown building ID on destroy', () => {
@@ -299,7 +310,7 @@ describe('build command — terrain reservations (#1390)', () => {
     const { runner, state } = setup();
     expect(runner.run('build_ramp start:30,20 end:30,40 depth:8').success).toBe(true);
     const before = snapshot(state);
-    const r = runner.run('build vehicle_depot at:28,19');
+    const r = runner.run('build geology_lab at:28,19');
     expect(r.success).toBe(false);
     expect(r.output.toLowerCase()).toContain('blocks a ramp');
     expect(snapshot(state)).toEqual(before);
@@ -355,7 +366,7 @@ describe('build command — terrain reservations (#1390)', () => {
     const { runner } = setup();
     runner.run('build_ramp start:30,20 end:30,40 depth:8');
     setLocale('fr');
-    const r = runner.run('build vehicle_depot at:28,19');
+    const r = runner.run('build geology_lab at:28,19');
     expect(r.success).toBe(false);
     expect(r.output.toLowerCase()).not.toContain('blocks a ramp');
     expect(r.output).not.toContain('shell.placement.refused_ramp');

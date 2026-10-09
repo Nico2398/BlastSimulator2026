@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Tests for findSafeEvacuationCell / evacuateZone
 // (src/core/engine/Evacuation.ts, #557).
 
+import { setFreightRoom, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
@@ -424,13 +425,13 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
 
   it('a vehicle mid-haul (to_depot, cargo already picked up) keeps its reservation and cargo intact instead of dropping it (#1091: isCommittedToOwnCargo carry-over)', () => {
     const state = createGame({ seed: EVACUATION_SEED });
-    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
+    setFreightRoom(state, 5000); // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     state.navGrid = flatWalkableGrid(40);
-    state.logistics.storageCapacityKg = 5000;
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
     // #1089: a real, co-located, mounted driver — see the first describe
     // block's own comment on why a dangling driverId no longer works.
     const { employee: driver1 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);
@@ -441,7 +442,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     state.pendingActions.push(action);
     driver1.activeActionId = action.id;
     reserveVehicle(state.vehicles, vehicle.id, action.id);
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     evacuateZone(state, zone);
     // #1089/#1138: the drive leg is read off the driving employee's own
@@ -457,7 +458,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     expect(cargo.state).toBe('in_transit');
     expect(cargo.vehicleId).toBe(String(vehicle.id));
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(action.id);
-    expect(vehicle.payload).toEqual({ fragmentId: 1, massKg: 850 });
+    expect(vehicle.cargo).toEqual([{ fragmentId: 1, massKg: 850 }]);
 
     // Vehicle is still ordered out of the zone like any other evacuee.
     const drivenBy1 = resolveVehicleDriver(vehicle, state.employees.employees);
@@ -485,7 +486,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     // No cargo committed yet — the ordinary claim-only release runs
     // (isCommittedToOwnCargo is false), unlike the cargo-loaded case above.
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     // Nothing was carried — the fragment is untouched, still on the ground.
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 2)!;
@@ -517,7 +518,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     tickLocomotion(state);
 
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     const drivenBy3 = resolveVehicleDriver(vehicle, state.employees.employees);
     expect(isInZone(drivenBy3!.itinerary!.legs[0]!.destX, drivenBy3!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
@@ -536,7 +537,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     tickLocomotion(state);
 
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     const drivenBy4 = resolveVehicleDriver(vehicle, state.employees.employees);
     expect(isInZone(drivenBy4!.itinerary!.legs[0]!.destX, drivenBy4!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
   });

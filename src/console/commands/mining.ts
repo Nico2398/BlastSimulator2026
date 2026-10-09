@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Console commands for mining operations
-// drill_plan, charge, sequence, blast, preview, build, weather, tubing, survey
+// drill_plan, charge, blast, preview, build, weather, tubing, survey
 //
 // Implementation split into command-family modules under ./mining/ (#787).
 // This file is a thin re-export barrel — every external import keeps using
@@ -8,13 +8,13 @@
 export type { MiningContext } from './mining/types.js';
 export type { DrillHoleActionPayload } from './mining/drillPlan.js';
 export { clearDrillPlan, drillPlanCommand } from './mining/drillPlan.js';
-export type { ChargeHoleActionPayload } from './mining/charge.js';
-export { chargeCommand, sequenceCommand } from './mining/charge.js';
+export type { ChargeHoleActionPayload } from '../../core/mining/ChargeOrder.js';
+export { chargeCommand } from './mining/charge.js';
 export { blastCommand } from './mining/blast.js';
 export { blastPlanCommand, previewCommand, blastPreviewCommand, buySoftwareCommand } from './mining/blastPlan.js';
 export type { RampSegmentActionPayload } from './mining/ramp.js';
 export { buildRampCommand, cancelRampCommand, widenRampCommand } from './mining/ramp.js';
 export type { LevelGroundActionPayload } from './mining/level.js';
 export { levelGroundCommand, cancelLevelGroundCommand } from './mining/level.js';
-export { weatherCommand, tubingCommand } from './mining/weatherTubing.js';
+export { weatherCommand, tubingCommand, drainHoleCommand } from './mining/weatherTubing.js';
 export { surveyCommand } from './mining/survey.js';

@@ -1,0 +1,278 @@
+{
+  "name": "blast-charge-visual",
+  "description": "Visual verification of charge loading UI: explosive selection, amount, stemming and tubing. #554: charging now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly, so a Charge All order is followed by a wait_until proving the landed count only advances as the blaster works through the queue, with a mid-loading screenshot of the ordered/loaded mix.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 30,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, a blaster with a bare blasting licence (no vehicle — #554's charge_hole actions are on-foot, requiredVehicleRole: null), plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one increment click on the strip's spacing stepper (data-field=\"spacing\") raises it to 4 before dragging, so the (15,15)-(23,19) rectangle (8x4) computes the declared 3 cols x 2 rows instead of the default-spacing 4x2 (issue #479 follow-up, Finding #4). #553: confirming the grid queues 6 drill_hole PendingActions and pushes 6 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 23,
+          "z2": 19
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 6,
+          "holeCount": 0
+        },
+        "note": "2 rows x 3 cols = 6 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:6 max_ticks:300",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 6 holes. #1339: wait on the 6th hole landing instead of a fixed 130-tick pad: payroll runs every tick, and the extra licences now held by the staffed drivers raise it enough that the idle pad left too little cash for the later 8 kg recharge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 6,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 6
+        },
+        "note": "All 6 holes have landed — none lost, none left ordered forever."
+      },
+      "timeout": 125
+    },
+    {
+      "command": "time speed 8",
+      "description": "Speed up the charge-loading wait below — real-clock auto-tick at 1x would take a long time to drain even a single blaster's queue.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 0
+        },
+        "note": "#554: Charge All only orders the 6 charge_hole actions — chargesByHole stays empty until the blaster actually loads each hole"
+      },
+      "description": "#554: this click queues one charge_hole PendingAction per hole (requiredSkill: 'blasting', requiredVehicleRole: null — on foot, unlike drilling's drill_rig gate). None of the 6 lands the instant the button is clicked; the wait_until steps right after this one drive the blaster through the queue."
+    },
+    {
+      "command": "wait_until field:chargedCount equals:3 max_ticks:3000",
+      "timeout": 125,
+      "description": "#554/#590: the single staffed blaster claims the nearest ordered hole and loads it, one at a time. Screenshot taken here on purpose, halfway through the batch: 3 holes show the loaded charge visuals while the other 3 (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — proving the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed). (#554 follow-up: NOT run at 8x speed -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value. The already-generous timeoutMs covers real-time draining at normal 1x speed instead.)",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 3,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 3
+        },
+        "note": "half the Charge All order has landed; the other half is still ordered-but-unloaded"
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:6 max_ticks:6000",
+      "timeout": 245,
+      "description": "#554/#590: drain the rest of the Charge All order. Budget doubled off the implementer's single-order figure to cover the remaining sequential loads.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 6,
+          "maxTicks": 6000,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        },
+        "note": "Charge All has now landed on every hole"
+      }
+    },
+    {
+      "command": "time speed 1",
+      "description": "Restore normal speed before the remaining player-driven steps.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 1"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "charge hole:H1 explosive:boomite amount:8 stemming:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The explicit [data-step=\"2\"] click is required: Charge All above completed the plan, so the still-armed autoAdvance had already moved the panel to Sequence. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach the declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed. #554: this queues a fresh charge_hole order for H1 — chargesByHole['H1'] keeps its already-landed (5kg/2m) value until the new order lands, so chargedCount is unaffected by this click, exactly as it was pre-#554 (Charge All had already charged all 6, and this proves one row overrides one hole without disturbing the count either way).",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        },
+        "note": "count is unchanged — Charge All had already loaded all 6; this proves one row can re-order one hole, and that the re-order doesn't land instantly either (#554)"
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "inspect 15,15,0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "inspect 15,15,0"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "closeup",
+      "yaw": 90,
+      "pitch": 10
+    },
+    {
+      "name": "birdseye",
+      "yaw": 0,
+      "pitch": 80
+    }
+  ]
+}

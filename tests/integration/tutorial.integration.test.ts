@@ -26,17 +26,16 @@ import { goalChipParams } from '../../src/ui/tutorialStepsClosing.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
-import { getFinancialReport } from '../../src/core/economy/Finance.js';
+import { getOperatingProfit } from '../../src/core/economy/Finance.js';
 import { isFillableSaleOffer } from '../../src/core/economy/Contract.js';
-import { computeDangerZone } from '../../src/core/entities/Zone.js';
 import {
-  BLAST_DANGER_MARGIN_M,
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
   CHARGE_DEFAULT_AMOUNT_KG,
   CHARGE_DEFAULT_STEMMING_M,
 } from '../../src/core/config/balance.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -213,7 +212,6 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
       }
       run('tick 1');
     }
-    expect(run('sequence auto delay_step:25').success).toBe(true);
     const blastResult = run('blast');
     expect(blastResult.success).toBe(true);
 
@@ -238,19 +236,15 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
   });
 });
 
-// ── evacuate before you fire (#557) ─────────────────────────────────────────
+// ── evacuate before you fire (#557, reworked by #1362) ──────────────────────
 //
-// The tutorial's evacuate-zone step (between 'sequence' and 'blast') exists
-// because the console command it's teaching has real teeth: with
-// ctx.tutorialActive set, `blast` refuses to fire while anyone is still
-// standing in the danger zone, and the refusal must leave the whole blast
-// step a no-op — no cash spent, no plan cleared, no blast recorded — not just
-// an error string.
+// #1362 removed the tutorial-only refusal: `blast` (Fire anyway) fires even on
+// an occupied zone and `blast detonate` is the
+// evacuate-zone step's action — it arms the horn + auto-fire sequence.
 
-describe('blast refuses to fire on an occupied zone during the tutorial (#557)', () => {
+describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', () => {
   function setup(): { ctx: MiningContext; runCmd: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']> } {
     const { runner, ctx } = createRunner();
-    ctx.tutorialActive = true;
     const runCmd = (cmd: string) => runner.run(cmd);
     expect(runCmd('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
     expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
@@ -267,33 +261,36 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
       }
       runCmd('tick 1');
     }
-    expect(runCmd('sequence auto delay_step:25').success).toBe(true);
     return { ctx, runCmd };
   }
 
-  it('refuses to fire while the danger zone is still occupied: no cash spent, no plan cleared, no blast recorded', () => {
+  it('fires on an occupied zone (Fire anyway): no refusal', () => {
     const { ctx, runCmd } = setup();
     const state = ctx.state!;
-
-    // Leave the crew standing inside the danger zone instead of clearing it.
     for (const emp of state.employees.employees) {
       emp.x = 16;
       emp.z = 16;
     }
 
-    const beforeCash = state.cash;
-    const beforeHoleCount = state.drillHoles.length;
-    const beforeChargeCount = Object.keys(state.chargesByHole).length;
-    const beforeBlastCount = state.damage.blastCount;
-
     const result = runCmd('blast');
 
-    expect(result.success, 'blast fired while tutorialActive and the zone was occupied').toBe(false);
-    expect(result.output.length).toBeGreaterThan(0);
-    expect(state.cash).toBe(beforeCash);
-    expect(state.drillHoles.length).toBe(beforeHoleCount);
-    expect(Object.keys(state.chargesByHole).length).toBe(beforeChargeCount);
-    expect(state.damage.blastCount).toBe(beforeBlastCount);
+    expect(result.success, result.output).toBe(true);
+    expect(state.damage.blastCount).toBe(1);
+  });
+
+  it('blast detonate during the tutorial arms the sequence instead of refusing or firing at once', () => {
+    const { ctx, runCmd } = setup();
+    const state = ctx.state!;
+    for (const emp of state.employees.employees) {
+      emp.x = 16;
+      emp.z = 16;
+    }
+
+    const result = runCmd('blast detonate');
+
+    expect(result.success, result.output).toBe(true);
+    expect(state.pendingDetonation).not.toBeNull();
+    expect(state.damage.blastCount).toBe(0);
   });
 
   it('fires once the zone is genuinely clear of every employee and vehicle', () => {
@@ -314,37 +311,6 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
 
     expect(result.success, result.output).toBe(true);
     expect(state.damage.blastCount).toBe(1);
-  });
-
-  it('without tutorialActive, the same occupied zone does not block firing — the gate is tutorial-only', () => {
-    const { runner, ctx } = createRunner();
-    ctx.tutorialActive = false;
-    const runCmd = (cmd: string) => runner.run(cmd);
-    expect(runCmd('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
-    expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
-    const state = ctx.state!;
-    for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
-      for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
-      }
-      runCmd('tick 1');
-    }
-    expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
-      for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
-      }
-      runCmd('tick 1');
-    }
-    expect(runCmd('sequence auto delay_step:25').success).toBe(true);
-
-    for (const emp of state.employees.employees) {
-      emp.x = 16;
-      emp.z = 16;
-    }
-
-    const result = runCmd('blast');
-    expect(result.success, result.output).toBe(true);
   });
 });
 
@@ -508,15 +474,15 @@ function tickIfUnpaused(
   return true;
 }
 
-// ── charge → sequence (#926): the step and the panel must never disagree ──
+// ── charge → evacuate-zone (#926): the step and the panel must never disagree ──
 //
 // BlastWorkshop.ts's suggestStep (not exported — its Charge-tab condition is
 // mirrored below as `stillOnChargeTab`) keeps the Blast Workshop on its
 // Charge tab for as long as any hole is still unlit. The 'charge' tutorial
 // step used to complete the instant the FIRST of several holes charged
 // (createComparisonStep's generic "value increased"), moving the tutorial on
-// to 'sequence' while the panel — correctly reading the plan as still
-// mid-charge — stayed on Charge. The Sequence tab's own controls live in a
+// to the next step while the panel — correctly reading the plan as still
+// mid-charge — stayed on Charge. The next tab's own controls live in a
 // hidden tab body at that point, so the rail had nothing reachable to point
 // at: a real dead end (issue #926). This test drains a real multi-hole
 // charge order through the real engine and pins the step's completion
@@ -570,11 +536,8 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     expect(stillOnChargeTab(ctx.state!)).toBe(false);
     expect(step.isComplete(ctx.state!, {})).toBe(true);
 
-    // The run continues cleanly through sequence and blast.
-    const sequenceStep = TUTORIAL_STEPS.find(s => s.id === 'sequence')!;
-    const sequenceSnapshot = sequenceStep.captureSnapshot!(ctx.state!);
-    expect(run('sequence auto delay_step:25').success).toBe(true);
-    expect(sequenceStep.isComplete(ctx.state!, sequenceSnapshot)).toBe(true);
+    // The run continues straight to evacuate-zone and blast (no sequence step).
+    expect(TUTORIAL_STEPS.some(s => s.id === 'sequence')).toBe(false);
 
     const blastResult = run('blast');
     expect(blastResult.success, blastResult.output).toBe(true);
@@ -593,7 +556,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
 // better, zero casualties, zero destroyed buildings/vehicles, real rock
 // still broken.
 describe('the tutorial\'s own scripted blast rates good or better (#949)', () => {
-  it('runs drill-plan/charge/sequence exactly as scripted and blasts cleanly', () => {
+  it('runs drill-plan/charge exactly as scripted and blasts cleanly', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
 
@@ -638,11 +601,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
-    // 5. sequence
-    const sequenceStep = TUTORIAL_STEPS.find((s) => s.id === 'sequence')!;
-    expect(run(sequenceStep.commands![0]!).success).toBe(true);
-
-    // 6. Evacuate crew and vehicles beyond the danger zone — mirrors the
+    // 5. Evacuate crew and vehicles beyond the danger zone — mirrors the
     // 'blast refuses to fire on an occupied zone' tests above, which move
     // everyone to a corner clear of computeDangerZone(state.drillHoles,
     // BLAST_DANGER_MARGIN_M). tutorial_pit is a 32x32 grid and the drill
@@ -661,7 +620,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
       veh.z = 2;
     }
 
-    // 7. blast
+    // 6. blast
     const blastResult = run('blast');
     expect(blastResult.success, blastResult.output).toBe(true);
 
@@ -742,7 +701,6 @@ describe('panel default parameters on the tutorial square rate good or better (#
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
-    expect(run('sequence auto').success).toBe(true);
 
     const preAlive = state.employees.employees.filter(e => e.alive).length;
     const preVehicles = state.vehicles.vehicles.length;
@@ -783,48 +741,6 @@ describe('panel default parameters on the tutorial square rate good or better (#
 describe('full tutorial playthrough ends WON by following the cards then playing on (#1328)', () => {
   /** Free-play tick ceiling, a constant so a slow win cannot hide behind a raised cap. */
   const FREE_PLAY_TICK_CAP = 6000;
-  const FORBIDDEN_COMMAND = /^(employee fire|vehicle scrap|build destroy|vehicle sell)\b/;
-
-  type Run = (cmd: string) => { success: boolean; output: string };
-
-  /** One ordinary player tick: resolve a pending event, then let time pass. */
-  function playTick(run: Run, state: GameState): void {
-    if (state.events.pendingEvent) run('event choose 0');
-    run('tick 1');
-  }
-
-  /** Advance ticks until `done()` reads true or `maxTicks` pass. */
-  function tickUntil(run: Run, state: GameState, maxTicks: number, done: () => boolean): void {
-    for (let i = 0; i < maxTicks && !done(); i++) playTick(run, state);
-  }
-
-  /**
-   * Ordinary contract play, the same actions the Contracts panel offers:
-   * deliver stock against accepted ore_sale/rubble_disposal contracts, and
-   * accept an offer only when current stock covers it in full (an
-   * unfulfilled contract costs a penalty). ore_sale is preferred.
-   */
-  function playContracts(run: Run, state: GameState): void {
-    const stockOf = (materialId: string) => (
-      materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
-    );
-    for (const active of [...state.contracts.active]) {
-      if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
-      const amount = Math.min(active.quantityKg - active.deliveredKg, stockOf(active.materialId));
-      if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
-    }
-    for (let guard = 0; guard < 8; guard++) {
-      const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
-      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
-        ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
-      if (!offer) return;
-      if (!run(`contract accept ${offer.id}`).success) return;
-      const active = state.contracts.active.find((c) => c.id === offer.id);
-      if (!active) return;
-      const amount = Math.min(active.quantityKg, stockOf(active.materialId));
-      if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
-    }
-  }
 
   /** Play the guided steps (everything before 'free-play') via each step's own commands. */
   function playGuidedPhase(run: Run, state: GameState): void {
@@ -853,22 +769,10 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       }
 
       if (step.id === 'evacuate-zone') {
-        // Carve-out: the step teaches "Sound the Horn" (no console hint);
-        // relocate crew and fleet beyond the danger zone, the state a real
-        // evacuation leaves them in.
-        const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-        expect(zone, 'no drill holes to compute a danger zone from').not.toBeNull();
-        const safeX = zone!.x1 - 5;
-        const safeZ = zone!.z1 - 5;
-        for (const emp of state.employees.employees) {
-          if (!emp.alive) continue;
-          emp.x = safeX;
-          emp.z = safeZ;
-        }
-        for (const veh of state.vehicles.vehicles) {
-          veh.x = safeX;
-          veh.z = safeZ;
-        }
+        // #1362: the player presses Fire -> Detonate. That arms the sequence
+        // (horn + auto-fire); the step is done once it is armed or fired.
+        const armed = run('blast detonate');
+        expect(armed.success, armed.output).toBe(true);
         expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }
@@ -883,6 +787,9 @@ describe('full tutorial playthrough ends WON by following the cards then playing
         // #1335: the step is "accept the one fillable ore offer, deliver it".
         // Accept is only legal on a fillable ore_sale offer (what the rails
         // let a player click); rubble/supply/unfillable offers stay untouched.
+        // With barren rock on a spoil heap the warehouse holds only ore (#1530), so the card's own
+        // accept + deliver commands can already close a sale before the loop starts.
+        const soldByCommands = complete();
         for (let i = 0; i < maxTicks && !complete(); i++) {
           for (const active of [...state.contracts.active]) {
             if (active.type !== 'ore_sale') continue;
@@ -898,7 +805,7 @@ describe('full tutorial playthrough ends WON by following the cards then playing
           }
           playTick(run, state);
         }
-        expect(acceptedInSellOre.length, 'sell-ore never accepted a fillable ore offer').toBeGreaterThan(0);
+        expect(soldByCommands || acceptedInSellOre.length > 0, 'sell-ore never accepted a fillable ore offer').toBe(true);
       } else {
         tickUntil(run, state, maxTicks, complete);
       }
@@ -948,8 +855,8 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     expect(state.cash).toBeGreaterThan(0);
     expect(freePlay.isComplete(state, {})).toBe(true);
 
-    const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
-    expect(netProfit).toBeGreaterThanOrEqual(target);
+    const operatingProfit = getOperatingProfit(state.finances);
+    expect(operatingProfit).toBeGreaterThanOrEqual(target);
 
     // Honesty guard: no layoff / scrap / demolish hack anywhere in the run.
     expect(commandsRun.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
@@ -961,9 +868,9 @@ describe('full tutorial playthrough ends WON by following the cards then playing
 
     const target = getLevel('tutorial_pit')!.unlockThreshold;
     const chip = goalChipParams(state);
-    const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
+    const operatingProfit = getOperatingProfit(state.finances);
     expect(chip.target).toBe(formatDollars(target));
-    expect(chip.profit).toBe(formatDollars(netProfit));
+    expect(chip.profit).toBe(formatDollars(operatingProfit));
   }, 120_000);
 
   it('after the first sale no rail disables a control and the clock is not held, however long the player idles', () => {

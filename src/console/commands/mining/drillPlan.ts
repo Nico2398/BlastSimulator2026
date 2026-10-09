@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
+import { requireGameWithSub, resolveHoleId, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
 import {
   gridCellPositions, createHolesAt, addHole, removeHole,
   computeDrillHoleDurationTicks,
@@ -15,6 +15,7 @@ import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../co
 import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
+import { cancelOutstandingChargeAction, removeAwaiting, planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -29,22 +30,23 @@ export interface DrillHoleActionPayload {
 }
 
 /**
- * Drop every per-hole charge/sequence record for `holeId` — called when a
+ * Drop every per-hole charge record for `holeId` — called when a
  * hole leaves the plan (drilled or still-ordered branch of drill_plan
- * remove) so no stale charge or delay survives under an id nothing
+ * remove) so no stale charge survives under an id nothing
  * references anymore (#634).
  */
 function clearHoleCharges(state: GameState, holeId: string): void {
   delete state.chargesByHole[holeId];
   delete state.plannedChargesByHole[holeId];
-  delete state.sequenceDelays[holeId];
+  delete state.holeWater[holeId];
+  removeAwaiting(state, holeId);
   removeHoleTubing(state.tubingState, holeId);
 }
 
 /**
  * Cancel every outstanding `drill_hole` PendingAction (queued/assigned/
  * in_progress — anything not yet completed) and empty both hole pools
- * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge/sequence
+ * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge
  * state keyed by hole id (#553). Cancellation is routed through the shared
  * `cancelAction` (#548) so an in-flight employee/vehicle is released back to
  * idle and any order-time cost is refunded — `drill_hole` carries none, but an
@@ -143,6 +145,14 @@ export function drillPlanCommand(
     const { clear, skipped } = partitionByFootprint(cells, buildingFootprintOccupants(ctx.state!));
     if (clear.length === 0) {
       return { success: false, output: t('mining.drill_plan.grid_all_blocked') };
+    }
+
+    // Replacing a plan with drilled or charged holes needs `confirm:true` (#1345);
+    // a plan of only ordered-not-yet-drilled holes does not. Nothing is mutated on refusal.
+    const state = ctx.state!;
+    const loss = planReplacementLoss(state);
+    if (named['confirm'] !== 'true' && loss) {
+      return { success: false, output: t('mining.drill_plan.confirm_replace', loss) };
     }
 
     // A grid replaces the whole plan (#553): drop every hole (ordered or

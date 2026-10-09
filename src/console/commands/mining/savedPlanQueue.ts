@@ -9,7 +9,8 @@ import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction } from '../siteExpansion.js';
 import type { MiningContext } from './types.js';
 import { dispatchDrillHoleAction } from './drillPlan.js';
-import { dispatchChargeAction, chargeFundsFailure, levelExplosiveFailure } from './charge.js';
+import { chargeFundsFailure, levelExplosiveFailure } from './charge.js';
+import { dispatchChargeAction } from '../../../core/mining/ChargeOrder.js';
 
 /**
  * Queue the saved plan's holes as drill_hole orders and its charges as
@@ -27,7 +28,6 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
     return { success: true, output: t('mining.blast_plan.load_nothing_new', { name }) };
   }
 
-  const freshIds = new Set(fresh.map(h => h.id));
   const chargeOrders: Array<{ oldHoleId: string; explosiveId: string; amountKg: number; stemmingM: number }> = [];
   for (const h of fresh) {
     const c = saved.chargesByHole[h.id];
@@ -57,12 +57,8 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
   for (const o of chargeOrders) {
     const newId = idMap.get(o.oldHoleId)!;
     const hole = state.plannedDrillHoles.find(h => h.id === newId)!;
-    dispatchChargeAction(ctx, hole, o.explosiveId, o.amountKg, o.stemmingM);
+    dispatchChargeAction(state, hole, { explosiveId: o.explosiveId, amountKg: o.amountKg, stemmingM: o.stemmingM });
     cost += chargeOrderCost(o.explosiveId, o.amountKg);
-  }
-  for (const [oldId, delay] of Object.entries(saved.sequenceDelays)) {
-    const newId = idMap.get(oldId);
-    if (newId !== undefined && freshIds.has(oldId)) state.sequenceDelays[newId] = delay;
   }
 
   return {

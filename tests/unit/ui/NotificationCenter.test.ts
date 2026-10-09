@@ -253,7 +253,7 @@ describe('NotificationCenter (redesign P1)', () => {
         const driver = stuckWalker(state, 2);
         state.vehicles.vehicles.push({
           id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-          payload: null, occupantIds: [driver.id],
+          cargo: [], occupantIds: [driver.id],
         });
         expect(walker.id).not.toBe(driver.id);
         const pip = center.update(state).find(p => p.tone === 'warn' && p.tip === t('notification.pip.crew_stuck_tip', { count: 2 }));
@@ -286,7 +286,7 @@ describe('NotificationCenter (redesign P1)', () => {
       employee.isMoveStuck = true;
       state.vehicles.vehicles.push({
         id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-        payload: null, occupantIds: [employee.id],
+        cargo: [], occupantIds: [employee.id],
       });
       const pips = center.update(state);
       const pip = pips.find(p => p.tip === t('notification.pip.crew_stuck_tip', { count: 1 }));
@@ -320,6 +320,39 @@ describe('NotificationCenter (redesign P1)', () => {
       state.tickCount = 2;
       const pips = center.update(state);
       expect(pips.some(p => p.kind === 'contract')).toBe(false);
+    });
+
+    it('raises no expiry pip or toast for a contract the stock already covers', () => {
+      setLocale('en');
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.contracts.active.push({
+        id: 9, type: 'ore_sale', materialId: 'grumpite', description: 'test',
+        quantityKg: 100, deliveredKg: 0, pricePerKg: 1, deadlineTicks: 5,
+        acceptedAtTick: 0, penaltyAmount: 500, earlyBonus: 0, completed: false, expired: false,
+      });
+      state.collectedOre['grumpite'] = 100;
+      state.tickCount = 2; // inside the warning window
+      const pips = center.update(state);
+      expect(pips.some(p => p.kind === 'contract')).toBe(false);
+      expect(center.getLog().filter(e => e.title.includes('#9'))).toHaveLength(0);
+    });
+
+    it('shows the penalty scaled by the undelivered share in the expiry toast', () => {
+      setLocale('en');
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.contracts.active.push({
+        id: 10, type: 'ore_sale', materialId: 'grumpite', description: 'test',
+        quantityKg: 100, deliveredKg: 60, pricePerKg: 1, deadlineTicks: 5,
+        acceptedAtTick: 0, penaltyAmount: 500, earlyBonus: 0, completed: false, expired: false,
+      });
+      state.collectedOre['grumpite'] = 10; // short of the 40 kg still owed
+      state.tickCount = 2;
+      center.update(state);
+      const entry = center.getLog().find(e => e.title.includes('#10'))!;
+      expect(entry.body).toContain(formatMoney(200)); // 500 * 40%
+      expect(entry.body).not.toContain(formatMoney(500));
     });
 
     // ── #1061: blocked-order warnings ─────────────────────────────────────
@@ -617,6 +650,38 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(message).not.toBe(otherMessage);
     });
 
+    it('names the licence and the level needed for licence_level_too_low (#1524)', () => {
+      const action = makeAction({
+        id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+        blockedReason: 'licence_level_too_low', blockedLicenceLevel: 2,
+      });
+      const message = buildBlockedOrderMessage(action);
+      expect(message).toContain(t(ACTION_LABEL_KEY.drill_hole));
+      expect(message).toContain(t('vehicle_type.drill_rig'));
+      expect(message).toContain('2');
+      expect(message).toBe(t('notification.order_blocked_licence_level', {
+        order: t(ACTION_LABEL_KEY.drill_hole), licence: t('vehicle_type.drill_rig'), level: 2,
+      }));
+      expect(message).not.toBe(buildBlockedOrderMessage(makeAction({ id: 1, blockedReason: 'no_licensed_driver' })));
+    });
+
+    it('has the licence-level message in both locales (#1524)', () => {
+      const params = { order: 'X', licence: 'Y', level: 3 };
+      try {
+        setLocale('en');
+        const en = t('notification.order_blocked_licence_level', params);
+        setLocale('fr');
+        const fr = t('notification.order_blocked_licence_level', params);
+        expect(en).not.toBe('notification.order_blocked_licence_level');
+        expect(fr).not.toBe('notification.order_blocked_licence_level');
+        expect(en).not.toBe(fr);
+        expect(en).toContain('3');
+        expect(fr).toContain('3');
+      } finally {
+        setLocale('en');
+      }
+    });
+
     it('names the order type and required skill for no_qualified_employee', () => {
       const action = makeAction({
         id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
@@ -739,6 +804,31 @@ describe('blocked haul orders: warehouse gating (#1369)', () => {
     center.update(state);
     center.update(state);
     expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('buildBlockedOrderMessage returns a translated message for no_spoil_heap (#1530)', () => {
+    const msg = buildBlockedOrderMessage(makeHaulAction(1, 'no_spoil_heap'));
+    expect(msg).not.toContain('notification.order_blocked_no_spoil_heap');
+    expect(msg).toBe(t('notification.order_blocked_no_spoil_heap', { order: t(ACTION_LABEL_KEY.haul_debris) }));
+    expect(msg).not.toBe(buildBlockedOrderMessage(makeHaulAction(1, 'no_freight_warehouse')));
+  });
+
+  it('en and fr both define notification.order_blocked_no_spoil_heap with different text (#1530)', () => {
+    const key = 'notification.order_blocked_no_spoil_heap';
+    expect(typeof locale('en')[key]).toBe('string');
+    expect(typeof locale('fr')[key]).toBe('string');
+    expect(locale('fr')[key]).not.toBe(locale('en')[key]);
+  });
+
+  it('raises one localized toast for N haul actions blocked by no_spoil_heap (#1530)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 12; i++) state.pendingActions.push(makeHaulAction(i, 'no_spoil_heap'));
+    center.update(state);
+    const entries = blockedEntries(center);
+    expect(entries).toHaveLength(1);
+    expect(JSON.stringify(entries[0])).not.toContain('notification.order_blocked_no_spoil_heap');
+    expect(JSON.stringify(entries[0])).toContain(t('notification.order_blocked_no_spoil_heap', { order: t(ACTION_LABEL_KEY.haul_debris) }).slice(0, 12));
   });
 
   it('re-toasts when the shared reason changes (warehouse built, then storage fills)', () => {
@@ -918,5 +1008,30 @@ describe('NotificationCenter localization (#1417)', () => {
     state.revolt.ticksAtZero = 40;
     const pip = new NotificationCenter().update(state).find(p => p.kind === 'wellbeing')!;
     expect(pip.label).toContain('3d 8h');
+  });
+});
+
+describe('NotificationCenter — charge awaiting funds toast (#1345)', () => {
+  const warnToasts = (center: NotificationCenter) =>
+    center.getLog().filter(n => n.body === t('notification.charge_awaiting_funds', { count: 1 })
+      || n.body === t('notification.charge_awaiting_funds', { count: 2 }));
+
+  it('toasts once per episode and re-arms after the list empties', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    center.update(state);
+    expect(center.getLog()).toHaveLength(0);
+
+    state.chargeAwaitingFunds = ['H1'];
+    center.update(state);
+    state.chargeAwaitingFunds = ['H1', 'H2'];
+    center.update(state);
+    expect(warnToasts(center)).toHaveLength(1);
+
+    state.chargeAwaitingFunds = [];
+    center.update(state);
+    state.chargeAwaitingFunds = ['H3'];
+    center.update(state);
+    expect(warnToasts(center)).toHaveLength(2);
   });
 });

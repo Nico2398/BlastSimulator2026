@@ -18,6 +18,7 @@ import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
+import { canAffordVehicleUpgrade } from '../../core/entities/VehicleUpgrade.js';
 import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
 /** Minimum horizontal gap between the selection bar and the left column's right edge. */
@@ -112,9 +113,14 @@ function selectionBarBounds(viewport: Viewport): Rect {
 // two unrelated flows, so they never share an action name or a data-action.
 export type SelectionAction =
   | 'detail' | 'dispatch_here' | 'train'
-  | 'follow' | 'move_here'
+  | 'follow' | 'move_here' | 'upgrade_vehicle'
   | 'upgrade' | 'move' | 'demolish'
   | 'focus' | 'widen';
+
+/** True when no standing building has this id because its upgrade is being rebuilt (#1392). */
+function isUnderRebuild(id: number, state: GameState): boolean {
+  return !state.buildings.buildings.some(b => b.id === id) && state.plannedBuildings.some(pb => pb.buildingId === id);
+}
 
 export class SelectionBar {
   private readonly root: HTMLElement;
@@ -173,7 +179,10 @@ export class SelectionBar {
     this.titleEl.textContent = identity.title;
     this.subEl.textContent = identity.sub;
     const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
-    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null));
+    const rebuilding = entity.kind === 'building' && isUnderRebuild(entity.id, state);
+    const vehicle = entity.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === entity.id) : undefined;
+    const vehicleUpgradable = vehicle !== undefined && canAffordVehicleUpgrade(vehicle, state.cash);
+    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null, rebuilding, vehicleUpgradable));
     this.root.style.display = 'flex';
   }
 
@@ -186,6 +195,9 @@ export class SelectionBar {
     switch (entity.kind) {
       case 'building': {
         const b = state.buildings.buildings.find(x => x.id === entity.id);
+        // An upgrade in progress keeps its id on the reserved site while the old building is gone (#1392).
+        const site = b ? undefined : state.plannedBuildings.find(pb => pb.buildingId === entity.id);
+        if (site) return { title: t(`building.${site.type}.t${site.tier}.name`), sub: `#${site.buildingId} · ${t('shell.selection.rebuilding')}` };
         if (!b) return null;
         let sub = `#${b.id} · HP ${Math.round(b.hp)}`;
         const capacity = getBuildingPeopleCapacity(b.type, b.tier);
@@ -217,8 +229,7 @@ export class SelectionBar {
       case 'hole': {
         const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
         if (!hole) return null;
-        const delay = state.sequenceDelays[hole.id];
-        return { title: hole.id, sub: delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m` };
+        return { title: hole.id, sub: `${hole.depth}m` };
       }
       case 'ramp': {
         const ramp = state.builtRamps.find(r => r.id === entity.id);
@@ -228,7 +239,7 @@ export class SelectionBar {
     }
   }
 
-  private buildActions(entity: EntityPick, nextWidth: RampWidth | null): HTMLElement[] {
+  private buildActions(entity: EntityPick, nextWidth: RampWidth | null, rebuilding: boolean, vehicleUpgradable: boolean): HTMLElement[] {
     const fire = (action: SelectionAction) => { if (this.current) this.onAction?.(action, this.current); };
     switch (entity.kind) {
       case 'employee':
@@ -241,12 +252,13 @@ export class SelectionBar {
         return [
           button('ghost', t('shell.selection.follow'), { icon: 'eye', dataAction: 'follow', onClick: () => fire('follow') }),
           button('ghost', t('shell.selection.move_here'), { icon: 'locate', dataAction: 'move_here', onClick: () => fire('move_here') }),
+          button('ghost', t('shell.selection.upgrade_vehicle'), { icon: 'up', dataAction: 'upgrade_vehicle', disabled: !vehicleUpgradable, onClick: () => fire('upgrade_vehicle') }),
         ];
       case 'building':
         return [
-          button('ghost', t('shell.selection.upgrade'), { icon: 'up', dataAction: 'upgrade', onClick: () => fire('upgrade') }),
-          button('ghost', t('shell.selection.move'), { icon: 'drive', dataAction: 'move', onClick: () => fire('move') }),
-          button('danger', t('shell.selection.demolish'), { icon: 'trash', dataAction: 'demolish', onClick: () => fire('demolish') }),
+          button('ghost', t('shell.selection.upgrade'), { icon: 'up', dataAction: 'upgrade', disabled: rebuilding, onClick: () => fire('upgrade') }),
+          button('ghost', t('shell.selection.move'), { icon: 'drive', dataAction: 'move', disabled: rebuilding, onClick: () => fire('move') }),
+          button('danger', t('shell.selection.demolish'), { icon: 'trash', dataAction: 'demolish', disabled: rebuilding, onClick: () => fire('demolish') }),
         ];
       case 'fragment':
         return [

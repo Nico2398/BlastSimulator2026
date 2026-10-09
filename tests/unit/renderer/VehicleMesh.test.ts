@@ -13,7 +13,7 @@ import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolati
 import { loadedModelLibrary } from '../../helpers/models.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier, hp = 100): Vehicle {
-  return { id, type, tier, x, z, hp, payload: null, occupantIds: [] };
+  return { id, type, tier, x, z, hp, cargo: [], occupantIds: [] };
 }
 
 /** #1138: addVehicle/update/refreshModels take a VehicleState now, not a raw Vehicle[]. */

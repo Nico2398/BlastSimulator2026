@@ -1,14 +1,16 @@
 // BlastSimulator2026 — Employee system
 // Workers with roles, morale, union status, and injury tracking.
 
+import type { HireCandidate } from './HiringPool.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import type { MovementTrail } from './MovementTrail.js';
 import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
+import type { VehicleTier } from './Vehicle.js';
 import type { Itinerary } from '../engine/Itinerary.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -41,7 +43,7 @@ const LAST_NAMES = [
   'Quartzman', 'Slagheap', 'Bedrock', 'Pitman', 'Drillbit',
 ];
 
-function generateName(rng: Random): string {
+export function generateName(rng: Random): string {
   return `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
 }
 
@@ -54,13 +56,19 @@ export type SkillCategory =
   | 'driving.rock_fragmenter'
   | 'blasting'
   | 'management'
-  | 'geology';
+  | 'geology'
+  | 'repair';
 
 export interface SkillQualification {
   category: SkillCategory;
   proficiencyLevel: 1 | 2 | 3 | 4 | 5;
   xp: number;
+  /** Driving-licence level (#1524) for `driving.*` categories; absent = 1. */
+  licenceLevel?: LicenceLevel;
 }
+
+/** Driving-licence level; a licence of level N may drive vehicles of tier <= N. */
+export type LicenceLevel = VehicleTier;
 
 /** A qualification at `level`, with the XP that level starts at. */
 export function qualificationAtLevel(category: SkillCategory, level: SkillQualification['proficiencyLevel']): SkillQualification {
@@ -72,6 +80,8 @@ export interface TrainingState {
   skill: SkillCategory;
   ticksRemaining: number;
   fee: number;
+  /** Set when the course raises an already-held driving licence to this level (#1524). */
+  raisesLicenceTo?: Exclude<LicenceLevel, 1>;
 }
 
 // ── Employee instance ──
@@ -128,6 +138,8 @@ export interface Employee {
    * UI omits the progress bar when absent instead of fabricating one.
    */
   activeTaskTotalTicks?: number;
+  /** Fraction of a work tick carried between ticks while an event slows the employee's role (#1414). Absent means none. */
+  workProgressCarry?: number;
   /**
    * Skill category of the in-progress dispatched task (mirrors taskTicksRemaining
    * lifecycle: set together on claim, cleared together on completion). Null when
@@ -293,15 +305,16 @@ export function hireEmployee(
   x: number = 0,
   z: number = 0,
   tickCount: number = 0,
+  candidate?: Pick<HireCandidate, 'name' | 'unionized' | 'qualifications'>,
 ): HireResult {
   const employee: Employee = {
     id: state.nextId++,
-    name: generateName(rng),
+    name: candidate ? candidate.name : generateName(rng),
     role,
     salary: BASE_SALARIES[role],
     raises: 0,
     morale: 60, // Neutral-positive starting morale
-    unionized: rng.chance(0.3), // 30% chance of being unionized
+    unionized: candidate ? candidate.unionized : rng.chance(CANDIDATE_UNION_CHANCE),
     injured: false,
     alive: true,
     hiredAtTick: tickCount,
@@ -312,7 +325,9 @@ export function hireEmployee(
     // a driver could not drive, because the only way to grant a qualification
     // was the `employee assign_skill` console command. Training raises
     // proficiency from here.
-    qualifications: ROLE_STARTING_QUALIFICATIONS[role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel)),
+    qualifications: candidate
+      ? candidate.qualifications.map(q => ({ ...q }))
+      : ROLE_STARTING_QUALIFICATIONS[role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel)),
     trainingState: null,
     pendingTrainingState: null,
     activeActionId: null,
@@ -397,7 +412,7 @@ export function removeFromRoster(state: EmployeeState, employeeId: number): void
 export function fireEmployee(
   state: EmployeeState,
   employeeId: number,
-): { success: boolean; error?: string } {
+): { success: boolean; error?: string } & RefusalKey {
   const guard = canFireEmployee(state, employeeId);
   if (!guard.success) return guard;
   removeFromRoster(state, employeeId);
@@ -406,9 +421,9 @@ export function fireEmployee(
 
 /**
  * Process pay cycle. Returns total salaries paid.
- * Call each tick; only pays when cycle completes.
+ * Call each tick; only pays when cycle completes. `salaryFactorOf` scales each role's pay (active event modifiers).
  */
-export function processPayCycle(state: EmployeeState): number {
+export function processPayCycle(state: EmployeeState, salaryFactorOf: (role: EmployeeRole) => number = () => 1): number {
   state.ticksSincePayday++;
   if (state.ticksSincePayday < PAY_CYCLE_TICKS) return 0;
 
@@ -416,7 +431,7 @@ export function processPayCycle(state: EmployeeState): number {
   let totalSalaries = 0;
   for (const emp of state.employees) {
     if (emp.alive) {
-      totalSalaries += emp.salary;
+      totalSalaries += emp.salary * salaryFactorOf(emp.role);
     }
   }
   return totalSalaries;
@@ -428,7 +443,7 @@ export function calculateQualificationBonus(employee: Pick<Employee, 'qualificat
 }
 
 /** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */
-export function calculateSalary(employee: Employee): number {
+export function calculateSalary(employee: Pick<Employee, 'role' | 'qualifications' | 'raises'>): number {
   return BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + (employee.raises ?? 0);
 }
 
@@ -590,7 +605,7 @@ export type {
   ProficiencyLevel, TrainingPlan, EnrolInTrainingResult, TrainingCompletion, TrainingCancellation,
 } from './EmployeeTraining.js';
 export {
-  MAX_PROFICIENCY, trainableSkills, isTrainingBuilding, schoolFor,
+  trainableSkills, isTrainingBuilding, schoolFor,
   planTraining, startTraining, enrolInTraining, tickTraining,
   isEnrolledInTraining, isSchoolFull,
 } from './EmployeeTraining.js';

@@ -141,7 +141,7 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // ordered hole has actually landed", and "blast fired".
       const drivingCenterIdx = steps.findIndex(s => s.command.startsWith('build living_quarters'));
       const drillPlanWaitIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount'));
-      const blastIdx = steps.findIndex(s => s.command === 'blast');
+      const blastIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount equals:0'));  // #1362: DETONATE arms, the auto-fire empties the plan
       expect(drivingCenterIdx).toBeGreaterThan(-1);
       expect(drillPlanWaitIdx).toBeGreaterThan(drivingCenterIdx);
       expect(blastIdx).toBeGreaterThan(drillPlanWaitIdx);
@@ -187,7 +187,7 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // Charging through the blast itself, same as
       // tutorial-interactive.json's own command-mode replay: resolve any
       // pending event, order the charge, wait for all 9 charges to land,
-      // resolve any pending event, auto-sequence, blast (steps
+      // resolve any pending event, blast (steps
       // drillPlanWaitIdx+1..blastIdx inclusive).
       const blastResults = runSteps(engine, steps.slice(drillPlanWaitIdx + 1, blastIdx + 1), outDir);
 
@@ -212,9 +212,9 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // succeeded -- "no revolt" must not be an accident of the grind
       // stalling out before ever reaching the blast step.
       const blastStepResult = blastResults[blastResults.length - 1]!;
-      expect(blastStepResult.command).toBe('blast');
+      expect(blastStepResult.command).toContain('wait_until field:holeCount equals:0');
       expect(blastStepResult.error, `blast step failed: ${blastStepResult.error}`).toBeUndefined();
-      expect(blastStepResult.commandOutput).toContain('BLAST REPORT');
+      expect(engine.ctx.state!.lastBlastReport).not.toBeNull();
     },
   );
 });

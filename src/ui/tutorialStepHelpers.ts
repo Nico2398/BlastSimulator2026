@@ -5,8 +5,6 @@ import type { ActionType, GameState } from '../core/state/GameState.js';
 import type { NavCell } from '../core/nav/NavGrid.js';
 import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
-import { computeDangerZone, isZoneClear } from '../core/entities/Zone.js';
-import { BLAST_DANGER_MARGIN_M } from '../core/config/balance.js';
 import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from './settingsHooks.js';
 import { hasOutstandingVehicleWork } from './tutorialGuide.js';
 
@@ -351,27 +349,18 @@ export function isBlastReportOutstanding(): boolean {
   return overlay?.dataset['outstanding'] === 'true';
 }
 
-/**
- * True once the same danger zone the FIRE gate/console blast refusal compute
- * (computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)) reads clear of
- * every vehicle and alive employee — the evacuate-zone tutorial step's
- * completion check (#557).
- */
-export function isEvacuationZoneClear(state: GameState): boolean {
-  // state.drillHoles may be absent on a minimal/mock GameState (tutorialSteps.test.ts's
-  // isComplete-never-throws check) — an empty array is exactly "no danger zone yet",
-  // matching computeDangerZone's own null-for-no-holes contract.
-  const zone = computeDangerZone(state.drillHoles ?? [], BLAST_DANGER_MARGIN_M);
-  return zone !== null && isZoneClear(zone, state.vehicles, state.employees);
+/** Blasts fired so far this level; tolerant of a minimal/mock GameState. */
+function blastsPerformed(state: GameState): number {
+  return state.levelStats?.blastsPerformed ?? 0;
 }
 
 /**
- * Helper: create the evacuate-zone step (#557) — completes once
- * isEvacuationZoneClear reads true. tickBudget 20 comfortably covers a
- * ~15-20m walk at AGENT_WALK_SPEED (2 cells/tick — 7.5-10 ticks one way).
- * Kept as a factory (like the other create*Step helpers above) so
- * tutorialSteps.ts — a grandfathered, may-only-shrink file — carries just the
- * one call site instead of the full step object.
+ * Helper: create the evacuate-zone step (#557, #1362) — completes once
+ * DETONATE has armed the sequence (state.pendingDetonation) or the blast has
+ * already fired (blastsPerformed rose since the snapshot, when the zone was
+ * clear at once). Kept as a factory (like the other create*Step helpers above)
+ * so tutorialSteps.ts — a grandfathered, may-only-shrink file — carries just
+ * the one call site instead of the full step object.
  */
 export function createEvacuateZoneStep(): TutorialStep {
   return {
@@ -381,7 +370,10 @@ export function createEvacuateZoneStep(): TutorialStep {
     highlightTarget: TOOLBAR_TARGET.blast,
     tickBudget: 20,
     waitsOnWork: true,
-    isComplete: isEvacuationZoneClear,
+    captureSnapshot: (state: GameState) => ({ prevBlasts: blastsPerformed(state) }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) =>
+      (state.pendingDetonation ?? null) !== null
+      || blastsPerformed(state) > ((snapshot.prevBlasts as number | undefined) ?? 0),
   };
 }
 

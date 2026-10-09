@@ -710,10 +710,6 @@ describe('LevelEndScreen', () => {
       expect(tip.toLowerCase()).toContain('continuous');
     });
 
-    it('custom shows the no_rest_policy tip', () => {
-      expect(renderText(revoltState('custom', 'active'))).toContain(t(`${TIP}.no_rest_policy`, HOURS));
-    });
-
     it('shift_12h behaves like shift_8h for both housing cases', () => {
       expect(renderText(revoltState('shift_12h', 'active'))).toContain(t(`${TIP}.morale_drain`, HOURS));
       expect(renderText(revoltState('shift_12h', 'none'))).toContain(t(`${TIP}.no_housing`, HOURS));

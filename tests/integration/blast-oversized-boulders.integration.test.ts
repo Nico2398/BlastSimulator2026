@@ -17,7 +17,6 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import {
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
@@ -98,7 +97,7 @@ function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
 }
 
 /**
- * Drill+charge+sequence+blast an undercharged, wide-spacing pattern at
+ * Drill+charge+blast an undercharged, wide-spacing pattern at
  * (18,19) — same origin as economy.integration.test.ts's full-loop case: it
  * sits on the same flat NavGrid bench as the vehicle spawn and warehouse, so
  * fragments land somewhere a vehicle can actually reach. Mirrors
@@ -126,9 +125,6 @@ function blastUndercharged(ctx: GameContext): void {
   });
   expect(chargeResult.success).toBe(true);
   driveChargePlanToCompletion(ctx);
-
-  const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-  expect(seqResult.success).toBe(true);
 
   const blastResult = blastCommand(ctx as any, [], {});
   expect(blastResult.success).toBe(true);
@@ -296,6 +292,8 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
       tickCommand(ctx, ['1'], {});
       ticks++;
     }
-    expect(ctx.state!.logistics.storedMassKg).toBeCloseTo(storedBefore + pieceMass, 6);
+    // #1370: the trip may batch neighbouring pieces, so the stored growth is at least the piece's own mass.
+    expect(ctx.state!.logistics.fragments.find(f => f.fragment.id === piece.fragment.id)!.state).toBe('stored');
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThanOrEqual(storedBefore + pieceMass - 1e-6);
   });
 });

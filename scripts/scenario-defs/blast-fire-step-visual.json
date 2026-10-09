@@ -70,7 +70,7 @@
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
       "timeout": 30,
-      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Sequence -> Fire as the plan completes, which is what the Fire step below checks.",
+      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Preview -> Fire as the plan completes, which is what the Fire step below checks.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -144,38 +144,21 @@
       }
     },
     {
-      "command": "sequence set hole:H1 delay:0ms",
-      "timeout": 30,
-      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. H1 has no delay at all at this point (Auto Sequence never ran in this file), and adjustHoleDelay reads an absent delay as 0 and floors the result at 0 — so one decrement dispatches exactly the declared `sequence set hole:H1 delay:0ms`. Charging the only hole moved the panel to Sequence by itself, so no tab click is needed.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "sequencedCount": 1
-        }
-      },
-      "role": "player"
-    },
-    {
       "command": "state",
       "timeout": 30,
-      "description": "The plan is complete once H1 is sequenced, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire). #557 correction: the danger zone is NOT clear here — the single-hole plan's own driller (employee #1) and the drill_rig they drove out on (vehicle #1) both come to rest exactly on top of H1 (10,10) once drilling and charging finish, squarely inside computeDangerZone([H1], BLAST_DANGER_MARGIN_M) (confirmed via direct trace: both sit at (10,10) right at this point) — so Sound the Horn is enabled and the occupant list shows both of them, not the 'nobody nearby' the file used to claim. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
+      "description": "The plan is complete once H1 is charged, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire). #557 correction: the danger zone is NOT clear here — the single-hole plan's own driller (employee #1) and the drill_rig they drove out on (vehicle #1) both come to rest exactly on top of H1 (10,10) once drilling and charging finish, squarely inside computeDangerZone([H1], BLAST_DANGER_MARGIN_M) (confirmed via direct trace: both sit at (10,10) right at this point) — so Sound the Horn is enabled and the occupant list shows both of them, not the 'nobody nearby' the file used to claim. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
       "interaction": [
         {
           "type": "wait",
           "durationMs": 300
         },
         {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
           "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
         {
           "type": "screenshot"
@@ -189,56 +172,23 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Occupant list + horn button visible with a real occupant in the zone (#557) — the driller and drill_rig confirmed above, before either has moved.",
+      "description": "#1362: the Fire step has no Sound the Horn button any more -- DETONATE sounds the horn itself. The occupant list still shows the driller and drill_rig in the zone.",
       "interaction": [
         {
           "type": "screenshot"
         }
       ],
-      "role": "player",
-      "expect": {
-        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
-      }
-    },
-    {
-      "command": "zone clear x1:-5 y1:-5 x2:25 y2:25",
-      "timeout": 90,
-      "description": "#557: Sound the Horn — the real, multi-tick evacuation walkout, not an instant clear. computeDangerZone([H1={10,10}], BLAST_DANGER_MARGIN_M) is (-5,-5) to (25,25), the exact box this command declares and the one soundHorn() computes and sends live. clearZone no longer teleports (#557): this only sets a destination for the driller and the drill_rig, so the zone is not clear the instant this command returns — the wait_until step right after proves the walk actually finishes.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "usable": "#bs-blast-panel [data-action=\"execute\"]",
-        "note": "clearZone sets destinations, not positions -- the walkout itself is proven by the wait_until step immediately below."
-      }
-    },
-    {
-      "command": "tick 20",
-      "timeout": 90,
-      "description": "#557/#947: drain the real walkout Sound the Horn just ordered. #947 (this session's own fix): dropped the old `wait_until field:dangerZoneClear equals:true` -- the driller (employee #1) auto-dismounts drill_rig #1 the instant its drilling task finishes, so the rig is undriven by the time Sound the Horn fires, and clearZone (Zone.ts) now refuses to even order a driverless vehicle out of the danger zone -- it reports it stranded instead, exactly the driving-itself-out-of-the-blast-zone bug #947 fixes. `dangerZoneClear` requires every vehicle AND every employee clear (isDangerZoneClear, Zone.ts), so with the rig permanently stranded on H1, that field can now never read true here -- a `wait_until` on it would stall the full `max_ticks` budget every run, so this is a plain tick pad instead (matching safety-projection-visual.json's #947 fix). The driller (employee #1) still walks out for real across this pad; only the driverless rig stays behind.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "dangerZoneClear": false
-        },
-        "note": "#947: dangerZoneClear reads false, not true -- the stranded driverless drill_rig keeps the zone permanently unclear now, a genuine new consequence of the #947 fix rather than a stale assumption to chase back to true. FIRE/DETONATE stay usable regardless (already asserted usable before Sound the Horn was even clicked, above), so an uncleared zone is not load-bearing for the rest of this file."
-      }
+      "role": "observe"
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "FIRE opens PreflightModal — real plan stats, the 'run analysis' hint (no preview has run), and the all-clear warnings",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -261,13 +211,53 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 30,
-      "description": "DETONATE fires the blast, closes PreflightModal, and BlastReportModal auto-opens with the real report (rating, cleared/cracked/fragments, ore value)",
+      "command": "blast detonate",
+      "timeout": 60,
+      "description": "#1362: DETONATE arms the sequence and sounds the horn. The drill_rig is driverless (auto-dismounted when its drilling finished) so it cannot drive out: the preflight modal switches to its waiting state, names the stranded occupant and offers Fire anyway and Cancel.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-fire-anyway\"]"
+      }
+    },
+    {
+      "command": "tick 20",
+      "timeout": 90,
+      "role": "setup",
+      "description": "Let the driller walk out for real; the stranded rig stays, so the sequence must not auto-fire.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "dangerZoneClear": false,
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "description": "Fire anyway (#1362): the player overrides the stranded-rig wait; the blast fires, the preflight modal closes and BlastReportModal auto-opens with the real report (rating, cleared/cracked/fragments, ore value)",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "wait",
@@ -285,8 +275,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }

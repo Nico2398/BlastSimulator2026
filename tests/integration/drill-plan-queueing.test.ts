@@ -17,6 +17,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { tickUntil } from './helpers.js';
+import { refreshHiringPool } from '../../src/core/entities/HiringPool.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { checkProtectedPositions } from '../../src/core/mining/BlastPlan.js';
@@ -267,6 +268,8 @@ describe('drill_plan grid — dense 1m-spacing grid under agent occupancy conver
     // contends with itself.
     for (let i = 0; i < 7; i++) {
       const beforeCount = state.employees.employees.length;
+      // A role offers only HIRING_POOL_SIZE (3) candidates per refresh (#1385).
+      if (i > 0 && i % 3 === 0) refreshHiringPool(state.hiringPool, 42, state.tickCount + i);
       expect(run('employee hire role:driller').success).toBe(true);
       const hired = state.employees.employees[beforeCount]!;
       expect(run(`employee assign_skill ${hired.id} skill:driving.drill_rig level:1`).success).toBe(true);
@@ -330,13 +333,14 @@ function setupSavedPlan() {
  * Empties the site of drilled holes and charges without firing, so the crater
  * and debris of a real blast cannot make the reloaded holes unreachable.
  */
-function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown>; sequenceDelays: Record<string, unknown> }): void {
+function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown>; patternCharge?: unknown }): void {
   // Keep the mine solvent while the crew works (the first run spent the starting cash).
   state.cash = 5_000_000;
   state.finances.cash = 5_000_000;
   state.drillHoles.length = 0;
+  // The pattern charge of the saved run would auto-charge the hole drilled next (#1345).
+  state.patternCharge = null;
   for (const k of Object.keys(state.chargesByHole)) delete state.chargesByHole[k];
-  for (const k of Object.keys(state.sequenceDelays)) delete state.sequenceDelays[k];
 }
 
 /** Fires the loaded plan's blast so the site holds no holes, keeping the saved plan. */
@@ -350,7 +354,6 @@ function fireBlast(
   // The ore revenue is not what these tests are about; keep the mine solvent while the crew works.
   state.cash = 5_000_000;
   state.finances.cash = 5_000_000;
-  expect(run('sequence auto').success).toBe(true);
   expect(run('blast').success).toBe(true);
   expect(state.drillHoles).toHaveLength(0);
 }
@@ -526,21 +529,15 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(state.plannedDrillHoles.some(h => h.x === x && h.z === z)).toBe(false);
   });
 
-  it('re-keys state.sequenceDelays to the new hole ids, matching the saved delays by position', () => {
+  it('a saved plan carries no sequence delays, and loading one adds none to state', () => {
     const { run, state } = setupSavedPlan();
-    expect(run('sequence auto').success).toBe(true);
-    expect(run('blast_plan save').success).toBe(true);
-    const saved = state.savedPlans['default']!;
-    expect(Object.keys(saved.sequenceDelays).length).toBeGreaterThan(0);
+    const saved = state.savedPlans['default']! as unknown as Record<string, unknown>;
+    expect('sequenceDelays' in saved).toBe(false);
     clearHolesWithoutBlast(state);
 
     expect(run('blast_plan load').success).toBe(true);
 
-    expect(Object.keys(state.sequenceDelays)).toHaveLength(Object.keys(saved.sequenceDelays).length);
-    for (const old of saved.drillHoles) {
-      const fresh = state.plannedDrillHoles.find(h => h.x === old.x && h.z === old.z)!;
-      expect(state.sequenceDelays[fresh.id]).toBe(saved.sequenceDelays[old.id]);
-    }
+    expect('sequenceDelays' in (state as unknown as Record<string, unknown>)).toBe(false);
   });
 
   it('a saved charge that fails validation refuses the whole load with no mutation', () => {
@@ -586,10 +583,11 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(run('blast_plan load').success).toBe(true);
     expect(state.plannedDrillHoles).toHaveLength(4);
     expect(state.drillHoles).toHaveLength(0);
-    // Nothing is drilled, so firing clears no rock (the old instant load let it fire again).
-    const report = run('blast') as { success: boolean; output?: string };
+    // Nothing is drilled, so firing is refused and clears no rock (the old instant load let it fire again).
+    const report = run('blast');
+    expect(report.success).toBe(false);
+    expect(report.output).toBe(t('mining.blast.no_charged_holes'));
     expect(state.drillHoles).toHaveLength(0);
-    expect(report.output ?? '').toContain('Cleared voxels: 0');
   });
 
   it('drill_plan remove on a loaded planned hole cancels its charge order and refunds the cost', () => {
@@ -821,7 +819,7 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
     drill('x:15 z:15', 1);
     expect(cell(15, 15).type).toBe('drill_hole');
 
-    expect(run('drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:22,22').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:22,22 confirm:true').success).toBe(true);
     expect(state.drillHoles).toHaveLength(0);
     expect(cell(15, 15)).toEqual(before);
     expect(cell(15, 15).type).not.toBe('drill_hole');

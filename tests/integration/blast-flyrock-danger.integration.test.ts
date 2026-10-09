@@ -10,7 +10,6 @@ import {
   blastCommand,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
 
@@ -22,6 +21,7 @@ import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { addFreightWarehouseToState } from '../helpers/freightWarehouse.js';
 
 function makeCtx(): MiningContext {
   // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
@@ -95,6 +95,8 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
   // Weather ticks with the game (#1403); rain fizzles boomite. These tests are
   // about flyrock, so pin dry weather for the blast that follows.
   ctx.state!.weather.current = 'sunny';
+  // Water outlives the rain that filled it (#1350): empty the holes too.
+  ctx.state!.holeWater = {};
   for (const emp of ctx.state!.employees.employees) {
     if (emp.id === 1 || emp.id === 2) {
       emp.x = 44;
@@ -104,7 +106,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
 }
 
 /** Fire a 3×3 pattern at (15,15) with the given stemming. */
-function blastAt(ctx: MiningContext, stemming: string): void {
+function blastAt(ctx: MiningContext, stemming: string): string {
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
   driveDrillPlanToCompletion(ctx);
   // Charging bills explosives at order time (#1341); these tests are about
@@ -113,9 +115,9 @@ function blastAt(ctx: MiningContext, stemming: string): void {
   const ordered = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
   expect(ordered.success, ordered.output).toBe(true);
   driveChargePlanToCompletion(ctx);
-  sequenceCommand(ctx, ['auto'], { delay_step: '25' });
   const result = blastCommand(ctx, [], {});
   expect(result.success, result.output).toBe(true);
+  return result.output;
 }
 
 /**
@@ -236,17 +238,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('reports how far the rock was thrown, and rates the blast on it', () => {
     const reckless = makeCtx();
-    blastAt(reckless, '0.5');
-    const careful = makeCtx();
-    blastAt(careful, '2');
-
-    // Both reports exist; the reckless one threw rock further and rates worse.
-    drillPlanCommand(reckless, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', start: '30,30' });
-    driveDrillPlanToCompletion(reckless);
-    chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
-    driveChargePlanToCompletion(reckless);
-    sequenceCommand(reckless, ['auto'], {});
-    const output = blastCommand(reckless, [], {}).output;
+    const output = blastAt(reckless, '0.5');
 
     expect(output).toMatch(/Furthest throw: \d+\.\d m/);
   });
@@ -283,7 +275,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['auto'], { delay_step: '25' });
     const result = blastCommand(ctx, [], {});
     expect(result.success, result.output).toBe(true);
 
@@ -346,5 +337,32 @@ describe('Blast flyrock — danger reaches the crew', () => {
         a.entityId === placed.building!.id && (a.type === 'building_damage' || a.type === 'building_destroyed'));
       expect(destroyed || damaged, 'building a few metres inside the zone took no outcome at all').toBe(true);
     });
+  });
+});
+
+describe('Blast-destroyed Freight Warehouse stock loss (#1372)', () => {
+  it('emits logistics:warehouse_stock_lost with the lost kg and prints the console line', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    const id = addFreightWarehouseToState(state, 14, 14);
+    state.logistics.fragments.push({
+      fragment: {
+        id: 9001, position: { x: 0, y: 0, z: 0 }, volume: 0.4, mass: 321, rockId: 'sandite',
+        oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 1, origin: { x: 0, y: 0, z: 0 },
+      },
+      state: 'stored', vehicleId: null, warehouseId: id,
+    });
+    state.logistics.storedMassKg += 321;
+    const events: Array<{ buildingId: number; massKg: number }> = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+
+    const output = blastAt(ctx, '0.5');
+
+    expect(state.buildings.buildings.some(b => b.id === id)).toBe(false);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.buildingId).toBe(id);
+    expect(events[0]!.massKg).toBe(321);
+    expect(output).toContain('321');
   });
 });

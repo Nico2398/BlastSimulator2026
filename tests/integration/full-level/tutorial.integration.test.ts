@@ -16,13 +16,14 @@ import {
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { timeCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
-import { surveyCommand, drillPlanCommand, chargeCommand, sequenceCommand, blastCommand, buildRampCommand } from '../../../src/console/commands/mining.js';
+import { surveyCommand, drillPlanCommand, chargeCommand, blastCommand, buildRampCommand } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { pickupFragment, deliverToDepot } from '../../../src/core/economy/Logistics.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import { accumulateOreMass } from '../../../src/core/mining/BlastOreReport.js';
 import { createGameEngine } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
@@ -134,10 +135,6 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(chargeResult.output).toContain('Ordered charges');
     driveChargePlanToCompletion(ctx);
 
-    // 9. Auto-sequence
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
-
     // 10. Blast — expect BLAST REPORT
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
@@ -169,6 +166,18 @@ describe('Tutorial Level — Full Walkthrough', () => {
     });
     expect(assignMgt.success).toBe(true);
     expect(assignMgt.output).toContain('assigned skill');
+
+    // 15b. Build a freight_warehouse (ore-sale contracts need one to be accepted, #1372) at (0,8) — flat ground post-blast (#1008
+    // requires a level footprint; the terrain at the old (5,5) spot is no
+    // longer flat by this point in the sequence). #556: confirming the order
+    // only queues a construction site — drive it to completion (the
+    // surveyor, idle since step 4, picks up the unskilled `place_building`
+    // work) before asserting a real building exists.
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '0,8' });
+    expect(buildResult.success).toBe(true);
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings.length).toBe(1);
 
     // 16. Accept a contract for whichever ore step 22's own greedy pickup
     // will actually land in storage, among what's currently on offer. Not
@@ -255,17 +264,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
     const assignDriver = vehicleCommand(ctx, ['driver', String(haulerId), '4'], {});
     expect(assignDriver.success).toBe(true);
 
-    // 21. Build a freight_warehouse at (0,8) — flat ground post-blast (#1008
-    // requires a level footprint; the terrain at the old (5,5) spot is no
-    // longer flat by this point in the sequence). #556: confirming the order
-    // only queues a construction site — drive it to completion (the
-    // surveyor, idle since step 4, picks up the unskilled `place_building`
-    // work) before asserting a real building exists.
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '0,8' });
-    expect(buildResult.success).toBe(true);
-    expect(ctx.state!.buildings.buildings.length).toBe(0);
-    driveConstructionToCompletion(ctx);
-    expect(ctx.state!.buildings.buildings.length).toBe(1);
+    // 21. (the freight_warehouse was built before step 16: ore-sale contracts need one, #1372)
 
     // 22. Deliver to the accepted contract — should generate positive payment.
     // Ore must actually be in storage first (#456 — blasting alone no longer
@@ -286,13 +285,14 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // storage was always enough of it. The dynamic contract selection above
     // can now land on a minor-share ore (rustite et al.) instead, for which
     // 500kg of *total* stored mass is nowhere near 500kg of *that ore*.
+    const sites = freightWarehouseSites(ctx.state!.buildings);
     const groundFragments = ctx.state!.logistics.fragments.filter(f => f.state === 'on_ground');
     for (const f of groundFragments) {
       // A blast throws off boulders heavier than an early warehouse holds, and
       // pickupFragment turns those away — so count what actually landed in
       // storage rather than what was attempted.
-      if (!pickupFragment(ctx.state!.logistics, f.fragment.id, 'vehicle-test')) continue;
-      deliverToDepot(ctx.state!.logistics, f.fragment.id, ctx.state!.collectedOre);
+      if (!pickupFragment(ctx.state!.logistics, f.fragment.id, 'vehicle-test', sites, 0, 8)) continue;
+      deliverToDepot(ctx.state!.logistics, f.fragment.id, ctx.state!.collectedOre, sites, 0, 8);
     }
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
 

@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { createRunner } from '../../src/console/createRunner.js';
+import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -64,8 +64,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -85,8 +84,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 14, 1);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -106,8 +104,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'pop_rock', 2, 1);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -130,8 +127,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 1.5);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -160,8 +156,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -177,7 +172,7 @@ describe('Blast execution — integration', () => {
     const grid = new VoxelGrid(20, 20);
     const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     // No charges → invalid
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
     const result = executeBlast(plan, grid, []);
     expect(result).toBeNull();
   });
@@ -233,7 +228,6 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
     expect(Object.keys(state.chargesByHole).length).toBeGreaterThan(0);
 
-    expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 
@@ -264,7 +258,6 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     expect(Object.keys(state.chargesByHole)).toHaveLength(0);
     expect(Object.keys(state.plannedChargesByHole).length).toBeGreaterThan(0);
 
-    expect(run('sequence auto delay_step:25').success).toBe(true);
     const result = run('blast');
 
     expect(result.success).toBe(false);
@@ -315,7 +308,6 @@ describe('Blast execution — #1346', () => {
     expect(state.pendingActions.some(a => a.type === 'drill_hole')).toBe(true);
     // Only the charged, drilled holes may be in the plan at fire time.
     for (const h of state.drillHoles) expect(state.chargesByHole[h.id]).toBeDefined();
-    expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 
@@ -327,7 +319,6 @@ describe('Blast execution — #1346', () => {
 
   it('no new hole is drilled after the blast, however long the crew keeps ticking', () => {
     const { run, state } = setupPartiallyDrilled();
-    expect(run('sequence auto delay_step:25').success).toBe(true);
     expect(run('blast').success).toBe(true);
     const drilledAfterBlast = state.drillHoles.length;
     for (let i = 0; i < 600; i++) run('tick 1');
@@ -384,7 +375,6 @@ describe('Blast execution — #1346', () => {
     for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < 2000 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
-    expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 
@@ -392,5 +382,314 @@ describe('Blast execution — #1346', () => {
     // No drill orders outstanding: neither the raw key nor the localized line may appear.
     expect(result.output).not.toContain('cancelled_drill_orders');
     expect(result.output).not.toContain(t('mining.blast.cancelled_drill_orders', { count: 0 }));
+  });
+});
+
+// ── #1362: DETONATE arms an evacuation sequence that fires once the zone is clear ──
+
+describe('Blast execution — DETONATE flow (#1362)', () => {
+  const SAFE_XZ = 44; // well outside the 3x3/spacing:3 pattern's padded danger zone
+
+  /** Staffed game with a drilled and fully charged 3x3 pattern, nobody yet moved. */
+  function setupCharged() {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
+    const state = () => ctx.state!;
+    const topUp = () => { for (const e of state().employees.employees) e.fatigue = 100; };
+    for (let i = 0; i < 600 && state().plannedDrillHoles.length > 0; i++) { topUp(); run('tick 1'); }
+    expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    for (let i = 0; i < 600 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
+    expect(state().drillHoles.length).toBeGreaterThan(0);
+    expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
+    return { run, ctx, state, topUp };
+  }
+
+  type Setup = ReturnType<typeof setupCharged>;
+
+  /** Put every employee at (x,z) and every vehicle at the safe corner. */
+  function crewAt(s: Setup, x: number, z: number): void {
+    for (const e of s.state().employees.employees) { e.x = x; e.z = z; e.destinationX = null; e.destinationZ = null; }
+    for (const v of s.state().vehicles.vehicles) { v.x = SAFE_XZ; v.z = SAFE_XZ; }
+  }
+
+  function crewClear(s: Setup): void { crewAt(s, SAFE_XZ, SAFE_XZ); }
+
+  /** Tick one at a time until a blast has been recorded (or the cap hits). */
+  function tickUntilBlast(s: Setup, cap = 400): number {
+    let n = 0;
+    while (n < cap && s.state().damage.blastCount === 0) { s.topUp(); s.run('tick 1'); n++; }
+    return n;
+  }
+
+  it('occupied zone: detonate does not fire on its own call, then auto-fires once clear with zero casualties', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    const staff = s.state().employees.employees.filter(e => e.alive).length;
+    expect(staff).toBeGreaterThan(0);
+
+    const res = s.run('blast detonate');
+
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().damage.deathCount).toBe(0);
+    expect(s.state().pendingDetonation).not.toBeNull();
+
+    tickUntilBlast(s);
+
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().pendingDetonation).toBeNull();
+    expect(s.state().lastBlastReport).not.toBeNull();
+    expect(s.state().damage.deathCount).toBe(0);
+    expect(s.state().employees.employees.filter(e => e.alive)).toHaveLength(staff);
+  });
+
+  it('fires exactly once and stops the tick batch at the firing tick', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    s.run('blast detonate');
+    const startTick = s.state().tickCount;
+    for (const e of s.state().employees.employees) e.fatigue = 100;
+
+    const out = s.run('tick 300');
+
+    expect(out.success).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().tickCount - startTick).toBeLessThan(300);
+    s.run('tick 20');
+    expect(s.state().damage.blastCount).toBe(1);
+  });
+
+  it('already-clear zone: detonate fires immediately in that call', () => {
+    const s = setupCharged();
+    crewClear(s);
+
+    const res = s.run('blast detonate');
+
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().pendingDetonation).toBeNull();
+    expect(s.state().lastBlastReport).not.toBeNull();
+    expect(s.state().damage.deathCount).toBe(0);
+  });
+
+  it('cancel clears the armed detonation and nothing ever fires', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    expect(s.run('blast detonate').success).toBe(true);
+    expect(s.state().pendingDetonation).not.toBeNull();
+
+    const res = s.run('blast cancel');
+
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().pendingDetonation).toBeNull();
+    for (let i = 0; i < 120; i++) { s.topUp(); s.run('tick 1'); }
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().drillHoles.length).toBeGreaterThan(0);
+  });
+
+  it('cancel with nothing armed is harmless and leaves the pattern loaded', () => {
+    const s = setupCharged();
+    s.run('blast cancel');
+    expect(s.state().pendingDetonation).toBeNull();
+    expect(s.state().damage.blastCount).toBe(0);
+  });
+
+  it('fire anyway (plain blast) on an occupied zone fires at once with casualties and clears the armed record', () => {
+    const s = setupCharged();
+    const hole = s.state().drillHoles[0]!;
+    crewAt(s, hole.x, hole.z);
+    expect(s.run('blast detonate').success).toBe(true);
+    expect(s.state().pendingDetonation).not.toBeNull();
+
+    const res = s.run('blast');
+
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().pendingDetonation).toBeNull();
+    expect(s.state().damage.deathCount).toBeGreaterThan(0);
+  });
+
+  it('fire anyway without ever arming still fires immediately (legacy path)', () => {
+    const s = setupCharged();
+    const hole = s.state().drillHoles[0]!;
+    crewAt(s, hole.x, hole.z);
+    const res = s.run('blast');
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().damage.deathCount).toBeGreaterThan(0);
+  });
+
+  it('after fire anyway nothing fires a second time', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    s.run('blast detonate');
+    s.run('blast');
+    for (let i = 0; i < 100; i++) s.run('tick 1');
+    expect(s.state().damage.blastCount).toBe(1);
+  });
+
+  it('a stranded occupant blocks the auto-fire, is named in blast status, and Fire anyway still works', () => {
+    const s = setupCharged();
+    crewClear(s);
+    const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
+    vehicle.occupantIds = []; // driverless: cannot drive itself out
+    const typeName = t(`vehicle_type.${vehicle.type}`);
+
+    const res = s.run('blast detonate');
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(0);
+
+    for (let i = 0; i < 200; i++) { s.topUp(); s.run('tick 1'); }
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().pendingDetonation).not.toBeNull();
+
+    const status = s.run('blast status');
+    expect(status.success).toBe(true);
+    expect(status.output).toContain(typeName);
+
+    const fired = s.run('blast');
+    expect(fired.success, fired.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().pendingDetonation).toBeNull();
+  });
+
+  it('a stranded occupant can be cancelled instead', () => {
+    const s = setupCharged();
+    crewClear(s);
+    const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
+    vehicle.occupantIds = [];
+    s.run('blast detonate');
+    expect(s.run('blast cancel').success).toBe(true);
+    for (let i = 0; i < 50; i++) s.run('tick 1');
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().pendingDetonation).toBeNull();
+  });
+
+  it('blast status reports without firing or changing state, armed or not', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    const idle = s.run('blast status');
+    expect(idle.success).toBe(true);
+    expect(idle.output.length).toBeGreaterThan(0);
+    s.run('blast detonate');
+    const armedTick = s.state().pendingDetonation!.armedTick;
+    const armed = s.run('blast status');
+    expect(armed.success).toBe(true);
+    expect(armed.output).not.toBe(idle.output);
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().pendingDetonation!.armedTick).toBe(armedTick);
+  });
+
+  it('save/load mid-sequence keeps the detonation armed and it still fires once clear', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    expect(s.run('blast detonate').success).toBe(true);
+    for (let i = 0; i < 2; i++) { s.topUp(); s.run('tick 1'); }
+    expect(s.state().damage.blastCount).toBe(0);
+    const armedTick = s.state().pendingDetonation!.armedTick;
+    expect(s.run('save slot:detonate-1362').success).toBe(true);
+
+    expect(s.run('load slot:detonate-1362').success).toBe(true);
+
+    expect(s.state().pendingDetonation).not.toBeNull();
+    expect(s.state().pendingDetonation!.armedTick).toBe(armedTick);
+    tickUntilBlast(s);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().pendingDetonation).toBeNull();
+    expect(s.state().damage.deathCount).toBe(0);
+  });
+
+  it('no occupied-zone refusal: plain blast fires on an occupied zone', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+
+    const res = s.run('blast');
+
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+  });
+
+  it('no occupied-zone refusal: detonate arms the sequence on an occupied zone', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+
+    const res = s.run('blast detonate');
+
+    expect(res.success, res.output).toBe(true);
+    expect(s.state().pendingDetonation).not.toBeNull();
+    tickUntilBlast(s);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().damage.deathCount).toBe(0);
+  });
+
+  it('a refused fire (charge still loading) leaves the armed detonation armed', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    expect(s.run('blast detonate').success).toBe(true);
+    const armed = s.state().pendingDetonation;
+    const holeId = s.state().drillHoles[0]!.id;
+    const landed = s.state().chargesByHole[holeId]!;
+    delete s.state().chargesByHole[holeId];
+    s.state().plannedChargesByHole[holeId] = landed;
+
+    const res = s.run('blast');
+
+    expect(res.success).toBe(false);
+    expect(s.state().pendingDetonation).toBe(armed);
+    expect(s.state().damage.blastCount).toBe(0);
+  });
+
+  it('an unknown blast subcommand is refused and fires nothing', () => {
+    const s = setupCharged();
+    crewClear(s);
+
+    const res = s.run('blast detonat');
+
+    expect(res.success).toBe(false);
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().drillHoles.length).toBeGreaterThan(0);
+  });
+
+  it('a second detonate while armed is refused and leaves the armed record untouched', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    expect(s.run('blast detonate').success).toBe(true);
+    const armed = s.state().pendingDetonation;
+
+    const again = s.run('blast detonate');
+
+    expect(again.success).toBe(false);
+    expect(again.output.length).toBeGreaterThan(0);
+    expect(s.state().pendingDetonation).toBe(armed);
+    expect(s.state().damage.blastCount).toBe(0);
+  });
+
+  it('detonate with no holes is refused and leaves pendingDetonation null', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+
+    const res = runner.run('blast detonate');
+
+    expect(res.success).toBe(false);
+    expect(res.output.length).toBeGreaterThan(0);
+    expect(ctx.state!.pendingDetonation).toBeNull();
+  });
+
+  it('detonate with drilled but uncharged holes is refused, nothing armed', () => {
+    const { runner, ctx } = createRunner();
+    const run = (c: string) => runner.run(c);
+    expect(run('new_game seed:42 size:48 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    for (let i = 0; i < 600 && ctx.state!.plannedDrillHoles.length > 0; i++) {
+      for (const e of ctx.state!.employees.employees) e.fatigue = 100;
+      run('tick 1');
+    }
+
+    const res = run('blast detonate');
+
+    expect(res.success).toBe(false);
+    expect(ctx.state!.pendingDetonation).toBeNull();
   });
 });

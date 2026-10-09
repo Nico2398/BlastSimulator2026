@@ -3,12 +3,12 @@
   "description": "Visual check: vehicle state transitions through idle moving working and waiting states",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:100000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:100000",
       "description": "cash:100000 override (campaign.ts's own `cash:` knob, mirroring new_game's) replaces dusty_hollow's default $50,000: the file now buys a debris_hauler ($25,000, pre-existing idle/moving/working coverage) AND a drill_rig ($35,000, issue #550's driving-to-task coverage) plus a driller hire ($1,000) -- $61,000 minimum before any fuel/maintenance ticks, more than the level default allows regardless of purchase order. Terrain/seed/grid are untouched (level.terrainSeed still drives regenerateGrid), so every camera-calibrated coordinate elsewhere in this file stays valid.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:100000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:100000"
         }
       ],
       "role": "setup",

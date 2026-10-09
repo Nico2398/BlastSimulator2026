@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
+import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
 import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
+import type { ConfirmModalConfig } from '../../../../../src/ui/panels/ConfirmModal.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
 
@@ -87,17 +89,19 @@ describe('DrillStep', () => {
     expect(step.root.textContent).not.toContain('TUBED');
   });
 
-  it('shows WET for an untubed hole while it is raining', () => {
+  it('shows WET for a hole that holds water', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    state.holeWater[hole.id] = { level: 0.8, porosity: 0.03 };
 
-    step.update(state, 'heavy_rain');
+    wetAllHoles(state);
+    step.update(state, 'sunny');
 
     expect(step.root.textContent).toContain('WET');
   });
 
-  it('shows TUBED even while raining, once tubing is installed', () => {
+  it('shows TUBED for a dry tubed hole even while raining, once tubing is installed', () => {
     const { step } = makeStep();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
@@ -506,5 +510,59 @@ describe('DrillStep — drill notice after confirm (#1359)', () => {
     controller.simulateSelect({ x1: 25, z1: 30, x2: 25, z2: 30 });
     expect(() => controller.simulateConfirm()).not.toThrow();
     expect(notice(step).style.display).toBe('none');
+  });
+});
+
+describe('DrillStep — replace-pattern confirm (#1345)', () => {
+  function armAndConfirm(state: ReturnType<typeof makeState>) {
+    const { step, gameConsole } = makeStep();
+    const { kit, controller } = makeMockKit();
+    const configs: ConfirmModalConfig[] = [];
+    step.setConfirmHandler(cfg => configs.push(cfg));
+    step.setPlacementKit(kit);
+    step.update(state, 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 18, z2: 14 });
+    controller.simulateConfirm();
+    return { configs, gameConsole };
+  }
+
+  it('opens the modal instead of running the grid when drilled holes exist', () => {
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 30, 30, 8, 0.15);
+    const { configs, gameConsole } = armAndConfirm(state);
+    expect(configs).toHaveLength(1);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('opens the modal when only charges exist', () => {
+    const state = makeState();
+    state.plannedChargesByHole['H1'] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    const { configs, gameConsole } = armAndConfirm(state);
+    expect(configs).toHaveLength(1);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('confirming the modal runs the grid command with confirm:true', () => {
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 30, 30, 8, 0.15);
+    const { configs, gameConsole } = armAndConfirm(state);
+    configs[0]!.onConfirm();
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole.mock.calls[0]![0]).toMatch(/^drill_plan grid .* confirm:true$/);
+  });
+
+  it('runs the grid directly, without modal, on an empty plan', () => {
+    const { configs, gameConsole } = armAndConfirm(makeState());
+    expect(configs).toHaveLength(0);
+    expect(gameConsole.mock.calls[0]![0]).not.toContain('confirm:true');
+  });
+
+  it('runs the grid directly when the plan holds only ordered holes', () => {
+    const state = makeState();
+    addHole(holeCounter, state.plannedDrillHoles, 30, 30, 8, 0.15);
+    const { configs, gameConsole } = armAndConfirm(state);
+    expect(configs).toHaveLength(0);
+    expect(gameConsole.mock.calls[0]![0]).not.toContain('confirm:true');
   });
 });

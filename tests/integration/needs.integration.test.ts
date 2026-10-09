@@ -814,8 +814,7 @@ describe("#928 — box-cut geometry: rest visits and cells walked stay under fre
         runCommand(engine, 'tick 1'); t++;
       }
     }
-    expect(runCommand(engine, 'employee train 2 skill:driving.drill_rig').success).toBe(true);
-    expect(runCommand(engine, 'tick 25').success).toBe(true);
+    // #1388: the driller already holds driving.drill_rig (ROLE_STARTING_QUALIFICATIONS) — no course for it.
     expect(runCommand(engine, 'vehicle buy drill_rig').success).toBe(true);
     expect(runCommand(engine, 'employee train 1 skill:driving.excavator').success).toBe(true);
     expect(runCommand(engine, 'tick 25').success).toBe(true);
@@ -1034,8 +1033,7 @@ describe('#945 — tutorial box-cut ramp: rock-digger driver boards a bounded nu
         runCommand(engine, 'tick 1'); t++;
       }
     }
-    expect(runCommand(engine, 'employee train 2 skill:driving.drill_rig').success).toBe(true);
-    expect(runCommand(engine, 'tick 25').success).toBe(true);
+    // #1388: the driller already holds driving.drill_rig (ROLE_STARTING_QUALIFICATIONS) — no course for it.
     expect(runCommand(engine, 'vehicle buy drill_rig').success).toBe(true);
     expect(runCommand(engine, 'employee train 1 skill:driving.excavator').success).toBe(true);
     expect(runCommand(engine, 'tick 25').success).toBe(true);

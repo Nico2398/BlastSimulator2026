@@ -22,7 +22,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15",
-      "description": "Corrected spacing from 5 to 4 to match the drag (#1072): the grid tool's spacing stepper defaults to 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts); one increment click on the strip's spacing stepper (data-field=\"spacing\") raises it to 4 before dragging, so the (15,15)-(20,20) rectangle (5x5) computes the declared 2x2 (round(5/4)+1=2). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "description": "Corrected spacing from 5 to 4 to match the drag (#1072): the grid tool's spacing stepper defaults to 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts); one increment click on the strip's spacing stepper (data-field=\"spacing\") raises it to 4 before dragging, so the (15,15)-(20,20) rectangle (5x5) computes the declared 2x2 (round(5/4)+1=2). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -151,30 +151,11 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast_preview",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -202,7 +183,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -231,7 +212,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -260,7 +241,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -289,7 +270,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -318,7 +299,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",

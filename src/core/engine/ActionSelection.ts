@@ -11,7 +11,9 @@ import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD } from '../config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
+import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
+import { readDemolishPayload } from './DemolishPayload.js';
 import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
@@ -24,8 +26,9 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 // function bodies, never evaluated at module-load time (same reasoning as
 // the documented VehicleReservation.ts <-> MoveTo.ts/PlanItinerary.ts cycle).
 import { planItinerary } from './PlanItinerary.js';
-import { isLicensedForRole } from './VehicleReservation.js';
+import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
+import { actionBlocked } from '../events/ActiveModifiers.js';
 
 /** Every configured NeedKey — used to validate an untyped payload value against the catalog rather than a hardcoded literal (#1062 genericity). */
 const NEED_KEYS = Object.keys(NEED_REST_DURATIONS) as NeedKey[];
@@ -127,6 +130,17 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
   // (interruptActiveAction) — returned raw, never rescaled.
   if (typeof action.payload['resumeTicks'] === 'number') {
     return action.payload['resumeTicks'];
+  }
+
+  if (action.type === 'demolish_building') {
+    // Reserved destroyer's tier scales a tier-1 baseline (#1392); the building
+    // tier comes from the standing building, falling back to the persisted payload.
+    const demolish = readDemolishPayload(action.payload);
+    const cells = demolish.footprint.length || 1;
+    const target = state.buildings.buildings.find(b => b.id === demolish.buildingId);
+    const vehicleTier = (findVehicleReservedForAction(state.vehicles, action.id)?.tier ?? 1) as VehicleTier;
+    if (target) return computeDemolitionDurationTicks(cells, target.tier, vehicleTier);
+    return Math.max(1, Math.ceil(demolish.durationTicks / DEMOLITION_VEHICLE_TIER_SPEED[vehicleTier]));
   }
 
   const baseTicks = typeof action.payload['durationTicks'] === 'number'
@@ -280,12 +294,13 @@ export function canReleaseStrandedVehicleGatedAction(
   if (resolveActionCost(state, employee, action) !== null) return false;
 
   const role = action.requiredVehicleRole;
+  // The stranded vehicle's own tier decides who can take it over (#1524).
   return state.employees.employees.some(other =>
     other.id !== employee.id &&
     other.alive &&
     other.activeActionId === null &&
     other.restTicksRemaining === null &&
-    isLicensedForRole(other, role),
+    canDriveTier(other, role, vehicle.tier),
   );
 }
 
@@ -418,7 +433,9 @@ export function selectBestActionForEmployee(
 ): SelectedAction | null {
   if (candidates.length === 0) return null;
 
-  const claimable = candidates.filter(isClaimable);
+  // Event modifiers (#1414): a stoppage, drill ban or haul pause keeps the action unclaimed.
+  const claimable = candidates.filter(a =>
+    !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role) && isClaimable(a));
   if (claimable.length === 0) return null;
 
   // Each candidate's estimate is computed exactly once, up front, rather

@@ -5,12 +5,15 @@ import type { Random } from '../math/Random.js';
 import { clampScore, type ScoreState } from '../scores/ScoreManager.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { addIncome, addExpense } from '../economy/Finance.js';
+import { applyExposure } from './MafiaActions.js';
 import type { EventConsequence } from './EventPool.js';
 import { getEventById } from './EventPool.js';
 import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
 import { TRAFFIC_JAM_EFFECTS, type EventWorld, type EffectOutcome } from './TrafficJamEffects.js';
 import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
+import { applyEventEffects } from './EventEffectCatalog.js';
+import { effectChips, type EventEffectChip } from './EventEffectText.js';
 
 // ── Resolution result ──
 
@@ -29,6 +32,10 @@ export interface ResolutionResult {
   scoreChanges: Partial<Record<keyof ScoreState, number>>;
   corruptionChange: number;
   followUpQueued: string | null;
+  /** Mafia exposure actually applied (fraction 0-1, signed) when the option carried an exposure delta. */
+  exposureChange?: number;
+  /** Structured descriptions of the declarative effects that were applied (#1414). */
+  effectChips: EventEffectChip[];
 }
 
 /**
@@ -80,9 +87,21 @@ export function resolveEvent(
   if (world && jam && tag && TRAFFIC_JAM_EFFECTS[tag]) {
     mergeOutcome(result, TRAFFIC_JAM_EFFECTS[tag]!(jam, world, tick));
   } else if (world && unqualifiedActionIds && tag && UNQUALIFIED_TASK_EFFECTS[tag]) {
-    // The raw tag is an internal name, not something to show the player.
-    result.effects = result.effects.filter(e => e !== tag);
     mergeOutcome(result, UNQUALIFIED_TASK_EFFECTS[tag]!(unqualifiedActionIds, world, tick));
+  }
+
+  // Declarative effects (#1414): modifiers, hires, bans, ... the sentence promised.
+  if (world && resolved.effects?.length) {
+    mergeOutcome(result, applyEventEffects(resolved.effects, world, tick, rng));
+    result.effectChips = effectChips(resolved.effects);
+  }
+
+  if (world && resolved.exposureDelta) {
+    const mafia = world.state.mafia;
+    const before = mafia.exposureRisk;
+    applyExposure(mafia, resolved.exposureDelta);
+    result.exposureChange = mafia.exposureRisk - before;
+    result.effects.push(`Exposure ${resolved.exposureDelta > 0 ? '+' : ''}${Math.round(resolved.exposureDelta * 100)}%`);
   }
 
   // Clear the pending event; record the outcome for the UI to read directly
@@ -101,7 +120,7 @@ function mergeOutcome(result: ResolutionResult, outcome: EffectOutcome): void {
   for (const [k, d] of Object.entries(outcome.scoreChanges) as [keyof ScoreState, number][]) {
     result.scoreChanges[k] = (result.scoreChanges[k] ?? 0) + d;
   }
-  result.resultKey += outcome.resultKeySuffix;
+  if (!result.resultKey.endsWith(outcome.resultKeySuffix)) result.resultKey += outcome.resultKeySuffix;
 }
 
 /**
@@ -123,9 +142,15 @@ function buildEventOutcome(result: ResolutionResult): EventOutcome {
   if (result.corruptionChange !== 0) {
     effects.push({ kind: 'other', key: 'corruption', delta: result.corruptionChange });
   }
+  if (result.exposureChange) {
+    // Shown in percentage points, like the console line.
+    effects.push({ kind: 'other', key: 'exposure', delta: Math.round(result.exposureChange * 100) });
+  }
   if (result.followUpQueued) {
     effects.push({ kind: 'other', key: 'followUp', delta: 0, textKey: 'ui.event.follow_up_developing' });
   }
+
+  effects.push(...result.effectChips);
 
   return { eventId: result.eventId, resultKey: result.resultKey, effects };
 }
@@ -197,11 +222,6 @@ function applyConsequence(
     effects.push('A follow-up situation is developing...');
   }
 
-  // Effect tag
-  if (c.effectTag) {
-    effects.push(c.effectTag);
-  }
-
   return {
     success: true,
     eventId,
@@ -213,5 +233,6 @@ function applyConsequence(
     scoreChanges,
     corruptionChange,
     followUpQueued,
+    effectChips: [],
   };
 }

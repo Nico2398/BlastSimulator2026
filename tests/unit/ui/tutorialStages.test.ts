@@ -340,165 +340,53 @@ function makeButton(attrs: Record<string, string>, parent: HTMLElement): HTMLBut
   return btn;
 }
 
-describe('sequence stage list — Charge-tab reachability regression (#926)', () => {
-  // Mirrors BlastWorkshop.ts's real DOM shape: a toolbar button that opens
-  // the panel, a `#bs-blast-panel` root holding a tab strip (`[data-step]`,
-  // always on screen regardless of which tab is active) and one body per
-  // step (display:none unless its own tab is the active one).
-  beforeEach(() => {
-    document.body.innerHTML = '';
+describe('sequence stage list is gone (#1344)', () => {
+  it('TUTORIAL_STAGES has no sequence entry', () => {
+    expect(Object.keys(TUTORIAL_STAGES)).not.toContain('sequence');
+    expect(TUTORIAL_STAGES['sequence']).toBeUndefined();
   });
 
-  it('resolves to a reachable control while the workshop is showing the Charge tab, not the already-open toolbar hint', () => {
-    const toolbar = document.createElement('div');
-    toolbar.id = 'bs-toolbar';
-    document.body.appendChild(toolbar);
-    makeButton({ 'data-panel': 'blast' }, toolbar);
-
-    const panel = document.createElement('div');
-    panel.id = 'bs-blast-panel';
-    document.body.appendChild(panel);
-    const strip = document.createElement('div');
-    panel.appendChild(strip);
-    makeButton({ 'data-step': '2' }, strip);
-    makeButton({ 'data-step': '3' }, strip);
-
-    // Charge tab body: visible (the crew is still mid-charge, so the panel's
-    // own auto-advance correctly keeps it on screen).
-    const chargeBody = document.createElement('div');
-    chargeBody.style.display = '';
-    panel.appendChild(chargeBody);
-    makeButton({ 'data-action': 'charge-all' }, chargeBody);
-
-    // Sequence tab body: hidden — its own auto-sequence button is not on
-    // screen yet.
-    const sequenceBody = document.createElement('div');
-    sequenceBody.style.display = 'none';
-    panel.appendChild(sequenceBody);
-    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
-
-    const stages = TUTORIAL_STAGES['sequence']!;
-    const index = resolveStageIndex(stages);
-    const resolved = stages[index]!;
-
-    expect(
-      resolved.target,
-      'sequence rail fell back to the already-satisfied "open the Blast panel" hint, ' +
-      'with no reachable control to click',
-    ).not.toBe(stages[0]!.target);
-    expect(isReachable(resolved.target)).toBe(true);
-  });
-
-  it('resolves to Auto Sequence once the panel actually shows the Sequence tab', () => {
-    const toolbar = document.createElement('div');
-    toolbar.id = 'bs-toolbar';
-    document.body.appendChild(toolbar);
-    makeButton({ 'data-panel': 'blast' }, toolbar);
-
-    const panel = document.createElement('div');
-    panel.id = 'bs-blast-panel';
-    document.body.appendChild(panel);
-    const strip = document.createElement('div');
-    panel.appendChild(strip);
-    makeButton({ 'data-step': '2' }, strip);
-    makeButton({ 'data-step': '3' }, strip);
-
-    const chargeBody = document.createElement('div');
-    chargeBody.style.display = 'none';
-    panel.appendChild(chargeBody);
-    makeButton({ 'data-action': 'charge-all' }, chargeBody);
-
-    const sequenceBody = document.createElement('div');
-    sequenceBody.style.display = '';
-    panel.appendChild(sequenceBody);
-    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
-
-    const stages = TUTORIAL_STAGES['sequence']!;
-    const index = resolveStageIndex(stages);
-    expect(stages[index]!.target).toBe('#bs-blast-panel [data-action="auto-sequence"]');
-    expect(isReachable(stages[index]!.target)).toBe(true);
+  it('no stage of any step targets an auto-sequence control or a data-step 5 tab', () => {
+    for (const [id, stages] of Object.entries(TUTORIAL_STAGES)) {
+      for (const stage of stages) {
+        expect(stage.target, `${id} targets a removed control`).not.toContain('auto-sequence');
+        expect(stage.target, `${id} targets a removed tab`).not.toContain('data-step="5"');
+      }
+    }
   });
 });
 
-describe('#1337 evacuate-zone manual-tab reachability', () => {
-  const FIRE_TAB = '#bs-blast-panel [data-step="5"]';
-  const HORN = '#bs-blast-panel [data-action="sound-horn"]';
-
-  function mount(opts: { panel: boolean; fireVisible: boolean }): void {
-    const toolbar = document.createElement('div');
-    toolbar.id = 'bs-toolbar';
-    document.body.appendChild(toolbar);
-    makeButton({ 'data-panel': 'blast' }, toolbar);
-    if (!opts.panel) return;
-
-    const panel = document.createElement('div');
-    panel.id = 'bs-blast-panel';
-    document.body.appendChild(panel);
-    const strip = document.createElement('div');
-    panel.appendChild(strip);
-    for (const n of ['3', '4', '5']) makeButton({ 'data-step': n }, strip);
-
-    const sequenceBody = document.createElement('div');
-    sequenceBody.style.display = opts.fireVisible ? 'none' : '';
-    panel.appendChild(sequenceBody);
-    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
-
-    const fireBody = document.createElement('div');
-    fireBody.style.display = opts.fireVisible ? '' : 'none';
-    panel.appendChild(fireBody);
-    makeButton({ 'data-action': 'sound-horn' }, fireBody);
-  }
-
-  beforeEach(() => {
-    document.body.innerHTML = '';
-  });
-
-  it('resolves to the Fire tab button when the player manually showed Sequence and Fire body is hidden', () => {
-    mount({ panel: true, fireVisible: false });
+describe('evacuate-zone stages after the horn button is gone (#1362, was #1337)', () => {
+  it('no stage targets the removed sound-horn control or uses its hint key', () => {
     const stages = TUTORIAL_STAGES['evacuate-zone']!;
-    const resolved = stages[resolveStageIndex(stages)]!;
-    expect(resolved.target).toBe(FIRE_TAB);
-    expect(resolved).not.toBe(stages[0]);
-    expect(isReachable(resolved.target)).toBe(true);
+    expect(stages.length).toBeGreaterThan(0);
+    for (const st of stages) {
+      expect(st.target).not.toContain('sound-horn');
+      expect(st.hintKey).not.toBe('tutorial.stage.sound_horn');
+    }
   });
 
-  it('resolves to Sound the Horn once the Fire body is visible', () => {
-    mount({ panel: true, fireVisible: true });
+  it('starts at the toolbar Blast button and still carries no spentWhen on any stage', () => {
     const stages = TUTORIAL_STAGES['evacuate-zone']!;
-    const resolved = stages[resolveStageIndex(stages)]!;
-    expect(resolved.target).toBe(HORN);
-    expect(isReachable(resolved.target)).toBe(true);
-  });
-
-  it('resolves to the toolbar Blast stage when the Blast panel is not open', () => {
-    mount({ panel: false, fireVisible: false });
-    const stages = TUTORIAL_STAGES['evacuate-zone']!;
-    expect(resolveStageIndex(stages)).toBe(0);
-  });
-
-  it('lists exactly toolbar, Fire tab, Sound the Horn in order', () => {
-    const stages = TUTORIAL_STAGES['evacuate-zone']!;
-    expect(stages).toHaveLength(3);
-    expect(stages.map((st) => st.hintKey)).toEqual([
-      'tutorial.stage.open_blast',
-      'tutorial.stage.open_fire_tab',
-      'tutorial.stage.sound_horn',
-    ]);
-    expect(stages[1]!.target).toBe(FIRE_TAB);
-    expect(stages[2]!.target).toBe(HORN);
-  });
-
-  it('has distinct open_fire_tab hint text in en and fr and no spentWhen on any stage', () => {
-    const key = 'tutorial.stage.open_fire_tab';
-    const enText = (en as Record<string, string>)[key];
-    const frText = (fr as Record<string, string>)[key];
-    expect(enText, 'missing en key').toBeTruthy();
-    expect(frText, 'missing fr key').toBeTruthy();
-    expect(enText).not.toBe(frText);
-    expect(enText).not.toBe((en as Record<string, string>)['tutorial.stage.sound_horn']);
-    for (const st of TUTORIAL_STAGES['evacuate-zone']!) {
+    expect(stages[0]!.hintKey).toBe('tutorial.stage.open_blast');
+    for (const st of stages) {
       expect((st as { spentWhen?: unknown }).spentWhen).toBeUndefined();
     }
+  });
+
+  it('every stage hint resolves to distinct en and fr text', () => {
+    for (const st of TUTORIAL_STAGES['evacuate-zone']!) {
+      const enText = (en as Record<string, string>)[st.hintKey];
+      const frText = (fr as Record<string, string>)[st.hintKey];
+      expect(enText, `missing en key ${st.hintKey}`).toBeTruthy();
+      expect(frText, `missing fr key ${st.hintKey}`).toBeTruthy();
+      expect(enText).not.toBe(frText);
+    }
+  });
+
+  it('the horn stage hint key is removed from both locales', () => {
+    expect((en as Record<string, string>)['tutorial.stage.sound_horn']).toBeUndefined();
+    expect((fr as Record<string, string>)['tutorial.stage.sound_horn']).toBeUndefined();
   });
 });
 
@@ -550,7 +438,7 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
     });
   }
 
-  it.each(['sequence', 'evacuate-zone', 'train-fragmenter'])(
+  it.each(['evacuate-zone', 'train-fragmenter'])(
     '%s carries no spentWhen on any of its stages',
     (stepId) => {
       const stages = TUTORIAL_STAGES[stepId]!;

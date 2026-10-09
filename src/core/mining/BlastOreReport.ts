@@ -52,6 +52,14 @@ function fragmentColumnEstimateKg(
 // ── Shared helper (exported for cross-module reuse) ────────────────────────────
 
 /**
+ * Ore mass (kg) one ore contributes to a fragment of `volume` m³ at the given
+ * density fraction (0–1): volume × density × ORE_DENSITY_KG_M3.
+ */
+export function oreContributionKg(volume: number, density: number): number {
+  return volume * density * ORE_DENSITY_KG_M3;
+}
+
+/**
  * Accumulate ore mass (kg) into `acc` keyed by ore type ID.
  *
  * Uses the standard formula: **mass = volume × oreDensity × ORE_DENSITY_KG_M3**
@@ -68,10 +76,26 @@ export function accumulateOreMass(
 ): void {
   for (const [oreId, density] of Object.entries(oreDensities)) {
     if (density > 0) {
-      const kg = volume * density * ORE_DENSITY_KG_M3;
+      const kg = oreContributionKg(volume, density);
       acc[oreId] = (acc[oreId] ?? 0) + kg;
     }
   }
+}
+
+/**
+ * Subtract from `collectedOre` the exact ore-kg every ore carries in a
+ * fragment slice of `volume` m³. Returns the per-ore breakdown removed.
+ */
+export function decrementCollectedOre(
+  collectedOre: Record<string, number>,
+  slice: { volume: number; oreDensities: Record<string, number> },
+): Record<string, number> {
+  const acc: Record<string, number> = {};
+  accumulateOreMass(acc, slice.volume, slice.oreDensities);
+  for (const [oreId, kg] of Object.entries(acc)) {
+    collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+  }
+  return acc;
 }
 
 /**

@@ -8,7 +8,7 @@
 import type { GameState } from '../core/state/GameState.js';
 import type { FinanceState } from '../core/economy/Finance.js';
 import type { TutorialStep } from './tutorialSteps.js';
-import { getFinancialReport } from '../core/economy/Finance.js';
+import { getOperatingProfit } from '../core/economy/Finance.js';
 import { formatDollars } from '../core/economy/formatMoney.js';
 import { getLevel } from '../core/campaign/Level.js';
 import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
@@ -24,7 +24,7 @@ export function victoryProgress(
   finances: FinanceState,
   target: number,
 ): { profit: number; target: number; remaining: number } {
-  const profit = getFinancialReport(finances, 0).netProfit;
+  const profit = getOperatingProfit(finances);
   return { profit, target, remaining: Math.max(0, target - profit) };
 }
 
@@ -37,7 +37,7 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
   // ── free-play ──
   // The guided part ends with the first ore sale. From here every rail is
   // lifted and the clock is never held (`guided: false`); the goal chip shows
-  // net profit against the level's target. Only a genuine win completes this
+  // operating profit against the level's target. Only a genuine win completes this
   // step — `state.levelEnded` alone also goes true on bankruptcy/arrest/
   // ecological_shutdown/worker_revolt (#959); any other terminal reason is
   // handled by TutorialOverlay's own defeat short-circuit from every step.
@@ -76,7 +76,7 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
   },
 ];
 
-/** Interpolation params for the goal chip: formatted net profit and profit target (#1328). */
+/** Interpolation params for the goal chip: formatted operating profit and profit target (#1328). */
 export function goalChipParams(state: GameState): { profit: string; target: string } {
   const target = tutorialTarget();
   return { profit: formatDollars(victoryProgress(state.finances, target).profit), target: formatDollars(target) };

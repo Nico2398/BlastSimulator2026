@@ -13,11 +13,13 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
-import { storageRoomKg } from './Logistics.js';
+import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
-import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
+import { freightWarehouseSites, nearestSite, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { isBarrenFragment, type HaulDestination } from './SpoilHeaps.js';
+import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
 /**
@@ -59,7 +61,7 @@ export function requestHaulFragment(
   if (!found.success) return found;
   const vehicle = found.vehicle;
   if (vehicleDriverId(vehicle) === null) return vehicleNoDriver();
-  if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.payload !== null) {
+  if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.cargo.length > 0) {
     return { success: false, error: 'Vehicle is already hauling', errorKey: 'vehicle.already_hauling' };
   }
 
@@ -85,7 +87,9 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!isHaulEligibleVehicle(vehicle, state.vehicles)) return null;
 
-  const roomKg = storageRoomKg(state.logistics);
+  const sites = freightWarehouseSites(state.buildings);
+  const used = warehouseUsedKgMap(state.logistics);
+  const hasHeap = spoilHeapSites(state.buildings).length > 0;
 
   return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
     // An oversized fragment can never be hauled until a Rock Fragmenter
@@ -97,21 +101,40 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     // away every tick from then on. Blasts throw off boulders far heavier than
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
-    if (tracked.fragment.mass > roomKg) return false;
+    if (isBarrenFragment(tracked.fragment.oreDensities)) return hasHeap;
+    if (!pickWarehouse(state.logistics, sites, vehicle.x, vehicle.z, tracked.fragment.mass, used)) return false;
     return true;
   });
 }
 
 /**
  * Nearest walkable NavGrid approach cell, from (`fromX`, `fromZ`), around the
- * nearest active freight_warehouse depot building — the itinerary-planning
+ * nearest active depot building for `destination` (freight_warehouse, or spoil_heap for barren rock, #1530) — the itinerary-planning
  * replacement for the old tickHaulingProgress's own per-tick depot re-target
  * (formerly `resolveDepotApproach`, inlined per-tick since the depot leg only
- * needs resolving once now, at plan time). Returns null when no active depot
+ * needs resolving once now, at plan time). Prefers the nearest warehouse with
+ * room for `massKg`; when every warehouse is full for it, falls back to the
+ * nearest not-overbooked one so planning (and the pickup refusal that follows)
+ * behaves as with a single global store. Returns null when no active depot
  * exists.
  */
-export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number): { x: number; z: number } | null {
-  const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', fromX, fromZ);
+export function findHaulDepotApproach(
+  state: GameState,
+  fromX: number,
+  fromZ: number,
+  massKg: number,
+  destination: HaulDestination = 'warehouse',
+): { x: number; z: number } | null {
+  const site = destination === 'spoil_heap'
+    ? nearestSite(spoilHeapSites(state.buildings), fromX, fromZ)
+    : warehouseSiteFor(state, fromX, fromZ, massKg);
+  const depot = site && state.buildings.buildings.find(b => b.id === site.id);
   if (!depot) return null;
   return findBuildingApproachCell(state.navGrid, depot, getBuildingDef(depot.type, depot.tier), fromX, fromZ);
+}
+
+function warehouseSiteFor(state: GameState, fromX: number, fromZ: number, massKg: number) {
+  const sites = freightWarehouseSites(state.buildings);
+  return pickWarehouse(state.logistics, sites, fromX, fromZ, massKg)
+    ?? pickWarehouse(state.logistics, sites, fromX, fromZ, 0);
 }

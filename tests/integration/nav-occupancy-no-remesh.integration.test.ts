@@ -21,13 +21,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { GameRenderer } from '../../src/renderer/GameRenderer.js';
 import { makeMockSceneManager } from '../helpers/rendererFixtures.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { equipDemolition, tickUntilDemolished } from '../helpers/demolition.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
 import { tickCommand } from '../../src/console/commands/tick.js';
 import {
   blastCommand,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
 
@@ -89,12 +89,16 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     const callsAfterConstruction = spy.mock.calls.length;
 
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
+    equipDemolition(ctx);
+    const callsBeforeDemolition = spy.mock.calls.length;
     const result = buildCommand(ctx, ['destroy', String(buildingId)], {});
     expect(result.success).toBe(true);
+    tickUntilDemolished(ctx);
 
     // Destroy is occupancy-only (carves zero voxels) — must not add any
     // remesh calls beyond what construction already caused.
-    expect(spy.mock.calls.length).toBe(callsAfterConstruction);
+    expect(spy.mock.calls.length).toBe(callsBeforeDemolition);
+    expect(callsBeforeDemolition).toBe(callsAfterConstruction);
 
     // The NavGrid patch itself still happened — via nav:occupancy_changed,
     // not skipped — a regression guard against a false pass from destroy
@@ -111,7 +115,6 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const callsBeforeBlast = spy.mock.calls.length;
 

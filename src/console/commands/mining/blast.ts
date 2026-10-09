@@ -7,7 +7,9 @@ import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleVal
 import { executeBlast, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
-import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
+import { addBlastFragments } from '../../../core/economy/Logistics.js';
+import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
+import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
@@ -22,35 +24,84 @@ import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
-import { getStorageCapacity } from '../../../core/entities/Building.js';
-import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
+import { computeDangerZone } from '../../../core/entities/Zone.js';
+import { isActive } from '../../../core/events/ActiveModifiers.js';
+import { armDetonation, cancelDetonation, hasChargedHole, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
+/** Report line for one warehouse whose stock a blast destroyed with it. */
+function stockLossLine(loss: WarehouseLoss): string {
+  return t('mining.blast.warehouse_stock_lost', { id: loss.buildingId, kg: Math.round(loss.massKg) });
+}
+
+/** Dispatch `blast` subcommands: (none) = fire anyway, detonate, cancel, status (#1362). */
 export function blastCommand(
   ctx: MiningContext,
-  _args: string[],
+  args: string[],
   _named: Record<string, string>,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
+  switch (args[0]) {
+    case 'detonate': return blastDetonate(ctx);
+    case 'cancel': return blastCancel(ctx);
+    case 'status': return blastStatus(ctx);
+    case undefined: return fireBlast(ctx);
+    default: return { success: false, output: t('mining.blast.unknown_subcommand', { arg: args[0] }) };
+  }
+}
 
-  // Tutorial-only refusal (#557): the tutorial teaches evacuating the blast
-  // zone before firing, so it refuses to fire on an occupied one. Outside the
-  // tutorial this never triggers — firing on an occupied zone stays exactly
-  // as before this issue (preflight warning only, still fireable). Runs
-  // before any state mutation: no cash spent, no drill plan cleared,
-  // executeBlast never called.
-  if (ctx.tutorialActive === true) {
-    const preState = ctx.state!;
-    const count = blockingOccupantCount(preState.drillHoles, BLAST_DANGER_MARGIN_M, preState.vehicles, preState.employees);
-    if (count !== null) {
-      return { success: false, output: t('mining.blast.refused_zone_occupied', { count }) };
-    }
+/** Localized line describing a non-idle phase. */
+function phaseLine(phase: DetonationPhase): string {
+  switch (phase.kind) {
+    case 'idle': return t('mining.blast.detonation_idle');
+    case 'ready': return t('mining.blast.detonation_armed', { remaining: 0 });
+    case 'evacuating': return t('mining.blast.detonation_armed', { remaining: phase.remaining });
+    case 'stranded': return t('mining.blast.detonation_stranded', { names: phase.names.join(', ') });
+  }
+}
+
+/** Arm the detonation; fire at once when the zone is already clear. */
+function blastDetonate(ctx: MiningContext): CommandResult {
+  const armed = armDetonation(ctx.state!);
+  if (!armed.success) return { success: false, output: armed.error };
+  const phase = detonationPhase(ctx.state!);
+  if (phase.kind !== 'ready') return { success: true, output: phaseLine(phase) };
+  return fireBlast(ctx);
+}
+
+function blastCancel(ctx: MiningContext): CommandResult {
+  const wasArmed = cancelDetonation(ctx.state!);
+  return { success: true, output: t(wasArmed ? 'mining.blast.detonation_cancelled' : 'mining.blast.detonation_idle') };
+}
+
+function blastStatus(ctx: MiningContext): CommandResult {
+  return { success: true, output: phaseLine(detonationPhase(ctx.state!)) };
+}
+
+/** Fire the loaded pattern immediately, dropping any armed detonation. */
+export function fireBlast(
+  ctx: MiningContext,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+
+  // An event's blasting ban (#1414) refuses the shot before anything mutates.
+  if (isActive(ctx.state!.events.activeModifiers, 'blast_ban', ctx.state!.tickCount)) {
+    return { success: false, output: t('mining.blast.banned') };
+  }
+
+  // Nothing loaded or loading: refuse before anything mutates (#1345). A hole
+  // whose charge is still loading falls through to validation, which names it.
+  if (!hasChargedHole(ctx.state!)) {
+    return { success: false, output: t('mining.blast.no_charged_holes') };
   }
 
   const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;
+  // Validation passed: this fire consumes any armed detonation. Refusals above leave it armed.
+  ctx.state!.pendingDetonation = null;
 
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
@@ -63,6 +114,14 @@ export function blastCommand(
   ctx.lastBlastFlights = result.flights;
 
   const state = ctx.state!;
+  const stockLossLines: string[] = [];
+  // Refresh logistics after a destruction path: console line plus the toast event per lost warehouse.
+  const recordStockLosses = (): void => {
+    for (const loss of refreshLogisticsCapacity(state)) {
+      stockLossLines.push(stockLossLine(loss));
+      ctx.emitter.emit('logistics:warehouse_stock_lost', loss);
+    }
+  };
 
   // Buildings destroyed by the blast: score penalty per building. Their freed
   // footprint is already inside clearedRegion, which executeBlast's own
@@ -74,7 +133,7 @@ export function blastCommand(
 
   // A blast can destroy a Freight Warehouse — keep logistics capacity honest.
   if (result.destroyedBuildings.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    recordStockLosses();
   }
 
   // Ore value is informational only here — cash is credited when the ore is
@@ -142,7 +201,7 @@ export function blastCommand(
     projectionSecondaryEvents,
   );
   if (impacts.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    recordStockLosses();
   }
   thisBlastAccidents.push(...impacts);
 
@@ -175,7 +234,7 @@ export function blastCommand(
     });
   }
   if (secondaryOutcomes.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    recordStockLosses();
     releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
   }
 
@@ -282,6 +341,7 @@ export function blastCommand(
       ...(result.destroyedBuildings.length > 0
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
+      ...stockLossLines,
       ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties })),
     ].join('\n'),
   };

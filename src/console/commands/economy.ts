@@ -2,23 +2,32 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { getBalance, getFinancialReport, addIncome } from '../../core/economy/Finance.js';
+import { getBalance, getFinancialReport } from '../../core/economy/Finance.js';
 import {
   generateContracts,
   acceptContract,
-  deliverMaterials,
+  contractAcceptBlocker,
+  setContractHeld,
   findContract,
+  remainingKg,
+  storedStockKg,
   type Contract,
   type ContractSelector,
   type ContractType,
 } from '../../core/economy/Contract.js';
+import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
+import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
+import { deliverStoredOre, bookDeliveryIncome } from '../../core/economy/ContractFulfilment.js';
+import { getFragmentCounts } from '../../core/economy/Logistics.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
+import type { Building } from '../../core/entities/Building.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
 
 // ── finances command ──
 
@@ -41,6 +50,7 @@ export function financesCommand(
     `Total income:   ${formatDollars(report.totalIncome)}`,
     `Total expenses: ${formatDollars(report.totalExpenses)}`,
     `Net profit:     ${formatDollars(report.netProfit)}`,
+    `Operating profit: ${formatDollars(report.operatingProfit)}`,
   ];
 
   if (report.incomeByCategory.length > 0) {
@@ -111,11 +121,11 @@ function resolveContract(
   args: string[],
   named: Record<string, string>,
   usage: string,
-  stock: { collectedOre: Readonly<Record<string, number>>; logistics: { storedMassKg: number } },
+  stock: { collectedOre: Readonly<Record<string, number>>; logistics: { storedMassKg: number }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
 ): Contract | CommandResult {
   const selector = parseContractSelector(args, named);
   if (!selector) return { success: false, output: usage };
-  const contract = findContract(pool, selector, stock.collectedOre, stock.logistics.storedMassKg);
+  const contract = findContract(pool, selector, stock.collectedOre, stateRubbleStockKg(stock));
   if (!contract && selector.fillable) return { success: false, output: t('economy.contract.none_fillable') };
   if (!contract) return { success: false, output: `Contract ${describeContractSelector(selector)} not found.` };
   return contract;
@@ -134,7 +144,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state));
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };
       }
@@ -152,6 +162,10 @@ export function contractCommand(
       const usage = t('economy.contract.usage_accept');
       const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
+      const offer = state.contracts.available.find(c => c.id === resolved.id);
+      if (offer && contractAcceptBlocker(offer, freightWarehouseSites(state.buildings).length > 0) === 'needs_freight_warehouse') {
+        return { success: false, output: t('economy.contract.needs_warehouse') };
+      }
       const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
       if (!contract) return { success: false, output: `Contract #${resolved.id} not found in available list.` };
       return { success: true, output: `Accepted contract #${contract.id}: ${contract.description}` };
@@ -175,7 +189,8 @@ export function contractCommand(
         const remaining = c.deadlineTicks - (state.tickCount - c.acceptedAtTick);
         lines.push(
           `  [${c.id}] ${c.description} — ${c.deliveredKg}/${c.quantityKg}kg (${pct}%)` +
-          ` | ${remaining} ticks remaining | penalty: $${c.penaltyAmount}`,
+          ` | ${remaining} ticks remaining | penalty: $${c.penaltyAmount}` +
+          (c.held ? ` ${t('economy.contract.held_badge')}` : ''),
         );
       }
       return { success: true, output: lines.join('\n') };
@@ -191,30 +206,29 @@ export function contractCommand(
       if ('success' in resolved) return resolved;
       const contract = resolved;
       const id = contract.id;
-      const cappedAmount = Math.min(amount, contract.quantityKg - contract.deliveredKg);
-      if (cappedAmount <= 0) {
-        return { success: false, output: t('economy.contract.deliver_fulfilled', { id }) };
+      // A manual request is all-or-nothing; only the automatic path caps at stock.
+      const stock = storedStockKg(contract, state.collectedOre, stateRubbleStockKg(state));
+      if (Math.min(amount, remainingKg(contract)) > stock + FRAGMENT_SPLIT_EPSILON_KG) {
+        return { success: false, output: t('economy.contract.deliver_insufficient', { material: contract.materialId || t('ui.contracts.material_rubble') }) };
       }
-      const consumption = consumeStoredOre(state.logistics, state.collectedOre, contract.materialId, cappedAmount);
-      if (!consumption.success) {
-        return { success: false, output: consumption.error ?? t('economy.contract.deliver_insufficient', { material: contract.materialId || 'material' }) };
-      }
-      const deliverKg = Math.min(consumption.consumedKg, cappedAmount);
-      const result = deliverMaterials(state.contracts, id, deliverKg, state.tickCount);
-      if (result.payment === 0 && !result.completed) {
-        return { success: false, output: t('economy.contract.deliver_not_found', { id }) };
-      }
-      state.cash += result.payment;
-      addIncome(state.finances, result.payment, 'contracts', `Contract #${id} delivery`, state.tickCount);
-      if (result.bonus > 0) {
-        state.cash += result.bonus;
-        addIncome(state.finances, result.bonus, 'bonus', `Contract #${id} early bonus`, state.tickCount);
-      }
+      const delivery = deliverStoredOre(state.contracts, state.logistics, state.collectedOre, id, amount, state.tickCount, state.buildings.buildings);
+      if (!delivery.success) return { success: false, output: delivery.error };
+      const result = delivery.data;
+      bookDeliveryIncome(state, id, result, state.tickCount);
       const msg = result.completed
         ? `Contract #${id} COMPLETED! Payment: $${result.payment.toFixed(2)}` +
           (result.bonus > 0 ? ` + early bonus: $${result.bonus.toFixed(2)}` : '')
         : `Delivered to contract #${id}. Payment: $${result.payment.toFixed(2)}`;
       return { success: true, output: msg };
+    }
+
+    case 'hold':
+    case 'release': {
+      const usage = t(sub === 'hold' ? 'economy.contract.usage_hold' : 'economy.contract.usage_release');
+      const resolved = resolveContract(state.contracts.active, args, named, usage, state);
+      if ('success' in resolved) return resolved;
+      setContractHeld(state.contracts, resolved.id, sub === 'hold');
+      return { success: true, output: t(sub === 'hold' ? 'economy.contract.held' : 'economy.contract.released', { id: resolved.id }) };
     }
 
     case 'negotiate': {

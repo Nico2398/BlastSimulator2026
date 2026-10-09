@@ -53,7 +53,6 @@ export interface ReportEntry {
   warning?: string;
   holes: number;
   charged: number;
-  sequenced: number;
   screenshot?: string;
 }
 
@@ -66,7 +65,7 @@ export interface ReportableStep {
   commandOutput: string;
   error?: string;
   warning?: string;
-  gameState: { holeCount?: number; chargedCount?: number; sequencedCount?: number } | null;
+  gameState: { holeCount?: number; chargedCount?: number } | null;
   screenshotPath?: string;
 }
 
@@ -88,7 +87,6 @@ export function buildScenarioReport(results: ReportableStep[]): ReportEntry[] {
     ...(r.warning !== undefined ? { warning: r.warning } : {}),
     holes: r.gameState?.holeCount ?? 0,
     charged: r.gameState?.chargedCount ?? 0,
-    sequenced: r.gameState?.sequencedCount ?? 0,
     ...(r.screenshotPath !== undefined ? { screenshot: r.screenshotPath } : {}),
   }));
 }

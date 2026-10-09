@@ -64,7 +64,7 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Unassign'))).toBe(false);
     expect(root.querySelector('[data-action="haul"]')).toBeNull();
     expect(root.querySelector('[data-action="unassign"]')).toBeNull();
-    expect(root.querySelectorAll('button[data-action]').length).toBe(2);
+    expect(root.querySelectorAll('button[data-action]').length).toBe(3);
   });
 
   it('shows the building action set (Upgrade, Move, Demolish)', () => {
@@ -132,22 +132,21 @@ describe('SelectionBar', () => {
     expect(root.style.display).toBe('none');
   });
 
-  it('shows hole id, depth, and sequence delay, and the Focus action', () => {
+  it('shows hole id, depth, and the Focus action', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    state.sequenceDelays[hole.id] = 25;
 
     bar.show(entity('hole', holeNumericId(hole.id)), state);
     expect(root.style.display).not.toBe('none');
     expect(root.textContent).toContain(hole.id);
     expect(root.textContent).toContain('8m');
-    expect(root.textContent).toContain('+25ms');
+    expect(root.textContent).not.toContain('ms');
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
     expect(labels.some(l => l?.includes('Focus'))).toBe(true);
   });
 
-  it('shows hole depth with no delay suffix when the hole is not yet sequenced', () => {
+  it('shows hole depth only (`${depth}m`), never a delay suffix', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
@@ -288,6 +287,40 @@ describe('SelectionBar', () => {
     const { bar, root, container } = makeBar();
     bar.dispose();
     expect(container.contains(root)).toBe(false);
+  });
+});
+
+describe('SelectionBar vehicle upgrade button (#1401)', () => {
+  function upgradeBtn(root: HTMLElement): HTMLButtonElement {
+    return root.querySelector('[data-action="upgrade_vehicle"]') as HTMLButtonElement;
+  }
+
+  it('is enabled when cash covers the upgrade', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 1e9;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(false);
+  });
+
+  it('is disabled when cash is short', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 0;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(true);
+  });
+
+  it('is disabled at max tier however much cash', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.tier = 3;
+    state.cash = 1e9;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(true);
   });
 });
 

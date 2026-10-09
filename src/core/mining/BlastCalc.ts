@@ -39,9 +39,8 @@ export function calculateHoleEnergy(charge: HoleCharge): number {
 export function computeInitialEnergy(charge: HoleCharge, holeDepth: number, isFlooded = false): number {
   const explosive = getExplosive(charge.explosiveId);
   if (!explosive) return 0;
-  // hasTubing is always false here: the caller (buildBlastEnergyField) only
-  // marks a hole flooded via wetHoles(), which already excludes tubed holes
-  // (WetHoles.ts) — isFlooded=true already means "and no tubing protects it".
+  // hasTubing is always false here: tubing does not remove water already in a
+  // hole (#1350), so isFlooded (from wetHoles(), WetHoles.ts) alone decides.
   const wf = waterEffect(isFlooded, explosive.waterSensitive, false);
   return explosive.energyPerKg * charge.amountKg * stemmingEfficiency(charge.stemmingM, holeDepth) * wf;
 }
@@ -79,29 +78,23 @@ export function effectiveHoleEnergy(
 // § 7: Vibration
 // --------------------------------------------------------
 
-export function calculateVibrations(chargePerDelay: number[], distance: number, groundFactor: number): number {
+/** Every charge fires together, so vibration scales with the whole blast's charge. */
+export function calculateVibrations(blastChargeKg: number, distance: number, groundFactor: number): number {
   if (distance <= 0) return Infinity;
-  if (chargePerDelay.length === 0) return 0;
-  return Math.pow(Math.max(...chargePerDelay), 0.7) / Math.pow(distance, 1.5) * groundFactor;
-}
-
-export function groupChargesByDelay(
-  holes: readonly DrillHole[], charges: Record<string, HoleCharge>, delays: Record<string, number>,
-): number[] {
-  const delayGroups = new Map<number, number>();
-  for (const hole of holes) {
-    const charge = charges[hole.id];
-    const delay = delays[hole.id];
-    if (charge !== undefined && delay !== undefined) {
-      delayGroups.set(delay, (delayGroups.get(delay) ?? 0) + charge.amountKg);
-    }
-  }
-  return [...delayGroups.values()];
+  if (blastChargeKg <= 0) return 0;
+  return Math.pow(blastChargeKg, 0.7) / Math.pow(distance, 1.5) * groundFactor;
 }
 
 // --------------------------------------------------------
 // Helpers
 // --------------------------------------------------------
+
+/** Sum of amountKg over charged holes present in `holes`; 0 if none. */
+export function totalChargeKg(holes: readonly DrillHole[], charges: Record<string, HoleCharge>): number {
+  let total = 0;
+  for (const hole of holes) total += charges[hole.id]?.amountKg ?? 0;
+  return total;
+}
 
 export function parseKey(key: string): [number, number, number] | null {
   const parts = key.split(',');

@@ -2,9 +2,13 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { accumulateOreMass } from '../mining/BlastOreReport.js';
+import { accumulateOreMass, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
+import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
+import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
+import { drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg } from './SpoilHeaps.js';
+import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
@@ -17,6 +21,8 @@ export interface TrackedFragment {
   state: FragmentState;
   /** Vehicle ID that picked up the fragment (if in_transit). */
   vehicleId: string | null;
+  /** Freight warehouse this fragment is reserved for (in_transit) or stored in; null on the ground. */
+  warehouseId: number | null;
 }
 
 // ── Logistics state ──
@@ -50,43 +56,69 @@ export function addBlastFragments(state: LogisticsState, fragments: FragmentData
       fragment: f,
       state: 'on_ground',
       vehicleId: null,
+      warehouseId: null,
     });
     navGrid?.addFragmentOccupant(Math.round(f.position.x), Math.round(f.position.z));
   }
 }
 
-/** Pick up a fragment with a vehicle. Returns false if storage is full. */
+/**
+ * Pick up a fragment with a vehicle and reserve room for it in the nearest
+ * freight warehouse (from the vehicle's position) that can hold it. A barren
+ * fragment reserves the nearest of `heapSites` instead (unbounded room, #1530).
+ * Returns false when no suitable site has room (or none exist).
+ */
 export function pickupFragment(
   state: LogisticsState,
   fragmentId: number,
   vehicleId: string,
+  sites: readonly WarehouseSite[],
+  vehicleX: number,
+  vehicleZ: number,
+  heapSites: readonly WarehouseSite[] = [],
 ): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
   if (!tracked) return false;
 
-  // Check if storage has room (fragments in transit will go to storage)
-  if (state.storedMassKg + tracked.fragment.mass > state.storageCapacityKg) {
-    return false; // No room
-  }
+  const site = haulDestinationOf(tracked.fragment) === 'spoil_heap'
+    ? nearestSite(heapSites, vehicleX, vehicleZ)
+    : pickWarehouse(state, sites, vehicleX, vehicleZ, tracked.fragment.mass);
+  if (!site) return false;
 
   tracked.state = 'in_transit';
   tracked.vehicleId = vehicleId;
+  tracked.warehouseId = site.id;
   return true;
 }
 
-/** Deliver a fragment to the storage depot. */
+/**
+ * Deliver a fragment to a freight warehouse: the one reserved at pickup if it
+ * still exists and has room, else the nearest (to `atX`,`atZ`) with room.
+ * Returns false without mutating anything when none can take it.
+ */
 export function deliverToDepot(
   state: LogisticsState,
   fragmentId: number,
-  collectedOre?: Record<string, number>,
+  collectedOre: Record<string, number> | undefined,
+  sites: readonly WarehouseSite[],
+  atX: number,
+  atZ: number,
 ): boolean {
   const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
 
+  const reserved = sites.find(s => s.id === tracked.warehouseId);
+  // The fragment's own reservation is already counted in warehouseFreeKg.
+  const target = reserved && warehouseFreeKg(state, reserved) >= 0
+    ? reserved
+    : pickWarehouse(state, sites, atX, atZ, tracked.fragment.mass);
+  if (!target) return false;
+
   tracked.state = 'stored';
   tracked.vehicleId = null;
+  tracked.warehouseId = target.id;
   state.storedMassKg += tracked.fragment.mass;
 
   // Accumulate ore mass into collectedOre when provided
@@ -95,6 +127,31 @@ export function deliverToDepot(
   }
 
   return true;
+}
+
+/**
+ * Dump a barren in-transit fragment on a spoil heap: the one reserved at
+ * pickup if it still exists, else the nearest to (`atX`,`atZ`). The fragment
+ * leaves logistics entirely — storedMassKg and collectedOre are untouched
+ * (heaps are not freight storage). Returns the heap and mass dumped so the
+ * caller can credit the heap building (logistics never imports buildings),
+ * or null without mutating anything when no heap can take it (#1530).
+ */
+export function deliverToSpoilHeap(
+  state: LogisticsState,
+  fragmentId: number,
+  heapSites: readonly WarehouseSite[],
+  atX: number,
+  atZ: number,
+): { heapId: number; massKg: number } | null {
+  const tracked = findInTransitFragment(state, fragmentId);
+  if (!tracked || haulDestinationOf(tracked.fragment) !== 'spoil_heap') return null;
+
+  const target = heapSites.find(s => s.id === tracked.warehouseId) ?? nearestSite(heapSites, atX, atZ);
+  if (!target) return null;
+
+  state.fragments.splice(state.fragments.indexOf(tracked), 1);
+  return { heapId: target.id, massKg: tracked.fragment.mass };
 }
 
 /** Mass/volume/ore content removed from storage by a sale or a partial split. */
@@ -135,6 +192,24 @@ export function sellFragment(
 }
 
 /**
+ * Shrink a stored fragment in place by the removed mass and volume: scales
+ * halfExtents by the cube root of the remaining volume ratio and debits
+ * state.storedMassKg.
+ */
+function shrinkStoredFragment(
+  state: LogisticsState,
+  fragment: FragmentData,
+  removedMassKg: number,
+  removedVolume: number,
+): void {
+  const oldVolume = fragment.volume;
+  fragment.mass -= removedMassKg;
+  fragment.volume -= removedVolume;
+  fragment.halfExtents = scale(fragment.halfExtents, Math.cbrt(fragment.volume / oldVolume));
+  state.storedMassKg -= removedMassKg;
+}
+
+/**
  * Split a stored fragment's mass, removing `massToRemoveKg` from it and leaving
  * the remainder in storage (as a smaller fragment covering the same ore
  * densities). Returns the removed mass/volume/oreDensities, or null when the
@@ -159,12 +234,7 @@ export function splitStoredFragmentMass(
   const removedVolume = fragment.volume * fraction;
   const removedOreDensities = { ...fragment.oreDensities };
 
-  fragment.mass -= massToRemoveKg;
-  fragment.volume -= removedVolume;
-  const shrink = Math.cbrt(1 - fraction);
-  fragment.halfExtents = scale(fragment.halfExtents, shrink);
-
-  state.storedMassKg -= massToRemoveKg;
+  shrinkStoredFragment(state, fragment, massToRemoveKg, removedVolume);
 
   return {
     mass: massToRemoveKg,
@@ -174,43 +244,73 @@ export function splitStoredFragmentMass(
 }
 
 /**
- * Decrement `collectedOre` by the exact ore-kg carried in a just-sold
- * fragment (`sellFragment`'s return shape). Shared by both branches of
- * `consumeStoredOre` below — a materialId-specific sale and a rubble/no-ore
- * sale both need `collectedOre` to reflect a fragment leaving storage the
- * same way, they just differ in which fragments they pick to sell.
- * Returns the per-ore breakdown so a caller that needs the amount of one
- * specific ore removed (the materialId branch's own running tally) doesn't
- * have to recompute it.
+ * Remove only `oreId` (up to `oreKg`) from one stored fragment, leaving every
+ * other ore in it at its exact kg. Shrinks the fragment's volume and mass,
+ * reduces state.storedMassKg by the removed mass, and removes a pure-ore
+ * fully-sold fragment via sellFragment. Returns the ore kg, mass and volume
+ * actually removed, or null when the fragment is not stored, lacks the ore,
+ * or oreKg is non-finite or <= 0.
  */
-function decrementCollectedOre(
-  collectedOre: Record<string, number>,
-  sold: { volume: number; oreDensities: Record<string, number> },
-): Record<string, number> {
-  const acc: Record<string, number> = {};
-  accumulateOreMass(acc, sold.volume, sold.oreDensities);
-  for (const [oreId, kg] of Object.entries(acc)) {
-    collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+export function extractOreFromFragment(
+  state: LogisticsState,
+  fragmentId: number,
+  oreId: string,
+  oreKg: number,
+): { oreKg: number; mass: number; volume: number } | null {
+  if (!Number.isFinite(oreKg) || oreKg <= 0) return null;
+  const tracked = findStoredFragment(state, fragmentId);
+  if (!tracked) return null;
+
+  const fragment = tracked.fragment;
+  const d = fragment.oreDensities[oreId] ?? 0;
+  const volume = fragment.volume;
+  const contribution = oreContributionKg(volume, d);
+  if (d <= 0 || !(contribution > 0)) return null;
+
+  const f = Math.min(1, Math.max(0, oreKg / contribution));
+  const removedVolume = volume * d * f;
+  const removedMass = fragment.mass * d * f;
+  const newVolume = volume - removedVolume;
+  const removedOreKg = contribution * f;
+
+  const othersPresent = Object.entries(fragment.oreDensities).some(([id, dens]) => id !== oreId && dens > 0);
+  const leftoverMass = fragment.mass - removedMass;
+  if (!othersPresent && (newVolume <= 0 || leftoverMass <= FRAGMENT_SPLIT_EPSILON_KG)) {
+    const sold = sellFragment(state, fragmentId);
+    if (!sold) return null;
+    return { oreKg: removedOreKg, mass: sold.mass, volume: sold.volume };
   }
-  return acc;
+  if (!(newVolume > 0)) return null;
+
+  const ratio = volume / newVolume;
+  const densities: Record<string, number> = {};
+  for (const [id, dens] of Object.entries(fragment.oreDensities)) {
+    const next = id === oreId ? dens * (1 - f) * ratio : dens * ratio;
+    if (next > 0) densities[id] = next;
+  }
+  fragment.oreDensities = densities;
+  shrinkStoredFragment(state, fragment, removedMass, removedVolume);
+
+  return { oreKg: removedOreKg, mass: removedMass, volume: removedVolume };
 }
 
 /**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
- * oldest-first, until the requested amount is covered: a fragment whose full
- * contribution the request still needs is removed whole (via sellFragment),
- * and a fragment that only needs to give up part of its contribution is
- * shrunk in place (via splitStoredFragmentMass), decrementing
- * collectedOre[materialId] (and every other ore key each touched fragment
- * carries) by the exact ore-kg physically removed. materialId === ''
- * (rubble_disposal) consumes raw stored mass regardless of ore content — any
- * fragment, ore-bearing or not.
+ * oldest-first, until the requested amount is covered. An ore sale removes only
+ * that ore from each fragment it touches (via extractOreFromFragment); other
+ * ores in the same fragments stay stored and in collectedOre. Only
+ * collectedOre[materialId] is decremented, by the exact kg extracted.
+ * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
+ * ore content — any fragment, ore-bearing or not — and debits every ore the
+ * removed mass carried. Rubble draws on the spoil heaps first (#1530), then
+ * storage; `buildings` is where the heaps are.
  */
 export function consumeStoredOre(
   state: LogisticsState,
   collectedOre: Record<string, number>,
   materialId: string,
   amountKg: number,
+  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
 ): { success: boolean; consumedKg: number; error?: string } {
   if (!Number.isFinite(amountKg) || amountKg <= 0) {
     return {
@@ -242,35 +342,27 @@ export function consumeStoredOre(
       if (!tracked) continue;
 
       const remaining = amountKg - tally;
-      const probe: Record<string, number> = {};
-      accumulateOreMass(probe, tracked.fragment.volume, tracked.fragment.oreDensities);
-      const contribution = probe[materialId] ?? 0;
-
-      if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
-        const sold = sellFragment(state, id);
-        if (!sold) continue;
-        const acc = decrementCollectedOre(collectedOre, sold);
-        tally += acc[materialId] ?? 0;
-      } else {
-        const massSlice = remaining * (tracked.fragment.mass / contribution);
-        const split = splitStoredFragmentMass(state, id, massSlice);
-        if (!split) continue;
-        decrementCollectedOre(collectedOre, split);
-        tally += remaining;
-        break;
-      }
+      const contribution = oreContributionKg(
+        tracked.fragment.volume,
+        tracked.fragment.oreDensities[materialId] ?? 0,
+      );
+      const take = remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG ? contribution : remaining;
+      const extracted = extractOreFromFragment(state, id, materialId, take);
+      if (!extracted) continue;
+      collectedOre[materialId] = (collectedOre[materialId] ?? 0) - extracted.oreKg;
+      tally += extracted.oreKg;
     }
 
     return { success: true, consumedKg: Math.min(tally, amountKg) };
   }
 
   // Rubble / no-ore materials: consume raw stored mass, any fragment. Barren
-  // fragments (no ore content at all) go first, oldest-first within each
+  // fragments (ore below the spoil-heap threshold) go first, oldest-first within each
   // group, only reaching into ore-bearing fragments once barren stock runs
   // out — a rubble contract pays cents per kg where an ore_sale pays
   // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
   // genuinely worthless waste would squander it for no reason (#959).
-  const available = state.storedMassKg;
+  const available = rubbleStockKg(state.storedMassKg, buildings);
   if (amountKg > available) {
     return {
       success: false,
@@ -279,10 +371,11 @@ export function consumeStoredOre(
     };
   }
 
+  const fromHeaps = drawSpoilKg(buildings, amountKg);
+  const storageKg = amountKg - fromHeaps;
+
   const stored = state.fragments.filter(f => f.state === 'stored');
-  const isBarren = (f: TrackedFragment) => (
-    Object.values(f.fragment.oreDensities).every(d => d <= 0)
-  );
+  const isBarren = (f: TrackedFragment) => isBarrenFragment(f.fragment.oreDensities);
   const storedIds = [
     ...stored.filter(isBarren).map(f => f.fragment.id),
     ...stored.filter(f => !isBarren(f)).map(f => f.fragment.id),
@@ -290,11 +383,11 @@ export function consumeStoredOre(
 
   let removedMass = 0;
   for (const id of storedIds) {
-    if (removedMass >= amountKg) break;
+    if (removedMass >= storageKg) break;
     const tracked = findStoredFragment(state, id);
     if (!tracked) continue;
 
-    const remaining = amountKg - removedMass;
+    const remaining = storageKg - removedMass;
     const contribution = tracked.fragment.mass;
 
     // A rubble_disposal sale draws on every stored fragment regardless of ore
@@ -317,7 +410,7 @@ export function consumeStoredOre(
     }
   }
 
-  return { success: true, consumedKg: Math.min(removedMass, amountKg) };
+  return { success: true, consumedKg: Math.min(fromHeaps + removedMass, amountKg) };
 }
 
 /**
@@ -351,14 +444,9 @@ export function getFragmentCounts(state: LogisticsState): FragmentCounts {
   return { onGround, inTransit, stored, total: state.fragments.length };
 }
 
-/** Check if there's room to pick up more fragments. */
-export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
-  return massKg <= storageRoomKg(state);
-}
-
-/** Free storage room in kg (capacity minus stored mass) (#1369). */
+/** Free storage room in kg (capacity minus stored and in-transit mass) (#1369, #1370). */
 export function storageRoomKg(state: LogisticsState): number {
-  return state.storageCapacityKg - state.storedMassKg;
+  return state.storageCapacityKg - state.storedMassKg - inTransitMassKg(state);
 }
 
 /** Total ore mass across all materials in `collectedOre`, in kg. */
@@ -402,6 +490,7 @@ export function returnFragmentToGround(
 
   tracked.state = 'on_ground';
   tracked.vehicleId = null;
+  tracked.warehouseId = null;
 
   if (dropPosition) {
     tracked.fragment.position = dropPosition;
@@ -415,4 +504,13 @@ export function returnFragmentToGround(
   }
 
   return true;
+}
+
+/** Total mass (kg) of fragments currently in transit (#1370). */
+export function inTransitMassKg(state: LogisticsState): number {
+  let total = 0;
+  for (const f of state.fragments) {
+    if (f.state === 'in_transit') total += f.fragment.mass;
+  }
+  return total;
 }

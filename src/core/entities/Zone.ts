@@ -263,9 +263,9 @@ export function isInZone(x: number, z: number, zone: ZoneBounds): boolean {
 
 /**
  * Combined count of alive employees + vehicles standing inside `zone` — the
- * one number the Fire step's occupant list (Fire.ts's `occupants()`), the
- * tutorial-gated console blast refusal, and the tutorial-gated FIRE button
- * reason all report, so they never disagree on how many are still in the way.
+ * one number the Fire step's occupant list (Fire.ts's `occupants()`) and the
+ * pre-flight modal's zone warning report, so they never disagree on how many
+ * are still in the way.
  */
 export function countZoneOccupants(zone: ZoneBounds, vehicles: VehicleState, employees: EmployeeState): number {
   let count = 0;
@@ -311,7 +311,7 @@ function boundsOverlap(a: ZoneBounds, b: ZoneBounds): boolean {
  * That occupancy-only question is the wrong one for a "safe to return"
  * decision: it reads true the INSTANT an evacuation succeeds — the whole
  * point of ordering one — which is exactly the moment the zone is still MOST
- * dangerous (holes charged and sequenced, nobody has fired yet), not the
+ * dangerous (holes charged, nobody has fired yet), not the
  * moment it is actually safe to walk back in. Confirmed live via
  * tutorial-interactive.json (#557 follow-up) at two independent call sites
  * that had each been built against occupancy alone:
@@ -329,7 +329,7 @@ function boundsOverlap(a: ZoneBounds, b: ZoneBounds): boolean {
  * the zone as resolved.
  *
  * Keyed to the LIVE drill-hole-derived danger box (computeDangerZone — the
- * same one Fire.ts's Sound the Horn/occupant list and `dangerZoneClear`
+ * same one the pre-flight occupant list and `dangerZoneClear`
  * itself already use) rather than to `zone` (typically
  * `state.zone.activeZone`) reading non-null on its own: the player-drawn
  * zone never resets once drawn (defineZone only ever assigns it), so testing
@@ -354,7 +354,7 @@ export function isZoneStillBlastThreatened(
 /**
  * Whether the live drill plan's own danger zone (computeDangerZone over
  * `drillHoles` at BLAST_DANGER_MARGIN_M — the same box Fire.ts's occupant
- * list and Sound the Horn button use) is clear of every vehicle and living
+ * list and DETONATE's evacuation use) is clear of every vehicle and living
  * employee. True when no plan exists yet — nothing to be clear of. The one
  * check `window.__gameState`/serializeGameState expose as `dangerZoneClear`,
  * so a scenario's wait_until can prove an evacuation genuinely finished
@@ -367,25 +367,4 @@ export function isDangerZoneClear(
 ): boolean {
   const zone = computeDangerZone(drillHoles, BLAST_DANGER_MARGIN_M);
   return zone === null || isZoneClear(zone, vehicles, employees);
-}
-
-/**
- * Whether the live drill plan's danger zone is blocked, and by how many.
- * Chains computeDangerZone → isZoneClear → countZoneOccupants — the same
- * three-call derivation the tutorial-only FIRE refusal needs on both sides
- * of the console/UI boundary (mining/blast.ts's console `blast` command and
- * blastFooter.ts's FIRE button, #557) — so they never disagree on whether to
- * refuse or on the count they report. Returns null when there are no holes
- * to derive a zone from, or the zone is already clear; the occupant count
- * otherwise.
- */
-export function blockingOccupantCount(
-  drillHoles: readonly { x: number; z: number }[],
-  marginM: number,
-  vehicles: VehicleState,
-  employees: EmployeeState,
-): number | null {
-  const zone = computeDangerZone(drillHoles, marginM);
-  if (zone === null || isZoneClear(zone, vehicles, employees)) return null;
-  return countZoneOccupants(zone, vehicles, employees);
 }

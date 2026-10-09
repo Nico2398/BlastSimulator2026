@@ -1,8 +1,10 @@
 // BlastSimulator2026 — Event pool: defines event structure
 // Each event has weight coefficients, prerequisites, and decision options.
 
+import type { EventEffectSpec } from './EventEffectCatalog.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
+import type { ActiveProtection } from '../economy/BribeProtection.js';
 import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX } from '../config/balance.js';
 
 // ── Event types ──
@@ -40,8 +42,12 @@ export interface EventConsequence {
   followUpEventId?: string;
   /** Corruption change. */
   corruptionDelta?: number;
+  /** Additive change to mafia exposure risk (0-1); applied when the resolver is given the world (#1411). */
+  exposureDelta?: number;
   /** Custom effect tag for the resolver to interpret. */
   effectTag?: string;
+  /** Declarative effects applied when this consequence is chosen (#1414). */
+  effects?: EventEffectSpec[];
   /** Probability this outcome occurs (1.0 = certain). */
   probability?: number;
   /** Alternative consequence if probability fails. */
@@ -69,6 +75,10 @@ export interface EventDef {
   canFire: (ctx: EventContext) => boolean;
   /** When true, category timers never pick this event; it fires only when queued as a follow-up. */
   followUpOnly?: boolean;
+  /** When true, may fire again after it has already fired this level (queued follow-ups only) (#1411). */
+  repeatable?: boolean;
+  /** Free-form tags (e.g. 'inspection') protections can match on (#1407). */
+  tags?: readonly string[];
 }
 
 /** Context passed to prerequisite checks. */
@@ -85,6 +95,8 @@ export interface EventContext {
   weatherId: WeatherState;
   /** True once the player has fired at least one blast (#1412). */
   hasBlasted: boolean;
+  /** Bribe protections currently held by the player (#1407). */
+  protections?: ActiveProtection[];
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */

@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Employee training: schools, plans, walk-in enrolment,
-// and school occupancy (#1203)
+// and school occupancy (#1203). Courses grant qualifications only (#1388).
 //
 // Training is the only in-game route to a qualification no role is hired
 // with, so these tests pin the two skills that depend on it entirely
@@ -32,7 +32,6 @@ import {
   enrolInTraining,
   tickTraining,
   availableTrainingOffers,
-  MAX_PROFICIENCY,
   type EnrolInTrainingResult,
   type TrainingPlan,
 } from '../../../src/core/entities/EmployeeTraining.js';
@@ -45,7 +44,12 @@ import { board } from '../../../src/core/engine/Mount.js';
 import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
-import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import {
+  XP_THRESHOLDS, TRAINING_BASE_FEE, TRAINING_BASE_TICKS, TRAINING_TIER_SPEED, QUALIFICATION_SALARY_BONUS,
+} from '../../../src/core/config/balance.js';
+import * as balance from '../../../src/core/config/balance.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 const SEED = 42;
 
@@ -120,10 +124,14 @@ function resolveArrival(state: GameState, employee: Employee, maxTicks = 300): v
 // ── Which school teaches what ────────────────────────────────────────────────
 
 describe('trainableSkills', () => {
-  it('the driving center teaches all four vehicle licences (#1339 adds the rock fragmenter)', () => {
+  it('the driving center teaches all four vehicle licences (#1339 adds the rock fragmenter) and repair (#1393)', () => {
     expect([...trainableSkills('driving_center')]).toEqual([
-      'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
+      'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter', 'repair',
     ]);
+  });
+
+  it('repair is taught at the driving center and nowhere else (#1393)', () => {
+    expect(schoolFor('repair')).toBe('driving_center');
   });
 
   it.each([
@@ -142,7 +150,7 @@ describe('trainableSkills', () => {
   it('every skill category has a school, or it could never be obtained', () => {
     const ALL: SkillCategory[] = [
       'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
-      'blasting', 'management', 'geology',
+      'blasting', 'management', 'geology', 'repair',
     ];
     for (const skill of ALL) {
       expect(schoolFor(skill), `${skill} has no school`).not.toBeNull();
@@ -157,30 +165,52 @@ describe('planTraining', () => {
 
   beforeEach(() => { ({ state } = makeStateWithOne()); });
 
-  it('a skill the employee lacks starts from level 0 and targets Rookie', () => {
+  it('a skill the employee lacks yields a plan with fee, ticks and salary increase', () => {
     const emp = state.employees.employees[0]!;
     const plan = planTraining(emp, 'driving.excavator', 1)!;
-    expect(plan.currentLevel).toBe(0);
-    expect(plan.targetLevel).toBe(1);
+    expect(plan.skill).toBe('driving.excavator');
+    expect(plan.fee).toBe(TRAINING_BASE_FEE);
+    expect(plan.ticks).toBe(Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[1])));
+    expect(plan.salaryIncrease).toBe(QUALIFICATION_SALARY_BONUS[1]);
   });
 
-  it('a skill the employee holds targets exactly one level up', () => {
+  it('the plan carries no level fields: courses only grant qualifications', () => {
     const emp = state.employees.employees[0]!;
-    assignSkill(state.employees, emp.id, 'blasting', 3);
-    expect(planTraining(emp, 'blasting', 1)!.targetLevel).toBe(4);
+    const plan = planTraining(emp, 'geology', 1)! as unknown as Record<string, unknown>;
+    expect('currentLevel' in plan).toBe(false);
+    expect('targetLevel' in plan).toBe(false);
   });
 
-  it('returns null at Master, so no fee is taken for nothing', () => {
-    const emp = state.employees.employees[0]!;
-    assignSkill(state.employees, emp.id, 'blasting', MAX_PROFICIENCY);
+  it('returns null for a skill already held at Rookie', () => {
+    const emp = state.employees.employees[0]!; // driller holds blasting at 1
     expect(planTraining(emp, 'blasting', 1)).toBeNull();
   });
 
-  it('higher levels cost more', () => {
+  it.each([2, 3, 4, 5] as const)('returns null for a skill already held at level %i', (level) => {
     const emp = state.employees.employees[0]!;
-    const first = planTraining(emp, 'geology', 1)!.fee;
-    assignSkill(state.employees, emp.id, 'geology', 4);
-    expect(planTraining(emp, 'geology', 1)!.fee).toBeGreaterThan(first);
+    assignSkill(state.employees, emp.id, 'blasting', level);
+    expect(planTraining(emp, 'blasting', 1)).toBeNull();
+  });
+
+  it('the fee is flat: every tier of school charges TRAINING_BASE_FEE', () => {
+    const emp = state.employees.employees[0]!;
+    for (const tier of [1, 2, 3] as const) {
+      expect(planTraining(emp, 'geology', tier)!.fee).toBe(TRAINING_BASE_FEE);
+    }
+  });
+
+  it('the fee does not depend on the proficiency the employee holds in other skills', () => {
+    const emp = state.employees.employees[0]!;
+    const before = planTraining(emp, 'geology', 1)!.fee;
+    assignSkill(state.employees, emp.id, 'blasting', 4);
+    expect(planTraining(emp, 'geology', 1)!.fee).toBe(before);
+  });
+
+  it('the salary increase is the Rookie qualification bonus whatever the school tier', () => {
+    const emp = state.employees.employees[0]!;
+    for (const tier of [1, 2, 3] as const) {
+      expect(planTraining(emp, 'geology', tier)!.salaryIncrease).toBe(QUALIFICATION_SALARY_BONUS[1]);
+    }
   });
 
   it('a better school runs the same course faster', () => {
@@ -190,9 +220,19 @@ describe('planTraining', () => {
     expect(t3).toBeLessThan(t1);
   });
 
+  it.each([1, 2, 3] as const)('ticks at tier %i follow base ticks times tier speed, no level multiplier', (tier) => {
+    const emp = state.employees.employees[0]!;
+    expect(planTraining(emp, 'geology', tier)!.ticks)
+      .toBe(Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[tier])));
+  });
+
   it('a course always takes at least one tick', () => {
     const emp = state.employees.employees[0]!;
     expect(planTraining(emp, 'geology', 3)!.ticks).toBeGreaterThanOrEqual(1);
+  });
+
+  it('TRAINING_LEVEL_COST_MULTIPLIER no longer exists in balance.ts', () => {
+    expect('TRAINING_LEVEL_COST_MULTIPLIER' in balance).toBe(false);
   });
 });
 
@@ -202,6 +242,12 @@ describe('enrolInTraining — validation', () => {
   let state: GameState;
 
   beforeEach(() => { ({ state } = makeStateWithOne()); });
+
+  it('enrols at a driving center for the repair skill (#1393)', () => {
+    const building = makeBuilding({ type: 'driving_center' });
+    state.buildings.buildings.push(building);
+    expectSuccess(enrolInTraining(state, 1, building, 'repair'));
+  });
 
   it('enrols at a school that teaches the skill: success, fee, and pendingTrainingState (not trainingState) set', () => {
     const building = makeBuilding({ type: 'geology_lab' });
@@ -261,11 +307,24 @@ describe('enrolInTraining — validation', () => {
     expect(enrolInTraining(state, 999, makeBuilding({ type: 'geology_lab' }), 'geology').success).toBe(false);
   });
 
-  it('refuses when the employee is already a Master of the skill', () => {
-    assignSkill(state.employees, 1, 'blasting', MAX_PROFICIENCY);
-    const result = enrolInTraining(state, 1, makeBuilding({ type: 'blasting_academy' }), 'blasting');
+  it.each([1, 3, 5] as const)('refuses a skill already held at level %i, with a translated error', (level) => {
+    assignSkill(state.employees, 1, 'blasting', level);
+    const building = makeBuilding({ type: 'blasting_academy' });
+    const result = enrolInTraining(state, 1, building, 'blasting');
     expectFailure(result);
-    expect(result.error).toContain('highest proficiency');
+    expect(result.error.length).toBeGreaterThan(0);
+    const key = (result as { errorKey?: string }).errorKey;
+    expect(key, 'refusal must carry an errorKey').toBeDefined();
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      const params = (result as { errorParams?: Record<string, string | number> }).errorParams;
+      expect(t(key!, params), `${key} must resolve in ${locale}`).not.toBe(key);
+    }
+    setLocale('en');
+    const emp = state.employees.employees[0]!;
+    expect(emp.pendingTrainingState).toBeNull();
+    expect(emp.trainingState).toBeNull();
+    expect(emp.qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(level);
   });
 });
 
@@ -277,16 +336,16 @@ describe('enrolInTraining — validation', () => {
 
 describe('enrolInTraining — walk-in and occupancy (#1203)', () => {
   it('on success, sets pendingTrainingState (not trainingState) and installs a walking itinerary — no instant relocation', () => {
-    const { state, school } = setupSchool('blasting_academy');
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
 
     expect(employee.trainingState).toBeNull();
     expect(employee.pendingTrainingState).not.toBeNull();
     expect(employee.pendingTrainingState!.buildingId).toBe(school.id);
-    expect(employee.pendingTrainingState!.skill).toBe('blasting');
+    expect(employee.pendingTrainingState!.skill).toBe('geology');
     expect(employee.pendingTrainingState!.ticksRemaining).toBe(result.plan.ticks);
     expect(employee.pendingTrainingState!.fee).toBe(result.fee);
     // Not teleported next to the building — an itinerary is in flight, and
@@ -296,10 +355,10 @@ describe('enrolInTraining — walk-in and occupancy (#1203)', () => {
   });
 
   it('does not decrement the countdown while still walking (tickTraining only iterates trainingState !== null employees)', () => {
-    const { state, school } = setupSchool('blasting_academy');
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
     const queuedTicks = employee.pendingTrainingState!.ticksRemaining;
 
@@ -310,10 +369,10 @@ describe('enrolInTraining — walk-in and occupancy (#1203)', () => {
   });
 
   it('on arrival, enters the school: pendingTrainingState is promoted into trainingState, locomotion is "inside" (mesh hidden)', () => {
-    const { state, school } = setupSchool('blasting_academy');
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
     const queuedTicks = employee.pendingTrainingState!.ticksRemaining;
 
@@ -326,15 +385,15 @@ describe('enrolInTraining — walk-in and occupancy (#1203)', () => {
     expect(employee.pendingTrainingState).toBeNull();
     expect(employee.trainingState).not.toBeNull();
     expect(employee.trainingState!.buildingId).toBe(school.id);
-    expect(employee.trainingState!.skill).toBe('blasting');
+    expect(employee.trainingState!.skill).toBe('geology');
     expect(employee.trainingState!.ticksRemaining).toBe(queuedTicks);
   });
 
   it('completes the course once ticksRemaining hits 0: reported in completed[], leaves the building back onto its ring, on foot', () => {
-    const { state, school } = setupSchool('blasting_academy');
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
     resolveArrival(state, employee);
     expect(employee.locomotion.kind).toBe('inside');
@@ -363,7 +422,7 @@ describe('enrolInTraining — school at capacity (#1203)', () => {
     school.occupantIds = Array.from({ length: capacity }, (_, i) => -(i + 1));
     const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2);
 
-    const result = enrolInTraining(state, employee.id, school, 'driving.excavator');
+    const result = enrolInTraining(state, employee.id, school, 'driving.rock_fragmenter');
 
     expectFailure(result);
     expect(result.error.toLowerCase()).toContain('full');
@@ -378,7 +437,7 @@ describe('enrolInTraining — school at capacity (#1203)', () => {
 
     for (let i = 0; i < capacity; i++) {
       const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2 + i);
-      const result = enrolInTraining(state, employee.id, school, 'driving.excavator');
+      const result = enrolInTraining(state, employee.id, school, 'driving.rock_fragmenter');
       expectSuccess(result);
     }
     // Nobody has actually walked in yet — the block above is purely
@@ -386,7 +445,7 @@ describe('enrolInTraining — school at capacity (#1203)', () => {
     expect(school.occupantIds).toEqual([]);
 
     const { employee: late } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2 + capacity);
-    const result = enrolInTraining(state, late.id, school, 'driving.excavator');
+    const result = enrolInTraining(state, late.id, school, 'driving.rock_fragmenter');
 
     expectFailure(result);
     expect(result.error.toLowerCase()).toContain('full');
@@ -404,7 +463,7 @@ describe('enrolInTraining — a mounted employee', () => {
     expect(board(state, vehicle.id, employee.id).success).toBe(true);
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
 
-    const result = enrolInTraining(state, employee.id, school, 'driving.excavator');
+    const result = enrolInTraining(state, employee.id, school, 'driving.rock_fragmenter');
 
     expectSuccess(result);
     expect(employee.locomotion).toEqual({ kind: 'on_foot' });
@@ -418,10 +477,10 @@ describe('enrolInTraining — a mounted employee', () => {
 
 describe('tickTraining — school destroyed mid-course', () => {
   it('cancels the course with a full refund instead of ticking it down or granting anything, once the building no longer exists', () => {
-    const { state, school } = setupSchool('blasting_academy');
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
     resolveArrival(state, employee);
     expect(employee.trainingState).not.toBeNull();
@@ -462,71 +521,29 @@ describe('licences no role is hired with', () => {
     },
   );
 
-  it('a surveyor can be raised from Rookie to Master one course at a time', () => {
+  it('a surveyor cannot buy a second course in the geology licence they hold', () => {
     const { state, school } = setupSchool('geology_lab', 3);
     const { employee } = hireEmployee(state.employees, 'surveyor', new Random(SEED), 2, 2);
     expect(employee.qualifications.find(q => q.category === 'geology')!.proficiencyLevel).toBe(1);
-
-    for (let level = 2; level <= MAX_PROFICIENCY; level++) {
-      const result = enrolInTraining(state, employee.id, school, 'geology');
-      expectSuccess(result);
-      resolveArrival(state, employee);
-      for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
-      expect(employee.qualifications.find(q => q.category === 'geology')!.proficiencyLevel).toBe(level);
-    }
-
+    expect(enrolInTraining(state, employee.id, school, 'geology').success).toBe(false);
     expect(planTraining(employee, 'geology', 3)).toBeNull();
   });
 });
 
-// ── Completion floors xp at the new level's threshold (#620) ────────────────
+// ── Completion grants qualifications only (#1388) ───────────────────────────
 //
-// gainXp derives proficiencyLevel from cumulative qual.xp against
-// XP_THRESHOLDS. tickTraining's existing-qualification branch used to raise
-// proficiencyLevel directly without touching xp, so a trained employee held
-// xp: 0 at their new level while a naturally-progressed peer at the same
-// level already carried partial progress — training silently cost ~half a
-// level's worth of progress toward the next one.
+// There is no promotion path: a course on a skill the employee lacks adds it at
+// Rookie with 0 xp, and completion never touches an existing qualification.
 
-describe('tickTraining floors qual.xp at the new level threshold', () => {
-  it('training from level 2 to level 3 raises xp to at least the level-3 threshold', () => {
-    const { state, school } = setupSchool('blasting_academy');
-    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2); // holds blasting at level 1
-    assignSkill(state.employees, employee.id, 'blasting', 2);
+/** Puts `employee` mid-course (inside `school`) on `skill`, one tick from done. */
+function startFinalTick(employee: Employee, school: Building, skill: SkillCategory): void {
+  employee.trainingState = { buildingId: school.id, skill, ticksRemaining: 1, fee: TRAINING_BASE_FEE };
+}
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
-    expectSuccess(result);
-    resolveArrival(state, employee);
-    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
-
-    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
-    expect(qual.proficiencyLevel).toBe(3);
-    expect(qual.xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[3]);
-  });
-
-  it('never lowers xp that already exceeds the new level threshold before completion', () => {
-    const { state, school } = setupSchool('blasting_academy');
-    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
-    assignSkill(state.employees, employee.id, 'blasting', 2);
-
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
-    expectSuccess(result);
-    resolveArrival(state, employee);
-
-    // The employee already carries more xp than the level-3 threshold (300)
-    // by the time the course completes — training must not claw it back down.
-    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
-    qual.xp = 500;
-
-    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
-
-    expect(qual.proficiencyLevel).toBe(3);
-    expect(qual.xp).toBe(500);
-  });
-
-  it('a brand-new qualification from training still starts at level 1 with 0 xp', () => {
+describe('tickTraining grants qualifications only', () => {
+  it('a brand-new qualification starts at level 1 with 0 xp', () => {
     const { state, school } = setupSchool('driving_center');
-    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2); // holds truck + excavator (#1339), not the fragmenter
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2); // truck + excavator, not the fragmenter
     expect(employee.qualifications.some(q => q.category === 'driving.rock_fragmenter')).toBe(false);
 
     const result = enrolInTraining(state, employee.id, school, 'driving.rock_fragmenter');
@@ -535,23 +552,59 @@ describe('tickTraining floors qual.xp at the new level threshold', () => {
     for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
 
     const qual = employee.qualifications.find(q => q.category === 'driving.rock_fragmenter')!;
-    expect(qual.proficiencyLevel).toBe(1);
-    expect(qual.xp).toBe(XP_THRESHOLDS[1]);
+    expect(qual).toEqual({ category: 'driving.rock_fragmenter', proficiencyLevel: 1, xp: 0 });
   });
 
-  it('training from level 4 to level 5 (MAX_PROFICIENCY) floors xp at the level-5 threshold', () => {
-    const { state, school } = setupSchool('blasting_academy');
+  it('completion reports the course as new at level 1', () => {
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
-    assignSkill(state.employees, employee.id, 'blasting', 4);
-
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
     resolveArrival(state, employee);
-    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+    let last: ReturnType<typeof tickTraining>['completed'] = [];
+    for (let i = 0; i < result.plan.ticks; i++) ({ completed: last } = tickTraining(state));
+    expect(last).toHaveLength(1);
+    expect(last[0]).toMatchObject({ employeeId: employee.id, skill: 'geology', level: 1, isNew: true });
+  });
 
+  it('emits employee:trained with the new skill at level 1', () => {
+    const { state, school } = setupSchool('geology_lab');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    const emitter = new EventEmitter();
+    const seen: unknown[] = [];
+    emitter.on('employee:trained', (p: unknown) => seen.push(p));
+    startFinalTick(employee, school, 'geology');
+    tickTraining(state, emitter);
+    expect(seen).toEqual([{ employeeId: employee.id, skill: 'geology', level: 1, isNew: true }]);
+  });
+
+  it('recomputes salary by exactly the planned increase', () => {
+    const { state, school } = setupSchool('geology_lab');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    const plan = planTraining(employee, 'geology', 1)!;
+    const before = employee.salary;
+    startFinalTick(employee, school, 'geology');
+    tickTraining(state);
+    expect(employee.salary - before).toBe(plan.salaryIncrease);
+    expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee));
+  });
+
+  it('completing on an already-held skill is skipped: level, xp and salary untouched, no completion reported', () => {
+    const { state, school } = setupSchool('blasting_academy');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    assignSkill(state.employees, employee.id, 'blasting', 3);
     const qual = employee.qualifications.find(q => q.category === 'blasting')!;
-    expect(qual.proficiencyLevel).toBe(MAX_PROFICIENCY);
-    expect(qual.xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[5]);
+    qual.xp = XP_THRESHOLDS[3] + 7;
+    const salaryBefore = employee.salary;
+
+    startFinalTick(employee, school, 'blasting');
+    const { completed } = tickTraining(state);
+
+    expect(completed).toEqual([]);
+    expect(qual.proficiencyLevel).toBe(3);
+    expect(qual.xp).toBe(XP_THRESHOLDS[3] + 7);
+    expect(employee.qualifications.filter(q => q.category === 'blasting')).toHaveLength(1);
+    expect(employee.salary).toBe(salaryBefore);
   });
 });
 
@@ -584,21 +637,21 @@ describe('availableTrainingOffers', () => {
     expect(offers[0]!.building.id).toBe(2);
   });
 
-  it('a driving_center offers all four licences from one building', () => {
+  it('a driving_center offers all four licences and repair from one building', () => {
     const offers = availableTrainingOffers([makeBuilding({ type: 'driving_center' })]);
-    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.rock_fragmenter', 'driving.truck']);
+    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.rock_fragmenter', 'driving.truck', 'repair']);
   });
 });
 
 // ── Raises survive enrolment-driven course completion (#1383) ───────────────
 
 describe('tickTraining keeps accumulated raises (#1383)', () => {
-  it('a promotion course completion keeps the raise', () => {
-    const { state, school } = setupSchool('blasting_academy');
+  it('a new-skill course completion keeps the raise', () => {
+    const { state, school } = setupSchool('geology_lab');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
     giveRaise(state.employees, employee.id, 250);
 
-    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    const result = enrolInTraining(state, employee.id, school, 'geology');
     expectSuccess(result);
     resolveArrival(state, employee);
     for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
@@ -607,17 +660,140 @@ describe('tickTraining keeps accumulated raises (#1383)', () => {
     expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + 250);
   });
 
-  it('a new level-1 skill completion keeps the raise', () => {
+  it('a second new skill completion keeps the raise', () => {
     const { state, school } = setupSchool('driving_center');
     const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2);
     giveRaise(state.employees, employee.id, 250);
 
-    const result = enrolInTraining(state, employee.id, school, 'driving.excavator');
+    const result = enrolInTraining(state, employee.id, school, 'driving.rock_fragmenter');
     expectSuccess(result);
     resolveArrival(state, employee);
     for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
 
-    expect(employee.qualifications.some(q => q.category === 'driving.excavator')).toBe(true);
+    expect(employee.qualifications.some(q => q.category === 'driving.rock_fragmenter')).toBe(true);
     expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + 250);
+  });
+});
+
+// ── Licence level courses (#1524) ───────────────────────────────────────────
+//
+// A held driving.* licence below level 3 can be raised one level at a time at a
+// Driving Center. The course changes licenceLevel only: proficiency and xp are
+// productivity, owned by work.
+
+function holdRigLicence(employee: Employee, licenceLevel?: 1 | 2 | 3) {
+  employee.qualifications = employee.qualifications.filter(q => q.category !== 'driving.drill_rig');
+  employee.qualifications.push({ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0 });
+  const qual = employee.qualifications.find(q => q.category === 'driving.drill_rig')!;
+  if (licenceLevel !== undefined) qual.licenceLevel = licenceLevel;
+  return qual;
+}
+
+describe('planTraining — licence level raise (#1524)', () => {
+  it('plans a raise to level 2 for a held level-1 licence (missing licenceLevel counts as 1)', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee);
+    const plan = planTraining(employee, 'driving.drill_rig', 1);
+    expect(plan).not.toBeNull();
+    expect(plan!.raisesLicenceTo).toBe(2);
+    expect(plan!.fee).toBe(balance.LICENCE_COURSE_FEE[2]);
+    expect(plan!.skill).toBe('driving.drill_rig');
+  });
+
+  it('plans a raise to level 3 for a held level-2 licence', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee, 2);
+    const plan = planTraining(employee, 'driving.drill_rig', 1);
+    expect(plan!.raisesLicenceTo).toBe(3);
+    expect(plan!.fee).toBe(balance.LICENCE_COURSE_FEE[3]);
+  });
+
+  it('scales course duration by LICENCE_COURSE_TICKS_MULT', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee);
+    const plan = planTraining(employee, 'driving.drill_rig', 1)!;
+    expect(plan.ticks).toBe(Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[1] * balance.LICENCE_COURSE_TICKS_MULT[2])));
+  });
+
+  it('refuses at level 3 (boundary)', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee, 3);
+    expect(planTraining(employee, 'driving.drill_rig', 1)).toBeNull();
+  });
+
+  it('refuses a held non-driving skill', () => {
+    const { employee } = makeStateWithOne('surveyor');
+    expect(planTraining(employee, 'geology', 1)).toBeNull();
+  });
+
+  it('a first-time licence course carries no raisesLicenceTo', () => {
+    const { employee } = makeStateWithOne('surveyor');
+    const plan = planTraining(employee, 'driving.drill_rig', 1)!;
+    expect(plan.raisesLicenceTo).toBeUndefined();
+  });
+
+  it('proficiency level never changes the planned raise', () => {
+    const { employee } = makeStateWithOne('driller');
+    const qual = holdRigLicence(employee);
+    qual.proficiencyLevel = 5;
+    expect(planTraining(employee, 'driving.drill_rig', 1)!.raisesLicenceTo).toBe(2);
+  });
+});
+
+describe('tickTraining — licence level course (#1524)', () => {
+  it('enrols, completes, and raises licenceLevel only', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    const qual = holdRigLicence(employee);
+    qual.proficiencyLevel = 3;
+    qual.xp = XP_THRESHOLDS[3] + 5;
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.drill_rig');
+    expectSuccess(result);
+    expect(result.plan.raisesLicenceTo).toBe(2);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    const after = employee.qualifications.filter(q => q.category === 'driving.drill_rig');
+    expect(after).toHaveLength(1);
+    expect(after[0]!.licenceLevel).toBe(2);
+    expect(after[0]!.proficiencyLevel).toBe(3);
+    expect(after[0]!.xp).toBe(XP_THRESHOLDS[3] + 5);
+    expect(employee.trainingState).toBeNull();
+  });
+
+  it('a second course takes level 2 to level 3, and a third is refused', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    holdRigLicence(employee, 2);
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.drill_rig');
+    expectSuccess(result);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    expect(employee.qualifications.find(q => q.category === 'driving.drill_rig')!.licenceLevel).toBe(3);
+    expect(enrolInTraining(state, employee.id, school, 'driving.drill_rig').success).toBe(false);
+  });
+
+  it('completion salary and held-skill list are otherwise untouched by a licence raise', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    holdRigLicence(employee);
+    const skillsBefore = employee.qualifications.map(q => q.category).sort();
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.drill_rig');
+    expectSuccess(result);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    expect(employee.qualifications.map(q => q.category).sort()).toEqual(skillsBefore);
+  });
+
+  it('a school that does not teach the licence still refuses the raise', () => {
+    const { state, school } = setupSchool('geology_lab');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    holdRigLicence(employee);
+    expect(enrolInTraining(state, employee.id, school, 'driving.drill_rig').success).toBe(false);
   });
 });

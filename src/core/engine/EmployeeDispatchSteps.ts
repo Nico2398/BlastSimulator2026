@@ -19,9 +19,11 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
-import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier } from './VehicleReservation.js';
+import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
+import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
+import { actionBlocked } from '../events/ActiveModifiers.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { alightIfMounted } from './Mount.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
@@ -45,6 +47,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
   // One id → fragment index for this whole pass, never a linear scan per
   // action — see createFragmentLookup's own doc comment (HaulDispatch.ts).
   const fragmentOf = createFragmentLookup(state);
+  const fits = createStorageFit(state);
   const targeted = state.pendingActions
     .filter(a => a.status === 'queued' && a.targetEmployeeId === employee.id
       // #552: a haul_debris/fragment_debris action whose fragment is no
@@ -52,7 +55,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // remaining storage room, stays queued rather than being claimed and
       // immediately failing at pickup — mirrors the vehicle-availability
       // check (findVehicleForClaim) just below.
-      && isHaulOrFragmentActionClaimable(state, a, fragmentOf)
+      && isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits)
       // #557: never re-claim a stale evacuation-relay leftover while its
       // zone is still occupied — see isEvacuationHoldActive's own doc
       // comment (Evacuation.ts).
@@ -61,7 +64,9 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // cooldown — see isActionPastStuckBackoff's own doc comment.
       && isActionPastStuckBackoff(state, a)
       // #1342: a loaded charge waits for its hole's drill order to land.
-      && isChargeHoleClaimable(state, a))
+      && isChargeHoleClaimable(state, a)
+      // #1414: event modifiers (stoppage, drill ban, haul pause) keep it unclaimed.
+      && !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role))
     .sort((a, b) => {
       // Rest actions win ties over any other targeted action, so a rest
       // queued alongside other work for this employee is always the first
@@ -359,13 +364,14 @@ export function claimOnePoolCandidate(
   // O(actions × fragments) for every idle employee, every tick (the
   // `level1-lose-ecology` cost createFragmentLookup's doc comment records).
   const fragmentOf = createFragmentLookup(state);
+  const fits = createStorageFit(state);
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
     (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
     holdsRequiredSkill(employee, a.requiredSkill) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-    isHaulOrFragmentActionClaimable(state, a, fragmentOf) &&
+    isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
     // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
     // (called once per tick from tickEmployees) means this never permanently
@@ -410,6 +416,8 @@ export function claimOnePoolCandidate(
 function hasIdleLicensedAlternative(state: GameState, candidate: PendingAction, employee: Employee): boolean {
   const role = candidate.requiredVehicleRole;
   if (role === null) return false;
+  const lowestTier = lowestFleetTier(state.vehicles.vehicles, role);
+  if (lowestTier === null) return false;
   return state.employees.employees.some(other =>
     other.id !== employee.id
     && other.alive
@@ -417,7 +425,7 @@ function hasIdleLicensedAlternative(state: GameState, candidate: PendingAction, 
     && other.trainingState === null
     && other.activeActionId === null
     && other.restTicksRemaining === null
-    && isLicensedForRole(other, role),
+    && canDriveTier(other, role, lowestTier),
   );
 }
 

@@ -215,7 +215,7 @@ describe('alight', () => {
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     // #1091: payload replaces haulingPhase as the mid-haul guard canReleaseDriver checks.
-    vehicle.payload = { fragmentId: 1, massKg: 500 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 500 }];
 
     const result = alight(state, vehicle.id);
 

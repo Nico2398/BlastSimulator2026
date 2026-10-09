@@ -14,6 +14,8 @@ import type { TutorialStage } from './tutorialStages.js';
 
 /** Marks the body while the tutorial holds the rails. */
 export const GUIDED_CLASS = 'bs-tutorial-guided';
+/** Marks the body while the tutorial card is on screen, guided or not (free play keeps it). */
+export const CARD_CLASS = 'bs-tutorial-card';
 /** Marks the controls the player is allowed to use right now. */
 export const ALLOWED_CLASS = 'bs-tutorial-allowed';
 /**
@@ -341,7 +343,7 @@ function workSignature(state: GameState): string {
     .slice()
     .sort((a, b) => a.id - b.id)
     .map((v) => [
-      v.id, v.x, v.z, getVehicleReservation(state.vehicles, v.id), v.payload?.fragmentId ?? null,
+      v.id, v.x, v.z, getVehicleReservation(state.vehicles, v.id), v.cargo.map((c) => c.fragmentId).join('+'),
     ].join(','))
     .join(';');
 

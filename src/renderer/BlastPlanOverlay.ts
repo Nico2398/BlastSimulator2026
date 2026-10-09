@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Blast Plan Visualization Overlays
-// Renders drill holes (X-ray view), charge fills, delay labels, and software-tier overlays.
+// Renders drill holes (X-ray view), charge fills, and software-tier overlays.
 
 import * as THREE from 'three';
 import type { DrillHole } from '../core/mining/DrillPlan.js';
@@ -8,8 +8,6 @@ import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { tagPickable } from './Pickable.js';
 import { disposeGroup } from './MeshUtils.js';
 import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
-import { createHoleDelayLabel, holeDelayLabelSpec } from './HoleDelayLabel.js';
-import { faceCamera } from './Billboard.js';
 import { confidenceToColor } from './SurveyConfidenceOverlay.js';
 
 // ---------- Config ----------
@@ -41,9 +39,6 @@ const CHARGE_COLORS: readonly number[] = [
   0xff2200, // max charge
 ];
 
-// Sequence label
-const LABEL_OFFSET = 0.5;     // Y above hole marker; close enough that a label reads as its hole's
-
 // Heatmap
 const HEATMAP_MAX_RADIUS = 8; // metres of energy influence
 const HEATMAP_SEGMENTS   = 16;
@@ -61,7 +56,6 @@ const WAVE_MAX_RADIUS = 20;
 export interface HoleOverlayData {
   hole: DrillHole;
   charge?: HoleCharge;
-  delayMs: number;
   /** True once this hole's `drill_hole` action has completed and it lives in `state.drillHoles`; false while still in `state.plannedDrillHoles` awaiting its turn (#553). */
   drilled: boolean;
   /** Terrain surface Y at this hole's (x,z) position. Markers are placed relative to this. */
@@ -87,7 +81,6 @@ export interface BlastPlanOverlayOptions {
 export class BlastPlanOverlay {
   private readonly scene: THREE.Scene;
   private readonly group = new THREE.Group();
-  private readonly delayLabels: THREE.Mesh[] = [];
   /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
   private readonly holePositions = new Map<number, THREE.Vector3>();
 
@@ -153,12 +146,6 @@ export class BlastPlanOverlay {
     }
   }
 
-  /** Face delay labels toward the camera; no-op while hidden. */
-  update(camera: THREE.Camera): void {
-    if (!this.group.visible) return;
-    for (const label of this.delayLabels) faceCamera(label, camera);
-  }
-
   hide(): void {
     this.group.visible = false;
     this.heatmapLayer.setVisible(false);
@@ -179,7 +166,6 @@ export class BlastPlanOverlay {
       }
     }
     this.holePositions.clear();
-    this.delayLabels.length = 0;
   }
 
   dispose(): void {
@@ -191,7 +177,7 @@ export class BlastPlanOverlay {
   // ---------- Per-hole markers ----------
 
   private addHoleMarker(hd: HoleOverlayData): void {
-    const { hole, delayMs, surfaceY: base } = hd;
+    const { hole, surfaceY: base } = hd;
     const x = hole.x, z = hole.z, depth = hole.depth;
     const pickId = holeNumericId(hole.id);
     this.holePositions.set(pickId, new THREE.Vector3(x, base, z));
@@ -249,16 +235,6 @@ export class BlastPlanOverlay {
         new THREE.CylinderGeometry(HOLE_RADIUS * 0.7, HOLE_RADIUS * 0.7, HOLE_HEIGHT * 0.9, HOLE_SEGMENTS),
         { color: CHARGE_COLORS[ci], transparent: true, opacity: 0.8 }, 14, x, base + HOLE_HEIGHT / 2, z, pickId,
       );
-    }
-
-    // Delay label above hole
-    const spec = holeDelayLabelSpec(delayMs);
-    if (spec) {
-      const label = createHoleDelayLabel(spec);
-      this.delayLabels.push(label);
-      label.position.set(x, base + HOLE_HEIGHT + LABEL_OFFSET, z);
-      tagPickable(label, 'hole', pickId);
-      this.group.add(label);
     }
   }
 

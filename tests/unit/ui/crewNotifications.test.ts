@@ -122,15 +122,11 @@ describe('wireCrewNotifications', () => {
     expect(notes[0]!.body).toContain('2');
   });
 
-  it('trained is info; isNew switches the text', () => {
+  it('trained is info and names the employee', () => {
     emitter.fire('employee:trained', { employeeId: empId, skill: 'driving', level: 1, isNew: true });
-    emitter.fire('employee:trained', { employeeId: empId, skill: 'driving', level: 2, isNew: false });
-    expect(notes).toHaveLength(2);
+    expect(notes).toHaveLength(1);
     expect(notes[0]!.severity).toBe('info');
-    expect(notes[1]!.severity).toBe('info');
     expect(notes[0]!.body).toContain(empName);
-    expect(notes[1]!.body).toContain(empName);
-    expect(notes[0]!.body).not.toBe(notes[1]!.body);
   });
 
   it('falls back to #id for an unknown employee, without throwing', () => {

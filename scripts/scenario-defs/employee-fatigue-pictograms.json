@@ -251,7 +251,10 @@
       "name": "pictogram-pair",
       "yaw": 30,
       "pitch": 25,
-      "target": [32, 32],
+      "target": [
+        32,
+        32
+      ],
       "distance": 25
     }
   ]

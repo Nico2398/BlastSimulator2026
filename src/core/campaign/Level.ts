@@ -3,8 +3,13 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
+import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
+import { getBiome } from '../world/BiomeCatalog.js';
+import { siteRockIds } from '../world/Strata.js';
+import { resolveGeneratedBiome } from '../world/TerrainGen.js';
+import { oresYieldedByRocks } from '../world/RockCatalog.js';
 
 // ── Types ──
 
@@ -44,6 +49,8 @@ export interface LevelDef {
   eventFreqMultiplier: number;
   /** Multiplier on contract prices (>1 = generous, <1 = tight market). */
   contractPriceMultiplier: number;
+  /** Pre-hired roster, fleet and buildings this level opens with (#1363). */
+  startingSite?: StartingSiteComposition;
   /** Per-tick score decay rate (higher = harder to maintain scores). */
   scoreDecayRate: number;
   /**
@@ -128,7 +135,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     // Level 1 — Dusty Hollow
     // Small desert quarry. Soft rocks. Basic explosives. Generous contracts.
-    // Tutorial-friendly. Real quarry: ~$2/ton profit → low threshold.
+    // Opens staffed and equipped (DUSTY_HOLLOW_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'dusty_hollow',
     nameKey: 'level.dusty_hollow.name',
@@ -141,10 +148,12 @@ const LEVELS: readonly LevelDef[] = [
     gridZ: 96,
     startingCash: 50000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle'],
-    // Unlock threshold: $80k. Reachable in ~10 good blasts.
+    // Unlock threshold: $80k of operating profit (income minus running costs;
+    // capital purchases do not count).
     unlockThreshold: 80000,
     eventFreqMultiplier: 0.5,   // Rare events — forgiving tutorial
-    contractPriceMultiplier: 1.2, // Generous buyers (easy to profit)
+    startingSite: DUSTY_HOLLOW_STARTING_SITE, // Crew, rig, hauler and warehouse from tick 0
+    contractPriceMultiplier: DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, // Generous buyers; rationale beside the constant
     scoreDecayRate: 0.03,        // Slow score decay — hard to ruin yourself
     mixedRockHardness: false,
     difficultyTier: 1,
@@ -153,7 +162,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     // Level 2 — Grumpstone Ridge
     // Mountain site. Mixed rock hardness. Mid-tier explosives. Moderate challenge.
-    // Neighboring village adds nuisance penalties.
+    // Neighboring village lowers neighbour relations.
     // ────────────────────────────────────────────────────────
     id: 'grumpstone_ridge',
     nameKey: 'level.grumpstone_ridge.name',
@@ -228,8 +237,32 @@ export function getAllLevels(): readonly LevelDef[] {
  */
 export function resolveContractPriceMultiplier(state: GameState): number {
   const levelId = state.campaign.activeLevelId;
-  if (!levelId) return 1;
-  return getLevel(levelId)?.contractPriceMultiplier ?? 1;
+  const level = levelId ? (getLevel(levelId)?.contractPriceMultiplier ?? 1) : 1;
+  // Event modifiers (#1414) move the price of new offers on top of the level's own multiplier.
+  return level * factorFor(state.events.activeModifiers, 'contract_price', state.tickCount);
+}
+
+/**
+ * Ore ids the state's level rocks can yield; contract offers draw from these.
+ * Unknown biome falls back to every priced ore.
+ */
+export function resolveContractOres(state: GameState): readonly string[] {
+  const declared = getBiome(state.mineType);
+  if (!declared) return Object.keys(ORE_PRICES);
+  const world = state.world;
+  if (!world) return oresYieldedByRocks(siteRockIds(declared.dominantRocks, false));
+  // Terrain generation lands on the climate-weighted biome, which can differ
+  // from the declared one, and the console seeds it per entry point: campaign
+  // start generates from the level's own terrainSeed + climateBias, while
+  // new_game / sandbox start use state.seed + the declared biome's climate
+  // centre. Mirror whichever one built this grid, so offers never drift from
+  // what it holds.
+  const level = state.campaign.activeLevelId ? getLevel(state.campaign.activeLevelId) : undefined;
+  const [seed, climateBias] = level
+    ? [level.terrainSeed, level.climateBias] as const
+    : [state.seed, declared.climateCenter] as const;
+  const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, climateBias);
+  return oresYieldedByRocks(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
 }
 
 /**

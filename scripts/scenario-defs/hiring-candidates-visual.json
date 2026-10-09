@@ -1,0 +1,116 @@
+{
+  "name": "hiring-candidates-visual",
+  "description": "#1385: the Crew panel's HIRING section offers named candidates per role (3 each) showing name, $/h salary, skill and union status; a real click on one candidate's Hire button hires exactly that candidate. Interaction mode proves a player reaches the candidate cards and the Hire buttons by clicking (data-role + data-candidate-id). Counts of 3 per role and the exact name/salary/union/qualification match between card and hire are pinned by tests/unit/ui/panels/CrewPanel.test.ts and tests/integration/hiring-pool.integration.test.ts; the state dump carries no per-employee salary, so this scenario proves reachability and the cash/headcount effect. Inspect the screenshots for card text.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee candidates",
+      "timeout": 30,
+      "role": "player",
+      "description": "Open the Crew panel by clicking its rail button and wait for a candidate Hire button for every role. Each card shows name, $X/h salary, skill, union status and the fee.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"driller\"][data-candidate-id]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"driver\"][data-candidate-id]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"surveyor\"][data-candidate-id]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"manager\"][data-candidate-id]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 0
+        },
+        "usable": "#bs-employee-panel button[data-role=\"driller\"][data-candidate-id]",
+        "note": "Every role offers candidate Hire buttons; counts per role are unit-tested."
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "timeout": 30,
+      "role": "player",
+      "description": "Click the first driller candidate's Hire button. Command-mode equivalent hires the first candidate for the role (same candidate).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel button[data-role=\"driller\"][data-candidate-id]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "employeeCount": 1,
+          "cash": -1000
+        },
+        "note": "HIRING_COSTS.driller is 1000 (balance.ts); exactly one hire for one click"
+      }
+    },
+    {
+      "command": "employee candidates role:driller",
+      "timeout": 30,
+      "role": "observe",
+      "description": "The hired slot stays empty until the next refresh: the driller row now offers two candidates, other roles still offer their candidates.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 1
+        },
+        "usable": "#bs-employee-panel button[data-role=\"blaster\"][data-candidate-id]"
+      }
+    }
+  ]
+}

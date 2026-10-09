@@ -2,11 +2,13 @@
 // Manages category timers, weighted selection, and event firing.
 
 import type { TrafficJam } from './TrafficJams.js';
+import { eventWeightFactor, type ActiveModifier } from './ActiveModifiers.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS } from '../config/balance.js';
+import { isEventShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -68,6 +70,10 @@ export interface EventSystemState {
   cooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
   raisedUnqualifiedActionIds?: number[];
+  /** Live timed modifiers raised by event effects (#1414). */
+  activeModifiers: ActiveModifier[];
+  /** Next id handed to an ActiveModifier. */
+  nextModifierId: number;
 }
 
 export interface FiredEvent {
@@ -111,6 +117,8 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     pendingEvent: null,
     jamSilencedUntil: {},
     raisedUnqualifiedActionIds: [],
+    activeModifiers: [],
+    nextModifierId: 1,
     lastOutcome: null,
     followUpQueue: [],
     followUpDelayTicks: 0,
@@ -142,16 +150,19 @@ export function tickEventSystem(
   // Don't fire new events while one is pending
   if (state.pendingEvent) return null;
 
+  if (ctx.protections) pruneProtections(ctx.protections, ctx.tickCount);
+
   // Follow-up queue: drop stale entries (already fired, unknown, or not follow-up-only),
   // then count down once per tick. While counting, timers run as with an empty queue.
   state.followUpQueue = state.followUpQueue.filter(id =>
-    !state.firedEventIds.includes(id) && getEventById(id)?.followUpOnly === true);
+    getEventById(id)?.followUpOnly === true
+    && (getEventById(id)?.repeatable === true || !state.firedEventIds.includes(id)));
   if (state.followUpQueue.length > 0) {
     state.followUpDelayTicks--;
     if (state.followUpDelayTicks <= 0) {
       const eventId = state.followUpQueue.shift()!;
       state.followUpDelayTicks = FOLLOWUP_DELAY_TICKS;
-      state.firedEventIds.push(eventId);
+      if (!state.firedEventIds.includes(eventId)) state.firedEventIds.push(eventId);
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
       state.lastEventTick = ctx.tickCount;
       state.actionCountSinceEvent = 0;
@@ -165,7 +176,11 @@ export function tickEventSystem(
 
     if (timer.remaining <= 0) {
       // Reset timer with score-modulated interval
-      timer.remaining = getModulatedInterval(timer.category, ctx.scores, timer.baseInterval);
+      timer.remaining = Math.max(MIN_EVENT_TIMER_TICKS, Math.round(
+        getModulatedInterval(timer.category, ctx.scores, timer.baseInterval)
+        * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)
+        // A heavier category weight (#1414) brings its next event sooner.
+        / eventWeightFactor(state.activeModifiers, timer.category, ctx.tickCount)));
 
       // Cooldown check — prevent events from firing too rapidly. The random
       // component is drawn once per cooldown window and cached (#597) rather
@@ -186,6 +201,11 @@ export function tickEventSystem(
       const event = selectEvent(timer.category, ctx, rng, state.firedEventIds);
       if (event) {
         state.firedEventIds.push(event.id);
+        // A judge's bribe dismisses the lawsuit unseen: it counts as fired, nothing is pending.
+        if (event.category === 'lawsuit' && ctx.protections
+          && consumeDismissal(ctx.protections, 'lawsuit', ctx.tickCount)) {
+          return null;
+        }
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
         state.lastEventTick = ctx.tickCount;
         state.actionCountSinceEvent = 0;
@@ -224,6 +244,8 @@ export function incrementActionCount(state: EventSystemState): void {
 /** Per-category prerequisite gating event selection (#1412). */
 export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {
   union: (ctx) => ctx.employeeCount >= 1,
+  // The mafia only approaches a player who has been seen paying (#1407).
+  mafia: (ctx) => ctx.corruptionLevel >= MAFIA_UNLOCK_THRESHOLD,
   // A lawsuit needs some cause: pollution/blast, a death, or staff to sue.
   lawsuit: (ctx) => hasEnvironmentalCause(ctx) || ctx.deathCount >= 1 || ctx.employeeCount >= 1,
 };
@@ -240,7 +262,8 @@ export function selectEvent(
 ): EventDef | null {
   if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
-  const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx));
+  const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx)
+    && !isEventShielded(e, ctx.protections ?? [], ctx.tickCount));
 
   if (available.length === 0) return null;
 
@@ -282,8 +305,8 @@ function getModulatedInterval(
       multiplier = 0.8 + 0.4 * (scores.ecology / 100);
       break;
     case 'weather':
-      // Weather is mostly independent of scores
-      multiplier = 0.9 + 0.2 * (scores.nuisance / 100);
+      // Weather is mostly independent of scores (slightly likelier when neighbour relations are poor)
+      multiplier = 0.9 + 0.2 * (1 - scores.nuisance / 100);
       break;
     case 'mafia':
       // More frequent when corruption is high (handled by canFire)
@@ -296,7 +319,7 @@ function getModulatedInterval(
   }
 
   // Floor of 5 ticks ensures a minimum gap even with extreme score modulation
-  return Math.max(5, Math.round(baseInterval * multiplier));
+  return Math.max(MIN_EVENT_TIMER_TICKS, Math.round(baseInterval * multiplier));
 }
 
 

@@ -3,11 +3,11 @@
   "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 35 (10 driver-boarding ticks added ahead of the move commands by #947, +25) once the tick budget was corrected — see the tick 26 step for detail.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:150000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:150000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:150000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:150000"
         }
       ],
       "role": "setup",
@@ -89,6 +89,17 @@
           "cash": -800
         }
       }
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds HIRING_POOL_SIZE (3) candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
     },
     {
       "command": "employee hire role:driver",

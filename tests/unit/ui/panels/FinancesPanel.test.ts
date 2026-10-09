@@ -395,4 +395,25 @@ describe('FinancesPanel — scroll-bounded ledger section (#958)', () => {
       expect(text).not.toContain('Bankruptcy in');
     });
   });
+
+  describe('operating profit row (#1374 regression)', () => {
+    it('shows operating profit against the target in a campaign level', () => {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.campaign.activeLevelId = 'dusty_hollow';
+      panel.show();
+      panel.update(state);
+      expect(panel.root.textContent).toContain(t('ui.finances.operating_profit'));
+      expect(panel.root.textContent).toContain('/ $80,000');
+    });
+
+    it('omits the row in sandbox', () => {
+      const { panel } = makePanel();
+      const state = makeState();
+      state.campaign.activeLevelId = 'sandbox';
+      panel.show();
+      panel.update(state);
+      expect(panel.root.textContent).not.toContain(t('ui.finances.operating_profit'));
+    });
+  });
 });

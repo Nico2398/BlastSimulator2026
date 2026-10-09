@@ -26,6 +26,7 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 | `blasting` | Charging holes, setting sequences, monitoring blasts | Blasting Academy |
 | `management` | Contract negotiation (requires an eligible manager; best level raises odds by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1). Hiring/firing/policy setting are not gated on it yet | Management Office |
 | `geology` | Seismic, core-sample, and aerial surveys | Geology Lab |
+| `repair` | Repairing damaged idle vehicles in place (`repair_vehicle`, #1393); parts cost per restored hp | Driving Center |
 
 ## Starting Qualifications
 
@@ -39,7 +40,7 @@ Every role arrives able to do its own job, with no per-employee course (`ROLE_ST
 | Surveyor | `geology` 1 |
 | Manager | `management` 1 |
 
-Training stays for what a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive), and licence/skill levels (which speed work).
+Training grants qualifications and licences a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive). A course teaches a missing skill only: it grants level 1 with 0 XP, carries a flat fee (`TRAINING_BASE_FEE`), a tier-scaled duration (`TRAINING_TIER_SPEED`) and the level-1 salary bonus (`planTraining`); it is refused (`employees.train_already_qualified`) for any held non-driving skill. A held `driving.*` licence below level 3 can be raised one level per course (`raisesLicenceTo`; fee `LICENCE_COURSE_FEE`, duration scaled by `LICENCE_COURSE_TICKS_MULT`); completion sets `licenceLevel` only, never proficiency or XP. Proficiency rises only from XP earned by working. The vehicle upgrade licence warning (#1401) is specified in `gameplay-vehicle-fleet`.
 
 ## Proficiency Levels & Effects
 
@@ -53,7 +54,7 @@ Training stays for what a role does not start with: the `driving.rock_fragmenter
 
 XP gain per tick of active work: `xpPerTick = 1 + floor(currentLevel * 0.5)`
 
-An action's XP award is a list, not a single slot — `computeTaskXpAwards` (`src/core/entities/EmployeeXpRules.ts`) evaluates two independent rules per tick: a non-null `requiredSkill` grants that skill category, and a non-null `requiredVehicleRole` additionally grants the licence category `ROLE_LICENCE_REQUIRED[role]` maps it to (`src/core/entities/VehicleDriverAssignment.ts`). An action can carry both fields — `drill_hole` grants blasting and driving.drill_rig XP in the same tick — or just one: `survey` grants geology only, `haul_debris` grants driving.truck only, `fragment_debris` grants driving.rock_fragmenter only. Every award uses the same `xpPerTick` formula above, keyed to the employee's current proficiency in that award's own category (default level 1 if unqualified in it yet).
+An action's XP award is a list, not a single slot — `computeTaskXpAwards` (`src/core/entities/EmployeeXpRules.ts`) evaluates two independent rules per tick: a non-null `requiredSkill` grants that skill category, and a non-null `requiredVehicleRole` additionally grants the licence category `ROLE_LICENCE_REQUIRED[role]` maps it to (`src/core/entities/VehicleDriverAssignment.ts`). An action can carry both fields — `drill_hole` grants blasting and driving.drill_rig XP in the same tick — or just one: `survey` grants geology only, `demolish_building` grants driving.truck only (Building Destroyer, #1392), `haul_debris` grants driving.truck only, `fragment_debris` grants driving.rock_fragmenter only. Every award uses the same `xpPerTick` formula above, keyed to the employee's current proficiency in that award's own category (default level 1 if unqualified in it yet).
 
 ## Task Duration Formula
 
@@ -96,7 +97,7 @@ A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` 
 **Unqualified-task event (#1380):** raised once per blocked action, not every tick — `detectUnqualifiedTask` keeps `events.raisedUnqualifiedActionIds` (pruned to ids still blocked each tick; a newly blocked action raises it again) and stamps the event with every blocked id (`unqualifiedActionIds`). Options act on those actions (`src/core/events/UnqualifiedTaskEffects.ts`):
 - **Cancel the Task:** each id is cancelled (`cancelAction`, order cost refunded) and its planned entry released (`releasePlannedOrderForCancelledAction`, `CancelledOrderCleanup.ts`).
 - **Hire a Contractor:** costs `UNQUALIFIED_CONTRACTOR_FEE`, debited once by the option's `cashDelta`. A synthetic, off-roster contractor (rank 1 in the skill, no XP) applies the completion effects (`applyTaskCompletion`) of each blocked action of a supported type (`general_work`, `survey`, `drill_hole`, `charge_hole`, `place_building`, `level_ground`); other types stay queued. If nothing could be done the fee is returned and the `_alt` outcome shows.
-- **Send Someone to Training:** books the first blocked action's skill with the best school on site for the lowest-id employee who is alive, not injured, not training and below Master in it; the course fee is debited as `plan.fee` like `employee train`. No school, candidate, cash or free seat: nothing is booked (`_alt`). The action stays queued until the course finishes.
+- **Send Someone to Training:** books the first blocked action's skill with the best school on site for the lowest-id employee who is alive, not injured, not training and lacking it; the course fee is debited as `plan.fee` like `employee train`. No school, candidate, cash or free seat: nothing is booked (`_alt`). The action stays queued until the course finishes.
 
 **Ghost rendering:** For every `PendingAction`, renderer creates a blue fresnel-effect translucent mesh with pulsing animation, tracked via `GhostPreview.claimed`. Claiming sets `claimed: true` — the ghost stays blue but renders dimmer and pulses slower (`src/renderer/GhostMesh.ts`) to distinguish claimed from unclaimed work without removing it. The ghost is removed when the action completes or is cancelled.
 
@@ -114,6 +115,10 @@ A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` 
 **Cancellation (player-initiated):** Console command `employee cancel <id>` and the Operations panel's "Work Queue" section (`src/ui/panels/OperationsPanel.ts`, one row per live player-cancellable action, Cancel button; engine-owned `rest` actions excluded) both call `cancelAction`. Any count of "unclaimed work" or live actions filters by `status`, same as claim logic below.
 
 **Task progress rendering:** For every employee whose `computeEmployeeActivity` reads `kind: 'working'`, `TaskProgressBar` (`src/renderer/TaskProgressBar.ts`) billboards a fill bar above the character, parented under its `CharacterMesh.getGroup(id)` transform so it tracks position without per-frame copying. Fill fraction comes from `taskProgressFraction`, shared with the Crew panel's own progress line so the two never disagree. Removed when the task ends.
+
+## Hiring Candidate Pools (#1385)
+
+Each role offers `HIRING_POOL_SIZE` (3) candidates (`src/core/entities/HiringPool.ts`, `GameState.hiringPool`, saved since v31). A candidate shows name, salary per hour, starting skill and union status; hiring picks one candidate and the hire gets exactly those values (`hireEmployee(..., candidate)`). The role's fee (`HIRING_COSTS`) stays visible and is charged once. Candidates start at the role's `ROLE_STARTING_QUALIFICATIONS`, with `CANDIDATE_SKILL_BONUS_CHANCE` of +1 level (up to `CANDIDATE_SKILL_BONUS_MAX`, cap 5) on the primary qualification; `CANDIDATE_UNION_CHANCE` of being unionized. Pool rotates every `HIRING_POOL_REFRESH_INTERVAL` ticks from a seeded RNG. Console: `employee candidates [role:X]`, `employee hire role:X [candidate:ID]` (no id = first candidate; unknown id or empty pool refuses with no charge).
 
 ## Salary Calculation
 

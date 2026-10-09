@@ -464,30 +464,11 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 7
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -502,6 +483,11 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
         },
@@ -514,8 +500,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero — all 7 holes (both explosives) detonate together in one plan, proving the presplit row and production grid actually coexist now (Finding #8), unlike every previous run of this file"
       }

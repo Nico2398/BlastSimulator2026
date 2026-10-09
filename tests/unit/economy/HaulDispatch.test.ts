@@ -12,6 +12,7 @@
 // no-op/pass-through stubs (src/core/economy/HaulDispatch.ts), so every test
 // below is expected to fail until #552 is implemented.
 
+import { setFreightRoom, setFreightRoomExact, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import type { ActionType } from '../../../src/core/state/GameState.js';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -19,9 +20,11 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup } from '../../../src/core/economy/HaulDispatch.js';
+import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup, findNearbyHaulableFragments } from '../../../src/core/economy/HaulDispatch.js';
 import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { isHaulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
+import { refreshLogisticsCapacity } from '../../../src/core/engine/BuildingTaskHelpers.js';
 
 const SEED = 42;
 
@@ -42,6 +45,11 @@ function makeFragment(id: number, x: number, z: number, mass = 1000): FragmentDa
     shapeSeed: 1,
     origin: { x, y: 0, z },
   };
+}
+
+/** An ore-bearing fragment: heads for a freight warehouse (barren default ones go to a spoil heap, #1530). */
+function oreFragment(id: number, x: number, z: number, mass = 1000): FragmentData {
+  return { ...makeFragment(id, x, z, mass), oreDensities: { blingite: 0.5 } };
 }
 
 function makeOversizedFragment(id: number, x: number, z: number, mass = 1000): FragmentData {
@@ -250,7 +258,7 @@ describe('syncHaulDispatch — fragments that have moved on', () => {
 describe('isHaulOrFragmentActionClaimable — pass-through for other action types', () => {
   it('is true for a general_work action regardless of storage state', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 100;
+    setFreightRoomExact(state, 100);
     state.logistics.storedMassKg = 100; // full
 
     const action: PendingAction = {
@@ -292,9 +300,8 @@ describe('isHaulOrFragmentActionClaimable — pass-through for other action type
 describe('isHaulOrFragmentActionClaimable — haul_debris storage gate', () => {
   it('is false when the fragment mass exceeds the remaining free storage capacity', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 900; // 100 kg free
-    const fragment = makeFragment(1, 5, 5, 500); // exceeds the 100 kg free room
+    setFreightRoomExact(state, 100); // 100 kg free
+    const fragment = oreFragment(1, 5, 5, 500); // exceeds the 100 kg free room
     addBlastFragments(state.logistics, [fragment]);
     const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
 
@@ -303,23 +310,21 @@ describe('isHaulOrFragmentActionClaimable — haul_debris storage gate', () => {
 
   it('becomes true once capacity frees up enough to fit the fragment', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 900;
-    const fragment = makeFragment(1, 5, 5, 500);
+    setFreightRoomExact(state, 100);
+    const fragment = oreFragment(1, 5, 5, 500);
     addBlastFragments(state.logistics, [fragment]);
     const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
     expect(isHaulOrFragmentActionClaimable(state, action)).toBe(false);
 
-    state.logistics.storedMassKg = 0; // full 1000 kg free now
+    state.logistics.fragments = state.logistics.fragments.filter(f => f.state !== 'stored'); // filler gone: 2000 kg free now
 
     expect(isHaulOrFragmentActionClaimable(state, action)).toBe(true);
   });
 
   it('is true (boundary) when the fragment mass exactly equals the remaining free capacity', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 500; // 500 kg free
-    const fragment = makeFragment(1, 5, 5, 500); // exactly fits
+    setFreightRoomExact(state, 500); // 500 kg free
+    const fragment = oreFragment(1, 5, 5, 500); // exactly fits
     addBlastFragments(state.logistics, [fragment]);
     const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
 
@@ -335,7 +340,7 @@ describe('isHaulOrFragmentActionClaimable — haul_debris storage gate', () => {
 
   it('is false when the fragment has already moved on to in_transit', () => {
     const state = createGame({ seed: SEED });
-    const fragment = makeFragment(1, 5, 5, 100);
+    const fragment = oreFragment(1, 5, 5, 100);
     addBlastFragments(state.logistics, [fragment]);
     state.logistics.fragments[0]!.state = 'in_transit';
     const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
@@ -393,7 +398,7 @@ describe('isHaulOrFragmentActionClaimable — fragment_debris oversized gate', (
 
   it('is unaffected by storage capacity — breaking never touches the warehouse', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 100;
+    setFreightRoomExact(state, 100);
     state.logistics.storedMassKg = 100; // full
     addBlastFragments(state.logistics, [makeOversizedFragment(1, 5, 5, 50_000)]); // far heavier than any free room
     const action = makeFragmentDebrisAction({ id: 1, payload: { fragmentId: 1 } });
@@ -577,27 +582,27 @@ describe('createFragmentLookup — one index per dispatch pass', () => {
 
   it('holds live objects: a fragment picked up after the index was built reads as in_transit', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
+    setFreightRoom(state, 5000); // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5)]);
     const lookup = createFragmentLookup(state);
     expect(lookup(1)?.state).toBe('on_ground');
 
-    expect(pickupFragment(state.logistics, 1, 'v1')).toBe(true);
+    expect(pickupFragment(state.logistics, 1, 'v1', sitesOf(state), 0, 0)).toBe(true);
 
     expect(lookup(1)?.state).toBe('in_transit');
   });
 
   it('gives isHaulOrFragmentActionClaimable the same verdicts with the lookup as without it', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 1000;
+    setFreightRoomExact(state, 1000);
     state.logistics.storedMassKg = 0;
     addBlastFragments(state.logistics, [
-      makeFragment(1, 5, 5, 500),            // haulable, fits
-      makeFragment(2, 6, 6, 5000),           // heavier than the room left
-      makeOversizedFragment(3, 7, 7, 500),   // oversized: fits as haul_debris, and still breakable
-      makeFragment(4, 8, 8, 500),            // will be picked up below
+      oreFragment(1, 5, 5, 500),            // haulable, fits
+      oreFragment(2, 6, 6, 5000),           // heavier than the room left
+      { ...makeOversizedFragment(3, 7, 7, 500), oreDensities: { blingite: 0.5 } }, // oversized ore: fits as haul_debris, and still breakable
+      oreFragment(4, 8, 8, 500),            // will be picked up below
     ]);
-    pickupFragment(state.logistics, 4, 'v1');
+    pickupFragment(state.logistics, 4, 'v1', sitesOf(state), 0, 0);
     const lookup = createFragmentLookup(state);
 
     const actions: PendingAction[] = [
@@ -655,7 +660,7 @@ function addWarehouse(state: ReturnType<typeof createGame>): void {
 describe('haulBlockedReason (#1369)', () => {
   it('is no_freight_warehouse for a haul_debris action with no active freight_warehouse', () => {
     const state = createGame({ seed: SEED });
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 100)]);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 100)]);
     expect(state.logistics.storageCapacityKg).toBe(0);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBe('no_freight_warehouse');
   });
@@ -663,41 +668,39 @@ describe('haulBlockedReason (#1369)', () => {
   it('no_freight_warehouse wins over storage_full when there is no warehouse and no room', () => {
     const state = createGame({ seed: SEED });
     state.logistics.storageCapacityKg = 0;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 100)]);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 100)]);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBe('no_freight_warehouse');
   });
 
   it('is null once a freight warehouse exists and the fragment fits', () => {
     const state = createGame({ seed: SEED });
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
+    setFreightRoomExact(state, 1000);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 400)]);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBeNull();
   });
 
   it('is null when the fragment mass exactly equals the room left', () => {
     const state = createGame({ seed: SEED });
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 600;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
+    setFreightRoomExact(state, 400);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 400)]);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBeNull();
   });
 
   it('is storage_full when the on-ground fragment is heavier than the room left', () => {
     const state = createGame({ seed: SEED });
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 700;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
+    setFreightRoomExact(state, 300);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 400)]);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBe('storage_full');
   });
 
   it('returns the same verdict with a createFragmentLookup index', () => {
     const state = createGame({ seed: SEED });
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 100;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
+    setFreightRoomExact(state, 100);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 400)]);
     const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
     expect(haulBlockedReason(state, action, createFragmentLookup(state))).toBe('storage_full');
   });
@@ -718,15 +721,16 @@ describe('haulBlockedReason (#1369)', () => {
   it('is null when the referenced fragment is missing (and warehouse exists)', () => {
     const state = createGame({ seed: SEED });
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 10;
+    setFreightRoomExact(state, 10);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 99 } }))).toBeNull();
   });
 
   it('is null for a missing fragment or one not on the ground even with no warehouse', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 1000;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
-    pickupFragment(state.logistics, 1, 'v1');
+    setFreightRoomExact(state, 1000);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 400)]);
+    pickupFragment(state.logistics, 1, 'v1', sitesOf(state), 0, 0);
+    state.buildings.buildings.length = 0; // the warehouse is gone
     state.logistics.storageCapacityKg = 0;
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBeNull();
     expect(haulBlockedReason(state, makeHaulAction({ id: 2, payload: { fragmentId: 99 } }))).toBeNull();
@@ -735,10 +739,162 @@ describe('haulBlockedReason (#1369)', () => {
   it('is null for a fragment that is no longer on_ground, however little room is left', () => {
     const state = createGame({ seed: SEED });
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
-    pickupFragment(state.logistics, 1, 'v1');
-    state.logistics.storageCapacityKg = 10;
+    setFreightRoomExact(state, 1000);
+    addBlastFragments(state.logistics, [oreFragment(1, 5, 5, 400)]);
+    pickupFragment(state.logistics, 1, 'v1', sitesOf(state), 0, 0);
+    setFreightRoomExact(state, 10);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBeNull();
+  });
+});
+
+// ── findNearbyHaulableFragments (#1370) ──────────────────────────────────────
+
+describe('findNearbyHaulableFragments (#1370)', () => {
+  function setup(fragments: FragmentData[]) {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, fragments);
+    syncHaulDispatch(state);
+    const primary = state.logistics.fragments.find(f => f.fragment.id === fragments[0]!.id)!;
+    const ids = () => findNearbyHaulableFragments(state, primary, 10).map(t => t.fragment.id);
+    return { state, ids };
+  }
+
+  it('excludes the primary itself and fragments beyond the radius', () => {
+    const { ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 40, 5)]);
+    expect(ids()).toEqual([2]);
+  });
+
+  it('excludes oversized fragments', () => {
+    const { ids } = setup([makeFragment(1, 5, 5), makeOversizedFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments already in transit', () => {
+    const { state, ids } = setup([oreFragment(1, 5, 5), oreFragment(2, 6, 5), oreFragment(3, 7, 5)]);
+    setFreightRoom(state, 20_000); // fresh state holds 0 kg (#1369)
+    expect(pickupFragment(state.logistics, 2, 'v1', sitesOf(state), 0, 0)).toBe(true);
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments whose haul action is claimed', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    const claimed = state.pendingActions.find(a => a.payload['fragmentId'] === 2)!;
+    claimed.holderId = 99;
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments whose haul action is not queued', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    state.pendingActions.find(a => a.payload['fragmentId'] === 2)!.status = 'in_progress';
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments with no haul action at all', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    state.pendingActions = state.pendingActions.filter(a => a.payload['fragmentId'] !== 3);
+    expect(ids()).toEqual([2]);
+  });
+
+  it('orders nearest first, breaking distance ties by lower fragment id', () => {
+    const { ids } = setup([makeFragment(1, 5, 5), makeFragment(9, 8, 5), makeFragment(4, 5, 7), makeFragment(7, 5, 3), makeFragment(2, 6, 5)]);
+    // dist: 2 -> 1, 7 -> 2, 4 -> 2, 9 -> 3
+    expect(ids()).toEqual([2, 4, 7, 9]);
+  });
+});
+
+// ── #1530: spoil heap routing ───────────────────────────────────────────────
+
+function barren(id: number, x: number, z: number, mass = 400): FragmentData {
+  return makeFragment(id, x, z, mass); // oreDensities: {} is barren
+}
+
+function ore(id: number, x: number, z: number, mass = 400): FragmentData {
+  return { ...makeFragment(id, x, z, mass), oreDensities: { blingite: 0.5 } };
+}
+
+function addHeap(state: ReturnType<typeof createGame>, x = 30, z = 30): void {
+  const result = placeBuilding(state.buildings, 'spoil_heap', x, z, 64, 64);
+  if (!result.success) throw new Error(`Setup: placeBuilding failed — ${result.error}`);
+  refreshLogisticsCapacity(state);
+}
+
+describe('haulBlockedReason — spoil heap (#1530)', () => {
+  const action = () => makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
+
+  it('isHaulBlockedReason accepts no_spoil_heap', () => {
+    expect(isHaulBlockedReason('no_spoil_heap')).toBe(true);
+    expect(isHaulBlockedReason('target_unreachable')).toBe(false);
+  });
+
+  it('a barren fragment with no heap is no_spoil_heap', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    setFreightRoomExact(state, 10_000);
+    addBlastFragments(state.logistics, [barren(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBe('no_spoil_heap');
+  });
+
+  it('a barren fragment with no heap and no warehouse is no_spoil_heap, not no_freight_warehouse', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [barren(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBe('no_spoil_heap');
+  });
+
+  it('a barren fragment is never storage_full: with a heap and a full warehouse it is unblocked', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    setFreightRoomExact(state, 0);
+    addHeap(state);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 50_000)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('a barren fragment with a heap but no warehouse is unblocked', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    addBlastFragments(state.logistics, [barren(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('an ore fragment with no warehouse is still no_freight_warehouse even with a heap', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    addBlastFragments(state.logistics, [ore(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBe('no_freight_warehouse');
+  });
+
+  it('an ore fragment with a warehouse but no heap is unblocked', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    setFreightRoomExact(state, 1000);
+    addBlastFragments(state.logistics, [ore(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('an ore fragment heavier than the room is still storage_full even with a heap', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    addHeap(state);
+    setFreightRoomExact(state, 100);
+    addBlastFragments(state.logistics, [ore(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBe('storage_full');
+  });
+});
+
+describe('findNearbyHaulableFragments — never mixes barren and ore (#1530)', () => {
+  function setup(fragments: FragmentData[]) {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, fragments);
+    syncHaulDispatch(state);
+    const primary = state.logistics.fragments.find(f => f.fragment.id === fragments[0]!.id)!;
+    return () => findNearbyHaulableFragments(state, primary, 10).map(t => t.fragment.id);
+  }
+
+  it('a barren primary only gets barren extras', () => {
+    expect(setup([barren(1, 5, 5), ore(2, 6, 5), barren(3, 7, 5)])()).toEqual([3]);
+  });
+
+  it('an ore primary only gets ore extras', () => {
+    expect(setup([ore(1, 5, 5), barren(2, 6, 5), ore(3, 7, 5)])()).toEqual([3]);
   });
 });

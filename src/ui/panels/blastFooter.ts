@@ -14,8 +14,6 @@ import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
-import { blockingOccupantCount } from '../../core/entities/Zone.js';
-import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 
 export class BlastFooter {
   private readonly el: HTMLElement;
@@ -82,34 +80,25 @@ export class BlastFooter {
 
   setFireRequestedHandler(cb: () => void): void { this.onFireRequested = cb; }
 
-  update(state: GameState, tutorialActive: boolean = false): void {
-    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+  update(state: GameState): void {
+    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const errors = validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
     const hasHoles = plan.holes.length > 0;
-    const baseFireOk = hasHoles && errors.length === 0;
+    const fireOk = hasHoles && errors.length === 0;
 
     const planCost = plannedChargesCost(state.chargesByHole);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
     const margin = estValue - planCost;
 
-    // Tutorial-only gate (#557): shares blockingOccupantCount (Zone.ts) with
-    // the console `blast` command's own refusal (mining/blast.ts) so FIRE and
-    // the command it dispatches never disagree on whether to refuse or on
-    // the count they report. Outside the tutorial this never applies — an
-    // occupied zone stays fireable, preflight-warning-only, exactly as
-    // before this issue. Likewise undrilled (ordered, not yet landed) holes
-    // are a PreflightModal warning only, never a FIRE gate: the blast cancels
-    // their drill orders (#1346).
-    const zoneOccupiedCount = tutorialActive && baseFireOk
-      ? blockingOccupantCount(state.drillHoles, BLAST_DANGER_MARGIN_M, state.vehicles, state.employees)
-      : null;
-    const fireOk = baseFireOk && zoneOccupiedCount === null;
+    // Undrilled (ordered, not yet landed) holes are a PreflightModal warning
+    // only, never a FIRE gate: the blast cancels their drill orders (#1346). An
+    // occupied zone is no gate either: DETONATE clears it (#1362).
 
     const reason = !hasHoles
       ? t('ui.blast_workshop.footer.fire_reason_no_holes')
       : errors[0]
         ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
-        : (zoneOccupiedCount !== null ? t('ui.blast_workshop.footer.fire_reason_zone_occupied', { count: zoneOccupiedCount }) : null);
+        : null;
 
     const signature = JSON.stringify({ planCost, estValue, margin, fireOk, reason });
     if (signature === this.lastSignature) return;

@@ -1,14 +1,14 @@
 {
   "name": "core-loop-visual",
-  "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
+  "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:200000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:200000",
       "description": "campaign start replaces any prior site entirely with dusty_hollow's own fixed 96x96 grid. #553: cash bumped from $50,000 to $200,000 to cover the driller/drill_rig ($36,000) this file now needs on top of its existing surveyor hire, plus payroll/upkeep during the drilling wait.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:200000"
         }
       ],
       "role": "setup",
@@ -221,7 +221,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: shrunk from 4x4 (16 holes) to 2x2 (4 holes) -- this file demonstrates the core gameplay loop end to end, not blast density, and a single driller cannot land 16 holes without risking a worker_revolt (sandbox-measured elsewhere in this pass). Drag rectangle previously 'corrected' to (20,20)-(26,26), but that arithmetic was wrong: a 6x6 span at spacing 3 is round(6/3)+1 = round(2)+1 = 3, a 3x3=9 grid (reproduced: orderedHoleCount came back 9, not 4). Drill.ts's real formula is cols/rows = Math.max(1, Math.round((x2-x1)/spacing)+1) (blastSteps/Drill.ts:286-287,304-305) -- to land exactly 2 per axis needs round(size/3)=1, i.e. size in [1.5,4.5). Re-corrected to (20,20)-(23,23), a 3x3 span: round(3/3)+1 = 1+1 = 2, a true 2x2=4-hole grid.",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: shrunk from 4x4 (16 holes) to 2x2 (4 holes) -- this file demonstrates the core gameplay loop end to end, not blast density, and a single driller cannot land 16 holes without risking a worker_revolt (sandbox-measured elsewhere in this pass). Drag rectangle previously 'corrected' to (20,20)-(26,26), but that arithmetic was wrong: a 6x6 span at spacing 3 is round(6/3)+1 = round(2)+1 = 3, a 3x3=9 grid (reproduced: orderedHoleCount came back 9, not 4). Drill.ts's real formula is cols/rows = Math.max(1, Math.round((x2-x1)/spacing)+1) (blastSteps/Drill.ts:286-287,304-305) -- to land exactly 2 per axis needs round(size/3)=1, i.e. size in [1.5,4.5). Re-corrected to (20,20)-(23,23), a 3x3 span: round(3/3)+1 = 1+1 = 2, a true 2x2=4-hole grid.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -311,7 +311,7 @@
     },
     {
       "command": "tick 50",
-      "description": "Third and final chunk — all 4 holes should have landed by now. Two further chunks (150->250 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 4 holes already landed by tick 155 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding, on a 2-employee crew with no living quarters ever built in this file, was enough for wellBeing (already pinned at 0 by ~tick135) to accumulate REVOLT_TICKS=120 consecutive ticks at zero and end the level via worker_revolt (WorkerRevolt.ts) before charging ever got a chance to run as real, clickable UI -- the interaction-mode wait_until step below needs the speed-8x control to still be usable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/sequence/blast to run as genuine player interaction instead of falling back to the guard-step pattern.",
+      "description": "Third and final chunk — all 4 holes should have landed by now. Two further chunks (150->250 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 4 holes already landed by tick 155 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding, on a 2-employee crew with no living quarters ever built in this file, was enough for wellBeing (already pinned at 0 by ~tick135) to accumulate REVOLT_TICKS=120 consecutive ticks at zero and end the level via worker_revolt (WorkerRevolt.ts) before charging ever got a chance to run as real, clickable UI -- the interaction-mode wait_until step below needs the speed-8x control to still be usable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/blast to run as genuine player interaction instead of falling back to the guard-step pattern.",
       "interaction": [
         {
           "type": "command",
@@ -462,42 +462,12 @@
       "role": "setup"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "description": "#554-followup (issue #586 CI): restored to a real click, same reason as the charge-all step above -- the level is alive again by this point.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
-      "command": "sequence show",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence show"
-        }
-      ],
-      "role": "observe"
-    },
-    {
       "command": "blast_preview",
-      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way. #554-followup (issue #586 CI): restored to a real click -- the level is alive again by this point (see the charge-all step's description above), so run-analysis is genuinely reachable, not covered by a level-end overlay. #554-followup round 2 (issue #586 CI, real failure): 'element has zero size (0x0)' -- run-analysis lives on the Preview tab ([data-step=\"4\"]), which the panel never auto-navigates to on its own (BlastWorkshop.ts's suggestStep only advances through drill/charge/sequence); the panel was still showing the Sequence tab from the auto-sequence step above, so run-analysis's own tab content was display:none. Added the missing tab click, matching the same panel-still-on-a-different-tab class already fixed elsewhere this session (blast-execution-visual.json, level3-playthrough-ecology.json).",
+      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way. #554-followup (issue #586 CI): restored to a real click -- the level is alive again by this point (see the charge-all step's description above), so run-analysis is genuinely reachable, not covered by a level-end overlay. #554-followup round 2 (issue #586 CI, real failure): 'element has zero size (0x0)' -- run-analysis lives on the Preview tab ([data-step=\"4\"]), which the panel never auto-navigates to on its own (BlastWorkshop.ts's suggestStep only advances through drill/charge); the panel was still showing the Sequence tab from the auto-sequence step above, so run-analysis's own tab content was display:none. Added the missing tab click, matching the same panel-still-on-a-different-tab class already fixed elsewhere this session (blast-execution-visual.json, level3-playthrough-ecology.json).",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -517,6 +487,10 @@
       "description": "#554-followup (issue #586 CI): restored to a real click sequence (execute -> confirm -> report close), same reason as the steps above -- matches blast-basic.json's own execute flow.",
       "interaction": [
         {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
@@ -527,6 +501,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
@@ -541,8 +520,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },
@@ -588,7 +566,7 @@
           "activeContractCount": 1
         }
       },
-      "description": "#513/#581: the accept click is scoped by contract type, not a fixed id -- `data-contract-type` (ContractsPanel's `makeOfferedCard`) names a contract by what it actually is (#554/#597's `type:`/`material:` ContractSelector convention), immune to the tick-based offer pool's own id drift. #554-followup (issue #586 CI): restored to a real click -- trimming the dead tick-50 padding earlier in this file (see that step's own description) keeps the level alive past the charge/sequence/blast steps, so the contracts panel is genuinely reachable here too, not covered by a level-end overlay."
+      "description": "#513/#581: the accept click is scoped by contract type, not a fixed id -- `data-contract-type` (ContractsPanel's `makeOfferedCard`) names a contract by what it actually is (#554/#597's `type:`/`material:` ContractSelector convention), immune to the tick-based offer pool's own id drift. #554-followup (issue #586 CI): restored to a real click -- trimming the dead tick-50 padding earlier in this file (see that step's own description) keeps the level alive past the charge/blast steps, so the contracts panel is genuinely reachable here too, not covered by a level-end overlay."
     },
     {
       "command": "contract deliver type:rubble_disposal amount:500",

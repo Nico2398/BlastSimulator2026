@@ -252,16 +252,16 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
 // false-match into, and the bug class this test guarded against is
 // structurally impossible. Removed rather than trimmed.
 
-describe('resolveStageIndex — sequence tab escape hatch (#926)', () => {
+describe('resolveStageIndex — evacuate-zone tab escape hatch (#926, #1344)', () => {
   // Reproduces the dead end the player hit: the Blast Workshop stayed on its
   // Charge tab (the crew still mid-charge), the tutorial's own step had
-  // already moved to 'sequence', and the Sequence tab's `auto-sequence`
-  // button lived in a hidden body -- unreachable, with the rail's only
+  // already moved on, and the next tab's control
+  // lived in a hidden body -- unreachable, with the rail's only
   // fallback an already-satisfied "open the Blast panel" hint and every
   // other control on the page blocked. No stage may resolve to that
   // already-satisfied hint while the panel is genuinely open on some tab:
   // there must always be a real, reachable control to click next.
-  const stages = TUTORIAL_STAGES['sequence']!;
+  const stages = TUTORIAL_STAGES['evacuate-zone']!;
 
   function withBox(el: HTMLElement): HTMLElement {
     el.getBoundingClientRect = () => ({
@@ -279,7 +279,7 @@ describe('resolveStageIndex — sequence tab escape hatch (#926)', () => {
   }
 
   /** Builds the panel with one tab body visible and the rest hidden, mirroring BlastWorkshop.ts's setActiveStep. */
-  function openPanelOnTab(activeStep: 2 | 3): void {
+  function openPanelOnTab(activeStep: 2 | 4): void {
     const toolbar = document.createElement('div');
     toolbar.id = 'bs-toolbar';
     document.body.appendChild(toolbar);
@@ -292,19 +292,20 @@ describe('resolveStageIndex — sequence tab escape hatch (#926)', () => {
     panel.appendChild(strip);
     makeButton({ 'data-step': '2' }, strip);
     makeButton({ 'data-step': '3' }, strip);
+    makeButton({ 'data-step': '4' }, strip);
 
     const chargeBody = document.createElement('div');
     chargeBody.style.display = activeStep === 2 ? '' : 'none';
     panel.appendChild(chargeBody);
     makeButton({ 'data-action': 'charge-all' }, chargeBody);
 
-    const sequenceBody = document.createElement('div');
-    sequenceBody.style.display = activeStep === 3 ? '' : 'none';
-    panel.appendChild(sequenceBody);
-    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
+    // FIRE (data-action="execute") lives in the always-visible sticky footer (#1362).
+    const footer = document.createElement('div');
+    panel.appendChild(footer);
+    makeButton({ 'data-action': 'execute' }, footer);
   }
 
-  for (const activeStep of [2, 3] as const) {
+  for (const activeStep of [2, 4] as const) {
     it(`never falls back to the already-satisfied "open panel" hint while the panel is open on tab ${activeStep}`, () => {
       openPanelOnTab(activeStep);
       const index = resolveStageIndex(stages);
@@ -459,7 +460,7 @@ describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
   // (tutorialGuide.ts's own doc comment on that function).
   it('haul-debris: also waits while a debris_hauler vehicle is reserved for a haul, with no pending action at all', () => {
     const s = baseState();
-    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', payload: null, occupantIds: [] } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', cargo: [], occupantIds: [] } as never];
     s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
 
@@ -469,7 +470,7 @@ describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
 
   it('haul-debris: also waits while a rock_fragmenter vehicle is reserved for a break', () => {
     const s = baseState();
-    s.vehicles.vehicles = [{ id: 1, type: 'rock_fragmenter', payload: null, occupantIds: [] } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'rock_fragmenter', cargo: [], occupantIds: [] } as never];
     s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
     expect(resolveWaitStatus(TUTORIAL_STAGES['haul-debris']!, s).waiting).toBe(true);
   });
@@ -561,7 +562,7 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
       { id: 2, buildingId: 2, type: 'driving_center', tier: 1, x: 0, z: 0, actionId: 2, cost: 100 } as never,
       { id: 3, buildingId: 3, type: 'freight_warehouse', tier: 1, x: 0, z: 0, actionId: 3, cost: 100 } as never,
     ];
-    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', payload: null, occupantIds: [] } as never];
+    s.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', cargo: [], occupantIds: [] } as never];
     s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
     s.contracts.active = [
       {
@@ -574,7 +575,7 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
     return s;
   }
 
-  it.each(['sequence', 'evacuate-zone'])(
+  it.each(['evacuate-zone'])(
     '%s never reports waiting, no matter how "spent" every domain looks',
     (stepId) => {
       expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, maximallySpentState()))
@@ -1155,7 +1156,7 @@ describe('decideClock', () => {
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', cargo: [], occupantIds: [], x: 3, z: 4 } as never,
       ];
       s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
@@ -1166,7 +1167,7 @@ describe('decideClock', () => {
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, type: 'rock_fragmenter', payload: null, occupantIds: [], x: 3, z: 4 } as never,
+        { id: 1, type: 'rock_fragmenter', cargo: [], occupantIds: [], x: 3, z: 4 } as never,
       ];
       s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
@@ -1177,7 +1178,7 @@ describe('decideClock', () => {
       s.tickCount = DEFAULT_TICK_BUDGET + 5;
       s.employees.employees = [];
       s.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', cargo: [], occupantIds: [], x: 3, z: 4 } as never,
       ];
       expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
     });
@@ -1191,7 +1192,7 @@ describe('decideClock', () => {
         s.employees.employees = [];
         // A fresh position every tick — the haul is provably still moving.
         s.vehicles.vehicles = [
-          { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: tick, z: 0 } as never,
+          { id: 1, type: 'debris_hauler', cargo: [], occupantIds: [], x: tick, z: 0 } as never,
         ];
         s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
         const decision = decideClock(s, 0, budget, true, progress);
@@ -1207,7 +1208,7 @@ describe('decideClock', () => {
       s1.tickCount = DEFAULT_TICK_BUDGET + 5;
       s1.employees.employees = [];
       s1.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x: 3, z: 4 } as never,
+        { id: 1, type: 'debris_hauler', cargo: [], occupantIds: [], x: 3, z: 4 } as never,
       ];
       s1.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       const d1 = decideClock(s1, 0, DEFAULT_TICK_BUDGET, true);
@@ -1216,7 +1217,7 @@ describe('decideClock', () => {
       s2.tickCount = DEFAULT_TICK_BUDGET + 5;
       s2.employees.employees = [];
       s2.vehicles.vehicles = [
-        { id: 1, type: 'debris_hauler', payload: { fragmentId: 9, massKg: 500 }, occupantIds: [], x: 9, z: 1 } as never,
+        { id: 1, type: 'debris_hauler', cargo: [{ fragmentId: 9, massKg: 500 }], occupantIds: [], x: 9, z: 1 } as never,
       ];
       s2.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
       const d2 = decideClock(s2, 0, DEFAULT_TICK_BUDGET, true);
@@ -1239,7 +1240,7 @@ describe('decideClock', () => {
         // simulating a hauler that stalls mid-drive (e.g. blocked path).
         const x = tick <= freezeAt ? tick : freezeAt;
         s.vehicles.vehicles = [
-          { id: 1, type: 'debris_hauler', payload: null, occupantIds: [], x, z: 0 } as never,
+          { id: 1, type: 'debris_hauler', cargo: [], occupantIds: [], x, z: 0 } as never,
         ];
         s.vehicles.reservations = [{ vehicleId: 1, actionId: 1 }];
         const decision = decideClock(s, 0, budget, true, progress);

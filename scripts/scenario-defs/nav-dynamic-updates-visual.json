@@ -165,26 +165,6 @@
       }
     },
     {
-      "command": "sequence auto",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 1
-        }
-      },
-      "description": "role: player: explicit [data-step=\"3\"] click before Sequence controls -- relying on the panel's own autoAdvance to have already landed there is unreliable in a real interaction-mode run (element present but zero-size, i.e. a hidden inactive tab), same finding as level1-win-efficient.json/level1-playthrough-win.json/tutorial-playthrough.json."
-    },
-    {
       "command": "state full",
       "interaction": [
         {
@@ -198,6 +178,10 @@
       "command": "blast",
       "interaction": [
         {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
@@ -208,6 +192,11 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "waitForSelector",
@@ -222,8 +211,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },

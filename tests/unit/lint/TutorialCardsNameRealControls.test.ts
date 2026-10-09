@@ -25,7 +25,9 @@ const CARD_CONTROLS: Record<string, string[]> = {
   'stage.open_crew': ['shell.rail.employees'],
   'stage.open_survey': ['shell.rail.survey'],
   'stage.open_blast': ['shell.rail.blast'],
-  'stage.sound_horn': ['ui.blast_workshop.fire.sound_horn'],
+  // #1362: the horn button is gone; the evacuate card teaches Fire -> Detonate.
+  step_evacuate: ['ui.blast_workshop.footer.fire', 'ui.blast_workshop.preflight.detonate'],
+  'stage.detonate': ['ui.blast_workshop.preflight.detonate'],
   'stage.open_contracts': ['shell.rail.contracts'],
   'stage.open_vehicles': ['shell.rail.vehicles'],
   'stage.open_build': ['shell.rail.build'],
@@ -43,7 +45,6 @@ const CARD_CONTROLS: Record<string, string[]> = {
     'ui.blast_workshop.charge.amount',
     'ui.blast_workshop.charge.stemming',
   ],
-  'stage.auto_sequence': ['ui.blast_workshop.sequence.auto'],
   'stage.execute': ['ui.blast_workshop.footer.fire'],
   'stage.contract_deliver': ['ui.contracts.deliver'],
   'stage.build_warehouse': ['ui.build.place'],

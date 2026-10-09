@@ -9,6 +9,9 @@ import type { GameContext } from './world.js';
 import {
   getBuildingDef,
   getDefSize,
+  isCrewlessBuilding,
+  isSingleTierType,
+  placeBuilding,
   isPlacementBlockedByResearch,
   checkFootprintPlacement,
   type BuildingType,
@@ -18,8 +21,8 @@ import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
-import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
-import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
+import { dispatchPlaceBuildingAction } from '../../core/engine/PlaceBuildingAction.js';
+import { settleBuiltFootprint } from '../../core/engine/BuildingTaskHelpers.js';
 import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
@@ -28,15 +31,6 @@ import { refusalText } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
-
-/** Payload carried by a queued `place_building` PendingAction (#556). */
-export interface PlaceBuildingActionPayload {
-  buildingOrderId: number;
-  cost: number;
-  footprint: ReadonlyArray<readonly [number, number]>;
-  /** Base ticks; scaled by the worker's proficiency at claim time. */
-  durationTicks: number;
-}
 
 /**
  * Re-point every other still-approaching `place_building` order's target at
@@ -74,6 +68,12 @@ function rescueStrandedApproachTargets(ctx: GameContext, state: GameState, justO
   }
 }
 
+/** Debit a building's construction cost from cash and book it as a construction expense. */
+function chargeConstruction(state: GameState, type: BuildingType, tier: BuildingTier, cost: number): void {
+  state.cash -= cost;
+  addExpense(state.finances, cost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+}
+
 /**
  * Order a new building at (x, z): validates and charges as `buildCommand`'s
  * default case does today, then queues one `place_building` action instead
@@ -84,9 +84,10 @@ export function orderBuildingCommand(
   type: BuildingType,
   x: number,
   z: number,
-  tier: BuildingTier,
+  requestedTier: BuildingTier,
 ): CommandResult {
   const state = ctx.state!;
+  const tier: BuildingTier = isSingleTierType(type) ? 1 : requestedTier;
 
   // Same two-stage order buildCommand's default case already documents:
   // research gate, then funds — both ahead of claimForAction/the footprint
@@ -122,13 +123,27 @@ export function orderBuildingCommand(
   );
   if (!check.valid) return { success: false, output: refusalText(check) };
 
+  // A crewless building (spoil heap, #1530) needs no builder: charged and placed
+  // now, with no PlannedBuilding or place_building action.
+  if (isCrewlessBuilding(type)) {
+    const placed = placeBuilding(
+      state.buildings, type, x, z, bounds.width, bounds.depth, tier, bounds.originX, bounds.originZ, undefined, ctx.grid ?? undefined,
+    );
+    if (!placed.success) return { success: false, output: placed.error! };
+    chargeConstruction(state, type, tier, def.constructionCost);
+    settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
+    return {
+      success: true,
+      output: `${type} T${tier} placed at (${x},${z}). Cost: $${def.constructionCost}`,
+    };
+  }
+
   // Claim the order's own id and the finished building's id now, not when
   // the site completes: sites are built in parallel and land in whatever
   // order the crew reaches them, so numbering at completion would hand the
   // player ids in an order they never chose (and make `build destroy 1`
   // name a different building each run).
   const buildingOrderId = state.nextPlannedBuildingId++;
-  const durationTicks = Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[tier]);
   const actionId = state.nextPendingActionId++;
   const plannedBuilding: PlannedBuilding = {
     id: buildingOrderId, buildingId: state.buildings.nextId++,
@@ -159,8 +174,7 @@ export function orderBuildingCommand(
     return { success: false, output: t('entities.build_no_approach') };
   }
 
-  state.cash -= def.constructionCost;
-  addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+  chargeConstruction(state, type, tier, def.constructionCost);
 
   // Anyone caught standing on the new footprint is relocated off it.
   relocateFootprintOccupants(state, makeFootprintRegion(x, z, footprintX, footprintZ));
@@ -178,23 +192,10 @@ export function orderBuildingCommand(
   // action's target).
   const targetY = ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0;
 
-  // skipQualificationCheck (#556, mirrors dig_ramp_segment/drill_hole/
-  // charge_hole's #555/#553/#554 dispatch): a build order must queue
-  // silently even when the roster is empty — construction needs no skill
-  // and no vehicle (requiredSkill/requiredVehicleRole both null).
-  dispatchPendingAction(state, {
-    id: actionId,
-    type: 'place_building',
-    requiredSkill: null,
-    requiredVehicleRole: null,
-    targetX: approach.x,
-    targetZ: approach.z,
-    targetY,
-    payload: {
-      buildingOrderId, cost: def.constructionCost, footprint: def.footprint, durationTicks,
-    } satisfies PlaceBuildingActionPayload,
-    targetEmployeeId: null,
-  }, { skipQualificationCheck: true });
+  // A build order queues silently even when the roster is empty (#556).
+  dispatchPlaceBuildingAction(state, {
+    actionId, buildingOrderId, tier, cost: def.constructionCost, footprint: def.footprint, approach, targetY,
+  });
 
   return {
     success: true,

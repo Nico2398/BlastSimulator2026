@@ -8,6 +8,7 @@
 // EmployeeDispatch.test.ts and the update paths in
 // tests/integration/ghost-reachability.integration.test.ts.
 
+import { setFreightRoom, setFreightRoomExact } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Count every flood fill the nav layer performs, whichever entry point the
@@ -237,6 +238,16 @@ describe('judgeQueuedOrders (#1306)', () => {
     const verdicts = judgeQueuedOrders(state);
     for (const id of ids) expect(verdicts.get(id)).toBe('reachable');
   });
+
+  it('ignores a vehicle tier no candidate is licensed to drive (#1524)', () => {
+    const state = makeState();
+    const driver = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']); // level 1 licence
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z, 1);
+    const tier3 = purchaseVehicle(state.vehicles, 'rock_digger', IN_B.x, IN_B.z, 3).vehicle;
+    tier3.occupantIds = [driver.id]; // would make the far-side vehicle usable were its tier not filtered out
+    const id = queue(state, 'level_ground', IN_B_TARGET, { requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger' });
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
 });
 
 describe('classifyQueuedOrders (#1306)', () => {
@@ -400,8 +411,9 @@ describe('every action type is judged by the red rule (#1306)', () => {
   // fails typecheck, so the rule cannot silently skip a new action type.
   const ALL_ACTION_TYPES: Record<ActionType, true> = {
     drill_hole: true, charge_hole: true, dig_ramp_segment: true, level_ground: true,
-    set_sequence: true, place_building: true, demolish_building: true, survey: true,
+    place_building: true, demolish_building: true, survey: true,
     fragment_debris: true, haul_debris: true, rest: true, general_work: true,
+    repair_vehicle: true,
   };
 
   it.each(Object.keys(ALL_ACTION_TYPES) as ActionType[])('%s: red with no actor, blue with an actor that reaches it, red when stranded', (type) => {
@@ -488,7 +500,7 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
   function fragment(id: number, mass: number): FragmentData {
     return {
       id, position: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z }, volume: 0.3, mass, rockId: 'cruite',
-      oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      oreDensities: { blingite: 0.5 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
       halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, origin: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z },
     };
   }
@@ -518,7 +530,7 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
     const { state, id } = stageHaul();
     classifyQueuedOrders(state);
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 5000;
+    setFreightRoom(state, 5000);
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBeNull();
   });
@@ -526,8 +538,7 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
   it('stamps storage_full when a warehouse exists but the fragment exceeds the room', () => {
     const { state, id } = stageHaul(400);
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 800;
+    setFreightRoomExact(state, 200);
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBe('storage_full');
   });
@@ -535,10 +546,9 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
   it('clears storage_full when room frees up', () => {
     const { state, id } = stageHaul(400);
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 800;
+    setFreightRoomExact(state, 200);
     classifyQueuedOrders(state);
-    state.logistics.storedMassKg = 0;
+    state.logistics.fragments = state.logistics.fragments.filter(f => f.state !== 'stored'); // filler gone
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBeNull();
   });

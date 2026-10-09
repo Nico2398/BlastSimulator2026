@@ -6,6 +6,7 @@ import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { addFreightWarehouseToState } from '../../../helpers/freightWarehouse.js';
 import type { Contract } from '../../../../src/core/economy/Contract.js';
 
 function makeState(): GameState {
@@ -120,6 +121,7 @@ describe('ContractsPanel', () => {
   it('Accept dispatches contract accept for the right offered card', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
+    addFreightWarehouseToState(state); // ore_sale offers can only be accepted with a freight warehouse (#1372)
     state.contracts.available.push(makeContract({ id: 7 }));
     panel.show();
     panel.update(state);
@@ -127,6 +129,20 @@ describe('ContractsPanel', () => {
     (panel.root.querySelector('.bs-contract-accept') as HTMLButtonElement).click();
 
     expect(gameConsole).toHaveBeenCalledWith('contract accept id:7');
+  });
+
+  it('Accept on an ore_sale offer is disabled and explained while no freight warehouse exists (#1372)', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 7 }));
+    panel.show();
+    panel.update(state);
+
+    const accept = panel.root.querySelector('.bs-contract-accept') as HTMLButtonElement;
+    expect(accept.disabled).toBe(true);
+    expect(accept.title).toBe(t('economy.contract.needs_warehouse'));
+    accept.click();
+    expect(gameConsole).not.toHaveBeenCalled();
   });
 
   // data-contract-fillable (#1048 CI fix): the DOM counterpart of
@@ -209,6 +225,89 @@ describe('ContractsPanel', () => {
     expect(panel.root.textContent).toContain('-$75');
   });
 
+  it('an active card carries a hold-toggle button that dispatches `contract hold <id>`', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5 }));
+    panel.show();
+    panel.update(state);
+
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-contract-id="5"] [data-action="hold-toggle"]');
+    expect(btn).not.toBeNull();
+    btn!.click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract hold 5');
+  });
+
+  it('a held card dispatches `contract release <id>` from the same button', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5, held: true }));
+    panel.show();
+    panel.update(state);
+
+    panel.root.querySelector<HTMLButtonElement>('[data-contract-id="5"] [data-action="hold-toggle"]')!.click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract release 5');
+  });
+
+  it('the active signature includes held: toggling held re-renders the button', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5 }));
+    panel.show();
+    panel.update(state);
+    const before = panel.root.querySelector('[data-contract-id="5"] [data-action="hold-toggle"]')!.textContent;
+
+    state.contracts.active[0]!.held = true;
+    panel.update(state);
+
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-contract-id="5"] [data-action="hold-toggle"]')!;
+    expect(btn.textContent).not.toBe(before);
+    btn.click();
+    expect(gameConsole).toHaveBeenCalledWith('contract release 5');
+  });
+
+  it('each active card has its own hold-toggle', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5 }), makeContract({ id: 6, held: true }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelectorAll('[data-action="hold-toggle"]')).toHaveLength(2);
+    panel.root.querySelector<HTMLButtonElement>('[data-contract-id="6"] [data-action="hold-toggle"]')!.click();
+    expect(gameConsole).toHaveBeenCalledWith('contract release 6');
+  });
+
+  it('an expired history row shows what was paid and the reduced penalty actually charged', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.completedHistory.push(makeContract({
+      id: 13, quantityKg: 100, deliveredKg: 40, pricePerKg: 10, penaltyAmount: 300,
+      completed: false, expired: true, paidTotal: 400, penaltyCharged: 180,
+    }));
+    panel.show();
+    panel.update(state);
+
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('400');
+    expect(text).toContain('-$180');
+    expect(text).not.toContain('-$300');
+  });
+
+  it('an expired history row with nothing delivered still shows the full penalty', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.completedHistory.push(makeContract({
+      id: 14, penaltyAmount: 300, completed: false, expired: true, penaltyCharged: 300,
+    }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain('-$300');
+  });
+
   it('storage strip link navigates to Operations', () => {
     const { panel } = makePanel();
     const onNavigate = vi.fn();
@@ -232,6 +331,27 @@ describe('ContractsPanel', () => {
     const { panel, container } = makePanel();
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
+  });
+
+  it('flags an offer for an ore the site cannot yield, and not one it can or rubble (#1364)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(
+      makeContract({ id: 21, materialId: 'dirtite' }),
+      makeContract({ id: 22, materialId: 'sparkium' }),
+      makeContract({ id: 23, type: 'rubble_disposal', materialId: '' }),
+    );
+    panel.show();
+    panel.update(state);
+
+    const card = (id: number) => panel.root.querySelector<HTMLElement>(`[data-contract-id="${id}"]`)!;
+    const badge = t('ui.contracts.not_on_site');
+    expect(card(21).textContent).not.toContain(badge);
+    expect(card(21).dataset['contractOnsite']).toBe('true');
+    expect(card(22).textContent).toContain(badge);
+    expect(card(22).dataset['contractOnsite']).toBe('false');
+    expect(card(23).textContent).not.toContain(badge);
+    expect(card(23).dataset['contractOnsite']).toBe('true');
   });
 
   // ── #513: cards must carry data-contract-id so per-card action selectors scope correctly ──
@@ -305,6 +425,7 @@ describe('ContractsPanel', () => {
   it('Accept on a specific offered card dispatches contract accept for that card only, with two offers present', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
+    addFreightWarehouseToState(state); // ore_sale offers can only be accepted with a freight warehouse (#1372)
     state.contracts.available.push(makeContract({ id: 3 }), makeContract({ id: 9 }));
     panel.show();
     panel.update(state);
@@ -318,6 +439,7 @@ describe('ContractsPanel', () => {
   it('Accept on the other offered card dispatches contract accept for that id, with two offers present', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
+    addFreightWarehouseToState(state); // ore_sale offers can only be accepted with a freight warehouse (#1372)
     state.contracts.available.push(makeContract({ id: 3 }), makeContract({ id: 9 }));
     panel.show();
     panel.update(state);

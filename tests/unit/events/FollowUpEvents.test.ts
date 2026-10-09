@@ -70,7 +70,7 @@ beforeEach(() => {
 
 describe('follow-up event definitions', () => {
   it('every FOLLOWUP_EVENTS entry is followUpOnly', () => {
-    expect(FOLLOWUP_EVENTS.length).toBe(8);
+    expect(FOLLOWUP_EVENTS.length).toBe(9);
     for (const e of FOLLOWUP_EVENTS) expect(e.followUpOnly, e.id).toBe(true);
   });
 
@@ -277,5 +277,30 @@ describe('save/load', () => {
     delete (parsed['events'] as Record<string, unknown>)['followUpDelayTicks'];
     const restored = deserialize(JSON.stringify(parsed));
     expect(restored.events.followUpDelayTicks).toBe(0);
+  });
+});
+
+describe('mafia_police_investigation follow-up (#1411)', () => {
+  it('exists in FOLLOWUP_EVENTS as a follow-up-only mafia event with 3 options', () => {
+    const def = FOLLOWUP_EVENTS.find(e => e.id === 'mafia_police_investigation');
+    expect(def).toBeDefined();
+    expect(def!.options).toHaveLength(3);
+    expect(def!.consequences).toHaveLength(3);
+    expect(def!.followUpOnly).toBe(true);
+  });
+
+  it('options have distinct, non-empty consequences', () => {
+    const def = FOLLOWUP_EVENTS.find(e => e.id === 'mafia_police_investigation');
+    expect(def).toBeDefined();
+    const serialized = def!.consequences.map(c => JSON.stringify(c));
+    for (const s of serialized) expect(s).not.toBe('{}');
+    expect(new Set(serialized).size).toBe(3);
+  });
+
+  it('at least one option raises mafia exposure via exposureDelta', () => {
+    const def = FOLLOWUP_EVENTS.find(e => e.id === 'mafia_police_investigation');
+    expect(def).toBeDefined();
+    const deltas = def!.consequences.map(c => (c as { exposureDelta?: number }).exposureDelta ?? 0);
+    expect(deltas.some(d => d > 0)).toBe(true);
   });
 });

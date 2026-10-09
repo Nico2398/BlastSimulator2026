@@ -9,6 +9,7 @@ import {
   NEGOTIATION_EARLY_BONUS_RATE,
   ORE_PRICES,
   RUBBLE_DISPOSAL_PRICE_RANGE,
+  SUPPLY_COMMON_ORE_COUNT,
 } from '../config/balance.js';
 
 // ── Contract types ──
@@ -42,6 +43,12 @@ export interface Contract {
   expired: boolean;
   /** Negotiation attempts already made on this offer. Absent means none. */
   negotiationAttempts?: number;
+  /** True when the player holds the contract back from automatic delivery. Absent means not held. */
+  held?: boolean;
+  /** Cumulative payment already credited for partial deliveries. Absent means none. */
+  paidTotal?: number;
+  /** Penalty already charged for this contract. Absent means none. */
+  penaltyCharged?: number;
 }
 
 // ── Negotiation outcome (types live here, not in Negotiation.ts, so
@@ -83,8 +90,6 @@ export function createContractState(): ContractState {
   };
 }
 
-// Ore IDs that can appear in contracts, in rarity order.
-const CONTRACT_ORES = Object.keys(ORE_PRICES);
 const ORE_BASE_PRICES: Record<string, number> = ORE_PRICES;
 
 // ── Generation ──
@@ -94,8 +99,10 @@ export function generateContracts(
   state: ContractState,
   rng: Random,
   currentTick: number,
-  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`). Defaults to 1 so every caller that doesn't pass one reproduces today's pricing exactly. */
-  priceMultiplier: number = 1,
+  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`); pass 1 for unscaled pricing. */
+  priceMultiplier: number,
+  /** Ore ids the level's rocks can yield (Level.ts's resolveContractOres). */
+  availableOres: readonly string[],
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
@@ -105,25 +112,44 @@ export function generateContracts(
   if (overflow > 0) state.available.splice(0, overflow);
 
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    state.available.push(generateOneContract(state, rng, priceMultiplier));
+    state.available.push(generateOneContract(state, rng, priceMultiplier, availableOres));
   }
   state.lastRefreshTick = currentTick;
 }
 
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1): Contract {
+/** Puts one extra offer on the board outside the refresh cycle (an event's special contract); the oldest offer makes room when full. */
+export function offerSpecialContract(
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[],
+): Contract {
+  if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
+  const contract = generateOneContract(state, rng, priceMultiplier, availableOres);
+  state.available.push(contract);
+  return contract;
+}
+
+/** The cheapest SUPPLY_COMMON_ORE_COUNT of the given ores, by base price. */
+function commonOres(ores: readonly string[]): string[] {
+  return [...ores]
+    .sort((a, b) => (ORE_BASE_PRICES[a] ?? 10) - (ORE_BASE_PRICES[b] ?? 10))
+    .slice(0, SUPPLY_COMMON_ORE_COUNT);
+}
+
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[]): Contract {
   const typeRoll = rng.nextFloat(0, 1);
+  // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
+  const rubbleOnly = availableOres.length === 0;
   let type: ContractType;
   let materialId: string;
   let pricePerKg: number;
   let description: string;
 
-  if (typeRoll < 0.5) {
+  if (!rubbleOnly && typeRoll < 0.5) {
     // Ore sale contract
     type = 'ore_sale';
-    materialId = rng.pick(CONTRACT_ORES);
+    materialId = rng.pick(availableOres);
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
     description = `Deliver ${materialId} ore`;
-  } else if (typeRoll < 0.8) {
+  } else if (rubbleOnly || typeRoll < 0.8) {
     // Rubble disposal
     type = 'rubble_disposal';
     materialId = '';
@@ -132,7 +158,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   } else {
     // Supply contract (recurring, higher quantity, lower price)
     type = 'supply';
-    materialId = rng.pick(CONTRACT_ORES.slice(0, 4)); // Only common ores for supply
+    materialId = rng.pick(commonOres(availableOres)); // Only the site's cheapest ores for supply
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
     description = `Supply ${materialId} (bulk)`;
   }
@@ -200,7 +226,7 @@ export function deliverMaterials(
     return { payment: 0, bonus: 0, completed: false };
   }
 
-  const remaining = contract.quantityKg - contract.deliveredKg;
+  const remaining = remainingKg(contract);
   const delivered = Math.min(amountKg, remaining);
   contract.deliveredKg += delivered;
 
@@ -347,12 +373,63 @@ export function findContract(
   ) ?? null;
 }
 
-/** Check and expire overdue contracts. Returns penalty amounts. */
+/** Share of a contract's quantity still undelivered, clamped to [0, 1]. A contract asking for nothing counts as fully undelivered. */
+export function undeliveredShare(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  if (c.quantityKg <= 0) return 1;
+  return Math.min(1, Math.max(0, (c.quantityKg - c.deliveredKg) / c.quantityKg));
+}
+
+/** Kilograms a contract still needs delivered (negative if over-delivered). */
+export function remainingKg(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  return c.quantityKg - c.deliveredKg;
+}
+
+/** Penalty owed if the contract expired now: the full penalty scaled by the share still undelivered. */
+export function outstandingPenalty(c: Pick<Contract, 'quantityKg' | 'deliveredKg' | 'penaltyAmount'>): number {
+  return Math.round(c.penaltyAmount * undeliveredShare(c));
+}
+
+/** Active contracts ordered by soonest deadline first (ties: lowest id), without mutating the input. */
+export function sortByDeadline(active: readonly Contract[]): Contract[] {
+  const deadline = (c: Contract) => c.acceptedAtTick + c.deadlineTicks;
+  return [...active].sort((a, b) => deadline(a) - deadline(b) || a.id - b.id);
+}
+
+/** Hold or release an active contract for automatic delivery. Returns false when the contract is not active. */
+export function setContractHeld(state: ContractState, contractId: number, held: boolean): boolean {
+  const contract = state.active.find(c => c.id === contractId);
+  if (!contract) return false;
+  contract.held = held;
+  return true;
+}
+
+/** Stored kilograms that can fill the contract: raw stored mass for rubble, the ore ledger entry otherwise. */
+export function storedStockKg(
+  c: Pick<Contract, 'type' | 'materialId'>,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): number {
+  return c.type === 'rubble_disposal' ? storedMassKg : (collectedOre[c.materialId] ?? 0);
+}
+
+/** True when stored stock of the contract's material cannot cover what it still needs (held contracts included). */
+export function contractShortOfStock(
+  c: Contract,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): boolean {
+  return storedStockKg(c, collectedOre, storedMassKg) < remainingKg(c);
+}
+
+/**
+ * Check and expire overdue contracts. Returns the penalty charged, scaled by
+ * the share still undelivered, with what was delivered and paid before expiry.
+ */
 export function checkDeadlines(
   state: ContractState,
   currentTick: number,
-): Array<{ contractId: number; penalty: number }> {
-  const penalties: Array<{ contractId: number; penalty: number }> = [];
+): Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }> {
+  const penalties: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }> = [];
 
   for (let i = state.active.length - 1; i >= 0; i--) {
     const c = state.active[i]!;
@@ -361,7 +438,9 @@ export function checkDeadlines(
     const elapsed = currentTick - c.acceptedAtTick;
     if (elapsed > c.deadlineTicks) {
       c.expired = true;
-      penalties.push({ contractId: c.id, penalty: c.penaltyAmount });
+      const penalty = outstandingPenalty(c);
+      c.penaltyCharged = penalty;
+      penalties.push({ contractId: c.id, penalty, deliveredKg: c.deliveredKg, paid: c.paidTotal ?? 0 });
       state.active.splice(i, 1);
       state.completedHistory.push(c);
     }
@@ -370,3 +449,10 @@ export function checkDeadlines(
   return penalties;
 }
 
+/** Why a contract cannot be accepted yet, or null. */
+export function contractAcceptBlocker(
+  c: Contract,
+  hasFreightWarehouse: boolean,
+): 'needs_freight_warehouse' | null {
+  return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
+}

@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
-import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId, getVehicleMaintenanceCostPerTick } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
@@ -82,7 +82,7 @@ function employeeMovementDefaults(): Omit<
  * Push a qualified truck driver (driving.truck licence) directly into employee state.
  * Returns the new employee's ID.
  */
-function addTruckDriver(ctx: MiningContext): number {
+function addTruckDriver(ctx: MiningContext, licenceLevel?: 1 | 2 | 3): number {
   const emp: Employee = {
     id: ctx.state!.employees.nextId++,
     name: 'Test Truck Driver',
@@ -94,7 +94,7 @@ function addTruckDriver(ctx: MiningContext): number {
     alive: true,
     x: 0,
     z: 0,
-    qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
+    qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, ...(licenceLevel ? { licenceLevel } : {}) }],
     trainingState: null,
     ...employeeMovementDefaults(),
   };
@@ -655,5 +655,180 @@ describe('scrapping or removing a mounted vehicle (#1389)', () => {
 
     expect(occupant.locomotion.kind).toBe('on_foot');
     expectNoWorldInvariantViolations(ctx.state!);
+  });
+});
+
+// ── vehicle upgrade (#1401) ──
+
+describe('vehicle upgrade', () => {
+  const ups = (ctx: MiningContext, id: number) => ctx.state!.vehicles.vehicles.find(v => v.id === id)!;
+
+  it('raises tier by one and charges the purchase-price difference', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    const cashBefore = ctx.state!.cash;
+
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+
+    expect(result.success).toBe(true);
+    expect(ups(ctx, id).tier).toBe(2);
+    expect(ctx.state!.cash).toBe(cashBefore - 25_000);
+  });
+
+  it('accepts the id as a named argument', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    const result = vehicleCommand(ctx, ['upgrade'], { id: String(id) });
+    expect(result.success).toBe(true);
+    expect(ups(ctx, id).tier).toBe(2);
+  });
+
+  it('records an equipment expense for the cost difference', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    vehicleCommand(ctx, ['upgrade', String(id)], {});
+    const tx = ctx.state!.finances.transactions.at(-1);
+    expect(tx?.type).toBe('expense');
+    expect(tx?.category).toBe('equipment');
+    expect(tx?.amount).toBe(25_000);
+  });
+
+  it('reports success through the localized vehicle.upgrade_success key', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+    const expected = t('vehicle.upgrade_success', { id, tier: 2, cost: 25_000 });
+    expect(expected).not.toBe('vehicle.upgrade_success');
+    expect(result.output).toContain(expected);
+  });
+
+  it('upgrades tier 2 to tier 3 for the second price difference', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    // Starting cash (50k) cannot cover both differences (25k + 50k).
+    ctx.state!.cash += 100_000;
+    vehicleCommand(ctx, ['upgrade', String(id)], {});
+    const cashBefore = ctx.state!.cash;
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(true);
+    expect(ups(ctx, id).tier).toBe(3);
+    expect(cashBefore - ctx.state!.cash).toBe(50_000);
+  });
+
+  it('refuses at max tier with vehicle.upgrade_max_tier and changes nothing', () => {
+    const ctx = makeCtx();
+    const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 0, 0, 3);
+    const cashBefore = ctx.state!.cash;
+    const txCount = ctx.state!.finances.transactions.length;
+
+    const result = vehicleCommand(ctx, ['upgrade', String(vehicle.id)], {});
+
+    expect(result.success).toBe(false);
+    expect(t('vehicle.upgrade_max_tier', { id: vehicle.id })).not.toBe('vehicle.upgrade_max_tier');
+    expect(result.output).toBe(t('vehicle.upgrade_max_tier', { id: vehicle.id }));
+    expect(vehicle.tier).toBe(3);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.finances.transactions.length).toBe(txCount);
+  });
+
+  it('refuses when cash is short and changes nothing', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    const v = ups(ctx, id);
+    v.hp = 40;
+    ctx.state!.cash = 24_999;
+    const txCount = ctx.state!.finances.transactions.length;
+
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(v.tier).toBe(1);
+    expect(v.hp).toBe(40);
+    expect(ctx.state!.cash).toBe(24_999);
+    expect(ctx.state!.finances.transactions.length).toBe(txCount);
+  });
+
+  it('succeeds when cash exactly equals the cost, leaving 0', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    ctx.state!.cash = 25_000;
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(0);
+    expect(ups(ctx, id).tier).toBe(2);
+  });
+
+  it('refuses an unknown id with vehicle.not_found', () => {
+    const ctx = makeCtx();
+    const cashBefore = ctx.state!.cash;
+    const result = vehicleCommand(ctx, ['upgrade', '9999'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('vehicle.not_found', { id: 9999 }));
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('rejects a non-numeric id with vehicle.upgrade_usage', () => {
+    const ctx = makeCtx();
+    const result = vehicleCommand(ctx, ['upgrade', 'abc'], {});
+    expect(result.success).toBe(false);
+    expect(t('vehicle.upgrade_usage')).not.toBe('vehicle.upgrade_usage');
+    expect(result.output).toBe(t('vehicle.upgrade_usage'));
+  });
+
+  it('rejects a missing id with vehicle.upgrade_usage', () => {
+    const ctx = makeCtx();
+    const result = vehicleCommand(ctx, ['upgrade'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('vehicle.upgrade_usage'));
+  });
+
+  it('a damaged vehicle comes out at the new tier full HP', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    ups(ctx, id).hp = 5;
+    vehicleCommand(ctx, ['upgrade', String(id)], {});
+    expect(ups(ctx, id).hp).toBe(150); // debris_hauler maxHp 100 x 1.5
+  });
+
+  it('a reserved vehicle keeps its reservation and position', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    const v = ups(ctx, id);
+    v.x = 6; v.z = 8;
+    reserveVehicle(ctx.state!.vehicles, id, 77);
+
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.vehicles.reservations).toEqual([{ vehicleId: id, actionId: 77 }]);
+    expect([v.x, v.z]).toEqual([6, 8]);
+  });
+
+  it('notes vehicle.upgrade_no_licensed when nobody on the roster holds the licence', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    addDrillRigDriver(ctx);
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(true);
+    expect(t('vehicle.upgrade_no_licensed', { id })).not.toBe('vehicle.upgrade_no_licensed');
+    expect(result.output).toContain(t('vehicle.upgrade_no_licensed', { id, type: 'debris_hauler', tier: 2 }));
+  });
+
+  it('omits the no-licence note when a licensed driver exists', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    addTruckDriver(ctx, 2);
+    const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(true);
+    expect(result.output).not.toContain(t('vehicle.upgrade_no_licensed', { id, type: 'debris_hauler', tier: 2 }));
+  });
+
+  it('maintenance cost per tick reflects the new tier', () => {
+    const ctx = makeCtx();
+    const id = addTruckVehicle(ctx);
+    expect(getVehicleMaintenanceCostPerTick(ctx.state!.vehicles)).toBe(3);
+    vehicleCommand(ctx, ['upgrade', String(id)], {});
+    expect(getVehicleMaintenanceCostPerTick(ctx.state!.vehicles)).toBeCloseTo(3 * 1.4);
   });
 });

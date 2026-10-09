@@ -9,7 +9,7 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { goalChipParams } from './tutorialStepsClosing.js';
 import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
-import { GUIDED_CLASS } from './tutorialGuide.js';
+import { CARD_CLASS, GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -110,6 +110,7 @@ export class TutorialOverlay {
     this.snapshots = snapshots;
     this._active = true;
     this.overlay.style.display = '';
+    document.body.classList.add(CARD_CLASS);
     this.applyGuidedClass();
   }
 
@@ -200,7 +201,7 @@ export class TutorialOverlay {
 
   /** Drop the rails class and hide the goal chip (tutorial ending or disposed). */
   private hideGuidedChrome(): void {
-    document.body.classList.remove(GUIDED_CLASS);
+    document.body.classList.remove(GUIDED_CLASS, CARD_CLASS);
     this.goalChipEl.style.display = 'none';
   }
 

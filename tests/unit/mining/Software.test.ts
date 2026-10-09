@@ -11,7 +11,6 @@ import {
 import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { vec3 } from '../../../src/core/math/Vec3.js';
@@ -133,7 +132,7 @@ describe('Software — previewHoleDetails', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
 
     const details = previewHoleDetails(plan, grid, 2);
     expect(holeIds.length).toBeGreaterThan(0);
@@ -154,7 +153,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, amountKg, stemmingM);
-    return { grid, plan: assembleBlastPlan(holes, charges, autoVPattern(holes, 25)) };
+    return { grid, plan: assembleBlastPlan(holes, charges) };
   }
 
   it('previewEnergy retains less total energy over a smaller footprint when holes are wet (water-sensitive explosive)', () => {

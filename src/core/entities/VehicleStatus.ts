@@ -61,7 +61,7 @@ export function computeVehicleStatus(v: Vehicle, vehicleState: VehicleState, occ
   if (occupant.isMoveStuck) return { ...IDLE, kind: 'stuck', ticks: occupant.moveConsecutiveFailures };
   if (occupant.vehicleWaitingTicks > 0) return { ...IDLE, kind: 'waiting', ticks: occupant.vehicleWaitingTicks };
   if (v.type === 'debris_hauler' && getVehicleReservation(vehicleState, v.id) !== null) {
-    return { ...IDLE, kind: 'hauling', haulingPhase: v.payload !== null ? 'to_depot' : 'to_fragment' };
+    return { ...IDLE, kind: 'hauling', haulingPhase: v.cargo.length > 0 ? 'to_depot' : 'to_fragment' };
   }
 
   if (occupant.taskTicksRemaining !== null) return { ...IDLE, kind: 'working', task: VEHICLE_ROLE_ARRIVAL_TASK[v.type] };

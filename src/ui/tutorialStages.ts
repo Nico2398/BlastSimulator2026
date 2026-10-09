@@ -398,42 +398,16 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     },
   ],
 
-  // #926: `auto-sequence` lives inside the Sequence tab's own body, hidden
-  // (display:none) whenever a different tab is showing -- which the panel's
-  // own auto-advance (BlastWorkshop.ts's suggestStep) can legitimately do
-  // while the crew is still mid-charge. Without a stage in between,
-  // resolveStageIndex (tutorialGuide.ts, "last reachable stage wins") had
-  // nowhere to fall back to but the already-satisfied "open the Blast panel"
-  // hint, with every control on the panel blocked and the Sequence tab
-  // itself un-clickable. The tab button (`data-step`, BlastWorkshop.ts) is
-  // part of the strip, not any one step's body, so it stays reachable
-  // regardless of which tab is active -- this stage lets the player put the
-  // panel on Sequence themselves whenever the panel hasn't gotten there on
-  // its own yet.
-  sequence: [
-    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
-    { target: '#bs-blast-panel [data-step="3"]', hintKey: 'tutorial.stage.open_sequence_tab' },
-    { target: '#bs-blast-panel [data-action="auto-sequence"]', hintKey: 'tutorial.stage.auto_sequence' },
-  ],
-
-  // #557: open the Blast Workshop, then press the Fire step's own "Sound the
-  // Horn" button (FireStep.ts's hornBtn, dataset.action="sound-horn"). Scoped
-  // to #bs-blast-panel — the same button-role/panel-scoping convention every
-  // other stage list above uses (charge/sequence/blast) — not the toolbar
-  // target both stages used to share: resolveStageIndex (tutorialGuide.ts)
-  // resolves the LAST reachable stage, and a toolbar button that is always
-  // reachable once the panel is open made this stage indistinguishable from
-  // the one before it, so the rail could never actually highlight the real
-  // Sound the Horn control.
-  // #1337: same shape as `sequence` (#926) -- the horn lives in the Fire tab's
-  // body, hidden whenever the player has clicked another Blast Workshop tab,
-  // which left it unreachable and the rail blocking the Fire tab button. The
-  // tab button (`data-step="5"`) is part of the always-reachable strip, so the
-  // middle stage lets the player switch to Fire themselves.
+  // #557, #1362: open the Blast Workshop, press FIRE (opens the pre-flight
+  // modal), then DETONATE inside it, which evacuates the zone and fires once
+  // clear. Same stage shape as the `blast` list below.
   'evacuate-zone': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
-    { target: '#bs-blast-panel [data-step="5"]', hintKey: 'tutorial.stage.open_fire_tab' },
-    { target: '#bs-blast-panel [data-action="sound-horn"]', hintKey: 'tutorial.stage.sound_horn' },
+    { target: '#bs-blast-panel [data-action="execute"]', hintKey: 'tutorial.stage.execute' },
+    {
+      target: '.bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger',
+      hintKey: 'tutorial.stage.detonate',
+    },
   ],
 
   blast: [

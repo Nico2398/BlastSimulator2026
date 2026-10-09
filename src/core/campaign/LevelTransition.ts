@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Level completion and transition
 // Handles profit threshold detection, level complete summary, and new-level setup.
 
+import { resolveStartingSite } from '../state/StartingBuildings.js';
 import { createGame, createWorldState, type GameConfig, type GameState } from '../state/GameState.js';
 import { getLevel } from './Level.js';
 import { recordProfit, recordStars, startLevel, type CampaignState } from './Campaign.js';
@@ -76,7 +77,7 @@ export function checkLevelComplete(
   if (!level) return { triggered: false, summary: null };
 
   const report = getFinancialReport(state.finances, 0);
-  const profit = report.netProfit;
+  const profit = report.operatingProfit;
   if (profit < level.unlockThreshold) return { triggered: false, summary: null };
 
   // Threshold reached — close the session (guards repeat triggers), record, build summary
@@ -102,7 +103,9 @@ export function checkLevelComplete(
 /**
  * Create a fresh GameState for the given level, preserving campaign state.
  * Returns null if the level is locked or doesn't exist.
- * `staffed` mirrors `new_game`/`sandbox start`'s own opt-in (#551): a
+ * `staffed` is tri-state (#1363): undefined uses the level's own
+ * `startingSite`, true the global staffed composition, false a bare site.
+ * It mirrors `new_game`/`sandbox start`'s own opt-in (#551): a
  * pre-hired roster and pre-purchased fleet, applied inside `createGame`
  * before terrain generation.
  */
@@ -116,13 +119,14 @@ export function createGameForLevel(
   const level = getLevel(levelId);
   if (!level) return null;
 
+  const startingSite = resolveStartingSite(level.startingSite, staffed);
   const config: GameConfig = {
     seed: level.terrainSeed,
     mineType: level.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
-    ...(staffed ? { staffed: true } : {}),
+    ...(startingSite ? { startingSite } : {}),
   };
 
   const newState = createGame(config);

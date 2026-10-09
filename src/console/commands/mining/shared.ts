@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Cross-family helpers shared by mining console commands
 
 import type { CommandResult } from '../../ConsoleRunner.js';
-import type { GameState, PendingAction } from '../../../core/state/GameState.js';
+import type { GameState } from '../../../core/state/GameState.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
@@ -23,7 +23,7 @@ export function requireGame(ctx: MiningContext): string | null {
  * Shared preamble for every *Command function that requires an active
  * game and then dispatches on a subcommand (args[0]) — the no-game-loaded
  * guard and the subcommand extraction were duplicated identically across
- * drillPlanCommand, sequenceCommand, blastPlanCommand, tubingCommand, and
+ * drillPlanCommand, blastPlanCommand, tubingCommand, and
  * surveyCommand (#790). Returns the CommandResult to return immediately
  * on failure, or the extracted subcommand to continue with.
  */
@@ -41,7 +41,7 @@ export function requireGameWithSub(
  * id: the exact id if it already names a real hole, otherwise the legacy
  * `hole_N` fallback format. `includePlanned` controls whether an ordered-
  * but-not-yet-drilled hole counts as "real" for this purpose — drill_plan
- * remove and charge must see planned holes; sequence set and tubing install
+ * remove and charge must see planned holes; tubing install
  * must not, since they only ever act on an already-drilled hole (#634).
  */
 export function resolveHoleId(
@@ -57,29 +57,14 @@ export function resolveHoleId(
     : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
 }
 
-/** The outstanding `charge_hole` PendingAction for `holeId`, if any. */
-export function findOutstandingChargeAction(state: GameState, holeId: string): PendingAction | undefined {
-  return state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
-}
-
 /**
- * Cancel the outstanding `charge_hole` PendingAction for `holeId`, if any
- * (#554, mirrors drill_hole's cancel-before-replace pattern). A no-op when
- * the hole has no order in flight.
- */
-export function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
-  const action = findOutstandingChargeAction(state, holeId);
-  if (action) cancelAction(state, action.id);
-}
-
-/**
- * Assemble the current drill/charge/sequence state into a BlastPlan —
+ * Assemble the current drill/charge state into a BlastPlan —
  * the same three GameState fields passed to assembleBlastPlan at every
  * call site (blastCommand, blastPlanCommand's validate, previewCommand,
  * blastPreviewCommand) (#790).
  */
 export function assembleCurrentBlastPlan(state: GameState): BlastPlan {
-  return assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+  return assembleBlastPlan(state.drillHoles, state.chargesByHole);
 }
 
 /**
@@ -123,7 +108,7 @@ export function assembleValidBlastPlan(
 
 /** Ids of drilled holes currently wet (rain-flooded); weather defaults to 'sunny' before the cycle exists. */
 export function wetHoleIdSet(ctx: MiningContext): Set<string> {
-  return wetHoleIdsFor(ctx.state!, ctx.state!.weather.current);
+  return wetHoleIdsFor(ctx.state!);
 }
 
 /** Vibration targets for the current level's villages (none when no playable area is loaded). */
@@ -152,15 +137,17 @@ export function cancelOutstandingDrillActions(state: GameState): number {
 
 /**
  * Reset every plan-scoped record: drilled holes, tubing (inventory kept),
- * charges and sequence delays. Shared by `drill_plan clear` and the
+ * charges. Shared by `drill_plan clear` and the
  * post-blast cleanup so the two cannot drift apart (#1351).
  */
 export function resetPlanState(state: GameState): void {
   state.drillHoles = [];
+  state.holeWater = {};
   clearTubing(state.tubingState);
   state.chargesByHole = {};
   state.plannedChargesByHole = {};
-  state.sequenceDelays = {};
+  state.patternCharge = null;
+  state.chargeAwaitingFunds = [];
 }
 
 /**

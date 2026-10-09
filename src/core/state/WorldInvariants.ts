@@ -299,18 +299,18 @@ function checkI7DriveLegWithoutMount(state: GameState): Violation[] {
 }
 
 /**
- * I8: a vehicle carrying `payload` must have its named fragment tracked
+ * I8: every `vehicle.cargo` item must name a fragment tracked
  * `in_transit` in logistics — the two are meant to move together (#1091,
- * `vehicle.payload` replaces the old payloadKg/haulingFragmentId pair). A
+ * `cargo` replaces the old payloadKg/haulingFragmentId pair). A
  * mismatch here means the fragment and cargo bookkeeping have desynced.
  */
 function checkI8PayloadNotInTransit(state: GameState): Violation[] {
   const violations: Violation[] = [];
   for (const v of state.vehicles.vehicles) {
-    if (v.payload === null) continue;
-    const tracked = findInTransitFragment(state.logistics, v.payload.fragmentId);
-    if (!tracked) {
-      violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: v.payload.fragmentId });
+    for (const item of v.cargo) {
+      if (!findInTransitFragment(state.logistics, item.fragmentId)) {
+        violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: item.fragmentId });
+      }
     }
   }
   return violations;
@@ -319,7 +319,7 @@ function checkI8PayloadNotInTransit(state: GameState): Violation[] {
 /**
  * Violation kinds severe enough to abort the tick outright rather than
  * merely being collected and reported (#1091, #1115). I8: a desynced
- * payload/logistics pairing corrupts every later tick that computes against
+ * cargo/logistics pairing corrupts every later tick that computes against
  * it. I4/I5 (#1115): a vehicle moved with no occupant, or a reservation with
  * no valid holder, means the mount/reservation bookkeeping has already
  * desynced from the itinerary that is supposed to drive it — every later

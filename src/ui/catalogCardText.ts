@@ -16,7 +16,7 @@ export const BUILDING_CAPACITY_UNIT_KEY: Record<BuildingType, string | null> = {
   living_quarters: 'ui.build.unit.beds',
   explosive_warehouse: 'ui.build.unit.kg',
   freight_warehouse: 'ui.build.unit.kg',
-  vehicle_depot: 'ui.build.unit.vehicles',
+  spoil_heap: null,
 };
 
 /** i18n key of the work-capacity unit for roles whose capacity is not a kg payload. */

@@ -13,6 +13,9 @@ const CSS = `
   z-index: 100;
 }
 .bs-ui * { box-sizing: border-box; }
+/* #bs-ui-root is click-through; its direct children opt back in. Zero specificity so
+   any pointer-events:none on a child (class or inline) still wins. */
+:where(#bs-ui-root) > :where(*) { pointer-events: auto; }
 
 /* ─── Panel base ─── */
 .bs-panel {
@@ -441,11 +444,11 @@ const CSS = `
   color: var(--bsx-text-primary);
 }
 /* ─── Placement parameter strip (redesign P3) ───
-   Bottom-docked like the tutorial coach card above, so a guided step that
+   Bottom-docked like the tutorial coach card above, so a step that
    arms the placement tool needs the strip pushed clear of the card instead
    of sitting behind it — same screen edge, same z-stack region. */
 #bs-param-strip { bottom: 18px; }
-body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
+body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
 /* Overrides the shared .bs-panel-title (uppercase, gold, bordered) — the
    coach card's title sits inline with the CLOCK HELD chip and step counter
    instead of owning its own bordered header row. */
@@ -532,6 +535,15 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
 }
 .bs-tutorial-stage {
   font: 600 11px/1.4 var(--bsx-font-ui);
+}
+/* HUD modifier chips (#1414) float over the 3D scene, so the warn tint alone
+   washes out on light terrain: opaque panel backing under the tint, 11px text. */
+.bsx-chip.bs-modifier-chip {
+  padding: 5px 10px;
+  font: 700 11px/1 var(--bsx-font-ui);
+  letter-spacing: .04em;
+  background: linear-gradient(rgba(255,176,46,.18), rgba(255,176,46,.18)), var(--bsx-panel);
+  border: 1px solid rgba(255,176,46,.45);
 }
 /* Shared pill-chip shape for the title-row status chips (CLOCK HELD, IN
    PROGRESS). Modifiers below carry only the color that distinguishes them. */

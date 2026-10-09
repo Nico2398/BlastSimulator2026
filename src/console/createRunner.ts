@@ -16,7 +16,6 @@ import {
   type MiningContext,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
   blastPlanCommand,
   previewCommand,
@@ -27,6 +26,7 @@ import {
   levelGroundCommand,
   weatherCommand,
   tubingCommand,
+  drainHoleCommand,
   surveyCommand,
 } from './commands/mining.js';
 import {
@@ -114,17 +114,6 @@ const META_EVENT_SUBCOMMANDS = ['status', 'dismiss'] as const;
  * that interaction mode never got for the identical no-op moment. Fixed by
  * only counting `event choose` when it actually resolved an event.
  */
-/**
- * Stamps ctx.tutorialActive from the tutorial overlay's current state. Must
- * be called before a command dispatches, not after: the tutorial-only blast
- * refusal (blastCommand, mining/blast.ts) reads ctx.tutorialActive during
- * runCommand itself — setting it only in a post-command UI sync would always
- * be one command too late (#557).
- */
-export function syncTutorialActive(ctx: MiningContext, isActive: boolean): void {
-  ctx.tutorialActive = isActive;
-}
-
 export function runCommand(engine: RunnerWithContext, cmd: string): CommandResult {
   const result = engine.runner.run(cmd);
   const parsed = parseCommand(cmd);
@@ -199,9 +188,6 @@ export function createRunner(): RunnerWithContext {
   runner.register('charge', 'Set charges (hole:* explosive:X amount:Ykg stemming:Zm)', (args, named) =>
     chargeCommand(ctx, args, named),
   );
-  runner.register('sequence', 'Detonation sequence (auto|set|show)', (args, named) =>
-    sequenceCommand(ctx, args, named),
-  );
   runner.register('blast', 'Execute the current blast plan', (args, named) =>
     blastCommand(ctx, args, named),
   );
@@ -232,6 +218,9 @@ export function createRunner(): RunnerWithContext {
   runner.register('buy', 'Buy items (tubing amount:10)', (_args, named) =>
     tubingCommand(ctx, ['buy'], named),
   );
+  runner.register('drain_hole', 'Drain water from a hole (hole:3 or hole:*)', (args, named) =>
+    drainHoleCommand(ctx, args, named),
+  );
   runner.register('install_tubing', 'Install tubing on a hole (hole:3)', (_args, named) =>
     tubingCommand(ctx, ['install'], named),
   );
@@ -254,7 +243,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('build', 'Place/manage buildings (list|destroy|upgrade|move|types|<type> at:x,z)', (args, named) =>
     buildCommand(ctx, args, named),
   );
-  runner.register('vehicle', 'Manage vehicles (list|buy|reposition|driver|haul|scrap|break)', (args, named) =>
+  runner.register('vehicle', 'Manage vehicles (list|buy|upgrade|reposition|driver|haul|scrap|break)', (args, named) =>
     vehicleCommand(ctx, args, named),
   );
   runner.register('employee', 'Manage employees (list|hire|raise|fire|assign_skill|dispatch|train|cancel)', (args, named) =>
@@ -269,7 +258,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('needs', 'Show all employees need gauges (fatigue)', (args, named) =>
     needsCommand(ctx, args, named),
   );
-  runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous|custom [fatigue:N])', (args, named) =>
+  runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous [fatigue:N])', (args, named) =>
     setPolicyCommand(ctx, args, named),
   );
   runner.register('research', 'Research Center tasks (queue type:<BuildingType> tier:2|3|status)', (args, named) =>

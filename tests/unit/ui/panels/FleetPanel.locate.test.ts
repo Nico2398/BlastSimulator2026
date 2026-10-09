@@ -16,7 +16,7 @@ describe('FleetPanel — Locate button (#1422)', () => {
     document.body.appendChild(container);
     const panel = new FleetPanel(container);
     const state = createGame({ seed: 1, mineType: 'desert' });
-    state.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', tier: 1, x: 7, z: 9, hp: 100, payload: null, occupantIds: [] }];
+    state.vehicles.vehicles = [{ id: 1, type: 'debris_hauler', tier: 1, x: 7, z: 9, hp: 100, cargo: [], occupantIds: [] }];
     state.vehicles.nextId = 2;
     panel.update(state);
 

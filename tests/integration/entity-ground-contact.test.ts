@@ -195,7 +195,6 @@ describe('every rendered entity rests on the terrain sampler through the real sy
     driveToCompletion(engine, 300, () => engine.ctx.state!.plannedDrillHoles.length > 0);
     expect(runCommand(engine, 'charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     driveToCompletion(engine, 300, () => Object.keys(engine.ctx.state!.plannedChargesByHole).length > 0);
-    expect(runCommand(engine, 'sequence auto delay_step:25').success).toBe(true);
     const blastResult = runCommand(engine, 'blast');
     expect(blastResult.success).toBe(true);
     expect(engine.ctx.state!.lastBlastReport!.clearedVoxels).toBeGreaterThan(0);

@@ -16,7 +16,6 @@ explosive_warehouse Fort Kaboom: crenellated castle, four cone-roofed towers, mo
                     warning flags, searchlight, and a giant lit bomb on the keep.
 freight_warehouse   Hoarder's Paradise: warehouse buried under crate towers (some gold), containers, a gantry
                     crane still adding more, MORE sign, conveyor loop, forklift, a leaning stack.
-vehicle_depot       Mecha Hangar: sci-fi hangar with half-open blast doors revealing a mech, cyan light
                     strips, twin gantries, warning beacons, jet vent, pad number 01, landing-strip lights.
 """
 from __future__ import annotations
@@ -1022,107 +1021,6 @@ def build_freight_warehouse(sx, sz, ex, xx, m):
     pivot('Body', (0, 0, 0), _all_meshes())
 
 
-def build_vehicle_depot(sx, sz, ex, xx, m):
-    """Mecha Hangar."""
-    P = []
-    P.append(B.plinth(sx, sz, m))
-    wsx, wsy = sx - 0.12, sz - 0.12
-    wh = 3.4
-    z0 = 0.12
-    front = wsy / 2
-    P.append(_bx('Floor', (wsx - 0.2, wsy - 0.2, 0.06), (0, 0, z0 + 0.03), m['dark'], r=0))
-    # Walls: back, sides, and a front split by the bay opening.
-    P.append(B.block('WallBack', wsx, 0.28, wh, z0, m, loc_xy=(0, -front + 0.14), radius=0.06))
-    for s in (-1, 1):
-        P.append(B.block('WallSide', 0.28, wsy, wh, z0, m, loc_xy=(s * (wsx / 2 - 0.14), 0), radius=0.06))
-    ow = 3.4
-    ph = (wsx - ow) / 2
-    for s in (-1, 1):
-        P.append(B.block('WallFront', ph, 0.28, wh, z0, m, loc_xy=(s * (ow / 2 + ph / 2), front - 0.14), radius=0.06))
-    P.append(B.block('Lintel', ow + 0.2, 0.28, 0.75, z0 + 2.65, m, loc_xy=(0, front - 0.14), radius=0.05))
-    P.append(_bx('Lintel.Stripe', (ow + 0.2, 0.05, 0.14), (0, front + 0.02, z0 + 2.72), m['stripe_y'], r=0))
-    P += _letters('Pad', '01', 0, front + 0.03, z0 + 2.9, 0.42, m['white'], thick=0.05)
-    P += B.door('Entry', ex, front, z0 + 0.02, m, m['entry'], width=0.55, height=1.1)
-    P += B.door('Exit', xx, front, z0 + 0.02, m, m['exit'], width=0.55, height=1.1)
-    # Blast doors, half open, hazard-striped.
-    for s in (-1, 1):
-        dx = s * (ow / 2 - 0.55)
-        P.append(_bx('BlastDoor', (1.1, 0.14, 2.62), (dx, front + 0.1, z0 + 1.33), m['steel'], r=0.03))
-        for i in range(3):
-            P.append(_bx('BlastDoor.Stripe', (0.14, 0.03, 1.1), (dx - 0.35 + i * 0.35, front + 0.18, z0 + 0.7), m['stripe_y'], r=0, rot=(0, 40, 0)))
-        P.append(_bx('BlastDoor.Bar', (1.0, 0.05, 0.1), (dx, front + 0.18, z0 + 2.0), m['dark'], r=0.01))
-        P.append(_bx('BlastDoor.Bar2', (1.0, 0.05, 0.1), (dx, front + 0.18, z0 + 1.6), m['dark'], r=0.01))
-    # Rails the doors slide on.
-    P.append(_bx('Door.Rail', (ow + 1.0, 0.06, 0.06), (0, front + 0.12, z0 + 2.66), m['dark'], r=0))
-    # The mech inside, one arm reaching out through the gap.
-    my = -0.55
-    P.append(_bx('Mech.Torso', (1.6, 0.9, 1.3), (0, my, z0 + 1.45), m['dark'], r=0.12, seg=3))
-    P.append(_bx('Mech.Chest', (0.9, 0.12, 0.7), (0, my + 0.5, z0 + 1.55), m['chrome'], r=0.04))
-    P.append(_sp('Mech.Core', 0.15, (0, my + 0.58, z0 + 1.55), m['glow_cyan'], segments=12, rings=6))
-    P.append(_bx('Mech.Head', (0.6, 0.55, 0.5), (0, my, z0 + 2.35), m['steel'], r=0.06))
-    P.append(_bx('Mech.Visor', (0.44, 0.05, 0.14), (0, my + 0.28, z0 + 2.4), m['glow_cyan'], r=0))
-    for s in (-1, 1):
-        P.append(_sp('Mech.Shoulder', 0.42, (s * 1.0, my, z0 + 2.05), m['steel'], segments=16, rings=8))
-        P.append(_bx('Mech.Leg', (0.5, 0.6, 0.95), (s * 0.45, my, z0 + 0.5), m['steel'], r=0.06))
-        P.append(_bx('Mech.Foot', (0.6, 0.75, 0.2), (s * 0.45, my + 0.1, z0 + 0.1), m['dark'], r=0.04))
-    elbow = Vector((0.75, 0.55, z0 + 1.55))
-    hand = Vector((0.55, front + 0.55, z0 + 1.0))
-    P.append(_rod('Mech.UpperArm', (1.0, my, z0 + 2.05), elbow, 0.17, m['steel'], segments=12))
-    P.append(_sp('Mech.Elbow', 0.22, elbow, m['dark'], segments=12, rings=6))
-    P.append(_rod('Mech.Forearm', elbow, hand, 0.16, m['steel'], segments=12))
-    P.append(_sp('Mech.Wrist', 0.2, hand, m['dark'], segments=12, rings=6))
-    for a in (-40, 0, 40):
-        r = math.radians(a)
-        P.append(_bx('Mech.Claw', (0.08, 0.36, 0.1), (hand.x + 0.2 * math.sin(r), hand.y + 0.18, hand.z - 0.25 * math.cos(r) + 0.05), m['dark'], r=0.01, rot=(0, a, 0)))
-    # Chamfered roof with cyan light strips.
-    rz = z0 + wh
-    roof = prism('Roof', [(-front - 0.12, 0), (front + 0.12, 0), (front + 0.12, 0.22), (front - 0.85, 0.95), (-front + 0.85, 0.95), (-front - 0.12, 0.22)],
-                 wsx + 0.24, loc=(0, 0, rz), axis='X')
-    bevel(roof, 0.04, 3)
-    assign(roof, m['roof'])
-    P.append(roof)
-    for y, z in ((front - 0.85, 0.96), (-front + 0.85, 0.96), (front + 0.1, 0.24), (-front - 0.1, 0.24)):
-        P.append(_bx('Roof.Strip', (wsx, 0.07, 0.07), (0, y, rz + z), m['glow_cyan'], r=0))
-    for s in (-1, 1):
-        P.append(_bx('Roof.Strip', (0.07, 2 * front, 0.07), (s * (wsx / 2 + 0.08), 0, rz + 0.24), m['glow_cyan'], r=0))
-    P.append(_bx('Roof.Deck', (wsx - 1.0, 2 * front - 1.9, 0.05), (0, 0, rz + 0.95), m['dark'], r=0))
-    # "01" flat on the roof deck.
-    zero = _to('Deck.Zero', 0.32, 0.09, (-0.5, 0.2, rz + 0.98), m['white'], ms=20, ns=6)
-    zero.scale = (1.0, 1.4, 0.3)
-    P.append(zero)
-    P.append(_bx('Deck.One', (0.16, 0.85, 0.05), (0.35, 0.2, rz + 0.99), m['white'], r=0))
-    P.append(_bx('Deck.OneFoot', (0.16, 0.3, 0.05), (0.2, 0.55, rz + 0.99), m['white'], r=0, rot=(0, 0, 40)))
-    # Twin gantry cranes over the roof.
-    for x in (-1.7, 1.7):
-        for s in (-1, 1):
-            P.append(_bx('Gantry.Leg', (0.18, 0.18, 2.3), (x, s * 1.55, rz + 0.3 + 1.15), m['orange'], r=0.02))
-        P.append(_bx('Gantry.Beam', (0.2, 3.5, 0.2), (x, 0, rz + 2.65), m['orange'], r=0.03))
-        P.append(_bx('Gantry.Trolley', (0.34, 0.4, 0.22), (x, 0.4 * (1 if x > 0 else -1), rz + 2.45), m['dark'], r=0.03))
-        P.append(_cy('Gantry.Cable', 0.02, 0.7, (x, 0.4 * (1 if x > 0 else -1), rz + 2.0), m['dark'], segments=6))
-        P.append(_cy('Gantry.Hook', 0.06, 0.12, (x, 0.4 * (1 if x > 0 else -1), rz + 1.6), m['steel'], segments=8))
-    # Jet-engine vent on the roof, warning beacons, mast.
-    vx, vy = -2.1, -0.1
-    P.append(_cy('Vent.Housing', 0.62, 0.35, (vx, vy, rz + 1.15), m['steel'], segments=20, r=0.03))
-    P.append(_to('Vent.Ring', 0.62, 0.1, (vx, vy, rz + 1.35), m['dark'], ms=20, ns=8))
-    P.append(_cy('Vent.Hub', 0.24, 0.45, (vx, vy, rz + 1.45), m['chrome'], segments=12, radius2=0.05))
-    for i in range(6):
-        P.append(_bx('Vent.Blade', (0.46, 0.09, 0.02), (vx + 0.32 * math.cos(math.radians(i * 60)), vy + 0.32 * math.sin(math.radians(i * 60)), rz + 1.34),
-                     m['dark'], r=0, rot=(0, 30, i * 60)))
-    for s in (-1, 1):
-        P.append(_cy('Beacon.Base', 0.11, 0.2, (s * (wsx / 2 - 0.25), front - 0.25, rz + 0.32), m['dark'], segments=10))
-        P.append(_sp('Beacon', 0.13, (s * (wsx / 2 - 0.25), front - 0.25, rz + 0.45), m['glow_orange'], segments=12, rings=6))
-    P.append(_cy('Mast', 0.05, 3.2, (2.3, -1.4, rz + 0.5 + 1.6), m['chrome'], segments=8))
-    P.append(_sp('Mast.Light', 0.1, (2.3, -1.4, rz + 3.72), m['glow_red'], segments=10, rings=5))
-    P.append(_to('Mast.Ring', 0.2, 0.025, (2.3, -1.4, rz + 3.0), m['chrome'], ms=16, ns=6))
-    # Landing-strip lights leading to the bay.
-    for s in (-1, 1):
-        for i in range(4):
-            P.append(_cy('Strip.Light', 0.06, 0.06, (s * 1.3, front + 0.25 + i * 0.18, 0.03), m['glow_white'], segments=8))
-    P.append(_bx('Strip.Chevron', (0.9, 0.12, 0.02), (-0.4, front + 0.5, 0.01), m['stripe_y'], r=0, rot=(0, 0, 25)))
-    P.append(_bx('Strip.Chevron2', (0.9, 0.12, 0.02), (0.4, front + 0.5, 0.01), m['stripe_y'], r=0, rot=(0, 0, -25)))
-    pivot('Body', (0, 0, 0), _all_meshes())
-
-
 BUILDERS = {
     'driving_center': build_driving_center,
     'blasting_academy': build_blasting_academy,
@@ -1132,7 +1030,6 @@ BUILDERS = {
     'living_quarters': build_living_quarters,
     'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
-    'vehicle_depot': build_vehicle_depot,
 }
 
 

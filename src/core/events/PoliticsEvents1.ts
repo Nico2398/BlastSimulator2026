@@ -2,6 +2,31 @@
 // Satirical geopolitics, regulations, and capitalism critique in open-pit mining.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import {
+  EVENT_BOOM_PRICE_PCT,
+  EVENT_BRIEF_STOP_HOURS,
+  EVENT_DRAG_HOURS,
+  EVENT_DRAG_WORK_PCT,
+  EVENT_EXPLOSIVE_DISCOUNT_PCT,
+  EVENT_EXPLOSIVE_SURCHARGE_DAYS,
+  EVENT_EXPLOSIVE_SURCHARGE_PCT,
+  EVENT_INSPECTION_BAN_HOURS,
+  EVENT_PAYCUT_SALARY_PCT,
+  EVENT_RAISE_DAYS,
+  EVENT_RAISE_SALARY_PCT,
+  EVENT_RETAINER_DAYS,
+  EVENT_RETAINER_PER_DAY,
+  EVENT_SCRUTINY_DAYS,
+  EVENT_SCRUTINY_WEIGHT_FACTOR,
+  EVENT_SETTLEMENT_DAYS,
+  EVENT_SETTLEMENT_PER_DAY,
+  EVENT_SULK_HOURS,
+  EVENT_SULK_MORALE_PER_HOUR,
+  EVENT_TARIFF_DAYS,
+  EVENT_TARIFF_PRICE_PCT,
+  EVENT_UPKEEP_DISCOUNT_DAYS,
+  EVENT_UPKEEP_DISCOUNT_PCT,
+} from '../config/balance.js';
 
 export const POLITICS_EVENTS_1: EventDef[] = [
   // 1 — Republic of Boomistan embargoes explosives
@@ -9,9 +34,16 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.2 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 30,
     options: [
-      { cashDelta: -40000, scoreDelta: { ecology: 3 }, effectTag: 'embargo_stockpile' },
-      { cashDelta: -5000, corruptionDelta: 20, effectTag: 'embargo_black_market' },
-      { cashDelta: -15000, scoreDelta: { ecology: 8 }, effectTag: 'embargo_alt_explosives' },
+      { cashDelta: -40000, scoreDelta: { ecology: 3 }, effectTag: 'embargo_stockpile',
+        effects: [
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_DISCOUNT_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
+        ] },
+      { cashDelta: -5000, corruptionDelta: 20, effectTag: 'embargo_black_market',
+        effects: [
+          { type: 'event_weight', category: 'mafia', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
+      { cashDelta: -15000, scoreDelta: { ecology: 8 }, effectTag: 'embargo_alt_explosives',
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
     ],
   }),
   // 2 — "Rocks Have Feelings Too" eco-blockade
@@ -19,8 +51,11 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.5 + 2 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.scores.ecology < 40,
     options: [
-      { cashDelta: -20000, scoreDelta: { ecology: 15, nuisance: -5 } },
-      { cashDelta: 0, scoreDelta: { ecology: -10, nuisance: 12 }, effectTag: 'bulldoze_protesters' },
+      { cashDelta: -20000, scoreDelta: { ecology: 15, nuisance: 5 } },
+      { cashDelta: 0, scoreDelta: { ecology: -10, nuisance: -12 }, effectTag: 'bulldoze_protesters',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -8000, scoreDelta: { ecology: 8 }, effectTag: 'pr_campaign' },
     ],
   }),
@@ -30,8 +65,12 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.tickCount > 50,
     options: [
       { cashDelta: -50000, scoreDelta: { ecology: 2 } },
-      { cashDelta: -10000, corruptionDelta: 25, effectTag: 'creative_bookkeeping' },
-      { cashDelta: -30000, corruptionDelta: 5, effectTag: 'partial_disclosure' },
+      { cashDelta: -10000, corruptionDelta: 25, effectTag: 'creative_bookkeeping',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
+      { cashDelta: -30000, corruptionDelta: 5, effectTag: 'partial_disclosure',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_SETTLEMENT_PER_DAY, days: EVENT_SETTLEMENT_DAYS }] },
     ],
   }),
   // 4 — MegaBlast Corp opens nearby mine
@@ -40,16 +79,22 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.tickCount > 100,
     options: [
       { cashDelta: -25000, effectTag: 'price_war' },
-      { cashDelta: -5000, corruptionDelta: 15, effectTag: 'sabotage_competitor' },
-      { cashDelta: -15000, scoreDelta: { wellBeing: 5 }, effectTag: 'poach_their_workers' },
+      { cashDelta: -5000, corruptionDelta: 15, effectTag: 'sabotage_competitor',
+        effects: [
+          { type: 'event_weight', category: 'mafia', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
+      { cashDelta: -15000, scoreDelta: { wellBeing: 5 }, effectTag: 'poach_their_workers',
+        effects: [{ type: 'employee_joins' }] },
     ],
   }),
   // 5 — Minister of Mines visiting
   ev('politics_minister_visit', 'politics', {
     weight: (s) => 1.0 + 0.8 * r.sf(s),
     options: [
-      { cashDelta: -30000, scoreDelta: { safety: 10, ecology: 5 }, effectTag: 'red_carpet' },
-      { cashDelta: 0, scoreDelta: { safety: -8 }, effectTag: 'honest_tour' },
+      { cashDelta: -30000, scoreDelta: { safety: 10, ecology: 5 }, effectTag: 'red_carpet',
+        effects: [{ type: 'special_contract' }] },
+      { cashDelta: 0, scoreDelta: { safety: -8 }, effectTag: 'honest_tour',
+        effects: [{ type: 'contract_price', pct: EVENT_TARIFF_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: -5000, corruptionDelta: 15, scoreDelta: { safety: 5 }, effectTag: 'potemkin_mine' },
     ],
   }),
@@ -59,8 +104,13 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.activeContractCount > 0,
     options: [
       { cashDelta: -35000, effectTag: 'honor_contracts_loss' },
-      { cashDelta: -10000, corruptionDelta: 10, effectTag: 'renegotiate_shady' },
-      { cashDelta: -20000, scoreDelta: { wellBeing: -8 }, effectTag: 'layoffs' },
+      { cashDelta: -10000, corruptionDelta: 10, effectTag: 'renegotiate_shady',
+        effects: [{ type: 'cancel_contract', penalty: false }] },
+      { cashDelta: -20000, scoreDelta: { wellBeing: -8 }, effectTag: 'layoffs',
+        effects: [
+          { type: 'employee_leaves', pick: 'random' },
+          { type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS },
+        ] },
     ],
   }),
   // 7 — New regulation bans favorite explosive
@@ -69,17 +119,26 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.scores.ecology < 50,
     options: [
       { cashDelta: -25000, scoreDelta: { ecology: 12 }, effectTag: 'comply_new_explosive' },
-      { cashDelta: -5000, corruptionDelta: 20, effectTag: 'ignore_regulation' },
-      { cashDelta: -15000, scoreDelta: { ecology: 6 }, effectTag: 'lobby_exemption' },
+      { cashDelta: -5000, corruptionDelta: 20, effectTag: 'ignore_regulation',
+        effects: [{ type: 'ban', what: 'blast', hours: EVENT_INSPECTION_BAN_HOURS }] },
+      { cashDelta: -15000, scoreDelta: { ecology: 6 }, effectTag: 'lobby_exemption',
+        effects: [
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_SURCHARGE_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
+        ] },
     ],
   }),
   // 8 — Neighboring country declares mining a human right
   ev('politics_mining_human_right', 'politics', {
     weight: (s) => 0.8 + 0.4 * r.wb(s),
     options: [
-      { cashDelta: 15000, scoreDelta: { wellBeing: -5 }, effectTag: 'cheap_labor_influx' },
+      { cashDelta: 15000, scoreDelta: { wellBeing: -5 }, effectTag: 'cheap_labor_influx',
+        effects: [
+          { type: 'employee_joins' },
+          { type: 'salary', pct: EVENT_PAYCUT_SALARY_PCT, days: EVENT_RAISE_DAYS },
+        ] },
       { cashDelta: 0, scoreDelta: { wellBeing: 5 }, effectTag: 'ignore_border' },
-      { cashDelta: -10000, scoreDelta: { wellBeing: 8 }, effectTag: 'hire_immigrants_fairly' },
+      { cashDelta: -10000, scoreDelta: { wellBeing: 8 }, effectTag: 'hire_immigrants_fairly',
+        effects: [{ type: 'employee_joins' }, { type: 'salary', pct: EVENT_RAISE_SALARY_PCT, days: EVENT_RAISE_DAYS }] },
     ],
   }),
   // 9 — Reality TV show wants to film at mine
@@ -87,16 +146,19 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.5 * r.sf(s),
     canFire: (ctx) => ctx.employeeCount > 5,
     options: [
-      { cashDelta: 20000, scoreDelta: { nuisance: 15, safety: -8 }, effectTag: 'cameras_rolling' },
-      { cashDelta: 0, scoreDelta: { nuisance: -3 } },
-      { cashDelta: 10000, scoreDelta: { nuisance: 8, safety: -3 }, effectTag: 'controlled_filming' },
+      { cashDelta: 20000, scoreDelta: { nuisance: -15, safety: -8 }, effectTag: 'cameras_rolling' },
+      { cashDelta: 0, scoreDelta: { nuisance: 3 } },
+      { cashDelta: 10000, scoreDelta: { nuisance: -8, safety: -3 }, effectTag: 'controlled_filming' },
     ],
   }),
   // 10 — Government subsidy available (with strings)
   ev('politics_gov_subsidy', 'politics', {
     weight: (s) => 1.0 + 0.7 * (1 - r.ec(s)),
     options: [
-      { cashDelta: 50000, scoreDelta: { ecology: -15 }, effectTag: 'subsidy_no_eco_rules' },
+      { cashDelta: 50000, scoreDelta: { ecology: -15 }, effectTag: 'subsidy_no_eco_rules',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: 20000, scoreDelta: { ecology: 5 }, effectTag: 'subsidy_green_strings' },
       { cashDelta: 0, scoreDelta: { ecology: 3 } },
     ],
@@ -106,9 +168,18 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 40,
     options: [
-      { cashDelta: -30000, effectTag: 'tariff_stockpile' },
-      { cashDelta: -8000, corruptionDelta: 12, effectTag: 'smuggle_route' },
-      { cashDelta: -18000, scoreDelta: { ecology: 5 }, effectTag: 'domestic_supplier' },
+      { cashDelta: -30000, effectTag: 'tariff_stockpile',
+        effects: [
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_DISCOUNT_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
+        ] },
+      { cashDelta: -8000, corruptionDelta: 12, effectTag: 'smuggle_route',
+        effects: [
+          { type: 'event_weight', category: 'mafia', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
+      { cashDelta: -18000, scoreDelta: { ecology: 5 }, effectTag: 'domestic_supplier',
+        effects: [
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_SURCHARGE_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
+        ] },
     ],
   }),
   // 12 — Mining lobbyist offers "partnership"
@@ -116,7 +187,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 1.2 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.corruptionLevel < 60,
     options: [
-      { cashDelta: 30000, corruptionDelta: 30, effectTag: 'lobbyist_deal' },
+      { cashDelta: 30000, corruptionDelta: 30, effectTag: 'lobbyist_deal',
+        effects: [
+          { type: 'event_weight', category: 'politics', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: 0, scoreDelta: { ecology: 5 } },
       { cashDelta: 10000, corruptionDelta: 10, effectTag: 'lobbyist_small_favor' },
     ],
@@ -126,7 +200,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.1 + 0.5 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 60,
     options: [
-      { cashDelta: -20000, corruptionDelta: 20, effectTag: 'fund_pro_mining' },
+      { cashDelta: -20000, corruptionDelta: 20, effectTag: 'fund_pro_mining',
+        effects: [{ type: 'contract_price', pct: EVENT_BOOM_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: -10000, scoreDelta: { ecology: 10 }, effectTag: 'fund_anti_mining' },
       { cashDelta: 0, scoreDelta: { ecology: -5 }, probability: 0.5,
         alt: { scoreDelta: { ecology: 8 } } },
@@ -139,7 +214,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -25000, scoreDelta: { safety: 8 }, effectTag: 'impress_delegation',
         probability: 0.7, alt: { cashDelta: -25000, scoreDelta: { safety: 3 } } },
-      { cashDelta: -5000, scoreDelta: { safety: -5 }, effectTag: 'rush_tour' },
+      { cashDelta: -5000, scoreDelta: { safety: -5 }, effectTag: 'rush_tour',
+        effects: [{ type: 'contract_price', pct: EVENT_TARIFF_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: -15000, corruptionDelta: 10, effectTag: 'bribe_delegation' },
     ],
   }),
@@ -149,7 +225,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.scores.ecology < 45,
     options: [
       { cashDelta: -30000, corruptionDelta: 25, effectTag: 'fund_opponent' },
-      { cashDelta: -20000, scoreDelta: { ecology: 12, nuisance: -8 }, effectTag: 'go_green_pr' },
+      { cashDelta: -20000, scoreDelta: { ecology: 12, nuisance: 8 }, effectTag: 'go_green_pr' },
       { cashDelta: 0, scoreDelta: { ecology: -10 }, followUp: 'politics_mayor_wins' },
     ],
   }),
@@ -157,7 +233,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
   ev('politics_celebrity', 'politics', {
     weight: (s) => 0.7 + 0.4 * r.wb(s),
     options: [
-      { cashDelta: -35000, scoreDelta: { wellBeing: 10, nuisance: 8 }, effectTag: 'celeb_endorsed' },
+      { cashDelta: -35000, scoreDelta: { wellBeing: 10, nuisance: -8 }, effectTag: 'celeb_endorsed',
+        effects: [{ type: 'contract_price', pct: EVENT_BOOM_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: 0 },
       { cashDelta: -15000, scoreDelta: { wellBeing: 5 }, effectTag: 'celeb_social_media' },
     ],
@@ -170,7 +247,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
       { cashDelta: -10000, scoreDelta: { wellBeing: 8, safety: 5 }, effectTag: 'attend_awards',
         probability: 0.4, alt: { cashDelta: -10000, scoreDelta: { wellBeing: 3 } } },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
-      { cashDelta: -5000, corruptionDelta: 15, effectTag: 'rig_awards' },
+      { cashDelta: -5000, corruptionDelta: 15, effectTag: 'rig_awards',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
     ],
   }),
   // 18 — Competitor caught in scandal
@@ -178,9 +258,13 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.4 * r.ec(s),
     canFire: (ctx) => ctx.tickCount > 70,
     options: [
-      { cashDelta: 25000, scoreDelta: { ecology: -8 }, effectTag: 'poach_contracts' },
+      { cashDelta: 25000, scoreDelta: { ecology: -8 }, effectTag: 'poach_contracts',
+        effects: [{ type: 'special_contract' }] },
       { cashDelta: 0, scoreDelta: { ecology: 5 }, effectTag: 'stay_clean' },
-      { cashDelta: 10000, corruptionDelta: 10, effectTag: 'leak_more_dirt' },
+      { cashDelta: 10000, corruptionDelta: 10, effectTag: 'leak_more_dirt',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
     ],
   }),
   // 19 — International mining safety summit
@@ -189,7 +273,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.tickCount > 50,
     options: [
       { cashDelta: -15000, scoreDelta: { safety: 12 }, effectTag: 'attend_summit' },
-      { cashDelta: 0, scoreDelta: { safety: -5 } },
+      { cashDelta: 0, scoreDelta: { safety: -5 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -8000, scoreDelta: { safety: 6 }, effectTag: 'send_delegate' },
     ],
   }),
@@ -198,8 +283,14 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 0.6 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 35,
     options: [
-      { cashDelta: -20000, effectTag: 'pay_tariff' },
-      { cashDelta: -8000, corruptionDelta: 15, effectTag: 'tariff_loophole' },
+      { cashDelta: -20000, effectTag: 'pay_tariff',
+        effects: [
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_SURCHARGE_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
+        ] },
+      { cashDelta: -8000, corruptionDelta: 15, effectTag: 'tariff_loophole',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -30000, scoreDelta: { ecology: 8 }, effectTag: 'local_supplier_switch' },
     ],
   }),
@@ -208,7 +299,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.employeeCount > 4,
     options: [
-      { cashDelta: -5000, scoreDelta: { ecology: -10, nuisance: 10 }, effectTag: 'unfiltered_access' },
+      { cashDelta: -5000, scoreDelta: { ecology: -10, nuisance: -10 }, effectTag: 'unfiltered_access',
+        effects: [{ type: 'contract_price', pct: EVENT_TARIFF_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'curated_footage' },
       { cashDelta: 0, scoreDelta: { ecology: -5 }, effectTag: 'ban_cameras' },
     ],
@@ -220,7 +312,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -40000, scoreDelta: { ecology: 10 }, effectTag: 'comply_reform' },
       { cashDelta: -15000, corruptionDelta: 20, effectTag: 'offshore_shell' },
-      { cashDelta: -25000, effectTag: 'lobby_against_reform' },
+      { cashDelta: -25000, effectTag: 'lobby_against_reform',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_RETAINER_PER_DAY, days: EVENT_RETAINER_DAYS }] },
     ],
   }),
   // 23 — Activist investor buys stake
@@ -228,7 +321,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 1.0 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 60,
     options: [
-      { cashDelta: 20000, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'green_reforms' },
+      { cashDelta: 20000, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'green_reforms',
+        effects: [
+          { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS },
+        ] },
       { cashDelta: 0, corruptionDelta: 10, effectTag: 'poison_pill' },
       { cashDelta: -10000, scoreDelta: { ecology: 8 }, effectTag: 'negotiate_compromise' },
     ],
@@ -239,8 +335,12 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.tickCount > 45,
     options: [
       { cashDelta: -35000, scoreDelta: { ecology: 18, wellBeing: 10 }, effectTag: 'fair_settlement' },
-      { cashDelta: -5000, corruptionDelta: 20, scoreDelta: { ecology: -15 }, effectTag: 'legal_loophole' },
-      { cashDelta: -20000, scoreDelta: { ecology: 10, wellBeing: 5 }, effectTag: 'shared_stewardship' },
+      { cashDelta: -5000, corruptionDelta: 20, scoreDelta: { ecology: -15 }, effectTag: 'legal_loophole',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
+      { cashDelta: -20000, scoreDelta: { ecology: 10, wellBeing: 5 }, effectTag: 'shared_stewardship',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_SETTLEMENT_PER_DAY, days: EVENT_SETTLEMENT_DAYS }] },
     ],
   }),
   // 25 — Meteor heading toward the mine (rare, fantastical)
@@ -248,7 +348,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.15 + 0.1 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.tickCount > 120,
     options: [
-      { cashDelta: -50000, scoreDelta: { safety: 15 }, effectTag: 'evacuate_mine' },
+      { cashDelta: -50000, scoreDelta: { safety: 15 }, effectTag: 'evacuate_mine',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: 0, scoreDelta: { safety: -20 }, probability: 0.3,
         alt: { cashDelta: 100000, scoreDelta: { safety: -5 }, effectTag: 'meteor_rare_ore' } },
       { cashDelta: -20000, effectTag: 'blast_meteor', probability: 0.5,

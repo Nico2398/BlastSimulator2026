@@ -5,13 +5,15 @@ import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress, createCampaignState, isCampaignDone, isCampaignLevel } from '../../core/campaign/Campaign.js';
-import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
+import { addIncome, getOperatingProfit } from '../../core/economy/Finance.js';
 import { createGameForLevel, settleLevelResult } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
-import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
+import { resolveStartingSite } from '../../core/state/StartingBuildings.js';
+import { sanitizeFiniteOverride, parseOptionalStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile } from '../../persistence/CampaignProfile.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -60,10 +62,18 @@ export function campaignStatusCommand(
 // ── campaign complete (debug) ──
 
 /**
+ * Bound on shortfall top-ups. Each grant is the exact remaining gap, so the
+ * residual shrinks to rounding error (~1e-11) after one pass; a handful of
+ * passes always converges and the bound only guards against an endless loop.
+ */
+const FORCE_COMPLETE_MAX_TOP_UPS = 4;
+
+/**
  * Debug force-win. Works on the active level; with `level:<id>` it also
  * activates that level on the running game (unlocking it) so a scenario
- * started by `new_game` can still end as a real campaign win. Grants only the
- * income shortfall below the level's profit threshold, then snapshots the
+ * started by `new_game` can still end as a real campaign win. Grants the
+ * income shortfall below the level's profit threshold (topped up against
+ * float dust), then snapshots the
  * stats so `levelStats.totalWealth` (the state dump's `profit`) reads the
  * threshold rather than a stale pre-completion value.
  */
@@ -89,8 +99,12 @@ export function campaignCompleteCommand(
   const level = getLevel(levelId);
   if (!level) return { success: false, output: t('campaign.complete_unknown_level', { levelId }) };
 
-  const shortfall = level.unlockThreshold - getFinancialReport(ctx.state.finances, 0).netProfit;
-  if (shortfall > 0) {
+  // The ledger sums sequentially in floating point, so one grant can land a few
+  // ulps under the threshold (249999.99999999977 vs 250000) and read as "not
+  // met". Top up the residual until the sum reaches the threshold.
+  for (let attempt = 0; attempt < FORCE_COMPLETE_MAX_TOP_UPS; attempt++) {
+    const shortfall = level.unlockThreshold - getOperatingProfit(ctx.state.finances);
+    if (shortfall <= 0) break;
     addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
   }
   ctx.state.cash = ctx.state.finances.cash;
@@ -127,10 +141,13 @@ export function campaignStartCommand(
   // pre-hired roster and pre-purchased fleet, so a scenario that only needs
   // an ordinary staffed opening does not have to hire/license/buy/assign it
   // by hand on every campaign level.
-  const flags = parseStaffedFlag(named['staffed']);
+  const flags = parseOptionalStaffedFlag(named['staffed']);
   if (flags.error) {
     return { success: false, output: flags.error };
   }
+
+  // Absent: the level's own site. true: the global staffed roster. false: bare.
+  const startingSite = resolveStartingSite(target?.startingSite, flags.staffed);
 
   const newState = createGameForLevel(campaign, levelId, flags.staffed);
   if (!newState) {
@@ -172,11 +189,12 @@ export function campaignStartCommand(
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
     startingCrew: true,
+    ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier);
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state));
 
   // Report the cash actually in hand, not the level default — an override that
   // took effect but printed the default would be indistinguishable from one
@@ -188,7 +206,7 @@ export function campaignStartCommand(
       gridX: level.gridX,
       gridZ: level.gridZ,
       cash: ctx.state.cash.toLocaleString('en-US'),
-      staffedSuffix: staffedSuffix(flags.staffed),
+      staffedSuffix: staffedSuffix(startingSite !== undefined),
     }),
   };
 }

@@ -2,6 +2,7 @@
 // 9 canonical building types × 3 tiers. Data file — line-limit exempt.
 
 import type { BuildingDef, BuildingTier, BuildingType } from './Building.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../config/balance.js';
 
 // ── Footprint helpers ──
 
@@ -231,7 +232,7 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.freight_warehouse.t1.name',
       footprint: rect(4, 4), entryPoint: entry(), exitPoint: exit_(4),
       constructionCost: 15000, demolishCost: 4000, operatingCostPerTick: 10,
-      capacity: 2000, maxHp: 150, structuralResistance: 4000,
+      capacity: FREIGHT_WAREHOUSE_CAPACITY_KG[1], maxHp: 150, structuralResistance: 4000,
       scoreEffects: {},
     },
     2: {
@@ -239,7 +240,7 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.freight_warehouse.t2.name',
       footprint: rect(5, 4), entryPoint: entry(), exitPoint: exit_(5),
       constructionCost: 36000, demolishCost: 9000, operatingCostPerTick: 16,
-      capacity: 6000, maxHp: 220, structuralResistance: 6000,
+      capacity: FREIGHT_WAREHOUSE_CAPACITY_KG[2], maxHp: 220, structuralResistance: 6000,
       scoreEffects: {},
     },
     3: {
@@ -247,37 +248,22 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.freight_warehouse.t3.name',
       footprint: rect(6, 5), entryPoint: entry(), exitPoint: exit_(6),
       constructionCost: 72000, demolishCost: 18000, operatingCostPerTick: 24,
-      capacity: 15000, maxHp: 300, structuralResistance: 9000,
+      capacity: FREIGHT_WAREHOUSE_CAPACITY_KG[3], maxHp: 300, structuralResistance: 9000,
       scoreEffects: {},
     },
   },
 
-  // ── Vehicle Depot ───────────────────────────────────────────────────────────
-  vehicle_depot: {
+  // ── Spoil Heap (#1530) — single tier, tiers 2/3 alias tier 1 ───────────────
+  spoil_heap: {
     1: {
-      type: 'vehicle_depot', tier: 1,
-      nameKey: 'building.vehicle_depot.t1.name',
-      footprint: rect(4, 3), entryPoint: entry(), exitPoint: exit_(4),
-      constructionCost: 18000, demolishCost: 4500, operatingCostPerTick: 12,
-      capacity: 6, maxHp: 130, structuralResistance: 4000,
+      type: 'spoil_heap', tier: 1,
+      nameKey: 'building.spoil_heap.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: 2000, demolishCost: 500, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
       scoreEffects: {},
     },
-    2: {
-      type: 'vehicle_depot', tier: 2,
-      nameKey: 'building.vehicle_depot.t2.name',
-      footprint: rect(5, 3), entryPoint: entry(), exitPoint: exit_(5),
-      constructionCost: 42000, demolishCost: 10000, operatingCostPerTick: 20,
-      capacity: 12, maxHp: 200, structuralResistance: 6000,
-      scoreEffects: {},
-    },
-    3: {
-      type: 'vehicle_depot', tier: 3,
-      nameKey: 'building.vehicle_depot.t3.name',
-      footprint: rect(6, 4), entryPoint: entry(), exitPoint: exit_(6),
-      constructionCost: 85000, demolishCost: 20000, operatingCostPerTick: 30,
-      capacity: 24, maxHp: 280, structuralResistance: 9000,
-      scoreEffects: {},
-    },
+    get 2() { return BUILDING_DEFS.spoil_heap[1]; },
+    get 3() { return BUILDING_DEFS.spoil_heap[1]; },
   },
-
 };

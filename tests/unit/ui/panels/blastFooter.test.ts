@@ -6,6 +6,7 @@ import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
+import { readFileSync } from 'node:fs';
 import { Random } from '../../../../src/core/math/Random.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -23,11 +24,10 @@ function makeFooter(): { footer: BlastFooter; container: HTMLElement; fireReques
   return { footer, container, fireRequested };
 }
 
-function chargeAndSequence(state: ReturnType<typeof makeState>) {
+function chargeHole(state: ReturnType<typeof makeState>) {
   const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const chargeResult = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-  state.sequenceDelays[hole.id] = 0;
   return hole;
 }
 
@@ -91,10 +91,10 @@ describe('BlastFooter', () => {
     expect(footer.root.textContent).not.toContain('Missing charge');
   });
 
-  it('FIRE enables once every hole is charged and sequenced', () => {
+  it('FIRE enables once every hole is charged', () => {
     const { footer } = makeFooter();
     const state = makeState();
-    chargeAndSequence(state);
+    chargeHole(state);
 
     footer.update(state);
 
@@ -114,7 +114,7 @@ describe('BlastFooter', () => {
   it('clicking FIRE while enabled requests a preflight confirm, without dispatching blast itself', () => {
     const { footer, fireRequested } = makeFooter();
     const state = makeState();
-    chargeAndSequence(state);
+    chargeHole(state);
     footer.update(state);
 
     (footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).click();
@@ -128,47 +128,44 @@ describe('BlastFooter', () => {
     expect(container.contains(footer.root)).toBe(false);
   });
 
-  // #557: the tutorial teaches evacuating the blast zone before firing, so
-  // FIRE mirrors the console `blast` command's own tutorial-only refusal —
-  // a disabled control with a stated reason, not a silent no-op.
-  describe('tutorial-only zone-occupied refusal (#557)', () => {
-    it('disables FIRE with the zone-occupied reason when tutorialActive and the danger zone is occupied', () => {
+  // #1362: the tutorial refusal is gone. DETONATE arms the evacuation sequence
+  // and fires once clear, so FIRE stays enabled on an occupied zone, in the
+  // tutorial too. A stale `tutorialActive` argument must change nothing.
+  describe('occupied zone never disables FIRE (#1362)', () => {
+    type LegacyUpdate = { update(state: unknown, tutorialActive: boolean): void };
+
+    it('keeps FIRE enabled in the tutorial with an occupied danger zone, with no zone-occupied reason', () => {
       const { footer } = makeFooter();
       const state = makeState();
-      chargeAndSequence(state); // hole at (10, 10), fully charged + sequenced — otherwise fireable
-      hireEmployee(state.employees, 'driller', new Random(1), 10, 10); // standing right on the hole
+      chargeHole(state);
+      hireEmployee(state.employees, 'driller', new Random(1), 10, 10);
 
-      footer.update(state, true);
+      (footer as unknown as LegacyUpdate).update(state, true);
 
       const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
-      expect(fireBtn.disabled).toBe(true);
-      expect(footer.root.textContent).toContain('1 still in the blast zone. Evacuate before firing.');
+      expect(fireBtn.disabled).toBe(false);
+      expect(footer.root.textContent).not.toContain('still in the blast zone');
+      expect(footer.root.textContent).not.toContain('Evacuate before firing');
     });
 
     it('keeps FIRE enabled outside the tutorial even with an occupied danger zone', () => {
       const { footer } = makeFooter();
       const state = makeState();
-      chargeAndSequence(state);
+      chargeHole(state);
       hireEmployee(state.employees, 'driller', new Random(1), 10, 10);
 
-      footer.update(state, false);
+      footer.update(state);
 
       const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
       expect(fireBtn.disabled).toBe(false);
       expect(footer.root.textContent).not.toContain('still in the blast zone');
     });
 
-    it('leaves FIRE enabled during the tutorial once the danger zone is clear', () => {
-      const { footer } = makeFooter();
-      const state = makeState();
-      chargeAndSequence(state);
-      hireEmployee(state.employees, 'driller', new Random(1), 200, 200); // well outside the zone
-
-      footer.update(state, true);
-
-      const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
-      expect(fireBtn.disabled).toBe(false);
-      expect(footer.root.textContent).not.toContain('still in the blast zone');
+    it('en.json and fr.json no longer define fire_reason_zone_occupied', () => {
+      for (const l of ['en', 'fr']) {
+        const loc = JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8')) as Record<string, string>;
+        expect(loc['ui.blast_workshop.footer.fire_reason_zone_occupied']).toBeUndefined();
+      }
     });
   });
 });

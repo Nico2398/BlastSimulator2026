@@ -12,7 +12,8 @@ import { SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 const MIN_STEPS: Record<string, number> = {
   'skill-progression': 72,
   // #1339: 32 fixed tick-pad/event pairs became condition waits (roles arrive able, so pad pacing no longer holds); every cycle, blast and contract step stays.
-  'level2-playthrough-win': 156,
+  // #1344: the sequence mechanic was deleted; the 4 steps removed from this fixture were sequence-only, not coverage.
+  'level2-playthrough-win': 152,
   'level3-playthrough-win': 78,
   'level1-playthrough-revolt': 92,
 };

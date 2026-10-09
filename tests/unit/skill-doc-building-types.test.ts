@@ -6,7 +6,7 @@
 // real `BuildingType` (src/core/entities/Building.ts). The real catalog has 9
 // types: `driving_center`, `blasting_academy`, `management_office`,
 // `geology_lab`, `research_center`, `living_quarters`, `explosive_warehouse`,
-// `freight_warehouse`, `vehicle_depot`. Runtime code already maps the phantom
+// `freight_warehouse`, `vehicle_depot` (removed #1393). Runtime code already maps the phantom
 // concepts correctly (`NEED_REST_BUILDING_TYPES`, `BUILDING_REPLENISH_RATES`,
 // `NEED_REST_COSTS` in src/core/config/balance.ts all route hunger/fatigue/
 // breakNeed replenishment through `living_quarters`); this is a doc/prose

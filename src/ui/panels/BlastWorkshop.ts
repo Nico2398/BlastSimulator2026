@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Blast Workshop panel (redesign P4)
-// Replaces BlastPlanUI with a 5-step workflow (Drill → Charge → Sequence →
+// Replaces BlastPlanUI with a 4-step workflow (Drill → Charge →
 // Preview → Fire) plus a sticky footer, all built to the full design spec
 // (tasks P4/#22-26). Firing is a two-step handoff out of this panel: the
 // footer's FIRE button requests a Preflight confirm (setFireRequestedHandler,
@@ -17,22 +17,21 @@ import type { PlacementKit } from '../scene/PlacementKit.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { BlastFooter } from './blastFooter.js';
+import type { ConfirmModalConfig } from './ConfirmModal.js';
 import { DrillStep } from './blastSteps/Drill.js';
 import type { DrillHole } from '../../core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../core/mining/ExplosiveRockFit.js';
 import { ChargeStep } from './blastSteps/Charge.js';
-import { SequenceStep } from './blastSteps/Sequence.js';
 import { PreviewStep } from './blastSteps/Preview.js';
 import { FireStep } from './blastSteps/Fire.js';
 
 
-export type StepId = 1 | 2 | 3 | 4 | 5;
+export type StepId = 1 | 2 | 3 | 4;
 const STEP_KEYS: Record<StepId, string> = {
   1: 'ui.blast_workshop.step.drill',
   2: 'ui.blast_workshop.step.charge',
-  3: 'ui.blast_workshop.step.sequence',
-  4: 'ui.blast_workshop.step.preview',
-  5: 'ui.blast_workshop.step.fire',
+  3: 'ui.blast_workshop.step.preview',
+  4: 'ui.blast_workshop.step.fire',
 };
 
 export class BlastWorkshop extends PanelBase {
@@ -44,7 +43,6 @@ export class BlastWorkshop extends PanelBase {
 
   private readonly drillStep: DrillStep;
   private readonly chargeStep: ChargeStep;
-  private readonly sequenceStep: SequenceStep;
   private readonly previewStep: PreviewStep;
   private readonly fireStep: FireStep;
 
@@ -72,7 +70,7 @@ export class BlastWorkshop extends PanelBase {
     this.tabButtons = {} as Record<StepId, HTMLButtonElement>;
     this.tabNumberEls = {} as Record<StepId, HTMLElement>;
     this.tabStateEls = {} as Record<StepId, HTMLElement>;
-    for (let n = 1; n <= 5; n++) {
+    for (let n = 1; n <= 4; n++) {
       const step = n as StepId;
       const btn = el('button');
       btn.dataset['step'] = String(step);
@@ -100,7 +98,6 @@ export class BlastWorkshop extends PanelBase {
 
     this.drillStep = new DrillStep(bodyOuter);
     this.chargeStep = new ChargeStep(bodyOuter);
-    this.sequenceStep = new SequenceStep(bodyOuter);
     this.previewStep = new PreviewStep(bodyOuter);
     this.fireStep = new FireStep(bodyOuter);
 
@@ -119,9 +116,12 @@ export class BlastWorkshop extends PanelBase {
   setGameConsole(fn: GameConsoleFn): void {
     this.drillStep.setGameConsole(fn);
     this.chargeStep.setGameConsole(fn);
-    this.sequenceStep.setGameConsole(fn);
     this.previewStep.setGameConsole(fn);
-    this.fireStep.setGameConsole(fn);
+  }
+
+  /** Routes the Drill step's replace-pattern confirmation to the shared ConfirmModal (#1345). */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.drillStep.setConfirmHandler(cb);
   }
 
   /** Passes the dominant-rock-under-a-hole sampler to the Charge step (#1358). */
@@ -148,31 +148,29 @@ export class BlastWorkshop extends PanelBase {
    * can assert-or-click a tab instead of assuming it, the same "ask the
    * game, not the DOM" reasoning already applied to `pendingEvent`. This
    * panel's own `autoAdvance` (`suggestStep`, above) moves the active tab
-   * out from under a scenario mid-sequence, which is what made a scenario's
+   * out from under a scenario mid-flow, which is what made a scenario's
    * own hardcoded `[data-step="N"]` click land on the wrong tab in PR #616.
    */
   get currentStep(): StepId { return this.activeStep; }
 
-  update(state: GameState, weather?: WeatherState, tutorialActive: boolean = false): void {
+  update(state: GameState, _weather?: WeatherState): void {
     if (this.autoAdvance) {
       const suggested = suggestStep(state);
       if (suggested !== this.activeStep) this.setActiveStep(suggested, false);
     }
 
     this.renderTabs(state);
-    this.drillStep.update(state, weather);
-    this.chargeStep.update(state, weather);
-    this.sequenceStep.update(state);
+    this.drillStep.update(state);
+    this.chargeStep.update(state);
     this.previewStep.update(state);
-    this.fireStep.update(state, weather);
-    this.footer.update(state, tutorialActive);
+    this.fireStep.update(state);
+    this.footer.update(state);
   }
 
   refreshLocale(): void {
     this.locale.refresh();
     this.drillStep.refreshLocale();
     this.chargeStep.refreshLocale();
-    this.sequenceStep.refreshLocale();
     this.previewStep.refreshLocale();
     this.fireStep.refreshLocale();
     this.footer.refreshLocale();
@@ -184,7 +182,6 @@ export class BlastWorkshop extends PanelBase {
   override dispose(): void {
     this.drillStep.dispose();
     this.chargeStep.dispose();
-    this.sequenceStep.dispose();
     this.previewStep.dispose();
     this.fireStep.dispose();
     this.footer.dispose();
@@ -196,9 +193,8 @@ export class BlastWorkshop extends PanelBase {
     if (manual) this.autoAdvance = false;
     this.drillStep.root.style.display = step === 1 ? '' : 'none';
     this.chargeStep.root.style.display = step === 2 ? '' : 'none';
-    this.sequenceStep.root.style.display = step === 3 ? '' : 'none';
-    this.previewStep.root.style.display = step === 4 ? '' : 'none';
-    this.fireStep.root.style.display = step === 5 ? '' : 'none';
+    this.previewStep.root.style.display = step === 3 ? '' : 'none';
+    this.fireStep.root.style.display = step === 4 ? '' : 'none';
     this.lastTabSignature = '';
     this.bodyEl.scrollTop = 0;
   }
@@ -209,7 +205,7 @@ export class BlastWorkshop extends PanelBase {
     if (signature === this.lastTabSignature) return;
     this.lastTabSignature = signature;
 
-    for (let n = 1; n <= 5; n++) {
+    for (let n = 1; n <= 4; n++) {
       const step = n as StepId;
       const active = step === this.activeStep;
       const btn = this.tabButtons[step];
@@ -232,16 +228,14 @@ interface StepStateText { text: string; critical?: boolean }
 function stepStateTexts(state: GameState): Record<StepId, StepStateText> {
   const holes = state.drillHoles;
   const charged = holes.filter(h => state.chargesByHole[h.id]).length;
-  const sequenced = holes.filter(h => state.sequenceDelays[h.id] !== undefined).length;
-  const plan = assembleBlastPlan(holes, state.chargesByHole, state.sequenceDelays);
+  const plan = assembleBlastPlan(holes, state.chargesByHole);
   const fireOk = holes.length > 0 && validateBlastPlan(plan).length === 0;
 
   return {
     1: { text: t('ui.blast_workshop.step_state.holes', { count: holes.length }) },
     2: { text: `${charged} / ${holes.length}` },
-    3: { text: `${sequenced} / ${holes.length}` },
-    4: { text: t('ui.blast_workshop.step_state.tier', { tier: state.softwareTier }) },
-    5: { text: t(fireOk ? 'ui.blast_workshop.step_state.ready' : 'ui.blast_workshop.step_state.blocked'), critical: !fireOk },
+    3: { text: t('ui.blast_workshop.step_state.tier', { tier: state.softwareTier }) },
+    4: { text: t(fireOk ? 'ui.blast_workshop.step_state.ready' : 'ui.blast_workshop.step_state.blocked'), critical: !fireOk },
   };
 }
 
@@ -250,6 +244,5 @@ function suggestStep(state: GameState): StepId {
   const holes = state.drillHoles;
   if (holes.length === 0) return 1;
   if (!holes.every(h => state.chargesByHole[h.id])) return 2;
-  if (!holes.every(h => state.sequenceDelays[h.id] !== undefined)) return 3;
-  return 5; // drilled + charged + sequenced: Preview is optional, go straight to Fire
+  return 4; // drilled + charged: Preview is optional, go straight to Fire
 }

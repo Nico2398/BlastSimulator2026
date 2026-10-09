@@ -12,6 +12,7 @@ export interface ScoreState {
   wellBeing: number;
   safety: number;
   ecology: number;
+  /** Neighbour relations, 0-100, high = good (internal key kept as nuisance). */
   nuisance: number;
   /**
    * Per-tick pull toward the neutral (50) midpoint, applied by `applyDecay`
@@ -74,10 +75,10 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   ecDelta -= inputs.maxRecentVibration * 0.01; // Vibrations worsen ecology
   state.ecology = clampScore(state.ecology + ecDelta);
 
-  // ── Nuisance ──
+  // ── Neighbour relations (internal key: nuisance) ──
   // Affected by vibrations and noise (from blasts)
   let nuDelta = buildingEffects.nuisance * 0.1;
-  nuDelta -= inputs.maxRecentVibration * 0.02; // Vibrations increase nuisance
+  nuDelta -= inputs.maxRecentVibration * 0.02; // Vibrations lower neighbour relations
   state.nuisance = clampScore(state.nuisance + nuDelta);
 
   // Apply decay towards neutral (50), at this state's own per-level rate.
@@ -92,7 +93,7 @@ export function recordAccident(state: ScoreState): void {
   state.safety = clampScore(state.safety - 10);
 }
 
-/** Record a blast vibration event — immediate nuisance hit. */
+/** Record a blast vibration event — immediate neighbour-relations hit. */
 export function recordVibration(state: ScoreState, vibrationMmS: number): void {
   state.nuisance = clampScore(state.nuisance - vibrationMmS * 0.05);
   state.ecology = clampScore(state.ecology - vibrationMmS * 0.02);

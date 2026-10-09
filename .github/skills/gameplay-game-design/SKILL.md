@@ -17,7 +17,7 @@ description: >
 
 1. **Survey** terrain to identify ore veins
 2. **Plan** access (build ramps, clear surface)
-3. **Design blast plans** (drill holes, load explosives, define detonation sequence)
+3. **Design blast plans** (drill holes, load explosives, preview, fire)
 4. **Execute blasts** — physics simulation determines fragments, projections, damage
 5. **Recover rubble** with vehicles (excavators, trucks)
 6. **Sell or store** materials via contracts
@@ -36,7 +36,7 @@ description: >
 ### Blast Plan Design
 **Drill Pattern:** Grid of holes with positions, depth, diameter, spacing, burden
 **Charge Loading:** Per hole: explosive type, amount (kg), stemming height, optional tubing
-**Detonation Sequence:** Order and delay (ms) per hole; affects fragmentation, vibrations, free face
+**Detonation:** All charges fire together; no per-hole order or delay. Vibration uses the total charge of every hole
 
 ### Blast Preview / Software Upgrades
 Tier 0 (none) → Tier 1 (energy heatmap) → Tier 2 (fragment prediction) → Tier 3 (projection risk) → Tier 4 (vibration model)
@@ -52,7 +52,12 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 ### Contracts
 - **Negotiable** with probabilistic outcomes, run by a Manager: no eligible manager (alive, not injured, not in training) means no negotiation. Best manager `management` level raises the success rate by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1 (#1340)
 - Types: ore sale, rubble disposal, supply
+- Offers only ask for ores the active site's rocks can yield (`resolveContractOres`: biome dominant rocks, softest+hardest when `mixedRockHardness`, via `oresYieldedByRocks`), plus rubble disposal. Supply picks from the cheapest `SUPPLY_COMMON_ORE_COUNT` of those ores. A site with no yielding ore offers rubble only. The panel badges an off-site offer (e.g. from an older save) "not found on this site" (`data-contract-onsite`) (#1364)
 - Each specifies: material type, quantity, unit price, deadline, penalties
+- **Automatic delivery (#1367):** every tick (`TickPipeline` step 3, before `checkDeadlines`) `autoDeliverContracts` (`ContractFulfilment.ts`) delivers stored ore to each active, non-held contract, soonest deadline first (`acceptedAtTick + deadlineTicks`, tie lowest id). Each takes `min(stock, remaining)` of its material (`ore_sale`/`supply` from `collectedOre`, `rubble_disposal` from `storedMassKg` plus every Spoil Heap's `storedSpoilKg`, heaps drawn first, #1530), re-reading stock after every delivery since contracts share one warehouse. Payment is `kg * pricePerKg` plus the early bonus when completed before 50% of the deadline, booked as `contracts` / `bonus` income (`bookDeliveryIncome`, shared with the console `contract deliver`, which uses `deliverStoredOre`). Partial payments accumulate in `paidTotal`. Manual Deliver still works.
+- **Delivering one ore removes only that ore (#1371):** `consumeStoredOre` takes just the sold ore's mass out of each fragment (`extractOreFromFragment`); other ores in the same fragments stay stored and in `collectedOre`. Rubble disposal removes raw mass and debits every ore it carried.
+- **Hold / Resume:** `contract hold <id>` / `contract release <id>` (ContractsPanel Hold/Resume, `data-action="hold-toggle"`) sets `held`; a held contract is skipped by automatic delivery but still expires and still raises the expiry warning.
+- **Partial-delivery expiry:** the penalty is `round(penaltyAmount * undeliveredShare)` (recorded in `penaltyCharged`); what was delivered and paid stays paid. Zero delivered = full penalty. The expiry warning (`CONTRACT_EXPIRY_WARNING_TICKS` before the deadline) only fires for contracts still short of stock (`contractShortOfStock`).
 
 ### Buildings
 9 canonical building types (see gameplay-buildings skill for the full catalog).
@@ -74,14 +79,14 @@ Unionized employees cannot be fired. Affected by well-being score.
 | **Worker Well-being** | Quarters quality, breaks, overwork, raises, accidents |
 | **Safety** | Equipment investment, accident rate, evacuation, PPE |
 | **Ecology** | Dust, water contamination, waste management, restoration |
-| **Neighbor Nuisance** | Blast vibrations, noise, dust, projections, traffic |
+| **Neighbour Relations** | High = good. Lowered by blast vibrations, noise, dust, projections, traffic, failed bribes; raised by events that please the village |
 
 ## Event System
 
 ### Architecture
 Events grouped into categories with independent timers. Timer fires → check available events → roll weighted selection → fire event. Weights + values depend on player scores.
 
-Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employee exists and `lawsuit` until some cause exists (environmental cause, a death, or staff). Environmental lawsuits additionally require `hasEnvironmentalCause` (a blast fired, or ecology/nuisance strictly below `ENV_CAUSE_*_MAX` = 45, under the initial 50). `lawsuitCount` counts fired lawsuit-category events.
+Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employee exists and `lawsuit` until some cause exists (environmental cause, a death, or staff). Environmental lawsuits additionally require `hasEnvironmentalCause` (a blast fired, or ecology/neighbour relations (`nuisance`) strictly below `ENV_CAUSE_*_MAX` = 45, under the initial 50). `lawsuitCount` counts fired lawsuit-category events.
 
 ### Categories
 - **Unions:** Strike threats, wage demands, safety complaints, overtime protests
@@ -93,9 +98,50 @@ Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an
 ### Resolution
 Each event presents 2-4 decision options with different consequences on scores, finances, future event probabilities.
 
+### Event effects (#1414)
+What an outcome sentence promises is what happens. An option carries `effects?: EventEffectSpec[]` (`EventEffectCatalog.ts`); the resolver runs `applyEventEffects` after the cash/score/corruption deltas. Raw `effectTag` strings are never shown (they only route the traffic-jam and unqualified-task handlers); the outcome lists structured chips (`EventEffectText.ts`, i18n `ui.event.effect.*`) and `event modifiers` (console) / the TopBar chips (`ModifierChips.ts`, `.bs-modifier-chip`) list live modifiers with remaining time. Tunables are `EVENT_EFFECT_*` and the per-event constants in `balance.ts`; adding a variant is a spec type plus its handler and `ui.event.effect.<type>` text (en + fr).
+
+Time: hours = ticks, days = `days * TICKS_PER_DAY`. Timed effects register an `ActiveModifier` (`ActiveModifiers.ts`) in `state.events.activeModifiers`, saved with the game (`SAVE_VERSION` 35). An equal kind/role/target/category modifier is extended, never shortened; the list is capped at `MAX_ACTIVE_MODIFIERS`; factors are clamped to `MODIFIER_FACTOR_MIN..MAX`. `tickModifiers` (first step of the tick pipeline) prunes lapsed modifiers, pays recurring charges and applies morale drift.
+
+| Group | Spec type | Effect |
+|-------|-----------|--------|
+| Workforce | `work_stoppage` | role (or all) claims nothing and task progress freezes |
+| | `work_rate` (`pct` -40 = x0.6) | only a fraction of ticks counts; the remainder carries (`Employee.workProgressCarry`) |
+| | `morale_shift` | morale drifts by `perHour` |
+| | `fatigue_relief` | everyone rested |
+| | `employee_leaves` (`random`/`role`/`junior`) | one employee leaves, unionised ones included (only events do this); `_alt` text when nobody matches |
+| | `employee_joins` | free hire at the hire spawn point |
+| | `employee_injured` | a healthy employee is injured; `_alt` with nobody |
+| Pay | `salary` (`days: null` = permanent) | payroll and HUD cost scale for a role or all |
+| | `bonus_per_employee` | one-off cash per living employee |
+| | `recurring_charge` | `perDay` cost for N days |
+| Operations | `ban` `blast`/`haul`/`drill` | `blast detonate` and `blast` refuse (`mining.blast.banned`); haul/drill actions are not claimed |
+| | `cost_factor` `explosive`/`upkeep` | charge orders and building/vehicle upkeep scale; `survey`/`research` are stored only (TODO(#1568)) |
+| Market | `contract_price` | new offers priced by the factor (`resolveContractPriceMultiplier`) |
+| | `special_contract` | one extra offer at `EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS` |
+| | `cancel_contract` | an active contract is cancelled, optionally with its outstanding penalty; `_alt` with none |
+| Assets | `vehicle_breakdown`, `building_closed` | HP loss and an `out_of_service` modifier (not yet enforced, TODO(#1568)) |
+| World | `forced_weather` | weather held each tick without drawing from the weather rng |
+| | `event_weight` | category timer interval divided by the factor |
+
+Named events: `union_strike_threat` call the bluff = all-role stoppage (`EVENT_STRIKE_HOURS`); `mafia_fbi_mole` fire him removes an employee; `union_hazard_emotional` pay = `EVENT_HAZARD_STIPEND_PER_DAY` for `EVENT_HAZARD_STIPEND_DAYS`; `politics_mayor_wins` relocate = `EVENT_RELOCATE_PAUSE_HOURS` stoppage on top of the cash cost; `politics_mining_ban_vote` partial ban = `EVENT_PARTIAL_BAN_WORK_PCT` for `EVENT_PARTIAL_BAN_HOURS`. Any result text that promises a lasting effect ("monthly", "lasting") must carry `effects`; otherwise it is written as one-off flavour. Event variety (#1538): every category (union, politics, weather, mafia, lawsuit) uses at least 6 distinct effect kinds, at least 60% of its events carry a lasting option and no kind exceeds 30% of a category's specs; every magnitude is a named `EVENT_*` constant in `balance.ts`, costs sit on the risky option and offsets on the fix. Unwired kinds (`vehicle_breakdown`, `building_closed`, `cost_factor` on survey/research) are never authored until #1568 lands (TODO(#1568)).
+
+Decisions: an equal-kind modifier takes the newest magnitude; a salary change with `days: null` is the only permanent modifier; the junior pick is the most recently hired; unionised staff can be removed only through event effects.
+
 ## Corruption & Mafia Gameplay
 
-- **Corruption:** Bribe judges, union leaders, inspectors. Success: problem goes away. Failure: scandal, fines, criminal charges.
+- **Corruption (#1407):** a 0 to `CORRUPTION_MAX` (100) meter, clamped. Event choices keep their own deltas. A successful bribe adds `BRIBE_CORRUPTION_DELTA[target]` and grants a timed protection; a failed one adds only `BRIBERY_FAILURE_CORRUPTION_DELTA`, grants nothing and does not extend an existing protection. `mafiaUnlocked` latches at `MAFIA_UNLOCK_THRESHOLD` (20) and never unlatches; the `mafia` event category needs `corruptionLevel >= MAFIA_UNLOCK_THRESHOLD`. Within the category, each mafia event's `canFire` gates on `mafiaTier(n)` (`EventBuilder.ts`) = `MAFIA_UNLOCK_THRESHOLD + (n-1) * MAFIA_ESCALATION_STEP` (10): tier 1 = 20 ... tier 5 = 60, so later events open as the meter climbs.
+- **Protections (`economy/BribeProfile` table in `BribeProtection.ts`):** price = `BRIBE_PRICE_PER_PROTECTION_DAY` x `BRIBE_PROTECTION_DAYS` (witness: flat). Re-bribing refreshes to max(existing, now + duration), never stacks. Followups already queued are not shielded. Shown in the Shady panel (`[data-protection="<target>"]`) with remaining time.
+
+| Target | Delta | Days | Price | Effect |
+|--------|-------|------|-------|--------|
+| judge | 15 | 5 | $50,000 | next lawsuit event dismissed (one-shot, counts as fired); lawsuit timer x`JUDGE_LAWSUIT_TIMER_STRETCH` (1.8) |
+| politician | 12 | 4 | $30,000 | no `politics` events |
+| union_leader | 8 | 4 | $15,000 | no `union` events |
+| inspector | 5 | 3 | $8,100 | no events tagged `INSPECTION_EVENT_TAG` (`inspection`: paperwork fine, OSHA hardhats, EPA, blast limit fines, UN inspector) |
+| witness | 5 | none | $10,000 | lowers mafia exposure by `WITNESS_EXPOSURE_REDUCTION` (0.25) |
+- **Corruption failure (#1411):** a failed bribe fines `BRIBERY_FAILURE_FINE_FRACTION` (0.5) of its cost (expense category `fines`), lowers the neighbour-relations score (`nuisance`) by `BRIBERY_FAILURE_NUISANCE_HIT` (8), and adds `BRIBERY_FAILURE_CORRUPTION_DELTA` (2) corruption (can unlock the mafia).
+- **Mafia failure (#1411):** a botched accident or detected frame raises exposure by `INVESTIGATION_EXPOSURE_JUMP` (0.2) and queues the repeatable follow-up `INVESTIGATION_FOLLOWUP_EVENT_ID` (`mafia_police_investigation`: pay off detective / hire lawyer / stonewall; events may carry `exposureDelta`). Exposed smuggling charges `SMUGGLING_EXPOSED_FINE` (25000), adds `SMUGGLING_EXPOSED_EXPOSURE_JUMP` (0.1) exposure and shuts smuggling off. Exposure decays `EXPOSURE_DECAY_PER_TICK` (0.004) per tick once `EXPOSURE_CLEAN_GRACE_TICKS` (30) pass with no mafia action and no active smuggling (`mafia.lastActivityTick`). Each of these raises a toast (`ui/notify/corruptionNotifications.ts`). Mafia rewards unchanged.
 - **Mafia:** Dark escalation path. Arrange incidents for unionized employees. Smuggling. Gets progressively more dangerous.
 
 ## World Generation
@@ -139,15 +185,18 @@ Fictional humorous names. "Treranium" (très rare, high value), common ores, exo
 ## Weather System
 
 Procedural cycle: sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap.
-Rain fills drill holes. Water-sensitive explosives fail without tubing. Porous rock = faster water infiltration.
-Tubing is purchasable per-hole waterproofing.
+Rain fills drill holes. Water-sensitive explosives fizzle in a wet hole. Tubing is purchasable per-hole waterproofing.
+**Hole water (#1350).** Each drilled hole carries `GameState.holeWater[id] = { level 0..1, porosity }` (porosity sampled once from the dominant rock under the hole, `dominantRockUnderHole` + `getRock().porosity`; grid-less runs use 0), and the site carries `groundWetness` 0..1; both persist (save v32). `tickHoleWater` runs in `runTick` right after `tickWeather` and advances every hole with `advanceHoleWater`: rain adds `rain * HOLE_RAIN_FILL_RATE`, wet ground seeps in `groundWetness * porosity * HOLE_SEEP_RATE`, and with no rain the level fades by `HOLE_WATER_FADE_RATE * (1 - porosity * HOLE_FADE_POROSITY_SLOWDOWN)` (porous rock holds water about twice as long). Ground wetness rises with rain (`GROUND_WETNESS_RISE_RATE`) and decays when dry (`GROUND_WETNESS_DECAY_RATE`, lingers a few ticks). Tuning: a storm fills a bare hole in about 2 ticks, light rain about 8; water fades in 12-24 ticks in tight rock; tight rock (0.03) never floods from wet ground, porous rock (0.35) does within about 100 ticks at full wetness. A hole is wet while `level > HOLE_WET_THRESHOLD` (`isHoleFlooded`); `wetHoles` / `wetHoleIdsFor` derive from the stored level, so the previews, `executeBlast`, the blast report, the preflight checklist and the Drill/Charge/Fire steps all read the same water state. Wet holes keep their effect on water-sensitive explosives.
+**Tubing is watertight, not draining.** A tubed hole neither gains nor loses water; tubing never removes water already inside. It can be bought and installed at any time, rain or not (the Charge step offers it whenever untubed holes exist).
+**Draining.** `drain_hole hole:<id|*>` (Charge step: Drain button, plus one per hole row) sets a wet hole's level to 0 and costs `HOLE_DRAIN_COST_PER_HOLE`. Refused when the hole is dry, unknown, cash is short, or it is untubed in porous rock (`porosity >= HOLE_DRAIN_POROSITY_LIMIT`: the ground refills it at once; tube it first, then drain, or wait). `*` targets every wet hole: blocked ones are named, the rest still drain. Removing a hole, firing, or `resetPlanState` drops its water entry. `weather set <state>` (console override) changes the weather only; standing water stays and fades or seeps away on its own, so a scenario that needs dry holes waits on `wetHoleCount` reaching 0.
 Weather advances once per tick in `runTick` (`tickWeather`, right after time advances, before events read `weatherId`) and lives in `GameState.weather` (`WeatherCycleState`), persisted with the save (v30) with its own PRNG stream `rngState` (mulberry32 int32, seeded `seed + WEATHER_RNG_SEED_OFFSET`); history is capped at `WEATHER_HISTORY_MAX`. The TopBar forecast runs the same `tickWeather` primitive on a clone, so forecast day N equals the live weather after N days of ticks. `createGame` reseeds weather for every start (browser level swap, console `new_game`, sandbox, campaign); a refused start leaves the old state untouched. `weather advance` uses `forceAdvanceInState`.
 Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing a hole or firing the blast drops its tubing record with no refund; unused inventory persists.
 
 ## Safety & Projection Profiles
 
-- Safety zone evacuation required before each blast
-- Projection trajectories based on overcharge, stemming, free face, sequence
+- Safety zone evacuation before each blast is one flow (#1362): FIRE opens the pre-flight modal, DETONATE (`blast detonate`) arms `state.pendingDetonation`, evacuates the danger zone (`DetonationSequence.ts`), re-orders late entrants out every `DETONATION_REEVACUATE_INTERVAL_TICKS`, and fires automatically on the tick the zone is clear (at once when it already is). No separate horn step.
+- Waiting state: modal and `blast status` show who is left, or by name who is stranded (cannot leave). `blast` with no argument = fire anyway (clears the pending detonation, fires with people inside, they die). `blast cancel` = abort. A second `blast detonate` while armed is refused. Armed with no holes left = cancelled automatically. Saved (`pendingDetonation`, save v34).
+- Projection trajectories based on overcharge, stemming, free face
 - Buildings, vehicles, and people in path take damage/die
 
 ## Campaign & World Map
@@ -156,6 +205,13 @@ Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing
 1. **"Dusty Hollow"** — Desert, soft rocks, basic explosives, generous contracts, no villages
 2. **"Grumpstone Ridge"** — Mountain, mixed rocks, mid-tier explosives, nearby village, moderate events
 3. **"Treranium Depths"** — Tropical, endgame rocks + Treranium, demanding contracts, multiple villages, volatile weather
+
+**Dusty Hollow opens staffed (#1363):** `LevelDef.startingSite` (`DUSTY_HOLLOW_STARTING_SITE`) hires a driller, a blaster and a driver, buys a drill rig and a debris hauler, and places a Tier 1 Freight Warehouse for free, so the crew can work from tick 0 with storage already synced (`regenerateGrid` → `placeStartingBuildings`, which spirals out from `STARTING_BUILDING_STANDOFF_M` from the crew toward the site centre so a footprint cannot wall a vehicle in). `createGameForLevel`/`campaign start` take a tri-state `staffed`: absent = the level's own site, `true` = the global `STARTING_SITE_STAFFED_COMPOSITION`, `false` = a bare site. Dusty Hollow's `contractPriceMultiplier` is `DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER` (bisect window in `balance.ts`).
+
+**Decisions (#1363):**
+- Hiring and training fees (`salaries` category) count as running costs; only `equipment` and `construction` are capital.
+- `refund` income is excluded: selling or demolishing back must not inflate the target.
+- Payroll (~$200/tick for the opening crew) makes the level a race: wellbeing collapses (no rest above `NEED_REST_NO_BUILDING_CAP` restores morale) into a revolt around tick 450-630, so prices are tuned for a win within a few blasts rather than a long grind. Starting cash stays $50,000: a 2x2 pattern lands its first sale by ~tick 130, well before bankruptcy.
 
 ### Progression
 Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-3) for replayability.
@@ -166,7 +222,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 - **Lose:** Bankruptcy, arrest (corruption), ecology=0, well-being=0
 - **Arrest:** mafia exposure >= `ARREST_EXPOSURE_THRESHOLD` (0.9) arrests immediately. `ARREST_WARNING_EXPOSURE` (0.75) fires one `arrest:warning` event (toast) and shows an exposure pip (warn, critical from 0.9); the warning re-arms when exposure drops under 0.75. A jump past 0.9 skips the warning.
 - **Revolt:** well-being at 0 for `REVOLT_TICKS` (120) revolts; `REVOLT_WARNING_TICKS` (40) fires `revolt:warning`. A well-being pip shows below `WELL_BEING_ALERT_THRESHOLD` (20, warn), and at 0 becomes a critical revolt countdown (`revoltTicksRemaining`).
-- **Win:** Reach profit threshold → next level unlocked
+- **Win:** Reach the profit threshold → next level unlocked. The figure is **operating profit** (#1363): income excluding `refund`, minus every expense outside `CAPITAL_EXPENSE_CATEGORIES` (`equipment`, `construction`) — `getOperatingProfit` / `FinancialReport.operatingProfit` (`Finance.ts`). One-off purchases of vehicles and buildings never count against the target. Everything that shows or checks progress reads it: `checkLevelComplete`, `snapshotStats` (`totalWealth`), `campaign complete`, the `finances` command, the goal chip, the Finances panel row and `console-api` `profit`.
 - **Campaign complete:** All 3 campaign levels (tier > 0; the tutorial level is excluded) completed. The final level's victory screen announces it.
 - **Site Map and the live game (#1314):** a *live game* is a state that exists and whose level has not ended. While one is live: the main menu shows RESUME (`#bs-menu-resume`) above CONTINUE; the Site Map opened from the top bar shows BACK TO SITE (`#bs-world-map-back-to-site`) and Esc does the same (a confirm closes first); Start on a level card asks for confirmation first, since it restarts that level from scratch. The map's Site Map entry from the level-end screen offers no way back. Both returns change no game state.
 

@@ -459,7 +459,58 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1358: +1 key (weak-explosive charge warning): 3734.
     // #1340: +4 keys (economy.negotiation.no_manager, ui.contracts.negotiate_no_manager, ui.crew.manager_effect, ui.crew.manager_effect_hint), both locales: 3738.
     // #1382: +1 key (ui.crew.injured_back_in): 3739; the unused ui.crew.tag_injured dropped: 3738.
-    expect(Object.keys(en).length).toBe(3738);
+    // #1411: +24 keys (corruption/mafia consequence notifications, investigation event, tick lines, exposure outcome chip): 3762.
+    // #1392: +4 keys (demolition/upgrade order notifications and rebuilding label), both locales: 3766.
+    // #1364: +1 key (ui.contracts.not_on_site, off-site contract badge), both locales: 3767.
+    // #1363: +2 keys (ui.finances.operating_profit, _tip), both locales: 3753 (after #1344's -16).
+    // #1344: -16 keys (detonation sequencing removed: blast.validation.missing_delay,
+    // blast.overlay.delay_ms, mining.sequence.*, ui.crew.action_set_sequence,
+    // ui.blast_workshop.step.sequence, ui.blast_workshop.sequence.*,
+    // tutorial.stage.open_sequence_tab, tutorial.stage.auto_sequence,
+    // tutorial.step7, tutorial.step7.title), both locales: 3751.
+    // #1391: +7 keys (ui.build.cutoff_* placement cutoff warning), both locales: 3758.
+    // #1363: +2 keys (ui.finances.operating_profit, _tip), both locales: 3760.
+    // #1385: +9 keys (hiring candidate pools), both locales: 3769.
+    // #1345: +14 keys (pattern-level charge settings), both locales: 3783.
+    // #1367: +14 keys (contract auto-delivery, hold toggle, partial expiry), both locales: 3797.
+    // #1350: +14 keys (hole water, drain), both locales: 3811.
+    // #1374: +1 key (shell.topbar.objective), both locales: 3812.
+    // #1388: net -4 keys (custom shift mode removed, course copy reworded), both locales: 3808.
+    // #1407: +16 keys (bribe protections, Shady panel protection rows, corruption meter) and #1362: +12 keys (detonation flow), -5 (horn, zone-occupied refusal), +1 (unknown blast subcommand), both locales: 3832.
+    // #1372: +5 keys (contract needs warehouse, warehouse stock lost warnings and notification), both locales: 3837.
+    // #1393: net -2 keys (vehicle depot building removed, repair skill and repair order added), both locales: 3835.
+    // #1401: +10 keys (vehicle upgrade command, Fleet panel upgrade button, SelectionBar upgrade_vehicle), both locales: 3845.
+    // #1414: +53 keys (event effect texts, modifier chips), both locales: 3898.
+    // #1524: +4 keys (licence tier gating: dealership level text, licence-level-too-low), both locales: 3902.
+    // #1524 review: licence_required + licence_holders merged into one ui.fleet.licence_line, net -1: 3901.
+    // #1538: +44 keys (resN_alt texts for employee_leaves/employee_injured/cancel_contract options), both locales: 3945.
+    // #1530: +4 keys (spoil heap names, description, no_spoil_heap blocked notification), both locales: 3949.
+    expect(Object.keys(en).length).toBe(3949);
+  });
+
+  it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
+    const removed = [
+      'blast.validation.missing_delay',
+      'blast.overlay.delay_ms',
+      'mining.sequence.usage',
+      'mining.sequence.none_set',
+      'ui.crew.action_set_sequence',
+      'ui.blast_workshop.step.sequence',
+      'ui.blast_workshop.sequence.section',
+      'ui.blast_workshop.sequence.auto',
+      'ui.blast_workshop.sequence.delay_step',
+      'ui.blast_workshop.sequence.callout',
+      'ui.blast_workshop.sequence.no_holes',
+      'ui.blast_workshop.sequence.row',
+      'tutorial.stage.open_sequence_tab',
+      'tutorial.stage.auto_sequence',
+      'tutorial.step7',
+      'tutorial.step7.title',
+    ];
+    for (const key of removed) {
+      expect(key in en, `en.json still has ${key}`).toBe(false);
+      expect(key in fr, `fr.json still has ${key}`).toBe(false);
+    }
   });
 });
 

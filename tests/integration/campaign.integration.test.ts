@@ -18,6 +18,7 @@ import {
   getBestStars,
 } from '../../src/core/campaign/Campaign.js';
 import { getLevel, getAllLevels } from '../../src/core/campaign/Level.js';
+import { DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER } from '../../src/core/config/balance.js';
 import {
   createLevelStats,
   snapshotStats,
@@ -106,7 +107,7 @@ describe('Campaign', () => {
     expect(level!.unlockThreshold).toBe(80000);
     expect(level!.difficultyTier).toBe(1);
     expect(level!.eventFreqMultiplier).toBe(0.5);
-    expect(level!.contractPriceMultiplier).toBe(1.2);
+    expect(level!.contractPriceMultiplier).toBe(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER);
     expect(level!.scoreDecayRate).toBe(0.03);
     expect(level!.mixedRockHardness).toBe(false);
     // Should include basic explosives
@@ -711,7 +712,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
 
   it('dusty_hollow refuses dynatomics for a single hole with localized text, queues nothing, keeps cash', () => {
     const ctx = makeCtx();
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow', staffed: 'false' });
     withHoles(ctx);
     const cash = ctx.state!.cash;
     const queued = ctx.state!.pendingActions.length;
@@ -730,7 +731,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
 
   it('dusty_hollow refuses dynatomics for hole:* and queues nothing', () => {
     const ctx = makeCtx();
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow', staffed: 'false' });
     withHoles(ctx);
     const cash = ctx.state!.cash;
     const queued = ctx.state!.pendingActions.length;
@@ -746,7 +747,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
 
   it.each(['pop_rock', 'boomite', 'krackle'])('dusty_hollow accepts %s', (id) => {
     const ctx = makeCtx();
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow', staffed: 'false' });
     withHoles(ctx, 1);
     const r = charge(ctx, { hole: 'H1', explosive: id, amount: '3kg', stemming: '2m' });
     expect(r.success).toBe(true);
@@ -763,7 +764,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
 
   it('an unknown explosive id keeps the existing unknown-explosive error on a campaign level', () => {
     const ctx = makeCtx();
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow', staffed: 'false' });
     withHoles(ctx, 1);
     const r = charge(ctx, { hole: 'H1', explosive: 'nope_ite', amount: '3kg', stemming: '2m' });
     expect(r.success).toBe(false);
@@ -780,14 +781,13 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
 
   it('replaying a saved plan holding an unavailable explosive is refused and queues nothing', () => {
     const ctx = makeCtx();
-    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow', staffed: 'false' });
     const st = ctx.state!;
     const cash = st.cash;
     const queued = st.pendingActions.length;
     const saved = {
       drillHoles: [{ id: 'H1', x: 12, z: 12, depth: 6, diameter: 0.15 }],
       chargesByHole: { H1: { explosiveId: 'dynatomics', amountKg: 3, stemmingM: 2 } },
-      sequenceDelays: {},
     };
 
     const r = queueSavedBlastPlan(ctx as never, saved as never, 'plan');
@@ -814,7 +814,7 @@ describe('Campaign profile (#1312)', () => {
 
   /** Complete dusty_hollow through the debug command, so grumpstone_ridge unlocks in the profile. */
   function completeDustyHollow(): void {
-    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(runner.run('campaign start level:dusty_hollow staffed:false').success).toBe(true);
     expect(runner.run('campaign complete').success).toBe(true);
   }
 
@@ -836,7 +836,7 @@ describe('Campaign profile (#1312)', () => {
   });
 
   it('campaign start of a tier>0 level aliases state.campaign to the profile campaign', () => {
-    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(runner.run('campaign start level:dusty_hollow staffed:false').success).toBe(true);
     expect(ctx.state!.campaign).toBe(ctx.campaignProfile.campaign);
     expect(ctx.state!.campaign.activeLevelId).toBe('dusty_hollow');
   });
@@ -855,7 +855,7 @@ describe('Campaign profile (#1312)', () => {
   });
 
   it('tick-pipeline level completion writes profit, completion and stars to the profile', () => {
-    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(runner.run('campaign start level:dusty_hollow staffed:false').success).toBe(true);
     const threshold = getLevel('dusty_hollow')!.unlockThreshold;
     addIncome(ctx.state!.finances, threshold + 10000, 'contracts', 'test:profile', ctx.state!.tickCount);
     ctx.state!.cash = ctx.state!.finances.cash;
@@ -872,7 +872,7 @@ describe('Campaign profile (#1312)', () => {
 
   it('level:complete records bestStars as the maximum, never lowering', () => {
     ctx.campaignProfile.bestStars['dusty_hollow'] = 3;
-    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(runner.run('campaign start level:dusty_hollow staffed:false').success).toBe(true);
     const threshold = getLevel('dusty_hollow')!.unlockThreshold;
     addIncome(ctx.state!.finances, threshold + 10000, 'contracts', 'test:profile', ctx.state!.tickCount);
     ctx.state!.cash = ctx.state!.finances.cash;
@@ -987,7 +987,7 @@ describe('Campaign profile (#1312)', () => {
   });
 
   it('loading a campaign-level save re-aliases state.campaign to the profile', () => {
-    runner.run('campaign start level:dusty_hollow');
+    runner.run('campaign start level:dusty_hollow staffed:false');
     runner.run('save slot:profile_level');
     runner.run('new_game seed:7');
     expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
@@ -999,13 +999,13 @@ describe('Campaign profile (#1312)', () => {
   it('loading a non-campaign save does not alias state.campaign to the profile', () => {
     runner.run('sandbox start biome:desert_badlands difficulty:easy seed:1');
     runner.run('save slot:profile_sandbox');
-    runner.run('campaign start level:dusty_hollow');
+    runner.run('campaign start level:dusty_hollow staffed:false');
     expect(runner.run('load slot:profile_sandbox').success).toBe(true);
     expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
   });
 
   it('completing a level after loading a campaign-level save still writes to the profile', () => {
-    runner.run('campaign start level:dusty_hollow');
+    runner.run('campaign start level:dusty_hollow staffed:false');
     runner.run('save slot:profile_level2');
     runner.run('new_game seed:7');
     runner.run('load slot:profile_level2');

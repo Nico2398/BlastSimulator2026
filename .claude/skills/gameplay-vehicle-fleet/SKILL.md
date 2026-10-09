@@ -28,8 +28,8 @@ Five roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
-| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Demolishes buildings; required for tier-upgrade workflow |
-| **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to Freight Warehouse |
+| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every demolition and tier upgrade (#1392): `build destroy` / `build upgrade` queue a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
+| **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to a Freight Warehouse (ore) or Spoil Heap (barren rock) |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
 | **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
@@ -51,7 +51,7 @@ and fuel.
 
 Units the field names do not state: `capacity` is kg for a Debris Hauler, m³/tick for a Rock
 Digger, holes/tick for a Drill Rig. `nameKey` is an i18n key of the form `vehicle.<role>.tier<N>`.
-Only a Debris Hauler carries cargo.
+Only a Debris Hauler carries cargo: `Vehicle.cargo`, a list of `{ fragmentId, massKg }` (`vehicleCargoMassKg` sums it). Hauler capacity is 4000 kg at tier 1 (6400, 10000 at tiers 2, 3).
 
 ## Driver Licensing
 
@@ -68,6 +68,15 @@ hire — it is earned at the Driving Center (the tutorial's one course, after th
 boulders), as are further licence levels and cross-training. A vehicle is not owned by a driver: any licensed
 employee may board any vehicle that is unoccupied and unclaimed. Nothing persists a driver
 assignment across tasks.
+
+**Licence level (#1524).** A licence carries a level 1-3 (`SkillQualification.licenceLevel`, absent = 1), separate
+from proficiency: XP never raises it, only a Driving Center course does (`LICENCE_COURSE_FEE`,
+`LICENCE_COURSE_TICKS_MULT`, `balance.ts`). Driving a tier-N vehicle needs the role licence at level >= N
+(`licenceLevelOf`, `canDriveTier`, `countLicenceHolders` in `VehicleDriverAssignment.ts`); `canAssignDriver`
+refuses with 'Employee lacks licence level for this vehicle tier', `findFreeVehicleForRole` skips vehicles above
+the claimer's level. A vehicle order nobody can level-qualify for carries `licence_level_too_low` (when someone
+holds the licence at a lower level) with `blockedLicenceLevel` = the lowest tier in that role's fleet, else
+`no_licensed_driver`. The dealership shows each tier's required level and how many employees hold it.
 
 ## State Model
 
@@ -217,14 +226,31 @@ Cargo stays in the vehicle when its occupant alights. Nothing is dropped on the 
 Both are ordinary itineraries with effect steps, not phase machines:
 
 ```
-haul:  [foot -> hauler, board] [drive -> fragment, effect 'load'] [drive -> depot, effect 'unload']
+haul:  [foot -> hauler, board] [drive -> fragment, effect 'load'] ([drive -> extra fragment, effect 'load' + targetId])* [drive -> depot, effect 'unload']
 break: [foot -> fragmenter, board] [drive -> boulder, effect 'split']
 ```
 
 Hauling is self-dispatching: each tick `HaulDispatch.ts` queues one `haul_debris` action per
 on-ground fragment not already covered (an oversized fragment queues `fragment_debris` instead).
-A destination targeting a depot resolves through the building-approach-cell lookup
+
+Multi-fragment cargo (#1370): after the primary `load` leg, `planFragmentTaskItinerary` adds one
+extra `load` leg (step `targetId` = fragment id) per nearby fragment chosen by `selectHaulBatch`
+(`HaulBatch.ts`). Candidates are on-ground, non-oversized, within `HAUL_BATCH_RADIUS_CELLS`
+(nearest first), with a queued, unclaimed `haul_debris`; at most `HAUL_BATCH_MAX_ITEMS` ride, and
+their cumulative mass stays within the tier capacity and `storageRoomKg`. The primary always rides,
+so a fragment heavier than the tier capacity rides alone (the load gauge clamps at 100%); an extra
+that overflows is skipped and a later, smaller one may still fit. On arrival an extra consumes its
+own haul action; one that is gone, claimed or no longer fits is a soft no-op and the trip carries
+less. The `unload` leg delivers every cargo item (one `vehicle:haul_delivered` each) and completes
+the primary action. `pickupFragment` and `storageRoomKg` count in-transit mass, so concurrent
+haulers cannot oversubscribe storage. An interrupted or scrapped hauler returns all cargo to the
+ground. A destination targeting a depot resolves through the building-approach-cell lookup
 (`gameplay-navmesh`), never the building's raw coordinates.
+
+Hauling destination (#1530): `haulDestinationOf` sends barren fragments (`isBarrenFragment`) to the
+nearest Spoil Heap and ore-bearing ones to a Freight Warehouse. The depot leg, the batch (never mixed)
+and the claim gate all use the fragment's destination; a destroyed target heap falls back to another
+heap. Heaps have unlimited room, so a barren haul is blocked only as `no_spoil_heap` (no heap placed).
 
 Storage capacity is what active Freight Warehouses provide: `INITIAL_STORAGE_CAPACITY_KG` is 0, so
 before the first warehouse nothing can be stored. `OrderReachability.ts` classifies a queued
@@ -234,6 +260,25 @@ fragment outweighs `storageRoomKg`. Oversized `fragment_debris` is never blocked
 reasons clear on the next classification; `NotificationCenter` toasts each once while it persists
 (not per action), and again if the reason changes. Capacity is re-derived from the warehouses
 after any building mutation and on load.
+
+## Vehicle Repair (#1393)
+
+A damaged vehicle (`0 < hp < maxHp`, `isRepairable`) that nobody is sitting in and no order has reserved gets one self-dispatched `repair_vehicle` order per tick sync (`syncRepairDispatch`, `RepairDispatch.ts`, run beside `syncHaulDispatch`). The order is on foot (`requiredVehicleRole` null) and needs the `repair` skill, trained at the Driving Center. There is no Vehicle Depot building: repair happens in place, wherever the vehicle stands.
+
+- Orders skip the qualification check and sit queued with `blockedReason = 'no_qualified_employee'` while nobody holds `repair`; this never raises the unqualified modal or auto-pause. A qualified employee who is merely busy or resting does not block anything.
+- Stale queued orders (vehicle gone, fully healed, boarded or reserved) are pruned on the next sync.
+- A vehicle under a claimed repair order is not claimable by `findFreeVehicleForRole` / `findVehicleForClaim` until the repair completes or aborts.
+- Duration: `ceil(missingHp * REPAIR_BASE_TICKS_PER_HP)` base ticks, scaled by proficiency like any `payload.durationTicks` action. Each work tick restores `repairHpThisTick` (missing hp spread over the ticks left) and charges `REPAIR_PARTS_COST_PER_HP` per restored hp as an expense, so an interrupted repair resumes with the right remainder and is never double-charged. XP goes to `repair`.
+
+## Vehicle Upgrade (#1401)
+
+An owned vehicle moves up one tier in place (`src/core/entities/VehicleUpgrade.ts`), up to `VEHICLE_MAX_TIER` (3, `balance.ts`).
+
+- **Cost:** `purchaseCost(next tier) - purchaseCost(current tier)` (`computeVehicleUpgradeCost`, null at max). Refused with `console.insufficient_funds` when cash is short; booked as an `equipment` expense.
+- **Effect:** `upgradeVehicle` mutates only `tier` and `hp`; hp is set to the new tier's `maxHp` (full restore even when damaged). Id, position, reservation and occupants are kept, so it is allowed while reserved, driven or carrying.
+- **Entry points:** console `vehicle upgrade <id>`; Fleet panel card button (`data-action="upgrade"`, shows cost, disabled with a reason at tier 3 or short cash); SelectionBar `upgrade_vehicle` (distinct from the building `upgrade` action).
+- **Upgrade vs scrap:** scrap sells at the 40% residual and the vehicle is gone; upgrade keeps the vehicle and pays only the difference, so it is the intended way up a tier.
+- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the card shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`, #1524).
 
 ## Traffic
 
@@ -290,7 +335,7 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 | I5 | A vehicle's reservation names a live `PendingAction` whose holder is alive and is the vehicle's driver, is walking to board it, or holds the action as a queued reserve-ahead |
 | I6 | `e.itinerary !== null` implies `legs.length > 0` |
 | I7 | `leg.mode === 'drive'` implies the employee is mounted in `leg.vehicleId` |
-| I8 | `v.payload !== null` implies that fragment's logistics state is `in_transit` |
+| I8 | Every fragment in `v.cargo` has logistics state `in_transit` |
 | I9 | `e.taskTicksRemaining !== null` implies `e.itinerary === null` (arrived, no longer travelling) |
 
 Three lint checks keep the writers singular. `tests/unit/lint/SingleVehicleMover.test.ts`: only

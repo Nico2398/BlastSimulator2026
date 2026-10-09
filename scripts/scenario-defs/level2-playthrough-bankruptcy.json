@@ -773,8 +773,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7380
-        }
+          "cash": -7830
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -820,8 +821,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7380
-        }
+          "cash": -7830
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -867,8 +869,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7380
-        }
+          "cash": -7830
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -964,8 +967,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7493
-        }
+          "cash": -7943
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       },
       "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -7109 -> -7121. #1200 retargets the management_office builder (employee #1) at the footprint's approach-ring cell (19,5) instead of the raw order origin (20,5), from order time -- one tile closer to employee #1's own spawn, so the construction (claimed at tick 0) completes one tick sooner than before (direct-traced: activeActionId clears at tick 39 here, tick 40-41 on main pre-#1200). That frees employee #1 for reassignment one tick earlier, which lands a small, one-time -$12 shift in this window's own cash total (direct-traced against a git-worktree run of this same command sequence on main, pre-#1200: cash -21141 identical through tick 39, then -27966/-27991/... here vs -27960/-27979/... there, a bounded -$6 then -$12 gap that never grows past -$12 for the rest of the file) -- not a growing divergence, a single early reassignment's own incidental cost."
     },
@@ -1012,8 +1016,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -14755
-        }
+          "cash": -15655
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -1059,8 +1064,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7565
-        }
+          "cash": -8015
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -1157,8 +1163,9 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -14755
-        }
+          "cash": -15655
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -1196,7 +1203,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -74148,
+          "cash": -78648,
           "tickCount": 100,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1204,7 +1211,7 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Funding the run for its shopping list did not save it and did not move the bankruptcy tick -- the spree ends on exactly $0, under the $5,000 BANKRUPTCY_THRESHOLD, so the 100-tick BANKRUPTCY_GRACE_TICKS window expires at tick 100 exactly as it did when the purchases overdrew. Payroll and upkeep against zero income do the killing now, which is a truer test than an overdraw no player could perform. #1313: the tick command stops on the tick the level ends, so this `tick 15` lands on tick 100 (not 105) and everything after it is frozen at that balance."
+        "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Funding the run for its shopping list did not save it and did not move the bankruptcy tick -- the spree ends on exactly $0, under the $5,000 BANKRUPTCY_THRESHOLD, so the 100-tick BANKRUPTCY_GRACE_TICKS window expires at tick 100 exactly as it did when the purchases overdrew. Payroll and upkeep against zero income do the killing now, which is a truer test than an overdraw no player could perform. #1313: the tick command stops on the tick the level ends, so this `tick 15` lands on tick 100 (not 105) and everything after it is frozen at that balance. #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       },
       "description": "#1151: re-baselined against a measured run -- cash -70397 -> -70379. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -70379 -> -70391 -- the same bounded -$12 shift the tick-45 checkpoint's own #1252 finding documents (employee #1's management_office build completing one tick sooner at the approach-ring cell) carries forward unchanged through this checkpoint; bankruptcy itself still fires at the same tick 100, unmoved."
     },

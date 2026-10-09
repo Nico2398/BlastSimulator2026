@@ -7,11 +7,11 @@ import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, button, type ChipTone } from './dom.js';
 import { iconEl } from './icons.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
-import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId } from '../core/entities/Vehicle.js';
+import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, vehicleCargoMassKg } from '../core/entities/Vehicle.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
-import { isLicensedForRole } from '../core/engine/VehicleReservation.js';
+import { rosterCanDriveVehicleTier } from '../core/entities/VehicleUpgrade.js';
 
 export function vehicleDisplayName(type: Vehicle['type'], tier: VehicleTier): string {
   return t(getVehicleDefByTier(type, tier).nameKey);
@@ -73,10 +73,9 @@ export function makeHpGauge(v: Vehicle): HTMLElement {
 export function makeLoadGauge(v: Vehicle): HTMLElement | null {
   if (v.type !== 'debris_hauler') return null;
   const capacity = getVehicleDefByTier(v.type, v.tier).capacity;
-  const massKg = v.payload?.massKg ?? 0;
-  // Clamped (#1092): an over-capacity load (a fragment heavier than the
-  // tier's own capacity, which loading does not refuse) would otherwise draw
-  // a gauge past its own track.
+  const massKg = vehicleCargoMassKg(v);
+  // Clamped (#1092): a lone over-capacity fragment rides alone (#1370) and
+  // would otherwise draw a gauge past its own track.
   const pct = capacity > 0 ? Math.min(100, Math.round((massKg / capacity) * 100)) : 0;
   const row = gauge(t('ui.fleet.load'), pct, 'var(--bsx-info)', { labelWidth: 30 });
   const value = row.querySelector('.bsx-gauge-value');
@@ -132,7 +131,7 @@ export function makePendingDriverRow(employee: Employee): HTMLElement {
  */
 export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => void): HTMLElement {
   const licence = ROLE_LICENCE_REQUIRED[v.type];
-  const anyLicensed = state.employees.employees.some(e => e.alive && isLicensedForRole(e, v.type));
+  const anyLicensed = rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier);
 
   if (!anyLicensed) {
     const warn = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px;padding:9px;border-radius:4px;background:var(--bsx-well)' } });

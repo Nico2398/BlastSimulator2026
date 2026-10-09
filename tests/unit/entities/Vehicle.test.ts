@@ -16,6 +16,7 @@ import {
   findVehicleReservedForAction,
   resolveVehicleDriver,
   vehicleRequiredClearanceCells,
+  vehicleCargoMassKg,
 } from '../../../src/core/entities/Vehicle.js';
 import {
   findBestEvacuationDriver,
@@ -836,7 +837,7 @@ describe('Vehicle interface fields', () => {
     // nothing when first purchased (#1091: replaces the old payloadKg number).
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 
   it('payload is null for every vehicle role immediately after purchase', () => {
@@ -844,7 +845,7 @@ describe('Vehicle interface fields', () => {
     const vs = createVehicleState();
     for (const role of ALL_ROLES) {
       const { vehicle } = purchaseVehicle(vs, role);
-      expect(vehicle.payload).toBeNull();
+      expect(vehicle.cargo).toEqual([]);
     }
   });
 
@@ -853,7 +854,7 @@ describe('Vehicle interface fields', () => {
     // the contract is strictly `null`, never a payload object with sentinel fields.
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'rock_fragmenter');
-    expect(vehicle.payload).toBe(null);
+    expect(vehicle.cargo).toEqual([]);
   });
 
   // ── Dead-field removal (#1138) ────────────────────────────────────────────
@@ -1602,7 +1603,7 @@ describe('canReleaseDriver — boundary: vehicle has no driver at all', () => {
 });
 
 describe('canReleaseDriver — error: vehicle is mid-haul', () => {
-  // #1091: the mid-haul guard reads `vehicle.payload !== null` now that
+  // #1091: the mid-haul guard reads `vehicle.cargo.length > 0` now that
   // haulingPhase/haulingFragmentId are gone — payload is only set once
   // haul_load's arrival effect fires, so this guard only ever catches the
   // loaded, driving-to-depot leg.
@@ -1610,7 +1611,7 @@ describe('canReleaseDriver — error: vehicle is mid-haul', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    vehicle.payload = { fragmentId: 1, massKg: 500 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 500 }];
 
     const result = canReleaseDriver(state.vehicles, vehicleId);
     expect(result.success).toBe(false);
@@ -1626,7 +1627,7 @@ describe('canReleaseDriver — error: vehicle is mid-haul', () => {
     const { state, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     expect(canReleaseDriver(state.vehicles, vehicleId).success).toBe(true);
     expect(alight(state, vehicleId).success).toBe(true);
@@ -1837,5 +1838,45 @@ describe('getVehicleMaintenanceCostPerTick / getVehicleFuelCostPerTick (#1375)',
       getVehicleDefByTier('drill_rig', 3).fuelCostPerTick, 8);
     expect(getVehicleMaintenanceCostPerTick(state)).toBeGreaterThan(0);
     expect(getVehicleFuelCostPerTick(state)).toBeGreaterThan(0);
+  });
+});
+
+// ── #1370: hauler capacity and cargo mass ─────────────────────────────────────
+
+describe('debris_hauler capacity (#1370)', () => {
+  it('tier 1 carries 4000 kg, tier 2 6400 kg, tier 3 10000 kg', () => {
+    expect(getVehicleDefByTier('debris_hauler', 1).capacity).toBe(4000);
+    expect(getVehicleDefByTier('debris_hauler', 2).capacity).toBeCloseTo(6400, 5);
+    expect(getVehicleDefByTier('debris_hauler', 3).capacity).toBeCloseTo(10000, 5);
+  });
+});
+
+describe('vehicleCargoMassKg (#1370)', () => {
+  it('is 0 for an empty cargo', () => {
+    expect(vehicleCargoMassKg({ cargo: [] })).toBe(0);
+  });
+
+  it('is the item mass for one item', () => {
+    expect(vehicleCargoMassKg({ cargo: [{ fragmentId: 1, massKg: 850 }] })).toBe(850);
+  });
+
+  it('sums every item', () => {
+    expect(vehicleCargoMassKg({
+      cargo: [{ fragmentId: 1, massKg: 850 }, { fragmentId: 2, massKg: 150 }, { fragmentId: 3, massKg: 0.5 }],
+    })).toBeCloseTo(1000.5, 5);
+  });
+
+  it('a freshly purchased vehicle carries nothing', () => {
+    const { vehicle } = purchaseVehicle(createVehicleState(), 'debris_hauler');
+    expect(vehicleCargoMassKg(vehicle)).toBe(0);
+  });
+});
+
+describe('canReleaseDriver with multi-item cargo (#1370)', () => {
+  it('refuses release while any cargo is aboard', () => {
+    const vs = createVehicleState();
+    const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
+    vehicle.cargo = [{ fragmentId: 1, massKg: 100 }, { fragmentId: 2, massKg: 100 }];
+    expect(canReleaseDriver(vs, vehicle.id).success).toBe(false);
   });
 });

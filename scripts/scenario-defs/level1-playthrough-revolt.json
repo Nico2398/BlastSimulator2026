@@ -764,42 +764,11 @@
       }
     },
     {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 10
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "description": "Auto-sequence the charged holes.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "chargedCount": 16,
-          "sequencedCount": 16,
-          "levelEnded": false
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -814,6 +783,11 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]",
           "timeout": 20000
@@ -825,7 +799,6 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 9,
           "levelEnded": false,
           "bankrupt": false

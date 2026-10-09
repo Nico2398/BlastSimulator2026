@@ -6,6 +6,7 @@
 // building, resolve a survey, ...) and reports what happened structurally,
 // rather than pushing console-formatted strings.
 
+import { autoChargeHole } from '../mining/ChargeOrder.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Employee } from '../entities/Employee.js';
@@ -22,10 +23,12 @@ import { recordBuiltRamp } from '../mining/RampWidening.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
+import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { addIncome } from '../economy/Finance.js';
+import { completeDemolition } from './BuildingDemolition.js';
+import { readDemolishPayload } from './DemolishPayload.js';
 import {
-  makeFootprintRegion, levelBuildingFootprint,
-  siteBoundsForGrid, refreshLogisticsCapacity, relocateFootprintOccupants,
+  siteBoundsForGrid, settleBuiltFootprint,
   emitFootprintRegionChanged,
 } from './BuildingTaskHelpers.js';
 
@@ -126,6 +129,16 @@ export function applyTaskCompletion(
       completeVehicleGatedAction(state, emp, progress.actionId);
     }
 
+    // A completed 'repair_vehicle' task leaves the vehicle at full hp (#1393);
+    // per-tick restoration normally got it there; this snaps any rounding
+    // remainder to maxHp.
+    if (progress.actionType === 'repair_vehicle' && progress.actionPayload) {
+      const vehicle = state.vehicles.vehicles.find(v => v.id === progress.actionPayload!['vehicleId']);
+      if (vehicle !== undefined) {
+        vehicle.hp = getVehicleDefByTier(vehicle.type, vehicle.tier).maxHp;
+      }
+    }
+
     // A completed 'survey' task resolves here — after the surveyor has
     // actually walked to and worked the site, not the instant it was
     // claimed (#437).
@@ -162,6 +175,7 @@ export function applyTaskCompletion(
         const [planned] = state.plannedDrillHoles.splice(plannedIdx, 1);
         const drilled = landDrilledHole(planned!);
         state.drillHoles.push(drilled);
+        autoChargeHole(state, drilled);
         if (state.navGrid && grid) {
           const cx = Math.floor(drilled.x);
           const cz = Math.floor(drilled.z);
@@ -187,6 +201,13 @@ export function applyTaskCompletion(
         state.chargesByHole[holeId] = loaded;
         report.chargeLoaded = { holeId, explosiveId: loaded.explosiveId, amountKg: loaded.amountKg };
       }
+    }
+
+    // A completed 'demolish_building' task lands here (#1392) — the building
+    // is removed only once a Building Destroyer has finished the work, and an
+    // upgrade's reserved place_building order is dispatched from it.
+    if (progress.actionType === 'demolish_building' && progress.actionPayload) {
+      completeDemolition(state, grid, emitter, readDemolishPayload(progress.actionPayload));
     }
 
     // A completed 'place_building' task lands here — the site becomes a real
@@ -216,68 +237,10 @@ export function applyTaskCompletion(
 
         if (result.success) {
           state.plannedBuildings.splice(orderIdx, 1);
-          refreshLogisticsCapacity(state);
-          let footprintRegion: ReturnType<typeof makeFootprintRegion> | undefined;
-          let footprintLevelled = 0;
-          if (grid) {
-            const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
-            footprintRegion = makeFootprintRegion(order.x, order.z, sizeX, sizeZ);
-            // Construction ends by cutting the ground under the footprint down
-            // to its lowest column (#1008 refinement). Placement tolerates a
-            // one-level slope (BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD) so siting
-            // a building is not a tile-by-tile hunt for perfectly level
-            // ground; this is the other half of that bargain — the finished
-            // building stands on flat ground regardless, rather than on the
-            // step it was allowed to straddle. Runs AFTER placeBuilding's own
-            // levelness re-check above, never before: carving first would make
-            // that check trivially pass and silently swallow a site a blast
-            // wrecked mid-construction, which is exactly what it exists to
-            // catch. A footprint already level carves nothing.
-            //
-            // The building's mesh is now centred on its TRUE footprint
-            // (`footprintCenterCoord`, #1198) rather than overhanging it by
-            // half a cell, so there is no wider "skirt" beyond the occupancy
-            // footprint left to carve or guard against a neighbour — carve
-            // and target both use `footprintRegion` unchanged.
-            const levelled = levelBuildingFootprint(grid, order.x, order.z, sizeX, sizeZ, emitter);
-            footprintLevelled = levelled.voxelsCleared;
-            // Emitted after the carve (unconditionally — even a footprint
-            // already flat still needs its occupancy reflected), so the
-            // NavGrid cells around the site carry their new surface heights
-            // (isStepClimbable reads them) and not the pre-construction
-            // ones. NavGridSync patches on nav:occupancy_changed; no direct
-            // call here.
-            emitFootprintRegionChanged(emitter, grid, order.x, order.z, sizeX, sizeZ);
-          }
-          // The employee who just finished the work is standing on the
-          // footprint they were building — the NavGrid patch above just
-          // turned that footprint 'blocked', so their own tile is now
-          // impassable. findPath refuses ANY route whose start cell is
-          // impassable (Pathfinding.ts), so left alone they'd be
-          // permanently stuck (never redispatchable) the instant their own
-          // construction finished. Same relocate-to-nearest-reachable move
-          // hire/vehicle-spawn already use when a spawn point lands on
-          // unwalkable ground (#556 finding).
-          //
-          // #816: relocating only `emp` (the builder) left a genuine
-          // livelock — any OTHER employee who merely happened to be idling
-          // on this same tile (e.g. a freshly hired employee still parked at
-          // the default spawn point a building later lands on) was left
-          // behind on the newly-blocked footprint with nobody ever moving
-          // them off it. Every subsequent pathfind FROM their position then
-          // failed at Pathfinding.ts's start-impassable check regardless of
-          // destination — including forceShiftRestIfNeededByPolicy's own
-          // routing to the nearest living_quarters — so a proactive-rest
-          // policy (continuous mode) permanently stranded that employee the
-          // instant the footprint under them closed, direct-traced via
-          // tutorial-interactive.json's own `set_policy mode:continuous` +
-          // two-building-order sequence. Sweeping every employee standing on
-          // the new footprint (not just the one whose PendingAction just
-          // completed) closes the gap the same relocate-to-nearest-reachable
-          // move already uses, just applied to everyone it actually affects.
-          if (footprintRegion) {
-            relocateFootprintOccupants(state, footprintRegion);
-          }
+          // Level, patch the nav grid and relocate anyone caught on the footprint (the builder
+          // included — #816, #556): see settleBuiltFootprint.
+          const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
+          const footprintLevelled = settleBuiltFootprint(state, grid, emitter, order.x, order.z, sizeX, sizeZ);
           report.building = {
             outcome: 'built',
             type: order.type,

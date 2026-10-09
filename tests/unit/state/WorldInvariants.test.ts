@@ -88,6 +88,7 @@ function addFragment(state: GameState, id: number, fragState: FragmentState = 'o
     },
     state: fragState,
     vehicleId: null,
+    warehouseId: null,
   });
 }
 
@@ -550,7 +551,7 @@ describe('assertWorldInvariants — I7_drive_leg_without_mount (#1089)', () => {
 describe('assertWorldInvariants — I8_payload_not_in_transit', () => {
   it('no violation when payload is null', () => {
     const state = makeState();
-    addVehicle(state, { payload: null });
+    addVehicle(state, { cargo: [] });
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
@@ -558,14 +559,14 @@ describe('assertWorldInvariants — I8_payload_not_in_transit', () => {
   it('no violation when payload names a fragment that is in_transit', () => {
     const state = makeState();
     addFragment(state, 1, 'in_transit');
-    addVehicle(state, { payload: { fragmentId: 1, massKg: 500 } });
+    addVehicle(state, { cargo: [{ fragmentId: 1, massKg: 500 }] });
 
     expect(assertWorldInvariants(state)).toEqual([]);
   });
 
   it('violation when payload names a fragment id that does not exist in logistics at all', () => {
     const state = makeState();
-    const v = addVehicle(state, { payload: { fragmentId: 999, massKg: 500 } });
+    const v = addVehicle(state, { cargo: [{ fragmentId: 999, massKg: 500 }] });
 
     const violations = assertWorldInvariants(state);
 
@@ -578,7 +579,7 @@ describe('assertWorldInvariants — I8_payload_not_in_transit', () => {
   it('violation when payload names a fragment that is on_ground, not in_transit', () => {
     const state = makeState();
     addFragment(state, 1, 'on_ground');
-    const v = addVehicle(state, { payload: { fragmentId: 1, massKg: 500 } });
+    const v = addVehicle(state, { cargo: [{ fragmentId: 1, massKg: 500 }] });
 
     const violations = assertWorldInvariants(state);
 
@@ -591,7 +592,7 @@ describe('assertWorldInvariants — I8_payload_not_in_transit', () => {
   it('violation when payload names a fragment that is already stored', () => {
     const state = makeState();
     addFragment(state, 1, 'stored');
-    const v = addVehicle(state, { payload: { fragmentId: 1, massKg: 500 } });
+    const v = addVehicle(state, { cargo: [{ fragmentId: 1, massKg: 500 }] });
 
     const violations = assertWorldInvariants(state);
 
@@ -684,5 +685,26 @@ describe('assertWorldInvariants — acceptance', () => {
     // throws 'not implemented' at this stage, same red-phase failure as the
     // direct assertWorldInvariants calls above.
     expectNoWorldInvariantViolations(ctx.state!);
+  });
+});
+
+describe('assertWorldInvariants — I8 with several cargo items (#1370)', () => {
+  it('no violation when every cargo item is in_transit', () => {
+    const state = makeState();
+    addFragment(state, 1, 'in_transit');
+    addFragment(state, 2, 'in_transit');
+    addVehicle(state, { cargo: [{ fragmentId: 1, massKg: 500 }, { fragmentId: 2, massKg: 500 }] });
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it('one violation naming only the item that is not in_transit', () => {
+    const state = makeState();
+    addFragment(state, 1, 'in_transit');
+    addFragment(state, 2, 'on_ground');
+    addVehicle(state, { cargo: [{ fragmentId: 1, massKg: 500 }, { fragmentId: 2, massKg: 500 }] });
+    const violations = assertWorldInvariants(state);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.kind).toBe('I8_payload_not_in_transit');
+    expect(violations[0]!.fragmentId).toBe(2);
   });
 });

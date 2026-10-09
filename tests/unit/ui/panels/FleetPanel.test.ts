@@ -19,7 +19,7 @@ import type {
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100,
-    payload: null,
+    cargo: [],
     occupantIds: [],
     ...overrides,
   };
@@ -620,6 +620,37 @@ function makeLicensedTruckDriver(overrides: Partial<Employee> = {}): Employee {
 function repositionBtn(panel: FleetPanel): HTMLButtonElement {
   return panel.root.querySelector('.bs-fleet-reposition-btn') as HTMLButtonElement;
 }
+
+describe('FleetPanel — Upgrade button (#1401)', () => {
+  function upgradeBtn(panel: FleetPanel): HTMLButtonElement {
+    return panel.root.querySelector('[data-action="upgrade"]') as HTMLButtonElement;
+  }
+
+  it('is enabled when cash covers the upgrade', () => {
+    const { panel } = makePanel();
+    const state = makeState([makeVehicle({ id: 2, tier: 1 })]);
+    state.cash = 1e9;
+    panel.update(state);
+    expect(upgradeBtn(panel).disabled).toBe(false);
+  });
+
+  it('is disabled when cash is short', () => {
+    const { panel } = makePanel();
+    const state = makeState([makeVehicle({ id: 2, tier: 1 })]);
+    state.cash = 0;
+    panel.update(state);
+    expect(upgradeBtn(panel).disabled).toBe(true);
+  });
+
+  it('is disabled at tier 3 with the max-tier explanation', () => {
+    const { panel } = makePanel();
+    const state = makeState([makeVehicle({ id: 2, tier: 3 })]);
+    state.cash = 1e9;
+    panel.update(state);
+    expect(upgradeBtn(panel).disabled).toBe(true);
+    expect(upgradeBtn(panel).title).toBe(t('ui.fleet.upgrade_max'));
+  });
+});
 
 describe('FleetPanel — Reposition button (#1092)', () => {
   it('is disabled and explains why when the vehicle is reserved for a task', () => {

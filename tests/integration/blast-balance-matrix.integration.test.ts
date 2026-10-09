@@ -9,7 +9,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
 import { summariseMuckPile } from '../../src/core/mining/MuckPileSummary.js';
@@ -62,7 +61,7 @@ function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, stemming);
-  const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+  const plan = assembleBlastPlan(holes, charges);
 
   const result = executeBlast(plan, grid, []);
   expect(result, 'blast plan was rejected').not.toBeNull();

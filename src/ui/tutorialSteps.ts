@@ -99,7 +99,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
 
   // ── Step 3a-i: build-living-quarters ──
-  // #681: the box-cut/drill-plan/charge/sequence stretch that follows runs
+  // #681: the box-cut/drill-plan/charge stretch that follows runs
   // this same 2-person crew continuously for ~400 ticks with nothing to
   // protect their well-being. Nothing built this early forces a revolt on
   // its own, but leaving the gap open does: #680's own survivability model
@@ -219,7 +219,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
   // ── Step 5: drill-plan ──
   // #554-followup: drilling is real, queued work (was instant pre-#553) --
-  // same waitsOnWork gap as 'charge'/'sequence' below, just on the drilling
+  // same waitsOnWork gap as 'charge' below, just on the drilling
   // stage: isComplete fires after the FIRST ordered hole lands, not all of
   // them, so without waitsOnWork the rail holds the clock (tutorialGuide.ts's
   // decideClock) well before a multi-hole grid finishes drilling -- and once
@@ -239,13 +239,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   //
   // #926: not a createComparisonStep any more -- its generic "value
   // increased" fired the instant the FIRST of nine holes charged, moving the
-  // tutorial on to 'sequence' while the crew was still mid-charge. The panel
+  // tutorial on while the crew was still mid-charge. The panel
   // (suggestStep, BlastWorkshop.ts) rightly keeps showing the Charge tab
-  // until every hole is charged, so the 'sequence' rail -- whose target
-  // lives inside the Sequence tab body -- had nothing reachable and nothing
-  // to fall back to but an already-satisfied "open the Blast panel" hint.
-  // Completion now matches suggestStep's own criterion exactly, so the step
-  // and the panel never disagree about which one is current.
+  // until every hole is charged. Completion now matches suggestStep's own
+  // criterion exactly, so the step and the panel never disagree about which one is current.
   {
     id: 'charge',
     titleKey: 'tutorial.step6.title',
@@ -260,23 +257,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       return holes.length > 0 && holes.every((h) => chargesByHole[h.id]);
     },
   },
-
-  // ── Step 6: sequence ──
-  // #554: `createComparisonStep`'s own isComplete fires the instant its
-  // tracked value first ticks up past its snapshot -- the preceding 'charge'
-  // step (see its own note above) advances to this one after the FIRST of 16
-  // holes charges, not after all of them, since charging is now real, queued
-  // work (was instant pre-#554). The crew is still genuinely mid-charge for
-  // a while after this stage's card is showing, so it needs the same
-  // waitsOnWork treatment as 'charge' -- otherwise the clock holds after
-  // DEFAULT_TICK_BUDGET ticks of sequencedCount staying at 0, permanently:
-  // once held, the driller can never finish charging (task dispatch only
-  // runs on ticks, and each subsequent `tick N` scenario command is capped
-  // to 1 real tick while the clock is held), so nothing can ever un-hold it.
-  // isWorkInProgress (tutorialGuide.ts) checks global pending actions/active
-  // employee work, not this step's own subject, so it correctly keeps the
-  // clock running while the charging crew is still busy.
-  createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['sequence auto delay_step:25'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 6b: evacuate-zone ── (#557 — see createEvacuateZoneStep)
   createEvacuateZoneStep(),
@@ -305,7 +285,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'blast',
     titleKey: 'tutorial.step8.title',
     textKey: 'tutorial.step8',
-    commands: ['blast'],
+    // No command: DETONATE (the evacuate-zone step) fires the blast itself (#1362).
     highlightTarget: TOOLBAR_TARGET.blast,
     captureSnapshot: (state: GameState) => ({
       prevValue: (state.levelStats?.blastsPerformed ?? 0) + Object.keys(state.collectedOre ?? {}).length,
@@ -313,7 +293,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
       const prev = snapshot.prevValue as number;
       const value = (state.levelStats?.blastsPerformed ?? 0) + Object.keys(state.collectedOre ?? {}).length;
-      return value > prev && !isBlastReportOutstanding();
+      // A blast fired at once by DETONATE (#1362) already counted in the snapshot.
+      const firedEarlier = (state.levelStats?.blastsPerformed ?? 0) > 0;
+      return (value > prev || firedEarlier) && !isBlastReportOutstanding();
     },
   },
 
@@ -402,7 +384,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // work before the freight_warehouse count actually moves. Without
   // waitsOnWork the rail's clock-hold (tutorialGuide.ts's decideClock) treats
   // the step as already resolved and stalls waiting on a count that hasn't
-  // changed yet -- same gap 'drill-plan'/'charge'/'sequence' document above.
+  // changed yet -- same gap 'drill-plan'/'charge' document above.
   // tickBudget 60 comfortably clears the build plus walk time.
   createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:8,18'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
 
@@ -448,7 +430,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // this step opened) rather than a fixed cycle count, so it self-adjusts
   // regardless of how many accept/deliver rounds that turns out to take —
   // exactly createComparisonStep's "value increased since snapshot" shape,
-  // like 'drill-plan'/'sequence' above. `completedHistory` also holds
+  // like 'drill-plan' above. `completedHistory` also holds
   // EXPIRED contracts (Contract.ts's checkDeadlines pushes there too), so
   // the count is filtered to `completed: true` — a contract that merely
   // timed out with a penalty must not falsely advance this step without a

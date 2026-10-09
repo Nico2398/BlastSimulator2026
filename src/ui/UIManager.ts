@@ -115,6 +115,7 @@ export class UIManager {
     // Shared confirm-before-destructive-action overlay — no owner panel of
     // its own; CrewPanel/FleetPanel (P6) will reach it once they exist.
     this.confirmModal = new ConfirmModal(container);
+    this.blastUI.setConfirmHandler(config => this.confirmModal.show(config));
     this.contractsPanel = new ContractsPanel(leftCol);
     this.contractsPanel.setCloseHandler(() => this.hideAllPanels());
     this.contractsPanel.setNavigateHandler((panel) => this.showPanel(panel));
@@ -413,7 +414,7 @@ export class UIManager {
     this.notify({ severity: 'warn', title: message, body: '' });
   }
 
-  update(state: GameState, tutorialActive: boolean = false, blastPlaybackDurationS: number = 0): void {
+  update(state: GameState, blastPlaybackDurationS: number = 0): void {
     const weather = state.weather.current;
     this.topBar.update(state, this.notificationCenter);
     this.toasts.update(this.notificationCenter);
@@ -437,7 +438,7 @@ export class UIManager {
     }
 
     // Update active panel
-    if (this.blastUI.visible) this.blastUI.update(state, weather, tutorialActive);
+    if (this.blastUI.visible) this.blastUI.update(state, weather);
     // Unconditional, like eventModal below: each is cheap when not relevant
     // (PreflightModal no-ops while closed; BlastReportModal no-ops until
     // lastBlastReport's tick actually changes) and neither's visibility is

@@ -3,11 +3,11 @@
   "description": "Visual check (#921 retarget): a vehicle's driver is claimed automatically now — a qualified, idle employee boards a free vehicle of the right role on their own the moment a vehicle-gated task needs one (VehicleReservation.ts / ArrivalGate.resolveBoarding / VehicleBoarding.ts's requestBoardVehicle). Player-facing driver assignment/unassignment is gone: no click anywhere in this file's own role:'player' steps targets an Assign/Unassign control, and no step issues the console-only `vehicle driver` command (that command still exists — assignDriver/unassignDriver are called directly by the automatic reservation/boarding path itself — but nothing here calls it manually). Buys a drill_rig, hires and licenses a driller, orders a drill plan (drill_hole is a vehicle-gated PendingAction requiring the drill_rig role, same gate #553 put on drilling), and watches the vehicle get itself a driver as the holes actually land.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:100000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:100000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:100000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:100000"
         }
       ],
       "description": "cash:100000 funds the drill_rig ($35,000) and the driller hire ($1,000) bought/hired below, with headroom left over for payroll/fuel/maintenance while the automatic claim-and-drill sequence runs its real course.",

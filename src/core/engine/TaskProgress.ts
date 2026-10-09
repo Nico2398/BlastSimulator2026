@@ -10,6 +10,9 @@ import { gainXp, type Employee, type SkillCategory } from '../entities/Employee.
 import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { repairHpThisTick, repairPartsCost } from '../entities/VehicleRepair.js';
+import { deductExpense } from '../economy/Finance.js';
+import { workRate } from '../events/ActiveModifiers.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
 
@@ -47,6 +50,27 @@ export interface TaskProgressResult {
 }
 
 /**
+ * One tick of repair work (#1393): restore this tick's hp share on the live
+ * vehicle and charge its parts. Totals REPAIR_PARTS_COST_PER_HP per restored hp.
+ */
+function tickRepairWork(state: GameState, vehicleId: unknown, ticksRemaining: number): void {
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  if (vehicle === undefined) return;
+  const restored = repairHpThisTick(vehicle, ticksRemaining);
+  if (restored <= 0) return;
+  vehicle.hp += restored;
+  deductExpense(state, repairPartsCost(restored), 'vehicle_maintenance', `Vehicle repair parts: vehicle ${vehicle.id}`);
+}
+
+/** Adds this tick's rate to the employee's carried fraction and returns how many whole ticks of work that completes. */
+function takeWholeWorkTicks(emp: Employee, rate: number): number {
+  const total = (emp.workProgressCarry ?? 0) + rate;
+  const whole = Math.floor(total + 1e-9);
+  emp.workProgressCarry = Math.max(0, total - whole);
+  return whole;
+}
+
+/**
  * Advance an employee's dispatched task toward completion, granting XP and
  * reporting completion when taskTicksRemaining reaches zero. Mirrors
  * ShiftCycle.ts's completeRestTick shape for taskTicksRemaining instead of
@@ -59,6 +83,18 @@ export interface TaskProgressResult {
  */
 export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter, grid?: VoxelGrid): TaskProgressResult | null {
   if (emp.taskTicksRemaining === null) return null;
+
+  // Event modifiers (#1414): a stoppage freezes the task, a slowdown lets only some ticks count
+  // (the fraction left over carries to the next tick), a boost counts more than one.
+  // Rest is exempt, as it is from actionBlocked: an exhausted crew still recovers during a strike.
+  const rate = emp.pendingActionType === 'rest' ? 1 : workRate(state.events.activeModifiers, emp.role, state.tickCount);
+  const workTicks = rate === 1 ? 1 : takeWholeWorkTicks(emp, rate);
+  if (workTicks === 0) return null;
+  emp.taskTicksRemaining -= workTicks - 1;
+
+  if (emp.pendingActionType === 'repair_vehicle' && emp.pendingActionPayload) {
+    tickRepairWork(state, emp.pendingActionPayload['vehicleId'], emp.taskTicksRemaining);
+  }
 
   emp.taskTicksRemaining -= 1;
 

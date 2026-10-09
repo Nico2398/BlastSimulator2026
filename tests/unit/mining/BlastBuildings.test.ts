@@ -20,7 +20,6 @@ import {
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import {
   assembleBlastPlan,
   checkProtectedPositions,
@@ -35,11 +34,11 @@ import {
   blastCommand,
   chargeCommand,
   drillPlanCommand,
-  sequenceCommand,
 } from '../../../src/console/commands/mining.js';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 
 import {
@@ -73,7 +72,7 @@ function fillRegion(
 }
 
 /**
- * Build a fully-charged, sequenced BlastPlan from a set of DrillHoles.
+ * Build a fully-charged BlastPlan from a set of DrillHoles.
  * Uses dynatomics (1300 energy/kg × 5 kg = 6500 raw energy) — more than
  * enough to fracture cruite (energyAbsorption 200) anywhere in the blast zone.
  */
@@ -82,8 +81,7 @@ function makeBlastPlan(holes: DrillHole[]) {
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;
   const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 5, 1);
-  const delays = autoVPattern(holes, 25);
-  return assembleBlastPlan(holes, charges, delays);
+  return assembleBlastPlan(holes, charges);
 }
 
 /**
@@ -525,7 +523,6 @@ function makeBlastContextWithWarehouse(kg: number) {
     for (const e of state.employees.employees) e.fatigue = 100;
     tickCommand(ctx, ['1'], {});
   }
-  sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   const hole = state.drillHoles[0]!;
   placeBuilding(state.buildings, 'explosive_warehouse', Math.floor(hole.x), Math.floor(hole.z), 32, 32);
   const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
@@ -570,11 +567,17 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     state.cash = 1_000_000;
     const accidentsBefore = state.damage.accidents.length;
 
+    equipDemolition(ctx);
+    state.cash = 1_000_000;
+
     const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
 
+    // The order itself warns the player what the demolition will cost them (#1392).
     expect(result.success).toBe(true);
-    expect(result.output).toContain('80 kg of stored explosives were lost');
+    expect(result.output).toContain('80 kg of stored explosives');
     expect(result.output).toContain('no detonation');
+    expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(true);
+    tickUntilDemolished(ctx);
     expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(false);
     expect(state.damage.accidents.length).toBe(accidentsBefore);
     expect(state.lastBlastReport?.secondaryBlasts ?? []).toEqual([]);
@@ -585,10 +588,11 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32);
     const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
+    equipDemolition(ctx);
     state.cash = 1_000_000;
     const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toContain('stored explosives were lost');
+    expect(result.output).not.toContain('stored explosives');
   });
 });
 

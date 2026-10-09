@@ -3,11 +3,11 @@
   "description": "Chapter 2: Add 4 haulers with drivers, converge 3 of them on one tile. Finding #21: TrafficJamEvent never actually fires here, at any tick budget — a direct engine trace confirms why: the redirect happens only 5 ticks after the initial move commands, nowhere near enough travel time from the shared vehicle spawn point to reach the 3 separate staging tiles first, so all 3 vehicles travel in perfect lockstep the whole way and arrive together with no contention. the jam detector (TrafficJams.ts) also requires TRAFFIC_JAM_MIN_AGENTS=3 agents simultaneously stuck at the same chokepoint for TRAFFIC_JAM_MIN_TICKS (see balance.ts) ticks; with only 3 vehicles converging (1 occupies the tile, at most 2 can ever be blocked waiting on it), that threshold is structurally out of reach regardless of timing — a real jam would need a 4th vehicle also converging on the same point. This file exercises real vehicle pathing/redirection but does not exercise TrafficJamEvent; assertions reflect that.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:150000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:150000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:150000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:150000"
         }
       ],
       "role": "setup",
@@ -99,6 +99,17 @@
           "employeeCount": 3
         }
       }
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds HIRING_POOL_SIZE (3) candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
     },
     {
       "command": "employee hire role:driver",
