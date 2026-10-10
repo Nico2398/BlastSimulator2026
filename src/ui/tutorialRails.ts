@@ -184,6 +184,11 @@ export class TutorialRails {
     if (state) state.isPaused = false;
   }
 
+  /** Reconcile the clock after the tutorial is resumed (#1627). */
+  settleClockAfterResume(_state: GameState): void {
+    // TODO: implement
+  }
+
   get clockHeld(): boolean {
     return this.held;
   }

@@ -32,6 +32,9 @@ export const SPEED_BUTTON_GROUP = '#bs-hud-top .bs-speed-btn button[data-speed]'
  *  new rails entry (#1041). */
 export const PANEL_OPEN_SELECTOR = '[data-panel]';
 
+/** The HUD pause/resume toggle (#1627). */
+export const PAUSE_TOGGLE_SELECTOR = 'button[data-action="pause-toggle"]';
+
 /** The tutorial card's exit button (#1332). */
 export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
 
