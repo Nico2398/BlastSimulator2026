@@ -4,7 +4,8 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
-import { executeBlast, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { executeBlastSteps, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments } from '../../../core/economy/Logistics.js';
@@ -67,6 +68,11 @@ function blastDetonate(ctx: MiningContext): CommandResult {
   if (!armed.success) return { success: false, output: armed.error };
   const phase = detonationPhase(ctx.state!);
   if (phase.kind !== 'ready') return { success: true, output: phaseLine(phase) };
+  if (ctx.sliceBlasts === true) {
+    // Resolved over the next frames instead (#1603); its report lands with it.
+    ctx.blastJob = fireBlastSteps(ctx);
+    return { success: true, output: phaseLine(phase) };
+  }
   return fireBlast(ctx);
 }
 
@@ -80,9 +86,21 @@ function blastStatus(ctx: MiningContext): CommandResult {
 }
 
 /** Fire the loaded pattern immediately, dropping any armed detonation. */
-export function fireBlast(
+function fireBlast(
   ctx: MiningContext,
 ): CommandResult {
+  return drain(fireBlastSteps(ctx));
+}
+
+/**
+ * `fireBlast`, yielding between slices of the blast (#1603, Steps.ts) so the
+ * browser can resolve a large one over several frames. Nothing else may touch
+ * the game until it returns: `ctx.blastJob` holds it, and every command
+ * finishes it first.
+ */
+export function* fireBlastSteps(
+  ctx: MiningContext,
+): Steps<CommandResult> {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
@@ -105,7 +123,7 @@ export function fireBlast(
 
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
-  const result = executeBlast(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
+  const result = yield* executeBlastSteps(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
   if (!result) return { success: false, output: t('mining.blast.execution_failed') };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
@@ -204,6 +222,7 @@ export function fireBlast(
     recordStockLosses();
   }
   thisBlastAccidents.push(...impacts);
+  yield;
 
   // Stocked explosive warehouses destroyed by the blast or by flying rock
   // detonate in turn (#1394). resolveSecondaryBlasts records its accidents on
@@ -257,6 +276,7 @@ export function fireBlast(
   snapshotStats(state.levelStats, state);
 
   // Trigger one post-blast ore report event when conditions are met.
+  yield;
   const oreReport = computeBlastOreReport(result.fragments, state.surveyResults);
   state.lastOreReport = oreReport;
   // After the report: it compares against estimates that were fresh pre-blast.
@@ -266,7 +286,9 @@ export function fireBlast(
   // Track blast fragments in logistics for contract delivery. collectedOre is
   // only credited once a fragment is hauled and delivered to a warehouse
   // (see Logistics.deliverToDepot), not the instant the blast resolves.
+  yield;
   addBlastFragments(state.logistics, result.fragments, state.navGrid);
+  yield;
 
   // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
   ctx.lastBlastHoles = [...state.drillHoles];

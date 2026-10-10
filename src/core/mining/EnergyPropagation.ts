@@ -14,6 +14,7 @@
 // See the gameplay-blast-system skill, "Step 1 — Energy Propagation".
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { drain, type Steps } from '../engine/Steps.js';
 import { getRock } from '../world/RockCatalog.js';
 import { tierShortfall, tierThresholdFactor, dominantRockTierAt } from './ExplosiveRockFit.js';
 import {
@@ -25,6 +26,7 @@ import {
   UNCONFINED_THRESHOLD_FACTOR,
   CONFINEMENT_FULL_DEPTH,
   FREE_FACE_BIAS,
+  BLAST_SLICE_CELLS,
 } from '../config/balance.js';
 
 // ── Geometry ────────────────────────────────────────────────────────────────
@@ -185,8 +187,8 @@ export function computeDistanceToAir(field: EnergyField): Float32Array {
   return field.distAir;
 }
 
-/** Fill `field.distAir` by multi-source BFS from every air cell. */
-function fillDistanceToAir(field: EnergyField): void {
+/** Fill `field.distAir` by multi-source BFS from every air cell, yielding every `BLAST_SLICE_CELLS` cells. */
+function* fillDistanceToAir(field: EnergyField): Steps<void> {
   const { nx, ny } = field;
   const count = field.air.length;
   const far = nx + ny + field.nz;
@@ -205,6 +207,7 @@ function fillDistanceToAir(field: EnergyField): void {
 
   // The box edge borders rock we cannot see; treat it as confined, not open.
   while (head < tail) {
+    if ((head & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     const i = queue[head++]!;
     const d = dist[i]!;
     const lx = i % nx;
@@ -288,6 +291,15 @@ export function createEnergyField(
   box: BlastBox,
   explosiveTierAt?: (x: number, z: number) => number,
 ): EnergyField {
+  return drain(createEnergyFieldSteps(grid, box, explosiveTierAt));
+}
+
+/** `createEnergyField`, yielding between slabs of the box (#1603). */
+export function* createEnergyFieldSteps(
+  grid: VoxelGrid,
+  box: BlastBox,
+  explosiveTierAt?: (x: number, z: number) => number,
+): Steps<EnergyField> {
   const nx = box.maxX - box.minX;
   const ny = box.maxY - box.minY;
   const nz = box.maxZ - box.minZ;
@@ -308,6 +320,7 @@ export function createEnergyField(
 
   // Pass 1: what is rock, and what does that rock cost to break in confinement.
   for (let z = box.minZ; z < box.maxZ; z++) {
+    yield;
     for (let y = box.minY; y < box.maxY; y++) {
       for (let x = box.minX; x < box.maxX; x++) {
         const i = indexOf(field, x, y, z);
@@ -327,7 +340,7 @@ export function createEnergyField(
 
   // Pass 2: distance to the nearest free face needs the finished air mask, and
   // the thresholds need that distance — rock near a face breaks for less.
-  fillDistanceToAir(field);
+  yield* fillDistanceToAir(field);
   for (let i = 0; i < count; i++) {
     if (field.air[i] === 1) continue;
     field.threshold[i] = field.threshold[i]! * confinementFactor(field.distAir[i]!);
@@ -401,6 +414,11 @@ export function buildHoleSeeds(
  * damped away, vented into air, or stranded when the iteration guard trips.
  */
 export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): void {
+  drain(seedEnergySteps(field, seeds));
+}
+
+/** `seedEnergy`, yielding every `BLAST_SLICE_CELLS` frontier cells (#1603). */
+export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[]): Steps<void> {
   // The frontier lives in flat arrays over the box rather than Maps: one wave
   // of a large blast revisits tens of thousands of cells, and a Map allocated
   // per wave is what used to dominate this function's cost.
@@ -453,6 +471,7 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
     iterations++;
 
     for (let a = 0; a < currentCount; a++) {
+      if ((a & (BLAST_SLICE_CELLS - 1)) === 0) yield;
       const i = currentActive[a]!;
       const incoming = currentEnergy[i]!;
       currentEnergy[i] = 0;

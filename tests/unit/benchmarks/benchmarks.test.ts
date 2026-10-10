@@ -26,6 +26,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
+import { classifyQueuedOrders } from '../../../src/core/engine/OrderReachability.js';
+import { DEBRIS_CLASSIFY_PER_TICK } from '../../../src/core/config/balance.js';
 import { claimOnePoolCandidate } from '../../../src/core/engine/EmployeeDispatchSteps.js';
 import { selectBestActionForEmployee } from '../../../src/core/engine/ActionSelection.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -671,25 +673,40 @@ describe('Dispatch over a post-blast debris field (6000 fragments, 6000 haul act
 });
 
 describe('Haul dispatch right after a large blast (6000 new fragments) (#1603)', () => {
-  it('queues and classifies every new haul order in one pass, under 250ms', () => {
+  it('queues every new haul order in one pass, then colours them a slice per tick', () => {
     // Warmup on a separate field so the measured pass is not paying JIT.
-    setupDebrisFieldState(500);
+    const warm = setupDebrisFieldState(500).state;
+    syncHaulDispatch(warm);
+    classifyQueuedOrders(warm, DEBRIS_CLASSIFY_PER_TICK);
 
     const state = createGame({ seed: 42 });
     const { state: seeded } = setupDebrisFieldState(6000);
     // Same fragments, not yet dispatched: the first tick after the blast.
     state.logistics = seeded.logistics;
+    state.navGrid = seeded.navGrid;
     state.logistics.storageCapacityKg = 6000 * 100;
 
-    const start = performance.now();
+    let start = performance.now();
     syncHaulDispatch(state);
-    const elapsed = performance.now() - start;
-
+    const queueMs = performance.now() - start;
     expect(state.pendingActions.length).toBe(6000);
-    // Classified, not left uncoloured: every order's ghost carries a verdict.
-    expect(state.pendingActions.every(a => a.blockedReason !== undefined)).toBe(true);
+
+    // The tick's own pass judges a bounded slice, rotating until every order
+    // carries a verdict — never the whole field in one frame.
+    const coloured = () => state.pendingActions.filter(a => a.blockedReason !== undefined).length;
+    start = performance.now();
+    classifyQueuedOrders(state, DEBRIS_CLASSIFY_PER_TICK);
+    const sliceMs = performance.now() - start;
+    expect(coloured()).toBe(DEBRIS_CLASSIFY_PER_TICK);
+    for (let pass = 1; pass < Math.ceil(6000 / DEBRIS_CLASSIFY_PER_TICK); pass++) {
+      classifyQueuedOrders(state, DEBRIS_CLASSIFY_PER_TICK);
+    }
+    expect(coloured()).toBe(6000);
+
     // Classifying each order as it was queued re-scanned the whole queue per
-    // order — seconds here; the single batched pass is tens of milliseconds.
-    expect(elapsed).toBeLessThan(250);
+    // order — seconds here; queueing alone is a few milliseconds, and one
+    // tick's slice stays well inside a frame.
+    expect(queueMs).toBeLessThan(100);
+    expect(sliceMs).toBeLessThan(25);
   });
 });

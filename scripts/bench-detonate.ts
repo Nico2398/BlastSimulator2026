@@ -21,11 +21,22 @@
  *
  *   npm run bench:detonate                    # 6-hole blast (blast-basic)
  *   npm run bench:detonate -- --blast large   # 30-hole, ~4500-fragment blast
+ *   npm run bench:detonate -- --mode frames   # the player's flow, frame by frame
+ *
+ * `--mode frames` plays it as a player does — DETONATE arms the shot, the crew
+ * evacuates at 1x, the game fires on its own — and times every animation-frame
+ * callback (simulation ticks, renderer update, UI) from the press until a few
+ * seconds after the blast, with GPU drawing off so a software rasteriser's
+ * seconds-long draws do not drown the CPU cost. It prints the worst frames and
+ * the commands that ran inside them, and exits 1 when any frame exceeds
+ * `--budget` milliseconds (default 16.7, one 60 fps frame). `--profile <file>`
+ * also records a main-thread CPU profile of the measured window, for DevTools.
  *
  * Without a GPU every frame takes seconds and link times are inflated several
  * times over; compare counts across runs, and times only within one machine.
  */
 
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import puppeteer, { type Page } from 'puppeteer';
 import { createServer } from 'vite';
@@ -103,6 +114,45 @@ const PROGRAM_LOG_HOOK = `(() => {
   }
 })()`;
 
+/** Installed before any page script: times every animation-frame callback, and each game command inside one. */
+const FRAME_HOOK = `(() => {
+  window.__frames = [];
+  window.__frameRec = false;
+  window.__outsideCmds = [];
+  window.__longTasks = [];
+  const raf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = cb => raf(t => {
+    const frame = { t, start: performance.now(), ms: 0, cmds: [] };
+    window.__curFrame = frame;
+    try { cb(t); } finally {
+      frame.ms = performance.now() - frame.start;
+      window.__curFrame = null;
+      if (window.__frameRec) window.__frames.push(frame);
+    }
+  });
+  try {
+    new PerformanceObserver(list => {
+      if (!window.__frameRec) return;
+      for (const e of list.getEntries()) window.__longTasks.push(Math.round(e.duration));
+    }).observe({ entryTypes: ['longtask'] });
+  } catch {}
+})()`;
+
+/** Wraps the console bridge (once the game defined it) so each command is timed into its frame. */
+const TIME_COMMANDS = `(() => {
+  const run = window.__gameConsole;
+  window.__gameConsole = cmd => {
+    const start = performance.now();
+    const result = run(cmd);
+    const entry = [cmd.slice(0, 40), performance.now() - start];
+    if (window.__curFrame) window.__curFrame.cmds.push(entry);
+    else if (window.__frameRec) window.__outsideCmds.push(entry);
+    return result;
+  };
+})()`;
+
+interface FrameRecord { t: number; ms: number; cmds: Array<[string, number]> }
+
 /** Runs in the page: fires the blast and watches WATCH_MS of frames after it. */
 const DETONATE = `(async () => {
   const before = window.__programLinks.length;
@@ -143,7 +193,75 @@ async function tickUntil(page: Page, done: () => Promise<boolean>, what: string)
   throw new Error(`gave up waiting for ${what} after 10000 ticks`);
 }
 
+/** Value after `--name` on the command line, or `fallback`. */
+function arg(name: string, fallback: string): string {
+  const i = process.argv.indexOf(name);
+  return i >= 0 ? process.argv[i + 1] ?? fallback : fallback;
+}
+
+/**
+ * The player's flow: arm with DETONATE, let the crew clear the zone at 1x and
+ * the game fire on its own, then keep running a few seconds. Frame callbacks are
+ * summed per frame (several can share one), so a frame's time is all the main
+ * thread did for it.
+ */
+async function measureFrames(page: Page, budgetMs: number, profilePath: string | null): Promise<number> {
+  await page.evaluate(TIME_COMMANDS);
+  const cdp = profilePath === null ? null : await page.createCDPSession();
+  if (cdp !== null) {
+    await cdp.send('Profiler.enable');
+    await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+  }
+  await command(page, 'time speed 1');
+  await command(page, 'time resume'); // a new game starts paused
+  await page.evaluate('window.__frames = []; window.__outsideCmds = []; window.__longTasks = []; window.__frameRec = true');
+  const armed = await command(page, 'blast detonate');
+  if (cdp !== null) await cdp.send('Profiler.start');
+  console.log(`  armed: ${armed.split('\n')[0]}`);
+  // The crew walks out at 1x before the game fires; bounded, so a stranded crew fails loudly.
+  for (let waited = 0; !(await page.evaluate('window.__gameState()?.holeCount === 0')); waited += 500) {
+    if (waited > 300000) {
+      const why = await page.evaluate(`JSON.stringify({ tick: window.__gameState()?.tickCount, paused: window.__gameState()?.isPaused, status: window.__gameConsole('blast status').output, menu: getComputedStyle(document.getElementById('bs-main-menu') ?? document.body).display })`);
+      throw new Error(`the armed blast never fired within 300 s: ${why}`);
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  const firedAt = await page.evaluate('performance.now()') as number;
+  await new Promise(r => setTimeout(r, 6000));
+  await page.evaluate('window.__frameRec = false');
+  if (cdp !== null && profilePath !== null) {
+    const { profile } = await cdp.send('Profiler.stop');
+    writeFileSync(profilePath, JSON.stringify(profile));
+    console.log(`  CPU profile: ${profilePath}`);
+  }
+  const raw = await page.evaluate('window.__frames') as FrameRecord[];
+  const outside = await page.evaluate('window.__outsideCmds') as Array<[string, number]>;
+  const longTasks = await page.evaluate('window.__longTasks') as number[];
+
+  const byFrame = new Map<number, FrameRecord>();
+  for (const f of raw) {
+    const merged = byFrame.get(f.t);
+    if (merged) { merged.ms += f.ms; merged.cmds.push(...f.cmds); } else byFrame.set(f.t, { ...f, cmds: [...f.cmds] });
+  }
+  const frames = [...byFrame.values()];
+  const after = frames.filter(f => f.t >= firedAt - 2000);
+  const over = (limit: number) => frames.filter(f => f.ms > limit).length;
+  console.log(`  frames timed: ${frames.length} (${after.length} from 2 s before the blast on)`);
+  console.log(`  frames over 16.7 ms: ${over(16.7)}   over 33 ms: ${over(33)}   over 100 ms: ${over(100)}`);
+  console.log('  worst frames (ms, then commands run inside):');
+  for (const f of [...frames].sort((a, b) => b.ms - a.ms).slice(0, 10)) {
+    const cmds = f.cmds.filter(([, ms]) => ms >= 1).map(([c, ms]) => `${c} ${ms.toFixed(0)}`).join('; ');
+    console.log(`    ${f.ms.toFixed(1).padStart(7)}  @${((f.t - firedAt) / 1000).toFixed(2)}s  ${cmds}`);
+  }
+  for (const [c, ms] of outside.filter(([, ms]) => ms >= 5)) console.log(`  outside a frame: ${c} ${ms.toFixed(0)} ms`);
+  if (longTasks.length > 0) console.log(`  long tasks (ms): ${longTasks.join(' ')}`);
+  const worst = Math.max(0, ...frames.map(f => f.ms), ...outside.map(([, ms]) => ms));
+  return worst <= budgetMs ? 0 : 1;
+}
+
 async function main(): Promise<number> {
+  const mode = arg('--mode', 'shaders');
+  const budgetMs = Number(arg('--budget', '16.7'));
   const flag = process.argv.indexOf('--blast');
   const blastName = flag >= 0 ? process.argv[flag + 1] ?? '' : 'basic';
   const setup = BLASTS[blastName];
@@ -159,6 +277,7 @@ async function main(): Promise<number> {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
     await page.evaluateOnNewDocument(PROGRAM_LOG_HOOK);
+    await page.evaluateOnNewDocument(FRAME_HOOK);
     await page.goto(`http://localhost:${PORT}`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction('typeof window.__gameConsole === "function"', { timeout: 180000 });
 
@@ -170,6 +289,11 @@ async function main(): Promise<number> {
     await tickUntil(page, async () => (await gameField(page, 'holeCount')) >= setup.holes, 'drilling');
     await command(page, charge);
     await tickUntil(page, async () => (await gameField(page, 'orderedChargeCount')) === 0, 'charging');
+
+    if (mode === 'frames') {
+      console.log(`blast "${blastName}", frame by frame:`);
+      return await measureFrames(page, budgetMs, process.argv.includes('--profile') ? arg('--profile', '') : null);
+    }
 
     // Draw the loaded site long enough for every pre-blast shader to compile,
     // so only what detonate itself brings in is counted.

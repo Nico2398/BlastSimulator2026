@@ -10,13 +10,13 @@ import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '.
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
-import { refreshOrderReachability } from '../engine/OrderReachability.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { haulDestinationOf, isBarrenFragment } from './SpoilHeaps.js';
 import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
+import { findById } from '../state/IdIndex.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -47,12 +47,10 @@ export function syncHaulDispatch(state: GameState): void {
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
-  let dispatched = false;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
 
-    dispatched = true;
     const oversized = isOversized(tracked.fragment.volume);
     const actionId = state.nextPendingActionId++;
     const targetX = Math.round(tracked.fragment.position.x);
@@ -64,6 +62,8 @@ export function syncHaulDispatch(state: GameState): void {
     // skipQualificationCheck: true because these must be able to sit queued
     // silently with no hauler/driver/depot available yet and pick up later
     // once the situation changes, never rejected outright.
+    // deferClassification: a blast lands thousands of fragments at once; the
+    // tick's own classifyQueuedOrders colours them a slice at a time (#1603).
     dispatchPendingAction(state, {
       id: actionId,
       type: oversized ? 'fragment_debris' : 'haul_debris',
@@ -78,7 +78,6 @@ export function syncHaulDispatch(state: GameState): void {
 
     coveredFragmentIds.add(tracked.fragment.id);
   }
-  if (dispatched) refreshOrderReachability(state);
 }
 
 /**
@@ -88,35 +87,27 @@ export function syncHaulDispatch(state: GameState): void {
 export type FragmentLookup = (fragmentId: number) => TrackedFragment | undefined;
 
 /**
- * Build a lazy id → TrackedFragment index over `state.logistics.fragments`
- * for one dispatch pass.
+ * An id → TrackedFragment resolver over `state.logistics.fragments`.
  *
  * `logistics.fragments` is a plain array, so resolving an action's fragment
  * is a linear `find`. The claim-time gate calls it once per pool action, for
  * every idle employee, every tick — after a large blast that is
  * O(employees × actions × fragments) per tick, with actions ≈ fragments in
  * the thousands: `level1-lose-ecology.json` spent 126 of its 137 s in that
- * one `find`. Every caller that walks the pool builds this once and hands
- * it to the gate, so the pass is O(actions + fragments).
+ * one `find`. Every caller that walks the pool resolves through this instead.
  *
- * The index is built on first use and is never kept past the pass that
- * created it — nothing here can go stale, because nothing that adds or
- * removes a fragment (`addBlastFragments`, `sellFragment`, a boulder split)
- * runs inside a claim pass, and a fragment's own `state` transitions mutate
- * the object the index holds. First occurrence wins, exactly like `find`.
+ * The index behind it (`findById`, IdIndex.ts) outlives the pass, since
+ * rebuilding it for every search was itself a per-tick cost after a large
+ * blast (#1603); fragments are only ever appended (`addBlastFragments`, a
+ * boulder split) or spliced out (`sellFragment`, delivery), which is what it
+ * relies on. A fragment's own `state` transitions mutate the object the array
+ * holds. First occurrence wins, exactly like `find`.
  */
 export function createFragmentLookup(state: GameState): FragmentLookup {
-  let byId: Map<number, TrackedFragment> | null = null;
-  return (fragmentId) => {
-    if (byId === null) {
-      byId = new Map();
-      for (const tracked of state.logistics.fragments) {
-        if (!byId.has(tracked.fragment.id)) byId.set(tracked.fragment.id, tracked);
-      }
-    }
-    return byId.get(fragmentId);
-  };
+  return fragmentId => findById(state.logistics.fragments, fragmentIdOf, fragmentId);
 }
+
+const fragmentIdOf = (tracked: TrackedFragment): number => tracked.fragment.id;
 
 /**
  * Resolve the TrackedFragment a haul_debris/fragment_debris action's

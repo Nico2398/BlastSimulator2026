@@ -471,8 +471,13 @@ describe('mining.ts #797 survey failed (runSurvey mocked past no_surveyor/insuff
   });
 });
 
-describe('mining.ts #797 blast execution failed (executeBlast mocked to null) â€” English literal + fr divergence', () => {
+describe('mining.ts #797 blast execution failed (executeBlastSteps mocked to null) â€” English literal + fr divergence', () => {
   const BLAST_EXECUTION_FAILED_EN = 'Blast execution failed.';
+
+  // The blast command runs the resumable pipeline (#1603); a failed one returns null.
+  function* failedBlast(): ReturnType<typeof BlastExecutionModule.executeBlastSteps> {
+    return null;
+  }
 
   function makeChargedPlan(ctx: MiningContext): void {
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
@@ -488,7 +493,7 @@ describe('mining.ts #797 blast execution failed (executeBlast mocked to null) â€
   it('matches the exact English literal by default', () => {
     const ctx = makeMiningContext();
     makeChargedPlan(ctx);
-    vi.spyOn(BlastExecutionModule, 'executeBlast').mockReturnValue(null);
+    vi.spyOn(BlastExecutionModule, 'executeBlastSteps').mockImplementation(failedBlast);
 
     const result = blastCommand(ctx, [], {});
 
@@ -499,7 +504,7 @@ describe('mining.ts #797 blast execution failed (executeBlast mocked to null) â€
   it('differs from the English literal under locale fr', () => {
     const ctx = makeMiningContext();
     makeChargedPlan(ctx);
-    vi.spyOn(BlastExecutionModule, 'executeBlast').mockReturnValue(null);
+    vi.spyOn(BlastExecutionModule, 'executeBlastSteps').mockImplementation(failedBlast);
     setLocale('fr');
 
     const result = blastCommand(ctx, [], {});

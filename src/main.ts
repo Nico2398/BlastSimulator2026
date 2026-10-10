@@ -36,6 +36,7 @@ import { loadCampaignProfile, saveCampaignProfile } from './persistence/Campaign
 import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
+import { advance } from './core/engine/Steps.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
@@ -195,7 +196,10 @@ savesModal.setOnAutoSaveFailed(() => uiManager.notify({ severity: 'warn', title:
 // its state here: a snapshot carrying the terrain encoded from the live grid
 // at that moment (#458 T0.3). SavesModal only sees GameState; it has no idea
 // VoxelGrid or its codec exist, by design.
-savesModal.setGetState(() => (ctx.state ? stateForSave(ctx, ctx.state) : null));
+savesModal.setGetState(() => {
+  finishBlastJob(); // never save a blast half-resolved (#1603)
+  return ctx.state ? stateForSave(ctx, ctx.state) : null;
+});
 
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
@@ -434,6 +438,9 @@ document.addEventListener('pointerdown', () => {
 // window.__gameConsole(cmd) routes commands to the same ConsoleRunner used in CLI mode.
 // Required by scripts/screenshot.ts to drive the game from headless Chrome.
 const { runner, ctx, emitter } = createRunner();
+// An armed blast resolves a few slices per frame instead of freezing one
+// (#1603). Scenario runs keep the synchronous fire their scripted steps expect.
+ctx.sliceBlasts = !scenarioMode;
 
 // Campaign progress outlives any one GameState (#1312). Scenario runs ignore
 // (and never write) the stored profile so a shared browser's leftovers cannot
@@ -542,9 +549,46 @@ function onLevelStateReplaced(state: GameState): void {
  * other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
+  finishBlastJob();
   const prevState = ctx.state;
   const prevBlastReport = ctx.state?.lastBlastReport ?? null;
   const result = runCommand({ runner, ctx, emitter }, cmd);
+  afterGameCommand(result, parseCommand(cmd).command, prevState, prevBlastReport, opts);
+  return result;
+}
+
+/** Frame time a blast being resolved in slices may take (#1603), leaving room for the frame's own work. */
+const BLAST_JOB_FRAME_BUDGET_MS = 8;
+
+/**
+ * Advance a blast being resolved in slices by up to `budgetMs`, and once it
+ * lands, update everything a command's result updates — the renderer's blast
+ * effects, the UI, the console output. Infinity finishes it now.
+ */
+function stepBlastJob(budgetMs: number): void {
+  const job = ctx.blastJob;
+  if (!job) return;
+  const prevBlastReport = ctx.state?.lastBlastReport ?? null;
+  const start = performance.now();
+  const next = advance(job, () => performance.now() - start >= budgetMs);
+  if (next.done !== true) return;
+  ctx.blastJob = null;
+  afterGameCommand(next.value, 'tick', ctx.state, prevBlastReport);
+}
+
+/** Land a blast still resolving in slices, before anything else reads or changes the game. */
+function finishBlastJob(): void {
+  stepBlastJob(Infinity);
+}
+
+/** Everything that follows a command: renderer sync, blast effects, UI, tutorial and recap. */
+function afterGameCommand(
+  result: CommandResult,
+  cmdName: string,
+  prevState: typeof ctx.state,
+  prevBlastReport: NonNullable<typeof ctx.state>['lastBlastReport'] | null,
+  opts?: { syncRenderer?: boolean },
+): void {
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
   // shipped 318 MB, #481) turns each of those reads into a protocol timeout.
@@ -553,7 +597,6 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
     : result.output;
   // Sync the renderer after every command so visual changes appear immediately
   if (opts?.syncRenderer !== false) gameRenderer.syncFromContext(ctx);
-  const cmdName = parseCommand(cmd).command;
 
   // Whether this command replaced ctx.state with a new object — new_game,
   // campaign level transitions, sandbox start, and any future entry point
@@ -610,7 +653,6 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // brief congratulations card of its own — the real recap takes over once
   // that finishes, rather than both fighting for the screen at once.
   if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
-  return result;
 }
 
 window.__gameConsole = (cmd: string) => runGameCommand(cmd);
@@ -825,7 +867,7 @@ if (scenarioMode) scene.setDrawingEnabled(false);
 // it awaits it here before capturing a frame it wants to show real assets.
 window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
 // A forced frame shows settled terrain: a deferred blast remesh lands first (#1603).
-window.__renderFrame = () => { gameRenderer.finishTerrainRemesh(); scene.renderFrame(); };
+window.__renderFrame = () => { finishBlastJob(); gameRenderer.finishTerrainRemesh(); scene.renderFrame(); };
 // Landscape chunks still queued for the current camera position (#1153's
 // streamer is budgeted per frame). A capture taken while this is non-zero
 // shows sky where ground has not been built yet, with scenery floating in
@@ -1010,6 +1052,7 @@ window.__worldToScreen = (x, z) => {
 // skipping it changes nothing — and without a GPU it would otherwise take
 // minutes of wall clock to play out (#475).
 window.__skipBlastPlayback = () => {
+  finishBlastJob();
   gameRenderer.finishTerrainRemesh();
   gameRenderer.skipFragmentPlayback();
 };
@@ -1274,15 +1317,18 @@ scene.start((dt) => {
     } else entityHighlight.setPosition(pos);
   }
 
-  // Advance game time
-  if (ctx.state && !ctx.state.isPaused && autoTickEnabled && !hasLevelEnded(ctx.state) && !fullScreenMenuUp()) {
+  // Advance game time. A blast resolving in slices holds the clock until it lands (#1603).
+  if (ctx.blastJob) {
+    stepBlastJob(BLAST_JOB_FRAME_BUDGET_MS);
+    accumulatedGameMs = 0;
+  } else if (ctx.state && !ctx.state.isPaused && autoTickEnabled && !hasLevelEnded(ctx.state) && !fullScreenMenuUp()) {
     accumulatedGameMs += dt * 1000;
     // Tick every BASE_TICK_MS ms; timeScale is handled inside tickCommand
     while (accumulatedGameMs >= BASE_TICK_MS) {
       accumulatedGameMs -= BASE_TICK_MS;
       window.__gameConsole(`tick ${ctx.state.timeScale}`);
-      // Stop if game paused mid-loop (e.g. an event fired)
-      if (ctx.state.isPaused) {
+      // Stop if game paused mid-loop (e.g. an event fired), or a blast started resolving
+      if (ctx.state.isPaused || ctx.blastJob) {
         accumulatedGameMs = 0;
         break;
       }

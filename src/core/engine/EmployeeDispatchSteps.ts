@@ -370,8 +370,6 @@ export function claimOnePoolCandidate(
     a.targetEmployeeId === null &&
     (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
     holdsRequiredSkill(employee, a.requiredSkill) &&
-    // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-    isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
     // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
     // (called once per tick from tickEmployees) means this never permanently
@@ -383,11 +381,16 @@ export function claimOnePoolCandidate(
 
   const selection = selectBestActionForEmployee(
     state, employee, poolCandidates,
-    candidate => findVehicleForClaim(state, candidate, employee).ok
+    // #552: see claimActionsTargetedAtEmployee's own comment on the same
+    // check. Gated here rather than in the pre-filter above, so a post-blast
+    // pool's debris is storage-checked per bin, not per piece (#1603).
+    candidate => isHaulOrFragmentActionClaimable(state, candidate, fragmentOf, fits)
+      && findVehicleForClaim(state, candidate, employee).ok
       && isRampSegmentClaimable(state, candidate)
       && isChargeHoleClaimable(state, candidate)
       && (!deferVehicleGatedToIdleAlternative
         || !hasIdleLicensedAlternative(state, candidate, employee)),
+    fragmentOf,
   );
   if (selection === null) return null;
 

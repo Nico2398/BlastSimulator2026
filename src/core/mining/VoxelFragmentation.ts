@@ -8,8 +8,9 @@
 // See the gameplay-blast-system skill, "Step 2 — What Breaks".
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX } from '../config/balance.js';
+import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX, BLAST_SLICE_CELLS } from '../config/balance.js';
 import { type EnergyField, indexOf, contains } from './EnergyPropagation.js';
+import { drain, type Steps } from '../engine/Steps.js';
 
 /** Face-adjacent offsets — connectivity for the support flood fill. */
 const FACE_OFFSETS: ReadonlyArray<readonly [number, number, number]> = [
@@ -53,12 +54,18 @@ export function isFragmented(result: FragmentationResult, field: EnergyField, x:
  * the ground plane, would drop every overhang the blast never touched.
  */
 export function identifyFragmentedVoxels(field: EnergyField, grid: VoxelGrid): FragmentationResult {
+  return drain(identifyFragmentedVoxelsSteps(field, grid));
+}
+
+/** `identifyFragmentedVoxels`, yielding between slabs of the box (#1603). */
+export function* identifyFragmentedVoxelsSteps(field: EnergyField, grid: VoxelGrid): Steps<FragmentationResult> {
   const { box } = field;
   const mask = new Uint8Array(field.effective.length);
   const cracked: VoxelCoord[] = [];
 
   // ── Pass 1: energy ────────────────────────────────────────────────────────
   for (let z = box.minZ; z < box.maxZ; z++) {
+    yield;
     for (let y = box.minY; y < box.maxY; y++) {
       for (let x = box.minX; x < box.maxX; x++) {
         const i = indexOf(field, x, y, z);
@@ -81,12 +88,14 @@ export function identifyFragmentedVoxels(field: EnergyField, grid: VoxelGrid): F
   const liftedCount = liftUnderminedBurden(field, mask);
 
   // ── Pass 3: rock left with nothing under it ───────────────────────────────
-  const detached = collectUnsupported(field, mask);
+  yield;
+  const detached = yield* collectUnsupported(field, mask);
   for (const i of detached) mask[i] = 1;
 
   // Collect in a stable order so downstream seeding and tests are deterministic.
   const fragmented: VoxelCoord[] = [];
   for (let z = box.minZ; z < box.maxZ; z++) {
+    yield;
     for (let y = box.minY; y < box.maxY; y++) {
       for (let x = box.minX; x < box.maxX; x++) {
         if (mask[indexOf(field, x, y, z)] === 1) fragmented.push({ x, y, z });
@@ -162,7 +171,7 @@ function liftUnderminedBurden(field: EnergyField, mask: Uint8Array): number {
  * Flood-fills the *supported* rock and returns the complement, so the cost is
  * one pass over the box regardless of how much of it broke.
  */
-function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
+function* collectUnsupported(field: EnergyField, mask: Uint8Array): Steps<number[]> {
   const { box } = field;
   const visited = new Uint8Array(field.effective.length);
   const queue: number[] = [];
@@ -221,6 +230,7 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
   }
 
   for (let head = 0; head < queue.length; head++) {
+    if ((head & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     const i = queue[head]!;
     const lx = i % field.nx;
     const ly = Math.floor(i / field.nx) % field.ny;
@@ -236,6 +246,7 @@ function collectUnsupported(field: EnergyField, mask: Uint8Array): number[] {
 
   const unsupported: number[] = [];
   for (let z = box.minZ; z < box.maxZ; z++) {
+    yield;
     for (let y = box.minY; y < box.maxY; y++) {
       for (let x = box.minX; x < box.maxX; x++) {
         const i = indexOf(field, x, y, z);

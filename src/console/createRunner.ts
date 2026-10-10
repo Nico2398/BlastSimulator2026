@@ -67,6 +67,7 @@ import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
 import { createCampaignProfile } from '../persistence/CampaignProfile.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
+import { drain } from '../core/engine/Steps.js';
 import { subscribeNavGridToUpdates } from '../core/nav/NavGridSync.js';
 
 export interface RunnerWithContext {
@@ -116,6 +117,12 @@ const META_EVENT_SUBCOMMANDS = ['status', 'dismiss'] as const;
  * only counting `event choose` when it actually resolved an event.
  */
 export function runCommand(engine: RunnerWithContext, cmd: string): CommandResult {
+  // A blast still resolving in slices lands before anything else touches the game (#1603).
+  const job = engine.ctx.blastJob;
+  if (job) {
+    engine.ctx.blastJob = null;
+    drain(job);
+  }
   const result = engine.runner.run(cmd);
   const parsed = parseCommand(cmd);
   const sub = parsed.args[0] ?? '';

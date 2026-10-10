@@ -63,9 +63,13 @@ describe('Tutorial Level — Contract Delivery', () => {
       level: '5',
     });
 
-    // 2. Seismic survey at (12,12)
+    // 2. Seismic survey at (7,12) — just outside the blast's 10..14 grid. The
+    // surveyor stays where it surveyed and is the crew's builder later
+    // (setupHaulingFleet); surveying at (12,12), mid-grid, buried it in the
+    // muck pile, and whether it could walk out to the warehouse site hung on
+    // which piece the hauler happened to take first (#1603).
     const surveyResult = surveyCommand(ctx as any, ['seismic'], {
-      x: '12',
+      x: '7',
       z: '12',
     });
     expect(surveyResult.success).toBe(true);

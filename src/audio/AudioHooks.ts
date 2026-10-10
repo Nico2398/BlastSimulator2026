@@ -19,6 +19,10 @@ export class AudioHooks {
   constructor(audio: AudioManager) {
     this.audio = audio;
     this.lib = new SoundLibrary(audio.getContext());
+    // Synthesized now, not on the first blast: the two buffers took tens of
+    // milliseconds to fill inside the detonate frame (#1603).
+    this.lib.get('boom');
+    this.lib.get('rumble');
   }
 
   /** Call when UI button is clicked. */

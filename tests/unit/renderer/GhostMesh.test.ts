@@ -31,6 +31,28 @@ function makePreview(id: number, overrides: Partial<GhostPreview> = {}): GhostPr
 }
 
 describe('GhostMesh', () => {
+  it('cube ghosts share one geometry, kept until dispose; a footprint box owns its own (#1603)', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const footprint: GhostPreview['footprint'] = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    gm.sync([makePreview(1), makePreview(2), makePreview(3, { type: 'level_ground', footprint })]);
+    const geometryOf = (id: number) => (gm.getGroup(id) as THREE.Mesh).geometry;
+    const shared = geometryOf(1);
+    const own = geometryOf(3);
+    expect(geometryOf(2)).toBe(shared);
+    expect(own).not.toBe(shared);
+
+    let sharedDisposed = 0;
+    let ownDisposed = 0;
+    shared.addEventListener('dispose', () => { sharedDisposed++; });
+    own.addEventListener('dispose', () => { ownDisposed++; });
+    gm.sync([makePreview(2)]); // drop a cube ghost and the footprint ghost
+    expect(sharedDisposed).toBe(0);
+    expect(ownDisposed).toBe(1);
+    gm.dispose();
+    expect(sharedDisposed).toBe(1);
+  });
+
   it('sync adds a mesh per preview', () => {
     const scene = new THREE.Scene();
     const gm = new GhostMesh(scene);

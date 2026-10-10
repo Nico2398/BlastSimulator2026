@@ -152,6 +152,27 @@ describe('computeClimbComponents (#1306)', () => {
     }
   });
 
+  it('reachableFrom answers every cell exactly like computeClimbReachableSetFromSources (#1603)', () => {
+    const grid = makeGrid(mixed);
+    const components = computeClimbComponents(grid, NAV_CLEARANCE_EMPLOYEE_CELLS);
+    const sourceSets = [
+      [{ x: 3, z: 3 }],
+      [{ x: 3, z: 3 }, { x: 25, z: 1 }],
+      [{ x: 5, z: 5 }, { x: 20, z: 2 }, { x: 10, z: 0 }], // stranded, low-clearance and walled sources
+      [{ x: -4, z: 2.6 }, { x: W + 3, z: H + 1 }], // off-grid sources clamp onto the edge
+      [],
+    ];
+    for (const sources of sourceSets) {
+      const set = computeClimbReachableSetFromSources(grid, sources, NAV_CLEARANCE_EMPLOYEE_CELLS);
+      const fromComponents = components.reachableFrom(sources);
+      for (let z = -1; z <= H; z++) {
+        for (let x = -1; x <= W; x++) {
+          expect(fromComponents.has(x, z), `${JSON.stringify(sources)} → ${x},${z}`).toBe(set.has(x, z));
+        }
+      }
+    }
+  });
+
   it('a stranded source reaches its own cell and the ground it can step onto, nothing walled off', () => {
     const grid = makeGrid(threeRegions);
     const components = computeClimbComponents(grid);

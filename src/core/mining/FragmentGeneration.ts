@@ -16,6 +16,7 @@
 // See the gameplay-blast-system skill, "Step 3 — Carving Fragments".
 
 import type { Random } from '../math/Random.js';
+import { drain, type Steps } from '../engine/Steps.js';
 import { vec3, type Vec3 } from '../math/Vec3.js';
 import type { VoxelGrid, VoxelRockComposition } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';
@@ -28,6 +29,7 @@ import {
   MAX_ORPHAN_COMPONENT_SUBCELLS,
   MAX_FRAGMENTS_PER_BLAST,
   FRAGMENTATION_MULTIPLIER,
+  BLAST_SLICE_ITEMS,
 } from '../config/balance.js';
 import { type EnergyField, intensityAt } from './EnergyPropagation.js';
 import type { FragmentationResult, VoxelCoord } from './VoxelFragmentation.js';
@@ -87,6 +89,16 @@ export function generateFragments(
   grid: VoxelGrid,
   rng: Random,
 ): FragmentGenerationResult {
+  return drain(generateFragmentsSteps(fragmentation, field, grid, rng));
+}
+
+/** `generateFragments`, yielding every `BLAST_SLICE_ITEMS` voxels or fragments (#1603). */
+export function* generateFragmentsSteps(
+  fragmentation: FragmentationResult,
+  field: EnergyField,
+  grid: VoxelGrid,
+  rng: Random,
+): Steps<FragmentGenerationResult> {
   const voxels = fragmentation.fragmented;
   if (voxels.length === 0) return { fragments: [], throttled: false };
 
@@ -121,6 +133,7 @@ export function generateFragments(
   const shellSeeds: (number[] | null)[] = new Array(SEED_SEARCH_RADIUS + 1);
 
   for (let vi = 0; vi < voxels.length; vi++) {
+    if ((vi & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
     const voxel = voxels[vi]!;
     shellSeeds.fill(null);
     const ensureShell = (r: number): number[] => {
@@ -172,6 +185,7 @@ export function generateFragments(
   const fragments: GeneratedFragment[] = [];
   // In seed order, so fragment order depends on the seeds alone.
   for (let si = 0; si < seeds.length; si++) {
+    if ((si & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
     if (clusterSize[si] === 0) continue;
     const fragment = buildFragment(clustered.subarray(clusterStart[si]!, clusterStart[si + 1]!), voxels, grid, rng);
     if (fragment) fragments.push(fragment);

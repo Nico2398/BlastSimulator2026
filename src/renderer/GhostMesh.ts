@@ -129,6 +129,8 @@ interface GhostEntry {
   instance: ModelInstance | null;
   /** A `place_building` box drawn only until its model has loaded. */
   standIn: boolean;
+  /** Whether the box geometry is this entry's own (a footprint box) rather than the shared cube. */
+  ownsGeometry: boolean;
   preview: GhostPreview;
 }
 
@@ -142,6 +144,12 @@ export class GhostMesh {
   private readonly claimedMaterial: THREE.MeshPhongMaterial;
   /** Material for unclaimed ghosts no capable actor can reach (#1306) — red, same pulse as unclaimed. */
   private readonly unreachableMaterial: THREE.MeshPhongMaterial;
+  /**
+   * The one cube every footprint-less ghost shares: a blast queues a haul
+   * order per fragment, and building a geometry for each of thousands of
+   * ghosts in one frame was a ~100 ms hitch right after detonate (#1603).
+   */
+  private readonly cubeGeometry = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
   private time = 0;
 
   constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
@@ -225,7 +233,11 @@ export class GhostMesh {
     // BuildingMesh.ts centers a real building's box on its own footprint:
     // group position at footprintCenterCoord(x, sizeX)/footprintCenterCoord(z, sizeZ),
     // box sized sizeX x sizeZ (#1198).
-    const mesh = new THREE.Mesh();
+    // Built with its real geometry and material: a bare `new Mesh()` allocates
+    // a default geometry and material of its own, thousands of them in the
+    // frame after a large blast (#1603).
+    const ownsGeometry = preview.footprint !== undefined;
+    const mesh = new THREE.Mesh(this.cubeGeometry, this.materialFor(preview));
     if (preview.footprint) {
       const { sizeX, sizeZ } = getFootprintSize(preview.footprint);
       mesh.geometry = new THREE.BoxGeometry(sizeX, GHOST_SIZE, sizeZ);
@@ -236,12 +248,11 @@ export class GhostMesh {
         footprintCenterCoord(origin.z, sizeZ),
       );
     } else {
-      mesh.geometry = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
       mesh.position.set(preview.targetX, preview.targetY + GHOST_SIZE / 2, preview.targetZ);
     }
     mesh.renderOrder = GHOST_RENDER_ORDER;
     markSceneOverlay(mesh);
-    return { root: mesh, meshes: [mesh], instance: null, standIn, preview };
+    return { root: mesh, meshes: [mesh], instance: null, standIn, ownsGeometry, preview };
   }
 
   /**
@@ -272,7 +283,7 @@ export class GhostMesh {
       meshes.push(obj);
     });
     markSceneOverlay(group);
-    return { root: group, meshes, instance, standIn: false, preview };
+    return { root: group, meshes, instance, standIn: false, ownsGeometry: false, preview };
   }
 
   private removeEntry(id: number, entry: GhostEntry): void {
@@ -281,13 +292,13 @@ export class GhostMesh {
     this.entries.delete(id);
   }
 
-  /** Box geometry is the ghost's own; a model's geometry is shared with the library and stays. */
+  /** A footprint box's geometry is the ghost's own; the shared cube and a model's geometry stay. */
   private disposeEntry(entry: GhostEntry): void {
     if (entry.instance !== null) {
       entry.instance.dispose();
       return;
     }
-    for (const mesh of entry.meshes) mesh.geometry.dispose();
+    if (entry.ownsGeometry) for (const mesh of entry.meshes) mesh.geometry.dispose();
   }
 
   /**
@@ -332,6 +343,7 @@ export class GhostMesh {
 
   dispose(): void {
     this.clearAll();
+    this.cubeGeometry.dispose();
     this.material.dispose();
     this.claimedMaterial.dispose();
     this.unreachableMaterial.dispose();
