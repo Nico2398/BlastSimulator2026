@@ -261,7 +261,12 @@ worldMap.setOnBack(() => {
 /** A live game: a state exists and its level has not ended. */
 const isLiveGame = (): boolean => !!ctx.state && !hasLevelEnded(ctx.state);
 mainMenu.setLiveGameProbe(isLiveGame);
-mainMenu.setOnResume(() => { mainMenu.hide(); uiManager.show(); });
+mainMenu.setOnResume(() => {
+  mainMenu.hide();
+  uiManager.show();
+  // Return to Menu suspended the tutorial with its progress kept; pick it back up guided.
+  if (ctx.state && !tutorial.isActive && shouldKeepTutorialRunning(ctx.state.campaign.activeLevelId)) tutorial.resume(ctx.state);
+});
 worldMap.setOnReturnToSite(() => { worldMap.hide(); uiManager.show(); });
 function startLevel(levelId: string): void {
   worldMap.hide();
@@ -1029,7 +1034,7 @@ uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });
 uiManager.setQuitHandler(() => {
-  tutorial.abandon(); // lifts the rails so the menu is clickable
+  tutorial.suspend(); // lifts the rails so the menu is clickable; keeps progress so Resume continues guided
   levelEndScreen.hide();
   mainMenu.show();
   uiManager.hide();
