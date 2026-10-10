@@ -614,3 +614,21 @@ describe('tutorial stage allow-set pins the scripted choice (#1595)', () => {
     expect(step.highlightTarget).toBe(TOOLBAR_TARGET.ops);
   });
 });
+
+describe('guided first-blast steps allow no stepper (#1596)', () => {
+  it.each(['box-cut', 'drill-plan', 'charge'])('%s stages expose no stepper control', (stepId) => {
+    const stages = stagesFor(stepId);
+    expect(stages.length).toBeGreaterThan(0);
+    for (const st of stages) {
+      const selectors = [
+        st.target,
+        ...(st.also ?? []),
+        ...(st.alsoWhen ?? []).map((c) => c.selector),
+      ].filter((x): x is string => typeof x === 'string');
+      for (const sel of selectors) {
+        expect(sel, `${stepId}: ${sel}`).not.toContain('[data-field=');
+        expect(sel, `${stepId}: ${sel}`).not.toContain('bsx-stepper');
+      }
+    }
+  });
+});

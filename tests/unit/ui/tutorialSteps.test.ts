@@ -392,6 +392,63 @@ describe('tutorialSteps', () => {
     } as unknown as GameState, {})).toBe(true);
   });
 
+  // ── #1596: the first blast is the scripted one ───────────────────────────
+  describe('first blast is deterministic (#1596)', () => {
+    const charge = { explosiveId: 'boomite', amountKg: 4, stemmingM: 2.5 };
+    const holeList = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `H${i + 1}` }));
+    const planned = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `P${i + 1}` }));
+    const chargedAll = (n: number) => Object.fromEntries(holeList(n).map((h) => [h.id, charge]));
+    const st = (o: Record<string, unknown>) => o as unknown as GameState;
+
+    describe('drill-plan', () => {
+      const step = () => TUTORIAL_STEPS.find((s) => s.id === 'drill-plan')!;
+
+      it('is not complete with 1 hole drilled and 8 still ordered', () => {
+        expect(step().isComplete(st({ drillHoles: holeList(1), plannedDrillHoles: planned(8) }), {})).toBe(false);
+      });
+
+      it('is not complete with nothing drilled and nothing ordered', () => {
+        expect(step().isComplete(st({ drillHoles: [], plannedDrillHoles: [] }), {})).toBe(false);
+      });
+
+      it('is complete with 9 drilled and 0 ordered', () => {
+        expect(step().isComplete(st({ drillHoles: holeList(9), plannedDrillHoles: [] }), {})).toBe(true);
+      });
+    });
+
+    describe('charge', () => {
+      const step = () => TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
+
+      it('is not complete while holes are still ordered, even if every drilled hole is charged', () => {
+        expect(step().isComplete(st({
+          drillHoles: holeList(1), plannedDrillHoles: planned(8),
+          chargesByHole: chargedAll(1), plannedChargesByHole: {},
+        }), {})).toBe(false);
+      });
+
+      it('is not complete while a charge is still ordered but not loaded', () => {
+        expect(step().isComplete(st({
+          drillHoles: holeList(9), plannedDrillHoles: [],
+          chargesByHole: chargedAll(9), plannedChargesByHole: { H9: charge },
+        }), {})).toBe(false);
+      });
+
+      it('is not complete while a drilled hole is uncharged', () => {
+        expect(step().isComplete(st({
+          drillHoles: holeList(9), plannedDrillHoles: [],
+          chargesByHole: chargedAll(8), plannedChargesByHole: {},
+        }), {})).toBe(false);
+      });
+
+      it('is complete only when all 9 are drilled, none ordered, all charged, no charge ordered', () => {
+        expect(step().isComplete(st({
+          drillHoles: holeList(9), plannedDrillHoles: [],
+          chargesByHole: chargedAll(9), plannedChargesByHole: {},
+        }), {})).toBe(true);
+      });
+    });
+  });
+
   // ── 17 ───────────────────────────────────────────────────────────────────
   it('only the scripted event step carries autoCommands', () => {
     for (const step of TUTORIAL_STEPS) {

@@ -528,7 +528,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
@@ -555,7 +556,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
@@ -582,7 +584,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
@@ -609,7 +612,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
@@ -636,7 +640,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
@@ -663,7 +668,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
@@ -690,7 +696,8 @@
       "expect": {
         "equals": {
           "levelEndReason": null
-        }
+        },
+        "tutorialStep": "drill-plan"
       }
     },
     {
