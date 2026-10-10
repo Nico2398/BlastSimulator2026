@@ -480,5 +480,23 @@ export function ensureScriptedOreSale(
   priceMultiplier: number,
   tick: number,
 ): void {
-  void state; void offer; void priceMultiplier; void tick; // TODO: implement
+  if (!offer) return;
+  const matches = (c: Contract): boolean =>
+    c.type === 'ore_sale' && c.materialId === offer.materialId
+    && c.quantityKg === offer.quantityKg && c.deadlineTicks === offer.deadlineTicks;
+  if (state.available.some(matches) || state.active.some(matches) || state.completedHistory.some(matches)) return;
+
+  const basePricePerKg = (ORE_BASE_PRICES[offer.materialId] ?? 10) * offer.priceFactor;
+  const pricePerKg = basePricePerKg * priceMultiplier;
+  if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
+  state.available.push({
+    id: state.nextId++, type: 'ore_sale', materialId: offer.materialId,
+    description: `Deliver ${offer.materialId} ore`,
+    quantityKg: offer.quantityKg, deliveredKg: 0, pricePerKg,
+    deadlineTicks: offer.deadlineTicks, acceptedAtTick: 0,
+    penaltyAmount: Math.round(offer.quantityKg * basePricePerKg * 0.3),
+    earlyBonus: computeEarlyBonus(offer.quantityKg, pricePerKg),
+    completed: false, expired: false,
+  });
+  void tick;
 }

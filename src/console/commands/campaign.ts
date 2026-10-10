@@ -10,7 +10,8 @@ import { createGameForLevel, settleLevelResult } from '../../core/campaign/Level
 import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
-import { generateContracts } from '../../core/economy/Contract.js';
+import { createHiringPool } from '../../core/entities/HiringPool.js';
+import { ensureScriptedOreSale, generateContracts } from '../../core/economy/Contract.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { sanitizeFiniteOverride, parseOptionalStaffedFlag, staffedSuffix } from './commandUtils.js';
@@ -192,9 +193,13 @@ export function campaignStartCommand(
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 
+  // Scripted levels (tutorial) offer the same hires on every run (#1600).
+  ctx.state.hiringPool = createHiringPool(ctx.state.seed, ctx.state.tickCount, level.hiringScript);
+
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
   generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state));
+  ensureScriptedOreSale(ctx.state.contracts, level.scriptedOreSale, level.contractPriceMultiplier, ctx.state.tickCount);
 
   // Report the cash actually in hand, not the level default — an override that
   // took effect but printed the default would be indistinguishable from one

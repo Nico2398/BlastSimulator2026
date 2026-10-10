@@ -15,7 +15,6 @@ import {
   createSurveyOverlayToggleStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
-import { hasFillableOreSaleOffer } from '../core/economy/Contract.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
 
 /** The one scripted event the tutorial fires, so the player meets the dialog. */
@@ -449,6 +448,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // the count is filtered to `completed: true` — a contract that merely
   // timed out with a penalty must not falsely advance this step without a
   // single dollar sold (#959).
+  //
+  // The fillable offer is scripted (#1600: Level.ts's scriptedOreSale puts it on
+  // the board), so the step never waits on the random contract pool and needs
+  // no `clockMustRun` to let the clock run until one appears.
   createComparisonStep(
     'sell-ore',
     'tutorial.step_sellore.title',
@@ -459,7 +462,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     {
       tickBudget: 20,
       waitsOnWork: true,
-      clockMustRun: (s) => !hasFillableOreSaleOffer(s.contracts?.available ?? [], s.collectedOre ?? {}),
     },
   ),
 

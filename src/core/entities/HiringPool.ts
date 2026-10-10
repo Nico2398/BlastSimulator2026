@@ -48,8 +48,11 @@ function topUp(pool: HiringPoolState, rng: Random): void {
 }
 
 export function createHiringPool(seed: number, tick: number, script?: readonly ScriptedCandidate[]): HiringPoolState {
-  void script; // TODO: implement
   const pool: HiringPoolState = { candidates: [], nextCandidateId: 1, lastRefreshTick: tick };
+  if (script) {
+    applyScript(pool, script);
+    return pool;
+  }
   topUp(pool, new Random(seed + tick));
   return pool;
 }
@@ -69,16 +72,37 @@ export function generateCandidate(role: EmployeeRole, rng: Random, id: number): 
 
 /** Replace the whole pool with fresh candidates (new ids). */
 export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number, script?: readonly ScriptedCandidate[]): void {
-  void script; // TODO: implement
   pool.candidates = [];
   pool.lastRefreshTick = tick;
+  if (script) {
+    applyScript(pool, script);
+    return;
+  }
   topUp(pool, new Random(seed + tick + pool.nextCandidateId));
 }
 
 /** Build the fixed candidate a script entry describes (#1600). */
 export function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
-  void s;
-  throw new Error('not implemented');
+  const qualifications = ROLE_STARTING_QUALIFICATIONS[s.role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
+  const primary = qualifications[0];
+  if (primary && s.skillBonus > 0) {
+    const level = Math.min(5, primary.proficiencyLevel + s.skillBonus) as SkillQualification['proficiencyLevel'];
+    qualifications[0] = qualificationAtLevel(primary.category, level);
+  }
+  return {
+    id: s.id,
+    role: s.role,
+    name: s.name,
+    unionized: s.unionized,
+    qualifications,
+    salary: calculateSalary({ role: s.role, qualifications, raises: 0 }),
+  };
+}
+
+/** Pool holds exactly the scripted candidates; ids are fixed so a refresh restores hired ones. */
+function applyScript(pool: HiringPoolState, script: readonly ScriptedCandidate[]): void {
+  pool.candidates = script.map(scriptedCandidate);
+  pool.nextCandidateId = Math.max(pool.nextCandidateId, ...script.map(s => s.id + 1));
 }
 
 export function candidatesForRole(pool: HiringPoolState, role: EmployeeRole): HireCandidate[] {

@@ -19,7 +19,7 @@ import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
-import { TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
+import { TUTORIAL_HIRING_SCRIPT, TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
 import { NavGrid } from '../core/nav/NavGrid.js';
 import { findPath } from '../core/nav/Pathfinding.js';
 
@@ -300,11 +300,13 @@ export function routeDistanceToRect(grid: NavGrid, from: TileRegion, to: TileReg
   return route.found ? route.totalCost : Infinity;
 }
 
-/** Open the Crew panel, then hire one role. */
+/** Open the Crew panel, then hire the role's one scripted candidate (#1600). */
 function hireStages(role: string, hintKey: string): TutorialStage[] {
+  const candidate = TUTORIAL_HIRING_SCRIPT.find(c => c.role === role);
+  if (!candidate) throw new Error(`TUTORIAL_HIRING_SCRIPT has no candidate for role ${role}`);
   return [
     { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
-    { target: `#bs-employee-panel [data-role="${role}"]`, hintKey },
+    { target: `#bs-employee-panel [data-role="${role}"][data-candidate-id="${candidate.id}"]`, hintKey },
   ];
 }
 

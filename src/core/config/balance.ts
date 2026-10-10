@@ -1866,10 +1866,16 @@ export interface ScriptedOreSaleOffer {
   deadlineTicks: number;
 }
 
-/** Tutorial ore-sale offer; quantity is a placeholder until implemented. */
+/**
+ * Tutorial ore-sale offer (#1600). quantityKg sits below the rustite the scripted
+ * tutorial blast always hauls in: measured in command mode on tutorial-steps-visual
+ * and tutorial-interactive, collectedOre.rustite is 334.375 after the first haul
+ * batch and 687.5 once hauling finishes (tutorial-playthrough: 793.75). 300 kg is
+ * fillable from the first batch and, at 12 * 80 = $960/kg, still ends the level.
+ */
 export const TUTORIAL_ORE_SALE_OFFER: ScriptedOreSaleOffer = {
   materialId: 'rustite',
-  quantityKg: 1,
+  quantityKg: 300,
   priceFactor: 1.0,
   deadlineTicks: 200,
 };

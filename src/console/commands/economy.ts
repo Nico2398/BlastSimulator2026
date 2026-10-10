@@ -8,6 +8,7 @@ import {
   acceptContract,
   contractAcceptBlocker,
   setContractHeld,
+  ensureScriptedOreSale,
   findContract,
   remainingKg,
   storedStockKg,
@@ -27,7 +28,7 @@ import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
-import { resolveContractOres } from '../../core/campaign/Level.js';
+import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
 
 // ── finances command ──
 
@@ -145,6 +146,7 @@ export function contractCommand(
   switch (sub) {
     case 'list': {
       generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
+      ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state), state.tickCount);
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };
       }
