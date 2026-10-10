@@ -219,7 +219,7 @@ export const REGION = {
 } as const satisfies Record<string, TileRegion>;
 
 /** World edge (tiles) after the seismic survey grows the world from 32 to 48. */
-const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
+export const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
 
 /** A single-tile hazard the tutorial's fixed building pins must clear. */
 export type TutorialHazard = TileRegion;
