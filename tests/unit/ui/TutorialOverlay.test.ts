@@ -224,6 +224,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.advanceToNextStep();
       const index = tut.stepIndex;
       tut.suspend();
+      state.campaign.activeLevelId = 'tutorial_pit'; // resume only restores on the tutorial level
       expect(tut.resume(state)).toBe(true);
       expect(tut.isActive).toBe(true);
       expect(tut.stepIndex).toBe(index);
