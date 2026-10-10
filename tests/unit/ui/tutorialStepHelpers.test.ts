@@ -159,12 +159,12 @@ describe('tutorialStepHelpers UI-action steps (#1334)', () => {
       expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(false);
     });
 
-    it('completes while the finances panel is displayed', () => {
+    it('completes on open (snapshot captured hidden): finances panel', () => {
       addPanel('bs-finances-panel', 'block');
       expect(make('#bs-finances-panel').isComplete(STATE, { panelWasVisible: false })).toBe(true);
     });
 
-    it('completes while the employee panel is displayed', () => {
+    it('completes on open (snapshot captured hidden): employee panel', () => {
       addPanel('bs-employee-panel', 'block');
       expect(make('#bs-employee-panel').isComplete(STATE, { panelWasVisible: false })).toBe(true);
     });
@@ -248,14 +248,20 @@ describe('createEvacuateZoneStep completes on the real fire, not on arming (#159
       expect(step.isComplete(STATE, snap)).toBe(true);
     });
 
-    it('does not mutate-leak between two steps made from the same action', () => {
+    it('isComplete mutates only its own snapshot, not a sibling step\'s', () => {
       addPanel('bs-finances-panel', 'block');
       const a = make('#bs-finances-panel');
       const b = make('#bs-finances-panel');
       const snapA = a.captureSnapshot!(STATE);
+      const snapB = b.captureSnapshot!(STATE);
+      const panel = document.getElementById('bs-finances-panel')!;
+      panel.style.display = 'none';
       expect(a.isComplete(STATE, snapA)).toBe(false);
-      document.getElementById('bs-finances-panel')!.style.display = 'none';
-      expect(b.isComplete(STATE, b.captureSnapshot!(STATE))).toBe(false);
+      expect(snapA['panelWasVisible']).toBe(false);
+      expect(snapB['panelWasVisible']).toBe(true);
+      panel.style.display = 'block';
+      expect(b.isComplete(STATE, snapB)).toBe(false);
+      expect(a.isComplete(STATE, snapA)).toBe(true);
     });
   });
 });

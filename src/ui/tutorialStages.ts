@@ -28,7 +28,11 @@ import { PLACEMENT_CANCEL_SELECTOR } from './scene/placementSelectors.js';
 /** Cancel button of the placement strip (picker). */
 export const PICKER_CANCEL = PLACEMENT_CANCEL_SELECTOR;
 
-/** Policy fatigue range the tutorial allows the player to set (#1595). */
+/**
+ * Policy fatigue range the tutorial allows the player to set (#1595).
+ * Upper bound stays below NEED_REST_NO_BUILDING_CAP (70, core/config/balance.ts): a threshold
+ * >= that cap re-triggers rest immediately after a no-building rest tops out (#1338).
+ */
 export const TUTORIAL_POLICY_FATIGUE_MIN = 50;
 export const TUTORIAL_POLICY_FATIGUE_MAX = 69;
 

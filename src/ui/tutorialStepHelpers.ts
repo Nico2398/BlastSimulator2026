@@ -214,6 +214,9 @@ export function createUiActionStep(
       ...(action.kind === 'scores' ? { inspectCount: readScoresInspectCount() } : {}),
       ...(action.kind === 'panel' ? { panelWasVisible: isPanelVisible(action.rootSelector) } : {}),
     }),
+    // NOTE: for the 'panel' kind this is not pure: it WRITES `snapshot.panelWasVisible = false`
+    // when it observes the panel hidden, so a close-then-reopen counts as a fresh open.
+    // The snapshot is the step's own per-run state (never shared between steps).
     isComplete: (_state: GameState, snapshot: Record<string, unknown>) => {
       // Only opening counts: a panel already on screen at capture never completes it.
       if (action.kind === 'panel') {
