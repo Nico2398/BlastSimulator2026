@@ -132,7 +132,7 @@ const MODAL_SELECTOR = '.bs-confirm-overlay';
 export const MODAL_DISMISS_SELECTOR = '[data-action$="-cancel"], [data-action$="-close"], .bs-event-dismiss';
 
 /** Every selector the player may interact with during a stage. */
-export function allowedSelectors(stage: TutorialStage | undefined): string[] {
+export function allowedSelectors(stage: TutorialStage | undefined, _root?: ParentNode): string[] {
   if (!stage) return [];
   return [stage.target, ...(stage.also ?? [])];
 }

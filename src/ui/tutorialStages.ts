@@ -28,6 +28,10 @@ import { PLACEMENT_CANCEL_SELECTOR } from './scene/placementSelectors.js';
 /** Cancel button of the placement strip (picker). */
 export const PICKER_CANCEL = PLACEMENT_CANCEL_SELECTOR;
 
+/** Policy fatigue range the tutorial allows the player to set (#1595). */
+export const TUTORIAL_POLICY_FATIGUE_MIN = 50;
+export const TUTORIAL_POLICY_FATIGUE_MAX = 69;
+
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
   target: string;
@@ -39,6 +43,11 @@ export interface TutorialStage {
    * Deliver, or picking a tile on a canvas before Confirm enables.
    */
   also?: string[];
+  /**
+   * Conditional extra selectors: each `selector` is allowed during this stage
+   * only while `when(root)` holds (#1595).
+   */
+  alsoWhen?: ReadonlyArray<{ selector: string; when: (root: ParentNode) => boolean }>;
   /**
    * Tiles the player must stay inside when this step opens a picker.
    *
