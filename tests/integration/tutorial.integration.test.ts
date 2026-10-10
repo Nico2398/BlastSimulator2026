@@ -605,7 +605,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     // 'blast refuses to fire on an occupied zone' tests above, which move
     // everyone to a corner clear of computeDangerZone(state.drillHoles,
     // BLAST_DANGER_MARGIN_M). tutorial_pit is a 32x32 grid and the drill
-    // plan's own danger zone (15m margin around a start:22,20 3x3/4m grid)
+    // plan's own danger zone (15m margin around the REGION.drill 3x3/4m grid)
     // covers most of it, so (2,2) — well below the zone's own x1/z1 — is the
     // one corner that stays clear.
     const preBlastAliveCount = state.employees.employees.filter(e => e.alive).length;

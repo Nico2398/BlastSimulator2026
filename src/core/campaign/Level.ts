@@ -3,6 +3,7 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
+import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
@@ -51,6 +52,8 @@ export interface LevelDef {
   contractPriceMultiplier: number;
   /** Pre-hired roster, fleet and buildings this level opens with (#1363). */
   startingSite?: StartingSiteComposition;
+  /** Weather pinned for the whole level; omitted = normal weather cycle (#1585). */
+  fixedWeather?: WeatherState;
   /** Per-tick score decay rate (higher = harder to maintain scores). */
   scoreDecayRate: number;
   /**
@@ -74,6 +77,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     id: 'tutorial_pit',
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
+    fixedWeather: 'sunny',      // Tutorial sky never changes: no rain flooding the scripted blast
     nameKey: 'level.tutorial_pit.name',
     descKey: 'level.tutorial_pit.desc',
     biome: 'desert_badlands',
@@ -155,7 +159,7 @@ const LEVELS: readonly LevelDef[] = [
     // Unlock threshold: $80k of operating profit (income minus running costs;
     // capital purchases do not count).
     unlockThreshold: 80000,
-    eventFreqMultiplier: 0.5,   // Rare events — forgiving tutorial
+    eventFreqMultiplier: 0.5,   // Rare events — forgiving first real level
     startingSite: DUSTY_HOLLOW_STARTING_SITE, // Crew, rig, hauler, warehouse and spoil heap from tick 0
     contractPriceMultiplier: DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, // Generous buyers; rationale beside the constant
     scoreDecayRate: 0.03,        // Slow score decay — hard to ruin yourself

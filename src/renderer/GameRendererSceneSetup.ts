@@ -26,6 +26,7 @@ import { EmployeePictograms } from './EmployeePictograms.js';
 import { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import { SkyboxWeather } from './SkyboxWeather.js';
 import { WindState } from './ambient/WindState.js';
+import { Random } from '../core/math/Random.js';
 import { CloudLayer } from './ambient/CloudLayer.js';
 import { BirdFlocks } from './ambient/BirdFlocks.js';
 import { ChimneySmoke } from './ambient/ChimneySmoke.js';
@@ -176,7 +177,8 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   deps.buildingOccupancyLabels = new BuildingOccupancyLabels(scene, deps.sm.camera);
 
   // Weather sky
-  deps.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
+  const flashRng = new Random(state.seed);
+  deps.skybox = new SkyboxWeather(scene, sunLight, ambient, fill, { random: () => flashRng.next() });
 
   // Wind + clouds (#458 T7.1/D12): one WindState per level, seeded so every
   // ambient module (clouds now, birds/smoke/water/sway in T7.2) leans the

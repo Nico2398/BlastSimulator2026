@@ -54,7 +54,7 @@ import type { CampaignState } from '../campaign/Campaign.js';
 import { createCampaignState } from '../campaign/Campaign.js';
 import type { BankruptcyState } from '../campaign/Bankruptcy.js';
 import { createBankruptcyState } from '../campaign/Bankruptcy.js';
-import type { WeatherCycleState } from '../weather/WeatherCycle.js';
+import type { WeatherState, WeatherCycleState } from '../weather/WeatherCycle.js';
 import { createWeatherCycle } from '../weather/WeatherCycle.js';
 import type { ArrestState } from '../campaign/CriminalArrest.js';
 import { createArrestState } from '../campaign/CriminalArrest.js';
@@ -175,6 +175,8 @@ export interface GameConfig {
   staffed?: boolean;
   /** A level's own starting site; wins over `staffed` when set (#1363). */
   startingSite?: StartingSiteComposition;
+  /** Weather pinned for the whole game; omitted = normal weather cycle (#1585). */
+  fixedWeather?: WeatherState;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -645,7 +647,7 @@ export function createGame(config: GameConfig): GameState {
     nextHoleId: 1,
     plannedBuildings: [],
     nextPlannedBuildingId: 1,
-    weather: createWeatherCycle(config.seed),
+    weather: createWeatherCycle(config.seed, config.fixedWeather),
   };
 
   if (config.startingSite) {

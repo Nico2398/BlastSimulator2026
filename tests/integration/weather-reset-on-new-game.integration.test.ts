@@ -59,8 +59,19 @@ describe('weather reset on game start (#1459, #1403)', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game seed:42');
     runner.run('weather set heavy_rain');
-    expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
+    // dusty_hollow: unpinned, so its cycle derives from the new state seed.
+    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
     expect(ctx.state!.weather).toEqual(createWeatherCycle(ctx.state!.seed));
+  });
+
+  it('campaign start on the tutorial pins the weather to sunny (#1585)', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('new_game seed:42');
+    runner.run('weather set heavy_rain');
+    expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(ctx.state!.seed, 'sunny'));
+    runner.run('tick 300');
+    expect(ctx.state!.weather.current).toBe('sunny');
   });
 
   it('failed new_game leaves weather untouched', () => {

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { REGION } from '../../../src/ui/tutorialStages.js';
 
 const SCENARIO_NAME = 'tutorial-steps-visual';
 const SCENARIO_PATH = path.resolve(SCENARIO_DIR, `${SCENARIO_NAME}.json`);
@@ -51,8 +52,8 @@ describe('tutorial-steps-visual.json descriptions', () => {
 
         expect(step.description).toMatch(/3x3/);
         expect(step.description).toMatch(/9-hole|9 hole/i);
-        expect(step.description).toContain('22,20');
-        expect(step.description).toContain('30,28');
+        expect(step.description).toContain(`${REGION.drill.x1},${REGION.drill.z1}`);
+        expect(step.description).toContain(`${REGION.drill.x2},${REGION.drill.z2}`);
     });
 
     it('step 24 (drill wait, waitUntil-chunked by #689-followup) description describes 9 holes, not 16', () => {
