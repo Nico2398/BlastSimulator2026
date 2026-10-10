@@ -1,6 +1,6 @@
 {
   "name": "tutorial-steps-visual",
-  "description": "Step-by-step visual walkthrough of the Tutorial Pit with per-step screenshots, played honestly (#1517, from #1338): real starting cash, no skill grants or vehicle-driver bootstraps, no forced win. Guided tutorial steps, then free play through fillable sales (#1363: the win counts operating profit, so the console clock ends the level after two sales; the browser's clock burns wages between clicks, so interaction mode plays more, skipped once the level has ended) until the level ends as a genuine victory (levelEndReason completed).",
+  "description": "Step-by-step visual walkthrough of the Tutorial Pit with per-step screenshots, played honestly (#1517, from #1338): real starting cash, no skill grants or vehicle-driver bootstraps, no forced win. Guided tutorial steps, then free play through fillable sales (#1363: the win counts operating profit, so the console clock ends the level after a few sales (the first two plus the third, which runs in both modes since #1586); the browser's clock burns wages between clicks, so interaction mode plays more, skipped once the level has ended) until the level ends as a genuine victory (levelEndReason completed).",
   "skipBlastPlayback": true,
   "shots": [
     {
@@ -1524,7 +1524,7 @@
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
       "timeout": 650,
       "role": "player",
-      "description": "Free play sale 2: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "description": "Free play sale 2: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338). #1586: no longer interaction-only. Real-cost action selection moves the first ore sale earlier, when less ore is stored, so two sales no longer clear the +$5,000 operating-profit target on the console clock (profit -$10,263 after two) and the run burned wages until bankruptcy instead of completing. This third sale runs in command mode too; the level still has to end as a genuine victory (levelEndReason completed, checked by the final step), nothing is forced.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1538,8 +1538,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1568,8 +1567,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1598,8 +1596,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
