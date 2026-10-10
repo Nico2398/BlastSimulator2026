@@ -13,7 +13,7 @@ import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
 import { RAILED_CONTROL_SELECTOR, isRailedControl, isControlLive, installActivationGuard } from '../../../src/ui/tutorialActivationGuard.js';
-import { readFileSync } from 'node:fs';
+import { injectStyles } from '../../../src/ui/styles.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
 // disappears (replaced by an "in training" status view, crewDetailSections.ts)
@@ -1209,7 +1209,8 @@ describe('keyboard cannot bypass the rails (#1597)', () => {
   });
 
   describe('selector parity with the CSS rail rule', () => {
-    const css = readFileSync('src/ui/styles.ts', 'utf8');
+    injectStyles();
+    const css = Array.from(document.head.querySelectorAll('style')).map(el => el.textContent).join('\n');
     for (const part of RAILED_CONTROL_SELECTOR.split(',').map(p => p.trim())) {
       it(`styles.ts rails "${part}"`, () => {
         expect(css).toContain(`body.${GUIDED_CLASS} ${part}:not(.${ALLOWED_CLASS})`);

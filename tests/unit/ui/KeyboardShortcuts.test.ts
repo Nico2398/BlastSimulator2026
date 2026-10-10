@@ -296,6 +296,7 @@ describe('KeyboardShortcuts — rails-aware shortcuts (#1597)', () => {
   function make(live: (sel: string) => boolean) {
     const callbacks = {
       togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn(),
+      onToggleSurveyOverlay: vi.fn(),
     };
     const isControlLive = vi.fn(live);
     const ks = new KeyboardShortcuts(callbacks, { isControlLive });
@@ -335,6 +336,21 @@ describe('KeyboardShortcuts — rails-aware shortcuts (#1597)', () => {
     const { callbacks, ks } = make(() => true);
     fire(code);
     expect(callbacks.setSpeed).toHaveBeenCalledWith(speed);
+    ks.dispose();
+  });
+
+  it('KeyO asks about the survey overlay toggle and is swallowed when not live', () => {
+    const { callbacks, isControlLive, ks } = make(() => false);
+    fire('KeyO');
+    expect(isControlLive).toHaveBeenCalledWith('#bs-survey-panel [data-role="overlay-toggle"]');
+    expect(callbacks.onToggleSurveyOverlay).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it('KeyO toggles the survey overlay when its button is live', () => {
+    const { callbacks, ks } = make(() => true);
+    fire('KeyO');
+    expect(callbacks.onToggleSurveyOverlay).toHaveBeenCalledOnce();
     ks.dispose();
   });
 

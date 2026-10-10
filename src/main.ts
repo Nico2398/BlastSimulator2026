@@ -1220,7 +1220,7 @@ new KeyboardShortcuts({
   // its click handler is the other path into the same preference, and the
   // two must never disagree the next time the panel opens.
   onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
-}, { isSuppressed: fullScreenMenuUp, isControlLive: (selector) => isControlLive(selector) });
+}, { isSuppressed: fullScreenMenuUp, isControlLive });
 
 // --- Render loop + game tick timer ---
 // The game ticks at BASE_TICK_MS intervals, adjusted for time scale.

@@ -1,6 +1,14 @@
 // BlastSimulator2026 — UI stylesheet injection
 // Injects a <style> block at runtime so all UI components share consistent styling.
 
+import { GUIDED_CLASS, ALLOWED_CLASS } from './tutorialGuide.js';
+import { RAILED_CONTROL_SELECTOR } from './tutorialActivationGuard.js';
+
+/** Rail rule selector list, derived from the shared constant so the keyboard guard and CSS cannot drift. */
+const RAIL_RULE_SELECTORS = RAILED_CONTROL_SELECTOR.split(',')
+  .map(part => `body.${GUIDED_CLASS} ${part.trim()}:not(.${ALLOWED_CLASS})`)
+  .join(',\n');
+
 const CSS = `
 /* ─── Reset & base overlay ─── */
 .bs-ui {
@@ -511,13 +519,9 @@ body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearanc
    The coach card's one button (Exit tutorial, #1332) and the Settings session
    controls are exempted by tutorialRails.ts's permanently-allowed list, which
    marks them allowed; there is no Skip and no Next.
-   Keep this selector list in sync with RAILED_CONTROL_SELECTOR in tutorialActivationGuard.ts,
-   which closes the keyboard path the pointer-events rule cannot. */
-body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
-body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
-body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
-body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed),
-body.bs-tutorial-guided .bs-survey-method:not(.bs-tutorial-allowed) {
+   The selector list is RAILED_CONTROL_SELECTOR from tutorialActivationGuard.ts, which also
+   closes the keyboard path the pointer-events rule cannot. */
+${RAIL_RULE_SELECTORS} {
   pointer-events: none;
   opacity: 0.4;
   filter: saturate(0.3);
