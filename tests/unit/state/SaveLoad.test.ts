@@ -1605,7 +1605,7 @@ describe('serialize — walk trail is transient (#1199)', () => {
     const state = createGame({ seed: 42 });
     const { employee } = hireEmployee(state.employees, 'driver', new Random(42));
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0, 1);
-    const trail = { points: [{ x: 0, z: 0 }, { x: 1, z: 0 }], relocated: false };
+    const trail = { points: [{ x: 0, z: 0 }, { x: 1, z: 0 }], relocated: false, hostMarkers: [] };
     employee.walkTrail = trail;
     vehicle.walkTrail = { ...trail, points: [...trail.points] };
 

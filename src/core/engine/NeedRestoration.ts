@@ -101,7 +101,7 @@ export interface CollapseResult {
  * Check all alive, non-injured employees for collapse thresholds.
  * On collapse, creates a rest PendingAction targeting nearest suitable building.
  */
-export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): CollapseResult {
+export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], emitter?: EventEmitter): CollapseResult {
   const result: CollapseResult = { collapsed: [] };
 
   for (const emp of state.employees.employees) {
@@ -176,7 +176,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
 
     result.collapsed.push(emp.id);
     _firedEvents?.push({ eventId: 'employee_collapsed', firedAtTick: state.tickCount });
-    _emitter?.emit('employee:collapsed', { employeeId: emp.id, needKey: collapsedGauge });
+    emitter?.emit('employee:collapsed', { employeeId: emp.id, needKey: collapsedGauge });
 
     // Determine rest duration
     let restDuration = NEED_REST_DURATIONS[collapsedGauge];
@@ -244,8 +244,8 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // guards (canReleaseDriver — mid-haul lock, e.g.) may refuse; that's fine —
     // beginRestTravel's moveTo still plans a route for whatever locomotion
     // state the employee ends up in, mounted or on foot.
-    alightIfMounted(state, emp, _emitter);
-    beginRestTravel(state, emp, targetX, targetZ, buildingId);
+    alightIfMounted(state, emp, emitter, { x: targetX, z: targetZ });
+    beginRestTravel(state, emp, targetX, targetZ, buildingId, emitter);
 
     // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this
     // employee after its vehicle was destroyed mid-drive) predating this

@@ -10,6 +10,19 @@ export interface TrailPoint {
   z: number;
 }
 
+export type TrailHostKind = 'vehicle' | 'building';
+
+export type TrailHostEvent = 'board' | 'enter' | 'alight' | 'leave';
+
+/** A host transition recorded on the trail: the trail point it happened at and the host's position. */
+interface TrailHostMarker {
+  pointIndex: number;
+  event: TrailHostEvent;
+  hostKind: TrailHostKind;
+  hostX: number;
+  hostZ: number;
+}
+
 export interface MovementTrail {
   /**
    * Positions in the order the entity occupied them. `points[0]` is where it
@@ -19,10 +32,12 @@ export interface MovementTrail {
   points: TrailPoint[];
   /**
    * True once the entity's position changed during the batch by something
-   * other than a recorded walk (a placement, a boarding snap, a driverless
+   * other than a recorded walk or host transition (a placement, a driverless
    * relocation). The renderer snaps instead of gliding through such a jump.
    */
   relocated: boolean;
+  /** Board / enter / alight / leave transitions along `points`, in order. */
+  hostMarkers: TrailHostMarker[];
 }
 
 /** Upper bound on recorded points — a long console batch drops the oldest, never grows unbounded. */
@@ -35,7 +50,24 @@ export function isSameTrailPoint(a: TrailPoint, bx: number, bz: number): boolean
 
 /** A fresh trail anchored at (x, z) — what every entity carries when a batch opens. */
 export function openMovementTrail(x: number, z: number): MovementTrail {
-  return { points: [{ x, z }], relocated: false };
+  return { points: [{ x, z }], relocated: false, hostMarkers: [] };
+}
+
+/**
+ * Trims `trail` to MOVEMENT_TRAIL_MAX_POINTS, dropping the oldest points and
+ * re-indexing the markers that point into them (markers whose point was
+ * dropped go too). Markers are also capped to the same length on their own:
+ * repeated transitions at one unchanged tail add markers but no points.
+ */
+function capTrail(trail: MovementTrail): void {
+  const overflow = trail.points.length - MOVEMENT_TRAIL_MAX_POINTS;
+  if (overflow > 0) {
+    trail.points.splice(0, overflow);
+    for (const m of trail.hostMarkers) m.pointIndex -= overflow;
+    trail.hostMarkers = trail.hostMarkers.filter(m => m.pointIndex >= 0);
+  }
+  const markerOverflow = trail.hostMarkers.length - MOVEMENT_TRAIL_MAX_POINTS;
+  if (markerOverflow > 0) trail.hostMarkers.splice(0, markerOverflow);
 }
 
 /**
@@ -49,11 +81,31 @@ export function appendToTrail(trail: MovementTrail, fromX: number, fromZ: number
   if (!tail || !isSameTrailPoint(tail, fromX, fromZ)) {
     trail.relocated = true;
     trail.points = [{ x: fromX, z: fromZ }];
+    trail.hostMarkers = [];
   }
   for (const hop of hops) {
     const last = trail.points[trail.points.length - 1]!;
     if (!isSameTrailPoint(last, hop.x, hop.z)) trail.points.push({ x: hop.x, z: hop.z });
   }
-  const overflow = trail.points.length - MOVEMENT_TRAIL_MAX_POINTS;
-  if (overflow > 0) trail.points.splice(0, overflow);
+  capTrail(trail);
+}
+
+/**
+ * Records a host transition at (x, z): appends the point unless it is already
+ * the tail, then pushes a marker at the last point's index. Never sets
+ * `relocated`. Mutates `trail`.
+ */
+export function appendHostTransition(
+  trail: MovementTrail,
+  x: number,
+  z: number,
+  event: TrailHostEvent,
+  hostKind: TrailHostKind,
+  hostX: number,
+  hostZ: number,
+): void {
+  const tail = trail.points[trail.points.length - 1];
+  if (!tail || !isSameTrailPoint(tail, x, z)) trail.points.push({ x, z });
+  trail.hostMarkers.push({ pointIndex: trail.points.length - 1, event, hostKind, hostX, hostZ });
+  capTrail(trail);
 }

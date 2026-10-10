@@ -1722,7 +1722,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 756276,
+          "cash": 756162,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1733,7 +1733,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged."
       }
     },
     {
@@ -1911,7 +1911,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1936,7 +1936,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1958,7 +1958,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1980,7 +1980,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2006,7 +2006,7 @@
           "tickCount": 6
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2032,7 +2032,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2055,7 +2055,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2146,7 +2146,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2168,7 +2168,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2194,7 +2194,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2216,7 +2216,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2259,7 +2259,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,

@@ -295,3 +295,21 @@ describe('runTick pipeline — injury recovery', () => {
     expect(emp.morale).toBe(morale);
   });
 });
+
+describe('tickInjuryRecovery emits employee:left_building on healing (#1588)', () => {
+  it('announces the healed employee leaving their living quarters', () => {
+    const { state, emp } = setup();
+    const lq = placeLq(state);
+    injure(state, emp);
+    putInside(state, emp, lq.id);
+    emp.injuryTicksRemaining = 1;
+    const emitter = new EventEmitter();
+    const left: unknown[] = [];
+    emitter.on('employee:left_building', e => left.push(e));
+
+    tickInjuryRecovery(state, emitter);
+
+    expect(emp.injured).toBe(false);
+    expect(left).toEqual([{ employeeId: emp.id, buildingId: lq.id }]);
+  });
+});

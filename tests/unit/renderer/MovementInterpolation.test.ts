@@ -323,7 +323,7 @@ describe('MovementInterpolation — following a walk trail (#1199)', () => {
 
   it('given a trail with a 90° turn, every interpolated point lies on the trail\'s segments and never on the chord between its ends', () => {
     const tween = createTween(0, 0);
-    const trail = { points: corner, relocated: false };
+    const trail = { points: corner, relocated: false, hostMarkers: [] };
     let render = { x: 0, z: 0 };
     const dt = MOVE_TWEEN_DURATION_S / 20;
     for (let i = 0; i < 25; i++) {
@@ -338,7 +338,7 @@ describe('MovementInterpolation — following a walk trail (#1199)', () => {
 
   it('keeps a constant pace along the trail across the tick interval', () => {
     const tween = createTween(0, 0);
-    const half = stepTween(tween, 0, 0, 4, 4, MOVE_TWEEN_DURATION_S / 2, { points: corner, relocated: false });
+    const half = stepTween(tween, 0, 0, 4, 4, MOVE_TWEEN_DURATION_S / 2, { points: corner, relocated: false, hostMarkers: [] });
     expect(half.x).toBeCloseTo(4);
     expect(half.z).toBeCloseTo(0);
   });
@@ -346,26 +346,26 @@ describe('MovementInterpolation — following a walk trail (#1199)', () => {
   it('follows a recorded walk even past MOVE_TELEPORT_DISTANCE — a fast vehicle drove it', () => {
     const far = MOVE_TELEPORT_DISTANCE + 10;
     const tween = createTween(0, 0);
-    const pos = stepTween(tween, 0, 0, far, 0, 0.01, { points: [{ x: 0, z: 0 }, { x: far, z: 0 }], relocated: false });
+    const pos = stepTween(tween, 0, 0, far, 0, 0.01, { points: [{ x: 0, z: 0 }, { x: far, z: 0 }], relocated: false, hostMarkers: [] });
     expect(pos.x).toBeGreaterThan(0);
     expect(pos.x).toBeLessThan(far);
   });
 
   it('snaps to the target when the trail is flagged relocated', () => {
     const tween = createTween(0, 0);
-    const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 2, z: 0 }, { x: 3, z: 0 }], relocated: true });
+    const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 2, z: 0 }, { x: 3, z: 0 }], relocated: true, hostMarkers: [] });
     expect(pos).toEqual({ x: 3, z: 0 });
   });
 
   it('snaps to the target when the trail does not end there — moved after the last walk', () => {
     const tween = createTween(0, 0);
-    const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 0, z: 0 }, { x: 1, z: 0 }], relocated: false });
+    const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 0, z: 0 }, { x: 1, z: 0 }], relocated: false, hostMarkers: [] });
     expect(pos).toEqual({ x: 3, z: 0 });
   });
 
   it('snaps when the target moved but the trail walked nowhere — relocated before the batch opened', () => {
     const tween = createTween(0, 0);
-    const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 3, z: 0 }], relocated: false });
+    const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 3, z: 0 }], relocated: false, hostMarkers: [] });
     expect(pos).toEqual({ x: 3, z: 0 });
   });
 });
