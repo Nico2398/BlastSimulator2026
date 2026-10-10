@@ -104,6 +104,7 @@ export class MainMenu {
     const sandboxBtn = this.makeMenuButton('wrench', 'menu.sandbox', () => this.onSandbox?.());
     sandboxBtn.el.id = 'bs-menu-sandbox';
     const tutorialBtn = this.makeMenuButton('training', 'menu.tutorial', () => this.onTutorial?.());
+    tutorialBtn.el.id = 'bs-menu-tutorial';
     this.locale.bindText(tutorialBtn.hintEl, 'ui.menu.hint_steps', { n: TUTORIAL_STEPS.length });
     const loadBtn = this.makeMenuButton('save', 'menu.load', () => this.onLoad?.());
     loadBtn.el.id = 'bs-menu-load';
