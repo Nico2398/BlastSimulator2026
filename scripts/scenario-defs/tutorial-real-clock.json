@@ -908,9 +908,13 @@
     {
       "command": "state",
       "timeout": 150,
-      "role": "observe",
-      "description": "#1626: after the first blast the player idles on build-driving-center (stage 1/4, nothing ordered) while ~hundreds of blocked haul_debris orders and crew rest walks keep work in flight. The real guide clock must still hold once the step's 60-tick budget is spent: the CLOCK HELD chip shows (waitForProperty on its offsetParent -- the chip toggles style.display, which no element property mirrors, so a rendered chip is the only observable condition) and the game reads isPaused. The step never clicks anything, so the order stays unissued.",
+      "role": "setup",
+      "description": "#1626: after the first blast the player idles on build-driving-center (stage 1/4, nothing ordered) while ~hundreds of blocked haul_debris orders and crew rest walks keep work in flight. The real guide clock must still hold once the step's 60-tick budget is spent: the CLOCK HELD chip shows (waitForProperty on its offsetParent -- the chip toggles style.display, which no element property mirrors, so a rendered chip is the only observable condition) and the game reads isPaused. The step never clicks anything, so the order stays unissued. Scenario mode only advances the clock inside awaitTutorialStep (which returns at once here: the step is already current), so a setup `tick 80` spends the step budget deterministically; the guide timer then holds the clock on its own and the wait below observes it.",
       "interaction": [
+        {
+          "type": "command",
+          "command": "tick 80"
+        },
         {
           "type": "waitForProperty",
           "selector": ".bs-tutorial-paused",
