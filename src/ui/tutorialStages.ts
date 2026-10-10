@@ -28,6 +28,24 @@ import { PLACEMENT_CANCEL_SELECTOR } from './scene/placementSelectors.js';
 /** Cancel button of the placement strip (picker). */
 export const PICKER_CANCEL = PLACEMENT_CANCEL_SELECTOR;
 
+/**
+ * Policy fatigue range the tutorial allows the player to set (#1595).
+ * Upper bound stays below NEED_REST_NO_BUILDING_CAP (70, core/config/balance.ts): a threshold
+ * >= that cap re-triggers rest immediately after a no-building rest tops out (#1338).
+ */
+export const TUTORIAL_POLICY_FATIGUE_MIN = 50;
+export const TUTORIAL_POLICY_FATIGUE_MAX = 69;
+
+/** Continuous selected and fatigue threshold inside the tutorial's range. */
+function isPolicyApplicable(root: ParentNode): boolean {
+  const continuous = root.querySelector('#bs-policy-shift button[data-shift-mode="continuous"]');
+  if (continuous?.getAttribute('aria-pressed') !== 'true') return false;
+  const input = root.querySelector('#bs-policy-fatigue') as HTMLInputElement | null;
+  if (!input || input.value.trim() === '') return false;
+  const fatigue = Number(input.value);
+  return fatigue >= TUTORIAL_POLICY_FATIGUE_MIN && fatigue <= TUTORIAL_POLICY_FATIGUE_MAX;
+}
+
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
   target: string;
@@ -39,6 +57,11 @@ export interface TutorialStage {
    * Deliver, or picking a tile on a canvas before Confirm enables.
    */
   also?: string[];
+  /**
+   * Conditional extra selectors: each `selector` is allowed during this stage
+   * only while `when(root)` holds (#1595).
+   */
+  alsoWhen?: ReadonlyArray<{ selector: string; when: (root: ParentNode) => boolean }>;
   /**
    * Tiles the player must stay inside when this step opens a picker.
    *
@@ -323,7 +346,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // name. Pointing the glow at a different method than the card describes is
     // exactly the kind of mismatch that loses a player.
     { target: '#bs-survey-panel [data-method="seismic"]', hintKey: 'tutorial.stage.survey_method' },
-    { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run' },
+    { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run', also: ['#bs-survey-panel [data-method="seismic"]'] },
     ...pickerStages('tutorial.stage.survey_target', REGION.survey, [], {
       spentWhen: (state) => hasPendingActionOfType(state, 'survey'),
       waitingKey: 'tutorial.waiting.surveying',
@@ -371,7 +394,9 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       // the one choice this early step actually requires the player to make.
       target: '#bs-policy-shift button[data-shift-mode="continuous"]',
       hintKey: 'tutorial.stage.policy_continuous',
-      also: ['#bs-policy-apply', '#bs-policy-fatigue'],
+      also: ['#bs-policy-fatigue'],
+      // Apply only once Continuous is selected and the fatigue threshold is in range.
+      alsoWhen: [{ selector: '#bs-policy-apply', when: isPolicyApplicable }],
     },
   ],
 
@@ -468,7 +493,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   // claimed automatically now, so the step completes on purchase alone.
   'vehicle-buy-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel [data-vtype="debris_hauler"]', hintKey: 'tutorial.stage.vehicle_buy' },
+    { target: '#bs-vehicle-panel button[data-vtype="debris_hauler"][data-tier="1"]', hintKey: 'tutorial.stage.vehicle_buy' },
   ],
 
   'build-storage': [

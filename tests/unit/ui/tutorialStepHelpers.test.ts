@@ -159,14 +159,14 @@ describe('tutorialStepHelpers UI-action steps (#1334)', () => {
       expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(false);
     });
 
-    it('completes while the finances panel is displayed', () => {
+    it('completes on open (snapshot captured hidden): finances panel', () => {
       addPanel('bs-finances-panel', 'block');
-      expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(true);
+      expect(make('#bs-finances-panel').isComplete(STATE, { panelWasVisible: false })).toBe(true);
     });
 
-    it('completes while the employee panel is displayed', () => {
+    it('completes on open (snapshot captured hidden): employee panel', () => {
       addPanel('bs-employee-panel', 'block');
-      expect(make('#bs-employee-panel').isComplete(STATE, {})).toBe(true);
+      expect(make('#bs-employee-panel').isComplete(STATE, { panelWasVisible: false })).toBe(true);
     });
 
     it('does not complete from an unrelated panel being open', () => {
@@ -207,5 +207,61 @@ describe('createEvacuateZoneStep completes on the real fire, not on arming (#159
   it('with no prevBlasts in the snapshot and 0 blasts, is not complete', () => {
     expect(step.isComplete(make(0, false), {})).toBe(false);
     expect(step.isComplete(make(0, true), {})).toBe(false);
+  });
+
+  describe('createUiActionStep: panel action needs a fresh open (#1595)', () => {
+    beforeEach(() => { document.body.innerHTML = ''; });
+    afterEach(() => { document.body.innerHTML = ''; });
+    const make = (root: string) => createUiActionStep('p', 't', 'x', { kind: 'panel', rootSelector: root });
+
+    it('does not complete when the panel is already visible at capture', () => {
+      addPanel('bs-finances-panel', 'block');
+      const step = make('#bs-finances-panel');
+      const snap = step.captureSnapshot!(STATE);
+      expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('still not complete while the panel stays open across repeated checks', () => {
+      addPanel('bs-finances-panel', 'block');
+      const step = make('#bs-finances-panel');
+      const snap = step.captureSnapshot!(STATE);
+      for (let i = 0; i < 3; i++) expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('completes after the panel is hidden and then shown again', () => {
+      const panel = addPanel('bs-finances-panel', 'block');
+      const step = make('#bs-finances-panel');
+      const snap = step.captureSnapshot!(STATE);
+      expect(step.isComplete(STATE, snap)).toBe(false);
+      panel.style.display = 'none';
+      expect(step.isComplete(STATE, snap)).toBe(false);
+      panel.style.display = 'block';
+      expect(step.isComplete(STATE, snap)).toBe(true);
+    });
+
+    it('completes when the panel was closed at capture and then opened', () => {
+      const panel = addPanel('bs-employee-panel', 'none');
+      const step = make('#bs-employee-panel');
+      const snap = step.captureSnapshot!(STATE);
+      expect(step.isComplete(STATE, snap)).toBe(false);
+      panel.style.display = 'block';
+      expect(step.isComplete(STATE, snap)).toBe(true);
+    });
+
+    it('isComplete mutates only its own snapshot, not a sibling step\'s', () => {
+      addPanel('bs-finances-panel', 'block');
+      const a = make('#bs-finances-panel');
+      const b = make('#bs-finances-panel');
+      const snapA = a.captureSnapshot!(STATE);
+      const snapB = b.captureSnapshot!(STATE);
+      const panel = document.getElementById('bs-finances-panel')!;
+      panel.style.display = 'none';
+      expect(a.isComplete(STATE, snapA)).toBe(false);
+      expect(snapA['panelWasVisible']).toBe(false);
+      expect(snapB['panelWasVisible']).toBe(true);
+      panel.style.display = 'block';
+      expect(b.isComplete(STATE, snapB)).toBe(false);
+      expect(a.isComplete(STATE, snapA)).toBe(true);
+    });
   });
 });

@@ -10,7 +10,7 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   // claimed automatically now, so the step completes on purchase alone.
   'buy-drill-rig-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel [data-vtype="drill_rig"]', hintKey: 'tutorial.stage.vehicle_buy_drill_rig' },
+    { target: '#bs-vehicle-panel button[data-vtype="drill_rig"][data-tier="1"]', hintKey: 'tutorial.stage.vehicle_buy_drill_rig' },
   ],
 
   // The hired Driver is found by role (data-employee-role), never by id: who
@@ -35,6 +35,6 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   // above for why.
   'buy-rock-digger-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel [data-vtype="rock_digger"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
+    { target: '#bs-vehicle-panel button[data-vtype="rock_digger"][data-tier="1"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
   ],
 };

@@ -8,7 +8,7 @@
 // hole 52.8 away over a tied hole 4.0 away (measured whole-route cost 243 vs 100).
 //
 // This replays the commands of scripts/scenario-defs/tutorial-interactive.json
-// steps 0-20 (campaign start, hires, living quarters, vehicles, box-cut, 3x3
+// steps up to the 9-hole drill wait (campaign start, hires, living quarters, vehicles, box-cut, 3x3
 // drill plan) headlessly through the console runner, spies on every drill_hole
 // selection the dispatcher makes, and asserts (a) each chosen hop is the cheapest
 // real cost among its top-ACTION_SELECTION_MAX_PATH_ATTEMPTS shortlist, and
@@ -86,7 +86,10 @@ function replayTutorialDrillPlan(): { hops: Map<number, Hop>; holes: number } {
     }
   };
 
-  for (let i = 0; i <= 20; i++) {
+  // Replay up to and including the 9-hole drill wait; guard steps (#1595) shift indices, so find it by content.
+  const lastIndex = steps.findIndex(s => /^wait_until field:holeCount equals:9\b/.test(s.command ?? ''));
+  expect(lastIndex, 'drill wait step present').toBeGreaterThan(0);
+  for (let i = 0; i <= lastIndex; i++) {
     const command = steps[i]!.command!;
     const wait = /^wait_until field:(\w+) equals:(\d+) max_ticks:(\d+)/.exec(command);
     if (wait) {

@@ -8,8 +8,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
-import { TUTORIAL_STAGES, stagesFor, REGION, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_STAGES, stagesFor, REGION, PICKER_CANCEL, TUTORIAL_POLICY_FATIGUE_MIN, TUTORIAL_POLICY_FATIGUE_MAX } from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
+import { TOOLBAR_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
 import { resolveStageIndex, isReachable } from '../../../src/ui/tutorialGuide.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
@@ -573,5 +574,43 @@ describe('every picker step keeps the strip cancel reachable (#1593)', () => {
     expect(messages['tutorial.stage.picker_cancel_tip']).toBeTruthy();
     expect(messagesFr['tutorial.stage.picker_cancel_tip']).toBeTruthy();
     expect(messages['tutorial.stage.picker_cancel_tip']).not.toBe(messagesFr['tutorial.stage.picker_cancel_tip']);
+  });
+});
+
+describe('tutorial stage allow-set pins the scripted choice (#1595)', () => {
+  it.each([
+    ['buy-drill-rig-assign', 'drill_rig'],
+    ['buy-rock-digger-assign', 'rock_digger'],
+    ['vehicle-buy-assign', 'debris_hauler'],
+  ])('%s matches only the tier-1 button of %s', (stepId, role) => {
+    const stages = stagesFor(stepId);
+    const buy = stages[stages.length - 1]!;
+    expect(buy.target).toContain(`[data-vtype="${role}"]`);
+    expect(buy.target).toContain('[data-tier="1"]');
+    for (const sel of buy.also ?? []) expect(sel).not.toMatch(/data-vtype/);
+  });
+
+  it('survey run stage keeps the seismic method row live', () => {
+    const run = stagesFor('survey').find(s => s.target === '#bs-survey-run')!;
+    expect(run.also).toContain('#bs-survey-panel [data-method="seismic"]');
+  });
+
+  it('set-early-policy no longer allows Apply unconditionally', () => {
+    for (const s of stagesFor('set-early-policy')) {
+      expect(s.also ?? []).not.toContain('#bs-policy-apply');
+    }
+    const cond = stagesFor('set-early-policy').flatMap(s => s.alsoWhen ?? []);
+    expect(cond.map(c => c.selector)).toContain('#bs-policy-apply');
+  });
+
+  it('tutorial fatigue range is a non-empty band inside 0..100', () => {
+    expect(TUTORIAL_POLICY_FATIGUE_MIN).toBeLessThanOrEqual(TUTORIAL_POLICY_FATIGUE_MAX);
+    expect(TUTORIAL_POLICY_FATIGUE_MIN).toBeGreaterThan(0);
+    expect(TUTORIAL_POLICY_FATIGUE_MAX).toBeLessThan(100);
+  });
+
+  it('set-early-policy highlights the Operations toolbar button, not settings', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'set-early-policy')!;
+    expect(step.highlightTarget).toBe(TOOLBAR_TARGET.ops);
   });
 });

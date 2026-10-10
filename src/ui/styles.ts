@@ -514,7 +514,8 @@ body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearanc
 body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
-body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
+body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed),
+body.bs-tutorial-guided .bs-survey-method:not(.bs-tutorial-allowed) {
   pointer-events: none;
   opacity: 0.4;
   filter: saturate(0.3);

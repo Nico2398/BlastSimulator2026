@@ -234,7 +234,7 @@ export function isZoneClear(
  * Evacuation.ts documents for entities, common on a small, not-yet-expanded
  * world where the danger zone's own padding barely fits inside it at all).
  * isZoneClear counting that stranded, driverless machine forever is correct
- * for its own callers (isDangerZoneClear, the tutorial's blast-refusal,
+ * for its own callers (isDangerZoneClear,
  * Fire.ts's occupant list — a fired blast on top of a vehicle is still a real
  * cost, whether or not anyone is driving it) but would make
  * isEvacuationHoldActive's own "has it become safe to resume yet" check

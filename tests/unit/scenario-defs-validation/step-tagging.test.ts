@@ -74,11 +74,14 @@ describe('UI-driven scenarios click real controls', () => {
   for (const name of UI_DRIVEN_SCENARIO_NAMES) {
     it(`${name} — has clickSelector actions on more than half its steps`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      const clicking = scenario.steps.filter(step => {
+      // Guard steps (#1595) only prove a control is inert and can never click
+      // (checkStepActionAllowed), so they are not part of the "does it click" denominator.
+      const actionable = scenario.steps.filter(step => (step as ScenarioStepDef).role !== 'guard');
+      const clicking = actionable.filter(step => {
         const s = step as ScenarioStepDef;
         return (s.interaction ?? []).some(a => a.type === 'clickSelector');
       });
-      expect(clicking.length).toBeGreaterThan(scenario.steps.length / 2);
+      expect(clicking.length).toBeGreaterThan(actionable.length / 2);
     });
 
     it(`${name} — every clickSelector targets a non-empty selector`, () => {

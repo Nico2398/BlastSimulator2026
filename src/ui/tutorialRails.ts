@@ -28,7 +28,7 @@ import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
  *   volume, Save & Load, Return to Menu) so the player can always leave or
  *   manage the session (#1332). Replay Tutorial stays gated.
  */
-const BASE_PERMANENTLY_ALLOWED: readonly string[] = [
+export const BASE_PERMANENTLY_ALLOWED: readonly string[] = [
   SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, PANEL_CLOSE_SELECTOR,
   TUTORIAL_EXIT_SELECTOR, ...SETTINGS_SESSION_SELECTORS,
 ];

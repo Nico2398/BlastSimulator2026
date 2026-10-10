@@ -786,17 +786,17 @@ describe('applyRails', () => {
       expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
     });
 
-    it('still marks the target ALLOWED (clickable) when spent is true', () => {
+    it('does not mark the target ALLOWED (inert) when spent is true', () => {
       button('a');
       applyRails({ target: '#a', hintKey: 'k' }, document, [], true);
-      expect(document.querySelector('#a')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(document.querySelector('#a')!.classList.contains(ALLOWED_CLASS)).toBe(false);
     });
 
-    it('still allows helper (also) selectors when spent is true', () => {
+    it('does not allow helper (also) selectors when spent is true', () => {
       button('deliver');
       button('amount');
       applyRails({ target: '#deliver', hintKey: 'k', also: ['#amount'] }, document, [], true);
-      expect(document.querySelector('#amount')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(document.querySelector('#amount')!.classList.contains(ALLOWED_CLASS)).toBe(false);
     });
 
     it('still allows extraAllowed selectors when spent is true', () => {
@@ -1530,5 +1530,62 @@ describe('evacuate-zone stages while a detonation waits for clearance (#1591)', 
       expect(frText, `fr ${key}`).toBeTruthy();
       expect(enText).not.toBe(frText);
     }
+  });
+});
+
+describe('conditional and spent allow-sets (#1595)', () => {
+  it('allowedSelectors includes an alsoWhen selector only while its condition holds', () => {
+    let on = false;
+    const stage: TutorialStage = {
+      target: '#a', hintKey: 'k',
+      alsoWhen: [{ selector: '#cond', when: () => on }],
+    };
+    expect(allowedSelectors(stage, document)).toEqual(['#a']);
+    on = true;
+    expect(allowedSelectors(stage, document)).toEqual(['#a', '#cond']);
+  });
+
+  it('alsoWhen receives the root it was asked about', () => {
+    const seen: ParentNode[] = [];
+    const stage: TutorialStage = {
+      target: '#a', hintKey: 'k',
+      alsoWhen: [{ selector: '#c', when: (r) => { seen.push(r); return true; } }],
+    };
+    allowedSelectors(stage, document);
+    expect(seen).toEqual([document]);
+  });
+
+  it('applyRails marks an alsoWhen control only when its condition holds', () => {
+    button('a');
+    const c = button('c');
+    let on = false;
+    const stage: TutorialStage = { target: '#a', hintKey: 'k', alsoWhen: [{ selector: '#c', when: () => on }] };
+    applyRails(stage);
+    expect(c.classList.contains(ALLOWED_CLASS)).toBe(false);
+    on = true;
+    applyRails(stage);
+    expect(c.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('spent: target, also and alsoWhen controls are all inert', () => {
+    const a = button('a');
+    const h = button('h');
+    const c = button('c');
+    applyRails({ target: '#a', hintKey: 'k', also: ['#h'], alsoWhen: [{ selector: '#c', when: () => true }] },
+      document, [], true);
+    for (const el of [a, h, c]) expect(el.classList.contains(ALLOWED_CLASS)).toBe(false);
+    expect(a.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+  });
+
+  it('spent: base-allowed controls and dismiss controls of open modals stay live', () => {
+    const base = button('base');
+    button('a');
+    const modal = document.createElement('div');
+    modal.className = 'bs-confirm-overlay';
+    document.body.appendChild(modal);
+    const ok = button('ok', modal);
+    applyRails({ target: '#a', hintKey: 'k' }, document, ['#base'], true);
+    expect(base.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(ok.classList.contains(ALLOWED_CLASS)).toBe(true);
   });
 });
