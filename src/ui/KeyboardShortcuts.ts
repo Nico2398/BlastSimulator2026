@@ -3,6 +3,7 @@
 // Shortcuts panel shown in Settings/Help.
 
 import type { PanelName } from './UIManager.js';
+import { SURVEY_OVERLAY_TOGGLE_TARGET } from './tutorialStepHelpers.js';
 
 export type GameConsoleFn = (cmd: string) => string;
 
@@ -29,7 +30,29 @@ interface ShortcutOptions {
    * are not preventDefault'd. `setEnabled(false)` still suppresses everything.
    */
   isSuppressed?: () => boolean;
+  /**
+   * Reports whether the on-screen control a shortcut drives is live. When it returns
+   * false the shortcut is swallowed (preventDefault, no callback).
+   */
+  isControlLive?: (selector: string) => boolean;
 }
+
+/** Game speed each digit key selects. */
+const SPEED_KEYS: Readonly<Record<string, number>> = {
+  Digit1: 1,
+  Digit2: 2,
+  Digit3: 4,
+  Digit4: 8,
+};
+
+/** On-screen control each shortcut drives, so a rail on the control also holds the key. */
+const SHORTCUT_CONTROLS: Readonly<Record<string, string>> = {
+  Space: 'button[data-action="pause-toggle"]',
+  KeyO: SURVEY_OVERLAY_TOGGLE_TARGET,
+  ...Object.fromEntries(
+    Object.entries(SPEED_KEYS).map(([code, speed]) => [code, `button[data-speed="${speed}"]`]),
+  ),
+};
 
 export class KeyboardShortcuts {
   private readonly handler: (e: KeyboardEvent) => void;
@@ -45,15 +68,23 @@ export class KeyboardShortcuts {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (this.options.isSuppressed?.() && e.code !== 'Escape') return;
 
+      const control = SHORTCUT_CONTROLS[e.code];
+      if (control !== undefined && this.options.isControlLive?.(control) === false) {
+        if (e.code === 'Space') e.preventDefault();
+        return;
+      }
+
+      const speed = SPEED_KEYS[e.code];
+      if (speed !== undefined) {
+        callbacks.setSpeed(speed);
+        return;
+      }
+
       switch (e.code) {
         case 'Space':
           e.preventDefault();
           callbacks.togglePause();
           break;
-        case 'Digit1': callbacks.setSpeed(1); break;
-        case 'Digit2': callbacks.setSpeed(2); break;
-        case 'Digit3': callbacks.setSpeed(4); break;
-        case 'Digit4': callbacks.setSpeed(8); break;
         case 'KeyB': callbacks.togglePanel('blast'); break;
         case 'KeyC': callbacks.togglePanel('contracts'); break;
         case 'KeyG': callbacks.togglePanel('build'); break;

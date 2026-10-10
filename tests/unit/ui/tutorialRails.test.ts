@@ -11,6 +11,9 @@ import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
 import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
+import { RAILED_CONTROL_SELECTOR, isRailedControl, isControlLive, installActivationGuard } from '../../../src/ui/tutorialActivationGuard.js';
+import { injectStyles } from '../../../src/ui/styles.js';
 
 // #903: a stage shaped like train-driller's final one — a `target` that
 // disappears (replaced by an "in training" status view, crewDetailSections.ts)
@@ -984,5 +987,234 @@ describe('the placement strip cancel is allowed on picker stages only (#1593)', 
     const tip = t('tutorial.stage.picker_cancel_tip');
     expect(tip).not.toBe('tutorial.stage.picker_cancel_tip');
     expect(rails.refresh().hint).toContain(tip);
+  });
+});
+
+describe('keyboard cannot bypass the rails (#1597)', () => {
+  function railed(tag = 'button'): HTMLElement {
+    const el = document.createElement(tag);
+    document.body.appendChild(el);
+    return el;
+  }
+  function key(target: EventTarget, code: string, extra: KeyboardEventInit = {}): KeyboardEvent {
+    const e = new KeyboardEvent('keydown', { code, key: code, bubbles: true, cancelable: true, ...extra });
+    target.dispatchEvent(e);
+    return e;
+  }
+  function click(target: EventTarget): MouseEvent {
+    const e = new MouseEvent('click', { bubbles: true, cancelable: true });
+    target.dispatchEvent(e);
+    return e;
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.body.className = '';
+  });
+
+  describe('isRailedControl', () => {
+    it('is true for a guided body and a button without the allowed mark', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      expect(isRailedControl(railed(), document)).toBe(true);
+    });
+    it('is false for an allowed button', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const b = railed();
+      b.classList.add(ALLOWED_CLASS);
+      expect(isRailedControl(b, document)).toBe(false);
+    });
+    it('is false when the body is not guided', () => {
+      expect(isRailedControl(railed(), document)).toBe(false);
+    });
+    it('is true for a child span inside a railed button', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const b = railed();
+      const span = document.createElement('span');
+      b.appendChild(span);
+      expect(isRailedControl(span, document)).toBe(true);
+    });
+    it('uses the nearest control: a child span of an allowed button is not railed', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const b = railed();
+      b.classList.add(ALLOWED_CLASS);
+      const span = document.createElement('span');
+      b.appendChild(span);
+      expect(isRailedControl(span, document)).toBe(false);
+    });
+    it('covers select, input, detail toggle and survey method', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const els = [railed('select'), railed('input'), railed('div'), railed('div')];
+      els[2]!.className = 'bs-detail-toggle';
+      els[3]!.className = 'bs-survey-method';
+      for (const el of els) expect(isRailedControl(el, document)).toBe(true);
+    });
+    it('is false for a plain div, a text node, the document and null, without throwing', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const div = railed('div');
+      expect(isRailedControl(div, document)).toBe(false);
+      expect(isRailedControl(document.createTextNode('x'), document)).toBe(false);
+      expect(isRailedControl(document, document)).toBe(false);
+      expect(isRailedControl(null, document)).toBe(false);
+    });
+  });
+
+  describe('isControlLive', () => {
+    it('is true when not guided', () => {
+      railed().dataset['action'] = 'pause-toggle';
+      expect(isControlLive('button[data-action="pause-toggle"]', document)).toBe(true);
+    });
+    it('is true when the element is absent', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      expect(isControlLive('button[data-action="pause-toggle"]', document)).toBe(true);
+    });
+    it('is true when the element carries the allowed mark', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const b = railed();
+      b.dataset['action'] = 'pause-toggle';
+      b.classList.add(ALLOWED_CLASS);
+      expect(isControlLive('button[data-action="pause-toggle"]', document)).toBe(true);
+    });
+    it('is false when guided and the element is present without the allowed mark', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      railed().dataset['action'] = 'pause-toggle';
+      expect(isControlLive('button[data-action="pause-toggle"]', document)).toBe(false);
+    });
+  });
+
+  describe('installActivationGuard', () => {
+    it('swallows a click on a railed control before bubble listeners see it', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      const b = railed();
+      const seen = vi.fn();
+      b.addEventListener('click', seen);
+      const e = click(b);
+      expect(e.defaultPrevented).toBe(true);
+      expect(seen).not.toHaveBeenCalled();
+      dispose();
+    });
+    it('swallows a click on a child span inside a railed button', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      const b = railed();
+      const span = document.createElement('span');
+      b.appendChild(span);
+      const seen = vi.fn();
+      b.addEventListener('click', seen);
+      click(span);
+      expect(seen).not.toHaveBeenCalled();
+      dispose();
+    });
+    it.each(['Enter', 'Space'])('swallows %s on a railed control', (code) => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      const b = railed();
+      const seen = vi.fn();
+      b.addEventListener('keydown', seen);
+      const e = key(b, code);
+      expect(e.defaultPrevented).toBe(true);
+      expect(seen).not.toHaveBeenCalled();
+      dispose();
+    });
+    it.each([
+      ['Tab', {}], ['Escape', {}], ['ShiftLeft', { shiftKey: true }], ['ControlLeft', { ctrlKey: true }],
+      ['AltLeft', { altKey: true }], ['MetaLeft', { metaKey: true }],
+    ] as [string, KeyboardEventInit][])('lets %s through on a railed control', (code, init) => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      const b = railed();
+      const seen = vi.fn();
+      b.addEventListener('keydown', seen);
+      const e = key(b, code, init);
+      expect(e.defaultPrevented).toBe(false);
+      expect(seen).toHaveBeenCalledOnce();
+      dispose();
+    });
+    it('lets an allowed control be activated', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      const b = railed();
+      b.classList.add(ALLOWED_CLASS);
+      const clicked = vi.fn();
+      const keyed = vi.fn();
+      b.addEventListener('click', clicked);
+      b.addEventListener('keydown', keyed);
+      click(b);
+      key(b, 'Enter');
+      expect(clicked).toHaveBeenCalledOnce();
+      expect(keyed).toHaveBeenCalledOnce();
+      dispose();
+    });
+    it('does nothing when the tutorial is not guiding', () => {
+      const dispose = installActivationGuard(document);
+      const b = railed();
+      const clicked = vi.fn();
+      b.addEventListener('click', clicked);
+      expect(click(b).defaultPrevented).toBe(false);
+      expect(key(b, 'Enter').defaultPrevented).toBe(false);
+      expect(clicked).toHaveBeenCalledOnce();
+      dispose();
+    });
+    it('ignores keys on a non-control target', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      expect(key(railed('div'), 'Enter').defaultPrevented).toBe(false);
+      dispose();
+    });
+    it('stops swallowing after the disposer runs', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const dispose = installActivationGuard(document);
+      dispose();
+      const b = railed();
+      const clicked = vi.fn();
+      b.addEventListener('click', clicked);
+      expect(click(b).defaultPrevented).toBe(false);
+      expect(key(b, 'Enter').defaultPrevented).toBe(false);
+      expect(clicked).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('TutorialRails wiring', () => {
+    it('beginStep installs the guard: Enter on a railed button is swallowed', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'hire-surveyor' }, state());
+      const b = railed();
+      expect(key(b, 'Enter').defaultPrevented).toBe(true);
+      rails.clear();
+    });
+    it('beginStep twice installs one listener set (idempotent)', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const addSpy = vi.spyOn(document, 'addEventListener');
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'hire-surveyor' }, state());
+      const after1 = addSpy.mock.calls.filter(c => c[0] === 'click' || c[0] === 'keydown').length;
+      rails.beginStep({ id: 'survey' }, state());
+      const after2 = addSpy.mock.calls.filter(c => c[0] === 'click' || c[0] === 'keydown').length;
+      expect(after1).toBeGreaterThan(0);
+      expect(after2).toBe(after1);
+      addSpy.mockRestore();
+      rails.clear();
+    });
+    it('clear disposes the guard', () => {
+      document.body.classList.add(GUIDED_CLASS);
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'hire-surveyor' }, state());
+      rails.clear();
+      document.body.classList.add(GUIDED_CLASS);
+      const b = railed();
+      expect(key(b, 'Enter').defaultPrevented).toBe(false);
+      expect(click(b).defaultPrevented).toBe(false);
+    });
+  });
+
+  describe('selector parity with the CSS rail rule', () => {
+    injectStyles();
+    const css = Array.from(document.head.querySelectorAll('style')).map(el => el.textContent).join('\n');
+    for (const part of RAILED_CONTROL_SELECTOR.split(',').map(p => p.trim())) {
+      it(`styles.ts rails "${part}"`, () => {
+        expect(css).toContain(`body.${GUIDED_CLASS} ${part}:not(.${ALLOWED_CLASS})`);
+      });
+    }
   });
 });

@@ -15,6 +15,7 @@ import {
   SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS,
 } from './tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
+import { installActivationGuard } from './tutorialActivationGuard.js';
 
 /**
  * Selectors permanently allowed from the tutorial's very first step onward,
@@ -71,10 +72,13 @@ export class TutorialRails {
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
   private lastProgressTrainingActive = false;
+  /** Disposer of the keyboard/programmatic activation guard; set while installed. */
+  private disposeActivationGuard: (() => void) | undefined;
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
     this.unguided = step.guided === false;
+    this.disposeActivationGuard ??= installActivationGuard(document);
     this.stages = this.unguided ? [] : stagesFor(step.id, step.highlightTarget);
     this.stageIndex = 0;
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
@@ -193,6 +197,8 @@ export class TutorialRails {
 
   /** Take every mark off the DOM — used when the tutorial ends or restarts. */
   clear(): void {
+    this.disposeActivationGuard?.();
+    this.disposeActivationGuard = undefined;
     clearRails();
     setPickerRegion(null);
     this.stages = [];

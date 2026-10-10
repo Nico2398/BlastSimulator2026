@@ -291,3 +291,85 @@ describe('KeyboardShortcuts (12.7)', () => {
   });
 
 });
+
+describe('KeyboardShortcuts — rails-aware shortcuts (#1597)', () => {
+  function make(live: (sel: string) => boolean) {
+    const callbacks = {
+      togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn(),
+      onToggleSurveyOverlay: vi.fn(),
+    };
+    const isControlLive = vi.fn(live);
+    const ks = new KeyboardShortcuts(callbacks, { isControlLive });
+    return { callbacks, isControlLive, ks };
+  }
+  function fire(code: string): KeyboardEvent {
+    const e = new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true });
+    window.dispatchEvent(e);
+    return e;
+  }
+
+  it('Space is swallowed when the pause button is not live, but still preventDefault', () => {
+    const { callbacks, isControlLive, ks } = make(() => false);
+    const e = fire('Space');
+    expect(callbacks.togglePause).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(true);
+    expect(isControlLive).toHaveBeenCalledWith('button[data-action="pause-toggle"]');
+    ks.dispose();
+  });
+
+  it('Space toggles when the pause button is live', () => {
+    const { callbacks, ks } = make(() => true);
+    fire('Space');
+    expect(callbacks.togglePause).toHaveBeenCalledOnce();
+    ks.dispose();
+  });
+
+  it.each([['Digit1', 1], ['Digit2', 2], ['Digit3', 4], ['Digit4', 8]])('%s asks about button[data-speed="%i"] and is swallowed when not live', (code, speed) => {
+    const { callbacks, isControlLive, ks } = make(() => false);
+    fire(code);
+    expect(isControlLive).toHaveBeenCalledWith(`button[data-speed="${speed}"]`);
+    expect(callbacks.setSpeed).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it.each([['Digit1', 1], ['Digit2', 2], ['Digit3', 4], ['Digit4', 8]])('%s sets speed %i when live', (code, speed) => {
+    const { callbacks, ks } = make(() => true);
+    fire(code);
+    expect(callbacks.setSpeed).toHaveBeenCalledWith(speed);
+    ks.dispose();
+  });
+
+  it('KeyO asks about the survey overlay toggle and is swallowed when not live', () => {
+    const { callbacks, isControlLive, ks } = make(() => false);
+    fire('KeyO');
+    expect(isControlLive).toHaveBeenCalledWith('#bs-survey-panel [data-role="overlay-toggle"]');
+    expect(callbacks.onToggleSurveyOverlay).not.toHaveBeenCalled();
+    ks.dispose();
+  });
+
+  it('KeyO toggles the survey overlay when its button is live', () => {
+    const { callbacks, ks } = make(() => true);
+    fire('KeyO');
+    expect(callbacks.onToggleSurveyOverlay).toHaveBeenCalledOnce();
+    ks.dispose();
+  });
+
+  it('only the speed button that is not live is swallowed', () => {
+    const { callbacks, ks } = make(sel => sel !== 'button[data-speed="2"]');
+    fire('Digit2');
+    fire('Digit1');
+    expect(callbacks.setSpeed).toHaveBeenCalledTimes(1);
+    expect(callbacks.setSpeed).toHaveBeenCalledWith(1);
+    ks.dispose();
+  });
+
+  it('without the option nothing changes', () => {
+    const callbacks = { togglePause: vi.fn(), setSpeed: vi.fn(), togglePanel: vi.fn(), quickSave: vi.fn(), onEscape: vi.fn() };
+    const ks = new KeyboardShortcuts(callbacks);
+    fire('Space');
+    fire('Digit3');
+    expect(callbacks.togglePause).toHaveBeenCalledOnce();
+    expect(callbacks.setSpeed).toHaveBeenCalledWith(4);
+    ks.dispose();
+  });
+});

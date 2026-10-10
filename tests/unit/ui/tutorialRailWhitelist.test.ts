@@ -8,11 +8,10 @@
 // off-script controls and fails when any of them is marked allowed.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { stagesFor, type TutorialStage } from '../../../src/ui/tutorialStages.js';
 import { applyRails, allowedSelectors, ALLOWED_CLASS } from '../../../src/ui/tutorialGuide.js';
+import { injectStyles } from '../../../src/ui/styles.js';
 import { BASE_PERMANENTLY_ALLOWED } from '../../../src/ui/tutorialRails.js';
 
 const ROLES = ['drill_rig', 'rock_digger', 'debris_hauler', 'rock_fragmenter', 'surveyor_truck'] as const;
@@ -153,7 +152,8 @@ describe('tutorial rails whitelist (#1595)', () => {
     });
 
     it('method rows are railed in CSS (plain divs need their own guided rule)', () => {
-      const css = readFileSync(resolve(import.meta.dirname, '../../../src/ui/styles.ts'), 'utf-8');
+      injectStyles();
+      const css = Array.from(document.head.querySelectorAll('style')).map(el => el.textContent).join('\n');
       expect(css).toMatch(/body\.bs-tutorial-guided\s+\.bs-survey-method:not\(\.bs-tutorial-allowed\)/);
     });
   });
