@@ -262,6 +262,8 @@ export function regenerateGrid(
   }
   // A level's opening buildings go next to the crew, free of charge. Only
   // after the crew is placed, so the spiral starts from where they stand.
+  // placeStartingBuildings levels each footprint, so the navgrid rebuild below
+  // sees the levelled ground and the agent snap after it moves anyone stranded.
   if (params.startingCrew && params.startingBuildings && params.startingBuildings.length > 0) {
     const crew = [...ctx.state.employees.employees, ...ctx.state.vehicles.vehicles];
     const near = startingBuildingAnchor(crew, ctx.grid);

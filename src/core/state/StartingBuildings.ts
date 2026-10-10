@@ -1,8 +1,8 @@
 // BlastSimulator2026 — Pre-placed starting buildings (#1363)
 // Places a level's opening buildings on real ground once terrain exists.
 
-import { placeBuilding, type BuildingState } from '../entities/Building.js';
-import { siteBoundsForGrid } from '../engine/BuildingTaskHelpers.js';
+import { placeBuilding, getBuildingDef, getDefSize, type BuildingState } from '../entities/Building.js';
+import { siteBoundsForGrid, levelBuildingFootprint } from '../engine/BuildingTaskHelpers.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import {
   STARTING_BUILDING_STANDOFF_M,
@@ -58,8 +58,11 @@ export function isStaffedComposition(site: StartingSiteComposition | undefined):
 
 /**
  * Places each slot on free, buildable ground as close to `near` as possible.
- * Searches rings outward from `near`; no cash is deducted. Returns the number
- * of buildings actually placed (a slot that fits nowhere is skipped).
+ * Searches rings outward from `near`; no cash is deducted. Each placed building
+ * has its footprint levelled on the spot (the same carve-then-level a finished
+ * build gets), so it stands on a flat pad and later slots land on levelled
+ * ground. Call before the navgrid is built. Returns the number of buildings
+ * actually placed (a slot that fits nowhere is skipped).
  */
 export function placeStartingBuildings(
   buildings: BuildingState,
@@ -81,6 +84,8 @@ export function placeStartingBuildings(
           slot.tier, bounds.originX, bounds.originZ, undefined, grid,
         );
         if (result.success) {
+          const { sizeX, sizeZ } = getDefSize(getBuildingDef(slot.type, slot.tier));
+          levelBuildingFootprint(grid, cell.x, cell.z, sizeX, sizeZ);
           placed++;
           break search;
         }
