@@ -17,6 +17,7 @@ declare global {
     __tutorialState: () => { active: boolean; stepIndex: number; stepId: string | null; title: string; total: number; stageIndex: number; stageTotal: number; stageTarget: string | null; clockHeld: boolean };
     __resetTickAccumulator: () => void;
     __setAutoTick: (enabled: boolean) => void;
+    __setTutorialClockFollowsTimer: (enabled: boolean) => void;
     __setRenderEnabled: (enabled: boolean) => void;
     __renderFrame: () => void;
     /** Landscape chunks the per-frame streamer still owes the current camera — 0 once it has converged. Harnesses check this before capturing. */

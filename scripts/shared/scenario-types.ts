@@ -70,6 +70,7 @@ export type InteractionStepAction =
   // (ms) remains as an outer wall-clock safety net against a genuine hang,
   // separate from and much larger than the tick budget itself.
   | { type: 'waitForTutorialStep'; stepId: string | string[]; timeout?: number; maxTicks?: number }
+  | { type: 'awaitTutorialStep'; stepId: string | string[]; timeoutMs?: number }
   | { type: 'type'; selector: string; text: string; delay?: number }
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
   // Polls a DOM property until it equals `expectedValue`, bounded by
@@ -439,6 +440,8 @@ export interface ScenarioDef {
    * dev-testing-strategy's playthrough checkpoint table).
    */
   skipBlastPlayback?: boolean;
+  /** Interaction mode only: run the tutorial on its real-time clock instead of the scenario's deterministic one. */
+  realTutorialClock?: boolean;
 }
 
 /**

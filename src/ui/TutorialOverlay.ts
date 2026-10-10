@@ -71,7 +71,7 @@ export class TutorialOverlay {
   private confirmHandler: ((config: ConfirmModalConfig) => void) | null = null;
 
   /** Whether the real-time guide pass may hold/release the clock. */
-  private readonly clockFollowsTimer: boolean;
+  private clockFollowsTimer: boolean;
 
   constructor(container: HTMLElement, options: TutorialOverlayOptions = {}) {
     this.clockFollowsTimer = options.clockFollowsTimer ?? true;
@@ -449,6 +449,11 @@ export class TutorialOverlay {
     if (!this.clockFollowsTimer) return;
     const held = this.rails.updateClock(this.gameState);
     this.pausedEl.style.display = held ? '' : 'none';
+  }
+
+  /** Switch the real-time guide pass (clock hold/release) on or off after construction. */
+  setClockFollowsTimer(_enabled: boolean): void {
+    // TODO: implement
   }
 
   /** Rails (inert controls) only apply while the current step is guided (#1328). */

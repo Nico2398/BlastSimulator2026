@@ -29,6 +29,32 @@ interface TutorialSnapshot {
   stepId: string | null;
   title: string;
   total: number;
+  clockHeld: boolean;
+  stageIndex: number;
+}
+
+/** Wall-clock ms a held tutorial clock may show no progress before the wait fails. */
+export const HELD_STALL_FAIL_AFTER_MS = 3000;
+
+export interface HeldStallSample {
+  stepId: string;
+  stageIndex: number;
+  tick: number;
+}
+
+/** Pure stall rule: tracks how long the clock has been held with no step, stage or tick progress. */
+export function nextHeldStallState(
+  _prev: HeldStallSample | null,
+  _cur: HeldStallSample & { clockHeld: boolean },
+  _nowMs: number,
+  _heldSinceMs: number | null,
+): { heldSinceMs: number | null; stalled: boolean } {
+  return { heldSinceMs: null, stalled: false };
+}
+
+/** Flip the tutorial overlay between the real-time clock and the scenario's deterministic one. */
+export async function setTutorialRealClock(_page: Page, _enabled: boolean): Promise<void> {
+  // TODO: implement
 }
 
 export class InteractionFailure extends Error {

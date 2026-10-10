@@ -991,6 +991,10 @@ export async function executeActionOnPage(
       }
       break;
     }
+    case 'awaitTutorialStep': {
+      // TODO: implement
+      break;
+    }
     default: {
       // Exhaustiveness check
       const _exhaustive: never = action;
