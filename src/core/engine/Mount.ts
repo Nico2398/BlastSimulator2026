@@ -205,6 +205,11 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
  * whole rubble haul never happened, and the level went bankrupt paying a
  * driver who could not move.
  *
+ * With a `toward` destination the candidates are ordered nearest-first and
+ * dead ends are skipped: one `findPath` per candidate (at most 8, run once
+ * per alight, never per tick) picks the first cell with a vehicle-avoiding
+ * route to it. Without one, the first qualifying neighbour wins.
+ *
  * The vehicle's own cell stays the fallback: whatever the terrain around it,
  * the vehicle drove there, so standing on it is reachable by construction.
  */
@@ -212,7 +217,7 @@ export function findAlightCell(
   grid: NavGrid | undefined,
   vx: number,
   vz: number,
-  toward?: { x: number; z: number },
+  toward?: Destination,
 ): { x: number; z: number } {
   if (!grid) return { x: vx, z: vz };
 
@@ -352,9 +357,10 @@ export function leaveBuilding(state: GameState, employeeId: number, emitter?: Ev
 
 /**
  * Leaves made by a caller holding no emitter (a console command, a deep
- * helper) wait here, keyed by state, until the next tick announces them — so
- * every leave fires `employee:left_building` without threading an emitter
- * through every call chain.
+ * helper) wait here, keyed by state, until the next tick announces them.
+ * Without the queue those leaves would be silent, and subscribers (renderer,
+ * UI) that rely on `employee:left_building` would never see them; queueing
+ * avoids threading an emitter through every call chain.
  */
 const unannouncedLeaves = new WeakMap<GameState, Array<{ employeeId: number; buildingId: number }>>();
 

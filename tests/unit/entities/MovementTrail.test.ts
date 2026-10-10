@@ -4,6 +4,11 @@ import { describe, it, expect } from 'vitest';
 import {
   appendHostTransition, appendToTrail, isSameTrailPoint, openMovementTrail, MOVEMENT_TRAIL_MAX_POINTS,
 } from '../../../src/core/entities/MovementTrail.js';
+import { openMovementTrails } from '../../../src/core/engine/Locomotion.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 describe('MovementTrail', () => {
   it('openMovementTrail anchors a fresh, unrelocated trail at the given position', () => {
@@ -109,10 +114,35 @@ describe('MovementTrail', () => {
       expect(trail.hostMarkers).toEqual([]);
     });
 
-    it('a fresh openMovementTrail resets markers per batch', () => {
+    it('openMovementTrails(state) clears leftover markers on employees and vehicles', () => {
+      const state = createGame({ seed: 1 });
+      const { employee } = hireEmployee(state.employees, 'driver', new Random(1), 2, 3);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 5);
+      for (const entity of [employee, vehicle]) {
+        const stale = openMovementTrail(0, 0);
+        appendHostTransition(stale, 1, 0, 'enter', 'building', 1, 1);
+        entity.walkTrail = stale;
+      }
+
+      openMovementTrails(state);
+
+      expect(employee.walkTrail).toEqual({ points: [{ x: 2, z: 3 }], relocated: false, hostMarkers: [] });
+      expect(state.vehicles.vehicles.every(v => v.walkTrail!.hostMarkers.length === 0)).toBe(true);
+    });
+
+    it('appendHostTransition caps points and markers even when the point is not appended', () => {
       const trail = openMovementTrail(0, 0);
-      appendHostTransition(trail, 1, 0, 'enter', 'building', 1, 1);
-      expect(openMovementTrail(1, 0).hostMarkers).toEqual([]);
+      for (let i = 1; i < MOVEMENT_TRAIL_MAX_POINTS; i++) appendHostTransition(trail, i, 0, 'board', 'vehicle', i, 0);
+      expect(trail.points).toHaveLength(MOVEMENT_TRAIL_MAX_POINTS);
+      // Same tail every time: no point is added, markers must still stay bounded.
+      for (let i = 0; i < 10; i++) appendHostTransition(trail, MOVEMENT_TRAIL_MAX_POINTS - 1, 0, 'alight', 'vehicle', 0, 0);
+      expect(trail.points).toHaveLength(MOVEMENT_TRAIL_MAX_POINTS);
+      expect(trail.hostMarkers.length).toBeLessThanOrEqual(MOVEMENT_TRAIL_MAX_POINTS);
+      // A new point past the cap drops the oldest and re-indexes markers.
+      appendHostTransition(trail, 9999, 0, 'enter', 'building', 9999, 0);
+      expect(trail.points).toHaveLength(MOVEMENT_TRAIL_MAX_POINTS);
+      expect(trail.hostMarkers.every(m => m.pointIndex >= 0 && m.pointIndex < trail.points.length)).toBe(true);
+      expect(trail.hostMarkers[trail.hostMarkers.length - 1]!.pointIndex).toBe(MOVEMENT_TRAIL_MAX_POINTS - 1);
     });
   });
 });

@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  board, alight, enterBuilding, findAlightCell, leaveBuilding, releaseOccupantsOfRemovedBuildings,
+  board, alight, enterBuilding, findAlightCell, flushUnannouncedLeaves, leaveBuilding, releaseOccupantsOfRemovedBuildings,
   releaseOccupantsOfRemovedVehicles,
 } from '../../../src/core/engine/Mount.js';
 import { placeBuilding, destroyBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
@@ -553,6 +553,26 @@ describe('leaveBuilding', () => {
     leaveBuilding(state, insiders[0]!.id);
 
     expect(enterBuilding(state, school.id, late.id).success).toBe(true);
+  });
+});
+
+describe('leaveBuilding without an emitter', () => {
+  it('queues the leave; flushUnannouncedLeaves announces it once and a second flush announces nothing', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = schoolNavGrid();
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    enterBuilding(state, school.id, employee.id);
+    leaveBuilding(state, employee.id);
+
+    const emitter = new EventEmitter();
+    const left: unknown[] = [];
+    emitter.on('employee:left_building', e => left.push(e));
+
+    flushUnannouncedLeaves(state, emitter);
+    expect(left).toEqual([{ employeeId: employee.id, buildingId: school.id }]);
+    flushUnannouncedLeaves(state, emitter);
+    expect(left).toHaveLength(1);
   });
 });
 

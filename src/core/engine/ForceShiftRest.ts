@@ -70,15 +70,15 @@ function finishForceRest(
   restAction: PendingAction,
   firedEvents: FiredEvent[],
   shiftRested: number[],
-  _emitter?: EventEmitter,
+  emitter?: EventEmitter,
 ): void {
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
-  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ, resolveRestBuildingId(restAction.payload), _emitter);
+  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ, resolveRestBuildingId(restAction.payload), emitter);
   releaseUnboardedTaskQueueVehicleReservations(state, emp);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
 
 /**
@@ -90,7 +90,7 @@ export function forceShiftRestIfNeeded(
   emp: Employee,
   firedEvents: FiredEvent[],
   shiftRested: number[],
-  _emitter?: EventEmitter,
+  emitter?: EventEmitter,
 ): void {
   if (isRestIneligible(emp)) return;
   // Already arrived and mid-execution of a claimed task (e.g. dig_ramp_segment)
@@ -141,7 +141,7 @@ export function forceShiftRestIfNeeded(
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId: dest.buildingId },
   }, emp.id);
 
-  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, emitter);
 }
 
 /** Action types whose mid-execution phase is protected from proactive
@@ -313,7 +313,7 @@ export function forceShiftRestIfNeededByPolicy(
   emp: Employee,
   firedEvents: FiredEvent[],
   shiftRested: number[],
-  _emitter?: EventEmitter,
+  emitter?: EventEmitter,
 ): void {
   if (isRestIneligible(emp)) return;
   // Boarded and driving toward, or already arrived and mid-execution of, a
@@ -488,5 +488,5 @@ export function forceShiftRestIfNeededByPolicy(
     payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId: dest.buildingId },
   }, emp.id);
 
-  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, emitter);
 }

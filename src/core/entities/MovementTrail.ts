@@ -54,6 +54,23 @@ export function openMovementTrail(x: number, z: number): MovementTrail {
 }
 
 /**
+ * Trims `trail` to MOVEMENT_TRAIL_MAX_POINTS, dropping the oldest points and
+ * re-indexing the markers that point into them (markers whose point was
+ * dropped go too). Markers are also capped to the same length on their own:
+ * repeated transitions at one unchanged tail add markers but no points.
+ */
+function capTrail(trail: MovementTrail): void {
+  const overflow = trail.points.length - MOVEMENT_TRAIL_MAX_POINTS;
+  if (overflow > 0) {
+    trail.points.splice(0, overflow);
+    for (const m of trail.hostMarkers) m.pointIndex -= overflow;
+    trail.hostMarkers = trail.hostMarkers.filter(m => m.pointIndex >= 0);
+  }
+  const markerOverflow = trail.hostMarkers.length - MOVEMENT_TRAIL_MAX_POINTS;
+  if (markerOverflow > 0) trail.hostMarkers.splice(0, markerOverflow);
+}
+
+/**
  * Appends one tick's advanced hops to `trail`, walked from (fromX, fromZ).
  * A start that is not the trail's last point means the entity was moved by
  * something other than a walk since it was last recorded: the trail restarts
@@ -70,12 +87,7 @@ export function appendToTrail(trail: MovementTrail, fromX: number, fromZ: number
     const last = trail.points[trail.points.length - 1]!;
     if (!isSameTrailPoint(last, hop.x, hop.z)) trail.points.push({ x: hop.x, z: hop.z });
   }
-  const overflow = trail.points.length - MOVEMENT_TRAIL_MAX_POINTS;
-  if (overflow > 0) {
-    trail.points.splice(0, overflow);
-    for (const m of trail.hostMarkers) m.pointIndex -= overflow;
-    trail.hostMarkers = trail.hostMarkers.filter(m => m.pointIndex >= 0);
-  }
+  capTrail(trail);
 }
 
 /**
@@ -95,4 +107,5 @@ export function appendHostTransition(
   const tail = trail.points[trail.points.length - 1];
   if (!tail || !isSameTrailPoint(tail, x, z)) trail.points.push({ x, z });
   trail.hostMarkers.push({ pointIndex: trail.points.length - 1, event, hostKind, hostX, hostZ });
+  capTrail(trail);
 }
