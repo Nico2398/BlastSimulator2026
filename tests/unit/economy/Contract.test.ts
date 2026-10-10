@@ -11,6 +11,7 @@ import {
   hasFillableSaleOffer,
   isFillableSaleOffer,
   hasRubbleDisposalOffer,
+  hasOreSaleOffer,
   setContractHeld,
   undeliveredShare,
   remainingKg,
@@ -365,6 +366,25 @@ describe('Contract system', () => {
         offer({ id: 2, materialId: 'dirtite', quantityKg: 50 }),
       ];
       expect(hasFillableOreSaleOffer(pool, { dirtite: 60 })).toBe(true);
+    });
+  });
+
+  describe('hasOreSaleOffer', () => {
+    it('is true when the pool offers that ore, however much of it is asked for', () => {
+      expect(hasOreSaleOffer([offer({ materialId: 'dirtite', quantityKg: 999_999 })], 'dirtite')).toBe(true);
+    });
+
+    it('is false on an empty pool', () => {
+      expect(hasOreSaleOffer([], 'dirtite')).toBe(false);
+    });
+
+    it('is false when only other ores or other contract types are offered', () => {
+      const pool = [
+        offer({ materialId: 'rustite' }),
+        offer({ id: 2, type: 'supply', materialId: 'dirtite' }),
+        offer({ id: 3, type: 'rubble_disposal', materialId: '' }),
+      ];
+      expect(hasOreSaleOffer(pool, 'dirtite')).toBe(false);
     });
   });
 

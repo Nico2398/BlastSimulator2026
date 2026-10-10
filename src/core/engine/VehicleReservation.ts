@@ -213,6 +213,38 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
   );
 }
 
+/** Under-repair vehicle ids for the state of the read-only scope opened by `withUnderRepairIndex`; null outside one. */
+let underRepairScope: { state: GameState; ids: ReadonlySet<number> } | null = null;
+
+function isUnderRepair(state: GameState, vehicleId: number): boolean {
+  if (underRepairScope !== null && underRepairScope.state === state) return underRepairScope.ids.has(vehicleId);
+  return isVehicleUnderRepair(state.pendingActions, vehicleId);
+}
+
+/**
+ * Runs the read-only `fn` with the under-repair vehicle ids of `state` indexed
+ * once (one O(pendingActions) scan) so each `findFreeVehicleForRole` inside
+ * costs O(1) per vehicle for this check instead of a full pending-action scan
+ * (#1586: thousands of candidates x vehicles x roles). `fn` must not mutate
+ * `state.pendingActions`; the index is dropped when it returns. Re-entrant:
+ * an open scope for the same state is reused.
+ */
+export function withUnderRepairIndex<T>(state: GameState, fn: () => T): T {
+  if (underRepairScope !== null && underRepairScope.state === state) return fn();
+  const outer = underRepairScope;
+  const ids = new Set<number>();
+  for (const a of state.pendingActions) {
+    const id = a.payload['vehicleId'];
+    if (a.type === 'repair_vehicle' && a.status !== 'queued' && typeof id === 'number') ids.add(id);
+  }
+  underRepairScope = { state, ids };
+  try {
+    return fn();
+  } finally {
+    underRepairScope = outer;
+  }
+}
+
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
  * (reservedForActionId === null), not `broken`, not under an active repair order (#1393), and either undriven
@@ -249,7 +281,7 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     canDriveTier(employee, role, v.tier) &&
     v.hp > 0 &&
     getVehicleReservation(state.vehicles, v.id) === null &&
-    !isVehicleUnderRepair(state.pendingActions, v.id) &&
+    !isUnderRepair(state, v.id) &&
     (vehicleDriverId(v) === null || vehicleDriverId(v) === employee.id),
   );
   if (qualifying.length === 0) return null;

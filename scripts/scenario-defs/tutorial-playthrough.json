@@ -958,7 +958,27 @@
       }
     },
     {
-      "command": "contract accept type:ore_sale material:dirtite",
+      "command": "wait_until field:blingiteSaleOffered equals:true max_ticks:2000",
+      "timeout": 130,
+      "description": "#1586: wait for a blingite ore_sale to be on the board before the accept below. The pool re-rolls every CONTRACT_REFRESH_INTERVAL ticks and the haulers fill storage on their own clock, so a pinned dirtite sale was a bet on timing: with lowest-real-cost routing the warehouse finishes ~19 ticks sooner (tick 233, was 252), the board then held no dirtite offer, and waiting for one let the haulers store enough dirtite that the guard deliver below completed the sale and ended the level. Blingite is never in storage before blast 2, so the accepted, held contract stays unfillable whatever the timing, which is what the deliver guard below proves; and waiting on the condition holds under any upstream retime.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "blingiteSaleOffered",
+          "equals": true,
+          "maxTicks": 2000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "blingiteSaleOffered": true
+        }
+      }
+    },
+    {
+      "command": "contract accept type:ore_sale material:blingite",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -966,11 +986,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -979,10 +999,10 @@
           "activeContractCount": 2
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:dirtite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:blingite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size. #1586: blingite, not dirtite -- see the wait step above."
     },
     {
-      "command": "contract hold type:ore_sale material:dirtite",
+      "command": "contract hold type:ore_sale material:blingite",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -990,14 +1010,14 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] [data-action=\"hold-toggle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] [data-action=\"hold-toggle\"]"
         }
       ],
-      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason.",
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason. #1586: blingite, not dirtite -- see the wait step above.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -1006,20 +1026,20 @@
       }
     },
     {
-      "command": "contract deliver type:ore_sale material:dirtite amount:5000",
+      "command": "contract deliver type:ore_sale material:blingite amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:ore_sale material:dirtite amount:5000"
+          "command": "contract deliver type:ore_sale material:blingite amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough dirtite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:dirtite`, matching the accept step above.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough dirtite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:blingite`, matching the accept step above. #1586: blingite, not dirtite -- see the wait step above.",
       "expect": {
         "equals": {
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-deliver"
       },
       "role": "guard",
       "commandOutcome": "refused"

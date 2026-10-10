@@ -34,6 +34,7 @@ import {
   isMidVehicleGatedWork,
   completeVehicleGatedAction,
   hasBlockedQueuedActionForVehicleRole,
+  withUnderRepairIndex,
 } from '../../../src/core/engine/VehicleReservation.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
@@ -894,5 +895,43 @@ describe('hasBlockedQueuedActionForVehicleRole (#1091: untargeted haul_debris ex
     }));
 
     expect(hasBlockedQueuedActionForVehicleRole(state, 'rock_fragmenter', employee.id)).toBe(true);
+  });
+});
+
+describe('withUnderRepairIndex (#1586)', () => {
+  function setup() {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 1, 1);
+    const repair = {
+      id: 9001, type: 'repair_vehicle', status: 'assigned', payload: { vehicleId: vehicle.id },
+    } as unknown as PendingAction;
+    return { state, employee, vehicle, repair };
+  }
+
+  it('excludes a vehicle under a claimed repair order exactly like the unindexed path', () => {
+    const { state, employee, vehicle, repair } = setup();
+    state.pendingActions.push(repair);
+    const plain = findFreeVehicleForRole(state, 'drill_rig', employee);
+    const indexed = withUnderRepairIndex(state, () => findFreeVehicleForRole(state, 'drill_rig', employee));
+    expect(plain).toBeNull();
+    expect(indexed).toBeNull();
+    expect(vehicle.id).toBeGreaterThan(-1);
+  });
+
+  it('ignores a queued repair order and returns the fn result', () => {
+    const { state, employee, vehicle, repair } = setup();
+    repair.status = 'queued';
+    state.pendingActions.push(repair);
+    expect(withUnderRepairIndex(state, () => findFreeVehicleForRole(state, 'drill_rig', employee)?.id)).toBe(vehicle.id);
+  });
+
+  it('drops the index on exit, even when fn throws', () => {
+    const { state, employee, repair } = setup();
+    expect(() => withUnderRepairIndex(state, () => { throw new Error('x'); })).toThrow('x');
+    state.pendingActions.push(repair);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
   });
 });

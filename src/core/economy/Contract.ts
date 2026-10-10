@@ -355,6 +355,17 @@ export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean 
 }
 
 /**
+ * True when `available` holds an `ore_sale` offer for `materialId`, whatever
+ * quantity it asks for — the wait before a scenario clicks that offer's
+ * Accept, where nothing has to be in storage yet (#1586: how fast the crew
+ * gets there decides which pool instance is on the board, so a fixed
+ * position in the run cannot name one).
+ */
+export function hasOreSaleOffer(available: readonly Contract[], materialId: string): boolean {
+  return available.some(c => c.type === 'ore_sale' && c.materialId === materialId);
+}
+
+/**
  * Find the first contract in `pool` matching every selector field given
  * (`id`, `type`, `materialId`, `fillable` are ANDed, so an `id` whose
  * contract has another `type` is no match). Null when no selector field is

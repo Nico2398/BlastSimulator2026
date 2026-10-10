@@ -10,7 +10,7 @@ import { wetHoles } from './core/mining/WetHoles.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
-import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 
@@ -117,6 +117,8 @@ export interface SerializableGameState {
    * stock against, so mere presence in the pool is the whole condition.
    */
   rubbleDisposalOffered: boolean;
+  /** An `ore_sale` for blingite is on the board at any quantity (`hasOreSaleOffer`, #1586): the wait before accepting a sale storage cannot fill yet. */
+  blingiteSaleOffered: boolean;
   /**
    * True when the pool holds an offer the site can fill in full right now, ore_sale
    * or rubble_disposal (`hasFillableSaleOffer`, #1338). The free-play wait: any
@@ -220,6 +222,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     fillableDirtiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'dirtite'),
     fillableRustiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite'),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,

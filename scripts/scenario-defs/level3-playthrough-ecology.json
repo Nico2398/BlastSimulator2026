@@ -1356,7 +1356,7 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 44.70133333333366,
+          "wellBeing": 44.40916666666664,
           "safety": 50,
           "ecology": 29.204481995231976,
           "nuisance": 0,
@@ -1367,7 +1367,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3)."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged."
       }
     },
     {
@@ -1509,7 +1509,7 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 44.70133333333366,
+          "wellBeing": 44.40916666666664,
           "safety": 50,
           "ecology": 29.204481995231976,
           "nuisance": 0,
@@ -1566,7 +1566,7 @@
           "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 25.701333333333626,
+          "wellBeing": 25.40916666666661,
           "safety": 0,
           "ecology": 28.326891971391863,
           "nuisance": 0,
@@ -1611,7 +1611,7 @@
           "tickCount": 316,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 25.701333333333626,
+          "wellBeing": 25.40916666666661,
           "safety": 0,
           "ecology": 28.326891971391863,
           "nuisance": 0,
@@ -1635,7 +1635,7 @@
           "tickCount": 316,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 25.701333333333626,
+          "wellBeing": 25.40916666666661,
           "safety": 0,
           "ecology": 28.326891971391863,
           "nuisance": 0,
