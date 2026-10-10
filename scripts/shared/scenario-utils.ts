@@ -173,6 +173,7 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
   resolveEventIfPending: 30000,
   clickIfPresent: 0,
   awaitUsable: 6000,
+  awaitTutorialStep: 6000,
   zoomOut: 6000,
   focusTile: 6000,
   clickEntity: 6000,

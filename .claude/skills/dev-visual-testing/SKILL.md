@@ -144,7 +144,8 @@ Browser entry point exposes:
 - `window.__uiState()` — panel visibility, button states, pointer-events
 - `window.__uiActions()` — every interactive control on screen: `selector`, `label`, `region`, `usable`, `blockedBy`, `hint`. Ask "what can I do right now?" instead of guessing selectors.
 - `window.__probeSelector(sel)` — `null` when usable, else `'absent' | 'disabled' | 'hidden' | 'zero-size' | 'covered' | 'pointer-events-none'`. Ask "why can't I click this?" about one control.
-- `window.__tutorialState()` — `{ active, stepIndex, stepId, title, total }`. Know which tutorial card is showing, by id.
+- `window.__tutorialState()` — `{ active, stepIndex, stepId, title, total, stageIndex, stageTarget, clockHeld }`. Know which tutorial card is showing, by id.
+- `window.__setTutorialClockFollowsTimer(enabled)` — scenario mode does not let the tutorial guide hold/release the clock (`decideClock`); a scenario opts in with `realTutorialClock: true` (the runners call this bridge). Only then does `awaitTutorialStep` exercise the real clock, and fail with `tutorial clock held and not advancing` when the clock stays held 3 s with no step, stage or tick progress. Without the opt-in, `awaitTutorialStep` only drives the rAF tick loop (`__setAutoTick`).
 
 Implementation: `src/ui/uiActionProbe.ts`. `blockedBy` is the diagnosis, not a detail:
 

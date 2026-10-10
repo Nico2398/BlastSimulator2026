@@ -17,7 +17,7 @@ export const KNOWN_INTERACTION_ACTION_TYPES = [
   // Ported from the former playtest harness (issue #479) — same names, same
   // implementations, so a converted step behaves the same way the harness's
   // beats used to. See InteractionStepAction in scripts/shared/scenario-types.ts.
-  'set', 'clickLabel', 'awaitUsable', 'zoomOut', 'focusTile', 'clickEntity',
+  'set', 'clickLabel', 'awaitUsable', 'awaitTutorialStep', 'zoomOut', 'focusTile', 'clickEntity',
   // Conditional click for genuinely nondeterministic beats (`event choose`
   // after a bare tick). Not an escape hatch — see InteractionStepAction.
   'clickIfPresent',

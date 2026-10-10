@@ -834,6 +834,7 @@ export async function executeActionOnPage(
     case 'set':
     case 'clickLabel':
     case 'awaitUsable':
+    case 'awaitTutorialStep':
     case 'zoomOut':
     case 'focusTile':
     case 'clickEntity':

@@ -25,6 +25,7 @@ export interface ParsedArgs {
   screenshots: boolean;
   reportDrift: boolean;
   skipBlastPlayback: boolean;
+  realTutorialClock: boolean;
 }
 
 function parseViewsArg(raw: string): ShotDef[] {
@@ -51,6 +52,7 @@ export function parseArgs(): ParsedArgs {
   let screenshots = false;
   let reportDrift = false;
   let skipBlastPlayback = false;
+  let realTutorialClock = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -59,6 +61,7 @@ export function parseArgs(): ParsedArgs {
         const def = loadScenarioDef(name, resolve(process.cwd(), 'scripts/scenario-defs'));
         steps = def.steps;
         skipBlastPlayback = def.skipBlastPlayback ?? false;
+        realTutorialClock = def.realTutorialClock ?? false;
         if (def.shots && Array.isArray(def.shots)) {
           shots = def.shots.map(s => ({
             name: s.name, yaw: s.yaw, pitch: s.pitch,
@@ -131,5 +134,6 @@ export function parseArgs(): ParsedArgs {
     screenshots,
     reportDrift,
     skipBlastPlayback,
+    realTutorialClock,
   };
 }

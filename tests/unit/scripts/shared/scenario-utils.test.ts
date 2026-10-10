@@ -131,6 +131,16 @@ describe('effectiveStepTimeoutMs', () => {
   // function's own doc comment. These three low-declared-timeout cases would
   // have reproduced PR #616's own outer-race bug for a step whose only
   // action was one of them.
+  it('derives past a low declared timeout for a lone awaitTutorialStep via its 6000ms default (#1598)', () => {
+    const s = step({ timeout: 3, interaction: [{ type: 'awaitTutorialStep', stepId: 'blast' }] });
+    expect(effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS)).toBe(6000 + 5000);
+  });
+
+  it('awaitTutorialStep with an explicit timeoutMs uses it plus the margin (#1598)', () => {
+    const s = step({ timeout: 3, interaction: [{ type: 'awaitTutorialStep', stepId: 'blast', timeoutMs: 120000 }] });
+    expect(effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS)).toBe(120000 + 5000);
+  });
+
   it.each(['zoomOut', 'focusTile', 'clickEntity'] as const)(
     'derives past a low declared timeout for a lone %s action, via its 6000ms default',
     (type) => {
