@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite, isStaffedComposition } from '../../../src/core/state/StartingBuildings.js';
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
-import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, getSmoothTerrainSurfaceY, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { StartingBuildingSlot } from '../../../src/core/config/balance.js';
 import { FREIGHT_WAREHOUSE_CAPACITY_KG, STARTING_BUILDING_STANDOFF_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
 
@@ -113,6 +113,57 @@ describe('placeStartingBuildings (#1363)', () => {
     }
     const buildings = createBuildingState();
     expect(placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 12, z: 12 })).toBe(0);
+  });
+});
+
+/** Every column steps 1 <-> 2 with x parity: a tolerated one-level slope under any footprint. */
+function makeSteppedGrid(size: number): VoxelGrid {
+  const grid = new VoxelGrid(size, size);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const top = 1 + (x % 2);
+      for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
+function footprintHeights(grid: VoxelGrid, b: { type: any; tier: any; x: number; z: number }): number[] {
+  return getBuildingDef(b.type, b.tier).footprint.map(([dx, dz]) => getSmoothTerrainSurfaceY(grid, b.x + dx, b.z + dz));
+}
+
+describe('placeStartingBuildings levels the footprint (#1583)', () => {
+  it('levels a footprint placed on a one-step slope, never raising it', () => {
+    const grid = makeSteppedGrid(40);
+    const before = new Map<string, number>();
+    for (let z = 0; z < 40; z++) for (let x = 0; x < 40; x++) before.set(`${x},${z}`, getSmoothTerrainSurfaceY(grid, x, z));
+    const buildings = createBuildingState();
+    expect(placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 10, z: 10 })).toBe(1);
+    const b = buildings.buildings[0]!;
+    const heights = footprintHeights(grid, b);
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1e-6);
+    const originals = getBuildingDef(b.type, b.tier).footprint.map(([dx, dz]) => before.get(`${b.x + dx},${b.z + dz}`)!);
+    expect(Math.max(...originals) - Math.min(...originals)).toBeGreaterThan(0.5);
+    heights.forEach((h, i) => expect(h).toBeLessThanOrEqual(originals[i]! + 1e-6));
+    expect(heights[0]).toBeGreaterThanOrEqual(Math.min(...originals) - 1e-6);
+  });
+
+  it('leaves a flat grid untouched', () => {
+    const grid = makeFlatGrid(40, 2);
+    const before = getSmoothTerrainSurfaceY(grid, 10, 10);
+    const buildings = createBuildingState();
+    placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 10, z: 10 });
+    for (const h of footprintHeights(grid, buildings.buildings[0]!)) expect(h).toBeCloseTo(before, 6);
+  });
+
+  it('levels every slot of a two-slot site', () => {
+    const grid = makeSteppedGrid(40);
+    const buildings = createBuildingState();
+    expect(placeStartingBuildings(buildings, grid, [WAREHOUSE, WAREHOUSE], { x: 10, z: 10 })).toBe(2);
+    for (const b of buildings.buildings) {
+      const heights = footprintHeights(grid, b);
+      expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1e-6);
+    }
   });
 });
 
