@@ -141,6 +141,7 @@ export class CharacterMesh {
       // route the simulation actually walked this batch (#1199).
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
+      if (!entry.retiring && !this.tweenTargetIs(entry, emp)) this.beginHostSpans(entry, emp);
       if (entry.retiring || (entry.tween.spans && this.tweenTargetIs(entry, emp))) {
         const finished = this.playSpans(entry, dt, heightAt);
         this.animateGait(entry, entry.group.position.x - fromX, entry.group.position.z - fromZ, dt);
@@ -318,6 +319,27 @@ export class CharacterMesh {
 
   private tweenTargetIs(entry: CharacterEntry, emp: Employee): boolean {
     return entry.tween.targetX === emp.x && entry.tween.targetZ === emp.z;
+  }
+
+  /**
+   * A new target reached through a board..alight trail (two or more visible spans) plays the spans
+   * with the ride hidden between them, instead of gliding the chord (#1589).
+   */
+  private beginHostSpans(entry: CharacterEntry, emp: Employee): void {
+    const trail = emp.walkTrail;
+    if (!trail || trail.relocated || trail.hostMarkers.length === 0) return;
+    const spans = visibleTrailSpans(trail);
+    const last = trail.points[trail.points.length - 1];
+    if (spans.length < 2 || !last || last.x !== emp.x || last.z !== emp.z) return;
+    const { x, z } = entry.group.position;
+    const head = spans[0]!.points[0]!;
+    const lead = Math.hypot(head.x - x, head.z - z);
+    if (lead > 1e-6) spans[0] = { ...spans[0]!, points: [{ x, z }, ...spans[0]!.points] };
+    entry.tween.targetX = emp.x;
+    entry.tween.targetZ = emp.z;
+    entry.fullTrailLength = trailLength(trail.points) + lead;
+    entry.gapHidden = false;
+    startSpanPlayback(entry.tween, spans, entry.fullTrailLength);
   }
 
   /** Steps span playback and places the group; returns true once the last span has finished. */
