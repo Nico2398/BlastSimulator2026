@@ -94,7 +94,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
-  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
+  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'rubbleDisposalOffered', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel',
