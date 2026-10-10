@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
-import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../../src/ui/panels/BlastReportModal.js';
+import { describe, it, expect, vi } from 'vitest';
+import { BlastReportModal } from '../../../../src/ui/panels/BlastReportModal.js';
+import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../../../src/core/config/balance.js';
+import type { BlastPlaybackSnapshot } from '../../../../src/core/mining/BlastPlayback.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 
@@ -37,17 +39,21 @@ function makeAccident(overrides: Partial<AccidentRecord> = {}): AccidentRecord {
   return { tick: 0, type: 'injury', entityId: 1, fragmentId: 1, kineticEnergy: 200, ...overrides };
 }
 
-/**
- * Injects a fake, manually-advanced clock (#545) — `setNow()` drives the same
- * `now` closure variable the modal's constructor was handed, so tests control
- * real-time delay without a real timer.
- */
-function makeModal(): { modal: BlastReportModal; container: HTMLElement; setNow: (v: number) => void } {
+// The modal reads the renderer's playback snapshot (#1590), never a wall clock.
+// `setPlayback(s)` drives the shared snapshot every `update(state, playback())`
+// call in this file passes: s rendered seconds elapsed, playback finished.
+let currentPlayback: BlastPlaybackSnapshot = { elapsedS: 0, durationS: 0, isPlaying: false };
+function playback(): BlastPlaybackSnapshot { return currentPlayback; }
+function setPlayback(elapsedS: number, extra: Partial<BlastPlaybackSnapshot> = {}): void {
+  currentPlayback = { elapsedS, durationS: 0, isPlaying: false, ...extra };
+}
+
+function makeModal(): { modal: BlastReportModal; container: HTMLElement; setPlayback: typeof setPlayback } {
   const container = document.createElement('div');
   document.body.appendChild(container);
-  let now = 0;
-  const modal = new BlastReportModal(container, () => now);
-  return { modal, container, setNow: (v: number) => { now = v; } };
+  setPlayback(0);
+  const modal = new BlastReportModal(container);
+  return { modal, container, setPlayback };
 }
 
 function makeReport(overrides: Partial<BlastReport> = {}): BlastReport {
@@ -66,10 +72,10 @@ function makeReport(overrides: Partial<BlastReport> = {}): BlastReport {
  * need before asserting on already-open content, factored out of the ~9
  * call sites that repeated it verbatim.
  */
-function openReport(modal: BlastReportModal, state: GameState, setNow: (v: number) => void): void {
-  modal.update(state);
-  setNow(BLAST_REPORT_DELAY_MS);
-  modal.update(state);
+function openReport(modal: BlastReportModal, state: GameState, setPlayback: (v: number) => void): void {
+  modal.update(state, playback());
+  setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+  modal.update(state, playback());
 }
 
 describe('BlastReportModal', () => {
@@ -89,31 +95,31 @@ describe('BlastReportModal', () => {
     const state = makeState();
     state.lastBlastReport = makeReport();
 
-    modal.update(state);
+    modal.update(state, playback());
 
     expect(modal.visible).toBe(false);
     expect(modal.pending).toBe(true);
   });
 
   it('stays closed just before the open delay has elapsed (#545)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state);
+    modal.update(state, playback());
 
-    setNow(BLAST_REPORT_DELAY_MS - 1);
-    modal.update(state);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S - 0.01);
+    modal.update(state, playback());
 
     expect(modal.visible).toBe(false);
     expect(modal.pending).toBe(true);
   });
 
   it('opens once the delay has elapsed, rendering the held report\'s real stats (#545)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
 
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     expect(modal.visible).toBe(true);
     expect(modal.pending).toBe(false);
@@ -126,25 +132,25 @@ describe('BlastReportModal', () => {
   });
 
   it('a second report inside the delay window replaces the first — only the latest is ever rendered (#545)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     const reportA = makeReport({ fragmentCount: 47, totalOreValue: 16020 });
     state.lastBlastReport = reportA;
-    modal.update(state); // arms A at now=0
+    modal.update(state, playback()); // arms A
     expect(modal.visible).toBe(false);
     expect(modal.root.textContent).not.toContain('16,020');
 
-    setNow(1000);
+    setPlayback(1);
     const reportB = makeReport({ fragmentCount: 12, totalOreValue: 12345 });
     state.lastBlastReport = reportB;
-    modal.update(state); // B replaces A well before A's own deadline (3000)
+    modal.update(state, playback()); // B replaces A well before A's own deadline (3000)
 
     expect(modal.visible).toBe(false); // A never opened
     expect(modal.root.textContent).not.toContain('16,020'); // A's stat never rendered
 
-    // B's own fresh full window, counted from when B was armed (now=1000).
-    setNow(1000 + BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    // B's own window: playback elapsed reaches the floor.
+    setPlayback(1 + BLAST_REPORT_MIN_PLAYBACK_S);
+    modal.update(state, playback());
 
     expect(modal.visible).toBe(true);
     expect(modal.pending).toBe(false);
@@ -153,10 +159,10 @@ describe('BlastReportModal', () => {
   });
 
   it('Close hides the modal', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
@@ -164,32 +170,33 @@ describe('BlastReportModal', () => {
   });
 
   it('does not reopen on the next tick for the same report once closed', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
-    modal.update(state); // same report object, time unchanged
+    modal.update(state, playback()); // same report object, time unchanged
 
     expect(modal.visible).toBe(false);
   });
 
   it('opens again for a genuinely new report (different tick)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100 });
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
-    setNow(BLAST_REPORT_DELAY_MS + 1);
+    // A new blast resets the renderer's playback clock: playing, elapsed 0.
+    setPlayback(0, { isPlaying: true });
     state.lastBlastReport = makeReport({ tick: 200 });
-    modal.update(state); // arms the new report
+    modal.update(state, playback()); // arms the new report
 
     expect(modal.visible).toBe(false);
 
-    setNow(BLAST_REPORT_DELAY_MS + 1 + BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+    modal.update(state, playback());
 
     expect(modal.visible).toBe(true);
   });
@@ -202,28 +209,29 @@ describe('BlastReportModal', () => {
     // fix compares report identity instead (buildBlastReport in mining.ts
     // always returns a fresh object, so two distinct blasts are always two
     // distinct references even when their tick matches). Issue #479.
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 47 });
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
     expect(modal.visible).toBe(false);
 
-    setNow(BLAST_REPORT_DELAY_MS + 1);
+    // A new blast resets the renderer's playback clock: playing, elapsed 0.
+    setPlayback(0, { isPlaying: true });
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 12 });
-    modal.update(state); // arms the second blast's report
+    modal.update(state, playback()); // arms the second blast's report
 
     expect(modal.visible).toBe(false); // still waiting out its own delay
 
-    setNow(BLAST_REPORT_DELAY_MS + 1 + BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+    modal.update(state, playback());
 
     expect(modal.visible).toBe(true);
     expect(modal.root.textContent).toContain('12');
   });
 
   it('shows the ore report card with real percentage and breakdown when a survey estimate exists', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
     state.lastOreReport = {
@@ -232,7 +240,7 @@ describe('BlastReportModal', () => {
       hasTreranium: false, absurdiumFraction: 0,
     };
 
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     expect(modal.root.textContent).toContain('86%');
     expect(modal.root.textContent).toContain('5220 kg');
@@ -240,7 +248,7 @@ describe('BlastReportModal', () => {
   });
 
   it('omits the ore report card when there was no survey estimate to compare against', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
     state.lastOreReport = {
@@ -248,44 +256,44 @@ describe('BlastReportModal', () => {
       hasTreranium: false, absurdiumFraction: 0,
     };
 
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     expect(modal.root.textContent).not.toContain('Ore Report');
   });
 
   it('shows one card per destroyed building', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({
       destroyedBuildings: [{ buildingId: 3, type: 'freight_warehouse', x: 5, z: 5 }],
     });
 
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     expect(modal.root.textContent).toContain('Freight Warehouse #3');
     expect(modal.root.textContent).toContain('was destroyed');
   });
 
   it('shows the oversized-fragments hint, naming the real rock_fragmenter vehicle, only when there are any', () => {
-    const { modal: modalA, setNow: setNowA } = makeModal();
+    const { modal: modalA, setPlayback: setPlaybackA } = makeModal();
     const stateA = makeState();
     stateA.lastBlastReport = makeReport({ oversizedFragments: 0 });
-    openReport(modalA, stateA, setNowA);
+    openReport(modalA, stateA, setPlaybackA);
     expect(modalA.root.textContent).not.toContain('too large for standard haulers');
 
-    const { modal: modalB, setNow: setNowB } = makeModal();
+    const { modal: modalB, setPlayback: setPlaybackB } = makeModal();
     const stateB = makeState();
     stateB.lastBlastReport = makeReport({ oversizedFragments: 6 });
-    openReport(modalB, stateB, setNowB);
+    openReport(modalB, stateB, setPlaybackB);
     expect(modalB.root.textContent).toContain('6 fragments are too large for standard haulers');
     expect(modalB.root.textContent).toContain('Rock Fragmenter');
   });
 
   it('reset() clears a pending report so it never opens (#545)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state); // arms the report at now=0
+    modal.update(state, playback()); // arms the report
     expect(modal.pending).toBe(true);
 
     modal.reset();
@@ -297,18 +305,18 @@ describe('BlastReportModal', () => {
     // entry), whose lastBlastReport always starts null — mirrors the real
     // enteredNewLevel guard, not a reuse of the same stale state object.
     const freshState = makeState();
-    setNow(BLAST_REPORT_DELAY_MS * 10);
-    modal.update(freshState);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 10);
+    modal.update(freshState, playback());
 
     expect(modal.visible).toBe(false);
     expect(modal.pending).toBe(false);
   });
 
   it('reset() also hides an already-open modal (#545)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
     expect(modal.visible).toBe(true);
 
     modal.reset();
@@ -326,11 +334,11 @@ describe('BlastReportModal', () => {
   // that report, and the very next update() tick re-armed it.
 
   it('reset(currentReport) stamps lastShownReport so a subsequent update() call with that same-identity report does not re-arm (#571)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     const original = makeReport({ tick: 100 });
     state.lastBlastReport = original;
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
     expect(modal.visible).toBe(false);
 
@@ -345,24 +353,24 @@ describe('BlastReportModal', () => {
 
     const newState = makeState();
     newState.lastBlastReport = reloaded; // same reference just passed to reset()
-    modal.update(newState);
+    modal.update(newState, playback());
 
     expect(modal.pending).toBe(false);
     expect(modal.visible).toBe(false);
 
     // Stays closed even once the report's would-be open delay fully elapses.
-    setNow(BLAST_REPORT_DELAY_MS * 20);
-    modal.update(newState);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 20);
+    modal.update(newState, playback());
 
     expect(modal.pending).toBe(false);
     expect(modal.visible).toBe(false);
   });
 
   it('reset() with no argument leaves lastShownReport at null, same as before — a later new report still arms and opens normally (#571)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100 });
-    modal.update(state); // arms it (pending)
+    modal.update(state, playback()); // arms it (pending)
 
     modal.reset(); // no argument — the pre-#571 call shape
 
@@ -371,20 +379,20 @@ describe('BlastReportModal', () => {
 
     const freshState = makeState();
     freshState.lastBlastReport = makeReport({ tick: 999 }); // genuinely new report
-    modal.update(freshState);
+    modal.update(freshState, playback());
     expect(modal.pending).toBe(true); // arms normally — nothing was wrongly suppressed
 
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(freshState);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+    modal.update(freshState, playback());
     expect(modal.visible).toBe(true);
   });
 
   it('reset(currentReport) discards an actively pending report outright — it does not resurrect once discarded, even when currentReport is that exact pending report (#571)', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     const pending = makeReport({ tick: 50 });
     state.lastBlastReport = pending;
-    modal.update(state); // arms `pending`, still waiting out its delay
+    modal.update(state, playback()); // arms `pending`, still waiting out its delay
     expect(modal.pending).toBe(true);
 
     // A level transition / save-load lands mid-delay: currentReport here is
@@ -397,151 +405,244 @@ describe('BlastReportModal', () => {
 
     // Even once its original deadline would have elapsed, on the same state
     // object with the same report reference, it stays suppressed.
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+    modal.update(state, playback());
 
     expect(modal.pending).toBe(false);
     expect(modal.visible).toBe(false);
   });
 
-  // ── real collapse duration as a floor against BLAST_REPORT_DELAY_MS (#950) ──
-  // The 3000ms floor is decoupled from how long the fragment-collapse
-  // animation actually plays — a blast with real flyrock (long projectile
-  // arcs) can run well past 3s, and the old fixed floor let the report cover
-  // the collapse mid-flight. update()'s second parameter,
-  // blastPlaybackDurationS, is the real playback duration in seconds
-  // (GameRenderer.fragmentPlaybackDuration); the modal must wait out
-  // whichever is longer: the floor, or that real duration.
+  // ── playback-gated opening (#1590, supersedes #545 wall clock / #950) ──
+  // The delay is measured in rendered playback seconds (the renderer's capped-dt
+  // clock), never wall time: the report opens only when playback has stopped
+  // AND at least BLAST_REPORT_MIN_PLAYBACK_S rendered seconds have elapsed.
 
-  describe('real collapse duration as a floor against the delay (#950)', () => {
-    it('stays closed past the 3000ms floor when the real collapse runs longer, opening only once the real duration elapses', () => {
-      const { modal, setNow } = makeModal();
+  describe('playback-gated opening (#1590)', () => {
+    it('stays closed while the collapse is still playing, however much playback time has elapsed', () => {
+      const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
+      for (const elapsedS of [0, 1, BLAST_REPORT_MIN_PLAYBACK_S, 10, 1000]) {
+        setPlayback(elapsedS, { durationS: 2000, isPlaying: true });
+        modal.update(state, playback());
+        expect(modal.visible).toBe(false);
+        expect(modal.pending).toBe(true);
+      }
+    });
 
-      modal.update(state, 5); // arms with a 5s real collapse duration
-
-      // Past the old fixed floor (3000ms) — must still be closed, since the
-      // real 5s collapse is still playing.
-      setNow(BLAST_REPORT_DELAY_MS);
-      modal.update(state, 5);
+    it('opens once playback has stopped and the floor was reached, even if the collapse outlasted the floor', () => {
+      const { modal } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+      setPlayback(5, { durationS: 5, isPlaying: true });
+      modal.update(state, playback());
       expect(modal.visible).toBe(false);
-      expect(modal.pending).toBe(true);
 
-      // Just under the real duration (5000ms) — still closed.
-      setNow(4999);
-      modal.update(state, 5);
-      expect(modal.visible).toBe(false);
-      expect(modal.pending).toBe(true);
-
-      // The real duration has now elapsed — opens.
-      setNow(5000);
-      modal.update(state, 5);
+      setPlayback(5, { durationS: 5, isPlaying: false });
+      modal.update(state, playback());
       expect(modal.visible).toBe(true);
       expect(modal.pending).toBe(false);
     });
 
-    it('still waits the full 3000ms floor when the real collapse duration is shorter than the floor (unchanged #545 behavior)', () => {
-      const { modal, setNow } = makeModal();
+    it('stays closed when playback stopped early (short collapse) but the floor is not yet reached', () => {
+      const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
-
-      modal.update(state, 1); // a 1s real collapse — shorter than the 3s floor
-
-      setNow(999);
-      modal.update(state, 1);
-      expect(modal.visible).toBe(false);
-
-      // The real duration (1000ms) has elapsed, but the floor has not.
-      setNow(1000);
-      modal.update(state, 1);
+      setPlayback(1, { durationS: 1 });
+      modal.update(state, playback());
       expect(modal.visible).toBe(false);
       expect(modal.pending).toBe(true);
 
-      setNow(BLAST_REPORT_DELAY_MS - 1);
-      modal.update(state, 1);
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S - 0.01, { durationS: 1 });
+      modal.update(state, playback());
       expect(modal.visible).toBe(false);
 
-      setNow(BLAST_REPORT_DELAY_MS);
-      modal.update(state, 1);
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 1 });
+      modal.update(state, playback());
       expect(modal.visible).toBe(true);
     });
 
-    it('still waits the full 3000ms floor when blastPlaybackDurationS is exactly 0 (unchanged #545 behavior)', () => {
-      const { modal, setNow } = makeModal();
+    it('opens when elapsed is exactly at the floor with duration 0 (headless, nothing animated)', () => {
+      const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
-
-      modal.update(state, 0);
-
-      setNow(BLAST_REPORT_DELAY_MS - 1);
-      modal.update(state, 0);
-      expect(modal.visible).toBe(false);
-
-      setNow(BLAST_REPORT_DELAY_MS);
-      modal.update(state, 0);
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 0 });
+      modal.update(state, playback());
       expect(modal.visible).toBe(true);
     });
 
-    it('update(state) with the duration parameter omitted behaves identically to before — floor stays 3000ms', () => {
-      const { modal, setNow } = makeModal();
+    it('the arming update does not need to differ from the opening one: a snapshot already complete opens at once', () => {
+      const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 1);
+      modal.update(state, playback());
+      expect(modal.visible).toBe(true);
+    });
 
-      modal.update(state); // no second argument at all
+    it('slow frames: a huge wall-clock jump with few 0.1 s-capped frames keeps the modal closed until accumulated playback reaches the floor', () => {
+      const wall = vi.spyOn(performance, 'now');
+      const date = vi.spyOn(Date, 'now');
+      try {
+        wall.mockReturnValue(0);
+        date.mockReturnValue(0);
+        const { modal } = makeModal();
+        const state = makeState();
+        state.lastBlastReport = makeReport();
+        modal.update(state, playback());
 
-      setNow(BLAST_REPORT_DELAY_MS - 1);
+        // 60 s of wall time pass, but the renderer only produced 5 frames
+        // (each capped to 0.1 s): 0.5 s of rendered playback.
+        wall.mockReturnValue(60_000);
+        date.mockReturnValue(60_000);
+        let elapsed = 0;
+        for (let i = 0; i < 5; i++) {
+          elapsed += 0.1;
+          setPlayback(elapsed, { durationS: 6, isPlaying: true });
+          modal.update(state, playback());
+          expect(modal.visible).toBe(false);
+        }
+        expect(modal.pending).toBe(true);
+
+        // Collapse finished early but floor not met: still closed.
+        setPlayback(elapsed, { durationS: 6, isPlaying: false });
+        modal.update(state, playback());
+        expect(modal.visible).toBe(false);
+
+        setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+        modal.update(state, playback());
+        expect(modal.visible).toBe(true);
+      } finally {
+        wall.mockRestore();
+        date.mockRestore();
+      }
+    });
+
+    it('hidden-tab gap: wall time passes with zero frames, modal stays closed', () => {
+      const wall = vi.spyOn(performance, 'now');
+      try {
+        wall.mockReturnValue(0);
+        const { modal } = makeModal();
+        const state = makeState();
+        state.lastBlastReport = makeReport();
+        setPlayback(0.2, { durationS: 4, isPlaying: true });
+        modal.update(state, playback());
+
+        wall.mockReturnValue(10 * 60_000);
+        for (let i = 0; i < 3; i++) modal.update(state, playback()); // same snapshot, no frames
+        expect(modal.visible).toBe(false);
+        expect(modal.pending).toBe(true);
+      } finally {
+        wall.mockRestore();
+      }
+    });
+
+    it('stamps data-opened-at-playback-s with the elapsed playback seconds (2 decimals) on open', () => {
+      const { modal } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 1 });
+      modal.update(state, playback());
+      expect(modal.root.dataset['openedAtPlaybackS']).toBe(BLAST_REPORT_MIN_PLAYBACK_S.toFixed(2));
+
+      const second = makeModal();
+      const s2 = makeState();
+      s2.lastBlastReport = makeReport();
+      setPlayback(4.567, { durationS: 4.567 });
+      second.modal.update(s2, playback());
+      expect(second.modal.root.dataset['openedAtPlaybackS']).toBe('4.57');
+    });
+
+    it('does not stamp openedAtPlaybackS while the report is only pending', () => {
+      const { modal } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+      setPlayback(1, { isPlaying: true });
+      modal.update(state, playback());
+      expect(modal.root.dataset['openedAtPlaybackS']).toBeUndefined();
+    });
+
+    it('a blast replacing a pending one while playing is armed afresh and only opens on its own completed playback', () => {
+      const { modal } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({ fragmentCount: 47, totalOreValue: 16020 });
+      setPlayback(2, { isPlaying: true });
+      modal.update(state, playback());
+
+      state.lastBlastReport = makeReport({ fragmentCount: 12, totalOreValue: 12345 });
+      setPlayback(0, { isPlaying: true }); // renderer reset the clock for blast B
+      modal.update(state, playback());
+      expect(modal.visible).toBe(false);
+
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
+      modal.update(state, playback());
+      expect(modal.visible).toBe(true);
+      expect(modal.root.textContent).toContain('12,345');
+      expect(modal.root.textContent).not.toContain('16,020');
+    });
+
+    it('update(state) with the snapshot omitted never opens (idle snapshot has elapsed 0)', () => {
+      const { modal } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+      modal.update(state);
       modal.update(state);
       expect(modal.visible).toBe(false);
       expect(modal.pending).toBe(true);
-
-      setNow(BLAST_REPORT_DELAY_MS);
-      modal.update(state);
-      expect(modal.visible).toBe(true);
-      expect(modal.pending).toBe(false);
     });
 
-    it('does not reset or extend the deadline when update() is pumped every frame with an unchanged report and duration', () => {
-      const { modal, setNow } = makeModal();
+    it('does not extend or reset the wait when update() is pumped every frame with an unchanged report', () => {
+      const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
-
-      // Arm with a 5s real duration, then call update() repeatedly at every
-      // tick in between (as the real render loop's per-frame call does) —
-      // none of these calls may push pendingDeadlineMs further out.
-      modal.update(state, 5);
-      for (let ms = 0; ms <= 4999; ms += 500) {
-        setNow(ms);
-        modal.update(state, 5);
+      for (let s = 0; s < BLAST_REPORT_MIN_PLAYBACK_S; s += 0.25) {
+        setPlayback(s, { durationS: 3, isPlaying: s < 2 });
+        modal.update(state, playback());
         expect(modal.visible).toBe(false);
       }
-
-      // Still opens at exactly the original 5000ms deadline, not later.
-      setNow(5000);
-      modal.update(state, 5);
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 3 });
+      modal.update(state, playback());
       expect(modal.visible).toBe(true);
     });
 
-    it('data-outstanding marker stays true through an extended real-duration delay, and flips false only once genuinely dismissed', () => {
-      const { modal, setNow } = makeModal();
+    it('data-outstanding stays true while playing and pending, and flips false only once dismissed', () => {
+      const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
 
-      modal.update(state, 5);
+      setPlayback(1, { isPlaying: true });
+      modal.update(state, playback());
       expect(modal.root.dataset['outstanding']).toBe('true');
 
-      setNow(BLAST_REPORT_DELAY_MS); // past the old floor, still mid-collapse
-      modal.update(state, 5);
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 2, { isPlaying: true });
+      modal.update(state, playback());
       expect(modal.root.dataset['outstanding']).toBe('true');
       expect(modal.visible).toBe(false);
 
-      setNow(5000); // real duration elapsed — opens
-      modal.update(state, 5);
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 2);
+      modal.update(state, playback());
       expect(modal.root.dataset['outstanding']).toBe('true');
       expect(modal.visible).toBe(true);
 
       (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
       expect(modal.root.dataset['outstanding']).toBe('false');
+    });
+
+    it('level end clears a pending report: it never opens afterwards (guard kept)', () => {
+      const { modal } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport();
+      setPlayback(1, { isPlaying: true });
+      modal.update(state, playback());
+      state.levelEndReason = 'bankruptcy';
+      modal.update(state, playback());
+      expect(modal.pending).toBe(false);
+      expect(modal.root.dataset['outstanding']).toBe('false');
+
+      state.levelEndReason = null;
+      setPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 5);
+      modal.update(state, playback());
+      expect(modal.visible).toBe(false);
     });
   });
 
@@ -565,78 +666,78 @@ describe('BlastReportModal', () => {
 
   describe('casualty/loss note-cards (#557)', () => {
     it('renders a death note-card with the real employee name and skull icon', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       const emp = addEmployee(state, { name: 'Oz Trill' });
       state.lastBlastReport = makeReport({ accidents: [makeAccident({ type: 'death', entityId: emp.id })] });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).toContain('Oz Trill was killed by flying rock');
       expect(modal.root.querySelector('bs-icon[name="skull"]')).not.toBeNull();
     });
 
     it('renders an injury note-card with the real employee name and injured icon', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       const emp = addEmployee(state, { name: 'Dorian Kask' });
       state.lastBlastReport = makeReport({ accidents: [makeAccident({ type: 'injury', entityId: emp.id })] });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).toContain('Dorian Kask was injured by flying rock');
       expect(modal.root.querySelector('bs-icon[name="injured"]')).not.toBeNull();
     });
 
     it('renders a vehicle_destroyed note-card naming the real vehicle type, with vehicle icon', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({
         accidents: [makeAccident({ type: 'vehicle_destroyed', entityId: 12, entityLabel: 'debris_hauler' })],
       });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).toContain('Debris Hauler was destroyed by flying rock');
       expect(modal.root.querySelector('bs-icon[name="vehicle"]')).not.toBeNull();
     });
 
     it('renders a vehicle_damage note-card naming the real vehicle type', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({
         accidents: [makeAccident({ type: 'vehicle_damage', entityId: 12, entityLabel: 'rock_fragmenter' })],
       });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).toContain('Rock Fragmenter took flying rock damage');
     });
 
     it('falls back to a generic worker label when the accident\'s employee can\'t be found', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({ accidents: [makeAccident({ type: 'injury', entityId: 999 })] });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).toContain('A worker was injured by flying rock');
     });
 
     it('does not render a note-card for a building accident — destroyedBuildings has its own dedicated card, and OperationsPanel covers the full incident history', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({
         accidents: [makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters' })],
       });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).not.toContain('Living Quarters was destroyed');
     });
 
     it('renders one note-card per accident when several land on the same blast', () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       const empA = addEmployee(state, { name: 'Oz Trill' });
       const empB = addEmployee(state, { name: 'Dorian Kask' });
@@ -647,7 +748,7 @@ describe('BlastReportModal', () => {
         ],
       });
 
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
 
       expect(modal.root.textContent).toContain('Oz Trill was killed by flying rock');
       expect(modal.root.textContent).toContain('Dorian Kask was injured by flying rock');
@@ -657,10 +758,10 @@ describe('BlastReportModal', () => {
 
 describe('BlastReportModal wet holes note (#1348)', () => {
   it('shows wet and fizzled counts plus the tubing hint when holes fizzled', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ wetHoleIds: ['H1', 'H2', 'H3'], fizzledHoleIds: ['H1', 'H2'] });
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     const text = modal.root.textContent ?? '';
     expect(text).toMatch(/wet holes: 3 \(2 fizzled\)/i);
@@ -668,19 +769,19 @@ describe('BlastReportModal wet holes note (#1348)', () => {
   });
 
   it('shows no wet note for a dry report', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     expect(modal.root.textContent ?? '').not.toMatch(/wet holes/i);
   });
 
   it('shows the ok variant when holes were wet but none fizzled', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ wetHoleIds: ['H1', 'H2'], fizzledHoleIds: [] });
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
 
     const text = modal.root.textContent ?? '';
     expect(text).toMatch(/wet holes: 2/i);
@@ -691,19 +792,19 @@ describe('BlastReportModal wet holes note (#1348)', () => {
 describe('BlastReportModal rating cap note (#1349)', () => {
   for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize'] as const) {
     it(`renders the ${cap} cap note`, () => {
-      const { modal, setNow } = makeModal();
+      const { modal, setPlayback } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport({ ratingCap: cap });
-      openReport(modal, state, setNow);
+      openReport(modal, state, setPlayback);
       expect(modal.root.textContent).toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
     });
   }
 
   it('renders no cap note without ratingCap', () => {
-    const { modal, setNow } = makeModal();
+    const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    openReport(modal, state, setNow);
+    openReport(modal, state, setPlayback);
     for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize']) {
       expect(modal.root.textContent).not.toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
     }

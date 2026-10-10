@@ -332,8 +332,8 @@ export function countVehiclesWithDriver(state: GameState): number {
  * Whether the Blast Report modal (`BlastReportModal.ts`) has a report armed
  * or on screen right now.
  *
- * True from the instant a blast arms a report through its real-time open
- * delay (#545, `BLAST_REPORT_DELAY_MS`) and until the player dismisses it —
+ * True from the instant a blast arms a report through its playback-gated open
+ * delay (#545, #1590, `BLAST_REPORT_MIN_PLAYBACK_S`) and until the player dismisses it —
  * read off a DOM marker the modal stamps on its own overlay rather than
  * GameState, the same reason `isReachable` (tutorialGuide.ts) reads the DOM
  * instead of threading a UI reference through TutorialStep: opening and

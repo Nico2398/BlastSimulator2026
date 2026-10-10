@@ -18,12 +18,22 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
-import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../src/ui/panels/BlastReportModal.js';
+import { BlastReportModal } from '../../../src/ui/panels/BlastReportModal.js';
+import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../../src/core/config/balance.js';
+import type { BlastPlaybackSnapshot } from '../../../src/core/mining/BlastPlayback.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementController } from '../../../src/ui/scene/PlacementController.js';
 
 setupEvents();
+
+function finishedPlayback(elapsedS: number = BLAST_REPORT_MIN_PLAYBACK_S): BlastPlaybackSnapshot {
+  return { elapsedS, durationS: 0, isPlaying: false };
+}
+
+function playingPlayback(elapsedS: number): BlastPlaybackSnapshot {
+  return { elapsedS, durationS: 100, isPlaying: true };
+}
 
 function makeState() {
   const state = createGame({ seed: 1, mineType: 'desert' });
@@ -473,19 +483,17 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     // the NavGrid overlay tests above do, since UIManager.update() also
     // drives the minimap.
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    // Blast reports arm on first sight and only open once real time (via
-    // performance.now()) advances past BLAST_REPORT_DELAY_MS (#545) — mock
-    // the clock so this test can reach a genuinely visible modal before
+    // Blast reports arm on first sight and only open once the renderer's
+    // playback snapshot is finished with the floor reached (#1590) — pass
+    // such a snapshot so this test can reach a genuinely visible modal before
     // testing that closeStaleLevelOverlays() closes it.
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
     // Simulate the first site's blast report arriving, the way a real
     // `blast` command's uiManager.update(state) call does.
     const state = makeStateWithReport(10);
     uiManager.update(state); // arms the report (pending)
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(state); // delay elapsed — report opens
+    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S)); // delay elapsed — report opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     // A second site's freshly-entered state — mirrors main.ts's
@@ -506,7 +514,6 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
   });
 
   it('clears a pending (not yet opened) report too, and a fresh level state stays closed/non-pending as time advances (#545)', () => {
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
     uiManager = new UIManager(container);
     // Report has arrived but is still waiting out its real-time open delay —
@@ -523,8 +530,7 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
 
     expect(uiManager.blastReportModalPending).toBe(false);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(freshState);
+    uiManager.update(freshState, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -580,12 +586,10 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
 
   it('a same-identity report re-observed after closeStaleLevelOverlays(state) does not re-arm the modal — the save/load bug, reproduced at UIManager level', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
     uiManager.update(state); // arms
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(state); // opens
+    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S)); // opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
@@ -599,8 +603,7 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
 
     uiManager.closeStaleLevelOverlays(reloadedState);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(reloadedState);
+    uiManager.update(reloadedState, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -608,12 +611,10 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
 
   it('a genuinely NEW blast report on the same reloaded state still arms and opens on its normal delay', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
     uiManager.update(state);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(state);
+    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S));
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
     const reloadedState = createGame({ seed: 1, mineType: 'desert' });
@@ -623,13 +624,11 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
     // A brand-new blast fires on the reloaded state — a fresh object, never
     // shown before.
     reloadedState.lastBlastReport = makeBlastReport(20);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(reloadedState); // arms the new report
+    uiManager.update(reloadedState, playingPlayback(0)); // arms the new report (collapse just began)
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(true);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10 + BLAST_REPORT_DELAY_MS);
-    uiManager.update(reloadedState);
+    uiManager.update(reloadedState, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S));
 
     expect(uiManager.blastReportModalVisible).toBe(true);
   });
@@ -669,7 +668,6 @@ describe('UIManager — blast report deferral holds the event modal (#545)', () 
   });
 
   it('event modal stays closed while the report is pending (arrived but not yet opened)', () => {
-    vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
     const state = makeStateWithReportAndEvent(10);
 
@@ -682,13 +680,11 @@ describe('UIManager — blast report deferral holds the event modal (#545)', () 
   });
 
   it('event modal opens once the report is closed', () => {
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
     const state = makeStateWithReportAndEvent(10);
     uiManager.update(state); // arms the report
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(state); // report opens
+    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S)); // report opens
 
     expect(uiManager.blastReportModalVisible).toBe(true);
     let eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
@@ -952,5 +948,59 @@ describe('UIManager — eventModalVisible and Esc layering (#1327)', () => {
 
     uiManager.handleEscape();
     expect(open).toBe(false);
+  });
+});
+
+// ── UIManager forwards the renderer's playback snapshot (#1590) ───────────
+
+describe('UIManager — blast report follows the playback snapshot (#1590)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('stays closed while the snapshot says the collapse is playing, however long it has been', () => {
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+    for (const s of [0, 1, BLAST_REPORT_MIN_PLAYBACK_S, 50]) uiManager.update(state, playingPlayback(s));
+    expect(uiManager.blastReportModalVisible).toBe(false);
+    expect(uiManager.blastReportModalPending).toBe(true);
+  });
+
+  it('opens when the snapshot turns finished with the floor reached', () => {
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+    uiManager.update(state, playingPlayback(1));
+    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S));
+    expect(uiManager.blastReportModalVisible).toBe(true);
+  });
+
+  it('does not open from wall time: a huge performance.now jump with an unfinished snapshot stays closed', () => {
+    const wall = vi.spyOn(performance, 'now').mockReturnValue(0);
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+    uiManager.update(state, playingPlayback(0.1));
+    wall.mockReturnValue(120_000);
+    uiManager.update(state, playingPlayback(0.2));
+    expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+
+  it('keeps the event modal deferred while the report is pending behind a still-playing collapse', () => {
+    uiManager = new UIManager(container);
+    const state = makeStateWithReportAndEvent(10);
+    uiManager.update(state, playingPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 5));
+    const eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
+    expect(eventDialog.style.display).toBe('none');
+    expect(uiManager.blastReportModalPending).toBe(true);
   });
 });

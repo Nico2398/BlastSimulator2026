@@ -12,7 +12,7 @@
 // report it was handed on the floor, the very next update() tick treated the
 // reloaded report as new (reference inequality against the untouched
 // lastShownReport) and re-armed the modal, popping it back open ~3s
-// (BLAST_REPORT_DELAY_MS) after the load with no blast having actually
+// (BLAST_REPORT_MIN_PLAYBACK_S of playback) after the load with no blast having actually
 // happened.
 //
 // This test drives the real console command layer (createRunner, real
@@ -26,7 +26,8 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { UIManager } from '../../src/ui/UIManager.js';
 import { MiniMap } from '../../src/ui/MiniMap.js';
-import { BLAST_REPORT_DELAY_MS } from '../../src/ui/panels/BlastReportModal.js';
+import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../src/core/config/balance.js';
+import type { BlastPlaybackSnapshot } from '../../src/core/mining/BlastPlayback.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
 
@@ -62,6 +63,14 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   expect(ctx.state!.lastBlastReport).not.toBeNull();
 }
 
+function finished(elapsedS: number): BlastPlaybackSnapshot {
+  return { elapsedS, durationS: 0, isPlaying: false };
+}
+
+function playing(elapsedS: number): BlastPlaybackSnapshot {
+  return { elapsedS, durationS: 100, isPlaying: true };
+}
+
 /**
  * Replicates main.ts's runGameCommand enteredNewLevel branch by hand:
  * whenever ctx.state's identity changes (new_game/campaign/sandbox entry —
@@ -86,7 +95,6 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     // MiniMap.update() the same way tests/unit/ui/UIManager.test.ts does,
     // since UIManager.update() unconditionally drives the minimap.
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -96,8 +104,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     // Arm + open the report the same way main.ts's per-frame uiManager.update(ctx.state) does.
     uiManager.update(ctx.state!);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     // Player dismisses before saving.
@@ -117,10 +124,8 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     // Advance real time well past the open delay across several frames, the
     // way the render loop's per-frame update() calls do.
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 2);
-    uiManager.update(ctx.state!);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 2));
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -128,7 +133,6 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
   it('a genuinely new blast fired after the save/load round trip still arms and opens on its normal delay', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -137,8 +141,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     fireBlast(runner, ctx);
 
     uiManager.update(ctx.state!);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
     expect(runner.run('save').success).toBe(true);
@@ -160,20 +163,17 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     };
     ctx.state!.lastBlastReport = newReport;
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 100);
-    uiManager.update(ctx.state!); // arms the new report
+    uiManager.update(ctx.state!, playing(0)); // arms the new report (collapse just began)
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(true);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 100 + BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
 
     expect(uiManager.blastReportModalVisible).toBe(true);
   });
 
   it('entering a fresh level (lastBlastReport === null) leaves the modal closed/non-pending — unchanged from current behavior', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -184,8 +184,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     simulateEnteredNewLevel(uiManager, ctx);
     uiManager.update(ctx.state!);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -193,7 +192,6 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
   it('a save/load round trip while the report is still open (not yet dismissed) closes it and does not reopen', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -202,8 +200,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     fireBlast(runner, ctx);
 
     uiManager.update(ctx.state!);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
     expect(uiManager.blastReportModalVisible).toBe(true); // never dismissed
 
     expect(runner.run('save').success).toBe(true);
@@ -213,27 +210,21 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(false);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
   });
 
-  // ── a longer real collapse duration (#950) in effect at save time does not
-  // leave the reload stuck waiting on a stale extended deadline ────────────
+  // ── a still-playing collapse (#1590, was the #950 longer-duration case) in
+  // effect at save time does not leave the reload stuck waiting ───────────
   //
-  // BlastReportModal's open deadline is now max(BLAST_REPORT_DELAY_MS,
-  // blastPlaybackDurationS * 1000) — a real fragment collapse longer than the
-  // 3s floor pushes pendingDeadlineMs further out than #571's save/load guard
-  // originally covered. reset(currentReport) discards pendingDeadlineMs
-  // outright (it does not carry it across the reset), so a save/load round
-  // trip must behave identically whether the in-flight delay at save time was
-  // the plain 3s floor or a longer real-duration one.
+  // reset(currentReport) discards the pending report outright, so a save/load
+  // round trip must behave identically whether playback had finished or was
+  // still running when the report was pending.
 
-  it('dismiss → save → load while a longer real-duration delay was in effect at open time leaves the modal closed after reload, same as the plain-floor case (#950)', () => {
+  it('dismiss → save → load after a long (still-playing, then finished) collapse leaves the modal closed after reload, whatever snapshot arrives next (#950/#1590)', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -241,24 +232,16 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     const { runner, ctx } = createRunner();
     fireBlast(runner, ctx);
 
-    // Arm + open the report with a real collapse duration (5s) longer than
-    // the 3000ms floor — matches main.ts's own call shape (weatherCycle, rng,
-    // tutorialActive, blastPlaybackDurationS), UIManager.update's 5th param.
-    uiManager.update(ctx.state!, 5);
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!, 5);
-    expect(uiManager.blastReportModalVisible).toBe(false); // still mid-collapse, past the old floor
+    uiManager.update(ctx.state!, playing(BLAST_REPORT_MIN_PLAYBACK_S + 1));
+    expect(uiManager.blastReportModalVisible).toBe(false); // past the floor but still mid-collapse
 
-    nowSpy.mockReturnValue(5000);
-    uiManager.update(ctx.state!, 5);
+    uiManager.update(ctx.state!, finished(5));
     expect(uiManager.blastReportModalVisible).toBe(true);
 
-    // Player dismisses before saving.
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
     expect(uiManager.blastReportModalVisible).toBe(false);
 
     expect(runner.run('save').success).toBe(true);
-
     const prevState = ctx.state;
     expect(runner.run('load').success).toBe(true);
     expect(ctx.state).not.toBe(prevState);
@@ -266,24 +249,16 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     simulateEnteredNewLevel(uiManager, ctx);
 
-    // Advance real time well past even the longer 5s delay across several
-    // frames — the reloaded state must not re-arm regardless of what
-    // blastPlaybackDurationS the caller now passes (a fresh frame after
-    // reload has no fragment collapse of its own in flight, so main.ts
-    // would pass 0 here — asserted for both 0 and a stale-looking 5 to prove
-    // the guard doesn't depend on which one arrives).
-    nowSpy.mockReturnValue(10000);
-    uiManager.update(ctx.state!, 0);
-    nowSpy.mockReturnValue(50000);
-    uiManager.update(ctx.state!, 5);
+    // Fresh playback clock after reload (0) and a stale-looking finished one.
+    uiManager.update(ctx.state!, finished(0));
+    uiManager.update(ctx.state!, finished(50));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
   });
 
-  it('a save/load round trip while the report is still pending under a longer real-duration delay (arrived, not yet opened) closes it and does not reopen (#950)', () => {
+  it('a save/load round trip while the report is pending behind a still-playing collapse closes it and does not reopen (#950/#1590)', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -291,14 +266,8 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     const { runner, ctx } = createRunner();
     fireBlast(runner, ctx);
 
-    uiManager.update(ctx.state!, 5); // arms with a 5s real duration, still waiting it out
-    expect(uiManager.blastReportModalPending).toBe(true);
-    expect(uiManager.blastReportModalVisible).toBe(false);
-
-    // Even past the old 3000ms floor, still pending — the real duration
-    // hasn't elapsed yet.
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!, 5);
+    uiManager.update(ctx.state!, playing(0));
+    uiManager.update(ctx.state!, playing(BLAST_REPORT_MIN_PLAYBACK_S + 1));
     expect(uiManager.blastReportModalPending).toBe(true);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
@@ -309,8 +278,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(ctx.state!, 0);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -318,7 +286,6 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
   it('a save/load round trip while the report is still pending (arrived, not yet opened) closes it and does not reopen', () => {
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     container = document.createElement('div');
     document.body.appendChild(container);
     uiManager = new UIManager(container);
@@ -337,8 +304,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
-    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(ctx.state!);
+    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);

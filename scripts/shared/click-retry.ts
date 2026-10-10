@@ -23,8 +23,8 @@ import type { Page } from 'puppeteer';
  * CLICK_SELECTOR_DEFAULT_TIMEOUT_MS expires — i.e. attached and otherwise
  * unblocked, but not yet laid out ('zero-size') or not yet toggled visible
  * ('hidden', e.g. a modal whose ancestor overlay is still `display:none`
- * behind a deferred open — BlastReportModal's `BLAST_REPORT_DELAY_MS` plus
- * whatever collapse-playback duration it waits out). Both are the render
+ * behind a deferred open — BlastReportModal's `BLAST_REPORT_MIN_PLAYBACK_S` floor
+ * or the collapse-playback duration it waits out, in rendered time). Both are the render
  * loop running behind schedule, not a permanent block, so both earn the same
  * one-time extension (#1109 CI-fix: `sandbox-mode`'s report-close measured
  * ~5.0-5.13s to open locally against the unchanged 5s default — a reason of

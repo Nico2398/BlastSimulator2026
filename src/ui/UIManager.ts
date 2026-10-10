@@ -1,6 +1,7 @@
 // BlastSimulator2026 — UI Manager (10.x, redesign P1)
 // Orchestrates all UI panels. Wires game console, handles panel routing, drives per-tick updates.
 
+import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
 import { registerIcons } from './icons.js';
@@ -414,7 +415,7 @@ export class UIManager {
     this.notify({ severity: 'warn', title: message, body: '' });
   }
 
-  update(state: GameState, blastPlaybackDurationS: number = 0): void {
+  update(state: GameState, blastPlayback: BlastPlaybackSnapshot = IDLE_BLAST_PLAYBACK): void {
     const weather = state.weather.current;
     this.topBar.update(state, this.notificationCenter);
     this.toasts.update(this.notificationCenter);
@@ -444,7 +445,7 @@ export class UIManager {
     // lastBlastReport's tick actually changes) and neither's visibility is
     // tied to blastUI's own, so gating on it here would miss real transitions.
     this.preflightModal.update(state, weather);
-    this.blastReportModal.update(state, blastPlaybackDurationS);
+    this.blastReportModal.update(state, blastPlayback);
     // Unconditional like settingsPanel below, same reason: contracts can
     // change (a blast finishing, a delivery landing) while the panel is
     // closed, and the player expects current offers the instant they open

@@ -2197,3 +2197,6 @@ export const SMUGGLING_VOLUME_LEVELS = [0.1, 0.25, 0.5, 1] as const;
 
 /** Volume an old save's active smuggling operation migrates to (#1409). */
 export const SMUGGLING_MIGRATED_VOLUME = 0.25;
+
+/** Minimum rendered seconds of blast playback before the blast report may open (#1590). */
+export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
