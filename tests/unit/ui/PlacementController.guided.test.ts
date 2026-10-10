@@ -16,6 +16,7 @@ import {
   setPickerRegion, liveArea, regionCenter, regionSpan, EXACT_LIVE_MARGIN,
 } from '../../../src/ui/tutorialPickerRegion.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
+import { REGION } from '../../../src/ui/tutorialStages.js';
 
 const EXACT = { x1: 20, z1: 20, x2: 30, z2: 30, exact: true };
 const AREA = { x1: 20, z1: 20, x2: 30, z2: 30 };
@@ -528,5 +529,202 @@ describe('a refused confirm leaves the tool armed (#1210)', () => {
 
     vi.advanceTimersByTime(CONFIRM_FLASH_MS + 50);
     expect(controller.isArmed).toBe(false);
+  });
+});
+
+// ── #1594: checks and preview follow the pin, not the cursor ────────────────
+//
+// An exact region snaps every live pick onto its pin, so the ghost, the claim
+// check and the flatness check must all be asked about the pin. Evaluating the
+// hovered tile instead made Confirm's state depend on terrain the order would
+// never touch. Pins come from REGION only.
+
+describe('exact region: preview and checks sit at the pin (#1594)', () => {
+  const PIN = REGION.warehouse;
+  const PIN_AT = { x: PIN.x1, z: PIN.z1 };
+  const MARGIN_TILE = { x: PIN.x1 + 2, z: PIN.z1 + 2 };
+  const OUTSIDE_TILE = { x: PIN.x2 + EXACT_LIVE_MARGIN + 1, z: PIN.z2 + EXACT_LIVE_MARGIN + 1 };
+  const onlyPin = (x: number, z: number): boolean => x === PIN_AT.x && z === PIN_AT.z;
+
+  it('the pin used here is an exact region', () => {
+    expect(PIN.exact).toBe(true);
+  });
+
+  describe('previewOrigin', () => {
+    it('is the pin when hovering a live margin tile', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      hover(MARGIN_TILE.x, MARGIN_TILE.z);
+      expect(controller.previewOrigin).toEqual(PIN_AT);
+    });
+
+    it('is the pin when hovering the pin itself', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      hover(PIN_AT.x, PIN_AT.z);
+      expect(controller.previewOrigin).toEqual(PIN_AT);
+    });
+
+    it('is the pin at the far edge of the margin', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      hover(PIN.x2 + EXACT_LIVE_MARGIN, PIN.z2 + EXACT_LIVE_MARGIN);
+      expect(controller.previewOrigin).toEqual(PIN_AT);
+    });
+
+    it('is the raw hovered tile outside the margin, which is also refused', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      hover(OUTSIDE_TILE.x, OUTSIDE_TILE.z);
+      expect(controller.previewOrigin).toEqual(OUTSIDE_TILE);
+      expect(controller.refusedTile).toEqual(OUTSIDE_TILE);
+    });
+
+    it('is the hovered tile when no region is published', () => {
+      controller.arm({ shape: 'point' });
+      hover(7, 9);
+      expect(controller.previewOrigin).toEqual({ x: 7, z: 9 });
+    });
+
+    it('is the hovered tile for a non-exact region', () => {
+      setPickerRegion(AREA);
+      controller.arm({ shape: 'point' });
+      hover(24, 26);
+      expect(controller.previewOrigin).toEqual({ x: 24, z: 26 });
+    });
+
+    it('is null before any hover and when the pointer leaves the terrain', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      expect(controller.previewOrigin).toBeNull();
+      hover(MARGIN_TILE.x, MARGIN_TILE.z);
+      tileUnderCursor = null;
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 1, clientY: 1, bubbles: true }));
+      expect(controller.previewOrigin).toBeNull();
+    });
+  });
+
+  describe('checks run at the pin', () => {
+    it('hover asks claimCheck and footprintCheck about the pin, not the hovered tile', () => {
+      const claimCheck = vi.fn((): ClaimRefusalReason | null => null);
+      const footprintCheck = vi.fn(() => true);
+      controller.setClaimCheck(claimCheck);
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      controller.setFootprintCheck(footprintCheck);
+
+      hover(MARGIN_TILE.x, MARGIN_TILE.z);
+
+      expect(claimCheck).toHaveBeenCalledWith(PIN_AT.x, PIN_AT.z);
+      expect(claimCheck).not.toHaveBeenCalledWith(MARGIN_TILE.x, MARGIN_TILE.z);
+      expect(footprintCheck).toHaveBeenCalledWith(PIN_AT.x, PIN_AT.z);
+      expect(footprintCheck).not.toHaveBeenCalledWith(MARGIN_TILE.x, MARGIN_TILE.z);
+    });
+
+    it('mouse-down asks claimCheck and footprintCheck about the pin', () => {
+      const claimCheck = vi.fn((): ClaimRefusalReason | null => null);
+      const footprintCheck = vi.fn(() => true);
+      controller.setClaimCheck(claimCheck);
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      controller.setFootprintCheck(footprintCheck);
+
+      press(MARGIN_TILE.x, MARGIN_TILE.z);
+
+      expect(claimCheck).toHaveBeenCalledWith(PIN_AT.x, PIN_AT.z);
+      expect(claimCheck).not.toHaveBeenCalledWith(MARGIN_TILE.x, MARGIN_TILE.z);
+      expect(footprintCheck).toHaveBeenCalledWith(PIN_AT.x, PIN_AT.z);
+      expect(footprintCheck).not.toHaveBeenCalledWith(MARGIN_TILE.x, MARGIN_TILE.z);
+    });
+
+    it('an unflat margin tile does not invalidate a flat pin', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      controller.setFootprintCheck(onlyPin);
+
+      press(MARGIN_TILE.x, MARGIN_TILE.z);
+
+      expect(controller.footprintInvalid).toBe(false);
+      expect(controller.canConfirm).toBe(true);
+    });
+
+    it('a flat margin tile does not validate an unflat pin', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      controller.setFootprintCheck((x, z) => !onlyPin(x, z));
+
+      press(MARGIN_TILE.x, MARGIN_TILE.z);
+
+      expect(controller.footprintInvalid).toBe(true);
+      expect(controller.canConfirm).toBe(false);
+    });
+
+    it('a claim refused only at the margin tile does not refuse the pin', () => {
+      controller.setClaimCheck((x, z) => (onlyPin(x, z) ? null : 'protected_structure'));
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+
+      press(MARGIN_TILE.x, MARGIN_TILE.z);
+
+      expect(controller.refusalReason).toBeNull();
+      expect(controller.canConfirm).toBe(true);
+    });
+
+    it('a claim refused at the pin refuses every margin tile', () => {
+      controller.setClaimCheck((x, z) => (onlyPin(x, z) ? 'protected_structure' : null));
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+
+      hover(MARGIN_TILE.x, MARGIN_TILE.z);
+
+      expect(controller.refusalReason).toBe('protected_structure');
+    });
+
+    it('a non-exact region still checks the raw tile', () => {
+      const claimCheck = vi.fn((): ClaimRefusalReason | null => null);
+      controller.setClaimCheck(claimCheck);
+      setPickerRegion(AREA);
+      controller.arm({ shape: 'point' });
+
+      hover(24, 26);
+
+      expect(claimCheck).toHaveBeenCalledWith(24, 26);
+    });
+  });
+
+  describe('a selected pin keeps its verdict while the cursor roams', () => {
+    function selectPin(): void {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      controller.setClaimCheck((x, z) => (onlyPin(x, z) || x === MARGIN_TILE.x ? null : 'protected_structure'));
+      controller.setFootprintCheck((x, z) => onlyPin(x, z) || x === MARGIN_TILE.x);
+      press(MARGIN_TILE.x, MARGIN_TILE.z);
+      expect(controller.currentPhase).toBe('selected');
+      expect(controller.canConfirm).toBe(true);
+    }
+
+    it.each([
+      ['an unflat live tile', { x: PIN_AT.x + 1, z: PIN_AT.z + 3 }],
+      ['a claim-refused live tile', { x: PIN_AT.x + 3, z: PIN_AT.z }],
+      ['a tile outside the region', { x: PIN.x2 + EXACT_LIVE_MARGIN + 4, z: PIN.z2 + EXACT_LIVE_MARGIN + 4 }],
+    ])('hovering %s leaves canConfirm, footprintInvalid and refusalReason unchanged', (_n, tile) => {
+      selectPin();
+      hover(tile.x, tile.z);
+      expect(controller.currentPhase).toBe('selected');
+      expect(controller.canConfirm).toBe(true);
+      expect(controller.footprintInvalid).toBe(false);
+      expect(controller.refusalReason).toBeNull();
+    });
+
+    it('hovering a flat live tile does not rescue an invalid selection either', () => {
+      setPickerRegion(PIN);
+      controller.arm({ shape: 'point' });
+      controller.setFootprintCheck((x) => x === MARGIN_TILE.x); // pin unflat
+      press(MARGIN_TILE.x + 0, MARGIN_TILE.z);
+      expect(controller.canConfirm).toBe(false);
+      hover(MARGIN_TILE.x, MARGIN_TILE.z + 1);
+      expect(controller.canConfirm).toBe(false);
+      expect(controller.footprintInvalid).toBe(true);
+    });
   });
 });

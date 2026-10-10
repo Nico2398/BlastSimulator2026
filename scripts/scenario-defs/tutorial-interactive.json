@@ -244,7 +244,7 @@
     {
       "command": "build living_quarters at:8,15",
       "timeout": 30,
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (2,12) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (2,12) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((8,15) pin, picked at margin tile (10,17)); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
         {
@@ -261,8 +261,8 @@
         },
         {
           "type": "pickTile",
-          "x": 8,
-          "z": 15
+          "x": 10,
+          "z": 17
         },
         {
           "type": "screenshot"
@@ -723,7 +723,7 @@
     {
       "command": "build driving_center at:6,15",
       "timeout": 90,
-      "description": "#1339: build-driving-center, click half -- ordered after the first blast, which leaves oversized boulders only a rock fragmenter can break; the Driving Center teaches its licence. Every role arrives able to do its own job, so the old drill-rig and excavator courses are gone.",
+      "description": "#1339: build-driving-center, click half -- ordered after the first blast, which leaves oversized boulders only a rock fragmenter can break; the Driving Center teaches its licence. Every role arrives able to do its own job, so the old drill-rig and excavator courses are gone. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((6,15) pin, picked at margin tile (8,17)); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
         {
@@ -740,8 +740,8 @@
         },
         {
           "type": "pickTile",
-          "x": 6,
-          "z": 15
+          "x": 8,
+          "z": 17
         },
         {
           "type": "screenshot"
@@ -981,7 +981,7 @@
     {
       "command": "build freight_warehouse at:2,12",
       "timeout": 90,
-      "description": "build-storage, click half: warehouse ordered by clicking the step's outlined tile (2,12) in the Build panel picker. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #556/#816: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (a genuine success, not refused: ordering is valid, successful work under #556); the wait step right below drives the site to completion, matching build-living-quarters above.",
+      "description": "build-storage, click half: warehouse ordered by clicking the step's outlined tile (2,12) in the Build panel picker. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #556/#816: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (a genuine success, not refused: ordering is valid, successful work under #556); the wait step right below drives the site to completion, matching build-living-quarters above. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((2,12) pin, picked at margin tile (4,14)); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
         {
@@ -998,8 +998,8 @@
         },
         {
           "type": "pickTile",
-          "x": 2,
-          "z": 12
+          "x": 4,
+          "z": 14
         },
         {
           "type": "screenshot"
