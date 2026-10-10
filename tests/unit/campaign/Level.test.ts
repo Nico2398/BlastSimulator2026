@@ -6,7 +6,7 @@ import { generateTerrain, resolveGeneratedBiome } from '../../../src/core/world/
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
-import { sandboxLevelDef, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
+import { sandboxLevelDef, SANDBOX_DEFAULTS, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
 import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
@@ -427,7 +427,7 @@ describe('scripted hiring and ore sale (#1600)', () => {
   });
 
   it('the sandbox level has neither', () => {
-    const def = sandboxLevelDef();
+    const def = sandboxLevelDef(SANDBOX_DEFAULTS);
     expect(def.hiringScript).toBeUndefined();
     expect(def.scriptedOreSale).toBeUndefined();
   });

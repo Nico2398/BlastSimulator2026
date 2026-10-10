@@ -1782,6 +1782,9 @@ export const NEGOTIATION_MAX_ATTEMPTS_PER_OFFER = 1;
 /** Early-delivery bonus as a fraction of quantity x price (#1366). */
 export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;
 
+/** Missed-deadline penalty as a fraction of quantity x unmultiplied base price. */
+export const CONTRACT_PENALTY_RATE = 0.3;
+
 /** Success-rate bonus per manager management level above 1 (#1340). */
 export const NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL = 0.08;
 

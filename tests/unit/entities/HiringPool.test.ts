@@ -295,6 +295,20 @@ describe('scripted hiring pool (#1600)', () => {
     }
   });
 
+  it('skillBonus 1 raises only the primary qualification by one level and the salary follows', () => {
+    const pool = createHiringPool(1, 0, [{ id: 1, role: 'blaster', name: 'Bo Nus', unionized: false, skillBonus: 1 }]);
+    const c = pool.candidates[0]!;
+    const base = ROLE_STARTING_QUALIFICATIONS.blaster[0]!;
+    expect(c.qualifications[0]!.proficiencyLevel).toBe(base.proficiencyLevel + 1);
+    expect(c.salary).toBe(calculateSalary({ role: 'blaster', qualifications: c.qualifications, raises: 0 }));
+  });
+
+  it('a scripted bonus never lifts the primary qualification above level 5', () => {
+    // skillBonus is typed 0 | 1; the cast forces an over-cap sum to exercise the clamp.
+    const pool = createHiringPool(1, 0, [{ id: 1, role: 'blaster', name: 'Max Out', unionized: false, skillBonus: 9 as 1 }]);
+    expect(pool.candidates[0]!.qualifications[0]!.proficiencyLevel).toBe(5);
+  });
+
   it('next candidate id follows the scripted ids', () => {
     const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
     expect(pool.candidates.map(c => c.id)).toEqual(TUTORIAL_HIRING_SCRIPT.map(s => s.id));

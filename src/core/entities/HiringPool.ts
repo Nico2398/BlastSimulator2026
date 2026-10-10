@@ -57,17 +57,24 @@ export function createHiringPool(seed: number, tick: number, script?: readonly S
   return pool;
 }
 
-export function generateCandidate(role: EmployeeRole, rng: Random, id: number): HireCandidate {
-  const name = generateName(rng);
-  const unionized = rng.chance(CANDIDATE_UNION_CHANCE);
+/** Assemble a candidate from its role's starting qualifications, the primary one raised by `skillBonus` levels (capped at 5). */
+function buildCandidate(id: number, role: EmployeeRole, name: string, unionized: boolean, skillBonus: number): HireCandidate {
   const qualifications = ROLE_STARTING_QUALIFICATIONS[role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
   const primary = qualifications[0];
-  if (primary && rng.chance(CANDIDATE_SKILL_BONUS_CHANCE)) {
-    const bonus = rng.nextInt(1, CANDIDATE_SKILL_BONUS_MAX);
-    const level = Math.min(5, primary.proficiencyLevel + bonus) as SkillQualification['proficiencyLevel'];
+  if (primary && skillBonus > 0) {
+    const level = Math.min(5, primary.proficiencyLevel + skillBonus) as SkillQualification['proficiencyLevel'];
     qualifications[0] = qualificationAtLevel(primary.category, level);
   }
   return { id, role, name, unionized, qualifications, salary: calculateSalary({ role, qualifications, raises: 0 }) };
+}
+
+export function generateCandidate(role: EmployeeRole, rng: Random, id: number): HireCandidate {
+  const name = generateName(rng);
+  const unionized = rng.chance(CANDIDATE_UNION_CHANCE);
+  // The bonus roll only happens for roles that have a primary qualification (draw order matters for seeded pools).
+  const hasPrimary = ROLE_STARTING_QUALIFICATIONS[role].length > 0;
+  const skillBonus = hasPrimary && rng.chance(CANDIDATE_SKILL_BONUS_CHANCE) ? rng.nextInt(1, CANDIDATE_SKILL_BONUS_MAX) : 0;
+  return buildCandidate(id, role, name, unionized, skillBonus);
 }
 
 /** Replace the whole pool with fresh candidates (new ids). */
@@ -83,20 +90,7 @@ export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: num
 
 /** Build the fixed candidate a script entry describes (#1600). */
 function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
-  const qualifications = ROLE_STARTING_QUALIFICATIONS[s.role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
-  const primary = qualifications[0];
-  if (primary && s.skillBonus > 0) {
-    const level = Math.min(5, primary.proficiencyLevel + s.skillBonus) as SkillQualification['proficiencyLevel'];
-    qualifications[0] = qualificationAtLevel(primary.category, level);
-  }
-  return {
-    id: s.id,
-    role: s.role,
-    name: s.name,
-    unionized: s.unionized,
-    qualifications,
-    salary: calculateSalary({ role: s.role, qualifications, raises: 0 }),
-  };
+  return buildCandidate(s.id, s.role, s.name, s.unionized, s.skillBonus);
 }
 
 /** Pool holds exactly the scripted candidates; ids are fixed so a refresh restores hired ones. */

@@ -13,6 +13,7 @@
 // Verifies the console commands invoked by the Tutorial button in main.ts
 // produce the expected game state: new_game seed:42 size:24 + campaign start level:tutorial_pit.
 
+import { HIRING_ROLES } from '../../src/core/entities/HiringPool.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
@@ -949,7 +950,8 @@ describe('Tutorial determinism (#1600)', () => {
   it('non-tutorial levels keep seeded 3-per-role pools', () => {
     const { runner, ctx } = createRunner();
     expect(runner.run('new_game seed:42 size:24').success).toBe(true);
-    expect(ctx.state!.hiringPool.candidates).toHaveLength(15);
+    const candidates = ctx.state!.hiringPool.candidates;
+    for (const role of HIRING_ROLES) expect(candidates.filter((c) => c.role === role)).toHaveLength(3);
     expect(ctx.state!.contracts.available.every((c) => c.quantityKg !== TUTORIAL_ORE_SALE_OFFER.quantityKg
       || c.deadlineTicks !== TUTORIAL_ORE_SALE_OFFER.deadlineTicks)).toBe(true);
   });
