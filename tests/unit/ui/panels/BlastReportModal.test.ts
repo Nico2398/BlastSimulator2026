@@ -188,13 +188,14 @@ describe('BlastReportModal', () => {
     openReport(modal, state, setPlayback);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
-    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 1);
+    // A new blast resets the renderer's playback clock: playing, elapsed 0.
+    setPlayback(0, { isPlaying: true });
     state.lastBlastReport = makeReport({ tick: 200 });
     modal.update(state, playback()); // arms the new report
 
     expect(modal.visible).toBe(false);
 
-    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 1 + BLAST_REPORT_MIN_PLAYBACK_S);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
     modal.update(state, playback());
 
     expect(modal.visible).toBe(true);
@@ -215,13 +216,14 @@ describe('BlastReportModal', () => {
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
     expect(modal.visible).toBe(false);
 
-    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 1);
+    // A new blast resets the renderer's playback clock: playing, elapsed 0.
+    setPlayback(0, { isPlaying: true });
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 12 });
     modal.update(state, playback()); // arms the second blast's report
 
     expect(modal.visible).toBe(false); // still waiting out its own delay
 
-    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 1 + BLAST_REPORT_MIN_PLAYBACK_S);
+    setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
     modal.update(state, playback());
 
     expect(modal.visible).toBe(true);
