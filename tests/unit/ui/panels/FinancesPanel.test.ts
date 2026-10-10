@@ -417,3 +417,23 @@ describe('FinancesPanel — scroll-bounded ledger section (#958)', () => {
     });
   });
 });
+
+// ── Scroll survives a live refresh (#1592) ──
+
+describe('FinancesPanel — scroll survives a refresh (#1592)', () => {
+  it('keeps the ledger scrollTop when a tick changes the content', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    panel.show();
+    panel.update(state);
+    const ledger = (): HTMLElement => Array.from(panel.root.querySelectorAll<HTMLElement>('div'))
+      .find(d => d.style.overflowY === 'auto' && d.style.maxHeight === '200px')!;
+    ledger().scrollTop = 70;
+
+    state.tickCount += 1;
+    state.cash += 500;
+    panel.update(state);
+
+    expect(ledger().scrollTop).toBe(70);
+  });
+});

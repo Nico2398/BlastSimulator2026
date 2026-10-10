@@ -5,57 +5,127 @@
     {
       "command": "new_game seed:42 cash:150000",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 cash:150000" }
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:150000"
+        }
       ],
       "role": "setup",
-      "expect": { "equals": { "cash": 150000 } }
+      "expect": {
+        "equals": {
+          "cash": 150000
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
-      "description": "Employee #1 — the tutorial's own train-driller stage (tutorialStagesTraining.ts) trains a skill the employee lacks the same way; courses grant new qualifications only (#1388), so the driller (who starts with blasting and driving.drill_rig) takes the rock fragmenter licence.",
+      "description": "Employees #1 and #2 — two drillers, so the crew keeps changing activity (walking to the site, working it) while the roster is open (#1592). The first is the tutorial's own train-driller subject; courses grant new qualifications only (#1388), so the driller (who starts with blasting and driving.drill_rig) takes the rock fragmenter licence.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
-        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
-        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
       ],
       "role": "player",
-      "expect": { "decreased": ["cash"], "equals": { "employeeCount": 1 } }
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
       "command": "build driving_center at:3,5",
       "description": "The only school that teaches driving.rock_fragmenter — no role starts with it (ROLE_STARTING_QUALIFICATIONS).",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
-        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn" },
-        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
-        { "type": "pickTile", "x": 3, "z": 5 },
-        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 3,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
       ],
       "role": "player",
-      "expect": { "decreased": ["cash"] }
-    },
-    {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
-      "description": "Drive the driving_center site to completion — the driller (only employee on site) does the building work itself before returning to train.",
-      "timeout": 95,
-      "interaction": [
-        { "type": "waitUntil", "field": "buildingCount", "equals": 1, "maxTicks": 300, "timeoutMs": 90000 }
-      ],
-      "role": "setup",
-      "expect": { "equals": { "buildingCount": 1, "orderedBuildingCount": 0 } }
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "employee list",
-      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly. The scroll is asserted through `waitForProperty` rather than a bare `assert`, because page.mouse.wheel() resolving does not guarantee the scroll has actually landed — Chrome can commit a wheel-triggered scroll on the compositor thread after the CDP call returns, independent of how fast the page itself is running. CI (PR #888, shard 6/10, Chrome 127) caught this asserting scrollTop immediately after the wheel action — 'expected scrollTop=50, got 0' — reproducibly, on a build that already had both real fixes applied, while sandbox runs here (Chrome 141, a dedicated browser per run rather than CI's shared one across a shard) never hit it. `waitForProperty` polls for the value instead of padding with a fixed delay, so it costs only the time the browser actually takes and still fails loudly — naming the last scrollTop it saw — if the scroll never lands, which is what the negative control depends on.",
+      "description": "#1592 regression, part 1. Command is a harmless placeholder (command mode has no 'wheel-scroll a panel'). While the driving_center is still a construction order, shrink to 1280x600, open Crew, expand employee #1 and wheel-scroll the roster by a real gesture. The Train button is not asserted here — it only exists once the school stands.",
       "interaction": [
-        { "type": "viewport", "width": 1280, "height": 600 },
-        { "type": "ensurePanel", "panel": "employees" },
-        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle" },
-        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]" },
-        { "type": "screenshot" },
-        { "type": "assert", "selector": "#bs-employee-panel .bsx-roster-scroll", "property": "scrollTop", "expectedValue": 0 },
-        { "type": "mousemove", "x": 190, "y": 300 },
-        { "type": "wheel", "deltaX": 0, "deltaY": 50 },
+        {
+          "type": "viewport",
+          "width": 1280,
+          "height": 600
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-crew-detail"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-employee-panel .bsx-roster-scroll",
+          "property": "scrollTop",
+          "expectedValue": 0
+        },
+        {
+          "type": "mousemove",
+          "x": 190,
+          "y": 300
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": 50
+        },
         {
           "type": "waitForProperty",
           "selector": "#bs-employee-panel .bsx-roster-scroll",
@@ -63,19 +133,87 @@
           "expectedValue": 50,
           "timeoutMs": 5000
         },
-        { "type": "screenshot" }
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "player",
-      "expect": { "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]", "note": "The Train button below the fold is reachable once the wheel gesture has scrolled to it — the step's own subject, and what step 5 then clicks. The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        },
+        "note": "No expect.usable here on purpose: it calls scrollIntoView, which would move the roster off the scrollTop 50 the wheel left and that part 2 asserts survives."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the driving_center site to completion while the Crew panel stays open and scrolled — both drillers walk to the site and work it, so their activity changes every few ticks. Before #1592 each change rebuilt the roster and snapped its scroll back to 0.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "#1592 regression, part 2. The ticks of the previous step changed the crew's activity repeatedly; the roster must still sit where the wheel left it (scrollTop 50 — a refresh may not teleport it back). Nothing in this step re-expands the card or scrolls: employee #1's row is still open from part 1. The Train button is reachable by the same wheel gesture.",
+      "interaction": [
+        {
+          "type": "assert",
+          "selector": "#bs-employee-panel .bsx-roster-scroll",
+          "property": "scrollTop",
+          "expectedValue": 50
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-employee-panel .bsx-roster-scroll",
+          "property": "scrollTop",
+          "expectedValue": 50
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]",
+        "note": "The scroll position survived the whole construction (asserted twice, before and after the Train button appeared); the button is reachable."
+      }
     },
     {
       "command": "employee train 1 skill:driving.rock_fragmenter",
-      "description": "Completes the tutorial's own train-driller stage target. clickSelector's own scrollIntoView brings the button the rest of the way into view — legitimate here, since the assert above already proved a real player's own wheel gesture can too. (#1203) This file's own subject is the scroll gesture, not training timing — enrolment now sends the employee walking to the school rather than relocating them instantly, so trainingCount stays 0 until arrival; cash decreasing is what proves enrolment itself succeeded.",
+      "description": "Completes the train-driller target. NOTE (#1592): the harness has no 'click by selector without scrollIntoView' action — clickSelector's own scrollIntoView still runs here. The regression is therefore proven by the scrollTop asserts above, not by this click; when such an action exists, switch this step to it.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+        }
       ],
       "role": "player",
-      "expect": { "decreased": ["cash"], "equals": { "trainingCount": 0 } }
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "trainingCount": 0
+        }
+      }
     }
   ]
 }
