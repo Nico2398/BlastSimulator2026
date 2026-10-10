@@ -380,7 +380,17 @@ function startTutorial(): void {
     tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
   ).then(() => { tutorial.start(ctx.state ?? undefined); });
 }
-mainMenu.setOnTutorial(startTutorial);
+// A live game is discarded by the tutorial, so ask first; Cancel leaves the menu and RESUME intact.
+mainMenu.setOnTutorial(() => {
+  if (!isLiveGame()) { startTutorial(); return; }
+  uiManager.showConfirm({
+    icon: 'warn',
+    title: t('ui.settings.replay_confirm_title'),
+    body: t('ui.settings.replay_confirm_body'),
+    confirmLabel: t('ui.settings.replay_confirm_button'),
+    onConfirm: startTutorial,
+  });
+});
 // Settings' REPLAY TUTORIAL button (10.x): same entry point as MainMenu's TUTORIAL.
 uiManager.setReplayTutorialHandler(startTutorial);
 
