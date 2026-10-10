@@ -46,10 +46,9 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "#1599: player opens Settings and clicks Return to Menu (confirming if asked); the tutorial is suspended, not abandoned.",
+      "description": "#1599: with Settings still open, player clicks Return to Menu (confirming if asked); the tutorial is suspended, not abandoned.",
       "role": "player",
       "interaction": [
-        {"type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]"},
         {"type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"},
         {"type": "clickSelector", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"},
         {"type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"},
