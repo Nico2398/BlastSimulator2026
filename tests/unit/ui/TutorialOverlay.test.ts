@@ -1216,6 +1216,84 @@ describe('TutorialOverlay exit (#1332)', () => {
   });
 });
 
+describe('TutorialOverlay.setClockFollowsTimer (#1598)', () => {
+  let container: HTMLDivElement;
+  let overlay: TutorialOverlay | null = null;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    try { localStorage.removeItem('bs_tutorial_done'); } catch { /* ignore */ }
+  });
+
+  afterEach(() => {
+    overlay?.dispose();
+    overlay = null;
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  function started(options?: { clockFollowsTimer?: boolean }) {
+    const tut = new TutorialOverlay(container, options);
+    overlay = tut;
+    const state = createMockState();
+    tut.start(state);
+    state.isPaused = false;
+    state.tickCount += 50;
+    return { tut, state };
+  }
+
+  it('enabling after construction with false makes guide passes hold the clock', () => {
+    const { tut, state } = started({ clockFollowsTimer: false });
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(false);
+    tut.setClockFollowsTimer(true);
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(true);
+  });
+
+  it('enabling while active refreshes the guide immediately', () => {
+    const { tut } = started({ clockFollowsTimer: false });
+    const refresh = vi.spyOn(tut as any, 'refreshGuide');
+    tut.setClockFollowsTimer(true);
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('enabling before start() does not throw and does not refresh', () => {
+    const tut = new TutorialOverlay(container, { clockFollowsTimer: false });
+    overlay = tut;
+    const refresh = vi.spyOn(tut as any, 'refreshGuide');
+    expect(() => tut.setClockFollowsTimer(true)).not.toThrow();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('disabling on a default overlay stops guide passes touching isPaused', () => {
+    const { tut, state } = started();
+    tut.setClockFollowsTimer(false);
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('disabling keeps today behaviour: card stays active and onCommandExecuted does not pause', () => {
+    const { tut, state } = started();
+    tut.setClockFollowsTimer(false);
+    vi.advanceTimersByTime(2_000);
+    tut.onCommandExecuted(state);
+    expect(tut.isActive).toBe(true);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('re-enabling after disabling holds the clock again', () => {
+    const { tut, state } = started();
+    tut.setClockFollowsTimer(false);
+    vi.advanceTimersByTime(2_000);
+    tut.setClockFollowsTimer(true);
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(true);
+  });
+});
+
 describe('TutorialOverlay clockFollowsTimer option (#1550)', () => {
   let container: HTMLDivElement;
   let overlay: TutorialOverlay | null = null;

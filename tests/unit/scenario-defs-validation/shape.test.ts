@@ -217,6 +217,23 @@ describe('Visual scenarios have valid shots array', () => {
 });
 
 // ──────────────────────────────────────────────
+// 10b. realTutorialClock (#1598) is a boolean when present
+// ──────────────────────────────────────────────
+describe('Scenario realTutorialClock field is a boolean when present (#1598)', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — realTutorialClock is boolean, or absent`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
+      if (scenario.realTutorialClock === undefined) return;
+      expect(typeof scenario.realTutorialClock).toBe('boolean');
+    });
+  }
+
+  it('tutorial-real-clock opts in with realTutorialClock: true', () => {
+    expect((loadScenarioDef('tutorial-real-clock', SCENARIO_DIR) as ScenarioDef).realTutorialClock).toBe(true);
+  });
+});
+
+// ──────────────────────────────────────────────
 // 11. skipBlastPlayback (#761) is a boolean when present, and absent from
 //     every scenario except the explicit, individually-audited opt-in list
 //     below — same "narrow, commented allowlist" shape as
@@ -243,6 +260,7 @@ describe('Scenario skipBlastPlayback field is a boolean when present (#761)', ()
   const SKIP_BLAST_PLAYBACK_SCENARIOS: Record<string, string> = {
     'tutorial-interactive': 'functional/bootstrap flow, no blast-visual checkpoint',
     'tutorial-placement-cancel': 'replays tutorial-interactive\'s prefix (incl. its blast) to reach the placement steps; the blast is not what it checks',
+    'tutorial-real-clock': 'functional real-clock deadlock check (#1598), no blast-visual checkpoint',
     'tutorial-steps-visual': 'per-step shots are static settled-aftermath orbits (no frames/interval mid-collapse capture) — identical shape to tutorial-interactive\'s own blast step, just via its own shots array instead of inline screenshot actions; without this its blast step (9 holes/994 fragments, same pattern as tutorial-interactive) blew its 65s effective timeout every run (CI regression)',
   };
 
