@@ -187,6 +187,8 @@ export interface ScrollBoundedSectionOptions {
   gap?: number;
   /** Extra hook class, e.g. for a stable selector. */
   className?: string;
+  /** Stable identity stamped as `data-scroll-key`, so a rebuild can carry the scroll offset over. */
+  scrollKey?: string;
 }
 
 /**
@@ -205,6 +207,17 @@ export function scrollBoundedSection(
     'display:flex', 'flex-direction:column', `gap:${opts?.gap ?? 8}px`,
   ].join(';');
   return section;
+}
+
+/**
+ * Replace `host`'s children with `next`, carrying over the scrollTop of every
+ * `[data-scroll-key]` descendant by key (keys absent from the new tree are
+ * dropped; nothing is captured while the host is hidden) and the user-edited
+ * values of `[data-preserve-key]` inputs (clamped to the new max).
+ */
+export function replaceChildrenKeepingScroll(host: HTMLElement, next: (Node | null | undefined)[]): void {
+  // TODO: implement
+  host.replaceChildren(...next.filter((n): n is Node => n != null));
 }
 
 // ── Panel chrome ──
