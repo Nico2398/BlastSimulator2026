@@ -1,6 +1,6 @@
 {
   "name": "tutorial-exit-and-settings",
-  "description": "#1332: mid-tutorial the player can always reach Settings session controls (language pill) and can leave the tutorial through its Exit button behind a confirm. Afterwards the rails are lifted: a Crew-panel hire button that was inert while the card pointed at the first hire is usable. Every beat after setup is a real click.",
+  "description": "#1332: mid-tutorial the player can always reach Settings session controls (language pill) and can leave the tutorial through its Exit button behind a confirm. Afterwards the rails are lifted: a Crew-panel hire button that was inert while the card pointed at the first hire is usable. Returning to the menu mid-tutorial suspends it and menu Resume restores the same step (#1599). Every beat after setup is a real click.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit",
@@ -42,6 +42,32 @@
         { "type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" }
       ],
       "expect": { "usable": "#bs-settings-panel [data-action=\"return-to-menu\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1599: player opens Settings and clicks Return to Menu (confirming if asked); the tutorial is suspended, not abandoned.",
+      "role": "player",
+      "interaction": [
+        {"type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]"},
+        {"type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"},
+        {"type": "clickSelector", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"},
+        {"type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"},
+        {"type": "clickSelector", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"},
+        {"type": "awaitUsable", "selector": "#bs-menu-resume"}
+      ],
+      "expect": {"usable": "#bs-menu-resume"}
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1599: player clicks Resume on the main menu; the tutorial is back on the same step with a usable Exit control.",
+      "role": "player",
+      "interaction": [
+        {"type": "clickSelector", "selector": "#bs-menu-resume"},
+        {"type": "awaitUsable", "selector": "#bs-tutorial-overlay [data-action=\"tutorial-exit\"]"}
+      ],
+      "expect": {"tutorialStep": "hire-surveyor", "usable": "#bs-tutorial-overlay [data-action=\"tutorial-exit\"]"}
     },
     {
       "command": "state",

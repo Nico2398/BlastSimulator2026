@@ -198,6 +198,57 @@ describe('TutorialOverlay (12.4)', () => {
       expect(localStorage.getItem('bs_tutorial_done')).toBeNull();
     });
 
+    it('suspend() tears down the UI, keeps tutorialProgress, records no completion and unpauses (#1599)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.advanceToNextStep();
+      const before = JSON.stringify(state.tutorialProgress);
+      expect(state.tutorialProgress).toBeTruthy();
+      tut.suspend();
+      expect(tut.isActive).toBe(false);
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(false);
+      expect((container.querySelector('.bs-tutorial-overlay') as HTMLElement).style.display).toBe('none');
+      expect(JSON.stringify(state.tutorialProgress)).toBe(before);
+      expect(localStorage.getItem('bs_tutorial_done')).toBeNull();
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+      expect(state.isPaused).toBe(false);
+    });
+
+    it('suspend() then resume(state) re-activates the same step (#1599)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.advanceToNextStep();
+      const index = tut.stepIndex;
+      tut.suspend();
+      expect(tut.resume(state)).toBe(true);
+      expect(tut.isActive).toBe(true);
+      expect(tut.stepIndex).toBe(index);
+    });
+
+    it('suspend() is a no-op when the tutorial is inactive (#1599)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      state.isPaused = true;
+      expect(() => tut.suspend()).not.toThrow();
+      expect(tut.isActive).toBe(false);
+      expect(state.isPaused).toBe(true);
+      expect(localStorage.getItem('bs_tutorial_done')).toBeNull();
+    });
+
+    it('abandon() still clears tutorialProgress so resume has nothing to restore (#1599)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.abandon();
+      expect(tut.resume(state)).toBe(false);
+    });
+
     it('takes the guided class off the body when it finishes', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
