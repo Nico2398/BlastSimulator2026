@@ -348,7 +348,9 @@ describe('TutorialRails', () => {
     // The same stuck worker is still there — only the step changed. A new
     // step must get its own full budget + grace, not the exhausted one it
     // inherited from the step that just held.
-    rails.beginStep({ id: 'survey', tickBudget: 5, waitsOnWork: true }, s);
+    // A stage-less step id: no player order, so #1626's unissued-order hold
+    // cannot apply and only the carried-over fingerprint is under test.
+    rails.beginStep({ id: 'no-order-step', tickBudget: 5, waitsOnWork: true }, s);
     expect(s.isPaused).toBe(false);
 
     const stepStart2 = s.tickCount;

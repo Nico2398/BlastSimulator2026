@@ -426,7 +426,14 @@ export function hasActiveOreSale(state: GameState): boolean {
   return (state.contracts?.active ?? []).some((c) => c.type === 'ore_sale' && !c.completed);
 }
 
-/** True if any employee has a booked/active training in `skill` (#1626). */
+/** True if any employee has a booked (walking in), active or finished training in `skill` (#1626). */
 export function hasBookedTraining(state: GameState, skill: string): boolean {
-  return state.employees.employees.some((e) => e.trainingState?.skill === skill);
+  // Booking first lands in `pendingTrainingState` (the walk to the school) and
+  // moves to `trainingState` on arrival (#1203): either one is a booked course.
+  return state.employees.employees.some(
+    (e) => e.trainingState?.skill === skill
+      || e.pendingTrainingState?.skill === skill
+      // A finished course leaves the qualification: the order stays issued.
+      || e.qualifications.some((q) => q.category === skill),
+  );
 }
