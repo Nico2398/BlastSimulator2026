@@ -1,6 +1,6 @@
 {
   "name": "blast-report-save-load-visual",
-  "description": "Regression coverage for #571: a Blast Report modal, dismissed by a real click, must stay closed after a save+load round trip -- even past the ~3s real-time delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts) that would otherwise re-arm it. Before the fix, `load` replaced ctx.state wholesale with a *new* state.lastBlastReport object (deep-cloned from the save), and the modal's identity check (report !== lastShownReport) treated that new reference as a fresh, never-shown report -- reopening it ~3s later over whatever panel the player had moved on to. The fix stamps lastShownReport from the swapped-in state inside reset() (closeStaleLevelOverlays), so a report identical in content to one already dismissed does not re-arm. Sanity checks bracket the regression check: the modal must still genuinely open for a real new report (step 'blast'), and must still genuinely close on a real click (step 'dismiss report').",
+  "description": "Regression coverage for #571: a Blast Report modal, dismissed by a real click, must stay closed after a save+load round trip -- even past the playback-gated open (BLAST_REPORT_MIN_PLAYBACK_S, BlastReportModal.ts) that would otherwise re-arm it. Before the fix, `load` replaced ctx.state wholesale with a *new* state.lastBlastReport object (deep-cloned from the save), and the modal's identity check (report !== lastShownReport) treated that new reference as a fresh, never-shown report -- reopening it ~3s later over whatever panel the player had moved on to. The fix stamps lastShownReport from the swapped-in state inside reset() (closeStaleLevelOverlays), so a report identical in content to one already dismissed does not re-arm. Sanity checks bracket the regression check: the modal must still genuinely open for a real new report (step 'blast'), and must still genuinely close on a real click (step 'dismiss report').",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -141,7 +141,7 @@
     {
       "command": "blast",
       "timeout": 30,
-      "description": "Fires the blast and waits out BLAST_REPORT_DELAY_MS (3000ms, BlastReportModal.ts) in real time so the report modal genuinely opens -- sanity check that the fix did not just disable the modal outright.",
+      "description": "Fires the blast and awaits the report modal opening after rendered collapse playback (BlastReportModal.ts) so it genuinely opens -- sanity check that the fix did not just disable the modal outright.",
       "interaction": [
         {
           "type": "ensureStep",
@@ -165,12 +165,9 @@
           "timeoutMs": 3000
         },
         {
-          "type": "wait",
-          "durationMs": 1000
-        },
-        {
-          "type": "wait",
-          "durationMs": 2500
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 30000
         },
         {
           "type": "screenshot"
@@ -274,7 +271,7 @@
     },
     {
       "command": "state",
-      "description": "#571's actual regression check: wait out BLAST_REPORT_DELAY_MS again in real time with no further player action after load, then screenshot. Before the fix, BlastReportModal.update() saw the freshly-deserialized state.lastBlastReport as a never-shown report (reference != lastShownReport) and re-armed its 3s open delay right here, popping the CLOSE-already-clicked report back over whatever the player had moved on to.",
+      "description": "#571's actual regression check: hold a bounded wall-clock window (a negative check has no condition to poll; long enough for a re-armed modal to finish playback and open) with no further player action after load, then screenshot. Before the fix, BlastReportModal.update() saw the freshly-deserialized state.lastBlastReport as a never-shown report (reference != lastShownReport) and re-armed its playback-gated open right here, popping the CLOSE-already-clicked report back over whatever the player had moved on to.",
       "interaction": [
         {
           "type": "wait",

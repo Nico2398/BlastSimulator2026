@@ -442,7 +442,7 @@ async function clickUsableSelector(
       // extension before treating this as a genuine failure. 'hidden' earns
       // the same grace as 'zero-size': a modal that toggles visibility via
       // its own ancestor's `display` (BlastReportModal's overlay, deferred
-      // open behind BLAST_REPORT_DELAY_MS + collapse-playback duration) is
+      // open behind the rendered collapse playback, BLAST_REPORT_MIN_PLAYBACK_S floor) is
       // "not yet rendered" for exactly the same reason a modal whose layout
       // box has not settled is "not yet usable" — both are the render loop
       // running behind schedule, not a permanent block (`sandbox-mode`'s

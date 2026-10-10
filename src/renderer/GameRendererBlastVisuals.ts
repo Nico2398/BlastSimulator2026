@@ -35,7 +35,11 @@ export interface BlastVisualsDeps {
 /** Trigger blast visual effects. Call from main.ts immediately after a successful blast command. */
 export function onBlast(deps: BlastVisualsDeps, ctx: MiningContext): void {
   console.log(`[GameRenderer] onBlast: lastGrid=${deps.lastGrid?.id} fragments=${ctx.lastBlastFragments?.length ?? 0}`);
-  if (!deps.terrain || !deps.lastGrid) return;
+  if (!deps.terrain || !deps.lastGrid) {
+    // Still clear the animator so a stale earlier duration is not read.
+    deps.fragmentAnimator?.begin([]);
+    return;
+  }
 
   // Clear the blast plan overlay (holes are consumed by blast)
   if (deps.blastOverlay) {
