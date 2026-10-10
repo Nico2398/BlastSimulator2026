@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { MovementTrail } from '../../../src/core/entities/MovementTrail.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { ROLE_COLORS, ROLE_TINT } from '../../../src/renderer/CharacterMesh.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
@@ -522,5 +523,214 @@ describe('CharacterMesh — model animation (real assets)', () => {
       expect(group.position.z).toBe(2);
       cm.dispose();
     });
+  });
+});
+
+// ── Delayed removal at the host marker / spawn at the exit marker (#1589) ───
+
+function hostTrail(
+  points: Array<[number, number]>,
+  markers: Array<[number, 'board' | 'enter' | 'alight' | 'leave']>,
+  hostX: number, hostZ: number,
+): MovementTrail {
+  return {
+    points: points.map(([x, z]) => ({ x, z })),
+    relocated: false,
+    hostMarkers: markers.map(([pointIndex, event]) => ({
+      pointIndex, event, hostKind: event === 'enter' || event === 'leave' ? 'building' : 'vehicle', hostX, hostZ,
+    })),
+  };
+}
+
+describe('CharacterMesh — retiring into a host (#1589)', () => {
+  const boardTrail = () => hostTrail([[0, 0], [1, 0], [2, 0], [3, 0]], [[3, 'board']], 3, 0);
+
+  it('keeps the mesh and reports isRetiring until the trail reaches the board marker', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    expect(cm.isRetiring(1)).toBe(false);
+
+    emp.x = 3;
+    emp.z = 0;
+    emp.walkTrail = boardTrail();
+    cm.retireEmployee(emp);
+    expect(cm.count).toBe(1);
+    expect(cm.isRetiring(1)).toBe(true);
+
+    cm.update([emp], MOVE_TWEEN_DURATION_S / 2);
+    expect(cm.count).toBe(1);
+    expect(cm.isRetiring(1)).toBe(true);
+    const x = cm.getPosition(1)!.x;
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThan(3);
+    cm.dispose();
+  });
+
+  it('removes the mesh once playback reaches the marker; isRetiring is false afterwards', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 3;
+    emp.walkTrail = boardTrail();
+    cm.retireEmployee(emp);
+
+    for (let i = 0; i < 40 && cm.count > 0; i++) cm.update([emp], 0.05);
+
+    expect(cm.count).toBe(0);
+    expect(cm.getPosition(1)).toBeNull();
+    expect(cm.isRetiring(1)).toBe(false);
+    cm.dispose();
+  });
+
+  it('never moves past the marker point while retiring', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 3;
+    emp.walkTrail = boardTrail();
+    cm.retireEmployee(emp);
+    for (let i = 0; i < 40 && cm.count > 0; i++) {
+      cm.update([emp], 0.05);
+      const p = cm.getPosition(1);
+      if (p) expect(p.x).toBeLessThanOrEqual(3 + 1e-9);
+    }
+    cm.dispose();
+  });
+
+  it('an employee with no walkTrail is removed immediately', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    cm.retireEmployee(emp);
+    expect(cm.count).toBe(0);
+    expect(cm.isRetiring(1)).toBe(false);
+    cm.dispose();
+  });
+
+  it('a relocated trail is removed immediately (nothing to walk)', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.walkTrail = { ...boardTrail(), relocated: true };
+    cm.retireEmployee(emp);
+    expect(cm.count).toBe(0);
+    cm.dispose();
+  });
+
+  it('retiring an employee that has no mesh is a harmless no-op', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    emp.walkTrail = boardTrail();
+    expect(() => cm.retireEmployee(emp)).not.toThrow();
+    expect(cm.count).toBe(0);
+    expect(cm.isRetiring(1)).toBe(false);
+    cm.dispose();
+  });
+
+  it('removeEmployee drops a retiring mesh at once', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 3;
+    emp.walkTrail = boardTrail();
+    cm.retireEmployee(emp);
+    cm.removeEmployee(1);
+    expect(cm.count).toBe(0);
+    expect(cm.isRetiring(1)).toBe(false);
+    cm.dispose();
+  });
+
+  it('clearAll clears retiring entries', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 3;
+    emp.walkTrail = boardTrail();
+    cm.retireEmployee(emp);
+    cm.clearAll();
+    expect(cm.count).toBe(0);
+    expect(cm.isRetiring(1)).toBe(false);
+    cm.dispose();
+  });
+
+  it('isRetiring is false for an unknown id', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    expect(cm.isRetiring(99)).toBe(false);
+    cm.dispose();
+  });
+});
+
+describe('CharacterMesh — spawning at the exit marker (#1589)', () => {
+  it('addEmployee with an alight trail starts at the marker point, not at the employee position', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 8, z: 0 });
+    emp.walkTrail = hostTrail([[2, 0], [5, 0], [8, 0]], [[0, 'alight']], 2, 0);
+    cm.addEmployee(emp, 0, emp.walkTrail);
+    const p = cm.getPosition(1)!;
+    expect(p.x).toBeCloseTo(2, 9);
+    expect(p.z).toBeCloseTo(0, 9);
+    cm.dispose();
+  });
+
+  it('then walks the post-marker points to the employee position and stays there', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 4, z: 3 });
+    emp.walkTrail = hostTrail([[2, 0], [4, 0], [4, 3]], [[0, 'leave']], 2, 0);
+    cm.addEmployee(emp, 0, emp.walkTrail);
+    for (let i = 0; i < 10; i++) {
+      cm.update([emp], 0.05);
+      const p = cm.getPosition(1)!;
+      // Always on the polyline (2,0)->(4,0)->(4,3): never cutting the corner.
+      const onLeg1 = Math.abs(p.z) < 1e-9 && p.x >= 2 - 1e-9 && p.x <= 4 + 1e-9;
+      const onLeg2 = Math.abs(p.x - 4) < 1e-9 && p.z >= -1e-9 && p.z <= 3 + 1e-9;
+      expect(onLeg1 || onLeg2).toBe(true);
+    }
+    for (let i = 0; i < 30; i++) cm.update([emp], 0.05);
+    const end = cm.getPosition(1)!;
+    expect(end.x).toBeCloseTo(4, 9);
+    expect(end.z).toBeCloseTo(3, 9);
+    cm.dispose();
+  });
+
+  it('without a trail it still spawns at the employee position (unchanged)', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    cm.addEmployee(makeEmployee(1, { x: 6, z: 7 }), 0);
+    const p = cm.getPosition(1)!;
+    expect(p.x).toBe(6);
+    expect(p.z).toBe(7);
+    cm.dispose();
+  });
+
+  it('a trail with no exit marker spawns at the employee position', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 6, z: 7 });
+    emp.walkTrail = hostTrail([[5, 7], [6, 7]], [], 0, 0);
+    cm.addEmployee(emp, 0, emp.walkTrail);
+    expect(cm.getPosition(1)!.x).toBe(6);
+    cm.dispose();
+  });
+});
+
+describe('CharacterMesh — board then alight in one batch (#1589)', () => {
+  it('hides the mesh between the spans without deleting it, then shows it at the end', () => {
+    const cm = new CharacterMesh(new THREE.Scene());
+    const emp = makeEmployee(1, { x: 0, z: 0 });
+    cm.addEmployee(emp, 0);
+    emp.x = 5;
+    emp.walkTrail = hostTrail(
+      [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0]],
+      [[2, 'board'], [4, 'alight']], 2, 0,
+    );
+    let sawHidden = false;
+    for (let i = 0; i < 60; i++) {
+      cm.update([emp], 0.05);
+      expect(cm.count).toBe(1);
+      if (!cm.getGroup(1)!.visible) sawHidden = true;
+    }
+    expect(sawHidden).toBe(true);
+    expect(cm.getGroup(1)!.visible).toBe(true);
+    expect(cm.getPosition(1)!.x).toBeCloseTo(5, 9);
+    cm.dispose();
   });
 });
