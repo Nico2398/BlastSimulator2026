@@ -2,7 +2,7 @@
 // Split out of tutorialStages.ts (#557). Click sequences for the
 // buy-drill-rig-assign/buy-rock-digger-assign/train-fragmenter steps.
 
-import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
+import { TOOLBAR_TARGET, hasBookedTraining } from './tutorialStepHelpers.js';
 import type { TutorialStage } from './tutorialStages.js';
 
 export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
@@ -28,6 +28,7 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
       // Booking the course replaces the button with a status view (#903).
       doneTarget: '#bs-employee-panel [data-employee-role="driver"] .bs-training-active[data-skill="driving.rock_fragmenter"]',
       hintKey: 'tutorial.stage.train_fragmenter',
+      orderIssuedWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
     },
   ],
 

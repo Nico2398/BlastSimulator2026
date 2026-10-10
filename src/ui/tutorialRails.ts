@@ -8,7 +8,7 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import { stagesFor, PICKER_CANVAS, type TutorialStage } from './tutorialStages.js';
 import {
-  applyRails, clearRails, resolveStageIndex, resolveWaitStatus, decideClock, DEFAULT_TICK_BUDGET,
+  applyRails, clearRails, resolveStageIndex, resolveWaitStatus, resolveOrderIssued, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
 import {
@@ -161,6 +161,7 @@ export class TutorialRails {
         trainingActive: this.lastProgressTrainingActive,
       },
       this.clockMustRun?.(state) === true,
+      resolveOrderIssued(this.stages, state) === false,
     );
     this.lastProgressSignature = decision.progressSignature;
     this.lastProgressTick = decision.lastProgressTick;

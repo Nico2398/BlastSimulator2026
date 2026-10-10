@@ -271,8 +271,16 @@ export interface ClockProgress {
  * Whether the current step's player order has been issued: `true` once issued,
  * `false` while pending, `null` when the step has no player order (#1626).
  */
-export function resolveOrderIssued(_stages: TutorialStage[], _state: GameState | null): boolean | null {
-  return null; // TODO: implement (#1626)
+export function resolveOrderIssued(stages: TutorialStage[], state: GameState | null): boolean | null {
+  if (!state) return null;
+  let hasSignal = false;
+  for (const stage of stages) {
+    const signal = stage.orderIssuedWhen === undefined ? stage.spentWhen : stage.orderIssuedWhen;
+    if (!signal) continue;
+    hasSignal = true;
+    if (signal(state)) return true;
+  }
+  return hasSignal ? false : null;
 }
 
 /**
@@ -403,6 +411,12 @@ function isWorkInProgress(state: GameState): boolean {
  * An armed detonation (`state.pendingDetonation`) overrides the hold the same
  * way: it only resolves on ticks (the crew walks out, then the blast fires),
  * so holding the clock would freeze the evacuation forever (#1591).
+ *
+ * `orderPending` (the step has a player order that is not issued yet, see
+ * `resolveOrderIssued`) holds the clock once the allowance is spent even for
+ * a step that waits on work: unrelated outstanding work (a walking crew,
+ * another course) must not keep the world running while the player has not
+ * placed the order the step asks for (#1626).
  */
 export function decideClock(
   state: GameState,
@@ -411,7 +425,7 @@ export function decideClock(
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
   clockMustRun: boolean = false,
-  _orderPending: boolean = false, // TODO: implement (#1626) — player order issued but not yet resolved
+  orderPending: boolean = false,
 ): ClockDecision {
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);
@@ -431,6 +445,12 @@ export function decideClock(
     };
   }
   if (!waitsOnWork) {
+    return {
+      hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick, trainingActive,
+    };
+  }
+
+  if (orderPending) {
     return {
       hold: true, spent, progressSignature: progress.signature, lastProgressTick: progress.tick, trainingActive,
     };
