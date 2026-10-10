@@ -43,7 +43,7 @@ interface Hop {
   travel: number;
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); });
 
 function replayTutorialDrillPlan(): { hops: Map<number, Hop>; holes: number } {
   const steps = (JSON.parse(readFileSync('scripts/scenario-defs/tutorial-interactive.json', 'utf8')) as { steps: ScenarioStep[] }).steps;

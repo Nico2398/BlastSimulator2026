@@ -796,9 +796,13 @@ describe('full tutorial playthrough ends WON by following the cards then playing
             const amount = Math.min(active.quantityKg - active.deliveredKg, state.collectedOre[active.materialId] ?? 0);
             if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
           }
-          const offer = state.contracts.available.find(
-            (c) => isFillableSaleOffer(c, state.collectedOre, 0) && c.type === 'ore_sale',
-          );
+          // The smallest-paying fillable offer: a player reaching the first sale sooner (#1586)
+          // carries less accrued payroll, so the biggest offer alone can already cross the
+          // tutorial's profit threshold and end the level inside the guided phase. Taking the
+          // smaller one keeps the guided/free-play boundary this test exists to cross.
+          const offer = state.contracts.available
+            .filter((c) => isFillableSaleOffer(c, state.collectedOre, 0) && c.type === 'ore_sale')
+            .sort((a, b) => a.quantityKg * a.pricePerKg - b.quantityKg * b.pricePerKg)[0];
           if (offer) {
             expect(run(`contract accept ${offer.id}`).success).toBe(true);
             acceptedInSellOre.push(offer.type);
