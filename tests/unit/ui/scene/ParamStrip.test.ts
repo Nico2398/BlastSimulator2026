@@ -13,7 +13,8 @@
 // #bs-tile-select-confirm id, and #bs-param-strip-reason.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ParamStrip, PLACEMENT_CANCEL_SELECTOR, type ParamStripConfig } from '../../../../src/ui/scene/ParamStrip.js';
+import { ParamStrip, type ParamStripConfig } from '../../../../src/ui/scene/ParamStrip.js';
+import { PLACEMENT_CANCEL_SELECTOR } from '../../../../src/ui/scene/placementSelectors.js';
 
 function makeConfig(over: Partial<ParamStripConfig> = {}): ParamStripConfig {
   return {

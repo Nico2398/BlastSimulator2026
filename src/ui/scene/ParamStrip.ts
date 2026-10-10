@@ -9,8 +9,6 @@ import { el, button, stepper } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { t } from '../../core/i18n/I18n.js';
 
-export { PLACEMENT_CANCEL_SELECTOR } from './placementSelectors.js';
-
 export interface ParamStripField {
   key: string;
   label: string;
