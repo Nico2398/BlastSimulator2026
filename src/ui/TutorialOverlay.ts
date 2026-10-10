@@ -329,7 +329,8 @@ export class TutorialOverlay {
    * keeps state.tutorialProgress, does not record bs_tutorial_done, unpauses. No-op when inactive.
    */
   suspend(): void {
-    // TODO: implement
+    if (!this._active) return;
+    this.teardown(false);
   }
 
   /** Resumes the tutorial from state.tutorialProgress; false when there is nothing to resume (#1333). */
@@ -379,7 +380,7 @@ export class TutorialOverlay {
   /** Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again. */
   private end(markDone: boolean): void {
     if (!this._active) return;
-    this.teardown();
+    this.teardown(true);
     if (!markDone) return;
     try {
       localStorage.setItem('bs_tutorial_done', '1');
@@ -388,7 +389,8 @@ export class TutorialOverlay {
     }
   }
 
-  private teardown(): void {
+  /** `clearProgress` false keeps state.tutorialProgress so resume() can pick the step back up. */
+  private teardown(clearProgress: boolean): void {
     this.stopGuide();
     this.clearCongratulationsTimer();
     this.rails.clear();
@@ -396,7 +398,7 @@ export class TutorialOverlay {
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
-      clearTutorialProgress(this.gameState);
+      if (clearProgress) clearTutorialProgress(this.gameState);
       this.gameState.isPaused = false;
     }
     this.pausedEl.style.display = 'none';
