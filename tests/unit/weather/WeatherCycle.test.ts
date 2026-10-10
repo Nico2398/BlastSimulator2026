@@ -447,7 +447,7 @@ describe('pinned weather cycle (#1585)', () => {
     expect(new Set(forecast(createWeatherCycle(42), 60)).size).toBeGreaterThan(1);
   });
 
-  it('setWeather on a pinned cycle re-pins to the new state for tick and forecast', () => {
+  it('setWeather on a pinned cycle holds the new weather for tick and forecast', () => {
     const c = createWeatherCycle(42, 'sunny');
     setWeather(c, 'storm');
     for (let i = 0; i < 500; i++) tickWeather(c);

@@ -2,7 +2,7 @@
 // Verifies that eventFreqMultiplier: 0 prevents both timer-based and
 // condition-based events from firing during the tutorial.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { makeCampaignCtx } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
@@ -10,11 +10,17 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { runTick } from '../../../src/core/engine/TickPipeline.js';
-import { bookTaxAuditIncome } from '../../../src/core/events/TaxAudit.js';
+import { bookTaxAuditIncome, tickTaxAudit } from '../../../src/core/events/TaxAudit.js';
 import { isRaining } from '../../../src/core/weather/WeatherCycle.js';
 import { wetHoles } from '../../../src/core/mining/WetHoles.js';
 import { addIncome } from '../../../src/core/economy/Finance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
+
+// Wrap tickTaxAudit so tests can assert the roll itself, not just its (~9%) chance outcome.
+vi.mock('../../../src/core/events/TaxAudit.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/core/events/TaxAudit.js')>();
+  return { ...actual, tickTaxAudit: vi.fn(actual.tickTaxAudit) };
+});
 
 describe('Tutorial Level — No Random Events', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -116,15 +122,18 @@ describe('Tutorial Level — No Random Events', () => {
     expect(state.taxAudit.auditsCount).toBeGreaterThan(0);
   });
 
-  it('eventFreqMultiplier 0 stops the audit roll on a bare state too', () => {
-    const state = createGame({ seed: 42, eventFreqMultiplier: 0 });
-    state.cash = 20_000;
-    const emitter = new EventEmitter();
-    for (let i = 0; i < 3000; i++) {
-      bookTaxAuditIncome(state.taxAudit, state.tickCount, 40_000, 40_000);
-      runTick(state, null, new Random(state.seed + state.tickCount), emitter, { checkInvariants: false });
-    }
-    expect(state.taxAudit.auditsCount).toBe(0);
+  it('eventFreqMultiplier 0 never rolls the audit; multiplier 1 rolls every tick', () => {
+    const rollsFor = (eventFreqMultiplier: number): number => {
+      vi.mocked(tickTaxAudit).mockClear();
+      const state = createGame({ seed: 42, eventFreqMultiplier });
+      const emitter = new EventEmitter();
+      for (let i = 0; i < 50; i++) {
+        runTick(state, null, new Random(state.seed + state.tickCount), emitter, { checkInvariants: false });
+      }
+      return vi.mocked(tickTaxAudit).mock.calls.length;
+    };
+    expect(rollsFor(0)).toBe(0);
+    expect(rollsFor(1)).toBe(50);
   });
 });
 
