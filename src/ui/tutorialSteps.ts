@@ -248,9 +248,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // increased" fired the instant the FIRST of nine holes charged, moving the
   // tutorial on while the crew was still mid-charge. The panel
   // (suggestStep, BlastWorkshop.ts) rightly keeps showing the Charge tab
-  // until every hole is charged. #1596: also waits for drilling and pending charge
-  // orders to finish. Completion now matches suggestStep's own
-  // criterion exactly, so the step and the panel never disagree about which one is current.
+  // until every hole is charged. #1596: isComplete additionally requires no
+  // planned drill holes and no planned charge orders still queued, so the step
+  // does not advance while the crew is mid-work. That is stricter than
+  // suggestStep's "every drilled hole is charged" check alone.
   {
     id: 'charge',
     titleKey: 'tutorial.step6.title',
