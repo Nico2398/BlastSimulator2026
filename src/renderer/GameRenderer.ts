@@ -10,6 +10,7 @@
 // onto `this`.
 
 import * as THREE from 'three';
+import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -312,6 +313,16 @@ export class GameRenderer {
   /** How long the last blast's collapse runs for, in seconds. */
   get fragmentPlaybackDuration(): number {
     return this.fragmentAnimator?.durationS ?? 0;
+  }
+
+  /** Snapshot of the last blast's collapse playback (rendered time). */
+  get blastPlayback(): BlastPlaybackSnapshot {
+    return IDLE_BLAST_PLAYBACK; // TODO: implement
+  }
+
+  /** Rendered seconds of the last blast's collapse played so far. */
+  get blastPlaybackElapsedS(): number {
+    return 0; // TODO: implement
   }
 
   /** Ambient shader clock, in game-time seconds — advances at state.timeScale, frozen while paused (#490). */

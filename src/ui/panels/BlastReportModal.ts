@@ -22,6 +22,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
+import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 
 const RATING_COLOR: Record<BlastRating, string> = {
@@ -154,7 +155,7 @@ export class BlastReportModal {
     this.lastShownReport = currentReport;
   }
 
-  update(state: GameState, blastPlaybackDurationS: number = 0): void {
+  update(state: GameState, playback: BlastPlaybackSnapshot = IDLE_BLAST_PLAYBACK): void {
     const report = state.lastBlastReport;
 
     // Once the level has ended, LevelEndScreen (z-index var(--bsx-z-menu),
@@ -194,7 +195,7 @@ export class BlastReportModal {
     // arrival time. The first report is never shown.
     if (report && report !== this.lastShownReport && report !== this.pendingReport) {
       this.pendingReport = report;
-      const delayMs = Math.max(BLAST_REPORT_DELAY_MS, blastPlaybackDurationS * 1000);
+      const delayMs = Math.max(BLAST_REPORT_DELAY_MS, playback.durationS * 1000);
       this.pendingDeadlineMs = this.now() + delayMs;
     }
 
