@@ -324,6 +324,14 @@ export class TutorialOverlay {
     this.end(false);
   }
 
+  /**
+   * Suspends the tutorial (Return to Menu): tears down UI, clock hold, rails and guide timers,
+   * keeps state.tutorialProgress, does not record bs_tutorial_done, unpauses. No-op when inactive.
+   */
+  suspend(): void {
+    // TODO: implement
+  }
+
   /** Resumes the tutorial from state.tutorialProgress; false when there is nothing to resume (#1333). */
   resume(state: GameState): boolean {
     if (state.campaign.activeLevelId !== TUTORIAL_LEVEL_ID) return false;
