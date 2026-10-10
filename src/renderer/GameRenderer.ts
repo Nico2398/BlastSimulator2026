@@ -22,8 +22,9 @@ import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
-import type { WindState } from './ambient/WindState.js';
+import type { WindState, WindVector } from './ambient/WindState.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
+import type { RainField } from './ambient/RainField.js';
 import type { BirdFlocks } from './ambient/BirdFlocks.js';
 import type { ChimneySmoke } from './ambient/ChimneySmoke.js';
 import type { WaterSurface } from './ambient/WaterSurface.js';
@@ -66,6 +67,9 @@ import {
   resolveFragmentId, entityWorldPosition, rampIdAtTile, type PickingDeps,
 } from './GameRendererPicking.js';
 
+/** Wind fed to the rain before a level has a WindState. */
+const CALM_WIND: WindVector = { x: 0, z: 0 };
+
 export class GameRenderer {
   private readonly sm: SceneManager;
 
@@ -76,6 +80,7 @@ export class GameRenderer {
   private skybox: SkyboxWeather | null = null;
   private windState: WindState | null = null;
   private clouds: CloudLayer | null = null;
+  private rain: RainField | null = null;
   private birds: BirdFlocks | null = null;
   private smoke: ChimneySmoke | null = null;
   private water: WaterSurface | null = null;
@@ -285,6 +290,7 @@ export class GameRenderer {
       buildingOccupancyLabels: this.buildingOccupancyLabels,
       skybox: this.skybox,
       clouds: this.clouds,
+      rain: this.rain,
       zone: ctx.state.zone.activeZone,
       getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
       syncSurveyOverlay: options => this.syncSurveyOverlay(options),
@@ -345,7 +351,7 @@ export class GameRenderer {
 
   /** Per-frame update — call from the render loop. */
   update(dt: number): void {
-    // Ambient decoration (wind, clouds, birds, smoke, water, dust devils, fireflies,
+    // Ambient decoration (wind, clouds, rain, birds, smoke, water, dust devils, fireflies,
     // vegetation sway via ambientUniforms.uTime) runs on game time: it scales with
     // state.timeScale and freezes with state.isPaused, so speeding up or pausing the
     // sim speeds up or freezes the decoration by the same factor. Everything else in
@@ -369,7 +375,7 @@ export class GameRenderer {
     if (Number.isFinite(dt) && dt > 0) this.blastPlaybackClockS += dt;
 
     if (this.skybox) {
-      this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
+      this.skybox.update(dt);
       this.sm.postPipeline.aerial.setHazeColor(this.skybox.skyColor);
     }
 
@@ -385,6 +391,18 @@ export class GameRenderer {
         (uniforms['uCloudOffset']!.value as THREE.Vector2).copy(this.clouds.cloudOffset);
         uniforms['uCloudCoverage']!.value = this.clouds.cloudCoverage;
       }
+    }
+
+    // Rain (#1601) falls on game time — frozen in mid-air while paused — and is
+    // anchored in the world: the view target only picks which drops are drawn.
+    if (this.rain) {
+      const controller = this.sm.cameraController;
+      const target = controller.viewTarget;
+      this.rain.update(
+        gameDt, dt,
+        { x: target.x, y: target.y, z: target.z, distance: controller.distance },
+        this.windState?.vector ?? CALM_WIND,
+      );
     }
 
     // Birds/smoke/water/vegetation (#458 T7.2/D12/A26). Vegetation needs no
@@ -614,6 +632,18 @@ export class GameRenderer {
   }
 
   /**
+   * Ground height for a rain splash: the playable grid's smoothed surface, the
+   * same height the terrain mesh renders. Null off the grid — the landscape's
+   * own sampler is far too heavy to call per splash.
+   */
+  private rainGroundY(x: number, z: number): number | null {
+    const grid = this.lastGrid;
+    if (!grid) return null;
+    if (x < grid.minX || x >= grid.minX + grid.sizeX || z < grid.minZ || z >= grid.minZ + grid.sizeZ) return null;
+    return getSmoothTerrainSurfaceY(grid, x, z);
+  }
+
+  /**
    * Threaded into SceneSetupDeps so buildLandscapeMesh can call it without
    * importing GameRendererTerrain.ts's rebuildBorderWall's own module
    * cyclically — both live behind this same-class indirection. Takes the
@@ -702,6 +732,7 @@ export class GameRenderer {
       skybox: this.skybox,
       windState: this.windState,
       clouds: this.clouds,
+      rain: this.rain,
       birds: this.birds,
       smoke: this.smoke,
       water: this.water,
@@ -741,6 +772,8 @@ export class GameRenderer {
       playableCut: (grid, edgeHeight) => playableCut(grid, edgeHeight),
       rebuildBorderWall: () => {},
       siteBoundsChanged: () => false,
+      // Read every frame long after the load, so it reads the live grid on `this`.
+      getRainGroundY: (x, z) => this.rainGroundY(x, z),
     };
     deps.getTerrainSurfaceY = (x, z) => getTerrainSurfaceY(deps.lastGrid, x, z);
     deps.getSmoothTerrainSurfaceY = (x, z) => getSmoothTerrainSurfaceY(deps.lastGrid, x, z);
@@ -760,6 +793,7 @@ export class GameRenderer {
     this.skybox = deps.skybox;
     this.windState = deps.windState;
     this.clouds = deps.clouds;
+    this.rain = deps.rain;
     this.birds = deps.birds;
     this.smoke = deps.smoke;
     this.water = deps.water;

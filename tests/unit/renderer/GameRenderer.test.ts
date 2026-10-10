@@ -681,6 +681,70 @@ function makeOverlaySurveyResult(overrides: Partial<SurveyResult> = {}): SurveyR
   };
 }
 
+describe('GameRenderer — rain falls on game time, anchored in the world (#1601)', () => {
+  /** A renderer showing heavy rain at the given speed, plus the rendered drop heads of its first visible layer. */
+  function rainy(timeScale: number, isPaused = false) {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    ctx.state!.weather.current = 'heavy_rain';
+    ctx.state!.timeScale = timeScale;
+    ctx.state!.isPaused = isPaused;
+    renderer.syncFromContext(ctx);
+    renderer.update(0.1);
+    const layer = sm.scene.children.find(
+      (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.name.startsWith('rain-layer-') && c.visible,
+    )!;
+    const heads = () => Array.from(layer.geometry.getAttribute('aHead').array as Float32Array);
+    return { sm, renderer, ctx, heads };
+  }
+
+  /** Median downward travel of the drops between two snapshots of their heads. */
+  function medianFall(before: number[], after: number[]): number {
+    const falls: number[] = [];
+    for (let i = 1; i < before.length; i += 3) falls.push(before[i]! - after[i]!);
+    falls.sort((a, b) => a - b);
+    return falls[Math.floor(falls.length / 2)]!;
+  }
+
+  it('the rain draws once a rainy weather is synced', () => {
+    const { heads } = rainy(1);
+    expect(heads().some(v => v !== 0)).toBe(true);
+  });
+
+  it('paused, the drops hang in the air however long the frames run', () => {
+    const { renderer, heads } = rainy(1, true);
+    const before = heads();
+    for (let i = 0; i < 20; i++) renderer.update(0.1);
+    expect(heads()).toEqual(before);
+  });
+
+  it('the drops fall 4x as far at 4x time scale as at 1x', () => {
+    const slow = rainy(1);
+    const fast = rainy(4);
+    const slowBefore = slow.heads();
+    const fastBefore = fast.heads();
+    slow.renderer.update(0.1);
+    fast.renderer.update(0.1);
+    const slowFall = medianFall(slowBefore, slow.heads());
+    expect(slowFall).toBeGreaterThan(0);
+    expect(medianFall(fastBefore, fast.heads())).toBeCloseTo(slowFall * 4, 3);
+  });
+
+  it('panning the camera while paused leaves the drops where they were in the world', () => {
+    const { sm, renderer, heads } = rainy(1, true);
+    const before = heads();
+    sm.cameraController.viewTarget.set(6, 0, -3);
+    renderer.update(0.1);
+    const after = heads();
+    let same = 0;
+    for (let i = 0; i < before.length; i += 3) {
+      if (before[i] === after[i] && before[i + 1] === after[i + 1] && before[i + 2] === after[i + 2]) same++;
+    }
+    expect(same / (before.length / 3)).toBeGreaterThan(0.9);
+  });
+});
+
 describe('GameRenderer — survey confidence overlay visibility preference (#496)', () => {
   it('surveyOverlayVisible defaults to true on a fresh GameRenderer', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);

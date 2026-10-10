@@ -25,28 +25,18 @@ function makeSetup() {
 }
 
 describe('SkyboxWeather', () => {
-  it('creates without error and adds rain points to scene', () => {
+  it('creates without error and adds the sky dome to the scene', () => {
     const { scene, sw } = makeSetup();
-    // Rain particles should be in scene (even if not visible)
     expect(scene.children.length).toBeGreaterThan(0);
     sw.dispose();
   });
 
-  it('setWeather storm makes rain visible', () => {
+  it('draws no rain of its own — rain is ambient/RainField, on game time (#1601)', () => {
     const { scene, sw } = makeSetup();
     sw.setWeather('storm');
-    const points = scene.children.find((c) => c instanceof THREE.Points);
-    expect(points).toBeDefined();
-    expect(points!.visible).toBe(true);
-    sw.dispose();
-  });
-
-  it('setWeather sunny hides rain', () => {
-    const { scene, sw } = makeSetup();
-    sw.setWeather('heavy_rain');
-    sw.setWeather('sunny');
-    const points = scene.children.find((c) => c instanceof THREE.Points);
-    expect(points!.visible).toBe(false);
+    sw.update(0.016);
+    expect(scene.children.filter((c) => c instanceof THREE.Points)).toHaveLength(0);
+    expect(scene.children).toHaveLength(1); // the dome
     sw.dispose();
   });
 
@@ -61,7 +51,7 @@ describe('SkyboxWeather', () => {
     const before = brightness(sw.skyColor);
     sw.setWeather('storm');
     // Run many frames to let lerp converge
-    for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
+    for (let i = 0; i < 120; i++) sw.update(0.016);
     const after = brightness(sw.skyColor);
     // Storm sky should be darker than default sunny sky
     expect(after).toBeLessThan(before);
@@ -74,7 +64,7 @@ describe('SkyboxWeather', () => {
     // lerping, so sampling after it would already be at the rainy target.
     const initialIntensity = sun.intensity;
     sw.setWeather('heavy_rain');
-    for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
+    for (let i = 0; i < 120; i++) sw.update(0.016);
     expect(sun.intensity).toBeLessThan(initialIntensity);
     sw.dispose();
   });
@@ -85,7 +75,7 @@ describe('SkyboxWeather', () => {
     expect(fill.intensity).toBeCloseTo(sun.intensity * 0.25, 5);
 
     sw.setWeather('storm'); // sunIntensity 0.10 — well below heat_wave's 1.5
-    for (let i = 0; i < 120; i++) sw.update(0.016, 50, 50);
+    for (let i = 0; i < 120; i++) sw.update(0.016);
     expect(fill.intensity).toBeCloseTo(sun.intensity * 0.25, 2);
     expect(fill.intensity).toBeLessThan(0.25 * 1.5);
     sw.dispose();
@@ -96,7 +86,7 @@ describe('SkyboxWeather', () => {
     sw.setWeather('storm'); // snaps — skyLow 0x3a4050
     expect(sw.skyColor.getHex()).toBe(0x3a4050);
     sw.setWeather('sunny');
-    for (let i = 0; i < 2000; i++) sw.update(0.016, 50, 50);
+    for (let i = 0; i < 2000; i++) sw.update(0.016);
     expect(sw.skyColor.getHex()).toBe(0x87ceeb);
     sw.dispose();
   });
@@ -106,16 +96,15 @@ describe('SkyboxWeather', () => {
     const states: WeatherState[] = ['sunny', 'cloudy', 'light_rain', 'heavy_rain', 'storm', 'heat_wave', 'cold_snap'];
     for (const s of states) {
       sw.setWeather(s);
-      sw.update(0.016, 50, 50);
+      sw.update(0.016);
     }
     sw.dispose();
   });
 
-  it('dispose removes rain particles from scene', () => {
+  it('dispose removes everything it added from the scene', () => {
     const { scene, sw } = makeSetup();
-    const before = scene.children.length;
     sw.dispose();
-    expect(scene.children.length).toBeLessThan(before);
+    expect(scene.children).toHaveLength(0);
   });
 
   // ── #458 T7.1/D12/A25: gradient sky dome ──
@@ -147,7 +136,7 @@ describe('SkyboxWeather', () => {
     expect((mat.uniforms['uSkyHigh']!.value as THREE.Color).getHex()).toBe(0x2a3040);
 
     sw.setWeather('sunny');
-    for (let i = 0; i < 2000; i++) sw.update(0.016, 50, 50);
+    for (let i = 0; i < 2000; i++) sw.update(0.016);
     expect((mat.uniforms['uSkyLow']!.value as THREE.Color).getHex()).toBe(0x87ceeb);
     expect((mat.uniforms['uSkyHigh']!.value as THREE.Color).getHex()).toBe(0x4fc3f7);
     sw.dispose();
@@ -181,7 +170,7 @@ describe('storm lightning flash', () => {
     const out: { t: number; v: number }[] = [];
     const n = Math.round(seconds / DT);
     for (let i = 1; i <= n; i++) {
-      sw.update(DT, 0, 0);
+      sw.update(DT);
       out.push({ t: startT + i * DT, v: sun.intensity });
     }
     return out;
@@ -348,9 +337,9 @@ describe('storm lightning flash', () => {
     it('a large dt spike ends a running flash in one step', () => {
       const { sun, sw } = makeStorm();
       let guard = 0;
-      while (sun.intensity <= STORM_BASE + 1 && guard++ < 1000) sw.update(DT, 0, 0);
+      while (sun.intensity <= STORM_BASE + 1 && guard++ < 1000) sw.update(DT);
       expect(sun.intensity).toBeGreaterThan(STORM_BASE + 1);
-      sw.update(0.5, 0, 0);
+      sw.update(0.5);
       expect(Math.abs(sun.intensity - STORM_BASE)).toBeLessThan(1e-6);
     });
   });
@@ -359,9 +348,9 @@ describe('storm lightning flash', () => {
     it('leaving storm mid-flash clears the boost and no flash fires afterwards', () => {
       const { sun, sw } = makeStorm();
       let guard = 0;
-      while (sun.intensity <= STORM_BASE + 1 && guard++ < 1000) sw.update(DT, 0, 0);
+      while (sun.intensity <= STORM_BASE + 1 && guard++ < 1000) sw.update(DT);
       sw.setWeather('sunny');
-      sw.update(DT, 0, 0);
+      sw.update(DT);
       expect(sun.intensity).toBeLessThan(0.3);
       const series = run(sw, sun, 40);
       for (const { v } of series) expect(v).toBeLessThanOrEqual(1.2 + 1e-6);

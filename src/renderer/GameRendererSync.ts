@@ -20,6 +20,7 @@ import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
+import type { RainField } from './ambient/RainField.js';
 import type { TerrainMesh } from './TerrainMesh.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from './EntitySync.js';
 import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
@@ -52,6 +53,8 @@ export interface SyncDeps {
   buildingOccupancyLabels?: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
   clouds: CloudLayer | null;
+  /** Optional since not every SyncDeps caller (e.g. tests) builds one (#1601). */
+  rain?: RainField | null;
   zone: ZoneBounds | null;
   getTerrainSurfaceY: (x: number, z: number) => number;
   syncSurveyOverlay: (options: SurveyConfidenceOverlayOptions | null) => void;
@@ -209,6 +212,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
     lastWeather = state.weather.current;
     deps.skybox.setWeather(lastWeather);
     deps.clouds?.setWeather(lastWeather);
+    deps.rain?.setWeather(lastWeather);
   }
 
   // Sync survey confidence overlay
