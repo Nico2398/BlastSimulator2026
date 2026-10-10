@@ -667,3 +667,120 @@ describe('hiringSignature (#1385)', () => {
     expect(hiringSignature(state)).toBe(a);
   });
 });
+
+// ── Live refresh keeps scroll, expansion and in-flight clicks (#1592) ──
+
+describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
+  const rosterScroll = (panel: CrewPanel): HTMLElement =>
+    panel.root.querySelector<HTMLElement>('.bsx-roster-scroll')!;
+
+  function threeCrew(): Employee[] {
+    return [
+      makeEmployee({ id: 1, name: 'Walt Diggins' }),
+      makeEmployee({ id: 2, name: 'Ada Blaster' }),
+      makeEmployee({ id: 3, name: 'Bo Hauler' }),
+    ];
+  }
+
+  it('keeps roster scrollTop and the expanded card when an employee changes activity', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(threeCrew()));
+    toggle(panel, 2);
+    rosterScroll(panel).scrollTop = 80;
+
+    // Employee 1 starts driving: activity kind (a signature input) and a status tag change.
+    panel.update(makeState(threeCrew(), [makeVehicle({ id: 1, occupantIds: [1] })]));
+
+    expect(rosterScroll(panel).scrollTop).toBe(80);
+    expect(panel.root.querySelector('[data-employee-id="2"] .bs-crew-detail')).not.toBeNull();
+    expect(panel.root.querySelector('[data-employee-id="1"] .bs-crew-detail')).toBeNull();
+  });
+
+  it('keeps roster scrollTop when injury hours remaining change', () => {
+    const { panel } = makePanel();
+    const injured = (ticks: number): Employee[] => [
+      makeEmployee({ id: 1, injured: true, injuryTicksRemaining: ticks }),
+      makeEmployee({ id: 2, name: 'Ada Blaster' }),
+    ];
+    panel.update(makeState(injured(100)));
+    rosterScroll(panel).scrollTop = 80;
+
+    panel.update(makeState(injured(60)));
+
+    expect(rosterScroll(panel).scrollTop).toBe(80);
+  });
+
+  it('does not rebuild roster rows on an activity-only change, yet refreshes status tags', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(threeCrew()));
+    const rowBefore = panel.root.querySelector('[data-employee-id="1"]');
+    const scrollBefore = rosterScroll(panel);
+    expect(rowBefore!.querySelector('[title="Driving a vehicle"]')).toBeNull();
+
+    panel.update(makeState(threeCrew(), [makeVehicle({ id: 1, occupantIds: [1] })]));
+
+    expect(panel.root.querySelector('[data-employee-id="1"]')).toBe(rowBefore);
+    expect(rosterScroll(panel)).toBe(scrollBefore);
+    expect(rowBefore!.querySelector('[title="Driving a vehicle"]')).not.toBeNull();
+  });
+
+  it('removes a stale status tag in place when the activity ends', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(threeCrew(), [makeVehicle({ id: 1, occupantIds: [1] })]));
+    const rowBefore = panel.root.querySelector('[data-employee-id="1"]');
+    expect(rowBefore!.querySelector('[title="Driving a vehicle"]')).not.toBeNull();
+
+    panel.update(makeState(threeCrew()));
+
+    expect(panel.root.querySelector('[data-employee-id="1"]')).toBe(rowBefore);
+    expect(rowBefore!.querySelector('[title="Driving a vehicle"]')).toBeNull();
+  });
+
+  it('refreshes the injury tooltip in place when injury hours change', () => {
+    const { panel } = makePanel();
+    const crew = (ticks: number): Employee[] => [
+      makeEmployee({ id: 1, injured: true, injuryTicksRemaining: ticks }),
+      makeEmployee({ id: 2, name: 'Ada Blaster' }),
+    ];
+    panel.update(makeState(crew(100)));
+    const rowBefore = panel.root.querySelector('[data-employee-id="1"]');
+    const titleBefore = rowBefore!.querySelector('[title^="Injured"]')!.getAttribute('title');
+
+    panel.update(makeState(crew(20)));
+
+    expect(panel.root.querySelector('[data-employee-id="1"]')).toBe(rowBefore);
+    expect(rowBefore!.querySelector('[title^="Injured"]')!.getAttribute('title')).not.toBe(titleBefore);
+  });
+
+  it('still rebuilds when the roster itself changes (a new hire appears)', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(threeCrew()));
+    rosterScroll(panel).scrollTop = 80;
+    panel.update(makeState([...threeCrew(), makeEmployee({ id: 4, name: 'New Hire' })]));
+
+    expect(panel.root.querySelector('[data-employee-id="4"]')).not.toBeNull();
+    expect(rosterScroll(panel).scrollTop).toBe(80);
+  });
+
+  it('keeps roster scrollTop across a card toggle', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(threeCrew()));
+    rosterScroll(panel).scrollTop = 80;
+    toggle(panel, 1);
+    expect(rosterScroll(panel).scrollTop).toBe(80);
+  });
+
+  it('the toggle handler re-renders from the latest state, not the render-time state', () => {
+    const { panel } = makePanel();
+    const first = makeState([makeEmployee({ id: 1, morale: 60 }), makeEmployee({ id: 2, name: 'Ada Blaster' })]);
+    panel.update(first);
+    // Morale drifts every tick without changing the structural signature.
+    const second = makeState([makeEmployee({ id: 1, morale: 20 }), makeEmployee({ id: 2, name: 'Ada Blaster' })]);
+    panel.update(second);
+
+    toggle(panel, 2);
+
+    const moraleText = panel.root.querySelector('[data-employee-id="1"] .bs-crew-morale-value')!.textContent;
+    expect(moraleText).toBe('20%');
+  });
+});
