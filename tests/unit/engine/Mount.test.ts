@@ -10,9 +10,10 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  board, alight, enterBuilding, leaveBuilding, releaseOccupantsOfRemovedBuildings,
+  board, alight, alightIfMounted, enterBuilding, findAlightCell, flushUnannouncedLeaves, leaveBuilding, releaseOccupantsOfRemovedBuildings,
   releaseOccupantsOfRemovedVehicles,
 } from '../../../src/core/engine/Mount.js';
+import { dismountVehicleDriver } from '../../../src/core/engine/VehicleReservation.js';
 import { placeBuilding, destroyBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
@@ -20,6 +21,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VEHICLE_SEAT_COUNT } from '../../../src/core/config/balance.js';
+import { openMovementTrail, appendToTrail } from '../../../src/core/entities/MovementTrail.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -457,6 +459,46 @@ function schoolNavGrid(occupied: ReadonlyArray<readonly [number, number]> = []):
   });
 }
 
+describe('alightIfMounted (#1611)', () => {
+  function mountedGame() {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5.16);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeNavGrid(3, 3, 5, 5, () => cell('walkable', false));
+    return { state, vehicle, employee };
+  }
+
+  it('alightIfMounted (hard-collapse path) marks the vehicle cell occupied exactly like dismountVehicleDriver (#1611)', () => {
+    const a = mountedGame();
+    expect(a.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(false);
+
+    alightIfMounted(a.state, a.employee, undefined, { x: 7, z: 5 });
+
+    expect(a.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(true);
+    expect(a.employee.locomotion.kind).toBe('on_foot');
+    expect(a.vehicle.occupantIds).toEqual([]);
+
+    // Parity with the soft path.
+    const b = mountedGame();
+    dismountVehicleDriver(b.state, b.vehicle);
+    expect(b.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(true);
+    expect(a.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(b.state.navGrid!.cellAt(5, 5)?.vehicleOccupied);
+  });
+
+  it('is a no-op for an unmounted employee and leaves the cell flag false (#1611)', () => {
+    const { state, vehicle, employee } = mountedGame();
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'on_foot' };
+
+    alightIfMounted(state, employee, undefined, { x: 7, z: 5 });
+
+    expect(state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(false);
+    expect(employee.locomotion.kind).toBe('on_foot');
+  });
+});
+
 describe('enterBuilding', () => {
   it('takes an on-foot employee standing on the ring inside, both sides together', () => {
     const state = createGame({ seed: SEED });
@@ -584,6 +626,26 @@ describe('leaveBuilding', () => {
   });
 });
 
+describe('leaveBuilding without an emitter', () => {
+  it('queues the leave; flushUnannouncedLeaves announces it once and a second flush announces nothing', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = schoolNavGrid();
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    enterBuilding(state, school.id, employee.id);
+    leaveBuilding(state, employee.id);
+
+    const emitter = new EventEmitter();
+    const left: unknown[] = [];
+    emitter.on('employee:left_building', e => left.push(e));
+
+    flushUnannouncedLeaves(state, emitter);
+    expect(left).toEqual([{ employeeId: employee.id, buildingId: school.id }]);
+    flushUnannouncedLeaves(state, emitter);
+    expect(left).toHaveLength(1);
+  });
+});
+
 describe('releaseOccupantsOfRemovedBuildings', () => {
   it('puts everyone inside a removed building back on foot on its ring, and leaves other buildings alone', () => {
     const state = createGame({ seed: SEED });
@@ -675,5 +737,176 @@ describe('releaseOccupantsOfRemovedVehicles (#1389)', () => {
     expect(releaseOccupantsOfRemovedVehicles(state)).toEqual([]);
     expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(onFoot.locomotion).toEqual({ kind: 'on_foot' });
+  });
+});
+
+
+describe('host-transition trail markers (#1588)', () => {
+  it('walk then board records the vehicle point with a board marker and no relocation', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.x = 5.5;
+    vehicle.z = 5.25;
+    const employee = hireTruckDriver(state, 4, 5);
+    employee.walkTrail = openMovementTrail(4, 5);
+    appendToTrail(employee.walkTrail, 4, 5, [{ x: 4.5, z: 5 }]);
+    employee.x = 4.5;
+
+    expect(board(state, vehicle.id, employee.id).success).toBe(true);
+
+    const trail = employee.walkTrail!;
+    expect(trail.relocated).toBe(false);
+    expect(trail.points[trail.points.length - 1]).toEqual({ x: 5.5, z: 5.25 });
+    expect(trail.hostMarkers).toEqual([
+      { pointIndex: trail.points.length - 1, event: 'board', hostKind: 'vehicle', hostX: 5.5, hostZ: 5.25 },
+    ]);
+  });
+
+  it('enterBuilding records an enter marker with the building host at the ring cell', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    employee.walkTrail = openMovementTrail(employee.x, employee.z);
+
+    expect(enterBuilding(state, school.id, employee.id).success).toBe(true);
+
+    const trail = employee.walkTrail!;
+    expect(trail.relocated).toBe(false);
+    const marker = trail.hostMarkers.find(m => m.event === 'enter')!;
+    expect(marker).toBeDefined();
+    expect(marker.hostKind).toBe('building');
+    expect(trail.points[marker.pointIndex]).toEqual({ x: SCHOOL_X - 1, z: SCHOOL_Z });
+  });
+
+  it('leaveBuilding records a leave marker at the exit cell and the walk afterwards stays continuous', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    state.navGrid = schoolNavGrid();
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    expect(enterBuilding(state, school.id, employee.id).success).toBe(true);
+    employee.walkTrail = openMovementTrail(employee.x, employee.z);
+
+    expect(leaveBuilding(state, employee.id).success).toBe(true);
+    const trail = employee.walkTrail!;
+    const marker = trail.hostMarkers.find(m => m.event === 'leave')!;
+    expect(marker).toBeDefined();
+    expect(marker.hostKind).toBe('building');
+    expect(trail.points[marker.pointIndex]).toEqual({ x: employee.x, z: employee.z });
+
+    appendToTrail(trail, employee.x, employee.z, [{ x: employee.x - 1, z: employee.z }]);
+    expect(trail.relocated).toBe(false);
+  });
+
+  it('alight records an alight marker at the new cell and the walk afterwards stays continuous', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeNavGrid(0, 0, 12, 12, () => cell('walkable'));
+    employee.walkTrail = openMovementTrail(5, 5);
+
+    expect(alight(state, vehicle.id).success).toBe(true);
+
+    const trail = employee.walkTrail!;
+    const marker = trail.hostMarkers.find(m => m.event === 'alight')!;
+    expect(marker).toBeDefined();
+    expect(marker.hostKind).toBe('vehicle');
+    expect(marker.hostX).toBe(vehicle.x);
+    expect(marker.hostZ).toBe(vehicle.z);
+    expect(trail.points[marker.pointIndex]).toEqual({ x: employee.x, z: employee.z });
+    appendToTrail(trail, employee.x, employee.z, [{ x: employee.x + 1, z: employee.z }]);
+    expect(trail.relocated).toBe(false);
+  });
+});
+
+describe('findAlightCell — fractional vehicle positions and destination bias (#1588)', () => {
+  const flat = () => makeNavGrid(0, 0, 40, 40, () => cell('walkable'));
+
+  it.each([[13.19, 18], [31.27, 29.27]])('lands on an integer walkable cell beside a vehicle at (%f, %f), not on it', (vx, vz) => {
+    const result = findAlightCell(flat(), vx, vz);
+    expect(Number.isInteger(result.x)).toBe(true);
+    expect(Number.isInteger(result.z)).toBe(true);
+    expect(Math.max(Math.abs(result.x - Math.round(vx)), Math.abs(result.z - Math.round(vz)))).toBeLessThanOrEqual(1);
+    expect(result).not.toEqual({ x: vx, z: vz });
+    expect(result).not.toEqual({ x: Math.round(vx), z: Math.round(vz) });
+  });
+
+  it('prefers the neighbour nearest the next leg destination', () => {
+    expect(findAlightCell(flat(), 10, 10, { x: 30, z: 10 })).toEqual({ x: 11, z: 10 });
+    expect(findAlightCell(flat(), 10, 10, { x: 10, z: 0 })).toEqual({ x: 10, z: 9 });
+    expect(findAlightCell(flat(), 10, 10, { x: 0, z: 30 })).toEqual({ x: 9, z: 11 });
+  });
+
+  it('skips an unwalkable preferred neighbour for the next-best one', () => {
+    const grid = makeNavGrid(0, 0, 40, 40, (x, z) => (x === 11 && z === 10 ? cell('blocked') : cell('walkable')));
+    const result = findAlightCell(grid, 10, 10, { x: 30, z: 10 });
+    expect(result).not.toEqual({ x: 11, z: 10 });
+    expect(result.x).toBe(11); // diagonal neighbours of the same side are next nearest
+    expect([9, 11]).toContain(result.z);
+  });
+
+  it('skips a too-steep preferred neighbour', () => {
+    const grid = makeNavGrid(0, 0, 40, 40, (x, z) => ({ ...cell('walkable'), surfaceY: x === 11 && z === 10 ? 50 : 0 }));
+    const result = findAlightCell(grid, 10, 10, { x: 30, z: 10 });
+    expect(result).not.toEqual({ x: 11, z: 10 });
+  });
+
+  it('falls back to the vehicle position with no navGrid', () => {
+    expect(findAlightCell(undefined, 13.19, 18, { x: 30, z: 10 })).toEqual({ x: 13.19, z: 18 });
+  });
+
+  /**
+   * Walkable strip along z=10 plus a column at x=12 up to z=0, and one dead-end
+   * cell (10,9) whose only link to the rest is the vehicle's own cell (10,10).
+   */
+  const deadEndGrid = () => makeNavGrid(0, 0, 30, 14, (x, z) => {
+    if (x === 10 && z === 10) return cell('walkable', true);
+    if (z === 10 || x === 12 || (x === 10 && z === 9)) return cell('walkable');
+    return cell('blocked');
+  });
+
+  it('skips a nearer neighbour whose only exit is through the parked vehicle', () => {
+    const result = findAlightCell(deadEndGrid(), 10, 10, { x: 12, z: 0 });
+    expect(result).not.toEqual({ x: 10, z: 9 });
+    expect(result).toEqual({ x: 11, z: 10 });
+  });
+
+  it('falls back to the nearest neighbour when the destination is unroutable', () => {
+    const result = findAlightCell(deadEndGrid(), 10, 10, { x: 5, z: 5 });
+    expect(result).toEqual({ x: 10, z: 9 });
+  });
+
+  it('alight honours an explicit destination over the itinerary', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 10);
+    const employee = hireTruckDriver(state, 10, 10);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = flat();
+
+    expect(alight(state, vehicle.id, undefined, { x: 0, z: 10 }).success).toBe(true);
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 9, z: 10 });
+  });
+
+  it('alight steers toward the next itinerary leg (legs[1]) destination', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 10);
+    const employee = hireTruckDriver(state, 10, 10);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = flat();
+    employee.itinerary = {
+      legs: [
+        { mode: 'drive', vehicleId: vehicle.id, destX: 10, destZ: 10, arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 1 },
+        { mode: 'foot', vehicleId: null, destX: 30, destZ: 10, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 20 },
+      ],
+      goal: { kind: 'reposition', x: 30, z: 10 },
+      workTicks: 0,
+      estTotalTicks: 21,
+    };
+
+    expect(alight(state, vehicle.id).success).toBe(true);
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 11, z: 10 });
   });
 });

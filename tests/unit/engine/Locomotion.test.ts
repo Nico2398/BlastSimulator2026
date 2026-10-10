@@ -951,8 +951,8 @@ describe('tickLocomotion — walk trail across a tick batch (#1199)', () => {
     const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 3, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 2, 1);
     openMovementTrails(state);
-    expect(employee.walkTrail).toEqual({ points: [{ x: 3, z: 1 }], relocated: false });
-    expect(vehicle.walkTrail).toEqual({ points: [{ x: 5, z: 2 }], relocated: false });
+    expect(employee.walkTrail).toEqual({ points: [{ x: 3, z: 1 }], relocated: false, hostMarkers: [] });
+    expect(vehicle.walkTrail).toEqual({ points: [{ x: 5, z: 2 }], relocated: false, hostMarkers: [] });
   });
 
   it('records every tick of a drive on both the driver and the vehicle, ending at their position', () => {
@@ -996,6 +996,50 @@ describe('tickLocomotion — walk trail across a tick batch (#1199)', () => {
     expect(moveTo(state, employee.id, { x: 15, z: 0 }).success).toBe(true);
     tickLocomotion(state);
     expect(employee.walkTrail).toBeUndefined();
+  });
+
+  // #1588: boarding snaps the employee onto the vehicle's (fractional) position;
+  // that snap is a recorded host transition, not a relocation.
+  it('walk + board + drive in one batch yields an unrelocated trail with a board marker (#1588)', () => {
+    const state = buildFlatNavGridState(24, 5);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 2, 1);
+    vehicle.x = 4.4;
+    vehicle.z = 2.3;
+    const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
+    employee.itinerary = {
+      legs: [
+        { mode: 'foot', vehicleId: null, destX: 4.4, destZ: 2.3, arrival: 'adjacent', onArrive: { kind: 'board', vehicleId: vehicle.id }, estTicks: 6 },
+        { mode: 'drive', vehicleId: vehicle.id, destX: 20, destZ: 2, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: Math.ceil(16 / speed) },
+      ],
+      goal: { kind: 'reposition', x: 20, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 6 + Math.ceil(16 / speed),
+    };
+
+    openMovementTrails(state);
+    for (let i = 0; i < 30; i++) tickLocomotion(state);
+
+    const trail = employee.walkTrail!;
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(trail.relocated).toBe(false);
+    const boards = trail.hostMarkers.filter(m => m.event === 'board');
+    expect(boards).toHaveLength(1);
+    expect(boards[0]!.hostKind).toBe('vehicle');
+    expect(vehicle.walkTrail!.relocated).toBe(false);
+  });
+
+  it('a manual teleport mid-batch is still a relocation (#1588)', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    expect(moveTo(state, employee.id, { x: 15, z: 0 }).success).toBe(true);
+    openMovementTrails(state);
+    tickLocomotion(state);
+    employee.x = 9;
+    employee.z = 3;
+    tickLocomotion(state);
+    expect(employee.walkTrail!.relocated).toBe(true);
+    expect(employee.walkTrail!.hostMarkers).toEqual([]);
   });
 });
 

@@ -7,6 +7,8 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { tickGeneralRestCompletion, type GeneralRestCompletionResult } from '../../../src/core/engine/RestCompletion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { completeRestForEmployee } from '../../../src/core/engine/RestActionHelpers.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import {
   NEED_REST_COSTS,
@@ -257,5 +259,36 @@ describe('tickGeneralRestCompletion — buildingId threading (#1204)', () => {
 
     expect(employee.locomotion.kind).not.toBe('inside');
     expect(building.occupantIds).not.toContain(employee.id);
+  });
+});
+
+describe('completeRestForEmployee emits employee:left_building (#1588)', () => {
+  it('announces the leave when the rest ends inside the building', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 5, 5);
+    const building = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, 1).building!;
+    building.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'inside', buildingId: building.id };
+    employee.fatigue = 10;
+    const emitter = new EventEmitter();
+    const left: unknown[] = [];
+    emitter.on('employee:left_building', e => left.push(e));
+
+    completeRestForEmployee(state, employee, 'fatigue', building.id, emitter);
+
+    expect(left).toEqual([{ employeeId: employee.id, buildingId: building.id }]);
+  });
+
+  it('emits nothing for an employee who was never inside', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 5, 5);
+    employee.fatigue = 10;
+    const emitter = new EventEmitter();
+    const left: unknown[] = [];
+    emitter.on('employee:left_building', e => left.push(e));
+
+    completeRestForEmployee(state, employee, 'fatigue', undefined, emitter);
+
+    expect(left).toEqual([]);
   });
 });

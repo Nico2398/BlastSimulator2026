@@ -20,6 +20,7 @@ import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { board, enterBuilding } from '../../../src/core/engine/Mount.js';
 import { moveTo, alightOnArrival } from '../../../src/core/engine/MoveTo.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 const SEED = 42;
@@ -444,5 +445,26 @@ describe('moveTo — into a building with allowUnreachable (#1204)', () => {
     expect(legs.length).toBeGreaterThan(0);
     const last = legs[legs.length - 1]!;
     expect(last.onArrive).toEqual({ kind: 'enter_building', buildingId: school.id });
+  });
+});
+
+describe('moveTo emits employee:left_building when it takes an employee out (#1588)', () => {
+  it('forwards the emitter to the leave', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64).building!;
+    const grid = makeFlatNavGrid(24, 24);
+    for (const [x, z] of [[10, 10], [11, 10], [10, 11], [11, 11]] as const) {
+      grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+    state.navGrid = grid;
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 9, 10);
+    expect(enterBuilding(state, school.id, employee.id).success).toBe(true);
+    const emitter = new EventEmitter();
+    const left: unknown[] = [];
+    emitter.on('employee:left_building', e => left.push(e));
+
+    expect(moveTo(state, employee.id, { x: 2, z: 2 }, undefined, emitter).success).toBe(true);
+
+    expect(left).toEqual([{ employeeId: employee.id, buildingId: school.id }]);
   });
 });

@@ -1,6 +1,7 @@
 // InjuryRecovery — injured employees recover over time, faster in better living quarters (#1382).
 
 import type { GameState } from '../state/GameState.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import { healEmployee, injuryTicksOf } from '../entities/Employee.js';
 import { isInsideBuilding, isMounted } from '../entities/EmployeeLocomotion.js';
@@ -24,15 +25,15 @@ function livingQuartersTierOf(state: GameState, emp: Employee): 1 | 2 | 3 | null
 }
 
 /** Walk an idle injured employee on foot to the nearest free-bed living quarters, if any. */
-function seekBed(state: GameState, emp: Employee): void {
+function seekBed(state: GameState, emp: Employee, emitter?: EventEmitter): void {
   if (emp.itinerary !== null || isInsideBuilding(emp.locomotion) || isMounted(emp.locomotion)) return;
   const bed = findNearestBuildingOfType(state, 'living_quarters', emp.x, emp.z);
   if (!bed) return;
-  moveTo(state, emp.id, { buildingId: bed.id }, { allowUnreachable: true });
+  moveTo(state, emp.id, { buildingId: bed.id }, { allowUnreachable: true }, emitter);
 }
 
 /** Advance recovery for every injured employee, healing those that finish. */
-export function tickInjuryRecovery(state: GameState): void {
+export function tickInjuryRecovery(state: GameState, emitter?: EventEmitter): void {
   for (const emp of state.employees.employees) {
     if (!emp.alive || !emp.injured) continue;
     emp.injuryTicksRemaining = injuryTicksOf(emp);
@@ -41,12 +42,12 @@ export function tickInjuryRecovery(state: GameState): void {
     if (emp.activeActionId !== null && emp.restTicksRemaining === null) {
       interruptActiveAction(state, emp, emp.activeActionId);
     }
-    seekBed(state, emp);
+    seekBed(state, emp, emitter);
 
     emp.injuryTicksRemaining -= injuryRecoveryRate(livingQuartersTierOf(state, emp));
     if (emp.injuryTicksRemaining <= 0) {
       healEmployee(state.employees, emp.id);
-      leaveBuildingIfInside(state, emp);
+      leaveBuildingIfInside(state, emp, emitter);
     }
   }
 }
