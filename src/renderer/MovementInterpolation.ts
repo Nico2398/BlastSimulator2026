@@ -20,6 +20,48 @@ export interface MovementTween {
    * Null for a plain straight glide.
    */
   path: TrailPoint[] | null;
+  /** Visible spans of the trail, split at host markers (#1589). Absent for a plain glide. */
+  spans?: TrailSpan[];
+  /** Index into `spans` of the span currently playing (#1589). */
+  spanIndex?: number;
+  /** Real seconds the current span takes to play (#1589). */
+  spanDurationS?: number;
+}
+
+export type HostMarker = MovementTrail['hostMarkers'][number];
+
+/** A stretch of a trail during which the character is visible (#1589). */
+export interface TrailSpan {
+  points: TrailPoint[];
+  /** True when the span ends at a board/enter marker, so the mesh retires there. */
+  endsInHost: boolean;
+}
+
+/**
+ * Splits a trail at its host markers into visible spans: start..first board/enter,
+ * alight/leave..next board/enter, ..., last exit..end. No markers: one span, all points.
+ */
+export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
+  void trail;
+  return []; // TODO: implement
+}
+
+/** Arc length of a polyline. */
+export function trailLength(points: readonly TrailPoint[]): number {
+  void points;
+  return 0; // TODO: implement
+}
+
+/** Advances span playback by dt; reports the new position and whether the span / whole trail finished. */
+export function stepSpanPlayback(
+  tween: MovementTween,
+  renderX: number,
+  renderZ: number,
+  dt: number,
+  fullTrailLength: number,
+): { x: number; z: number; spanDone: boolean; finished: boolean } {
+  void tween; void renderX; void renderZ; void dt; void fullTrailLength;
+  return { x: 0, z: 0, spanDone: false, finished: false }; // TODO: implement
 }
 
 // Real seconds a mesh takes to ease from one GameState position update to the next.

@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
+import type { MovementTrail } from '../core/entities/MovementTrail.js';
 import { tagPickable } from './Pickable.js';
 import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
@@ -81,7 +82,8 @@ export class CharacterMesh {
     this.library = library;
   }
 
-  addEmployee(employee: Employee, surfaceY: number = 0): void {
+  addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail): void {
+    void trail; // TODO: implement (#1589) spawn at alight/leave marker
     const group = new THREE.Group();
     const { instance, nodes } = this.attachModel(group, employee);
     group.position.set(employee.x, surfaceY, employee.z);
@@ -166,6 +168,17 @@ export class CharacterMesh {
       entry.evacuating = evacuating;
       if (!evacuating) entry.group.visible = true;
     }
+  }
+
+  /** Keep the mesh until it reaches the host enter/board marker, then remove it (#1589). */
+  retireEmployee(employee: Employee): void {
+    void employee; // TODO: implement
+  }
+
+  /** True while a mesh is playing out its final span before removal (#1589). */
+  isRetiring(id: number): boolean {
+    void id;
+    return false; // TODO: implement
   }
 
   removeEmployee(id: number): void {
