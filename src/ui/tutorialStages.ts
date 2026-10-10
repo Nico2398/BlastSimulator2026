@@ -420,6 +420,17 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '.bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger',
       hintKey: 'tutorial.stage.detonate',
     },
+    // #1591: DETONATE only arms; the blast fires once the crew has left.
+    {
+      target: '[data-role="preflight-waiting"][data-phase="evacuating"]',
+      hintKey: 'tutorial.stage.detonation_clearing',
+      also: ['[data-action="preflight-cancel-detonation"]'],
+    },
+    {
+      target: '[data-role="preflight-waiting"][data-phase="stranded"]',
+      hintKey: 'tutorial.stage.detonation_stranded',
+      also: ['[data-action="preflight-cancel-detonation"]'],
+    },
   ],
 
   blast: [
