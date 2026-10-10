@@ -28,8 +28,6 @@ export interface MovementTween {
   spanDurationS?: number;
 }
 
-export type HostMarker = MovementTrail['hostMarkers'][number];
-
 /** A stretch of a trail during which the character is visible (#1589). */
 export interface TrailSpan {
   points: TrailPoint[];
