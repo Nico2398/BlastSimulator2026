@@ -10,6 +10,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
+import { appendHostTransition, type TrailHostEvent, type TrailHostKind } from '../entities/MovementTrail.js';
 import type { Locomotion } from '../entities/EmployeeLocomotion.js';
 import { canAssignDriver, canReleaseDriver, vehicleDriverId } from '../entities/Vehicle.js';
 import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
@@ -19,8 +20,9 @@ import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
+import type { NavGrid } from '../nav/NavGrid.js';
 import { isStepClimbable } from '../nav/NavGrid.js';
-import { isImpassable } from '../nav/Pathfinding.js';
+import { findPath, isImpassable } from '../nav/Pathfinding.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
 type MountResult = { success: true } | ({ success: false; error: string } & RefusalKey);
@@ -84,6 +86,11 @@ function releaseOccupant(host: OccupancyHost | undefined, employeeId: number, em
   employee.destinationZ = null;
 }
 
+/** Records a host transition on the employee's trail at their current position; no-op without a trail. */
+function markTransition(employee: Employee, event: TrailHostEvent, hostKind: TrailHostKind, hostX: number, hostZ: number): void {
+  if (employee.walkTrail) appendHostTransition(employee.walkTrail, employee.x, employee.z, event, hostKind, hostX, hostZ);
+}
+
 /**
  * Whether two points are within one tile of each other (Chebyshev distance
  * <= 1) — the "close enough to board" test `board` itself uses. Locomotion.ts's
@@ -122,6 +129,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   }
   employee.x = vehicle.x;
   employee.z = vehicle.z;
+  markTransition(employee, 'board', 'vehicle', vehicle.x, vehicle.z);
   // #1206: a mounted employee holds no ground cell of their own — the
   // vehicle they now ride claims one instead (AgentOccupancy.ts's own
   // rebuild already excludes a mounted/inside employee; releasing here keeps
@@ -143,6 +151,9 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   return { success: true };
 }
 
+/** Where an alighting employee is headed next; steers the alight cell toward it. */
+type Destination = { x: number; z: number };
+
 /**
  * Alight the driving/riding employee from a vehicle. Refuses mid-haul (via
  * `canReleaseDriver`'s own fail-closed guard) so a haul never gets orphaned
@@ -150,7 +161,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
  * within one tile of the vehicle (or the vehicle's own cell, as a fallback)
  * and returns to `on_foot`.
  */
-export function alight(state: GameState, vehicleId: number, emitter?: EventEmitter): MountResult {
+export function alight(state: GameState, vehicleId: number, emitter?: EventEmitter, toward?: Destination): MountResult {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
 
@@ -160,15 +171,19 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   const guard = canReleaseDriver(state.vehicles, vehicleId);
   if (!guard.success) return { ...guard, success: false, error: guard.error ?? t('mount.alight_failed') };
 
-  alightOccupant(state, vehicle, employeeId, emitter);
+  alightOccupant(state, vehicle, employeeId, emitter, toward);
   return { success: true };
 }
 
 /** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
-function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter): void {
+function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter, destination?: Destination): void {
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  const cell = findAlightCell(state, vehicle);
+  // Read the next destination before releaseOccupant clears the itinerary.
+  const next = employee?.itinerary?.legs[1];
+  const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
+  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
   releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
+  if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
   // A driver who alights mid-route (rest, death) leaves the vehicle parked on a
   // cell its drive leg never marked: without the flag, foot paths route through it
   // and every hop is then refused by the occupancy ledger, stranding the walker.
@@ -197,24 +212,54 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
  * whole rubble haul never happened, and the level went bankrupt paying a
  * driver who could not move.
  *
+ * With a `toward` destination the candidates are ordered nearest-first and
+ * dead ends are skipped: one `findPath` per candidate (at most 8, run once
+ * per alight, never per tick) picks the first cell with a vehicle-avoiding
+ * route to it. Without one, the first qualifying neighbour wins.
+ *
  * The vehicle's own cell stays the fallback: whatever the terrain around it,
  * the vehicle drove there, so standing on it is reachable by construction.
  */
-function findAlightCell(state: GameState, vehicle: Vehicle): { x: number; z: number } {
-  const grid = state.navGrid;
-  if (!grid) return { x: vehicle.x, z: vehicle.z };
+export function findAlightCell(
+  grid: NavGrid | undefined,
+  vx: number,
+  vz: number,
+  toward?: Destination,
+): { x: number; z: number } {
+  if (!grid) return { x: vx, z: vz };
 
-  const from = grid.cellAt(vehicle.x, vehicle.z)?.surfaceY;
+  const vcx = Math.round(vx);
+  const vcz = Math.round(vz);
+  const from = grid.cellAt(vcx, vcz)?.surfaceY;
+  const candidates: Array<{ x: number; z: number; dist: number }> = [];
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-    const x = vehicle.x + dx;
-    const z = vehicle.z + dz;
+    const x = vcx + dx;
+    const z = vcz + dz;
+    if (!grid.containsCell(x, z)) continue;
     const cell = grid.cellAt(x, z);
     if (!cell || isImpassable(cell, true)) continue;
     if (!isStepClimbable(from, cell.surfaceY, Math.hypot(dx, dz))) continue;
-    return { x, z };
+    if (!toward) return { x, z };
+    candidates.push({ x, z, dist: Math.hypot(x - toward.x, z - toward.z) });
   }
+  if (!toward) return { x: vx, z: vz };
 
-  return { x: vehicle.x, z: vehicle.z };
+  // Nearest first. A cell only joined to the rest of the mine through the
+  // vehicle's own cell is a dead end once the vehicle parks there, so the
+  // first candidate with a route to the destination that does not cross a
+  // vehicle wins; the nearest one is the fallback when none has (or the
+  // destination is not a routable cell, e.g. a building footprint).
+  candidates.sort((a, b) => a.dist - b.dist);
+  if (grid.containsCell(Math.round(toward.x), Math.round(toward.z))) {
+    for (const c of candidates) {
+      const route = findPath(grid, {
+        agentId: -1, fromX: c.x, fromZ: c.z, toX: Math.round(toward.x), toZ: Math.round(toward.z), avoidVehicles: true,
+      });
+      if (route.found) return { x: c.x, z: c.z };
+    }
+  }
+  const nearest = candidates[0];
+  return nearest ? { x: nearest.x, z: nearest.z } : { x: vx, z: vz };
 }
 
 /**
@@ -224,9 +269,9 @@ function findAlightCell(state: GameState, vehicle: Vehicle): { x: number; z: num
  * policy — #1103's non-rest dispatch promotion, #1118's hard-threshold
  * collapse.
  */
-export function alightIfMounted(state: GameState, emp: Employee, emitter?: EventEmitter): void {
+export function alightIfMounted(state: GameState, emp: Employee, emitter?: EventEmitter, toward?: Destination): void {
   if (isMounted(emp.locomotion)) {
-    alight(state, emp.locomotion.vehicleId, emitter);
+    alight(state, emp.locomotion.vehicleId, emitter, toward);
   }
 }
 
@@ -284,6 +329,7 @@ export function enterBuilding(state: GameState, buildingId: number, employeeId: 
   if (!admitOccupant(building, capacity, employee, { kind: 'inside', buildingId })) {
     return { success: false, error: t('building.full') };
   }
+  markTransition(employee, 'enter', 'building', building.x, building.z);
   // #1206: same reasoning as `board`'s own release above — an employee inside
   // a building holds no ground cell.
   state.agentOccupancy?.release({ kind: 'employee', id: employeeId });
@@ -309,9 +355,34 @@ export function leaveBuilding(state: GameState, employeeId: number, emitter?: Ev
     ? findBuildingExitCell(state.navGrid, building, getBuildingDef(building.type, building.tier), employee.x, employee.z)
     : { x: employee.x, z: employee.z };
   releaseOccupant(building, employeeId, employee, cell.x, cell.z);
+  markTransition(employee, 'leave', 'building', building?.x ?? cell.x, building?.z ?? cell.z);
 
-  emitter?.emit('employee:left_building', { employeeId, buildingId });
+  if (emitter) emitter.emit('employee:left_building', { employeeId, buildingId });
+  else queueUnannouncedLeave(state, employeeId, buildingId);
   return { success: true };
+}
+
+/**
+ * Leaves made by a caller holding no emitter (a console command, a deep
+ * helper) wait here, keyed by state, until the next tick announces them.
+ * Without the queue those leaves would be silent, and subscribers (renderer,
+ * UI) that rely on `employee:left_building` would never see them; queueing
+ * avoids threading an emitter through every call chain.
+ */
+const unannouncedLeaves = new WeakMap<GameState, Array<{ employeeId: number; buildingId: number }>>();
+
+function queueUnannouncedLeave(state: GameState, employeeId: number, buildingId: number): void {
+  const queue = unannouncedLeaves.get(state);
+  if (queue) queue.push({ employeeId, buildingId });
+  else unannouncedLeaves.set(state, [{ employeeId, buildingId }]);
+}
+
+/** Announce every leave that was made without an emitter. */
+export function flushUnannouncedLeaves(state: GameState, emitter: EventEmitter): void {
+  const queue = unannouncedLeaves.get(state);
+  if (!queue?.length) return;
+  unannouncedLeaves.delete(state);
+  for (const leave of queue) emitter.emit('employee:left_building', leave);
 }
 
 /** Leave the building `emp` is inside, if any — the building counterpart of `alightIfMounted`. */

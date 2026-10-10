@@ -4,6 +4,7 @@
 // locomotion tick to walk.
 
 import type { GameState } from '../state/GameState.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
 import { leaveBuildingIfInside } from './Mount.js';
@@ -22,6 +23,7 @@ export function moveTo(
   // to planItinerary's own opts — a best-effort route instead of a refusal
   // when the target is unreachable right now.
   opts?: { via?: number; allowUnreachable?: boolean },
+  emitter?: EventEmitter,
 ): MoveResult;
 /** Walk to a vehicle and board it — no destination beyond the vehicle itself. */
 export function moveTo(
@@ -43,6 +45,7 @@ export function moveTo(
   employeeId: number,
   target: { actionId: number },
   opts?: { via?: number; allowUnreachable?: boolean },
+  emitter?: EventEmitter,
 ): MoveResult;
 /**
  * Walk to a building's ring and go inside it (#1202): the itinerary's last
@@ -70,19 +73,21 @@ export function moveTo(
   // best-effort-route opt-in `beginRestTravel` already uses for the (x, z)
   // overload above.
   opts?: { allowUnreachable?: boolean },
+  emitter?: EventEmitter,
 ): MoveResult;
 export function moveTo(
   state: GameState,
   employeeId: number,
   target: { x: number; z: number } | { vehicleId: number } | { actionId: number } | { buildingId: number },
   opts?: { via?: number; allowUnreachable?: boolean },
+  emitter?: EventEmitter,
 ): MoveResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee) return { success: false, error: t('move_to.employee_not_found') };
 
   // Every journey starts on the ground: an employee inside a building steps
   // out onto its ring before any route is planned from where they stand.
-  const left = leaveBuildingIfInside(state, employee);
+  const left = leaveBuildingIfInside(state, employee, emitter);
   if (!left.success) return left;
 
   if ('buildingId' in target) {
