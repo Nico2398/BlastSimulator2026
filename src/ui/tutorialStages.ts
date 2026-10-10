@@ -15,14 +15,12 @@ import {
   hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
-import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
-import { getLevel } from '../core/campaign/Level.js';
 import { TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
-import type { NavGrid } from '../core/nav/NavGrid.js';
+import { NavGrid } from '../core/nav/NavGrid.js';
 import { findPath } from '../core/nav/Pathfinding.js';
 
 export interface TutorialStage {
@@ -162,10 +160,20 @@ const DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn
  * corridor, sat within the old straight-line bound but far outside a real
  * route's cost once slope gating made the only walkable path a long detour.
  * Moved the whole cluster west of the box-cut corridor instead, to
- * livingQuarters (8,15), drivingCenter (6,15), warehouse (8,18) — measured
- * (via `routeDistanceToRect` against the tutorial's own seed-42 navGrid) at
- * real route costs of ~16.9/~18.9/~15.6 to REGION.drill's own (22,20) corner,
- * comfortably under the 24 bound with margin for future navmesh changes.
+ * livingQuarters (8,15), drivingCenter (6,15), warehouse (2,14).
+ *
+ * #1587: the drill pattern used to sit on the (22,20)-(30,28) slope, where
+ * 36.7% of 8-neighbour steps were unclimbable and the rig drove switchbacks
+ * of up to 16x the straight-line distance between holes. REGION.drill now
+ * sits on the west plateau (14,24)-(22,32): the nearest fully climbable 11x11
+ * area (every 8-neighbour step in the region + 1 margin passes
+ * `isStepClimbable`) that still keeps ore (dirtite 46, rustite 8). Origin
+ * (14,24) over the climbable neighbours (14,23)/(13,23): the scripted
+ * 4kg/2.5m shot rates `good` there, but `catastrophic` (168 projections) from
+ * those two. The
+ * box-cut moved with it to x=10, west of the drill, and the warehouse pin to
+ * (2,14) to stay in round-trip range. Measured on the seed-42 post-survey
+ * grid (the world grows 32 -> 48 after the seismic survey).
  */
 export const REGION = {
   // One tile, because a survey is a point pick. Sits inside the old 18→28
@@ -173,35 +181,36 @@ export const REGION = {
   survey: { x1: 23, z1: 23, x2: 23, z2: 23, exact: true },
   // Sized to the grid it produces: the tool derives
   // cols = round((x2 - x1) / spacing) + 1. The tool's default spacing is 4
-  // (DRILL_GRID_DEFAULT_SPACING_M), so the 8x8 span (22,20)-(30,28) yields a
+  // (DRILL_GRID_DEFAULT_SPACING_M), so the 8x8 span (14,24)-(22,32) yields a
   // 3x3 grid of 9 holes untouched (#1330) -- not the 16-hole grid that
-  // collapsed a lone early-tutorial employee (#586).
-  drill: { x1: 22, z1: 20, x2: 30, z2: 28, exact: true },
+  // collapsed a lone early-tutorial employee (#586). #1587: on the climbable
+  // west plateau, so the rig drives hole to hole near-straight.
+  drill: { x1: 14, z1: 24, x2: 22, z2: 32, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
   // corridor, alongside livingQuarters (8,15) and drivingCenter (6,15) — see
   // this file's own REGION doc comment above for the full trace.
-  warehouse: { x1: 8, z1: 18, x2: 8, z2: 18, exact: true },
+  warehouse: { x1: 2, z1: 14, x2: 2, z2: 14, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
   // toward and a void for the rock to fall into. One line, not a corridor of
   // candidate lines: the console hint names this exact ramp.
-  boxcut: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
+  boxcut: { x1: 10, z1: 23, x2: 10, z2: 35, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
-  // corridor, alongside livingQuarters (8,15) and warehouse (8,18) — see this
+  // corridor, alongside livingQuarters (8,15) and warehouse (2,14) — see this
   // file's own REGION doc comment above for the full trace.
   drivingCenter: { x1: 6, z1: 15, x2: 6, z2: 15, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
-  // corridor, alongside drivingCenter (6,15) and warehouse (8,18) — see this
+  // corridor, alongside drivingCenter (6,15) and warehouse (2,14) — see this
   // file's own REGION doc comment above for the full trace. Non-overlapping
   // with drivingCenter's own 2x2 footprint at (6,15)-(7,16) and adjacent to
-  // (not overlapping) warehouse's 4x4 footprint one tile below at (8,18):
+  // (not overlapping) warehouse's 4x4 footprint at (2,14):
   // checkFootprintPlacement refuses an actual overlap, so the pins are
   // placed in the same order the tutorial rail orders them (living_quarters,
   // then driving_center, then freight_warehouse) with each one checked
@@ -210,21 +219,21 @@ export const REGION = {
 } as const satisfies Record<string, TileRegion>;
 
 /** World edge (tiles) after the seismic survey grows the world from 32 to 48. */
-export const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
+const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
 
 /** A single-tile hazard the tutorial's fixed building pins must clear. */
 export type TutorialHazard = TileRegion;
 
 /**
- * The tutorial's fleet spawn point, mirrored from how a real purchase derives
- * its own spawn base (`src/console/commands/vehicle.ts`: `minX + sizeX / 2`,
- * `minZ + sizeZ / 2`) — the tutorial level's world starts unexpanded, so
- * `minX`/`minZ` are 0 and the grid dimensions come straight from its `LevelDef`.
+ * The tutorial's first-vehicle spawn point. Raw point is the post-survey world
+ * centre (the first purchase happens after the survey grew the world to
+ * `TUTORIAL_POST_SURVEY_WORLD_SIZE`); given a grid it is snapped with
+ * `NavGrid.findNearestSpawnCell` exactly as a real purchase does
+ * (`src/console/commands/vehicle.ts`), yielding the real spawn tile.
  */
-export function tutorialVehicleSpawnPoint(_navGrid?: NavGrid): TutorialHazard {
-  const level = getLevel(TUTORIAL_LEVEL_ID)!;
-  const x = Math.floor(level.gridX / 2);
-  const z = Math.floor(level.gridZ / 2);
+export function tutorialVehicleSpawnPoint(navGrid?: NavGrid): TutorialHazard {
+  const raw = Math.floor(TUTORIAL_POST_SURVEY_WORLD_SIZE / 2);
+  const { x, z } = navGrid ? NavGrid.findNearestSpawnCell(navGrid, raw, raw) : { x: raw, z: raw };
   return { x1: x, z1: z, x2: x, z2: z, exact: true };
 }
 

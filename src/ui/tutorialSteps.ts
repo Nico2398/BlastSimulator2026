@@ -195,7 +195,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step_boxcut.title',
     textKey: 'tutorial.step_boxcut',
     highlightTarget: TOOLBAR_TARGET.build,
-    commands: ['build_ramp start:16,19 end:16,31 depth:6'],
+    commands: ['build_ramp start:10,23 end:10,35 depth:6'],
     waitsOnWork: true,
     // #1210: tracks the player's own ramp order(s), not NavGrid classification
     // — a pre-existing ramp elsewhere, or any other mechanism that produces a
@@ -226,7 +226,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // held, every subsequent scenario `tick N` is capped to exactly 1 real tick
   // per call (events.ts's tickCommand checks isPaused only at the end of each
   // iteration), so no tick budget, however large, ever recovers from it.
-  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
+  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 5: charge ──
   // #554: charging is real, queued work now (was instant) -- without
@@ -386,7 +386,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // the step as already resolved and stalls waiting on a count that hasn't
   // changed yet -- same gap 'drill-plan'/'charge' document above.
   // tickBudget 60 comfortably clears the build plus walk time.
-  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:8,18'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:2,14'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
 
   // ── Step 14b: haul-debris ──
   // Fires when stored mass increases — the same "value went up" pattern every
