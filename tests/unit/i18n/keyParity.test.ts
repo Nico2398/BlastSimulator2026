@@ -486,7 +486,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1538: +44 keys (resN_alt texts for employee_leaves/employee_injured/cancel_contract options), both locales: 3945.
     // #1530: +4 keys (spoil heap names, description, no_spoil_heap blocked notification), both locales: 3949.
     // #1568: +1 key (employees.train_school_closed)
-    expect(Object.keys(en).length).toBe(3960);
+    // #1593: +1 key (tutorial.stage.picker_cancel_tip)
+    expect(Object.keys(en).length).toBe(3961);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

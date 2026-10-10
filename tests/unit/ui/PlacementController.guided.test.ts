@@ -246,6 +246,8 @@ describe('cancel via right-click vs right-drag (#544)', () => {
     const selectionBefore = controller.selection;
 
     cameraController.rightButtonDragged = true;
+    // A real orbit travels beyond the guided click tolerance (40px, #1593).
+    cameraController.rightGesturePeakPx = 120;
     // Real (measured) gesture order: mousedown(2) -> contextmenu -> mousemove(s)
     // -> mouseup(2). contextmenu fires immediately after mousedown, before any
     // movement, so the tool is still armed when it arrives and preventDefault()
