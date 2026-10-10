@@ -124,9 +124,9 @@ export const STORM_FLASH_DURATION = STORM_FLASH_ENVELOPE[STORM_FLASH_ENVELOPE.le
 const DEFAULT_FLASH_SEED = 0x1f1a5;
 
 /** Source of randomness in [0, 1) for flash spacing. */
-export type FlashRandom = () => number;
+type FlashRandom = () => number;
 
-export interface SkyboxWeatherOptions {
+interface SkyboxWeatherOptions {
   /** Injectable for deterministic tests; defaults to the renderer's own source. */
   random?: () => number;
 }
