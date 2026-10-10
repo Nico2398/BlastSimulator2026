@@ -754,6 +754,7 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
 
   it('still rebuilds when the roster itself changes (a new hire appears)', () => {
     const { panel } = makePanel();
+    panel.show(); // a hidden panel reads scrollTop 0, so scroll is only carried while visible
     panel.update(makeState(threeCrew()));
     rosterScroll(panel).scrollTop = 80;
     panel.update(makeState([...threeCrew(), makeEmployee({ id: 4, name: 'New Hire' })]));
@@ -764,6 +765,7 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
 
   it('keeps roster scrollTop across a card toggle', () => {
     const { panel } = makePanel();
+    panel.show();
     panel.update(makeState(threeCrew()));
     rosterScroll(panel).scrollTop = 80;
     toggle(panel, 1);
