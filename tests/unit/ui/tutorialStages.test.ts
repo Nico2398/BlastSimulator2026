@@ -18,10 +18,9 @@ import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 const UI_DIR = resolve(import.meta.dirname, '../../../src/ui');
 
-/** Every .ts source in src/ui, concatenated — where selectors are produced. */
-const UI_SOURCE = readdirSync(UI_DIR)
-  .filter(f => f.endsWith('.ts'))
-  .map(f => readFileSync(resolve(UI_DIR, f), 'utf-8'))
+/** Every .ts source in src/ui and src/ui/scene, concatenated — where selectors are produced. */
+const UI_SOURCE = [UI_DIR, resolve(UI_DIR, 'scene')]
+  .flatMap(dir => readdirSync(dir).filter(f => f.endsWith('.ts')).map(f => readFileSync(resolve(dir, f), 'utf-8')))
   .join('\n');
 
 const messages = en as Record<string, string>;
