@@ -341,7 +341,9 @@ export class TutorialOverlay {
     this.activate(progress.stepIndex, progress.snapshot);
     this.gameState = state;
     this.rails.beginStep(this.step(), state);
-    state.isPaused = true;
+    // Work already under way keeps running; otherwise start paused, and the
+    // player owns the pause button (#1627).
+    this.rails.settleClockAfterResume(state);
     this.render();
     if (this.stepIndex === LAST_STEP_INDEX) {
       this.jumpToLastStep();
