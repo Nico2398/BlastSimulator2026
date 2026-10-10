@@ -161,12 +161,12 @@ describe('tutorialStepHelpers UI-action steps (#1334)', () => {
 
     it('completes while the finances panel is displayed', () => {
       addPanel('bs-finances-panel', 'block');
-      expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(true);
+      expect(make('#bs-finances-panel').isComplete(STATE, { panelWasVisible: false })).toBe(true);
     });
 
     it('completes while the employee panel is displayed', () => {
       addPanel('bs-employee-panel', 'block');
-      expect(make('#bs-employee-panel').isComplete(STATE, {})).toBe(true);
+      expect(make('#bs-employee-panel').isComplete(STATE, { panelWasVisible: false })).toBe(true);
     });
 
     it('does not complete from an unrelated panel being open', () => {
@@ -210,6 +210,8 @@ describe('createEvacuateZoneStep completes on the real fire, not on arming (#159
   });
 
   describe('createUiActionStep: panel action needs a fresh open (#1595)', () => {
+    beforeEach(() => { document.body.innerHTML = ''; });
+    afterEach(() => { document.body.innerHTML = ''; });
     const make = (root: string) => createUiActionStep('p', 't', 'x', { kind: 'panel', rootSelector: root });
 
     it('does not complete when the panel is already visible at capture', () => {

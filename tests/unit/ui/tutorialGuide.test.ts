@@ -786,17 +786,17 @@ describe('applyRails', () => {
       expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
     });
 
-    it('still marks the target ALLOWED (clickable) when spent is true', () => {
+    it('does not mark the target ALLOWED (inert) when spent is true', () => {
       button('a');
       applyRails({ target: '#a', hintKey: 'k' }, document, [], true);
-      expect(document.querySelector('#a')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(document.querySelector('#a')!.classList.contains(ALLOWED_CLASS)).toBe(false);
     });
 
-    it('still allows helper (also) selectors when spent is true', () => {
+    it('does not allow helper (also) selectors when spent is true', () => {
       button('deliver');
       button('amount');
       applyRails({ target: '#deliver', hintKey: 'k', also: ['#amount'] }, document, [], true);
-      expect(document.querySelector('#amount')!.classList.contains(ALLOWED_CLASS)).toBe(true);
+      expect(document.querySelector('#amount')!.classList.contains(ALLOWED_CLASS)).toBe(false);
     });
 
     it('still allows extraAllowed selectors when spent is true', () => {

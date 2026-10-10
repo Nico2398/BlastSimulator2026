@@ -763,7 +763,7 @@ describe('TutorialRails — waiting state (#1014)', () => {
     return withBox(btn);
   }
 
-  it('build-living-quarters (issue\'s own example): reports waiting and releases the buy button\'s highlight once the order lands, keeping it clickable', () => {
+  it('build-living-quarters (issue\'s own example): reports waiting and releases the buy button\'s highlight once the order lands, leaving it inert', () => {
     toolbarBuild();
     const buyBtn = buyLivingQuartersButton();
     const rails = new TutorialRails();
@@ -782,7 +782,7 @@ describe('TutorialRails — waiting state (#1014)', () => {
     expect(after.waiting).toBe(true);
     expect(after.waitingHint).toBe(t('tutorial.waiting.building'));
     expect(buyBtn.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
-    expect(buyBtn.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(buyBtn.classList.contains(ALLOWED_CLASS)).toBe(false);
   });
 
   it('build-living-quarters: waiting clears once the building actually lands (plannedBuildings emptied)', () => {

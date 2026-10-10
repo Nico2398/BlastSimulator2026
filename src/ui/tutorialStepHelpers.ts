@@ -216,7 +216,12 @@ export function createUiActionStep(
     }),
     isComplete: (_state: GameState, snapshot: Record<string, unknown>) => {
       // Only opening counts: a panel already on screen at capture never completes it.
-      if (action.kind === 'panel') return snapshot?.panelWasVisible === false && isPanelVisible(action.rootSelector);
+      if (action.kind === 'panel') {
+        const visible = isPanelVisible(action.rootSelector);
+        // Seeing it hidden clears the flag, so closing then re-opening counts as a fresh open.
+        if (!visible && snapshot) snapshot.panelWasVisible = false;
+        return visible && snapshot?.panelWasVisible !== true;
+      }
       // TopBar resets the DOM counter to 0 on page load while a resumed snapshot
       // keeps the old value, so "changed from baseline, and nonzero" (not ">")
       // is the robust test: any inspect click moves the count off a stale baseline.
