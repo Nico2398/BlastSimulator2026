@@ -211,9 +211,9 @@ describe('storm lightning flash', () => {
       expect(STORM_FLASH_ENVELOPE[STORM_FLASH_ENVELOPE.length - 1]!.level).toBe(0);
     });
 
-    it('duration equals last keyframe and is at most 0.35s', () => {
+    it('duration equals last keyframe and is at most 0.3s', () => {
       expect(STORM_FLASH_DURATION).toBe(STORM_FLASH_ENVELOPE[STORM_FLASH_ENVELOPE.length - 1]!.at);
-      expect(STORM_FLASH_DURATION).toBeLessThanOrEqual(0.35);
+      expect(STORM_FLASH_DURATION).toBeLessThanOrEqual(0.3);
     });
 
     it('returns keyframe levels at keyframe times', () => {
@@ -285,13 +285,13 @@ describe('storm lightning flash', () => {
       expect(max).toBeLessThanOrEqual(STORM_BASE + STORM_FLASH_PEAK_BOOST + 1e-6);
     });
 
-    it('returns to baseline within 0.35s of the flash start', () => {
+    it('returns to baseline within 0.3s of the flash start', () => {
       const { sun, sw } = makeStorm();
       const series = run(sw, sun, STORM_FLASH_FIRST_DELAY + 1);
       const start = series.find((p) => p.v > STORM_BASE + 1e-6)!;
       expect(start).toBeDefined();
       for (const p of series) {
-        if (p.t >= start.t + 0.35) expect(Math.abs(p.v - STORM_BASE)).toBeLessThan(EPS);
+        if (p.t >= start.t + 0.3) expect(Math.abs(p.v - STORM_BASE)).toBeLessThan(EPS);
       }
     });
 
@@ -329,11 +329,8 @@ describe('storm lightning flash', () => {
       for (const p of series) {
         const dt = p.t - start.t;
         if (dt < 0 || dt > 0.3) continue;
-        // start frame lies somewhere within the first DT of the flash
-        const lo = STORM_BASE + Math.min(flashLevel(dt), flashLevel(dt + DT)) * STORM_FLASH_PEAK_BOOST;
-        const hi = STORM_BASE + Math.max(flashLevel(dt), flashLevel(dt + DT), flashLevel(dt - DT)) * STORM_FLASH_PEAK_BOOST;
-        expect(p.v).toBeGreaterThanOrEqual(Math.min(lo, STORM_BASE) - 1e-6);
-        expect(p.v).toBeLessThanOrEqual(hi + 1e-6);
+        // envelope level is 1 at t=0, so the first visible frame is elapsed 0
+        expect(p.v).toBeCloseTo(STORM_BASE + flashLevel(dt) * STORM_FLASH_PEAK_BOOST, 6);
       }
     });
 
@@ -394,7 +391,7 @@ describe('storm lightning flash', () => {
       const starts = secondFlashGap(0);
       expect(starts.length).toBeGreaterThanOrEqual(2);
       const gap = starts[1]! - starts[0]!;
-      expect(gap).toBeGreaterThanOrEqual(STORM_FLASH_INTERVAL_MIN - 2 * DT);
+      expect(gap).toBeGreaterThanOrEqual(STORM_FLASH_INTERVAL_MIN + STORM_FLASH_DURATION - 2 * DT);
       expect(gap).toBeLessThanOrEqual(STORM_FLASH_INTERVAL_MIN + STORM_FLASH_DURATION + 2 * DT);
     });
 
@@ -402,7 +399,7 @@ describe('storm lightning flash', () => {
       const starts = secondFlashGap(0.999999);
       expect(starts.length).toBeGreaterThanOrEqual(2);
       const gap = starts[1]! - starts[0]!;
-      expect(gap).toBeGreaterThanOrEqual(STORM_FLASH_INTERVAL_MAX - 2 * DT);
+      expect(gap).toBeGreaterThanOrEqual(STORM_FLASH_INTERVAL_MAX + STORM_FLASH_DURATION - 2 * DT);
       expect(gap).toBeLessThanOrEqual(STORM_FLASH_INTERVAL_MAX + STORM_FLASH_DURATION + 2 * DT);
     });
 
@@ -410,7 +407,7 @@ describe('storm lightning flash', () => {
       const mid = STORM_FLASH_INTERVAL_MIN + 0.5 * (STORM_FLASH_INTERVAL_MAX - STORM_FLASH_INTERVAL_MIN);
       const starts = secondFlashGap(0.5);
       const gap = starts[1]! - starts[0]!;
-      expect(gap).toBeGreaterThanOrEqual(mid - 2 * DT);
+      expect(gap).toBeGreaterThanOrEqual(mid + STORM_FLASH_DURATION - 2 * DT);
       expect(gap).toBeLessThanOrEqual(mid + STORM_FLASH_DURATION + 2 * DT);
     });
 

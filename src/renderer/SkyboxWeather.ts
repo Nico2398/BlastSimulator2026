@@ -128,7 +128,7 @@ type FlashRandom = () => number;
 
 interface SkyboxWeatherOptions {
   /** Injectable for deterministic tests; defaults to the renderer's own source. */
-  random?: () => number;
+  random?: FlashRandom;
 }
 
 /** Flash brightness level (0..1) `t` seconds into a flash, interpolated from STORM_FLASH_ENVELOPE. */
@@ -318,7 +318,7 @@ export class SkyboxWeather {
       this.updateRain(dt, cameraX, cameraZ);
     }
 
-    // Storm flashes — single write point for sun intensity
+    // Storm flashes advance the boost; the sun intensity is written once below, as baseline + boost
     if (this.currentWeather === 'storm') {
       this.updateStormFlash(dt);
     } else {
