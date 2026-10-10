@@ -209,6 +209,9 @@ export const REGION = {
   livingQuarters: { x1: 8, z1: 15, x2: 8, z2: 15, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
+/** World edge (tiles) after the seismic survey grows the world from 32 to 48. */
+export const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
+
 /** A single-tile hazard the tutorial's fixed building pins must clear. */
 export type TutorialHazard = TileRegion;
 
@@ -218,7 +221,7 @@ export type TutorialHazard = TileRegion;
  * `minZ + sizeZ / 2`) — the tutorial level's world starts unexpanded, so
  * `minX`/`minZ` are 0 and the grid dimensions come straight from its `LevelDef`.
  */
-function tutorialVehicleSpawnPoint(): TutorialHazard {
+export function tutorialVehicleSpawnPoint(_navGrid?: NavGrid): TutorialHazard {
   const level = getLevel(TUTORIAL_LEVEL_ID)!;
   const x = Math.floor(level.gridX / 2);
   const z = Math.floor(level.gridZ / 2);
