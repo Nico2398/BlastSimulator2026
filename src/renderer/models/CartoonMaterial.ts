@@ -90,6 +90,20 @@ float sway = bendT * 0.4 * sin(uTime * 1.7 + instanceWorldX * 0.35);
 transformed.xz += uWind * sway;
 `;
 
+/** Per-hull overrides of the outline defaults. */
+interface OutlineOptions {
+  /** Thickness cap in world metres (default: sized for entity models at gameplay distance). */
+  maxWorld?: number;
+  /**
+   * Push the hull this far back along the view ray, in the object's own
+   * (instance-scaled) units. A rim one part draws across another part of
+   * the same object less than this far behind it sinks out of sight, so only
+   * the outer silhouette keeps its line. The push runs along the ray, so the
+   * line keeps its screen position and width.
+   */
+  depthPush?: number;
+}
+
 /**
  * Inverted-hull outline: the same geometry drawn back-face only, pushed out
  * along its normal in view space by a screen-constant width. Cheap (one extra
@@ -98,13 +112,15 @@ transformed.xz += uWind * sway;
  * `instanceMatrix`), and can carry the vegetation sway so an outline bends
  * with its canopy.
  */
-export function createOutlineMaterial(sway?: SwayOptions): THREE.ShaderMaterial {
+export function createOutlineMaterial(sway?: SwayOptions, options: OutlineOptions = {}): THREE.ShaderMaterial {
   const uniforms: Record<string, THREE.IUniform> = {
     color: { value: new THREE.Color(OUTLINE_COLOR) },
     thicknessPx: { value: OUTLINE_THICKNESS_PX },
-    maxWorld: { value: OUTLINE_MAX_WORLD },
+    maxWorld: { value: options.maxWorld ?? OUTLINE_MAX_WORLD },
     viewportHeight: OUTLINE_UNIFORMS.viewportHeight,
   };
+  const depthPush = options.depthPush ?? 0;
+  if (depthPush > 0) uniforms['depthPush'] = { value: depthPush };
   if (sway) {
     uniforms['uTime'] = sway.uTime;
     uniforms['uWind'] = sway.uWind;
@@ -117,6 +133,7 @@ export function createOutlineMaterial(sway?: SwayOptions): THREE.ShaderMaterial 
       uniform float maxWorld;
       uniform float viewportHeight;
       ${sway ? 'uniform float uTime; uniform vec2 uWind; uniform float uCanopyHeight;' : ''}
+      ${depthPush > 0 ? 'uniform float depthPush;' : ''}
       void main() {
         vec3 transformed = position;
         vec3 objectNormal = normal;
@@ -135,6 +152,13 @@ export function createOutlineMaterial(sway?: SwayOptions): THREE.ShaderMaterial 
         float worldPerPx = (-mv.z) * 2.0 / (projectionMatrix[1][1] * viewportHeight);
         float w = min(thicknessPx * worldPerPx, maxWorld);
         mv.xyz += n * w;
+        ${depthPush > 0 ? /* glsl */ `
+        #ifdef USE_INSTANCING
+          float objectScale = length((modelMatrix * instanceMatrix)[0].xyz);
+        #else
+          float objectScale = length(modelMatrix[0].xyz);
+        #endif
+        mv.xyz += normalize(mv.xyz) * depthPush * objectScale;` : ''}
         gl_Position = projectionMatrix * mv;
       }
     `,
