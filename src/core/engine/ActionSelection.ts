@@ -26,6 +26,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 // function bodies, never evaluated at module-load time (same reasoning as
 // the documented VehicleReservation.ts <-> MoveTo.ts/PlanItinerary.ts cycle).
 import { planItinerary } from './PlanItinerary.js';
+import { withUnderRepairIndex } from './VehicleReservation.js';
 import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { actionBlocked } from '../events/ActiveModifiers.js';
@@ -327,11 +328,16 @@ export interface SelectedAction {
  * then resolves the real cost (via `resolveActionCost`) down the ranked list,
  * keeping the reachable candidate with the lowest bonus-adjusted real cost
  * (the same ore-haul bonus the estimate got; the returned `totalTicks` stays
- * raw). The estimate is a lower bound on the real cost, so the scan stops as
- * soon as a candidate's estimate cannot beat the best real cost found; ties
- * keep the earlier (lower-id) candidate.
+ * raw). The estimate is an approximate lower bound on the real cost (weighted
+ * A* vs. octile mismatch: ~35.63 estimated vs ~35.11 real seen on open
+ * ground), so the scan stops once a candidate's estimate reaches the best real
+ * cost found; this may rarely skip a marginally better candidate (<~2%,
+ * harmless). Ties keep the earlier (lower-id) candidate.
  *
- * Cost per selection: at most `ACTION_SELECTION_MAX_PATH_ATTEMPTS` (5) real
+ * Cost per selection: O(P) to index under-repair vehicles once
+ * (P = pending actions; was O(P) per vehicle per candidate, ~2e9 scans in
+ * level2-playthrough-win), O(C * R * V) estimates over C claimable
+ * candidates, R vehicle roles, V vehicles, plus at most `ACTION_SELECTION_MAX_PATH_ATTEMPTS` (5) real
  * pathfinds, typically ~1 on open ground where the estimate is near-exact.
  *
  * `isClaimable` (default: always true) lets a caller apply a claim-time gate
@@ -448,6 +454,15 @@ export function selectBestActionForEmployee(
   isClaimable: (action: PendingAction) => boolean = () => true,
 ): SelectedAction | null {
   if (candidates.length === 0) return null;
+  return withUnderRepairIndex(state, () => selectWithinIndex(state, employee, candidates, isClaimable));
+}
+
+function selectWithinIndex(
+  state: GameState,
+  employee: Employee,
+  candidates: PendingAction[],
+  isClaimable: (action: PendingAction) => boolean,
+): SelectedAction | null {
 
   // Event modifiers (#1414): a stoppage, drill ban or haul pause keeps the action unclaimed.
   const claimable = candidates.filter(a =>
@@ -483,7 +498,7 @@ export function selectBestActionForEmployee(
   for (let i = 0; i < costed.length && attemptsSpent < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
     const { action: candidate, cost: estimate, bonus } = costed[i]!;
 
-    // Sorted ascending and estimate <= real: no later candidate can beat the best.
+    // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
     if (best !== null && estimate >= bestAdjusted) break;
 
     if (climbReachable !== null && state.navGrid !== null) {
