@@ -723,7 +723,7 @@
     {
       "command": "build driving_center at:6,15",
       "timeout": 90,
-      "description": "#1339: build-driving-center, click half -- ordered after the first blast, which leaves oversized boulders only a rock fragmenter can break; the Driving Center teaches its licence. Every role arrives able to do its own job, so the old drill-rig and excavator courses are gone. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((6,15) pin, picked at margin tile (8,17)); the picker snaps to the pin, so the order still lands on it.",
+      "description": "#1339: build-driving-center, click half -- ordered after the first blast, which leaves oversized boulders only a rock fragmenter can break; the Driving Center teaches its licence. Every role arrives able to do its own job, so the old drill-rig and excavator courses are gone. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((6,15) pin, picked at margin tile (6,13), clear of the already-built living quarters); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
         {
@@ -740,8 +740,8 @@
         },
         {
           "type": "pickTile",
-          "x": 8,
-          "z": 17
+          "x": 6,
+          "z": 13
         },
         {
           "type": "screenshot"
