@@ -53,10 +53,11 @@ const PINNED_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', P
 };
 
 /**
- * The tutorial's OLD guided-build coordinates, before #1008 — kept only as a
- * regression check documenting why the move above was necessary: the
- * placement path didn't check flatness before #1008, so these coordinates
- * silently ordered a building on a height step and nothing caught it.
+ * Historical coordinates from before #1008 — NOT the current pins. Literal on
+ * purpose: they are a frozen record, kept only as a regression check
+ * documenting why the guided sites moved: the placement path didn't check
+ * flatness before #1008, so these coordinates silently ordered a building on
+ * a height step and nothing caught it. Current pins come from REGION only.
  */
 const OLD_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', PinnedRegion> = {
   warehouse: { type: 'freight_warehouse', tier: 1, x: 6, z: 6 },
@@ -118,6 +119,23 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
     const rockType = getRock(dominantRock);
     expect(rockType).toBeDefined();
     expect(rockType!.hardnessTier).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Test 1b: PINNED_REGIONS is REGION, not a copy of it (#1594) ───────────
+
+  it.each(['warehouse', 'drivingCenter', 'livingQuarters'] as const)(
+    '%s pin equals REGION and the region is exact', (key) => {
+      expect(PINNED_REGIONS[key].x).toBe(REGION[key].x1);
+      expect(PINNED_REGIONS[key].z).toBe(REGION[key].z1);
+      expect(REGION[key].exact).toBe(true);
+    },
+  );
+
+  it('no pinned region coincides with a historical (pre-#1008) coordinate', () => {
+    for (const key of ['warehouse', 'drivingCenter', 'livingQuarters'] as const) {
+      expect([PINNED_REGIONS[key].x, PINNED_REGIONS[key].z])
+        .not.toEqual([OLD_REGIONS[key].x, OLD_REGIONS[key].z]);
+    }
   });
 
   // ── Test 2: pinned regions are flat for their own building's footprint (#1008) ──

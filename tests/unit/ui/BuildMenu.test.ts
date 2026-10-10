@@ -19,7 +19,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building, type BuildingTier, type BuildingType } from '../../../src/core/entities/Building.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
-import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
+import { liveArea, regionContains, EXACT_LIVE_MARGIN, type TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
+import { REGION } from '../../../src/ui/tutorialStages.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
@@ -254,6 +255,15 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
     get selection() { return selection; },
     get activeRegion() { return activeRegion; },
     get hoveredTile() { return hoveredTile; },
+    // Mirrors PlacementController.previewOrigin (#1594): an exact region's pin
+    // while the hover is inside its live margin, else the raw hovered tile.
+    get previewOrigin() {
+      if (!hoveredTile) return null;
+      if (activeRegion?.exact && regionContains(liveArea(activeRegion), hoveredTile.x, hoveredTile.z)) {
+        return { x: activeRegion.x1, z: activeRegion.z1 };
+      }
+      return hoveredTile;
+    },
     get canConfirm() { return selection !== null; },
     setConfirmHandler: (cb: PlacementConfirmHandler) => { confirmHandler = cb; },
     setCancelHandler: vi.fn(),
@@ -823,6 +833,25 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
       armCatalog(kit);
       controller.simulateHover({ x: 4, z: 4 }); // 2x2 covers (4..5, 4..5)
       expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+    });
+
+    it('hovering a margin tile of an exact region draws the ghost at the pin (#1594)', () => {
+      const pin = REGION.warehouse;
+      const { kit, controller, overlay } = makeMockKit({ activeRegion: pin });
+      menu.update(makeMockState());
+      armCatalog(kit);
+      controller.simulateHover({ x: pin.x1 + 2, z: pin.z1 + 2 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'point', x: pin.x1, z: pin.z1 }));
+    });
+
+    it('hovering outside the exact region margin keeps the ghost under the cursor (#1594)', () => {
+      const pin = REGION.warehouse;
+      const far = { x: pin.x2 + EXACT_LIVE_MARGIN + 5, z: pin.z2 + EXACT_LIVE_MARGIN + 5 };
+      const { kit, controller, overlay } = makeMockKit({ activeRegion: pin });
+      menu.update(makeMockState());
+      armCatalog(kit);
+      controller.simulateHover(far);
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ x: far.x, z: far.z }));
     });
 
     it('hovering free flat ground is not refused', () => {

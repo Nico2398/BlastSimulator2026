@@ -496,7 +496,7 @@ export class BuildMenu extends PanelBase {
     const refresh = (): void => {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
       const sel = controller.selection;
-      const at = sel ? { x: sel.x1, z: sel.z1 } : controller.hoveredTile;
+      const at = sel ? { x: sel.x1, z: sel.z1 } : controller.previewOrigin;
       let rectReason: string | null = null;
       if (at) {
         const reservations = this.currentReservations();
