@@ -51,4 +51,24 @@ describe('createOutlineMaterial', () => {
     expect(m.vertexShader).toContain('thicknessPx');
     expect(m.vertexShader).toContain('maxWorld');
   });
+
+  it('defaults to no depth push and the model-scale width cap', () => {
+    const m = createOutlineMaterial();
+    expect(m.uniforms['depthPush']).toBeUndefined();
+    expect(m.vertexShader).not.toContain('depthPush');
+    expect(m.uniforms['maxWorld']!.value).toBeLessThan(0.1);
+  });
+
+  it('takes a width cap and a depth push, pushing the hull back along the view ray only when asked', () => {
+    const m = createOutlineMaterial(undefined, { maxWorld: 4, depthPush: 1.2 });
+    expect(m.uniforms['maxWorld']!.value).toBe(4);
+    expect(m.uniforms['depthPush']!.value).toBe(1.2);
+    expect(m.vertexShader).toContain('normalize(mv.xyz) * depthPush');
+  });
+
+  it('treats a zero depth push as none', () => {
+    const m = createOutlineMaterial(undefined, { depthPush: 0 });
+    expect(m.uniforms['depthPush']).toBeUndefined();
+    expect(m.vertexShader).not.toContain('depthPush');
+  });
 });

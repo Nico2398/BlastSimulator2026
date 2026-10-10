@@ -26,9 +26,10 @@ const CAMERA_FOV = 55; // degrees — slightly narrow for cinematic feel
 
 // Cartoon-style sunlight, from upper-right — retired as a plain
 // DirectionalLight in favour of CSM's own cascaded lights (#458 T5.1/D11);
-// kept as constants purely to derive CSM's lightDirection/lightIntensity.
+// kept as constants purely to derive CSM's lightDirection/lightIntensity
+// (and the cloud shader's lit side, which draws without scene lights).
 const SUN_INTENSITY = 1.2;
-const SUN_POSITION = new THREE.Vector3(100, 200, 80);
+export const SUN_POSITION = new THREE.Vector3(100, 200, 80);
 
 // Cascaded shadow maps (#458 A20)
 const CSM_CASCADES = 3;
