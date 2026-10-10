@@ -1840,6 +1840,40 @@ export const ORDER_REACH_CACHE_MAX_KEYS = 64;
  */
 export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 80.0;
 
+/** One fixed hire candidate of a scripted hiring pool (#1600). */
+export interface ScriptedCandidate {
+  id: number;
+  role: EmployeeRole;
+  name: string;
+  unionized: boolean;
+  skillBonus: 0 | 1;
+}
+
+/** Tutorial hiring pool: one fixed candidate per hiring role, ids 1..5 (#1600). */
+export const TUTORIAL_HIRING_SCRIPT: readonly ScriptedCandidate[] = [
+  { id: 1, role: 'driller', name: 'Dale Drillson', unionized: false, skillBonus: 0 },
+  { id: 2, role: 'blaster', name: 'Bea Boomer', unionized: false, skillBonus: 0 },
+  { id: 3, role: 'driver', name: 'Dex Hauler', unionized: false, skillBonus: 0 },
+  { id: 4, role: 'surveyor', name: 'Sue Seismic', unionized: false, skillBonus: 0 },
+  { id: 5, role: 'manager', name: 'Max Manager', unionized: false, skillBonus: 0 },
+];
+
+/** A fixed ore-sale contract offer a level guarantees (#1600). */
+export interface ScriptedOreSaleOffer {
+  materialId: string;
+  quantityKg: number;
+  priceFactor: number;
+  deadlineTicks: number;
+}
+
+/** Tutorial ore-sale offer; quantity is a placeholder until implemented. */
+export const TUTORIAL_ORE_SALE_OFFER: ScriptedOreSaleOffer = {
+  materialId: 'rustite',
+  quantityKg: 1,
+  priceFactor: 1.0,
+  deadlineTicks: 200,
+};
+
 /** Trailing window (ticks) over which operating income per hour is averaged (#1375). */
 export const OPERATING_INCOME_WINDOW_TICKS = 72;
 

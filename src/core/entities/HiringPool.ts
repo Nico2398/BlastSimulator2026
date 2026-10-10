@@ -16,6 +16,7 @@ import {
   HIRING_POOL_REFRESH_INTERVAL,
   HIRING_POOL_SIZE,
   ROLE_STARTING_QUALIFICATIONS,
+  type ScriptedCandidate,
 } from '../config/balance.js';
 
 export interface HireCandidate {
@@ -46,7 +47,8 @@ function topUp(pool: HiringPoolState, rng: Random): void {
   }
 }
 
-export function createHiringPool(seed: number, tick: number): HiringPoolState {
+export function createHiringPool(seed: number, tick: number, script?: readonly ScriptedCandidate[]): HiringPoolState {
+  void script; // TODO: implement
   const pool: HiringPoolState = { candidates: [], nextCandidateId: 1, lastRefreshTick: tick };
   topUp(pool, new Random(seed + tick));
   return pool;
@@ -66,10 +68,17 @@ export function generateCandidate(role: EmployeeRole, rng: Random, id: number): 
 }
 
 /** Replace the whole pool with fresh candidates (new ids). */
-export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number): void {
+export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number, script?: readonly ScriptedCandidate[]): void {
+  void script; // TODO: implement
   pool.candidates = [];
   pool.lastRefreshTick = tick;
   topUp(pool, new Random(seed + tick + pool.nextCandidateId));
+}
+
+/** Build the fixed candidate a script entry describes (#1600). */
+export function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
+  void s;
+  throw new Error('not implemented');
 }
 
 export function candidatesForRole(pool: HiringPoolState, role: EmployeeRole): HireCandidate[] {

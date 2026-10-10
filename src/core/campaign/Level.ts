@@ -6,7 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
+import { ORE_PRICES, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -64,6 +64,10 @@ export interface LevelDef {
   mixedRockHardness: boolean;
   /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
+  /** Fixed hiring pool; omitted = seeded random candidates (#1600). */
+  hiringScript?: readonly ScriptedCandidate[];
+  /** Fixed ore-sale offer guaranteed on the contract board; omitted = none (#1600). */
+  scriptedOreSale?: ScriptedOreSaleOffer;
 }
 
 // ── Level catalog ──
@@ -288,4 +292,16 @@ export function resolveAvailableExplosives(activeLevelId: string | null): readon
 /** True when `explosiveId` may be used at the given level. */
 export function isExplosiveAvailable(activeLevelId: string | null, explosiveId: string): boolean {
   return resolveAvailableExplosives(activeLevelId).includes(explosiveId);
+}
+
+/** The active level's scripted hiring pool, or undefined for seeded candidates (#1600). */
+export function resolveHiringScript(state: GameState): readonly ScriptedCandidate[] | undefined {
+  void state;
+  return undefined; // TODO: implement
+}
+
+/** The active level's scripted ore-sale offer, or undefined (#1600). */
+export function resolveScriptedOreSale(state: GameState): ScriptedOreSaleOffer | undefined {
+  void state;
+  return undefined; // TODO: implement
 }

@@ -2,6 +2,7 @@
 // Contracts define material delivery requirements with deadlines, payments, and penalties.
 
 import { Random } from '../math/Random.js';
+import type { ScriptedOreSaleOffer } from '../config/balance.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
   CONTRACTS_PER_REFRESH,
@@ -470,4 +471,14 @@ export function contractAcceptBlocker(
   hasFreightWarehouse: boolean,
 ): 'needs_freight_warehouse' | null {
   return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
+}
+
+/** Guarantee the level's scripted ore-sale offer is on the board (#1600). */
+export function ensureScriptedOreSale(
+  state: ContractState,
+  offer: ScriptedOreSaleOffer | undefined,
+  priceMultiplier: number,
+  tick: number,
+): void {
+  void state; void offer; void priceMultiplier; void tick; // TODO: implement
 }
