@@ -167,6 +167,11 @@ export class CameraController {
     return this.rightGestureMoved;
   }
 
+  /** Peak pointer travel (px) of the current/last right-button gesture. */
+  get rightGesturePeakPx(): number {
+    return 0; // TODO: implement
+  }
+
   /** Point the camera looks at (can be updated externally for tracking). */
   setTarget(x: number, y: number, z: number): void {
     this.target.set(x, y, z);

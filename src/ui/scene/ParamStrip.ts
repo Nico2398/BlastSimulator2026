@@ -9,6 +9,9 @@ import { el, button, stepper } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { t } from '../../core/i18n/I18n.js';
 
+/** Selector of the strip's cancel (ESC) button. */
+export const PLACEMENT_CANCEL_SELECTOR = '#bs-param-strip-bar [data-action="cancel"]';
+
 export interface ParamStripField {
   key: string;
   label: string;

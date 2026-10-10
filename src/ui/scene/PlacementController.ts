@@ -16,6 +16,9 @@ import {
 } from '../tutorialPickerRegion.js';
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 
+/** Right-click drift tolerance (px) while the tutorial guides a placement. */
+export const GUIDED_RIGHT_CLICK_TOLERANCE_PX = 40;
+
 export type PlacementShape = 'rect' | 'line' | 'point';
 export type PlacementPhase = 'idle' | 'armed' | 'hovering' | 'dragging' | 'selected' | 'confirmed';
 

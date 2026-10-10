@@ -23,6 +23,11 @@ import { TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js'
 import { NavGrid } from '../core/nav/NavGrid.js';
 import { findPath } from '../core/nav/Pathfinding.js';
 
+import { PLACEMENT_CANCEL_SELECTOR } from './scene/ParamStrip.js';
+
+/** Cancel button of the placement strip (picker). */
+export const PICKER_CANCEL = PLACEMENT_CANCEL_SELECTOR;
+
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
   target: string;
