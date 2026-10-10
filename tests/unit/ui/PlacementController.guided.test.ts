@@ -719,10 +719,27 @@ describe('exact region: preview and checks sit at the pin (#1594)', () => {
     it('hovering a flat live tile does not rescue an invalid selection either', () => {
       setPickerRegion(PIN);
       controller.arm({ shape: 'point' });
-      controller.setFootprintCheck((x) => x === MARGIN_TILE.x); // pin unflat
-      press(MARGIN_TILE.x + 0, MARGIN_TILE.z);
+      controller.setFootprintCheck((x, z) => x === MARGIN_TILE.x && z === MARGIN_TILE.z); // pin unflat
+      press(MARGIN_TILE.x, MARGIN_TILE.z);
       expect(controller.canConfirm).toBe(false);
       hover(MARGIN_TILE.x, MARGIN_TILE.z + 1);
+      expect(controller.canConfirm).toBe(false);
+      expect(controller.footprintInvalid).toBe(true);
+    });
+
+    // A non-exact region does not snap picks onto a pin, so the hovered tile is
+    // what the checks evaluate: only the phase guard keeps the verdict frozen.
+    it('a non-exact selection keeps its unflat verdict when a flat tile is hovered', () => {
+      setPickerRegion(AREA);
+      controller.arm({ shape: 'point' });
+      const UNFLAT = { x: 24, z: 26 };
+      controller.setFootprintCheck((x, z) => !(x === UNFLAT.x && z === UNFLAT.z));
+      press(UNFLAT.x, UNFLAT.z);
+      expect(controller.currentPhase).toBe('selected');
+      expect(controller.canConfirm).toBe(false);
+      expect(controller.footprintInvalid).toBe(true);
+      hover(UNFLAT.x + 1, UNFLAT.z);
+      expect(controller.currentPhase).toBe('selected');
       expect(controller.canConfirm).toBe(false);
       expect(controller.footprintInvalid).toBe(true);
     });

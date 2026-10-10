@@ -348,7 +348,8 @@ export class PlacementController {
 
     this.hoverTile = tile;
     const { regionLive, claimRefusalReason, footprintCheckFailed } = this.evaluateTileChecks(tile);
-    // Once selected, the verdict stays as at selection time; only the hover moves.
+    // Once selected, the verdict fields stay as at selection time; only the hover
+    // moves, so blockedTile and live below intentionally keep following the cursor.
     if (this.phase !== 'selected') {
       this.claimRefusalReason = claimRefusalReason;
       this.footprintCheckFailed = footprintCheckFailed;
