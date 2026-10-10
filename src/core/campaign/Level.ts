@@ -77,6 +77,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     id: 'tutorial_pit',
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
+    fixedWeather: 'sunny',      // Tutorial sky never changes: no rain flooding the scripted blast
     nameKey: 'level.tutorial_pit.name',
     descKey: 'level.tutorial_pit.desc',
     biome: 'desert_badlands',
@@ -158,7 +159,7 @@ const LEVELS: readonly LevelDef[] = [
     // Unlock threshold: $80k of operating profit (income minus running costs;
     // capital purchases do not count).
     unlockThreshold: 80000,
-    eventFreqMultiplier: 0.5,   // Rare events — forgiving tutorial
+    eventFreqMultiplier: 0.5,   // Rare events — forgiving first real level
     startingSite: DUSTY_HOLLOW_STARTING_SITE, // Crew, rig, hauler, warehouse and spoil heap from tick 0
     contractPriceMultiplier: DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, // Generous buyers; rationale beside the constant
     scoreDecayRate: 0.03,        // Slow score decay — hard to ruin yourself
