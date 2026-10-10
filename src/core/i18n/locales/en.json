@@ -3240,6 +3240,7 @@
   "tutorial.stage.survey_method": "Choose the Seismic Survey method.",
   "tutorial.stage.survey_run": "Press Pick Target in Scene.",
   "tutorial.stage.survey_target": "Click the blue tile outlined in the scene — the camera is already looking at it.",
+  "tutorial.stage.picker_cancel_tip": "Changed your mind? Press ESC, right-click, or use the Esc button to cancel.",
   "tutorial.stage.picker_confirm": "Press Confirm.",
   "tutorial.stage.open_blast": "Open the Blast panel from the toolbar.",
   "tutorial.stage.grid_tool": "Press Grid Tool to lay out drill holes.",

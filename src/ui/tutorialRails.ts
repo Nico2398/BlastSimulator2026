@@ -6,7 +6,7 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
-import { stagesFor, type TutorialStage } from './tutorialStages.js';
+import { stagesFor, PICKER_CANVAS, type TutorialStage } from './tutorialStages.js';
 import {
   applyRails, clearRails, resolveStageIndex, resolveWaitStatus, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
@@ -133,7 +133,7 @@ export class TutorialRails {
    * rectangle will be accepted.
    */
   private stageHint(stage: TutorialStage): string {
-    const text = t(stage.hintKey);
+    const text = stage.target === PICKER_CANVAS ? `${t(stage.hintKey)} ${t('tutorial.stage.picker_cancel_tip')}` : t(stage.hintKey);
     const r = stage.region;
     if (!r) return text;
     return text

@@ -16,6 +16,9 @@ import {
 } from '../tutorialPickerRegion.js';
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 
+/** Right-click drift tolerance (px) while the tutorial guides a placement. */
+export const GUIDED_RIGHT_CLICK_TOLERANCE_PX = 40;
+
 export type PlacementShape = 'rect' | 'line' | 'point';
 export type PlacementPhase = 'idle' | 'armed' | 'hovering' | 'dragging' | 'selected' | 'confirmed';
 
@@ -382,7 +385,13 @@ export class PlacementController {
       // guaranteed, on every platform, to fire only after the full gesture's
       // movement is known (#544).
       if (this.phase === 'idle' || this.phase === 'confirmed') return;
-      if (this.cameraController.rightButtonDragged) return;
+      // Guided (tutorial picker region published): the camera pans on right
+      // drag, so a hand that drifts a little while clicking must still cancel.
+      // Only a real drag (peak beyond the guided tolerance) keeps the placement.
+      const dragged = this.region !== null
+        ? this.cameraController.rightGesturePeakPx > GUIDED_RIGHT_CLICK_TOLERANCE_PX
+        : this.cameraController.rightButtonDragged;
+      if (dragged) return;
       this.cancel();
       return;
     }

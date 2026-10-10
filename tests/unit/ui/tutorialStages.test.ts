@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
-import { TUTORIAL_STAGES, stagesFor, REGION } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_STAGES, stagesFor, REGION, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { resolveStageIndex, isReachable } from '../../../src/ui/tutorialGuide.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
@@ -539,5 +539,39 @@ describe('scores/finances/needs stages (#1334)', () => {
   it.each(OWN_STAGES)('$hintKey exists in en.json and fr.json', ({ hintKey }) => {
     expect(messages[hintKey], `missing en key ${hintKey}`).toBeTruthy();
     expect(messagesFr[hintKey], `missing fr key ${hintKey}`).toBeTruthy();
+  });
+});
+
+describe('every picker step keeps the strip cancel reachable (#1593)', () => {
+  const PICKER_STEPS = ['survey', 'build-living-quarters', 'box-cut', 'drill-plan', 'build-driving-center', 'build-storage'];
+
+  it('PICKER_CANCEL is the strip cancel selector', () => {
+    expect(PICKER_CANCEL).toBe('#bs-param-strip-bar [data-action="cancel"]');
+  });
+
+  it.each(PICKER_STEPS)('%s: both picker stages list the cancel control in `also`', (stepId) => {
+    const step = TUTORIAL_STEPS.find(st => st.id === stepId);
+    expect(step, `step ${stepId} exists`).toBeDefined();
+    const pickerStages = stagesFor(stepId, step!.highlightTarget).filter(
+      st => st.target.includes('bs-placement-armed') || st.target === '#bs-tile-select-confirm',
+    );
+    expect(pickerStages.length).toBe(2);
+    for (const stage of pickerStages) {
+      expect(stage.also ?? [], `${stepId} ${stage.target}`).toContain(PICKER_CANCEL);
+    }
+  });
+
+  it('every stage that allows the placement canvas also allows the cancel control', () => {
+    for (const { stepId, i, stage } of ALL_STAGES) {
+      const picker = stage.target.includes('bs-placement-armed') || stage.also?.some(a => a.includes('bs-placement-armed'));
+      if (!picker) continue;
+      expect(stage.also ?? [], `${stepId}[${i}]`).toContain(PICKER_CANCEL);
+    }
+  });
+
+  it('the cancel tip hint exists in both locales and differs between them', () => {
+    expect(messages['tutorial.stage.picker_cancel_tip']).toBeTruthy();
+    expect(messagesFr['tutorial.stage.picker_cancel_tip']).toBeTruthy();
+    expect(messages['tutorial.stage.picker_cancel_tip']).not.toBe(messagesFr['tutorial.stage.picker_cancel_tip']);
   });
 });

@@ -7,7 +7,7 @@ import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS }
 import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
-import { stagesFor } from '../../../src/ui/tutorialStages.js';
+import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
 import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -941,4 +941,48 @@ describe('TutorialRails — evacuate-zone waiting for clearance (#1591)', () => 
       expect(cancel.classList.contains(ALLOWED_CLASS)).toBe(true);
     });
   }
+});
+
+describe('the placement strip cancel is allowed on picker stages only (#1593)', () => {
+  function armedPlacement(): HTMLButtonElement {
+    document.body.classList.add('bs-placement-armed');
+    document.body.appendChild(withBox(Object.assign(document.createElement('canvas'), { id: 'game-canvas' })));
+    const bar = document.createElement('div');
+    bar.id = 'bs-param-strip-bar';
+    const cancel = document.createElement('button');
+    cancel.dataset['action'] = 'cancel';
+    bar.appendChild(cancel);
+    document.body.appendChild(bar);
+    return withBox(cancel) as HTMLButtonElement;
+  }
+
+  it('sanity: the fixture matches PICKER_CANCEL', () => {
+    expect(armedPlacement().matches(PICKER_CANCEL)).toBe(true);
+  });
+
+  it.each(['build-storage', 'survey', 'box-cut', 'drill-plan'])('%s: cancel is allowed on the armed picker stage', (stepId) => {
+    const cancel = armedPlacement();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: stepId }, state());
+    rails.refresh();
+    expect(cancel.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('a non-picker stage does not allow the cancel control', () => {
+    const cancel = armedPlacement();
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(cancel.classList.contains(ALLOWED_CLASS)).toBe(false);
+  });
+
+  it('the picker canvas stage hint tells the player how to cancel', () => {
+    armedPlacement();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'build-storage' }, state());
+    const tip = t('tutorial.stage.picker_cancel_tip');
+    expect(tip).not.toBe('tutorial.stage.picker_cancel_tip');
+    expect(rails.refresh().hint).toContain(tip);
+  });
 });

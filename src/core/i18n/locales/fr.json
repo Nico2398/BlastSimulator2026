@@ -3240,6 +3240,7 @@
   "tutorial.stage.survey_method": "Choisissez la méthode Sondage sismique.",
   "tutorial.stage.survey_run": "Appuyez sur Choisir la cible sur le terrain.",
   "tutorial.stage.survey_target": "Cliquez sur la case bleue entourée dans la scène — la caméra est déjà dessus.",
+  "tutorial.stage.picker_cancel_tip": "Vous avez changé d'avis ? Appuyez sur ÉCHAP, faites un clic droit ou utilisez le bouton Échap pour annuler.",
   "tutorial.stage.picker_confirm": "Appuyez sur Confirmer.",
   "tutorial.stage.open_blast": "Ouvrez le panneau Minage depuis la barre d'outils.",
   "tutorial.stage.grid_tool": "Appuyez sur Grille pour disposer les trous de forage.",

@@ -14,6 +14,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ParamStrip, type ParamStripConfig } from '../../../../src/ui/scene/ParamStrip.js';
+import { PLACEMENT_CANCEL_SELECTOR } from '../../../../src/ui/scene/placementSelectors.js';
 
 function makeConfig(over: Partial<ParamStripConfig> = {}): ParamStripConfig {
   return {
@@ -161,5 +162,21 @@ describe('ParamStrip', () => {
   it('dispose() takes the strip off the page', () => {
     strip.dispose();
     expect(container.querySelector('#bs-param-strip')).toBeNull();
+  });
+
+  it('renders the cancel (Esc) button under PLACEMENT_CANCEL_SELECTOR (#1593)', () => {
+    strip.show(makeConfig());
+    const cancel = container.querySelector(PLACEMENT_CANCEL_SELECTOR) as HTMLButtonElement | null;
+    expect(cancel).not.toBeNull();
+    expect(cancel!.getAttribute('data-action')).toBe('cancel');
+    expect(bar().contains(cancel)).toBe(true);
+  });
+
+  it('clicking the cancel button fires the cancel handler once (#1593)', () => {
+    const onCancel = vi.fn();
+    strip.setCancelHandler(onCancel);
+    strip.show(makeConfig());
+    (container.querySelector(PLACEMENT_CANCEL_SELECTOR) as HTMLButtonElement).click();
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });
