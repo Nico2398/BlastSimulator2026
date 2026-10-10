@@ -38,7 +38,7 @@ import {
 } from '../../../src/core/entities/Building.js';
 import { siteBounds } from '../../../src/console/commands/buildingHelpers.js';
 import { NavGrid, isStepClimbable, type NavCell } from '../../../src/core/nav/NavGrid.js';
-import { findPath } from '../../../src/core/nav/Pathfinding.js';
+import { findPath, octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
 
 /**
  * The three tutorial pins, in the order the tutorial rail actually orders
@@ -354,6 +354,7 @@ describe('tutorial site layout rule (#1040)', () => {
     });
 
     it('the survey grows the world to TUTORIAL_POST_SURVEY_WORLD_SIZE', () => {
+      if (!state.world) throw new Error('world missing');
       expect(state.world.sizeX).toBe(TUTORIAL_POST_SURVEY_WORLD_SIZE);
       expect(state.world.sizeZ).toBe(TUTORIAL_POST_SURVEY_WORLD_SIZE);
     });
@@ -384,10 +385,6 @@ describe('tutorial site layout rule (#1040)', () => {
     });
 
     it('the worst hole-pair path cost is within 1.5x the octile distance', () => {
-      const octile = (dx: number, dz: number): number => {
-        const a = Math.abs(dx), b = Math.abs(dz);
-        return Math.max(a, b) + (Math.SQRT2 - 1) * Math.min(a, b);
-      };
       let worst = 0;
       let worstPair = '';
       for (const a of holes) {
@@ -396,7 +393,7 @@ describe('tutorial site layout rule (#1040)', () => {
           const path = findPath(navGrid, {
             agentId: -1, fromX: a.x, fromZ: a.z, toX: b.x, toZ: b.z, avoidVehicles: false,
           });
-          const ratio = path.found ? path.totalCost / octile(b.x - a.x, b.z - a.z) : Infinity;
+          const ratio = path.found ? path.totalCost / octileHeuristic(a.x, a.z, b.x, b.z) : Infinity;
           if (ratio > worst) { worst = ratio; worstPair = `(${a.x},${a.z})->(${b.x},${b.z})`; }
         }
       }
