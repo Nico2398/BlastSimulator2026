@@ -1591,8 +1591,15 @@ describe('TutorialOverlay.resume clock (#1627)', () => {
     tut.dispose();
   });
 
-  it('stays paused on a step without a waiting order', () => {
+  it('stays paused on a waits-on-work step whose order is not issued', () => {
     const { tut, state } = suspendedAt('survey');
+    expect(tut.resume(state)).toBe(true);
+    expect(state.isPaused).toBe(true);
+    tut.dispose();
+  });
+
+  it('stays paused on a step that does not wait on work', () => {
+    const { tut, state } = suspendedAt('hire-surveyor');
     expect(tut.resume(state)).toBe(true);
     expect(state.isPaused).toBe(true);
     tut.dispose();

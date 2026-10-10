@@ -163,7 +163,7 @@ export class TutorialRails {
         trainingActive: this.lastProgressTrainingActive,
       },
       this.clockMustRun?.(state) === true,
-      resolveOrderIssued(this.stages, state) === false,
+      this.orderNotIssued(state),
     );
     this.lastProgressSignature = decision.progressSignature;
     this.lastProgressTick = decision.lastProgressTick;
@@ -180,6 +180,11 @@ export class TutorialRails {
     return this.held;
   }
 
+  /** The step has a player order and it is not issued yet (`null`: no player order). */
+  private orderNotIssued(state: GameState): boolean {
+    return resolveOrderIssued(this.stages, state) === false;
+  }
+
   /** Let the clock run again — the step moved on. */
   releaseClock(state: GameState | null): void {
     this.held = false;
@@ -193,7 +198,7 @@ export class TutorialRails {
    */
   settleClockAfterResume(state: GameState): void {
     this.held = false;
-    const underway = this.waitsOnWork && resolveOrderIssued(this.stages, state) !== false;
+    const underway = this.waitsOnWork && !this.orderNotIssued(state);
     state.isPaused = !underway;
   }
 

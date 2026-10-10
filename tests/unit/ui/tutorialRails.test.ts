@@ -1362,13 +1362,21 @@ describe('TutorialRails.settleClockAfterResume (#1627)', () => {
     expect(s.isPaused).toBe(false);
   });
 
-  it('unpauses while a detonation is pending', () => {
+  it('unpauses while a detonation is pending (no training in flight)', () => {
     const s = state();
     const rails = new TutorialRails();
-    rails.beginStep({ id: 'train-fragmenter', tickBudget: 25, waitsOnWork: true }, s);
+    rails.beginStep({ id: 'blast', waitsOnWork: true }, s);
     s.isPaused = true;
-    inFlightTraining(s);
     s.pendingDetonation = {} as never;
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(false);
+  });
+
+  it('unpauses a waits-on-work step with no player order (self-dispatching haul)', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'haul-debris', tickBudget: 30, waitsOnWork: true }, s);
+    s.isPaused = true;
     rails.settleClockAfterResume(s);
     expect(s.isPaused).toBe(false);
   });
