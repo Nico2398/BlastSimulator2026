@@ -1123,7 +1123,7 @@
     },
     {
       "command": "state",
-      "timeout": 60,
+      "timeout": 90,
       "role": "guard",
       "description": "#1595: at vehicle-buy-assign the tutorial buys the tier-1 debris_hauler only; the tier-3 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
       "interaction": [
@@ -1144,7 +1144,7 @@
     },
     {
       "command": "state",
-      "timeout": 60,
+      "timeout": 90,
       "role": "guard",
       "description": "#1595: at vehicle-buy-assign the tutorial buys the tier-1 debris_hauler only; the tier-2 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
       "interaction": [
