@@ -87,7 +87,7 @@ export class GameRenderer {
   private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
   private fragmentAnimator: FragmentAnimator | null = null;
-  /** Rendered (capped-dt) seconds since the last blast began; reset at every onBlast. */
+  /** Rendered (capped-dt) seconds since the last blast began (or since construction, before any blast); reset at every onBlast. */
   private blastPlaybackClockS = 0;
   private blastEffects: BlastEffects | null = null;
   /** Public (like `terrain`) so aiming/raycasting can fall back to landscape meshes past the site's claimed edge (#558). */
@@ -302,6 +302,10 @@ export class GameRenderer {
    * rock to a destination core already decided, so cutting it short is safe
    * for a harness (a settled muck pile is otherwise minutes of wall clock
    * away without a GPU, at 0.1s/frame of animation clock).
+   *
+   * Only finishes the animator: `blastPlayback.isPlaying` turns false, but the
+   * playback clock is not advanced, so the blast report's minimum-playback
+   * floor (`BLAST_REPORT_MIN_PLAYBACK_S`) still has to be reached in rendered time.
    */
   skipFragmentPlayback(): void {
     this.fragmentAnimator?.finish();
@@ -317,7 +321,13 @@ export class GameRenderer {
     return this.fragmentAnimator?.durationS ?? 0;
   }
 
-  /** Snapshot of the last blast's collapse playback (rendered time). */
+  /**
+   * Snapshot of the last blast's collapse playback (rendered time). Consumers
+   * gate on this instead of wall-clock timers. `skipFragmentPlayback` ends
+   * `isPlaying` without advancing `elapsedS`. `BlastReportModal` stamps
+   * `elapsedS` into `dataset.openedAtPlaybackS` on open — a deliberate probe
+   * for scenarios and tests, not read by game logic.
+   */
   get blastPlayback(): BlastPlaybackSnapshot {
     return {
       elapsedS: this.blastPlaybackClockS,
@@ -326,11 +336,6 @@ export class GameRenderer {
       // short of the end keeps it true and skip/finish makes it false.
       isPlaying: this.fragmentAnimator?.isPlaying ?? false,
     };
-  }
-
-  /** Rendered seconds of the last blast's collapse played so far. */
-  get blastPlaybackElapsedS(): number {
-    return this.blastPlaybackClockS;
   }
 
   /** Ambient shader clock, in game-time seconds — advances at state.timeScale, frozen while paused (#490). */

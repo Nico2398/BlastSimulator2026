@@ -1056,8 +1056,8 @@ describe('clickSelector — zero-size grace extension (issue #1032)', () => {
   // reproduced locally, 1/3 runs) with the bare "element has zero size
   // (0x0)" message, no grace context, even though PR #1037's grace already
   // exists. Diagnosis: BlastReportModal's overlay toggles `display` from
-  // 'none' to '' only once its deferred open fires (BLAST_REPORT_DELAY_MS
-  // plus collapse-playback duration), so the poll's last-read reason at the
+  // 'none' to '' only once its deferred open fires (rendered
+  // playback reaching BLAST_REPORT_MIN_PLAYBACK_S and the collapse finishing), so the poll's last-read reason at the
   // CLICK_SELECTOR_DEFAULT_TIMEOUT_MS deadline is 'hidden', not 'zero-size'
   // — the original grace condition only checked the latter, so it never
   // engaged, and the loop threw immediately even though the control was

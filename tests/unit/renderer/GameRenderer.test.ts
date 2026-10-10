@@ -1006,7 +1006,7 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     renderer.syncFromContext(makeCtx());
     expect(renderer.blastPlayback).toEqual({ elapsedS: 0, durationS: 0, isPlaying: false });
-    expect(renderer.blastPlaybackElapsedS).toBe(0);
+    expect(renderer.blastPlayback.elapsedS).toBe(0);
   });
 
   it('onBlast starts playback at elapsed 0 with the animator duration, playing', () => {
@@ -1032,7 +1032,7 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     renderer.update(0.1);
     renderer.update(0.05);
 
-    expect(renderer.blastPlaybackElapsedS).toBeCloseTo(0.25, 10);
+    expect(renderer.blastPlayback.elapsedS).toBeCloseTo(0.25, 10);
     expect(renderer.blastPlayback.elapsedS).toBeCloseTo(0.25, 10);
   });
 
@@ -1047,7 +1047,7 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     renderer.update(0);
     renderer.update(-1);
 
-    expect(renderer.blastPlaybackElapsedS).toBeCloseTo(0.1, 10);
+    expect(renderer.blastPlayback.elapsedS).toBeCloseTo(0.1, 10);
   });
 
   it('keeps advancing after the collapse ends, even with no flights at all (headless blast)', () => {
@@ -1061,7 +1061,7 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     expect(renderer.blastPlayback.isPlaying).toBe(false);
     for (let i = 0; i < 30; i++) renderer.update(0.1);
 
-    expect(renderer.blastPlaybackElapsedS).toBeCloseTo(3, 6);
+    expect(renderer.blastPlayback.elapsedS).toBeCloseTo(3, 6);
     expect(renderer.blastPlayback).toMatchObject({ durationS: 0, isPlaying: false });
   });
 
@@ -1084,11 +1084,11 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     renderer.syncFromContext(ctx);
     renderer.onBlast(ctx);
     for (let i = 0; i < 20; i++) renderer.update(0.1);
-    expect(renderer.blastPlaybackElapsedS).toBeGreaterThan(1);
+    expect(renderer.blastPlayback.elapsedS).toBeGreaterThan(1);
 
     renderer.onBlast(ctx);
 
-    expect(renderer.blastPlaybackElapsedS).toBe(0);
+    expect(renderer.blastPlayback.elapsedS).toBe(0);
     expect(renderer.blastPlayback.isPlaying).toBe(true);
   });
 
@@ -1099,13 +1099,13 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     renderer.onBlast(ctx);
     for (let i = 0; i < 5; i++) renderer.update(0.1);
     expect(renderer.fragmentPlaybackDuration).toBeGreaterThan(0);
-    expect(renderer.blastPlaybackElapsedS).toBeGreaterThan(0);
+    expect(renderer.blastPlayback.elapsedS).toBeGreaterThan(0);
 
     (renderer as any).terrain = null; // terrain/grid unavailable -> onBlast early-returns
     renderer.onBlast(ctx);
 
     expect(renderer.fragmentPlaybackDuration).toBe(0);
-    expect(renderer.blastPlaybackElapsedS).toBe(0);
+    expect(renderer.blastPlayback.elapsedS).toBe(0);
     expect(renderer.blastPlayback).toEqual({ elapsedS: 0, durationS: 0, isPlaying: false });
   });
 
