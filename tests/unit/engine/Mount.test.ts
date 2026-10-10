@@ -766,6 +766,39 @@ describe('findAlightCell — fractional vehicle positions and destination bias (
     expect(findAlightCell(undefined, 13.19, 18, { x: 30, z: 10 })).toEqual({ x: 13.19, z: 18 });
   });
 
+  /**
+   * Walkable strip along z=10 plus a column at x=12 up to z=0, and one dead-end
+   * cell (10,9) whose only link to the rest is the vehicle's own cell (10,10).
+   */
+  const deadEndGrid = () => makeNavGrid(0, 0, 30, 14, (x, z) => {
+    if (x === 10 && z === 10) return cell('walkable', true);
+    if (z === 10 || x === 12 || (x === 10 && z === 9)) return cell('walkable');
+    return cell('blocked');
+  });
+
+  it('skips a nearer neighbour whose only exit is through the parked vehicle', () => {
+    const result = findAlightCell(deadEndGrid(), 10, 10, { x: 12, z: 0 });
+    expect(result).not.toEqual({ x: 10, z: 9 });
+    expect(result).toEqual({ x: 11, z: 10 });
+  });
+
+  it('falls back to the nearest neighbour when the destination is unroutable', () => {
+    const result = findAlightCell(deadEndGrid(), 10, 10, { x: 5, z: 5 });
+    expect(result).toEqual({ x: 10, z: 9 });
+  });
+
+  it('alight honours an explicit destination over the itinerary', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 10);
+    const employee = hireTruckDriver(state, 10, 10);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = flat();
+
+    expect(alight(state, vehicle.id, undefined, { x: 0, z: 10 }).success).toBe(true);
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 9, z: 10 });
+  });
+
   it('alight steers toward the next itinerary leg (legs[1]) destination', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 10);

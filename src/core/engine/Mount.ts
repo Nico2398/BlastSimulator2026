@@ -22,7 +22,7 @@ import type { RefusalKey } from '../i18n/Refusal.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { isStepClimbable } from '../nav/NavGrid.js';
-import { isImpassable } from '../nav/Pathfinding.js';
+import { findPath, isImpassable } from '../nav/Pathfinding.js';
 
 type MountResult = { success: true } | ({ success: false; error: string } & RefusalKey);
 
@@ -150,6 +150,9 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   return { success: true };
 }
 
+/** Where an alighting employee is headed next; steers the alight cell toward it. */
+type Destination = { x: number; z: number };
+
 /**
  * Alight the driving/riding employee from a vehicle. Refuses mid-haul (via
  * `canReleaseDriver`'s own fail-closed guard) so a haul never gets orphaned
@@ -157,7 +160,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
  * within one tile of the vehicle (or the vehicle's own cell, as a fallback)
  * and returns to `on_foot`.
  */
-export function alight(state: GameState, vehicleId: number, emitter?: EventEmitter): MountResult {
+export function alight(state: GameState, vehicleId: number, emitter?: EventEmitter, toward?: Destination): MountResult {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
 
@@ -167,16 +170,16 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   const guard = canReleaseDriver(state.vehicles, vehicleId);
   if (!guard.success) return { ...guard, success: false, error: guard.error ?? t('mount.alight_failed') };
 
-  alightOccupant(state, vehicle, employeeId, emitter);
+  alightOccupant(state, vehicle, employeeId, emitter, toward);
   return { success: true };
 }
 
 /** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
-function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter): void {
+function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter, destination?: Destination): void {
   const employee = state.employees.employees.find(e => e.id === employeeId);
   // Read the next destination before releaseOccupant clears the itinerary.
   const next = employee?.itinerary?.legs[1];
-  const toward = next ? { x: next.destX, z: next.destZ } : undefined;
+  const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
   const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
   releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
   if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
@@ -216,8 +219,7 @@ export function findAlightCell(
   const vcx = Math.round(vx);
   const vcz = Math.round(vz);
   const from = grid.cellAt(vcx, vcz)?.surfaceY;
-  let best: { x: number; z: number } | undefined;
-  let bestDist = Infinity;
+  const candidates: Array<{ x: number; z: number; dist: number }> = [];
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
     const x = vcx + dx;
     const z = vcz + dz;
@@ -226,14 +228,26 @@ export function findAlightCell(
     if (!cell || isImpassable(cell, true)) continue;
     if (!isStepClimbable(from, cell.surfaceY, Math.hypot(dx, dz))) continue;
     if (!toward) return { x, z };
-    const dist = Math.hypot(x - toward.x, z - toward.z);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = { x, z };
+    candidates.push({ x, z, dist: Math.hypot(x - toward.x, z - toward.z) });
+  }
+  if (!toward) return { x: vx, z: vz };
+
+  // Nearest first. A cell only joined to the rest of the mine through the
+  // vehicle's own cell is a dead end once the vehicle parks there, so the
+  // first candidate with a route to the destination that does not cross a
+  // vehicle wins; the nearest one is the fallback when none has (or the
+  // destination is not a routable cell, e.g. a building footprint).
+  candidates.sort((a, b) => a.dist - b.dist);
+  if (grid.containsCell(Math.round(toward.x), Math.round(toward.z))) {
+    for (const c of candidates) {
+      const route = findPath(grid, {
+        agentId: -1, fromX: c.x, fromZ: c.z, toX: Math.round(toward.x), toZ: Math.round(toward.z), avoidVehicles: true,
+      });
+      if (route.found) return { x: c.x, z: c.z };
     }
   }
-
-  return best ?? { x: vx, z: vz };
+  const nearest = candidates[0];
+  return nearest ? { x: nearest.x, z: nearest.z } : { x: vx, z: vz };
 }
 
 /**
@@ -243,9 +257,9 @@ export function findAlightCell(
  * policy — #1103's non-rest dispatch promotion, #1118's hard-threshold
  * collapse.
  */
-export function alightIfMounted(state: GameState, emp: Employee, emitter?: EventEmitter): void {
+export function alightIfMounted(state: GameState, emp: Employee, emitter?: EventEmitter, toward?: Destination): void {
   if (isMounted(emp.locomotion)) {
-    alight(state, emp.locomotion.vehicleId, emitter);
+    alight(state, emp.locomotion.vehicleId, emitter, toward);
   }
 }
 

@@ -1443,6 +1443,23 @@
       }
     },
     {
+      "command": "tick 60",
+      "timeout": 90,
+      "role": "setup",
+      "description": "Free play: let the hauling crew bring more ore into the warehouse before the first free-play sale. #1588: alighting now steps onto a real neighbour cell, which shifts crew timing and the RNG draws that roll the contract pool, so the sales that follow are smaller; more stocked ore keeps them large enough to reach the profit target. A pad rather than a wait_until because no observable field marks 'enough ore for a big sale' -- fillableOreSaleOffered is already true for a small offer.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
       "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:6000",
       "timeout": 650,
       "role": "player",
@@ -1524,7 +1541,7 @@
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
       "timeout": 650,
       "role": "player",
-      "description": "Free play sale 2: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "description": "Free play sale 2: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338). #1588: command mode plays this first extra sale as well (interaction mode skips it once the level has ended): the offer pool is rolled by the RNG, so the free-play sales alone can land just short of the profit target.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1539,7 +1556,7 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1569,7 +1586,7 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1599,7 +1616,7 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
