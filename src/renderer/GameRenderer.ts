@@ -10,7 +10,7 @@
 // onto `this`.
 
 import * as THREE from 'three';
-import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
+import type { BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -87,6 +87,8 @@ export class GameRenderer {
   private readonly ambientUniforms: AmbientUniforms = createAmbientUniforms();
   private fragments: FragmentMesh | null = null;
   private fragmentAnimator: FragmentAnimator | null = null;
+  /** Rendered (capped-dt) seconds since the last blast began; reset at every onBlast. */
+  private blastPlaybackClockS = 0;
   private blastEffects: BlastEffects | null = null;
   /** Public (like `terrain`) so aiming/raycasting can fall back to landscape meshes past the site's claimed edge (#558). */
   public landscape: LandscapeMesh | null = null;
@@ -317,12 +319,18 @@ export class GameRenderer {
 
   /** Snapshot of the last blast's collapse playback (rendered time). */
   get blastPlayback(): BlastPlaybackSnapshot {
-    return IDLE_BLAST_PLAYBACK; // TODO: implement
+    return {
+      elapsedS: this.blastPlaybackClockS,
+      durationS: this.fragmentAnimator?.durationS ?? 0,
+      // Derived by FragmentAnimator from its own elapsed < endsAt, so a seek
+      // short of the end keeps it true and skip/finish makes it false.
+      isPlaying: this.fragmentAnimator?.isPlaying ?? false,
+    };
   }
 
   /** Rendered seconds of the last blast's collapse played so far. */
   get blastPlaybackElapsedS(): number {
-    return 0; // TODO: implement
+    return this.blastPlaybackClockS;
   }
 
   /** Ambient shader clock, in game-time seconds — advances at state.timeScale, frozen while paused (#490). */
@@ -353,6 +361,7 @@ export class GameRenderer {
 
     // Rock still falling from the last blast.
     this.fragmentAnimator?.update(dt);
+    if (Number.isFinite(dt) && dt > 0) this.blastPlaybackClockS += dt;
 
     if (this.skybox) {
       this.skybox.update(dt, cam.position.x, cam.position.z, this.sm.cameraController.distance);
@@ -521,6 +530,7 @@ export class GameRenderer {
 
   /** Trigger blast visual effects. Call from main.ts immediately after a successful blast command. See GameRendererBlastVisuals.ts. */
   onBlast(ctx: MiningContext): void {
+    this.blastPlaybackClockS = 0;
     onBlast(this.blastVisualsDeps(), ctx);
   }
 

@@ -9,7 +9,6 @@ export interface BlastPlaybackSnapshot {
 export const IDLE_BLAST_PLAYBACK: BlastPlaybackSnapshot = { elapsedS: 0, durationS: 0, isPlaying: false };
 
 /** True once playback has stopped and has rendered at least `floorS` seconds. */
-export function isBlastPlaybackComplete(_playback: BlastPlaybackSnapshot, _floorS: number): boolean {
-  // TODO: implement
-  return false;
+export function isBlastPlaybackComplete(playback: BlastPlaybackSnapshot, floorS: number): boolean {
+  return !playback.isPlaying && playback.elapsedS >= floorS;
 }

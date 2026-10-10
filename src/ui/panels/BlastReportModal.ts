@@ -5,8 +5,9 @@
 // report whose identity differs from the last one shown means a new blast
 // just happened, right after PreflightModal's DETONATE dispatches `blast`
 // and closes itself. Rather than opening on that very next update() tick,
-// the modal arms and waits out BLAST_REPORT_DELAY_MS before actually
-// showing itself (#545), so the fragment-collapse animation plays first.
+// the modal arms and waits for the renderer's collapse playback to finish
+// (and reach BLAST_REPORT_MIN_PLAYBACK_S of rendered time) before actually
+// showing itself (#545, #1590), so the fragment-collapse animation plays first.
 //
 // Deviation from the design mock: its second footer button, "SEND HAULERS",
 // has no real backing command — only per-vehicle `vehicle haul <id>` exists,
@@ -22,7 +23,8 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
-import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
+import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
+import { IDLE_BLAST_PLAYBACK, isBlastPlaybackComplete, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 
 const RATING_COLOR: Record<BlastRating, string> = {
@@ -43,14 +45,6 @@ const RATING_COLOR: Record<BlastRating, string> = {
  */
 const REPORT_ACCIDENT_TYPES = new Set<AccidentRecord['type']>(['death', 'injury', 'vehicle_destroyed', 'vehicle_damage']);
 
-// Real-time delay between a blast report becoming available and the modal
-// actually opening (#545), so the fragment-collapse animation plays in the
-// clear instead of being instantly covered. Acts as a floor, not the whole
-// delay (#950): the real collapse (flyrock/projection arcs included) can run
-// longer than this, so update()'s caller also supplies the actual playback
-// duration and the modal waits out whichever is longer.
-export const BLAST_REPORT_DELAY_MS = 3000;
-
 export class BlastReportModal {
   private readonly overlay: HTMLElement;
   private readonly ratingEl: HTMLElement;
@@ -62,17 +56,16 @@ export class BlastReportModal {
   private readonly locale = new LocaleTextRegistry();
 
   // Deferred-open state (#545). pendingReport holds a report that has
-  // arrived but not yet been shown; pendingDeadlineMs is the `now()`
-  // timestamp (per the injected clock) at which it should open.
+  // arrived but not yet been shown; it opens once the rendered collapse
+  // playback snapshot passed to update() reports completion (#1590).
   private pendingReport: BlastReport | null = null;
-  private pendingDeadlineMs: number | null = null;
 
-  constructor(container: HTMLElement, private readonly now: () => number = () => performance.now()) {
+  constructor(container: HTMLElement) {
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
     this.overlay.style.display = 'none';
     // Stable marker for TutorialOverlay (#707): a report is "outstanding"
     // from the instant a blast arms one (pendingReport set) through the
-    // real-time open delay (#545) and until the player dismisses it. The
+    // playback-gated open delay (#545, #1590) and until the player dismisses it. The
     // overlay itself stays in the DOM the whole time — only its display
     // toggles — so this dataset flag is readable even while `pending` is
     // true and the overlay is still `display:none`, which is exactly the
@@ -143,14 +136,13 @@ export class BlastReportModal {
    * `currentReport` is the replacing state's lastBlastReport, e.g. from a
    * caller swapping ctx.state wholesale (#571, `load`): stamping it into
    * lastShownReport means a later update() tick that sees that same-identity
-   * report treats it as already-shown and does not re-arm the delay timer,
+   * report treats it as already-shown and does not re-arm the playback gate,
    * even though the new state object's reference differs from whatever was
    * shown before the swap. Defaults to null, matching a fresh level's
    * lastBlastReport (new_game, campaign transition).
    */
   reset(currentReport: BlastReport | null = null): void {
     this.pendingReport = null;
-    this.pendingDeadlineMs = null;
     this.hide();
     this.lastShownReport = currentReport;
   }
@@ -163,7 +155,7 @@ export class BlastReportModal {
     // tier with EventModal/ConfirmModal/etc. (z-index 600, styles.ts), well
     // underneath it. A blast landing right as the level ends (bankruptcy,
     // worker revolt, ecological shutdown) still arms its report on the
-    // normal 3s real-time delay (#545) and opens it well after LevelEndScreen
+    // normal playback-gated delay (#545, #1590) and opens it well after LevelEndScreen
     // has already taken over: confirmed live (screenshot) rendering the
     // report's stats garbled underneath LevelEndScreen's own defeat text,
     // reachable by no click — the report's own CLOSE button included. A
@@ -176,7 +168,6 @@ export class BlastReportModal {
       if (this.open) this.hide();
       if (report) this.lastShownReport = report;
       this.pendingReport = null;
-      this.pendingDeadlineMs = null;
       this.syncOutstandingMarker();
       return;
     }
@@ -190,23 +181,20 @@ export class BlastReportModal {
     // player who fires twice in a row would never see the second one).
     //
     // Arming replaces any not-yet-opened pending report outright (#545): a
-    // second blast inside the delay window discards the first pending
-    // report and starts its own full-length real-time window from its own
-    // arrival time. The first report is never shown.
+    // second blast before the first opens discards the first pending
+    // report and waits on the playback of its own blast. The first report is never shown.
     if (report && report !== this.lastShownReport && report !== this.pendingReport) {
       this.pendingReport = report;
-      const delayMs = Math.max(BLAST_REPORT_DELAY_MS, playback.durationS * 1000);
-      this.pendingDeadlineMs = this.now() + delayMs;
     }
 
-    if (this.pendingReport !== null && this.pendingDeadlineMs !== null && this.now() >= this.pendingDeadlineMs) {
+    if (this.pendingReport !== null && isBlastPlaybackComplete(playback, BLAST_REPORT_MIN_PLAYBACK_S)) {
       const toShow = this.pendingReport;
       this.lastShownReport = toShow;
       this.pendingReport = null;
-      this.pendingDeadlineMs = null;
       this.render(toShow, state);
       this.open = true;
       this.overlay.style.display = '';
+      this.overlay.dataset['openedAtPlaybackS'] = playback.elapsedS.toFixed(2);
     }
 
     this.syncOutstandingMarker();

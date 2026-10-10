@@ -1450,7 +1450,7 @@
       "timeout": 100,
       "frames": 6,
       "interval": 50,
-      "description": "#950: this cycle's CATASTROPHIC, real-projections blast (8kg boomite / 0.5m stemming on a 2x2 grid, see this cycle's own charge step note) is the fixture chosen specifically because its real fragment-collapse duration is expected to run well past BLAST_REPORT_DELAY_MS's 3000ms floor -- real flyrock arcs scale toward MAX_PROJECTION_VELOCITY (80 m/s, balance.ts), and that same file notes a straight-up throw at max velocity alone takes 16.3s to come back down, so this pattern's thrown fragments plausibly keep the collapse airborne for several real seconds past the floor. The added `wait`+`assert` pair below is the one place in this file that waits a flat real-time duration rather than polling a condition: there is no DOM-observable signal for \"the collapse is still mid-flight\" other than the report modal's own closed state, which is exactly what that assert checks, so the wait exists only to create the checkpoint moment the assert reads.",
+      "description": "#950: this cycle's CATASTROPHIC, real-projections blast (8kg boomite / 0.5m stemming on a 2x2 grid, see this cycle's own charge step note) is the fixture chosen specifically because its real fragment-collapse duration is expected to run well past BLAST_REPORT_MIN_PLAYBACK_S's 3s rendered-time floor -- real flyrock arcs scale toward MAX_PROJECTION_VELOCITY (80 m/s, balance.ts), and that same file notes a straight-up throw at max velocity alone takes 16.3s to come back down, so this pattern's thrown fragments plausibly keep the collapse airborne for several real seconds past the floor. The report opens only after the renderer's capped-dt collapse playback finishes (#1590), so the assert right after the click needs no flat wait: the modal's own closed state is the \"collapse is still mid-flight\" signal, and the awaitUsable that follows polls until playback ends.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1472,10 +1472,6 @@
           "type": "clickIfPresent",
           "selector": "[data-action=\"preflight-fire-anyway\"]",
           "timeoutMs": 3000
-        },
-        {
-          "type": "wait",
-          "durationMs": 3200
         },
         {
           "type": "assert",
@@ -1506,7 +1502,7 @@
           "chargedCount": 0
         },
         "blocked": "[data-action=\"report-close\"]",
-        "note": "#950: a fired blast clears the plan back to zero — CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed at t=3200ms (past the old fixed 3000ms floor, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
+        "note": "#950: a fired blast clears the plan back to zero — CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed right after firing (playback-gated, #1590, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
       }
     },
     {

@@ -174,18 +174,21 @@
           "durationMs": 1000
         },
         {
+          "type": "assert",
+          "selector": "[data-action=\"report-close\"]",
+          "property": "offsetHeight",
+          "expectedValue": 0
+        },
+        {
           "type": "screenshot"
         },
         {
-          "type": "wait",
-          "durationMs": 2500
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 30000
         },
         {
           "type": "screenshot"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
         },
         {
           "type": "clickSelector",
