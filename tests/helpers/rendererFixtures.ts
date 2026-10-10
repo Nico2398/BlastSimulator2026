@@ -32,8 +32,9 @@ export function makeMockSceneManager() {
   };
   const postPipeline = {
     aerial: { setHazeColor: vi.fn(), setHeightRef: vi.fn(), setGrade: vi.fn(), update: vi.fn() },
+    sceneTarget: null,
   };
-  return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: vi.fn() } as unknown };
+  return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: vi.fn(), compile: vi.fn(), getRenderTarget: vi.fn(() => null), setRenderTarget: vi.fn() } as unknown };
 }
 
 export function makeCtx(seed = 42): MiningContext {

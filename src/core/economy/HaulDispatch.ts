@@ -10,6 +10,7 @@ import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '.
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
+import { refreshOrderReachability } from '../engine/OrderReachability.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { haulDestinationOf, isBarrenFragment } from './SpoilHeaps.js';
 import type { TrackedFragment } from './Logistics.js';
@@ -46,10 +47,12 @@ export function syncHaulDispatch(state: GameState): void {
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
+  let dispatched = false;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
 
+    dispatched = true;
     const oversized = isOversized(tracked.fragment.volume);
     const actionId = state.nextPendingActionId++;
     const targetX = Math.round(tracked.fragment.position.x);
@@ -71,10 +74,11 @@ export function syncHaulDispatch(state: GameState): void {
       targetY: 0,
       payload: { fragmentId: tracked.fragment.id } satisfies HaulActionPayload,
       targetEmployeeId: null,
-    }, { skipQualificationCheck: true });
+    }, { skipQualificationCheck: true, deferClassification: true });
 
     coveredFragmentIds.add(tracked.fragment.id);
   }
+  if (dispatched) refreshOrderReachability(state);
 }
 
 /**

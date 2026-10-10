@@ -669,3 +669,27 @@ describe('Dispatch over a post-blast debris field (6000 fragments, 6000 haul act
     expect(elapsed).toBeLessThan(250);
   });
 });
+
+describe('Haul dispatch right after a large blast (6000 new fragments) (#1603)', () => {
+  it('queues and classifies every new haul order in one pass, under 250ms', () => {
+    // Warmup on a separate field so the measured pass is not paying JIT.
+    setupDebrisFieldState(500);
+
+    const state = createGame({ seed: 42 });
+    const { state: seeded } = setupDebrisFieldState(6000);
+    // Same fragments, not yet dispatched: the first tick after the blast.
+    state.logistics = seeded.logistics;
+    state.logistics.storageCapacityKg = 6000 * 100;
+
+    const start = performance.now();
+    syncHaulDispatch(state);
+    const elapsed = performance.now() - start;
+
+    expect(state.pendingActions.length).toBe(6000);
+    // Classified, not left uncoloured: every order's ghost carries a verdict.
+    expect(state.pendingActions.every(a => a.blockedReason !== undefined)).toBe(true);
+    // Classifying each order as it was queued re-scanned the whole queue per
+    // order — seconds here; the single batched pass is tens of milliseconds.
+    expect(elapsed).toBeLessThan(250);
+  });
+});

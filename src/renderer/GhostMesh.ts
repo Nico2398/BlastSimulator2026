@@ -310,6 +310,11 @@ export class GhostMesh {
     for (const [id, entry] of [...this.entries]) this.removeEntry(id, entry);
   }
 
+  /** Every material a ghost can wear — for compiling at level load (ShaderWarmup.ts, #1603). */
+  get materials(): readonly THREE.Material[] {
+    return [this.material, this.claimedMaterial, this.unreachableMaterial];
+  }
+
   /** Number of ghost meshes currently rendered. */
   get count(): number {
     return this.entries.size;
