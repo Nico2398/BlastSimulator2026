@@ -1596,7 +1596,7 @@ describe('decideClock — unissued step order (#1626)', () => {
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, false, true).hold).toBe(false);
   });
 
-  it('holds with a pending order even far past the grace cap is unchanged (still a hold)', () => {
+  it('still holds with a pending order far past the grace cap', () => {
     const s = busyState();
     s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, false, true).hold).toBe(true);
@@ -1665,6 +1665,41 @@ describe('resolveOrderIssued (#1626)', () => {
     s.contracts.active = [oreContract()];
     expect(resolveOrderIssued(TUTORIAL_STAGES['sell-ore']!, s)).toBe(true);
   });
+
+  it('drill-plan: false before, true once a hole is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['drill-plan']!, s)).toBe(false);
+    s.plannedDrillHoles = [{ id: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['drill-plan']!, s)).toBe(true);
+  });
+
+  it('charge: false before, true once a charge is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['charge']!, s)).toBe(false);
+    s.plannedChargesByHole = { '1': {} as never };
+    expect(resolveOrderIssued(TUTORIAL_STAGES['charge']!, s)).toBe(true);
+  });
+
+  it('box-cut: false before, true once a ramp is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['box-cut']!, s)).toBe(false);
+    s.plannedRamps = [{ id: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['box-cut']!, s)).toBe(true);
+  });
+
+  it('survey: false before, true once a survey action is pending', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['survey']!, s)).toBe(false);
+    s.pendingActions = [{ type: 'survey' } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['survey']!, s)).toBe(true);
+  });
+
+  it('build-living-quarters: false before, true once living_quarters is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-living-quarters']!, s)).toBe(false);
+    s.plannedBuildings = [{ id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 2, z: 12, actionId: 1, cost: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-living-quarters']!, s)).toBe(true);
+  });
 });
 
 describe('hasActiveOreSale (#1626)', () => {
@@ -1721,6 +1756,22 @@ describe('hasBookedTraining (#1626)', () => {
     const s = fresh();
     s.employees.employees = [trainee('driving.drill_rig')];
     expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(false);
+  });
+
+  it('is true when the course is still a pending booking (walking to the school)', () => {
+    const s = fresh();
+    s.employees.employees = [
+      { qualifications: [], trainingState: null, pendingTrainingState: { buildingId: 1, skill: 'driving.rock_fragmenter', fee: 1 } } as never,
+    ];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(true);
+  });
+
+  it('is true once the course finished and left the qualification', () => {
+    const s = fresh();
+    s.employees.employees = [
+      { qualifications: [{ category: 'driving.rock_fragmenter' }], trainingState: null } as never,
+    ];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(true);
   });
 
   it('is false with an empty roster', () => {

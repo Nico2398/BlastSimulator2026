@@ -89,7 +89,7 @@ export interface TutorialStage {
   /**
    * Whether the player's order for this step has been issued (#1626). `null`
    * marks a step with no player order. Overrides `spentWhen` as the
-   * "order issued" signal.
+   * "order issued" signal; `undefined` falls back to `spentWhen`.
    */
   orderIssuedWhen?: ((state: GameState) => boolean) | null;
   /** i18n key for the waiting line shown once `spentWhen` fires. Required whenever `spentWhen` is set. */

@@ -326,11 +326,14 @@ export function isHaulDispatched(state: GameState): boolean {
  * has stock in `collectedOre`.
  */
 export function isSellOreWaiting(state: GameState): boolean {
-  const activeOreSales = (state.contracts?.active ?? []).filter(
-    (c) => c.type === 'ore_sale' && !c.completed,
-  );
-  if (activeOreSales.length === 0) return false;
-  return activeOreSales.every((c) => (state.collectedOre?.[c.materialId] ?? 0) <= 0);
+  const sales = activeOreSales(state);
+  if (sales.length === 0) return false;
+  return sales.every((c) => (state.collectedOre?.[c.materialId] ?? 0) <= 0);
+}
+
+/** Active, incomplete ore_sale contracts; tolerant of a minimal/mock GameState. */
+function activeOreSales(state: GameState) {
+  return (state.contracts?.active ?? []).filter((c) => c.type === 'ore_sale' && !c.completed);
 }
 
 /** Count vehicles with a driver aboard — the driver seat is `occupantIds[0]` (#1092). */
@@ -420,10 +423,9 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
   };
 }
 
-
 /** True if `contracts.active` holds an incomplete ore_sale contract (#1626). */
 export function hasActiveOreSale(state: GameState): boolean {
-  return (state.contracts?.active ?? []).some((c) => c.type === 'ore_sale' && !c.completed);
+  return activeOreSales(state).length > 0;
 }
 
 /** True if any employee has a booked (walking in), active or finished training in `skill` (#1626). */
