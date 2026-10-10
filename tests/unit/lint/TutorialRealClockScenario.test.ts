@@ -25,8 +25,15 @@ describe('tutorial-real-clock.json (#1598)', () => {
     expect(cmds.filter((c) => /\bcash:/.test(c))).toEqual([]);
   });
 
-  it('setup steps are limited to campaign start, tutorial_start and time resume', () => {
-    const offenders = steps.filter((s) => s.role === 'setup' && !SETUP_COMMANDS.includes(s.command));
+  // Scenario mode only advances the clock inside awaitTutorialStep, so a beat that idles
+  // (#1626: held-clock chip) spends its step budget with a setup `tick N` and nothing else.
+  const isTickOnlySetup = (s: ScenarioStepDef): boolean => {
+    const cmds = (s.interaction ?? []).filter((a) => a.type === 'command').map((a) => (a as { command: string }).command);
+    return cmds.length > 0 && cmds.every((c) => /^tick \d+$/.test(c));
+  };
+
+  it('setup steps are limited to campaign start, tutorial_start, time resume and tick-only idle steps', () => {
+    const offenders = steps.filter((s) => s.role === 'setup' && !SETUP_COMMANDS.includes(s.command) && !isTickOnlySetup(s));
     expect(offenders.map((s) => s.command)).toEqual([]);
   });
 
