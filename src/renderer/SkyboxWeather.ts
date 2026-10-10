@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
+import { Random } from '../core/math/Random.js';
 
 // ---------- Sky colors per weather state ----------
 // skyLow feeds the dome's horizon stop and legacy scene.background fallback;
@@ -101,9 +102,49 @@ export interface SunLightSource {
 }
 
 // ---------- Storm flash ----------
-const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
-const STORM_FLASH_INTERVAL_MAX = 8.0;
-const STORM_FLASH_DURATION = 0.08;     // seconds the flash lasts
+export const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
+export const STORM_FLASH_INTERVAL_MAX = 8.0;
+export const STORM_FLASH_FIRST_DELAY = 4.0;   // seconds until the first flash
+export const STORM_FLASH_PEAK_BOOST = 3.4;    // sun intensity added at envelope level 1
+
+/** Flash brightness keyframes: `at` seconds into the flash, `level` 0..1. */
+export const STORM_FLASH_ENVELOPE: readonly { at: number; level: number }[] = [
+  { at: 0, level: 1 },
+  { at: 0.06, level: 1 },
+  { at: 0.10, level: 0 },
+  { at: 0.16, level: 0 },
+  { at: 0.19, level: 0.6 },
+  { at: 0.28, level: 0 },
+];
+
+/** Seconds the whole flash lasts — the last envelope keyframe. */
+export const STORM_FLASH_DURATION = STORM_FLASH_ENVELOPE[STORM_FLASH_ENVELOPE.length - 1]!.at;
+
+/** Seed of the fallback flash source when the caller injects none. */
+const DEFAULT_FLASH_SEED = 0x1f1a5;
+
+/** Source of randomness in [0, 1) for flash spacing. */
+type FlashRandom = () => number;
+
+interface SkyboxWeatherOptions {
+  /** Injectable for deterministic tests; defaults to the renderer's own source. */
+  random?: FlashRandom;
+}
+
+/** Flash brightness level (0..1) `t` seconds into a flash, interpolated from STORM_FLASH_ENVELOPE. */
+export function flashLevel(t: number): number {
+  const last = STORM_FLASH_ENVELOPE[STORM_FLASH_ENVELOPE.length - 1]!;
+  if (t < 0 || t >= last.at) return 0;
+  for (let i = 1; i < STORM_FLASH_ENVELOPE.length; i++) {
+    const b = STORM_FLASH_ENVELOPE[i]!;
+    if (t < b.at) {
+      const a = STORM_FLASH_ENVELOPE[i - 1]!;
+      const span = b.at - a.at;
+      return span <= 0 ? b.level : a.level + ((b.level - a.level) * (t - a.at)) / span;
+    }
+  }
+  return 0;
+}
 
 // ---------- Gradient sky dome (#458 T7.1/D12/A25) ----------
 // Comfortably bigger than the far plane (6000, #458 T6.1/D13) so the dome
@@ -158,16 +199,23 @@ export class SkyboxWeather {
   private rainArea = RAIN_AREA_BASE;
 
   // Storm
-  private stormFlashTimer = 4.0;
-  private stormFlashActive = false;
-  private stormFlashRemaining = 0;
+  /** Weather-lerped sun intensity; the flash boost is added on top and never feeds back. */
+  private sunBaseline: number;
+  /** Seconds into the running flash; null while idle. */
+  private flashElapsed: number | null = null;
+  private flashCountdown = STORM_FLASH_FIRST_DELAY;
+  private readonly flashRandom: FlashRandom;
 
   constructor(
     scene: THREE.Scene,
     sun: SunLightSource,
     ambient: THREE.AmbientLight,
     fill: SunLightSource,
+    options: SkyboxWeatherOptions = {},
   ) {
+    const defaultRandom = new Random(DEFAULT_FLASH_SEED);
+    this.flashRandom = options.random ?? (() => defaultRandom.next());
+    this.sunBaseline = sun.intensity;
     this.scene = scene;
     this.sun = sun;
     this.ambient = ambient;
@@ -215,10 +263,13 @@ export class SkyboxWeather {
       this.currentSkyHigh.copy(colors.skyHigh);
       (this.skyDomeMaterial.uniforms['uSkyLow']!.value as THREE.Color).copy(this.currentSky);
       (this.skyDomeMaterial.uniforms['uSkyHigh']!.value as THREE.Color).copy(this.currentSkyHigh);
+      this.sunBaseline = colors.sunIntensity;
       this.sun.intensity = colors.sunIntensity;
       this.ambient.intensity = colors.ambientIntensity;
       this.fill.intensity = colors.sunIntensity * FILL_INTENSITY_RATIO;
     }
+
+    if (state !== 'storm') this.clearStormFlash();
 
     const isRaining = state === 'light_rain' || state === 'heavy_rain' || state === 'storm';
     if (this.rainPoints) {
@@ -257,7 +308,7 @@ export class SkyboxWeather {
     (this.skyDomeMaterial.uniforms['uSkyHigh']!.value as THREE.Color).copy(this.currentSkyHigh);
 
     // Lerp sun / ambient / fill
-    this.sun.intensity += (target.sunIntensity - this.sun.intensity) * TRANSITION_SPEED * dt;
+    this.sunBaseline += (target.sunIntensity - this.sunBaseline) * TRANSITION_SPEED * dt;
     this.ambient.intensity += (target.ambientIntensity - this.ambient.intensity) * TRANSITION_SPEED * dt;
     const targetFill = target.sunIntensity * FILL_INTENSITY_RATIO;
     this.fill.intensity += (targetFill - this.fill.intensity) * TRANSITION_SPEED * dt;
@@ -267,10 +318,16 @@ export class SkyboxWeather {
       this.updateRain(dt, cameraX, cameraZ);
     }
 
-    // Storm flashes
+    // Storm flashes advance the boost; the sun intensity is written once below, as baseline + boost
     if (this.currentWeather === 'storm') {
       this.updateStormFlash(dt);
+    } else {
+      this.clearStormFlash();
     }
+    const boost = this.flashElapsed === null
+      ? 0
+      : flashLevel(this.flashElapsed) * STORM_FLASH_PEAK_BOOST;
+    this.sun.intensity = this.sunBaseline + boost;
   }
 
   /** Current lerped sky color — AerialPerspectivePass tints haze to match it each frame (#458 T5.2). */
@@ -345,24 +402,24 @@ export class SkyboxWeather {
     (geo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
 
+  private clearStormFlash(): void {
+    this.flashElapsed = null;
+    this.flashCountdown = STORM_FLASH_FIRST_DELAY;
+    this.sun.intensity = this.sunBaseline;
+  }
+
   private updateStormFlash(dt: number): void {
-    if (this.stormFlashActive) {
-      this.stormFlashRemaining -= dt;
-      if (this.stormFlashRemaining <= 0) {
-        // Flash end — restore sun intensity
-        this.stormFlashActive = false;
-        this.stormFlashTimer =
+    if (this.flashElapsed !== null) {
+      this.flashElapsed += dt;
+      if (this.flashElapsed >= STORM_FLASH_DURATION) {
+        this.flashElapsed = null;
+        this.flashCountdown =
           STORM_FLASH_INTERVAL_MIN +
-          Math.random() * (STORM_FLASH_INTERVAL_MAX - STORM_FLASH_INTERVAL_MIN);
+          this.flashRandom() * (STORM_FLASH_INTERVAL_MAX - STORM_FLASH_INTERVAL_MIN);
       }
     } else {
-      this.stormFlashTimer -= dt;
-      if (this.stormFlashTimer <= 0) {
-        // Trigger flash
-        this.stormFlashActive = true;
-        this.stormFlashRemaining = STORM_FLASH_DURATION;
-        this.sun.intensity = 3.5; // brief bright flash
-      }
+      this.flashCountdown -= dt;
+      if (this.flashCountdown <= 0) this.flashElapsed = 0;
     }
   }
 }
