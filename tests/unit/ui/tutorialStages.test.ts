@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { TUTORIAL_STAGES, stagesFor, REGION, PICKER_CANCEL, TUTORIAL_POLICY_FATIGUE_MIN, TUTORIAL_POLICY_FATIGUE_MAX } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_HIRING_SCRIPT } from '../../../src/core/config/balance.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { TOOLBAR_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
 import { resolveStageIndex, isReachable } from '../../../src/ui/tutorialGuide.js';
@@ -630,4 +631,45 @@ describe('guided first-blast steps allow no stepper (#1596)', () => {
       }
     }
   });
+});
+
+describe('hire stages target one scripted candidate (#1600)', () => {
+  const HIRE_STEPS: Array<[string, string]> = [
+    ['hire-surveyor', 'surveyor'],
+    ['hire-driller', 'driller'],
+    ['hire-manager', 'manager'],
+    ['hire-driver', 'driver'],
+  ];
+
+  for (const [stepId, role] of HIRE_STEPS) {
+    it(`${stepId}: the hire stage selector names exactly the scripted ${role} id`, () => {
+      const scripted = TUTORIAL_HIRING_SCRIPT.filter(c => c.role === role);
+      expect(scripted).toHaveLength(1);
+      const stages = TUTORIAL_STAGES[stepId]!;
+      const hireStage = stages[stages.length - 1]!;
+      const ids = [...hireStage.target.matchAll(/\[data-candidate-id="([^"]+)"\]/g)].map(m => m[1]);
+      expect(ids).toEqual([String(scripted[0]!.id)]);
+      expect(hireStage.target).toContain(`[data-role="${role}"]`);
+    });
+
+    it(`${stepId}: the stage resolves against a pool card of that candidate and ignores other cards`, () => {
+      const scripted = TUTORIAL_HIRING_SCRIPT.find(c => c.role === role)!;
+      document.body.innerHTML = '';
+      const panel = document.createElement('div');
+      panel.id = 'bs-employee-panel';
+      document.body.appendChild(panel);
+      const mk = (id: number) => {
+        const b = document.createElement('button');
+        b.setAttribute('data-role', role);
+        b.setAttribute('data-candidate-id', String(id));
+        panel.appendChild(b);
+      };
+      mk(scripted.id + 100);
+      const stages = TUTORIAL_STAGES[stepId]!;
+      const target = stages[stages.length - 1]!.target;
+      expect(document.querySelectorAll(target)).toHaveLength(0);
+      mk(scripted.id);
+      expect(document.querySelectorAll(target)).toHaveLength(1);
+    });
+  }
 });

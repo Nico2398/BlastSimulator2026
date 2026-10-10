@@ -593,6 +593,18 @@
       "role": "bootstrap"
     },
     {
+      "command": "tick 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "description": "#1600: tutorial_pit offers one scripted candidate per role; 24 single ticks (a bigger `tick` stops early on a need event) reach the pool refresh that restores the driver hired above.",
+      "repeat": 24
+    },
+    {
       "command": "employee hire role:driver",
       "interaction": [
         {

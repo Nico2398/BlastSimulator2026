@@ -19,16 +19,17 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow staffed:false",
+      "command": "campaign start level:tutorial_pit staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false"
+          "command": "campaign start level:tutorial_pit staffed:false"
         }
       ],
       "role": "setup",
+      "description": "#1600: tutorial_pit (scripted one-candidate-per-role hiring pool) rather than dusty_hollow, because the tutorial hire rail only lets the scripted candidate's Hire button through -- a seeded pool has no such candidate, so the later Crew-panel hire click would hit an inert button.",
       "expect": {
-        "increased": [
+        "decreased": [
           "worldSizeX"
         ]
       }

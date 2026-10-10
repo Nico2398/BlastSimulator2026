@@ -1782,6 +1782,9 @@ export const NEGOTIATION_MAX_ATTEMPTS_PER_OFFER = 1;
 /** Early-delivery bonus as a fraction of quantity x price (#1366). */
 export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;
 
+/** Missed-deadline penalty as a fraction of quantity x unmultiplied base price. */
+export const CONTRACT_PENALTY_RATE = 0.3;
+
 /** Success-rate bonus per manager management level above 1 (#1340). */
 export const NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL = 0.08;
 
@@ -1839,6 +1842,46 @@ export const ORDER_REACH_CACHE_MAX_KEYS = 64;
  * not make the tutorial unwinnable (or trivially won) again.
  */
 export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 80.0;
+
+/** One fixed hire candidate of a scripted hiring pool (#1600). */
+export interface ScriptedCandidate {
+  id: number;
+  role: EmployeeRole;
+  name: string;
+  unionized: boolean;
+  skillBonus: 0 | 1;
+}
+
+/** Tutorial hiring pool: one fixed candidate per hiring role, ids 1..5 (#1600). */
+export const TUTORIAL_HIRING_SCRIPT: readonly ScriptedCandidate[] = [
+  { id: 1, role: 'driller', name: 'Dale Drillson', unionized: false, skillBonus: 0 },
+  { id: 2, role: 'blaster', name: 'Bea Boomer', unionized: false, skillBonus: 0 },
+  { id: 3, role: 'driver', name: 'Dex Hauler', unionized: false, skillBonus: 0 },
+  { id: 4, role: 'surveyor', name: 'Sue Seismic', unionized: false, skillBonus: 0 },
+  { id: 5, role: 'manager', name: 'Max Manager', unionized: false, skillBonus: 0 },
+];
+
+/** A fixed ore-sale contract offer a level guarantees (#1600). */
+export interface ScriptedOreSaleOffer {
+  materialId: string;
+  quantityKg: number;
+  priceFactor: number;
+  deadlineTicks: number;
+}
+
+/**
+ * Tutorial ore-sale offer (#1600). quantityKg sits below the rustite the scripted
+ * tutorial blast always hauls in: measured in command mode on tutorial-steps-visual
+ * and tutorial-interactive, collectedOre.rustite is 334.375 after the first haul
+ * batch and 687.5 once hauling finishes (tutorial-playthrough: 793.75). 300 kg is
+ * fillable from the first batch and, at 12 * 80 = $960/kg, still ends the level.
+ */
+export const TUTORIAL_ORE_SALE_OFFER: ScriptedOreSaleOffer = {
+  materialId: 'rustite',
+  quantityKg: 300,
+  priceFactor: 1.0,
+  deadlineTicks: 200,
+};
 
 /** Trailing window (ticks) over which operating income per hour is averaged (#1375). */
 export const OPERATING_INCOME_WINDOW_TICKS = 72;

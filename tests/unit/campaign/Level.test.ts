@@ -6,7 +6,7 @@ import { generateTerrain, resolveGeneratedBiome } from '../../../src/core/world/
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
-import { sandboxLevelDef, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
+import { sandboxLevelDef, SANDBOX_DEFAULTS, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
 import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
@@ -405,5 +405,51 @@ describe('fixed weather per level (#1585)', () => {
       if (level.id === 'tutorial_pit') continue;
       expect(level.fixedWeather, level.id).toBeUndefined();
     }
+  });
+});
+
+// ── Scripted tutorial content (#1600) ──
+
+import { resolveHiringScript, resolveScriptedOreSale } from '../../../src/core/campaign/Level.js';
+import { TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER } from '../../../src/core/config/balance.js';
+
+describe('scripted hiring and ore sale (#1600)', () => {
+  it('only tutorial_pit defines hiringScript and scriptedOreSale', () => {
+    for (const level of getAllLevels()) {
+      if (level.id === 'tutorial_pit') {
+        expect(level.hiringScript).toBe(TUTORIAL_HIRING_SCRIPT);
+        expect(level.scriptedOreSale).toBe(TUTORIAL_ORE_SALE_OFFER);
+      } else {
+        expect(level.hiringScript, level.id).toBeUndefined();
+        expect(level.scriptedOreSale, level.id).toBeUndefined();
+      }
+    }
+  });
+
+  it('the sandbox level has neither', () => {
+    const def = sandboxLevelDef(SANDBOX_DEFAULTS);
+    expect(def.hiringScript).toBeUndefined();
+    expect(def.scriptedOreSale).toBeUndefined();
+  });
+
+  it('resolvers return the tutorial data while tutorial_pit is active', () => {
+    const s = createGame({ seed: 1, mineType: 'desert' });
+    s.campaign.activeLevelId = 'tutorial_pit';
+    expect(resolveHiringScript(s)).toBe(TUTORIAL_HIRING_SCRIPT);
+    expect(resolveScriptedOreSale(s)).toBe(TUTORIAL_ORE_SALE_OFFER);
+  });
+
+  it('resolvers return undefined for other levels, the sandbox and no level', () => {
+    for (const id of ['dusty_hollow', SANDBOX_LEVEL_ID, null] as const) {
+      const s = createGame({ seed: 1, mineType: 'desert' });
+      s.campaign.activeLevelId = id;
+      expect(resolveHiringScript(s), String(id)).toBeUndefined();
+      expect(resolveScriptedOreSale(s), String(id)).toBeUndefined();
+    }
+  });
+
+  it('the tutorial script has one candidate per hiring role with unique ids', () => {
+    expect(TUTORIAL_HIRING_SCRIPT.map(c => c.role).sort()).toEqual(['blaster', 'driller', 'driver', 'manager', 'surveyor']);
+    expect(new Set(TUTORIAL_HIRING_SCRIPT.map(c => c.id)).size).toBe(TUTORIAL_HIRING_SCRIPT.length);
   });
 });

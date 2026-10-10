@@ -50,7 +50,7 @@ import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
-import { checkDeadlines, generateContracts } from '../economy/Contract.js';
+import { checkDeadlines, ensureScriptedOreSale, generateContracts } from '../economy/Contract.js';
 import { autoDeliverContracts, bookDeliveryIncome } from '../economy/ContractFulfilment.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
 import {
@@ -61,7 +61,7 @@ import {
 import { isExposed, smugglingIncomeForTick, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
 import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
 import { getOperatingIncomePerHour } from '../economy/OperatingFinance.js';
-import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
+import { resolveContractOres, resolveContractPriceMultiplier, resolveHiringScript, resolveScriptedOreSale } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
@@ -214,11 +214,12 @@ export function runTick(
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
     generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
+    ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
   }
 
   // 4b. Rotate the hiring candidate pool on its interval
   if (isHiringPoolDue(state.hiringPool, state.tickCount)) {
-    refreshHiringPool(state.hiringPool, state.seed, state.tickCount);
+    refreshHiringPool(state.hiringPool, state.seed, state.tickCount, resolveHiringScript(state));
   }
 
   // 5. Smuggling income — a chosen fraction of trailing operating income, read before

@@ -18,6 +18,16 @@ export function tickUntilFresh(run: (cmd: string) => unknown, state: GameState, 
   }
 }
 
+/**
+ * Hires a driver on a level with a scripted hiring pool (#1600): the pool offers one
+ * candidate per role, so a second driver needs the next daily refresh, which restores
+ * the scripted candidate. Ticks one at a time (fatigue refreshed) until one is on offer.
+ */
+export function hireDriver(run: (cmd: string) => unknown, state: GameState): void {
+  tickUntilFresh(run, state, () => state.hiringPool.candidates.some(c => c.role === 'driver'), 100);
+  expect(run('employee hire role:driver')).toMatchObject({ success: true });
+}
+
 /** The 3 tutorial_pit NavGrid cells this file's own direct trace confirmed permanently climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's approach cell, for the (18,10) amount:3 blast below. */
 export const POCKET_CELLS: ReadonlySet<string> = new Set(['18,9', '19,10', '18,10']);
 export function isPocketCell(x: number, z: number): boolean {
@@ -61,7 +71,7 @@ export function drillChargeAndBlast(startX: number, startZ: number, amount: numb
 
 /** Hires an excavator-licensed driver, buys a rock_digger and crews it, so a built ramp actually gets carved. */
 export function crewRockDigger(run: (cmd: string) => unknown, state: GameState): void {
-  expect(run('employee hire role:driver')).toMatchObject({ success: true });
+  hireDriver(run, state);
   const diggerDriver = [...state.employees.employees].reverse().find(e => e.role === 'driver')!;
   expect(run(`employee assign_skill ${diggerDriver.id} skill:driving.excavator level:5`)).toMatchObject({ success: true });
   expect(run('vehicle buy rock_digger')).toMatchObject({ success: true });

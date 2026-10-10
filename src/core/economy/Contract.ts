@@ -2,12 +2,14 @@
 // Contracts define material delivery requirements with deadlines, payments, and penalties.
 
 import { Random } from '../math/Random.js';
+import type { ScriptedOreSaleOffer } from '../config/balance.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
   CONTRACTS_PER_REFRESH,
   MAX_AVAILABLE_CONTRACTS,
   NEGOTIATION_EARLY_BONUS_RATE,
   ORE_PRICES,
+  CONTRACT_PENALTY_RATE,
   RUBBLE_DISPOSAL_PRICE_RANGE,
   SUPPLY_COMMON_ORE_COUNT,
 } from '../config/balance.js';
@@ -140,26 +142,26 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   const rubbleOnly = availableOres.length === 0;
   let type: ContractType;
   let materialId: string;
-  let pricePerKg: number;
+  let basePricePerKg: number;
   let description: string;
 
   if (!rubbleOnly && typeRoll < 0.5) {
     // Ore sale contract
     type = 'ore_sale';
     materialId = rng.pick(availableOres);
-    pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
+    basePricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
     description = `Deliver ${materialId} ore`;
   } else if (rubbleOnly || typeRoll < 0.8) {
     // Rubble disposal
     type = 'rubble_disposal';
     materialId = '';
-    pricePerKg = rng.nextFloat(RUBBLE_DISPOSAL_PRICE_RANGE.min, RUBBLE_DISPOSAL_PRICE_RANGE.max);
+    basePricePerKg = rng.nextFloat(RUBBLE_DISPOSAL_PRICE_RANGE.min, RUBBLE_DISPOSAL_PRICE_RANGE.max);
     description = 'Dispose of rubble';
   } else {
     // Supply contract (recurring, higher quantity, lower price)
     type = 'supply';
     materialId = rng.pick(commonOres(availableOres)); // Only the site's cheapest ores for supply
-    pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
+    basePricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
     description = `Supply ${materialId} (bulk)`;
   }
 
@@ -172,19 +174,27 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   // least able to absorb it — tutorial_pit runs at 16.0, where a single
   // 500kg gloomium contract nobody can fill would fine a $340,000 mine
   // $250,000 for the mistake the tutorial exists to let a player make.
-  const basePricePerKg = pricePerKg;
-  pricePerKg *= priceMultiplier;
 
   const quantityKg = Math.round(rng.nextFloat(50, 500) / 10) * 10;
   const deadlineTicks = rng.nextInt(30, 100);
-  const penaltyAmount = Math.round(quantityKg * basePricePerKg * 0.3);
-  const earlyBonus = computeEarlyBonus(quantityKg, pricePerKg);
+  return buildOffer(state, type, materialId, description, quantityKg, deadlineTicks, basePricePerKg, priceMultiplier);
+}
 
-  const id = state.nextId++;
-
+/**
+ * Shared contract literal for random and scripted offers. The level's market
+ * multiplier scales price and early bonus; the penalty stays on the unmultiplied
+ * base price (see generateOneContract). Consumes one id from `state`.
+ */
+function buildOffer(
+  state: ContractState, type: ContractType, materialId: string, description: string,
+  quantityKg: number, deadlineTicks: number, basePricePerKg: number, priceMultiplier: number,
+): Contract {
+  const pricePerKg = basePricePerKg * priceMultiplier;
   return {
-    id, type, materialId, description, quantityKg, deliveredKg: 0,
-    pricePerKg, deadlineTicks, acceptedAtTick: 0, penaltyAmount, earlyBonus,
+    id: state.nextId++, type, materialId, description, quantityKg, deliveredKg: 0,
+    pricePerKg, deadlineTicks, acceptedAtTick: 0,
+    penaltyAmount: Math.round(quantityKg * basePricePerKg * CONTRACT_PENALTY_RATE),
+    earlyBonus: computeEarlyBonus(quantityKg, pricePerKg),
     completed: false, expired: false,
   };
 }
@@ -470,4 +480,29 @@ export function contractAcceptBlocker(
   hasFreightWarehouse: boolean,
 ): 'needs_freight_warehouse' | null {
   return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
+}
+
+/**
+ * Guarantee the level's scripted ore-sale offer is on the board (#1600).
+ * A match in `available`, `active` or `completedHistory` counts as already
+ * offered: matching history is deliberate, so a sold offer is never re-offered.
+ * Draws no RNG, so seeded unscripted contract streams are unaffected.
+ */
+export function ensureScriptedOreSale(
+  state: ContractState,
+  offer: ScriptedOreSaleOffer | undefined,
+  priceMultiplier: number,
+): void {
+  if (!offer) return;
+  const matches = (c: Contract): boolean =>
+    c.type === 'ore_sale' && c.materialId === offer.materialId
+    && c.quantityKg === offer.quantityKg && c.deadlineTicks === offer.deadlineTicks;
+  if (state.available.some(matches) || state.active.some(matches) || state.completedHistory.some(matches)) return;
+
+  if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
+  state.available.push(buildOffer(
+    state, 'ore_sale', offer.materialId, `Deliver ${offer.materialId} ore`,
+    offer.quantityKg, offer.deadlineTicks,
+    (ORE_BASE_PRICES[offer.materialId] ?? 10) * offer.priceFactor, priceMultiplier,
+  ));
 }

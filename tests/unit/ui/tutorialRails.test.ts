@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TutorialRails } from '../../../src/ui/tutorialRails.js';
 import { ALLOWED_CLASS, HIGHLIGHT_CLASS, DEFAULT_TICK_BUDGET, WORK_GRACE_TICKS } from '../../../src/ui/tutorialGuide.js';
+import { TUTORIAL_HIRING_SCRIPT } from '../../../src/core/config/balance.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
@@ -61,6 +62,7 @@ function hireSurveyor(): HTMLElement {
   panel.id = 'bs-employee-panel';
   const btn = document.createElement('button');
   btn.dataset['role'] = 'surveyor';
+  btn.dataset['candidateId'] = String(TUTORIAL_HIRING_SCRIPT.find(c => c.role === 'surveyor')!.id);
   panel.appendChild(btn);
   document.body.appendChild(panel);
   return withBox(btn);

@@ -6,7 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -64,6 +64,10 @@ export interface LevelDef {
   mixedRockHardness: boolean;
   /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
+  /** Fixed hiring pool; omitted = seeded random candidates (#1600). */
+  hiringScript?: readonly ScriptedCandidate[];
+  /** Fixed ore-sale offer guaranteed on the contract board; omitted = none (#1600). */
+  scriptedOreSale?: ScriptedOreSaleOffer;
 }
 
 // ── Level catalog ──
@@ -76,6 +80,8 @@ const LEVELS: readonly LevelDef[] = [
     // No events. Bonus contracts. Player-proof score decay.
     // ────────────────────────────────────────────────────────
     id: 'tutorial_pit',
+    hiringScript: TUTORIAL_HIRING_SCRIPT,       // Same four hires on every run (#1600)
+    scriptedOreSale: TUTORIAL_ORE_SALE_OFFER,   // sell-ore never waits on the random board (#1600)
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
     fixedWeather: 'sunny',      // Tutorial sky never changes: no rain flooding the scripted blast
     nameKey: 'level.tutorial_pit.name',
@@ -288,4 +294,16 @@ export function resolveAvailableExplosives(activeLevelId: string | null): readon
 /** True when `explosiveId` may be used at the given level. */
 export function isExplosiveAvailable(activeLevelId: string | null, explosiveId: string): boolean {
   return resolveAvailableExplosives(activeLevelId).includes(explosiveId);
+}
+
+/** The active level's scripted hiring pool, or undefined for seeded candidates (#1600). */
+export function resolveHiringScript(state: GameState): readonly ScriptedCandidate[] | undefined {
+  const levelId = state.campaign.activeLevelId;
+  return levelId ? getLevel(levelId)?.hiringScript : undefined;
+}
+
+/** The active level's scripted ore-sale offer, or undefined (#1600). */
+export function resolveScriptedOreSale(state: GameState): ScriptedOreSaleOffer | undefined {
+  const levelId = state.campaign.activeLevelId;
+  return levelId ? getLevel(levelId)?.scriptedOreSale : undefined;
 }

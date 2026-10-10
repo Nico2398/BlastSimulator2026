@@ -243,3 +243,131 @@ describe('hireEmployee with a candidate', () => {
     expect(employee.salary).toBe(calculateSalary(employee));
   });
 });
+
+
+// ── Scripted pools (#1600) ──
+
+import { TUTORIAL_HIRING_SCRIPT, type ScriptedCandidate } from '../../../src/core/config/balance.js';
+
+const sig = (p: HiringPoolState) =>
+  p.candidates.map(c => `${c.id}:${c.name}:${c.unionized ? 'U' : 'N'}:${c.salary}`).join('|');
+
+/** Captured from the pre-#1600 implementation: unscripted pools must not change. */
+const UNSCRIPTED_GOLDEN = [
+  { seed: 42, tick: 0, created: '1:Nick Rubble:N:600|2:Earl Stoneface:U:600|3:Tony Miner:U:600|4:Pete Crater:U:820|5:Otto Pickaxe:U:820|6:Stan Diggins:N:920|7:Chuck Rockwell:N:500|8:Bob Rockwell:N:500|9:Stan Crater:N:570|10:Mike Hardhat:U:650|11:Frank Crater:N:650|12:Lars Gravel:U:720|13:Otto Dynamite:N:1050|14:Chuck Pitman:N:1050|15:Dave McBoom:U:1050',
+    refreshed: '16:Rick Slagheap:N:600|17:Lars Boulder:N:600|18:Hank Dynamite:N:600|19:Lars Quartzman:U:820|20:Ivan Slagheap:U:920|21:Lars Pitman:N:920|22:Nick Rubble:N:570|23:Rick Gravel:N:570|24:Tony Rockwell:N:500|25:Lars Hardhat:U:720|26:Frank Bedrock:U:650|27:Otto Bedrock:U:650|28:Dave Miner:U:1120|29:Jake Gravel:N:1120|30:Chuck Dynamite:N:1120', nextId: 31 },
+  { seed: 42, tick: 24, created: '1:Dave Blaster:U:600|2:Mike Bedrock:U:670|3:Gus Blaster:U:600|4:Mike Boulder:N:820|5:Ivan Pickaxe:N:920|6:Pete Quartzman:U:920|7:Kurt Dusty:N:500|8:Earl Dusty:U:570|9:Mike Drillbit:N:500|10:Rick McBoom:N:650|11:Mike Crater:N:650|12:Kurt Boulder:U:720|13:Tony Diggins:N:1120|14:Vic Slagheap:N:1050|15:Tony Pickaxe:N:1050',
+    refreshed: '16:Frank Dynamite:U:600|17:Frank Hardhat:N:600|18:Bob McBoom:N:600|19:Earl Miner:U:820|20:Kurt Shale:N:820|21:Dave Hardhat:U:920|22:Hank Dusty:N:500|23:Frank Crater:N:500|24:Lars Rubble:U:500|25:Frank Blaster:U:650|26:Lars Drillbit:U:650|27:Jake Shale:N:650|28:Bob Pickaxe:N:1050|29:Pete Pickaxe:N:1050|30:Jake Rubble:N:1050', nextId: 31 },
+  { seed: 7, tick: 0, created: '1:Bob Diggins:N:600|2:Lars Rubble:N:670|3:Pete Dusty:U:600|4:Lars Rockwell:N:920|5:Gus Drillbit:U:820|6:Earl McBoom:U:920|7:Rick Diggins:N:500|8:Nick Dynamite:N:500|9:Vic Slagheap:U:570|10:Jake Blaster:U:650|11:Ivan Rubble:N:650|12:Pete Dynamite:N:650|13:Dave McBoom:N:1120|14:Nick Crater:U:1050|15:Vic Stoneface:N:1050',
+    refreshed: '16:Nick Diggins:N:600|17:Lars Dynamite:N:600|18:Bob Hardhat:U:670|19:Frank Stoneface:N:820|20:Gus Shale:N:820|21:Dave Hardhat:N:820|22:Nick Dynamite:U:500|23:Walt Gravel:U:500|24:Dave Blaster:N:500|25:Frank Crater:N:650|26:Lars McBoom:U:720|27:Hank Quartzman:U:720|28:Bob Pickaxe:N:1120|29:Tony Pitman:N:1050|30:Frank Blaster:U:1120', nextId: 31 },
+  { seed: 7, tick: 24, created: '1:Otto Slagheap:N:670|2:Hank Diggins:N:600|3:Otto Crater:N:600|4:Jake Shale:U:820|5:Rick Slagheap:U:820|6:Stan Quartzman:N:820|7:Otto Pickaxe:U:570|8:Pete Dusty:U:500|9:Nick Drillbit:N:500|10:Tony Crater:N:650|11:Chuck Slagheap:U:650|12:Bob Rubble:N:650|13:Otto Slagheap:N:1050|14:Dave Drillbit:N:1050|15:Stan Dusty:N:1050',
+    refreshed: '16:Rick Rockwell:N:600|17:Kurt Rockwell:U:600|18:Hank Rubble:N:600|19:Lars Stoneface:N:820|20:Walt Miner:N:820|21:Pete McBoom:N:820|22:Chuck Blaster:U:500|23:Dave Bedrock:U:500|24:Earl Dusty:N:570|25:Frank Miner:N:720|26:Stan Boulder:N:650|27:Dave Bedrock:N:720|28:Frank Rubble:N:1050|29:Gus Gravel:U:1120|30:Frank Hardhat:U:1050', nextId: 31 },
+];
+
+describe('scripted hiring pool (#1600)', () => {
+  it('createHiringPool with a script offers exactly one candidate per role with the scripted ids and names', () => {
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    expect(pool.candidates).toHaveLength(ROLES.length);
+    for (const role of ROLES) expect(candidatesForRole(pool, role)).toHaveLength(1);
+    for (const s of TUTORIAL_HIRING_SCRIPT) {
+      const c = pool.candidates.find(x => x.id === s.id)!;
+      expect(c).toBeDefined();
+      expect(c.role).toBe(s.role);
+      expect(c.name).toBe(s.name);
+      expect(c.unionized).toBe(false);
+    }
+  });
+
+  it('scripted candidates carry the role starting qualifications and a salary matching calculateSalary', () => {
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    expect(pool.candidates).toHaveLength(TUTORIAL_HIRING_SCRIPT.length);
+    for (const c of pool.candidates) {
+      const cats = c.qualifications.map(q => q.category);
+      expect(cats).toEqual(ROLE_STARTING_QUALIFICATIONS[c.role].map(q => q.category));
+      expect(c.salary).toBe(calculateSalary({ role: c.role, qualifications: c.qualifications, raises: 0 }));
+    }
+  });
+
+  it('is deep-equal across seeds and ticks', () => {
+    const base = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    for (const [seed, tick] of [[42, 24], [7, 0], [7, 137], [999, 5000]] as const) {
+      expect(createHiringPool(seed, tick, TUTORIAL_HIRING_SCRIPT).candidates).toEqual(base.candidates);
+    }
+  });
+
+  it('skillBonus 1 raises only the primary qualification by one level and the salary follows', () => {
+    const pool = createHiringPool(1, 0, [{ id: 1, role: 'blaster', name: 'Bo Nus', unionized: false, skillBonus: 1 }]);
+    const c = pool.candidates[0]!;
+    const base = ROLE_STARTING_QUALIFICATIONS.blaster[0]!;
+    expect(c.qualifications[0]!.proficiencyLevel).toBe(base.proficiencyLevel + 1);
+    expect(c.salary).toBe(calculateSalary({ role: 'blaster', qualifications: c.qualifications, raises: 0 }));
+  });
+
+  it('a scripted bonus never lifts the primary qualification above level 5', () => {
+    // skillBonus is typed 0 | 1; the cast forces an over-cap sum to exercise the clamp.
+    const pool = createHiringPool(1, 0, [{ id: 1, role: 'blaster', name: 'Max Out', unionized: false, skillBonus: 9 as 1 }]);
+    expect(pool.candidates[0]!.qualifications[0]!.proficiencyLevel).toBe(5);
+  });
+
+  it('next candidate id follows the scripted ids', () => {
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    expect(pool.candidates.map(c => c.id)).toEqual(TUTORIAL_HIRING_SCRIPT.map(s => s.id));
+    expect(pool.nextCandidateId).toBeGreaterThan(Math.max(...TUTORIAL_HIRING_SCRIPT.map(s => s.id)));
+  });
+
+  it('refresh with a script leaves the content identical, whatever seed, tick or nextCandidateId', () => {
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    const before = structuredClone(pool.candidates);
+    refreshHiringPool(pool, 42, 24, TUTORIAL_HIRING_SCRIPT);
+    expect(pool.candidates).toEqual(before);
+    pool.nextCandidateId = 500;
+    refreshHiringPool(pool, 7, 4800, TUTORIAL_HIRING_SCRIPT);
+    expect(pool.candidates).toEqual(before);
+    expect(pool.lastRefreshTick).toBe(4800);
+  });
+
+  it('refresh restores a taken candidate with the same id', () => {
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    const before = structuredClone(pool.candidates);
+    const taken = takeCandidate(pool, 'surveyor')!;
+    expect(candidatesForRole(pool, 'surveyor')).toHaveLength(0);
+    refreshHiringPool(pool, 42, 24, TUTORIAL_HIRING_SCRIPT);
+    expect(candidatesForRole(pool, 'surveyor')).toEqual([taken]);
+    expect(pool.candidates).toEqual(before);
+  });
+
+  it('hiring the same scripted candidate at different times gives identical employees', () => {
+    const a = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    const b = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    refreshHiringPool(b, 42, 24 * 7, TUTORIAL_HIRING_SCRIPT);
+    for (const role of ROLES) {
+      const ea = hireFrom(role, candidatesForRole(a, role)[0]!, 1);
+      const eb = hireFrom(role, candidatesForRole(b, role)[0]!, 99);
+      expect([ea.name, ea.unionized, ea.salary, ea.qualifications]).toEqual([eb.name, eb.unionized, eb.salary, eb.qualifications]);
+    }
+  });
+
+  it('an empty script yields an empty pool', () => {
+    const empty: readonly ScriptedCandidate[] = [];
+    const pool = createHiringPool(42, 0, empty);
+    expect(pool.candidates).toEqual([]);
+    refreshHiringPool(pool, 42, 24, empty);
+    expect(pool.candidates).toEqual([]);
+  });
+});
+
+describe('unscripted hiring pool is unchanged (#1600)', () => {
+  for (const g of UNSCRIPTED_GOLDEN) {
+    it(`seed ${g.seed} tick ${g.tick}: create and refresh match the pre-script output`, () => {
+      const pool = createHiringPool(g.seed, g.tick);
+      expect(sig(pool)).toBe(g.created);
+      refreshHiringPool(pool, g.seed, g.tick + 24);
+      expect(sig(pool)).toBe(g.refreshed);
+      expect(pool.nextCandidateId).toBe(g.nextId);
+    });
+  }
+
+  it('explicit undefined script behaves like no script', () => {
+    expect(createHiringPool(42, 0, undefined)).toEqual(createHiringPool(42, 0));
+  });
+});

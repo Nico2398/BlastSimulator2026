@@ -29,6 +29,7 @@ import {
   isPocketCell,
   drillChargeAndBlast,
   crewRockDigger,
+  hireDriver,
 } from '../helpers/blastFixtures.js';
 
 /**
@@ -40,7 +41,7 @@ import {
  * builds at.
  */
 function crewHaulingAndBuildDepot(run: (cmd: string) => unknown, state: GameState): void {
-  expect(run('employee hire role:driver')).toMatchObject({ success: true });
+  hireDriver(run, state);
   const fragmenterDriver = [...state.employees.employees].reverse().find(e => e.role === 'driver')!;
   expect(run(`employee assign_skill ${fragmenterDriver.id} skill:driving.rock_fragmenter level:5`)).toMatchObject({ success: true });
   expect(run('vehicle buy rock_fragmenter')).toMatchObject({ success: true });
@@ -49,7 +50,7 @@ function crewHaulingAndBuildDepot(run: (cmd: string) => unknown, state: GameStat
 
   tickUntilFresh(run, state, () => false, 5); // let the rock_fragmenter driver board and clear its spawn tile
 
-  expect(run('employee hire role:driver')).toMatchObject({ success: true });
+  hireDriver(run, state);
   const haulerDriver = [...state.employees.employees].reverse().find(e => e.role === 'driver' && e.id !== fragmenterDriver.id)!;
   expect(run('vehicle buy debris_hauler')).toMatchObject({ success: true });
   const debrisHauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
