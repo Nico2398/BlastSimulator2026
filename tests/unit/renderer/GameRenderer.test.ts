@@ -969,3 +969,169 @@ describe('GameRenderer — ghost/terrain resync dirty-check gating (#761)', () =
     syncSpy.mockRestore();
   });
 });
+
+// ── blast playback clock (#1590) ───────────────────────────────────────────
+// The blast report opens on rendered playback time: the same capped-dt clock
+// that advances the collapse animation, reset at every onBlast.
+
+function longBlastCtx() {
+  const ctx = makeCtx();
+  ctx.lastBlastFlights = [{
+    fragmentId: 0,
+    from: { x: 10, y: 20, z: 10 },
+    to: { x: 10, y: 0, z: 10 },
+    delayS: 0,
+    durationS: 5,
+    impactSpeed: 10,
+    thrown: false,
+  }];
+  ctx.lastBlastFragmentData = [{
+    id: 0,
+    position: { x: 10, y: 0, z: 10 },
+    volume: 0.5,
+    mass: 1000,
+    rockId: 'sandite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+    shapeSeed: 3,
+    origin: { x: 10, y: 0, z: 10 },
+  }];
+  return ctx;
+}
+
+describe('GameRenderer — blast playback clock (#1590)', () => {
+  it('is idle before any blast', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(makeCtx());
+    expect(renderer.blastPlayback).toEqual({ elapsedS: 0, durationS: 0, isPlaying: false });
+    expect(renderer.blastPlaybackElapsedS).toBe(0);
+  });
+
+  it('onBlast starts playback at elapsed 0 with the animator duration, playing', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+
+    const p = renderer.blastPlayback;
+    expect(p.elapsedS).toBe(0);
+    expect(p.durationS).toBeGreaterThan(0);
+    expect(p.durationS).toBe(renderer.fragmentPlaybackDuration);
+    expect(p.isPlaying).toBe(true);
+  });
+
+  it('update(dt) advances the clock by exactly dt per frame', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+
+    renderer.update(0.1);
+    renderer.update(0.1);
+    renderer.update(0.05);
+
+    expect(renderer.blastPlaybackElapsedS).toBeCloseTo(0.25, 10);
+    expect(renderer.blastPlayback.elapsedS).toBeCloseTo(0.25, 10);
+  });
+
+  it('ignores NaN, zero and negative dt', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+    renderer.update(0.1);
+
+    renderer.update(Number.NaN);
+    renderer.update(0);
+    renderer.update(-1);
+
+    expect(renderer.blastPlaybackElapsedS).toBeCloseTo(0.1, 10);
+  });
+
+  it('keeps advancing after the collapse ends, even with no flights at all (headless blast)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.lastBlastFlights = [];
+    ctx.lastBlastFragmentData = [];
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+
+    expect(renderer.blastPlayback.isPlaying).toBe(false);
+    for (let i = 0; i < 30; i++) renderer.update(0.1);
+
+    expect(renderer.blastPlaybackElapsedS).toBeCloseTo(3, 6);
+    expect(renderer.blastPlayback).toMatchObject({ durationS: 0, isPlaying: false });
+  });
+
+  it('stops playing once the collapse has run its duration, with elapsed >= duration', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+    const duration = renderer.fragmentPlaybackDuration;
+
+    for (let i = 0; i < Math.ceil(duration / 0.1) + 2; i++) renderer.update(0.1);
+
+    expect(renderer.blastPlayback.isPlaying).toBe(false);
+    expect(renderer.blastPlayback.elapsedS).toBeGreaterThanOrEqual(duration);
+  });
+
+  it('a second blast resets the clock to 0', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+    for (let i = 0; i < 20; i++) renderer.update(0.1);
+    expect(renderer.blastPlaybackElapsedS).toBeGreaterThan(1);
+
+    renderer.onBlast(ctx);
+
+    expect(renderer.blastPlaybackElapsedS).toBe(0);
+    expect(renderer.blastPlayback.isPlaying).toBe(true);
+  });
+
+  it('the early-return path (no terrain/grid) still resets the clock and the duration, never reusing a stale blast', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+    for (let i = 0; i < 5; i++) renderer.update(0.1);
+    expect(renderer.fragmentPlaybackDuration).toBeGreaterThan(0);
+    expect(renderer.blastPlaybackElapsedS).toBeGreaterThan(0);
+
+    (renderer as any).terrain = null; // terrain/grid unavailable -> onBlast early-returns
+    renderer.onBlast(ctx);
+
+    expect(renderer.fragmentPlaybackDuration).toBe(0);
+    expect(renderer.blastPlaybackElapsedS).toBe(0);
+    expect(renderer.blastPlayback).toEqual({ elapsedS: 0, durationS: 0, isPlaying: false });
+  });
+
+  it('skipFragmentPlayback makes isPlaying false', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+    expect(renderer.blastPlayback.isPlaying).toBe(true);
+
+    renderer.skipFragmentPlayback();
+
+    expect(renderer.blastPlayback.isPlaying).toBe(false);
+  });
+
+  it('seekFragmentPlayback mid-collapse keeps isPlaying true; seeking to the duration makes it false', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    renderer.onBlast(ctx);
+    const duration = renderer.fragmentPlaybackDuration;
+
+    renderer.seekFragmentPlayback(duration / 2);
+    expect(renderer.blastPlayback.isPlaying).toBe(true);
+
+    renderer.seekFragmentPlayback(duration);
+    expect(renderer.blastPlayback.isPlaying).toBe(false);
+  });
+});
