@@ -18,7 +18,7 @@
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -132,9 +132,8 @@ export class CrewPanel extends PanelBase {
       .filter(e => e.alive)
       .map(e => {
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
-        const activity = computeEmployeeActivity(e, state.vehicles);
-        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${injuryHoursRemaining(e) ?? ''}:${e.collapsing ? 1 : 0}`
-          + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
+        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
+          + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
       .join('|');
     const schools = state.buildings.buildings.map(b => `${b.type}${b.tier}`).sort().join(',');
@@ -163,6 +162,8 @@ export class CrewPanel extends PanelBase {
       if (fill) fill.style.background = color;
       if (value) { value.textContent = `${Math.round(e.morale)}%`; value.style.color = color; }
 
+      row.querySelector('.bs-crew-status')?.replaceWith(this.makeStatusTags(e, state));
+
       if (e.id !== this.expandedId) continue;
       const detail = row.querySelector<HTMLElement>('.bs-crew-detail');
       if (!detail) continue;
@@ -185,11 +186,11 @@ export class CrewPanel extends PanelBase {
     // className hook: this inner div, not bodyEl, is now the roster's real
     // scrolling container (overflow-y:auto lives here per scrollBoundedSection),
     // so scenario coverage needs a stable selector for it (#964 CI fix).
-    this.bodyEl.replaceChildren(
-      scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll' }),
+    replaceChildrenKeepingScroll(this.bodyEl, [
+      scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll', scrollKey: 'roster' }),
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`)),
-    );
+    ]);
   }
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
@@ -208,7 +209,7 @@ export class CrewPanel extends PanelBase {
     toggle.addEventListener('click', () => {
       this.expandedId = expanded ? null : e.id;
       this.lastSignature = '';
-      this.update(state);
+      if (this.lastState) this.update(this.lastState);
     });
 
     const avatar = el('div', { text: getInitials(e.name), attrs: { style: `width:30px;height:30px;flex:0 0 30px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${roleColorHex(e.role)};color:#12161c;font:800 11px/1 var(--bsx-font-ui)` } });
@@ -260,7 +261,7 @@ export class CrewPanel extends PanelBase {
 
   private makeStatusTags(e: Employee, state: GameState): HTMLElement {
     const activity = computeEmployeeActivity(e, state.vehicles);
-    const wrap = el('div', { attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
+    const wrap = el('div', { className: 'bs-crew-status', attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
     const tags: Array<{ icon: Parameters<typeof iconEl>[0]; color: string; tip: string }> = [];
     if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union') });
     if (e.injured) tags.push({ icon: 'injured', color: 'var(--bsx-critical-text)', tip: t('ui.crew.injured_back_in', { hours: injuryHoursRemaining(e) ?? 0 }) });

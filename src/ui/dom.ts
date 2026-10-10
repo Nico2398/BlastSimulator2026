@@ -202,6 +202,7 @@ export function scrollBoundedSection(
   opts?: ScrollBoundedSectionOptions,
 ): HTMLElement {
   const section = opts?.className ? el('div', { className: opts.className, children }) : el('div', { children });
+  if (opts?.scrollKey) section.dataset['scrollKey'] = opts.scrollKey;
   section.style.cssText = [
     'overflow-y:auto', `max-height:${maxHeightPx}px`, 'flex-shrink:0',
     'display:flex', 'flex-direction:column', `gap:${opts?.gap ?? 8}px`,
@@ -216,8 +217,51 @@ export function scrollBoundedSection(
  * values of `[data-preserve-key]` inputs (clamped to the new max).
  */
 export function replaceChildrenKeepingScroll(host: HTMLElement, next: (Node | null | undefined)[]): void {
-  // TODO: implement
+  const hidden = isHostHidden(host);
+  const offsets = new Map<string, number>();
+  const edits = new Map<string, { value: string; focused: boolean; start: number | null; end: number | null }>();
+  if (!hidden) {
+    for (const n of scrollKeyed(host)) offsets.set(n.dataset['scrollKey'] ?? '', n.scrollTop);
+  }
+  const active = host.ownerDocument.activeElement;
+  for (const input of Array.from(host.querySelectorAll<HTMLInputElement>('input[data-preserve-key]'))) {
+    if (input.value === input.defaultValue && active !== input) continue;
+    edits.set(input.dataset['preserveKey'] ?? '', {
+      value: input.value, focused: active === input, start: input.selectionStart, end: input.selectionEnd,
+    });
+  }
+
   host.replaceChildren(...next.filter((n): n is Node => n != null));
+
+  for (const n of scrollKeyed(host)) {
+    const top = offsets.get(n.dataset['scrollKey'] ?? '');
+    if (top !== undefined) n.scrollTop = top;
+  }
+  for (const input of Array.from(host.querySelectorAll<HTMLInputElement>('input[data-preserve-key]'))) {
+    const saved = edits.get(input.dataset['preserveKey'] ?? '');
+    if (!saved) continue;
+    const max = input.max === '' ? NaN : Number(input.max);
+    const num = Number(saved.value);
+    input.value = saved.value !== '' && Number.isFinite(max) && Number.isFinite(num) && num > max ? String(max) : saved.value;
+    if (saved.focused) {
+      input.focus();
+      try { input.setSelectionRange(saved.start, saved.end); } catch { /* number inputs have no selection range */ }
+    }
+  }
+}
+
+/** Keyed scroll containers at or under `host`. */
+function scrollKeyed(host: HTMLElement): HTMLElement[] {
+  const found = Array.from(host.querySelectorAll<HTMLElement>('[data-scroll-key]'));
+  return host.dataset['scrollKey'] !== undefined ? [host, ...found] : found;
+}
+
+/** True when `host` or an ancestor is display:none — scrollTop reads 0 there and would clobber the saved offset. */
+function isHostHidden(host: HTMLElement): boolean {
+  for (let n: HTMLElement | null = host; n; n = n.parentElement) {
+    if (n.style.display === 'none') return true;
+  }
+  return false;
 }
 
 // ── Panel chrome ──

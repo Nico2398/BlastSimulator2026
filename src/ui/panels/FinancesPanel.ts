@@ -21,7 +21,7 @@
 import { PanelBase } from './PanelBase.js';
 import { t, getLocale } from '../../core/i18n/I18n.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
@@ -65,7 +65,6 @@ export class FinancesPanel extends PanelBase {
       txCount: state.finances.transactions.length,
       belowThreshold: state.bankruptcy.ticksBelowThreshold,
       bankrupt: state.bankruptcy.bankrupt,
-      tick: state.tickCount,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -87,9 +86,9 @@ export class FinancesPanel extends PanelBase {
       sectionHeader(t('ui.finances.expenses')),
       ...this.makeCategoryRows(report.expensesByCategory, report.totalExpenses, 'var(--bsx-critical-text)', t('ui.finances.none_expenses')),
       sectionHeader(t('ui.finances.ledger')),
-      scrollBoundedSection(this.makeLedger(state), 200, { gap: 10 }),
+      scrollBoundedSection(this.makeLedger(state), 200, { gap: 10, scrollKey: 'ledger' }),
     ];
-    this.bodyEl.replaceChildren(...sections);
+    replaceChildrenKeepingScroll(this.bodyEl, sections);
   }
 
   // ── Balance ──
