@@ -510,7 +510,9 @@ body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearanc
    the guide is inert from its first frame rather than briefly live.
    The coach card's one button (Exit tutorial, #1332) and the Settings session
    controls are exempted by tutorialRails.ts's permanently-allowed list, which
-   marks them allowed; there is no Skip and no Next. */
+   marks them allowed; there is no Skip and no Next.
+   Keep this selector list in sync with RAILED_CONTROL_SELECTOR in tutorialActivationGuard.ts,
+   which closes the keyboard path the pointer-events rule cannot. */
 body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided input:not(.bs-tutorial-allowed),

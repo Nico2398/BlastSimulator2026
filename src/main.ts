@@ -15,6 +15,7 @@ import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { shouldAutoStartTutorial, shouldKeepTutorialRunning, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
 import { probeTutorialState } from './ui/tutorialStateProbe.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
+import { isControlLive } from './ui/tutorialActivationGuard.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { WorldMap } from './ui/screens/WorldMap.js';
 import { LevelEndScreen } from './ui/screens/LevelEndScreen.js';
@@ -1219,7 +1220,7 @@ new KeyboardShortcuts({
   // its click handler is the other path into the same preference, and the
   // two must never disagree the next time the panel opens.
   onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
-}, { isSuppressed: fullScreenMenuUp });
+}, { isSuppressed: fullScreenMenuUp, isControlLive: (selector) => isControlLive(selector) });
 
 // --- Render loop + game tick timer ---
 // The game ticks at BASE_TICK_MS intervals, adjusted for time scale.

@@ -36,6 +36,15 @@ interface ShortcutOptions {
   isControlLive?: (selector: string) => boolean;
 }
 
+/** On-screen control each shortcut drives, so a rail on the control also holds the key. */
+const SHORTCUT_CONTROLS: Readonly<Record<string, string>> = {
+  Space: 'button[data-action="pause-toggle"]',
+  Digit1: 'button[data-speed="1"]',
+  Digit2: 'button[data-speed="2"]',
+  Digit3: 'button[data-speed="4"]',
+  Digit4: 'button[data-speed="8"]',
+};
+
 export class KeyboardShortcuts {
   private readonly handler: (e: KeyboardEvent) => void;
   private enabled = true;
@@ -49,6 +58,12 @@ export class KeyboardShortcuts {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (this.options.isSuppressed?.() && e.code !== 'Escape') return;
+
+      const control = SHORTCUT_CONTROLS[e.code];
+      if (control !== undefined && this.options.isControlLive?.(control) === false) {
+        if (e.code === 'Space') e.preventDefault();
+        return;
+      }
 
       switch (e.code) {
         case 'Space':
