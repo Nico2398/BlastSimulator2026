@@ -31,6 +31,7 @@ interface TutorialSnapshot {
   total: number;
   clockHeld: boolean;
   stageIndex: number;
+  stageTarget: string | null;
 }
 
 /** Wall-clock ms a held tutorial clock may show no progress before the wait fails. */
@@ -44,17 +45,23 @@ export interface HeldStallSample {
 
 /** Pure stall rule: tracks how long the clock has been held with no step, stage or tick progress. */
 export function nextHeldStallState(
-  _prev: HeldStallSample | null,
-  _cur: HeldStallSample & { clockHeld: boolean },
-  _nowMs: number,
-  _heldSinceMs: number | null,
+  prev: HeldStallSample | null,
+  cur: HeldStallSample & { clockHeld: boolean },
+  nowMs: number,
+  heldSinceMs: number | null,
 ): { heldSinceMs: number | null; stalled: boolean } {
-  return { heldSinceMs: null, stalled: false };
+  if (!cur.clockHeld) return { heldSinceMs: null, stalled: false };
+  const progressed = prev === null
+    || prev.stepId !== cur.stepId || prev.stageIndex !== cur.stageIndex || prev.tick !== cur.tick;
+  if (heldSinceMs === null || progressed) return { heldSinceMs: nowMs, stalled: false };
+  return { heldSinceMs, stalled: nowMs - heldSinceMs >= HELD_STALL_FAIL_AFTER_MS };
 }
 
 /** Flip the tutorial overlay between the real-time clock and the scenario's deterministic one. */
-export async function setTutorialRealClock(_page: Page, _enabled: boolean): Promise<void> {
-  // TODO: implement
+export async function setTutorialRealClock(page: Page, enabled: boolean): Promise<void> {
+  await page.evaluate((e: boolean) => (window as unknown as {
+    __setTutorialClockFollowsTimer: (enabled: boolean) => void;
+  }).__setTutorialClockFollowsTimer(e), enabled);
 }
 
 export class InteractionFailure extends Error {
@@ -438,17 +445,40 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
     case 'awaitTutorialStep': {
       const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
       const deadline = Date.now() + (action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-      // Drive the real rAF-driven, isPaused-gated clock for the duration of this
-      // wait only — the same mechanism a real player's browser uses — so that
-      // gates like decideClock's hold/unhold logic are genuinely exercised
-      // instead of bypassed by a scripted tick. Always restored on the way out
-      // so every other scripted action keeps the deterministic scenarioMode clock.
+      // Drive the page's rAF tick loop for the duration of this wait only, and
+      // restore it on the way out so every other scripted action keeps the
+      // deterministic scenarioMode clock. The guide clock (decideClock hold/
+      // release) follows that loop only when the scenario opted in via
+      // `realTutorialClock`; otherwise scenario mode does not follow the clock
+      // and this wait only drives the rAF tick loop. With the opt-in, a clock
+      // held with no step/stage/tick progress for HELD_STALL_FAIL_AFTER_MS is
+      // a stall a real player could not get past.
       await setAutoTick(page, true);
       try {
         let seen: TutorialSnapshot | null = null;
+        let prevSample: HeldStallSample | null = null;
+        let heldSince: number | null = null;
         for (;;) {
           seen = await tutorialState(page);
           if (seen.stepId !== null && wanted.includes(seen.stepId)) break;
+          if (seen.clockHeld && seen.stepId !== null) {
+            const tick = Number((await gameState(page))['tickCount'] ?? 0);
+            const cur = { stepId: seen.stepId, stageIndex: seen.stageIndex, tick, clockHeld: true };
+            const next = nextHeldStallState(prevSample, cur, Date.now(), heldSince);
+            heldSince = next.heldSinceMs;
+            prevSample = cur;
+            if (next.stalled) {
+              throw new InteractionFailure(
+                `tutorial clock held and not advancing on "${seen.stepId}" (stage ${seen.stageIndex}, live control`
+                + ` ${seen.stageTarget ?? 'none'}) while waiting for ${wanted.map(s => `"${s}"`).join(' or ')}`
+                + ' — a real player could not advance past this',
+                describeAvailable(await probe(page)),
+              );
+            }
+          } else {
+            heldSince = null;
+            prevSample = null;
+          }
           if (Date.now() > deadline) {
             throw new InteractionFailure(
               `tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`

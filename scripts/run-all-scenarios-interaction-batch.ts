@@ -28,7 +28,7 @@ import {
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
 import { describeStepFailure } from './scenario-interaction-runner.js';
-import { checkGoal, gameState } from './shared/interaction-driver.js';
+import { checkGoal, gameState, setTutorialRealClock } from './shared/interaction-driver.js';
 import { stateIfInteractionOnlyStepMoot } from './shared/interaction-level-skip.js';
 import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 import { buildScenarioLoadFailure, logBatchProgress } from './run-all-scenarios-result.js';
@@ -95,6 +95,7 @@ export async function runBatchInteraction(
         // pixels: every step drives the DOM and reads __gameState. Without
         // this each of those CDP calls waits on a multi-second frame (#475).
         await suspendDrawing(page);
+        if (def.realTutorialClock) await setTutorialRealClock(page, true);
 
         let failed = false;
         let errorMsg = '';

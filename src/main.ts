@@ -783,7 +783,7 @@ window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 // for a mode that wants to flip it after load.
 let autoTickEnabled = !scenarioMode;
 window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
-window.__setTutorialClockFollowsTimer = (_enabled: boolean) => { /* TODO: implement */ };
+window.__setTutorialClockFollowsTimer = (enabled: boolean) => tutorial.setClockFollowsTimer(enabled);
 
 // Drawing control for the browser-driven harnesses (#475). They need pixels
 // only at a screenshot, but every CDP call they make waits on the render

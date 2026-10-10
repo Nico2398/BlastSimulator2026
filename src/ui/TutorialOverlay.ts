@@ -423,7 +423,7 @@ export class TutorialOverlay {
     }
   }
 
-  /** One pass: check completion, move the rails, hold or release the clock. With clockFollowsTimer false it only refreshes presentation. */
+  /** One pass: check completion, move the rails, hold or release the clock. With clockFollowsTimer false (scenario mode, until a scenario opts in via setClockFollowsTimer) it only refreshes presentation. */
   private tickGuide(): void {
     if (!this._active || !this.gameState) return;
 
@@ -452,8 +452,9 @@ export class TutorialOverlay {
   }
 
   /** Switch the real-time guide pass (clock hold/release) on or off after construction. */
-  setClockFollowsTimer(_enabled: boolean): void {
-    // TODO: implement
+  setClockFollowsTimer(enabled: boolean): void {
+    this.clockFollowsTimer = enabled;
+    if (this._active) this.refreshGuide();
   }
 
   /** Rails (inert controls) only apply while the current step is guided (#1328). */

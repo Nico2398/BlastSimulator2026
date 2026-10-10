@@ -834,6 +834,7 @@ export async function executeActionOnPage(
     case 'set':
     case 'clickLabel':
     case 'awaitUsable':
+    case 'awaitTutorialStep':
     case 'zoomOut':
     case 'focusTile':
     case 'clickEntity':
@@ -989,10 +990,6 @@ export async function executeActionOnPage(
       if (active !== action.step) {
         await waitUsableAndClick(page, `#bs-blast-panel [data-step="${action.step}"]`, action.timeout ?? 10000);
       }
-      break;
-    }
-    case 'awaitTutorialStep': {
-      // TODO: implement
       break;
     }
     default: {

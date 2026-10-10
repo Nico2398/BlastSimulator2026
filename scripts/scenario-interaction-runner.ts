@@ -28,7 +28,7 @@ import {
   suspendDrawing,
   forceRenderFrame,
 } from './shared/puppeteer-utils.js';
-import { checkGoal, gameState, InteractionFailure } from './shared/interaction-driver.js';
+import { checkGoal, gameState, InteractionFailure, setTutorialRealClock } from './shared/interaction-driver.js';
 import { stateIfInteractionOnlyStepMoot } from './shared/interaction-level-skip.js';
 import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 
@@ -203,6 +203,9 @@ export async function runScenarioInteraction(
   // caller that forgets to thread it fails to compile instead of silently
   // observing playback.
   skipBlastPlayback: boolean,
+  // ScenarioDef.realTutorialClock ?? false: the tutorial guide clock follows
+  // the real timer, as for a player (#1598).
+  realTutorialClock = false,
 ): Promise<StepResult[]> {
   const outDir = resolve(screenshotDir, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
@@ -218,6 +221,7 @@ export async function runScenarioInteraction(
   // need pixels, and captureFrame draws its own. Without this every CDP call
   // waits on a multi-second frame (#475).
   await suspendDrawing(page);
+  if (realTutorialClock) await setTutorialRealClock(page, true);
 
   try {
     for (let i = 0; i < steps.length; i++) {
