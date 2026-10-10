@@ -244,7 +244,7 @@
     {
       "command": "build living_quarters at:8,15",
       "timeout": 30,
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (8,18) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (2,12) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
       "role": "player",
       "interaction": [
         {
@@ -306,7 +306,7 @@
     {
       "command": "wait_until field:buildingCount equals:2 max_ticks:300",
       "timeout": 95,
-      "description": "#556/#816: build-living-quarters complete (#1574: buildingCount 2 -- the level's free opening spoil heap plus the living_quarters) -- the driller or surveyor (both idle, no skill required for place_building) walks to (8,15) and builds the tier-1 living_quarters over its ~40-tick base duration. Waits on buildingCount itself rather than waitForTutorialStep, matching the drill-plan/charge waits below -- the tutorial card only flips to 'set-early-policy' once the building genuinely exists. #1170: pin moved west of the box-cut corridor alongside driving_center (6,15) and freight_warehouse (8,18) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
+      "description": "#556/#816: build-living-quarters complete (#1574: buildingCount 2 -- the level's free opening spoil heap plus the living_quarters) -- the driller or surveyor (both idle, no skill required for place_building) walks to (8,15) and builds the tier-1 living_quarters over its ~40-tick base duration. Waits on buildingCount itself rather than waitForTutorialStep, matching the drill-plan/charge waits below -- the tutorial card only flips to 'set-early-policy' once the building genuinely exists. #1170: pin moved west of the box-cut corridor alongside driving_center (6,15) and freight_warehouse (2,12) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
       "role": "player",
       "interaction": [
         {
@@ -441,7 +441,7 @@
       }
     },
     {
-      "command": "build_ramp start:16,19 end:16,31 depth:6",
+      "command": "build_ramp start:10,23 end:10,35 depth:6",
       "timeout": 90,
       "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923. #1151: depth explicit 8 -> 6 -- length 12 (z:19-31, can't extend further without running off this 32-wide map's edge) now caps the legal depth at floor(12 / 1.8) = 6 to keep every per-column step within NAV_MAX_SLOPE_RATIO. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan below is depth:8, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth by up to 1 (the old depth:8/length:12 pairing actually bottomed out at floor(11/12*8)=7, not 8) -- at depth:6 the ramp's real floor is floor(11/12*6)=5, up to 3m short of this file's 8-deep crater floor. A gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of how ramp length/depth are tuned in this file alone; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts) -- not something a scenario-def edit can fix on its own.",
       "role": "player",
@@ -465,10 +465,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 16,
-          "z1": 19,
-          "x2": 16,
-          "z2": 31
+          "x1": 10,
+          "z1": 23,
+          "x2": 10,
+          "z2": 35
         },
         {
           "type": "screenshot"
@@ -489,9 +489,9 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20",
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24",
       "timeout": 60,
-      "description": "drill-plan, click half: grid tool dragged over the 22,20-30,28 rectangle the card asks for, confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below. #554-followup (issue #586 CI, rounds 4-5): round 4 corrected the command from rows:3 cols:3 spacing:5 (9 holes) to rows:4 cols:4 spacing:3 (16 holes), reasoning the spacing stepper is unreachable this early in the rail (confirmed live, still true) so the declared spacing:5 could never be real. That was half right: spacing really is stuck at the tool's own DEFAULT_SPACING_M=3, but the drag rectangle producing 16 holes at that spacing was itself a latent bug in the region the tutorial rail snaps this drag to (REGION.drill, tutorialStages.ts), sized for a spacing of 5 that Drill.ts has never actually used since #479 -- nothing caught it because charging was instant until #553/#554, so the extra holes never cost real time. Round 5 fixes REGION.drill directly (20-30 -> 20-26), restoring the tutorial's originally-intended 3x3/9-hole workload for a lone early-tutorial employee with no living quarters yet; a 16-hole grid drove that same employee into a full worker revolt partway through charging (see the charging step's own note below). Command and drag corrected back in step to match the fixed region. #949: spacing/depth/start retuned again, from 3/6/(20,20) to 4/8/(22,20) -- mirrors tutorialSteps.ts's own 'drill-plan' stage retune, which fixes the tutorial's scripted plan so it rates good-or-better instead of catastrophic (verified live against the real engine to rate PERFECT with zero casualties/destruction). `dragTiles` moved to (22,20)-(30,28) to match. #949-followup: added the spacing (3->4, one increment click) and depth (6->8, two increment clicks) stepper clicks before the drag, plus tightened `expect` from `increased: [orderedHoleCount]` to an exact `equals` -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), reachable the instant the grid tool arms, but were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix, tutorialStages.ts). Without these clicks the drag alone produced a 4x4/spacing:3/depth:6 grid at the panel's own defaults, and the old loose `increased` expectation passed on that wrong result by coincidence. This file's own downstream tick/cash figures against the new 4/8/(22,20) plan were verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
+      "description": "drill-plan, click half: grid tool dragged over the 14,24-22,32 rectangle the card asks for, confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below. #554-followup (issue #586 CI, rounds 4-5): round 4 corrected the command from rows:3 cols:3 spacing:5 (9 holes) to rows:4 cols:4 spacing:3 (16 holes), reasoning the spacing stepper is unreachable this early in the rail (confirmed live, still true) so the declared spacing:5 could never be real. That was half right: spacing really is stuck at the tool's own DEFAULT_SPACING_M=3, but the drag rectangle producing 16 holes at that spacing was itself a latent bug in the region the tutorial rail snaps this drag to (REGION.drill, tutorialStages.ts), sized for a spacing of 5 that Drill.ts has never actually used since #479 -- nothing caught it because charging was instant until #553/#554, so the extra holes never cost real time. Round 5 fixes REGION.drill directly (20-30 -> 20-26), restoring the tutorial's originally-intended 3x3/9-hole workload for a lone early-tutorial employee with no living quarters yet; a 16-hole grid drove that same employee into a full worker revolt partway through charging (see the charging step's own note below). Command and drag corrected back in step to match the fixed region. #949: spacing/depth/start retuned again, from 3/6/(20,20) to 4/8/(22,20) -- mirrors tutorialSteps.ts's own 'drill-plan' stage retune, which fixes the tutorial's scripted plan so it rates good-or-better instead of catastrophic (verified live against the real engine to rate PERFECT with zero casualties/destruction). `dragTiles` moved to (14,24)-(22,32) to match. #949-followup: added the spacing (3->4, one increment click) and depth (6->8, two increment clicks) stepper clicks before the drag, plus tightened `expect` from `increased: [orderedHoleCount]` to an exact `equals` -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), reachable the instant the grid tool arms, but were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix, tutorialStages.ts). Without these clicks the drag alone produced a 4x4/spacing:3/depth:6 grid at the panel's own defaults, and the old loose `increased` expectation passed on that wrong result by coincidence. This file's own downstream tick/cash figures against the new 4/8/(22,20) plan were verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "role": "player",
       "interaction": [
         {
@@ -508,10 +508,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 22,
-          "z1": 20,
-          "x2": 30,
-          "z2": 28
+          "x1": 14,
+          "z1": 24,
+          "x2": 22,
+          "z2": 32
         },
         {
           "type": "screenshot"
@@ -955,9 +955,9 @@
       }
     },
     {
-      "command": "build freight_warehouse at:8,18",
+      "command": "build freight_warehouse at:2,12",
       "timeout": 90,
-      "description": "build-storage, click half: warehouse ordered by clicking the step's outlined tile (8,18) in the Build panel picker. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #556/#816: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (a genuine success, not refused: ordering is valid, successful work under #556); the wait step right below drives the site to completion, matching build-living-quarters above.",
+      "description": "build-storage, click half: warehouse ordered by clicking the step's outlined tile (2,12) in the Build panel picker. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #556/#816: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (a genuine success, not refused: ordering is valid, successful work under #556); the wait step right below drives the site to completion, matching build-living-quarters above.",
       "role": "player",
       "interaction": [
         {
@@ -974,8 +974,8 @@
         },
         {
           "type": "pickTile",
-          "x": 8,
-          "z": 18
+          "x": 2,
+          "z": 12
         },
         {
           "type": "screenshot"
@@ -1074,14 +1074,14 @@
       }
     },
     {
-      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:60000",
+      "command": "wait_until field:fillableRustiteSaleOffered equals:true max_ticks:60000",
       "timeout": 650,
       "description": "#1042 CI-fix: replaced the fixed `tick 200` + eight `tick 20` pad that stood here with the same `wait_until fillableOreSaleOffered` pattern #1048 already proved for this exact fragility in tutorial-steps-visual.json. #1042's evacuate-zone fix (a qualified employee now genuinely drives a driverless vehicle clear instead of the horn stranding it unconditionally) shifts every tick this file's own trajectory lands on downstream of Sound the Horn -- direct-traced (interaction mode, this fix): tickCount 680 after this step used to require `tick 200` alone to reach 771, and the old fixed pad of eight further `tick 20` calls (aimed at tick 832, where dirtite offer #47 was confirmed present under the pre-#1042 timing) instead rotated a fillable offer that was already on the board at 680 back out by 821 -- `fillableOreSaleOffered` read true at 680 and false again at 821, which is exactly the shape of failure #1048's own history describes: a fixed pad aimed at one pool instance breaks the moment anything upstream re-times the run into a different one. `fillableOreSaleOffered` (console-api.ts) waits on the real condition -- the pool holding an ore_sale asking no more of its ore than the site already has -- rather than a tick count guessed against one trajectory, so it holds regardless of how many ticks evacuate-zone or any future upstream change spends. Dropped the `material:dirtite` pin on the two steps below for the same reason: this pit's two blasts only ever produce dirtite in fillable quantity (every other offer this file's own history sees -- absurdium/rustite/craktonite/blingite -- is never actually held in storage), so a generic fillable match resolves to dirtite in practice without re-pinning the scenario to one pool composition an upstream retime can roll away from under it, same as #1048's own fix. #1091-followup: max_ticks 400 -> 4200 (timeoutMs 120000 -> 600000) -- #1090's dispatch-cost reordering changes the absolute tick this run's RNG stream rolls a fillable ore_sale offer on (same condition, different draw sequence; see the new_game step's own #1091-followup note on the matching cash bump this required). Direct-traced (command mode) the match now lands 3798 ticks into this wait (tickCount 4300), not within the old 400-tick budget. 4200 keeps ~400 ticks of margin above that measured landing point, the same margin-over-measured-landing philosophy every earlier retune of this exact step already used. #1131 CI-fix: max_ticks 4200 -> 60000 -- the #1091-followup retune above was measured in command mode only, and CI's shard 5/10 (interaction mode) stalled at max_ticks:4200 as a result. Direct-traced (interaction mode, real browser, this fix, same PR): this run's own RNG stream lands the match at tickCount 14100, 13634 ticks into this wait (it starts at tick 466) -- over 3x command mode's own 3798-tick landing, and well past the old 4200-tick budget. 60000 keeps ~46000 ticks of margin above that measured interaction-mode landing point; wall-clock cost of the extra ticks is cheap (this whole 53-step scenario, end to end, ran in well under 400s in this fix's own verification run) so the ceiling is set generously rather than tightly retuned, matching this file's own #1015/#1091 precedent of paying real margin over the measured landing rather than the minimum that clears it. Re-verified command mode at the same max_ticks: still lands at tickCount 4300 (3798 ticks in), unaffected -- raising the ceiling doesn't change where a mode's own RNG stream resolves, only how much headroom is left above it. See the new_game step's own #1131 CI-fix note for the matching cash bump this required (2,000,000 -> 50,000,000) to keep interaction mode's much longer wait solvent.",
       "role": "player",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "fillableOreSaleOffered",
+          "field": "fillableRustiteSaleOffered",
           "equals": true,
           "maxTicks": 60000,
           "timeoutMs": 600000
@@ -1089,7 +1089,7 @@
       ],
       "expect": {
         "equals": {
-          "fillableOreSaleOffered": true
+          "fillableRustiteSaleOffered": true
         },
         "increased": [
           "tickCount"
@@ -1097,9 +1097,9 @@
       }
     },
     {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:ore_sale material:rustite fillable:true",
       "timeout": 120,
-      "description": "#959, the issue's own missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blasts produced and its own haulers carried in. #1042 CI-fix: scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to `material:dirtite` -- which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins this step to a pool composition that any upstream re-timing (like #1042's own evacuate-zone fix) re-rolls, same failure #1048 already fixed this same way in tutorial-steps-visual.json. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. A `waitForSelector` ahead of the click gives the refresh cycle time to surface the right card rather than assuming it's there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 22` in command mode), so the same wait_until above lands command mode on a different offer pool, where the console can refuse this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all.",
+      "description": "#959, the issue's own missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blasts produced and its own haulers carried in. #1042 CI-fix: scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to `material:dirtite` -- which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins this step to a pool composition that any upstream re-timing (like #1042's own evacuate-zone fix) re-rolls, same failure #1048 already fixed this same way in tutorial-steps-visual.json. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. A `waitForSelector` ahead of the click gives the refresh cycle time to surface the right card rather than assuming it's there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 22` in command mode), so the same wait_until above lands command mode on a different offer pool, where the console can refuse this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all. #1587: the drill pattern moved to the climbable west plateau, whose haul loads are mostly dirtite ($240/kg), so a generic fillable match can land on a dirtite offer worth less than the operating deficit the running payroll has piled up, and the level does not end on the first sale. The sale pins rustite (the pit's one valuable ore, ~$960/kg): the wait is on a fillable rustite offer and accept/deliver name it, as a player picks the best-paying card on the board.",
       "role": "player",
       "interaction": [
         {
@@ -1108,7 +1108,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 30000
         },
         {
@@ -1116,7 +1116,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "expect": {
@@ -1125,7 +1125,7 @@
       }
     },
     {
-      "command": "contract deliver type:ore_sale fillable:true amount:100000",
+      "command": "contract deliver type:ore_sale material:rustite fillable:true amount:100000",
       "timeout": 120,
       "description": "#959, the issue's own missing half, second beat: Deliver clicked on the accepted contract, and with it the tutorial finally turns blasted ore into money. Nothing is typed into the amount field: ContractsPanel pre-fills it with `min(remaining, stored)` (`maxDeliverable`), so a plain click delivers exactly what storage can cover, which is the mechanic the 'sell-ore' card's own text teaches. #1042 CI-fix: click scoped to `[data-contract-type=\"ore_sale\"]` alone (no `material:dirtite` pin, same reasoning as the accept step above) -- safe unscoped-by-material here because the accept step already narrowed the pool to exactly one active contract, the same way tutorial-steps-visual.json's own sibling step does it. `commandOutcome: 'either'` for the same command-mode trajectory reason as the accept step. Reaching 'set-policy' rather than 'sell-ore''s immediate successor is deliberate: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat, so whichever is showing when this step's goal is evaluated would be a race -- 'set-policy' is the next card that waits for a click and therefore stays put once reached. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card. #1585: with the tutorial sky pinned sunny the scripted blast no longer fizzles in the rain, so this one sale of its full-yield ore already clears the +$5,000 profit target: the level is won on this click (the card passes through free-play to congratulations within a tick), not after a free-play stretch. The step therefore waits on the level ending, a condition that holds however fast the win lands, rather than on the transient 'free-play' card.",
       "role": "player",
@@ -1136,7 +1136,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-deliver",
           "timeout": 30000
         },
         {
@@ -1144,7 +1144,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-deliver"
         },
         {
           "type": "waitUntil",

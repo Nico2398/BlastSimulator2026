@@ -3,6 +3,7 @@ import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../
 import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from '../../../scripts/shared/scenario-types.js';
 import { effectiveStepTimeoutMs, loadScenarioDef, SCENARIO_DIR, TIMEOUT_MARGIN_MS } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
+import { REGION } from '../../../src/ui/tutorialStages.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
 // split out of the former scenario-defs.test.ts (#703).
@@ -530,8 +531,8 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     12: 'employee hire role:driver', // #1339: moved before box-cut
     13: 'vehicle buy drill_rig',
     14: 'vehicle buy rock_digger',
-    15: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
-    16: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089', // #949
+    15: `build_ramp start:${REGION.boxcut.x1},${REGION.boxcut.z1} end:${REGION.boxcut.x2},${REGION.boxcut.z2} depth:6`, // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
+    16: `drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${REGION.drill.x1},${REGION.drill.z1} diameter:0.089`, // #949
     25: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
     29: 'blast detonate', // #1362: replaces the Sound the Horn step (zone clear)
   };
