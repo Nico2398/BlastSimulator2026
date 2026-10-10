@@ -29,6 +29,11 @@ interface ShortcutOptions {
    * are not preventDefault'd. `setEnabled(false)` still suppresses everything.
    */
   isSuppressed?: () => boolean;
+  /**
+   * Reports whether the on-screen control a shortcut drives is live. When it returns
+   * false the shortcut is swallowed (preventDefault, no callback).
+   */
+  isControlLive?: (selector: string) => boolean;
 }
 
 export class KeyboardShortcuts {
