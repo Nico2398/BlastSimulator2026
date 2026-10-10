@@ -15,7 +15,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, emptyState, chip, button, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, card, sectionHeader, emptyState, chip, button, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -152,17 +152,17 @@ export class OperationsPanel extends PanelBase {
       sectionHeader(t('ui.operations.logistics')),
       this.makeLogisticsRows(state),
       sectionHeader(t('ui.operations.work_queue')),
-      scrollBoundedSection(this.makeWorkQueueRows(state), 220),
+      scrollBoundedSection(this.makeWorkQueueRows(state), 220, { scrollKey: 'work-queue' }),
       sectionHeader(t('ui.operations.ore_on_hand')),
       ...this.makeOreRows(state),
       sectionHeader(t('ui.operations.last_ore_report')),
       this.makeOreReportCard(state),
       sectionHeader(t('ui.operations.incidents')),
-      scrollBoundedSection([...this.makeInjuredList(state), ...this.makeIncidentRows(state)], 200),
+      scrollBoundedSection([...this.makeInjuredList(state), ...this.makeIncidentRows(state)], 200, { scrollKey: 'incidents' }),
       sectionHeader(t('ui.policy.title')),
       this.policyCard,
     ];
-    this.bodyEl.replaceChildren(...sections);
+    replaceChildrenKeepingScroll(this.bodyEl, sections);
   }
 
   // ── Logistics ──

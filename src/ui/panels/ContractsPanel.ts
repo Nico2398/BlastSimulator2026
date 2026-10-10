@@ -20,7 +20,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, flashStatus } from '../dom.js';
+import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
@@ -101,9 +101,11 @@ export class ContractsPanel extends PanelBase {
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
-      tick: state.tickCount,
     });
-    if (signature === this.lastSignature) return;
+    if (signature === this.lastSignature) {
+      this.refreshDynamic(state);
+      return;
+    }
     this.lastSignature = signature;
     this.render(state);
   }
@@ -129,7 +131,7 @@ export class ContractsPanel extends PanelBase {
           ? state.contracts.active.map(c => this.makeActiveCard(c, state))
           : [emptyState(t('ui.contracts.none_active'))],
         200,
-        { gap: 10 },
+        { gap: 10, scrollKey: 'active' },
       ),
       sectionHeader(t('ui.contracts.available')),
       scrollBoundedSection(
@@ -137,7 +139,7 @@ export class ContractsPanel extends PanelBase {
           ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel, siteOres))
           : [emptyState(t('ui.contracts.none'))],
         200,
-        { gap: 10 },
+        { gap: 10, scrollKey: 'available' },
       ),
       sectionHeader(t('ui.contracts.closed')),
       scrollBoundedSection(
@@ -145,10 +147,30 @@ export class ContractsPanel extends PanelBase {
           ? [...state.contracts.completedHistory].reverse().map(c => this.makeHistoryRow(c))
           : [emptyState(t('ui.contracts.none_closed'))],
         200,
-        { gap: 10 },
+        { gap: 10, scrollKey: 'closed' },
       ),
     ];
-    this.bodyEl.replaceChildren(...sections);
+    replaceChildrenKeepingScroll(this.bodyEl, sections);
+  }
+
+  /** Time-left text and urgency colour tick every hour; patch them in place so scroll and typed input survive. */
+  private refreshDynamic(state: GameState): void {
+    for (const c of state.contracts.active) {
+      const cardEl = this.bodyEl.querySelector<HTMLElement>(`[data-contract-id="${c.id}"]`);
+      if (!cardEl) continue;
+      const color = this.urgencyColor(c, state.tickCount);
+      const timeLeft = cardEl.querySelector<HTMLElement>('.bs-contract-time-left');
+      if (timeLeft) {
+        timeLeft.textContent = t('ui.contracts.time_left', { hours: this.remainingTicks(c, state.tickCount) });
+        timeLeft.style.color = color;
+      }
+      const fill = cardEl.querySelector<HTMLElement>('.bsx-progress-fill');
+      if (fill) fill.style.background = color;
+    }
+  }
+
+  private remainingTicks(c: Contract, tickCount: number): number {
+    return Math.max(0, c.acceptedAtTick + c.deadlineTicks - tickCount);
   }
 
   /** Kilograms of `materialId` available to deliver — collected ore by type, or raw stored mass for rubble ('' materialId). */
@@ -206,7 +228,7 @@ export class ContractsPanel extends PanelBase {
   // ── Active ──
 
   private urgencyColor(c: Contract, tickCount: number): string {
-    const remaining = Math.max(0, c.acceptedAtTick + c.deadlineTicks - tickCount);
+    const remaining = this.remainingTicks(c, tickCount);
     const fraction = c.deadlineTicks > 0 ? remaining / c.deadlineTicks : 0;
     if (fraction > 0.5) return 'var(--bsx-positive)';
     if (fraction > 0.2) return 'var(--bsx-amber)';
@@ -214,7 +236,7 @@ export class ContractsPanel extends PanelBase {
   }
 
   private makeActiveCard(c: Contract, state: GameState): HTMLElement {
-    const remainingTicks = Math.max(0, c.acceptedAtTick + c.deadlineTicks - state.tickCount);
+    const remainingTicks = this.remainingTicks(c, state.tickCount);
     const color = this.urgencyColor(c, state.tickCount);
     const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
     const stored = this.storedOf(c.materialId, state);
@@ -229,6 +251,7 @@ export class ContractsPanel extends PanelBase {
       ...(c.held ? [el('span', { text: t('ui.contracts.held_badge'), attrs: { class: 'bs-contract-held', style: 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.1em;padding:3px 5px;border-radius:3px;background:rgba(255,255,255,.08);color:var(--bsx-amber)' } })] : []),
       el('span', {
         text: t('ui.contracts.time_left', { hours: remainingTicks }),
+        className: 'bs-contract-time-left',
         attrs: { style: `margin-left:auto;display:flex;align-items:center;gap:4px;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:${color}` },
       }),
     );
@@ -242,7 +265,7 @@ export class ContractsPanel extends PanelBase {
     );
 
     const amountValue = maxDeliverable > 0 ? maxDeliverable : 0.1;
-    const amountInput = el('input', { className: 'bs-input bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(amountValue) } }) as HTMLInputElement;
+    const amountInput = el('input', { className: 'bs-input bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(amountValue), 'data-preserve-key': `contract-amount-${c.id}` } }) as HTMLInputElement;
     amountInput.max = String(amountValue);
     amountInput.disabled = maxDeliverable <= 0;
     amountInput.style.cssText = 'flex:1;height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';

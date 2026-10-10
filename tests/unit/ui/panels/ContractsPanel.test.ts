@@ -808,3 +808,111 @@ describe('ContractsPanel deliver amount (#1368)', () => {
     expect(panel.root.textContent).not.toContain('Refused: reason-xyz');
   });
 });
+
+// ── Live refresh keeps scroll and typed input across ticks (#1592) ──
+
+describe('ContractsPanel — tick refresh keeps scroll and typed input (#1592)', () => {
+  /** The three bounded sections (active, available, closed), in DOM order. */
+  const sections = (panel: ContractsPanel): HTMLElement[] =>
+    Array.from(panel.root.querySelectorAll<HTMLElement>('div'))
+      .filter(d => d.style.overflowY === 'auto' && d.style.maxHeight === '200px');
+
+  function busyState(): GameState {
+    const state = makeState();
+    state.collectedOre['dirtite'] = 40;
+    state.tickCount = 10;
+    state.contracts.active.push(makeContract({ id: 5, quantityKg: 100, deliveredKg: 0 }));
+    state.contracts.available.push(makeContract({ id: 6, quantityKg: 50, deadlineTicks: 80 }));
+    state.contracts.completedHistory.push(makeContract({ id: 7, completed: true, deliveredKg: 100 }));
+    return state;
+  }
+
+  it('finds the three bounded sections', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(busyState());
+    expect(sections(panel)).toHaveLength(3);
+  });
+
+  it('keeps active, available and closed section scrollTop after a tick', () => {
+    const { panel } = makePanel();
+    const state = busyState();
+    panel.show();
+    panel.update(state);
+    const [a, b, c] = sections(panel);
+    a!.scrollTop = 30; b!.scrollTop = 45; c!.scrollTop = 60;
+
+    state.tickCount++;
+    panel.update(state);
+
+    const [a2, b2, c2] = sections(panel);
+    expect([a2!.scrollTop, b2!.scrollTop, c2!.scrollTop]).toEqual([30, 45, 60]);
+  });
+
+  it('keeps section scrollTop across many consecutive ticks', () => {
+    const { panel } = makePanel();
+    const state = busyState();
+    panel.show();
+    panel.update(state);
+    sections(panel)[0]!.scrollTop = 30;
+    for (let i = 0; i < 5; i++) { state.tickCount++; panel.update(state); }
+    expect(sections(panel)[0]!.scrollTop).toBe(30);
+  });
+
+  it('keeps a typed amount in .bs-contract-amount across a tick', () => {
+    const { panel } = makePanel();
+    const state = busyState();
+    panel.show();
+    panel.update(state);
+    const input = panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!;
+    input.value = '12.5';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    state.tickCount++;
+    panel.update(state);
+
+    expect(panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!.value).toBe('12.5');
+  });
+
+  it('clamps a typed amount to the new max when stock shrinks', () => {
+    const { panel } = makePanel();
+    const state = busyState();
+    panel.show();
+    panel.update(state);
+    const input = panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!;
+    input.value = '35';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    state.collectedOre['dirtite'] = 20;
+    state.tickCount++;
+    panel.update(state);
+
+    expect(panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!.value).toBe('20');
+  });
+
+  it('an untouched amount still follows the new max', () => {
+    const { panel } = makePanel();
+    const state = busyState();
+    panel.show();
+    panel.update(state);
+    state.collectedOre['dirtite'] = 20;
+    state.tickCount++;
+    panel.update(state);
+    expect(panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!.value).toBe('20');
+  });
+
+  it('the time-left text still counts down per tick', () => {
+    const { panel } = makePanel();
+    const state = busyState();
+    panel.show();
+    panel.update(state);
+    const before = t('ui.contracts.time_left', { hours: 40 }); // 0 + 50 - 10
+    expect(panel.root.textContent).toContain(before);
+
+    state.tickCount += 5;
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain(t('ui.contracts.time_left', { hours: 35 }));
+    expect(panel.root.textContent).not.toContain(before);
+  });
+});
