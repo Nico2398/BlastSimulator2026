@@ -438,8 +438,8 @@
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "clickSelector",

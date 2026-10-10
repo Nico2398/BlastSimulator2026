@@ -12,6 +12,8 @@ export const RAILED_CONTROL_SELECTOR =
 /** Keys that stay free so a railed control never traps focus or hides the Escape cascade. */
 const PASS_THROUGH_KEYS: ReadonlySet<string> = new Set([
   'Tab', 'Shift', 'Escape', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'OS',
+  'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight',
+  'MetaLeft', 'MetaRight',
 ]);
 
 function isGuided(doc: Document): boolean {
@@ -33,8 +35,12 @@ export function isControlLive(selector: string, doc: Document = document): boole
   return el === null || el.classList.contains(ALLOWED_CLASS);
 }
 
+/** One guard per document: a fresh install replaces a stale one rather than stacking beside it. */
+const installed = new WeakMap<Document, () => void>();
+
 /** Installs capture-phase click and keydown listeners; returns a disposer. */
 export function installActivationGuard(doc: Document = document): () => void {
+  installed.get(doc)?.();
   const swallow = (e: Event): void => {
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -43,13 +49,17 @@ export function installActivationGuard(doc: Document = document): () => void {
     if (isRailedControl(e.target, doc)) swallow(e);
   };
   const onKeydown = (e: Event): void => {
-    if (PASS_THROUGH_KEYS.has((e as KeyboardEvent).key)) return;
+    const { key, code } = e as KeyboardEvent;
+    if (PASS_THROUGH_KEYS.has(key) || PASS_THROUGH_KEYS.has(code)) return;
     if (isRailedControl(e.target, doc)) swallow(e);
   };
   doc.addEventListener('click', onClick, true);
   doc.addEventListener('keydown', onKeydown, true);
-  return () => {
+  const dispose = (): void => {
     doc.removeEventListener('click', onClick, true);
     doc.removeEventListener('keydown', onKeydown, true);
+    if (installed.get(doc) === dispose) installed.delete(doc);
   };
+  installed.set(doc, dispose);
+  return dispose;
 }
