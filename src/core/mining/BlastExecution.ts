@@ -37,7 +37,7 @@ import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { VoxelGrid, firstEmptyLayerAboveGround, captureColumnTopsForCarve, renormaliseCarvedColumns } from '../world/VoxelGrid.js';
-import type { EventEmitter } from '../state/EventEmitter.js';
+import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import type { AccidentRecord } from '../entities/Damage.js';
 import {
@@ -49,6 +49,7 @@ import {
   THROW_DISTANCE_CATASTROPHIC,
   BLAST_SLICE_CELLS,
   BLAST_SLICE_ITEMS,
+  BLAST_SLICE_STRIP_COLUMNS,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -387,7 +388,8 @@ export function* executeBlastSteps(
   yield;
   const carvedColumns = captureColumnTopsForCarve(grid, toClear);
   for (let c = 0; c < toClear.length; c++) {
-    if ((c & (BLAST_SLICE_CELLS - 1)) === 0) yield;
+    // A clear also records a terrain edit: several times a plain cell's cost.
+    if ((c & (BLAST_SLICE_CELLS / 4 - 1)) === 0) yield;
     const { x, y, z } = toClear[c]!;
     grid.clearVoxel(x, y, z);
   }
@@ -412,6 +414,7 @@ export function* executeBlastSteps(
     maxThrowDistance = resolved.maxThrowDistance;
   }
 
+  yield;
   // 4b. Compute cleared region AABB from toClear for navmesh dirty-region
   //     update. One pass with running bounds — a reduce allocating an object
   //     per voxel showed up in the blast's frame budget.
@@ -439,12 +442,14 @@ export function* executeBlastSteps(
   //     callers already use clearedRegion directly) the exact voxel AABB that
   //     changed, covering both the fracture-pass clears and anything the
   //     crater pass added afterward.
-  if (toClear.length > 0) {
-    emitter?.emit('terrain:updated', {
-      region: { minX: regMinX, maxX: regMaxX, minY: regMinY, maxY: regMaxY, minZ: regMinZ, maxZ: regMaxZ },
+  yield;
+  if (toClear.length > 0 && emitter) {
+    yield* emitRegionInStrips(emitter, 'terrain:updated', {
+      minX: regMinX, maxX: regMaxX, minY: regMinY, maxY: regMaxY, minZ: regMinZ, maxZ: regMaxZ,
     });
   }
 
+  yield;
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
   //     within a building's footprint, the building is destroyed.
   const destroyedBuildings: DestroyedBuildingInfo[] = [];
@@ -500,6 +505,7 @@ export function* executeBlastSteps(
     };
   });
 
+  yield;
   // 7. Compute stats and rating
   const projectionCount = fragments.filter(f => f.isProjection).length;
   const maxProjectionSpeed = fragments.reduce((max, f) => {
@@ -541,6 +547,25 @@ export function* executeBlastSteps(
 }
 
 // ── Helpers ──
+
+/**
+ * Announce a changed region as strips of `BLAST_SLICE_STRIP_COLUMNS` columns,
+ * yielding between them (#1603): the nav grid re-patches every region it is
+ * told about, and a large blast's in one go was a frame's budget on its own.
+ * Every listener accumulates what it is told region by region (the nav patch
+ * reads the final terrain, the renderer queues chunks), so the end state is
+ * the same as one announcement of the whole region.
+ */
+export function* emitRegionInStrips(
+  emitter: EventEmitter,
+  event: 'terrain:updated' | 'nav:occupancy_changed',
+  region: GameEventMap['terrain:updated']['region'],
+): Steps<void> {
+  for (let x = region.minX; x <= region.maxX; x += BLAST_SLICE_STRIP_COLUMNS) {
+    if (x > region.minX) yield;
+    emitter.emit(event, { region: { ...region, minX: x, maxX: Math.min(region.maxX, x + BLAST_SLICE_STRIP_COLUMNS - 1) } });
+  }
+}
 
 /**
  * Seed for a blast's fragment randomness, derived from the plan itself so the
@@ -637,7 +662,8 @@ function* buildBlastEnergyFieldSteps(
     ));
   }
 
-  const field = yield* createEnergyFieldSteps(grid, box, explosiveTierResolver(plan, box));
+  const tierAt = yield* explosiveTierResolver(plan, box);
+  const field = yield* createEnergyFieldSteps(grid, box, tierAt);
   yield* seedEnergySteps(field, seeds);
   return field;
 }
@@ -650,10 +676,10 @@ function* buildBlastEnergyFieldSteps(
  *
  * Cost: footprint columns x charged holes, once per field build.
  */
-function explosiveTierResolver(
+function* explosiveTierResolver(
   plan: BlastPlan,
   box: BlastBox,
-): ((x: number, z: number) => number) | undefined {
+): Steps<((x: number, z: number) => number) | undefined> {
   const gating: { hole: DrillHole; tier: number }[] = [];
   for (const hole of plan.holes) {
     const charge = plan.charges[hole.id];
@@ -666,6 +692,7 @@ function explosiveTierResolver(
   const holes = gating.map(g => g.hole);
   const tierByHole = new Map(gating.map(g => [g.hole.id, g.tier]));
   for (let z = box.minZ; z < box.maxZ; z++) {
+    if (((z - box.minZ) & 3) === 0) yield;
     for (let x = box.minX; x < box.maxX; x++) {
       const hole = findNearestHole(vec3(x, 0, z), holes);
       tiers[(z - box.minZ) * nx + (x - box.minX)] = tierByHole.get(hole.id)!;

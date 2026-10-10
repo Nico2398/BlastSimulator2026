@@ -5,14 +5,22 @@ import { ChunkRemeshBatch, type QueuedChunk } from '../../../../src/renderer/ter
 
 const chunk = (key: number): QueuedChunk => ({ key, cx: key, cy: 0, cz: 0 });
 
-/** A batch whose builds each cost `costMs` of a fake clock, recording every call. */
-function makeBatch(costMs = 3) {
+/**
+ * A batch whose builds each cost `costMs` of a fake clock, recording every
+ * call; a build runs in `slices` resumable slices of `costMs / slices` each.
+ */
+function makeBatch(costMs = 3, slices = 1) {
   let clock = 0;
   let builds = 0;
   const installed: Array<[number, string]> = [];
   const discarded: string[] = [];
   const batch = new ChunkRemeshBatch<string>(
-    c => { clock += costMs; builds++; return `mesh-${c.key}-${builds}`; },
+    function* (c) {
+      for (let s = 1; s < slices; s++) { clock += costMs / slices; yield; }
+      clock += costMs / slices;
+      builds++;
+      return `mesh-${c.key}-${builds}`;
+    },
     (c, built) => { installed.push([c.key, built]); },
     built => { discarded.push(built); },
   );
@@ -38,7 +46,29 @@ describe('ChunkRemeshBatch', () => {
     expect(batch.pending).toBe(0);
   });
 
-  it('builds at least one chunk per step, however small the budget', () => {
+  it('spreads one heavy chunk\'s march over several steps', () => {
+    const { batch, now, installed, builds } = makeBatch(12, 4); // 3 ms slices
+    batch.queue([chunk(1)]);
+    expect(batch.step(5, now)).toBe(false); // two slices: 3, then 6 ≥ 5
+    expect(builds()).toBe(0);
+    expect(batch.step(5, now)).toBe(true); // the last two, then the swap
+    expect(builds()).toBe(1);
+    expect(installed.map(([key]) => key)).toEqual([1]);
+  });
+
+  it('restarts a half-marched chunk whose voxels change again', () => {
+    const { batch, now, builds, installed } = makeBatch(12, 4);
+    batch.queue([chunk(1)]);
+    batch.step(5, now); // half-marched
+    batch.queue([chunk(1)]);
+    expect(batch.pending).toBe(1);
+    batch.finish();
+    expect(builds()).toBe(1);
+    expect(now()).toBe(6 + 12); // the two stale slices, then a whole fresh march
+    expect(installed).toEqual([[1, 'mesh-1-1']]);
+  });
+
+  it('builds at least one slice per step, however small the budget', () => {
     const { batch, now, builds } = makeBatch(50);
     batch.queue([1, 2].map(chunk));
     batch.step(0, now);

@@ -218,7 +218,10 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Ghosts first appear mid-game — haul orders the moment a blast lands —
   // so compile their materials now, with every light in place, rather than
   // on that frame (#1603). Nothing after this adds a light.
-  warmupShaders(deps.sm.renderer, deps.sm.camera, scene, deps.ghosts.materials, deps.sm.postPipeline.sceneTarget);
+  warmupShaders(
+    deps.sm.renderer, deps.sm.camera, scene, deps.ghosts.materials, deps.sm.postPipeline.sceneTarget,
+    deps.ghosts.materials, // debris ghosts draw instanced (GhostInstanceBatch.ts)
+  );
 }
 
 /**

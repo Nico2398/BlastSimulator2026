@@ -16,6 +16,7 @@ import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
+import { DEBRIS_DISPATCH_PER_TICK } from '../config/balance.js';
 import { findById } from '../state/IdIndex.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
@@ -27,7 +28,9 @@ export interface HaulActionPayload {
  * Create one haul_debris/fragment_debris PendingAction per on-ground fragment
  * with no existing action (any status: queued/assigned/in_progress) already
  * covering its id. Idempotent — safe to call every tick. Oversized fragments
- * get fragment_debris instead of haul_debris.
+ * get fragment_debris instead of haul_debris. At most
+ * `DEBRIS_DISPATCH_PER_TICK` are queued per call; a large blast's pile is
+ * queued over the next few ticks (#1603).
  *
  * requiredSkill is deliberately left null on both action types — the actual
  * qualification a haul/break vehicle needs (the truck/excavator licence
@@ -40,6 +43,13 @@ export interface HaulActionPayload {
  * queued silently instead.
  */
 export function syncHaulDispatch(state: GameState): void {
+  // Nothing to queue unless an order or an on-ground fragment came or went
+  // since the last pass: after a large blast both lists run to thousands, and
+  // rebuilding the covered set every tick to find nothing was a frame's
+  // millisecond of its own (#1603).
+  const signature = haulDispatchSignature(state);
+  if (lastHaulDispatch.get(state) === signature) return;
+
   const coveredFragmentIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (!isAutoDebrisAction(action.type)) continue;
@@ -47,9 +57,12 @@ export function syncHaulDispatch(state: GameState): void {
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
+  let queued = 0;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
+    // The rest wait for the next tick's pass (DEBRIS_DISPATCH_PER_TICK).
+    if (queued++ === DEBRIS_DISPATCH_PER_TICK) return;
 
     const oversized = isOversized(tracked.fragment.volume);
     const actionId = state.nextPendingActionId++;
@@ -78,6 +91,26 @@ export function syncHaulDispatch(state: GameState): void {
 
     coveredFragmentIds.add(tracked.fragment.id);
   }
+  lastHaulDispatch.set(state, haulDispatchSignature(state));
+}
+
+/** Signature of the last `syncHaulDispatch` pass per game — derived, never serialized. */
+const lastHaulDispatch = new WeakMap<GameState, string>();
+
+/**
+ * Everything a dispatch pass's outcome depends on: the order list's length and
+ * id counter (an order added or removed), and the on-ground fragments' count
+ * and id sum (one landing, picked up, returned to the ground, or split).
+ */
+function haulDispatchSignature(state: GameState): string {
+  let onGround = 0;
+  let idSum = 0;
+  for (const tracked of state.logistics.fragments) {
+    if (tracked.state !== 'on_ground') continue;
+    onGround++;
+    idSum += tracked.fragment.id;
+  }
+  return `${state.pendingActions.length}|${state.nextPendingActionId}|${state.logistics.fragments.length}|${onGround}|${idSum}`;
 }
 
 /**

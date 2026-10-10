@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
-import { executeBlastSteps, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { executeBlastSteps, emitRegionInStrips, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
@@ -24,6 +24,7 @@ import { recordBlastResult, snapshotStats } from '../../../core/campaign/Success
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
+import { warmOrderReachability } from '../../../core/engine/OrderReachability.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
 import { isActive } from '../../../core/events/ActiveModifiers.js';
@@ -66,6 +67,8 @@ function phaseLine(phase: DetonationPhase): string {
 function blastDetonate(ctx: MiningContext): CommandResult {
   const armed = armDetonation(ctx.state!);
   if (!armed.success) return { success: false, output: armed.error };
+  // Built lazily on first use: build it now, while the crew evacuates, not in the firing frame (#1603).
+  levelVillagePositions(ctx);
   const phase = detonationPhase(ctx.state!);
   if (phase.kind !== 'ready') return { success: true, output: phaseLine(phase) };
   if (ctx.sliceBlasts === true) {
@@ -123,9 +126,11 @@ export function* fireBlastSteps(
 
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
+  yield;
   const result = yield* executeBlastSteps(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
   if (!result) return { success: false, output: t('mining.blast.execution_failed') };
 
+  yield;
   // Store fragment data for renderer (localized remesh + mesh spawning)
   ctx.lastBlastFragments = result.fragments.map(f => f.position);
   ctx.lastBlastFragmentData = result.fragments;
@@ -175,6 +180,7 @@ export function* fireBlastSteps(
   // report (or vice versa).
   const thisBlastAccidents: AccidentRecord[] = [];
 
+  yield;
   const blastedColumns = new Set(result.clearedColumns);
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
@@ -206,6 +212,7 @@ export function* fireBlastSteps(
   // a fragment's real flyrock trajectory can land past that box, and an entity
   // clearly outside it must not take a hit just because a stray fragment
   // happened to come down nearby (#557 audit).
+  yield;
   const dangerZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
   const projectionSecondaryEvents: SecondaryBlastEvent[] = [];
   const impacts = processProjections(
@@ -290,6 +297,7 @@ export function* fireBlastSteps(
   addBlastFragments(state.logistics, result.fragments, state.navGrid);
   yield;
 
+  yield;
   // Store drill holes before clearing (needed by renderer for per-hole detonation timing)
   ctx.lastBlastHoles = [...state.drillHoles];
 
@@ -303,6 +311,7 @@ export function* fireBlastSteps(
   );
   state.lastBlastReport = report;
 
+  yield;
   // Clear drill plan after blast (holes are consumed)
   resetPlanState(state);
 
@@ -321,7 +330,7 @@ export function* fireBlastSteps(
   // means the renderer (subscribed only to `terrain:updated`) does not
   // double-remesh for what carves zero further voxels.
   if (result.clearedVoxels > 0) {
-    ctx.emitter.emit('nav:occupancy_changed', { region: regionForColumns(result.clearedRegion, ctx.grid!) });
+    yield* emitRegionInStrips(ctx.emitter, 'nav:occupancy_changed', regionForColumns(result.clearedRegion, ctx.grid!));
   }
 
   // Every footprint a detonation cleared is free ground for navigation, as
@@ -333,6 +342,12 @@ export function* fireBlastSteps(
       if (gone) emitFootprintOccupancyChanged(ctx, gone.x, gone.z, gone.sizeX, gone.sizeZ);
     }
   }
+
+  // The blast reshaped the nav grid: label it now, in slices of their own,
+  // rather than in the next tick alongside thousands of new haul orders (#1603).
+  yield;
+  warmOrderReachability(state);
+  yield;
 
   return {
     success: true,

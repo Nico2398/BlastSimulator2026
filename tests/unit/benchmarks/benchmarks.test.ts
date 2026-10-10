@@ -27,7 +27,7 @@ import type { Building } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 import { classifyQueuedOrders } from '../../../src/core/engine/OrderReachability.js';
-import { DEBRIS_CLASSIFY_PER_TICK } from '../../../src/core/config/balance.js';
+import { DEBRIS_CLASSIFY_PER_TICK, DEBRIS_DISPATCH_PER_TICK } from '../../../src/core/config/balance.js';
 import { claimOnePoolCandidate } from '../../../src/core/engine/EmployeeDispatchSteps.js';
 import { selectBestActionForEmployee } from '../../../src/core/engine/ActionSelection.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -644,7 +644,8 @@ function setupDebrisFieldState(fragmentCount: number): { state: GameState; emplo
   }
   state.logistics.storageCapacityKg = fragmentCount * 100;
   addBlastFragments(state.logistics, fragments);
-  syncHaulDispatch(state);
+  // The whole field queued, as it is a few ticks after the blast (DEBRIS_DISPATCH_PER_TICK a tick).
+  while (state.pendingActions.length < fragmentCount) syncHaulDispatch(state);
   const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 0, 0);
   return { state, employeeId: employee.id };
 }
@@ -673,7 +674,7 @@ describe('Dispatch over a post-blast debris field (6000 fragments, 6000 haul act
 });
 
 describe('Haul dispatch right after a large blast (6000 new fragments) (#1603)', () => {
-  it('queues every new haul order in one pass, then colours them a slice per tick', () => {
+  it('queues the new haul orders a slice per tick, then colours them a slice per tick', () => {
     // Warmup on a separate field so the measured pass is not paying JIT.
     const warm = setupDebrisFieldState(500).state;
     syncHaulDispatch(warm);
@@ -686,9 +687,12 @@ describe('Haul dispatch right after a large blast (6000 new fragments) (#1603)',
     state.navGrid = seeded.navGrid;
     state.logistics.storageCapacityKg = 6000 * 100;
 
+    // Queued a tick's share at a time (DEBRIS_DISPATCH_PER_TICK), never the whole field at once.
     let start = performance.now();
     syncHaulDispatch(state);
     const queueMs = performance.now() - start;
+    expect(state.pendingActions.length).toBe(DEBRIS_DISPATCH_PER_TICK);
+    while (state.pendingActions.length < 6000) syncHaulDispatch(state);
     expect(state.pendingActions.length).toBe(6000);
 
     // The tick's own pass judges a bounded slice, rotating until every order
@@ -706,7 +710,7 @@ describe('Haul dispatch right after a large blast (6000 new fragments) (#1603)',
     // Classifying each order as it was queued re-scanned the whole queue per
     // order — seconds here; queueing alone is a few milliseconds, and one
     // tick's slice stays well inside a frame.
-    expect(queueMs).toBeLessThan(100);
+    expect(queueMs).toBeLessThan(25);
     expect(sliceMs).toBeLessThan(25);
   });
 });

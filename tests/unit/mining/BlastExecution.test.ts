@@ -327,12 +327,17 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
     const result = executeBlast(plan, grid, [], undefined, undefined, emitter);
     expect(result).not.toBeNull();
 
-    expect(handler).toHaveBeenCalledTimes(1);
-    const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
+    // Announced in column strips (#1603, emitRegionInStrips): together they
+    // tile the cleared region exactly, each with the region's full Y range.
+    const strips = handler.mock.calls.map(c => (c[0] as { region: { minX: number; maxX: number; maxY: number } }).region);
+    expect(strips.length).toBeGreaterThan(0);
+    for (let k = 1; k < strips.length; k++) expect(strips[k]!.minX).toBe(strips[k - 1]!.maxX + 1);
+    expect(strips[0]!.minX).toBe(result!.clearedRegion.minX);
+    expect(strips[strips.length - 1]!.maxX).toBe(result!.clearedRegion.maxX);
     // Renormalisation reaches y=11 (the residue) — one cell above the raw
-    // fragmented voxels' own top (y=10) — so the emitted event's region must
-    // widen to cover it, not stop at the raw fragmented voxels' own Y range.
-    expect(emitted.region.maxY).toBeGreaterThanOrEqual(11);
+    // fragmented voxels' own top (y=10) — so the emitted region must widen to
+    // cover it, not stop at the raw fragmented voxels' own Y range.
+    for (const strip of strips) expect(strip.maxY).toBeGreaterThanOrEqual(11);
   });
 
   /**

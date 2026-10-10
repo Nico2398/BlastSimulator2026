@@ -85,7 +85,7 @@ export function* identifyFragmentedVoxelsSteps(field: EnergyField, grid: VoxelGr
   }
 
   // ── Pass 2: burden that has been undermined ───────────────────────────────
-  const liftedCount = liftUnderminedBurden(field, mask);
+  const liftedCount = yield* liftUnderminedBurden(field, mask);
 
   // ── Pass 3: rock left with nothing under it ───────────────────────────────
   yield;
@@ -104,7 +104,11 @@ export function* identifyFragmentedVoxelsSteps(field: EnergyField, grid: VoxelGr
   }
 
   // Cracked rock is weaker next time somebody blasts here.
-  for (const { x, y, z } of cracked) grid.scaleFractureAt(x, y, z, CRACKED_VOXEL_WEAKENING);
+  for (let c = 0; c < cracked.length; c++) {
+    if ((c & (BLAST_SLICE_CELLS - 1)) === 0) yield;
+    const { x, y, z } = cracked[c]!;
+    grid.scaleFractureAt(x, y, z, CRACKED_VOXEL_WEAKENING);
+  }
 
   return { fragmented, mask, cracked, detachedCount: detached.length, liftedCount };
 }
@@ -125,11 +129,12 @@ export function* identifyFragmentedVoxelsSteps(field: EnergyField, grid: VoxelGr
  * A cap thicker than `BURDEN_BREAKOUT_MAX` still holds, which is what makes an
  * over-buried charge fail to break out — the classic too-much-burden mistake.
  */
-function liftUnderminedBurden(field: EnergyField, mask: Uint8Array): number {
+function* liftUnderminedBurden(field: EnergyField, mask: Uint8Array): Steps<number> {
   const { box } = field;
   let lifted = 0;
 
   for (let z = box.minZ; z < box.maxZ; z++) {
+    yield;
     for (let x = box.minX; x < box.maxX; x++) {
       // Highest broken voxel in this column — the roof of the excavation.
       // `null`, not a numeric sentinel: a box entirely below y=0 has every
@@ -192,6 +197,7 @@ function* collectUnsupported(field: EnergyField, mask: Uint8Array): Steps<number
 
   // Every voxel on the six faces of the box is treated as anchored.
   for (let z = box.minZ; z < box.maxZ; z++) {
+    if (((z - box.minZ) & 15) === 0) yield;
     for (let y = box.minY; y < box.maxY; y++) {
       seed(box.minX, y, z);
       seed(box.maxX - 1, y, z);
@@ -217,12 +223,14 @@ function* collectUnsupported(field: EnergyField, mask: Uint8Array): Steps<number
   // #1186) is exactly the ordinary case seed()'s own air check already no-ops
   // on, same as it always has.
   for (let z = box.minZ; z < box.maxZ; z++) {
+    if (((z - box.minZ) & 15) === 0) yield;
     for (let x = box.minX; x < box.maxX; x++) {
       seed(x, box.minY, z);
       seed(x, box.maxY - 1, z);
     }
   }
   for (let y = box.minY; y < box.maxY; y++) {
+    if (((y - box.minY) & 15) === 0) yield;
     for (let x = box.minX; x < box.maxX; x++) {
       seed(x, y, box.minZ);
       seed(x, y, box.maxZ - 1);

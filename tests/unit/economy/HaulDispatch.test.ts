@@ -13,6 +13,7 @@
 // below is expected to fail until #552 is implemented.
 
 import { setFreightRoom, setFreightRoomExact, sitesOf } from "../../helpers/freightWarehouse.js";
+import { DEBRIS_DISPATCH_PER_TICK } from '../../../src/core/config/balance.js';
 import { describe, it, expect } from 'vitest';
 import type { ActionType } from '../../../src/core/state/GameState.js';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -165,6 +166,33 @@ describe('syncHaulDispatch — idempotency', () => {
     expect(haulActions).toHaveLength(2);
     const fragmentIds = haulActions.map(a => (a.payload as { fragmentId: number }).fragmentId).sort();
     expect(fragmentIds).toEqual([1, 2]);
+  });
+  // A pass that would find nothing new is skipped (#1603): anything that could
+  // leave an on-ground fragment uncovered must still be seen.
+  it('re-covers a fragment whose order was dropped while it was in transit, once it is back on the ground', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5), makeFragment(2, 6, 6)]);
+    syncHaulDispatch(state);
+    const tracked = state.logistics.fragments.find(f => f.fragment.id === 1)!;
+
+    tracked.state = 'in_transit';
+    state.pendingActions.splice(state.pendingActions.findIndex(a => a.payload['fragmentId'] === 1), 1);
+    syncHaulDispatch(state);
+    expect(state.pendingActions.some(a => a.payload['fragmentId'] === 1)).toBe(false);
+
+    tracked.state = 'on_ground'; // returned to the ground, nothing else changed
+    syncHaulDispatch(state);
+    expect(state.pendingActions.filter(a => a.payload['fragmentId'] === 1)).toHaveLength(1);
+  });
+
+  it('re-covers a fragment whose order was dropped, even when another order was queued in its place', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
+    syncHaulDispatch(state);
+    state.pendingActions.splice(0, 1);
+    state.pendingActions.push({ ...makeHaulAction({ id: state.nextPendingActionId++, payload: { fragmentId: 999 } }) });
+    syncHaulDispatch(state);
+    expect(state.pendingActions.filter(a => a.payload['fragmentId'] === 1)).toHaveLength(1);
   });
 });
 
@@ -930,5 +958,24 @@ describe('findNearbyHaulableFragments — never mixes barren and ore (#1530)', (
 
   it('an ore primary only gets ore extras', () => {
     expect(setup([ore(1, 5, 5), barren(2, 6, 5), ore(3, 7, 5)])()).toEqual([3]);
+  });
+});
+
+describe('syncHaulDispatch — a large pile is queued over several ticks (#1603)', () => {
+  it('queues at most DEBRIS_DISPATCH_PER_TICK orders per call, in fragment order, until every fragment is covered', () => {
+    const state = createGame({ seed: SEED });
+    const total = DEBRIS_DISPATCH_PER_TICK * 2 + 7;
+    addBlastFragments(state.logistics, Array.from({ length: total }, (_, i) => makeFragment(i + 1, 5 + (i % 40), 5 + Math.floor(i / 40))));
+
+    syncHaulDispatch(state);
+    expect(state.pendingActions).toHaveLength(DEBRIS_DISPATCH_PER_TICK);
+    expect(state.pendingActions.map(a => a.payload['fragmentId'])).toEqual(
+      Array.from({ length: DEBRIS_DISPATCH_PER_TICK }, (_, i) => i + 1),
+    );
+    syncHaulDispatch(state);
+    syncHaulDispatch(state);
+    expect(state.pendingActions).toHaveLength(total);
+    syncHaulDispatch(state);
+    expect(state.pendingActions).toHaveLength(total);
   });
 });

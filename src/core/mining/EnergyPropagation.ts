@@ -199,6 +199,7 @@ function* fillDistanceToAir(field: EnergyField): Steps<void> {
   let tail = 0;
 
   for (let i = 0; i < count; i++) {
+    if ((i & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     if (field.air[i] === 1) {
       dist[i] = 0;
       queue[tail++] = i;
@@ -342,6 +343,7 @@ export function* createEnergyFieldSteps(
   // the thresholds need that distance — rock near a face breaks for less.
   yield* fillDistanceToAir(field);
   for (let i = 0; i < count; i++) {
+    if ((i & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     if (field.air[i] === 1) continue;
     field.threshold[i] = field.threshold[i]! * confinementFactor(field.distAir[i]!);
   }
@@ -433,6 +435,7 @@ export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[
   // Neighbour scratch, reused across every cell of every wave.
   const targetScratch = new Int32Array(NEIGHBOUR_OFFSETS.length);
   const weightScratch = new Float64Array(NEIGHBOUR_OFFSETS.length);
+  yield;
 
   for (const seed of seeds) {
     if (!Number.isFinite(seed.energy) || seed.energy <= PROPAGATION_ENERGY_EPSILON) continue;
@@ -452,6 +455,7 @@ export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[
   // a measurable share of a large blast. Two seeds can land in one cell; keep
   // each active cell listed once, in ascending order so the wave sweeps cells
   // deterministically.
+  yield;
   let currentActive = new Int32Array(cellCount);
   let nextActive = new Int32Array(cellCount);
   const firstWave = [...new Set(seeded)].sort((a, b) => a - b);

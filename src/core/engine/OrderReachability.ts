@@ -141,6 +141,30 @@ function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCa
   return fillPool(state, cache, req, employees);
 }
 
+/**
+ * Climb reachability for one employee on foot, from the labelling the order
+ * pools already share (#1603): `canReach(x, z, tx, tz)` answers exactly what
+ * `computeClimbReachableSet(navGrid, x, z).has(tx, tz)` does, without a flood
+ * fill per question. Null with no nav grid.
+ */
+export function employeeClimbReach(state: GameState): ClimbComponents | null {
+  const cache = cacheFor(state);
+  return cache === null ? null : componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
+}
+
+/**
+ * Label the current nav grid for every clearance the order pools use, ahead
+ * of the tick that would otherwise pay for it (#1603): a blast reshapes the
+ * grid, and its first tick after classifying thousands of new haul orders
+ * was the one that also relabelled it. Pure cache warm-up — no verdict changes.
+ */
+export function warmOrderReachability(state: GameState): void {
+  const cache = cacheFor(state);
+  if (cache === null) return;
+  componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
+  componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS);
+}
+
 export function buildOrderReachability(
   state: GameState,
   actions: ReadonlyArray<PendingAction>,

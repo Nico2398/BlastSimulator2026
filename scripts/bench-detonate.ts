@@ -151,7 +151,79 @@ const TIME_COMMANDS = `(() => {
   };
 })()`;
 
-interface FrameRecord { t: number; ms: number; cmds: Array<[string, number]> }
+interface FrameRecord { t: number; start: number; ms: number; cmds: Array<[string, number]> }
+
+interface CpuProfile {
+  nodes: Array<{ id: number; callFrame: { functionName: string; url: string; lineNumber: number }; children?: number[] }>;
+  startTime: number;
+  samples: number[];
+  timeDeltas: number[];
+}
+
+/** Names that say nothing about where a frame's time went. */
+const WRAPPER_FRAMES = new Set(['(root)', '(program)', '(idle)', '(anon)', 'loop', 'runCommand', 'run', 'dispatch']);
+
+/** Each sample's absolute time (µs) and the function names on its stack. */
+function sampleStacks(profile: CpuProfile): Array<{ t: number; dt: number; names: string[] }> {
+  const parent = new Map<number, number>();
+  const byId = new Map(profile.nodes.map(n => [n.id, n]));
+  for (const n of profile.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
+  const stackOf = new Map<number, string[]>();
+  const namesOf = (id: number): string[] => {
+    let names = stackOf.get(id);
+    if (names === undefined) {
+      names = [];
+      for (let x: number | undefined = id; x !== undefined; x = parent.get(x)) names.push(byId.get(x)!.callFrame.functionName || '(anon)');
+      stackOf.set(id, names);
+    }
+    return names;
+  };
+  let t = profile.startTime;
+  return profile.samples.map((id, k) => {
+    t += profile.timeDeltas[k]!;
+    return { t, dt: profile.timeDeltas[k]!, names: namesOf(id) };
+  });
+}
+
+/**
+ * Page-clock ms to profile µs. The page clock read right after Profiler.start
+ * is only roughly the profile's start, so the offset is refined against the
+ * frames that ran a tick: each one's first tickCommand sample.
+ */
+function profileClock(samples: ReturnType<typeof sampleStacks>, frames: FrameRecord[], startTime: number, pageT0: number): (pageMs: number) => number {
+  const rough = (pageMs: number): number => startTime + (pageMs - pageT0) * 1000;
+  const tickTimes = samples.filter(s => s.names.includes('tickCommand')).map(s => s.t);
+  const offsets: number[] = [];
+  for (const f of frames) {
+    if (!f.cmds.some(([c]) => c.startsWith('tick'))) continue;
+    // Ticks run a second apart at 1x, so the nearest tick sample within half
+    // of that is this frame's own.
+    const a = rough(f.start);
+    let nearest: number | undefined;
+    for (const t of tickTimes) {
+      if (Math.abs(t - a) <= 500_000 && (nearest === undefined || Math.abs(t - a) < Math.abs(nearest - a))) nearest = t;
+    }
+    if (nearest !== undefined) offsets.push(nearest - a);
+  }
+  offsets.sort((x, y) => x - y);
+  const shift = offsets.length > 0 ? offsets[Math.floor(offsets.length / 2)]! : 0;
+  return pageMs => rough(pageMs) + shift;
+}
+
+/** The functions a frame spent its time in (inclusive ms), from the CPU profile. */
+function frameHotspots(samples: ReturnType<typeof sampleStacks>, clock: (pageMs: number) => number, frame: FrameRecord, top = 14): string {
+  const from = clock(frame.start);
+  const to = from + frame.ms * 1000;
+  const inclusive = new Map<string, number>();
+  for (const s of samples) {
+    if (s.t < from || s.t > to) continue;
+    for (const name of new Set(s.names)) {
+      if (WRAPPER_FRAMES.has(name)) continue;
+      inclusive.set(name, (inclusive.get(name) ?? 0) + s.dt / 1000);
+    }
+  }
+  return [...inclusive].sort((a, b) => b[1] - a[1]).slice(0, top).map(([n, ms]) => `${n} ${ms.toFixed(0)}`).join(', ');
+}
 
 /** Runs in the page: fires the blast and watches WATCH_MS of frames after it. */
 const DETONATE = `(async () => {
@@ -216,7 +288,11 @@ async function measureFrames(page: Page, budgetMs: number, profilePath: string |
   await command(page, 'time resume'); // a new game starts paused
   await page.evaluate('window.__frames = []; window.__outsideCmds = []; window.__longTasks = []; window.__frameRec = true');
   const armed = await command(page, 'blast detonate');
-  if (cdp !== null) await cdp.send('Profiler.start');
+  let pageT0 = 0;
+  if (cdp !== null) {
+    await cdp.send('Profiler.start');
+    pageT0 = await page.evaluate('performance.now()') as number;
+  }
   console.log(`  armed: ${armed.split('\n')[0]}`);
   // The crew walks out at 1x before the game fires; bounded, so a stranded crew fails loudly.
   for (let waited = 0; !(await page.evaluate('window.__gameState()?.holeCount === 0')); waited += 500) {
@@ -229,8 +305,9 @@ async function measureFrames(page: Page, budgetMs: number, profilePath: string |
   const firedAt = await page.evaluate('performance.now()') as number;
   await new Promise(r => setTimeout(r, 6000));
   await page.evaluate('window.__frameRec = false');
+  let profile: CpuProfile | null = null;
   if (cdp !== null && profilePath !== null) {
-    const { profile } = await cdp.send('Profiler.stop');
+    profile = (await cdp.send('Profiler.stop')).profile as CpuProfile;
     writeFileSync(profilePath, JSON.stringify(profile));
     console.log(`  CPU profile: ${profilePath}`);
   }
@@ -249,9 +326,12 @@ async function measureFrames(page: Page, budgetMs: number, profilePath: string |
   console.log(`  frames timed: ${frames.length} (${after.length} from 2 s before the blast on)`);
   console.log(`  frames over 16.7 ms: ${over(16.7)}   over 33 ms: ${over(33)}   over 100 ms: ${over(100)}`);
   console.log('  worst frames (ms, then commands run inside):');
+  const samples = profile !== null ? sampleStacks(profile) : [];
+  const clock = profile !== null ? profileClock(samples, frames, profile.startTime, pageT0) : null;
   for (const f of [...frames].sort((a, b) => b.ms - a.ms).slice(0, 10)) {
     const cmds = f.cmds.filter(([, ms]) => ms >= 1).map(([c, ms]) => `${c} ${ms.toFixed(0)}`).join('; ');
     console.log(`    ${f.ms.toFixed(1).padStart(7)}  @${((f.t - firedAt) / 1000).toFixed(2)}s  ${cmds}`);
+    if (clock !== null) console.log(`             ${frameHotspots(samples, clock, f)}`);
   }
   for (const [c, ms] of outside.filter(([, ms]) => ms >= 5)) console.log(`  outside a frame: ${c} ${ms.toFixed(0)} ms`);
   if (longTasks.length > 0) console.log(`  long tasks (ms): ${longTasks.join(' ')}`);

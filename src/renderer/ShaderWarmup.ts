@@ -18,6 +18,8 @@ import * as THREE from 'three';
  * its output colour space and tone mapping, so a program compiled for the
  * wrong one is a different program. Call once the scene's lights are final:
  * a light added afterwards changes every lit program and voids the warmup.
+ * `instancedMaterials` are compiled again as an InstancedMesh draws them —
+ * instancing is a program variant of its own.
  */
 export function warmupShaders(
   renderer: Pick<THREE.WebGLRenderer, 'compile' | 'getRenderTarget' | 'setRenderTarget'>,
@@ -25,13 +27,15 @@ export function warmupShaders(
   scene: THREE.Scene,
   materials: readonly THREE.Material[],
   target: THREE.WebGLRenderTarget | null,
+  instancedMaterials: readonly THREE.Material[] = [],
 ): void {
-  if (materials.length === 0) return;
+  if (materials.length === 0 && instancedMaterials.length === 0) return;
   // A holder of throwaway meshes, never added to `scene`: compile() takes the
   // lights from `scene` and the materials from the holder.
   const holder = new THREE.Scene();
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   for (const material of materials) holder.add(new THREE.Mesh(geometry, material));
+  for (const material of instancedMaterials) holder.add(new THREE.InstancedMesh(geometry, material, 1));
   const previous = renderer.getRenderTarget();
   renderer.setRenderTarget(target);
   try {

@@ -64,7 +64,8 @@ describe('GameRenderer — onBlast()', () => {
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
 
-    const spawnSpy = vi.spyOn(FragmentMesh.prototype, 'spawnFragments');
+    // onBlast spawns through the resumable path (#1603), run to completion here.
+    const spawnSpy = vi.spyOn(FragmentMesh.prototype, 'spawnFragmentsSteps');
     ctx.lastBlastFragmentData = [{
       id: 0,
       position: { x: 10, y: 5, z: 10 },
@@ -83,6 +84,34 @@ describe('GameRenderer — onBlast()', () => {
 
     expect(spawnSpy).toHaveBeenCalledWith(ctx.lastBlastFragmentData);
     spawnSpy.mockRestore();
+  });
+
+  it('onBlastSteps spawns the same fragments over several slices, drawn only once all are written (#1603)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    ctx.lastBlastFragmentData = Array.from({ length: 1500 }, (_, i) => ({
+      id: i,
+      position: { x: 10 + (i % 30), y: 5, z: 10 + Math.floor(i / 30) },
+      volume: 0.1, mass: 200, rockId: 'sandite', oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.2, y: 0.2, z: 0.2 }, shapeSeed: i, origin: { x: 10, y: 5, z: 10 },
+    }));
+    const drawn = (): number => {
+      let n = 0;
+      (renderer as any).fragments.instancedMeshes.forEach((im: THREE.InstancedMesh) => { n += im.count; });
+      return n;
+    };
+
+    const steps = renderer.onBlastSteps(ctx);
+    let slices = 0;
+    let next = steps.next();
+    while (next.done !== true) {
+      if (slices++ === 1) expect(drawn()).toBe(0); // mid-spawn: nothing half-drawn
+      next = steps.next();
+    }
+    expect(slices).toBeGreaterThan(2);
+    expect(drawn()).toBeGreaterThan(0);
   });
 
   it('does nothing before a game has been loaded', () => {

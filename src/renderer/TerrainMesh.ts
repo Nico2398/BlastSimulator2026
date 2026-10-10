@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, computeColumnRangeY, type VoxelGrid, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
 import { meshedCellRect } from './terrain/PlayableCoverage.js';
 import { ChunkRemeshBatch, type QueuedChunk } from './terrain/ChunkRemeshBatch.js';
+import { drain, type Steps } from '../core/engine/Steps.js';
 import { ChunkFieldCache, CUBE_CORNER_OFFSETS, type CornerSample, type EdgeHeightSampler } from './terrain/TerrainField.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
@@ -118,6 +119,9 @@ function emitVertex(
   outOre.push(oreIdx, oreIdx >= 0 ? nearer.oreAmt : 0);
 }
 
+/** Vertex coordinates (three per vertex) whose normals are computed between two yields of a march. */
+const NORMALS_PER_SLICE = 3 * 512;
+
 // ---------- Main class ----------
 
 export class TerrainMesh {
@@ -131,7 +135,7 @@ export class TerrainMesh {
   private edgeHeightSampler: EdgeHeightSampler | null = null;
   /** A blast's chunks, marched across frames and swapped in together (#1603). */
   private readonly remeshBatch = new ChunkRemeshBatch<THREE.Mesh | null>(
-    ({ cx, cy, cz }) => this.marchChunk(cx, cy, cz),
+    ({ cx, cy, cz }) => this.marchChunkSteps(cx, cy, cz),
     ({ key }, mesh) => this.installChunk(key, mesh),
     mesh => mesh?.geometry.dispose(),
   );
@@ -468,6 +472,11 @@ export class TerrainMesh {
 
   /** March one chunk off-screen: its mesh, or null when nothing in it crosses the surface. */
   private marchChunk(cx: number, cy: number, cz: number): THREE.Mesh | null {
+    return drain(this.marchChunkSteps(cx, cy, cz));
+  }
+
+  /** `marchChunk`, yielding per slab of cubes and per run of normals (#1603). */
+  private *marchChunkSteps(cx: number, cy: number, cz: number): Steps<THREE.Mesh | null> {
     const positions: number[] = [];
     const rockA: number[] = [];
     const rockB: number[] = [];
@@ -509,6 +518,7 @@ export class TerrainMesh {
       minX: xStart, minY: yStart, minZ: zStart, maxX: xEnd, maxY: yEnd, maxZ: zEnd,
     });
     for (let z = zStart; z < zEnd; z++) {
+      yield;
       for (let y = yStart; y < yEnd; y++) {
         for (let x = xStart; x < xEnd; x++) {
           this.marchCube(field, x, y, z, positions, rockA, rockB, rockWeight, ore);
@@ -527,6 +537,7 @@ export class TerrainMesh {
     // Normals from the field, not the triangulation — see densityGradientNormal.
     const normals = new Float32Array(positions.length);
     for (let i = 0; i < positions.length; i += 3) {
+      if (i % NORMALS_PER_SLICE === 0) yield;
       const n = field.normal(positions[i]!, positions[i + 1]!, positions[i + 2]!);
       normals[i] = n[0]; normals[i + 1] = n[1]; normals[i + 2] = n[2];
     }

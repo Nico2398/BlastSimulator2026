@@ -24,7 +24,7 @@ import {
   DEBRIS_SELECTION_BIN_PROBES,
   DEBRIS_SELECTION_BINNING_MIN,
   DEBRIS_SELECTION_MAX_BINS,
-  DEBRIS_SELECTION_MAX_BINS_TRIED,
+  DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND,
 } from '../config/balance.js';
 
 type DebrisPool = Pick<GameState, 'pendingActions' | 'nextPendingActionId'>;
@@ -44,14 +44,18 @@ interface DebrisIndex {
   length: number;
   nextId: number;
   bins: DebrisBin[];
+  /** Id range of the debris orders binned (every debris candidate is one of them). */
+  minId: number;
+  maxId: number;
 }
 
 /**
  * The candidates worth costing: every non-debris candidate `allowed` lets
  * through, plus up to `DEBRIS_SELECTION_MAX_BINS` debris representatives —
- * bins tried nearest `employee` first, at most `DEBRIS_SELECTION_MAX_BINS_TRIED`
- * of them, each represented by its member nearest `employee` (lowest id on a
- * tie) that is among `candidates` and that `allowed` accepts. At most
+ * bins tried nearest `employee` first, at most
+ * `DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND` of each kind, each represented by
+ * its member nearest `employee` (lowest id on a tie) that is among
+ * `candidates` and that `allowed` accepts. At most
  * `DEBRIS_SELECTION_BIN_PROBES` candidate members of a bin are tried, since
  * `allowed` holds the costly claim gates (vehicle, storage room) and a bin of
  * rock nobody can take right now is given up on quickly rather than checked
@@ -70,26 +74,38 @@ export function thinDebrisCandidates(
   carriesOre: (action: PendingAction) => boolean,
   allowed: (action: PendingAction) => boolean,
 ): PendingAction[] {
-  const debrisIds = new Set<number>();
-  for (const action of candidates) if (isDebris(action)) debrisIds.add(action.id);
-  if (debrisIds.size <= DEBRIS_SELECTION_BINNING_MIN) return candidates.filter(allowed);
+  let debris = 0;
+  for (const action of candidates) if (isDebris(action)) debris++;
+  if (debris <= DEBRIS_SELECTION_BINNING_MIN) return candidates.filter(allowed);
 
+  const index = indexOf(pool, isDebris, carriesOre);
+  const bins = index.bins;
+  // One pass: stamp the debris candidates, keep the other candidates allowed.
+  const span = index.maxId - index.minId + 1;
+  if (stamps.length < span) stamps = new Uint32Array(span);
+  if (++stamp === 0xffffffff) { stamps.fill(0); stamp = 1; }
+  const mark = stamp;
+  const base = index.minId;
+  const marks = stamps;
   const out: PendingAction[] = [];
   for (const action of candidates) {
-    if (!debrisIds.has(action.id) && allowed(action)) out.push(action);
+    if (isDebris(action)) marks[action.id - base] = mark;
+    else if (allowed(action)) out.push(action);
   }
+  const isCandidate = (action: PendingAction): boolean => marks[action.id - base] === mark;
 
-  const bins = indexOf(pool, isDebris, carriesOre).bins;
   const distance = bins.map(bin => octileHeuristic(employee.x, employee.z, bin.x, bin.z));
   const order = bins.map((_, i) => i).sort((a, b) => distance[a]! - distance[b]! || bins[a]!.key - bins[b]!.key);
 
   let kept = 0;
-  let tried = 0;
+  const tried = [0, 0, 0, 0]; // per bin kind: the low two bits of its key
   for (const i of order) {
-    if (kept >= DEBRIS_SELECTION_MAX_BINS || tried >= DEBRIS_SELECTION_MAX_BINS_TRIED) break;
-    const members = bins[i]!.members.filter(member => debrisIds.has(member.id));
+    if (kept >= DEBRIS_SELECTION_MAX_BINS) break;
+    const kind = bins[i]!.key & 3;
+    if (tried[kind]! >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) continue;
+    const members = bins[i]!.members.filter(isCandidate);
     if (members.length === 0) continue;
-    tried++;
+    tried[kind]!++;
     const near = members.map(member => ({ member, d: octileHeuristic(employee.x, employee.z, member.targetX, member.targetZ) }));
     near.sort((a, b) => a.d - b.d || a.member.id - b.member.id);
     const probes = Math.min(near.length, DEBRIS_SELECTION_BIN_PROBES);
@@ -99,6 +115,14 @@ export function thinDebrisCandidates(
   }
   return out;
 }
+
+/**
+ * Membership of a search's debris candidates, as a stamp per action id over
+ * the pool's id range: a Set of thousands of ids built per search was most of
+ * a search's own cost. The buffer is reused; each search writes a fresh stamp.
+ */
+let stamps = new Uint32Array(0);
+let stamp = 0;
 
 const indexes = new WeakMap<DebrisPool, DebrisIndex>();
 
@@ -114,8 +138,12 @@ function indexOf(
     && cached.nextId === pool.nextPendingActionId) return cached;
 
   const byKey = new Map<number, DebrisBin>();
+  let minId = Infinity;
+  let maxId = -Infinity;
   for (const action of actions) {
     if (!isDebris(action)) continue;
+    if (action.id < minId) minId = action.id;
+    if (action.id > maxId) maxId = action.id;
     const key = binKeyOf(action, carriesOre);
     const bin = byKey.get(key);
     if (bin !== undefined) {
@@ -130,7 +158,7 @@ function indexOf(
       members: [action],
     });
   }
-  const index = { actions, length: actions.length, nextId: pool.nextPendingActionId, bins: [...byKey.values()] };
+  const index = { actions, length: actions.length, nextId: pool.nextPendingActionId, bins: [...byKey.values()], minId, maxId };
   indexes.set(pool, index);
   return index;
 }

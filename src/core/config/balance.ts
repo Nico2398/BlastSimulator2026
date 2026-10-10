@@ -933,17 +933,28 @@ export const DEBRIS_SELECTION_BIN_PROBES = 3;
 /** Debris bins, nearest first, whose representative is costed in one search. */
 export const DEBRIS_SELECTION_MAX_BINS = 16;
 /**
- * Debris bins tried in one search before the rest are left for a later one:
- * bounds a search when the nearest rock can't be taken (no storage room, no
- * free vehicle), so it costs the same however big the pile.
+ * Debris bins of one kind (order type × ore or barren) tried in one search
+ * before the rest of that kind are left for a later one: bounds a search when
+ * the nearest rock can't be taken (no storage room, no free vehicle), so it
+ * costs the same however big the pile. Per kind, so ore the warehouse has no
+ * room for never hides barren rock the spoil heap would take.
  */
-export const DEBRIS_SELECTION_MAX_BINS_TRIED = 64;
+export const DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND = 16;
 /**
  * Auto-debris orders re-judged per tick for reachability and warnings, rotating
  * through them (#1603, OrderReachability.ts `sliceDebris`); every other order
  * is judged every tick.
  */
-export const DEBRIS_CLASSIFY_PER_TICK = 256;
+export const DEBRIS_CLASSIFY_PER_TICK = 128;
+
+/**
+ * Auto-debris orders queued per tick (#1603, HaulDispatch.ts `syncHaulDispatch`).
+ * A large blast lands thousands of fragments at once; queueing an order (and
+ * its ghost) for every one in the first tick after it froze that tick, so the
+ * pile is queued this many fragments a tick, in the order the blast left them.
+ * Haulers take one load at a time, so they never wait on it.
+ */
+export const DEBRIS_DISPATCH_PER_TICK = 512;
 
 /**
  * Work between two yields of the resumable blast pipeline (#1603, Steps.ts),
@@ -951,8 +962,10 @@ export const DEBRIS_CLASSIFY_PER_TICK = 256;
  * broken voxels for the per-item ones. Each slice is a fraction of a millisecond, so the browser
  * can stop within its frame budget; the console runs every slice at once.
  */
-export const BLAST_SLICE_CELLS = 4096;
-export const BLAST_SLICE_ITEMS = 64;
+export const BLAST_SLICE_CELLS = 2048;
+export const BLAST_SLICE_ITEMS = 32;
+/** Columns of ground per terrain/nav update a blast announces at a time (`emitRegionInStrips`). */
+export const BLAST_SLICE_STRIP_COLUMNS = 8;
 
 /**
  * Upper bound on how many ranked, qualified candidates

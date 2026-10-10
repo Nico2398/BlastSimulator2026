@@ -30,6 +30,7 @@ import {
   MAX_FRAGMENTS_PER_BLAST,
   FRAGMENTATION_MULTIPLIER,
   BLAST_SLICE_ITEMS,
+  BLAST_SLICE_CELLS,
 } from '../config/balance.js';
 import { type EnergyField, intensityAt } from './EnergyPropagation.js';
 import type { FragmentationResult, VoxelCoord } from './VoxelFragmentation.js';
@@ -105,10 +106,11 @@ export function* generateFragmentsSteps(
   // Index the broken voxels so sub-cell work can look them up by coordinate.
   const voxelIndex = new Map<number, number>();
   for (let i = 0; i < voxels.length; i++) {
+    if ((i & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     voxelIndex.set(voxelKey(voxels[i]!), i);
   }
 
-  const { seeds, seedsByVoxel, throttled } = scatterSeeds(voxels, field, rng);
+  const { seeds, seedsByVoxel, throttled } = yield* scatterSeeds(voxels, field, rng);
 
   // Assign every sub-cell of every broken voxel to its nearest seed.
   const subCellsPerVoxel = SUB ** 3;
@@ -166,6 +168,7 @@ export function* generateFragmentsSteps(
   // over seed indices (#1603) rather than a Map of growing arrays: every one of
   // a large blast's ~10⁵ sub-cells passed through Map.get/push. Stable, so each
   // cluster lists its sub-cells in the same ascending order as before.
+  yield;
   const clusterSize = new Int32Array(seeds.length);
   const orphans: number[] = [];
   for (let k = 0; k < owner.length; k++) {
@@ -182,6 +185,7 @@ export function* generateFragmentsSteps(
     if (seedIdx >= 0) clustered[fill[seedIdx]!++] = k;
   }
 
+  yield;
   const fragments: GeneratedFragment[] = [];
   // In seed order, so fragment order depends on the seeds alone.
   for (let si = 0; si < seeds.length; si++) {
@@ -207,12 +211,14 @@ interface SeedScatter {
   throttled: boolean;
 }
 
-function scatterSeeds(voxels: readonly VoxelCoord[], field: EnergyField, rng: Random): SeedScatter {
+function* scatterSeeds(voxels: readonly VoxelCoord[], field: EnergyField, rng: Random): Steps<SeedScatter> {
   const seeds: Vec3[] = [];
   const seedsByVoxel = new Map<number, number[]>();
   let throttled = false;
 
-  for (const voxel of voxels) {
+  for (let v = 0; v < voxels.length; v++) {
+    if ((v & (BLAST_SLICE_CELLS - 1)) === 0) yield;
+    const voxel = voxels[v]!;
     // The guard exists for pathological input, never as a balance dial: once it
     // trips, stop adding seeds rather than dropping rock, so the volume still
     // comes out whole — as fewer, larger fragments.

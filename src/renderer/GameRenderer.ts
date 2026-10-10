@@ -60,7 +60,8 @@ import {
   frameCameraOnGrid, refreshPanLeash, clearAll,
   type SceneSetupDeps,
 } from './GameRendererSceneSetup.js';
-import { onBlast, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
+import { onBlast, onBlastSteps, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
+import type { Steps } from '../core/engine/Steps.js';
 import { modelLibrary } from './models/ModelLibrary.js';
 import {
   raycastSurfaceY, surfaceYAt, smoothSurfaceYAt, pickables,
@@ -562,6 +563,12 @@ export class GameRenderer {
   onBlast(ctx: MiningContext): void {
     this.blastPlaybackClockS = 0;
     onBlast(this.blastVisualsDeps(), ctx);
+  }
+
+  /** `onBlast`, spawning the fragments a slice at a time (#1603). */
+  *onBlastSteps(ctx: MiningContext): Steps<void> {
+    this.blastPlaybackClockS = 0;
+    yield* onBlastSteps(this.blastVisualsDeps(), ctx);
   }
 
   /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). See GameRendererTerrain.ts. */

@@ -7,7 +7,6 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js';
-import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
@@ -20,6 +19,7 @@ import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { createFragmentLookup, haulActionCarriesOre, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
+import { employeeClimbReach } from './OrderReachability.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
 // and cellsToTravelTicks from this module — a two-way cycle, safe because
@@ -493,11 +493,9 @@ function selectWithinIndex(
   // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
   // interior) can never be reached by any real findExactPath, so it's skipped
   // below without spending one of the bounded real-pathfind attempts — frees
-  // the budget for a farther candidate that might actually resolve. One
-  // flood fill for the whole call, reused as an O(1) check per candidate.
-  const climbReachable = state.navGrid !== null
-    ? NavGrid.computeClimbReachableSet(state.navGrid, employee.x, employee.z)
-    : null;
+  // the budget for a farther candidate that might actually resolve. Answered
+  // from the climb labelling the order pools share, O(1) per candidate (#1603).
+  const climbReach = employeeClimbReach(state);
 
   let best: SelectedAction | null = null;
   let bestAdjusted = Infinity;
@@ -508,10 +506,10 @@ function selectWithinIndex(
     // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
     if (best !== null && estimate >= bestAdjusted) break;
 
-    if (climbReachable !== null && state.navGrid !== null) {
+    if (climbReach !== null && state.navGrid !== null) {
       const cx = state.navGrid.clampX(candidate.targetX);
       const cz = state.navGrid.clampZ(candidate.targetZ);
-      if (!climbReachable.has(cx, cz)) continue;
+      if (!climbReach.canReach(employee.x, employee.z, cx, cz)) continue;
     }
 
     attemptsSpent++;

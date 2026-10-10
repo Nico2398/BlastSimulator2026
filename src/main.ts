@@ -36,7 +36,7 @@ import { loadCampaignProfile, saveCampaignProfile } from './persistence/Campaign
 import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { advance } from './core/engine/Steps.js';
+import { advance, type Steps } from './core/engine/Steps.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
@@ -558,22 +558,55 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 }
 
 /** Frame time a blast being resolved in slices may take (#1603), leaving room for the frame's own work. */
-const BLAST_JOB_FRAME_BUDGET_MS = 8;
+const BLAST_JOB_FRAME_BUDGET_MS = 5;
 
 /**
- * Advance a blast being resolved in slices by up to `budgetMs`, and once it
- * lands, update everything a command's result updates — the renderer's blast
- * effects, the UI, the console output. Infinity finishes it now.
+ * A blast the simulation has resolved whose visuals and UI are still catching
+ * up: the fragments spawn a slice at a time, then everything a command's
+ * result updates runs on a frame of its own (#1603).
+ */
+let blastLanding: Steps<void> | null = null;
+/**
+ * The blast report as it stood when the resolving job was first stepped
+ * (undefined while no job is running): the job writes the new report a few
+ * slices before it returns, so "did a blast land" compares against this.
+ */
+let reportBeforeBlastJob: NonNullable<typeof ctx.state>['lastBlastReport'] | null | undefined;
+
+/** True while a blast is resolving or landing: the game clock waits for it. */
+function blastInProgress(): boolean {
+  return Boolean(ctx.blastJob) || blastLanding !== null;
+}
+
+/**
+ * Advance a blast being resolved in slices, then its landing, by up to
+ * `budgetMs` of this frame. Infinity finishes both now.
  */
 function stepBlastJob(budgetMs: number): void {
-  const job = ctx.blastJob;
-  if (!job) return;
-  const prevBlastReport = ctx.state?.lastBlastReport ?? null;
   const start = performance.now();
-  const next = advance(job, () => performance.now() - start >= budgetMs);
-  if (next.done !== true) return;
-  ctx.blastJob = null;
-  afterGameCommand(next.value, 'tick', ctx.state, prevBlastReport);
+  const outOfTime = (): boolean => performance.now() - start >= budgetMs;
+  const job = ctx.blastJob;
+  if (job) {
+    if (reportBeforeBlastJob === undefined) reportBeforeBlastJob = ctx.state?.lastBlastReport ?? null;
+    const next = advance(job, outOfTime);
+    if (next.done !== true) return;
+    ctx.blastJob = null;
+    blastLanding = landBlast(next.value, reportBeforeBlastJob);
+    reportBeforeBlastJob = undefined;
+    if (outOfTime()) return;
+  }
+  if (blastLanding !== null && advance(blastLanding, outOfTime).done === true) blastLanding = null;
+}
+
+function* landBlast(result: CommandResult, prevBlastReport: NonNullable<typeof ctx.state>['lastBlastReport'] | null): Steps<void> {
+  const report = ctx.state?.lastBlastReport ?? null;
+  if (ctx.state && report !== null && report !== prevBlastReport) {
+    yield* gameRenderer.onBlastSteps(ctx);
+    audioHooks.onBlast();
+    yield;
+  }
+  // The blast's report is already drawn above: tell the follow-up so it does not draw it again.
+  afterGameCommand(result, 'tick', ctx.state, report);
 }
 
 /** Land a blast still resolving in slices, before anything else reads or changes the game. */
@@ -1318,7 +1351,7 @@ scene.start((dt) => {
   }
 
   // Advance game time. A blast resolving in slices holds the clock until it lands (#1603).
-  if (ctx.blastJob) {
+  if (blastInProgress()) {
     stepBlastJob(BLAST_JOB_FRAME_BUDGET_MS);
     accumulatedGameMs = 0;
   } else if (ctx.state && !ctx.state.isPaused && autoTickEnabled && !hasLevelEnded(ctx.state) && !fullScreenMenuUp()) {

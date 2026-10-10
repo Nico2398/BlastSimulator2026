@@ -43,6 +43,18 @@ describe('warmupShaders', () => {
     expect(scene.children).toEqual(before);
   });
 
+  it('compiles the instanced variant of the materials asked for it, alongside the plain ones', () => {
+    const plain = new THREE.MeshPhongMaterial();
+    const both = new THREE.MeshPhongMaterial();
+    const { renderer, calls } = fakeRenderer();
+
+    warmupShaders(renderer, new THREE.PerspectiveCamera(), new THREE.Scene(), [plain, both], null, [both]);
+
+    const children = calls[0]!.holder.children as THREE.Mesh[];
+    expect(children.filter(c => !(c instanceof THREE.InstancedMesh)).map(c => c.material)).toEqual([plain, both]);
+    expect(children.filter(c => c instanceof THREE.InstancedMesh).map(c => c.material)).toEqual([both]);
+  });
+
   it('skips the compile when there is nothing to warm', () => {
     const { renderer, compile } = fakeRenderer();
     warmupShaders(renderer, new THREE.PerspectiveCamera(), new THREE.Scene(), [], null);

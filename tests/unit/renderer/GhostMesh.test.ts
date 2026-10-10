@@ -53,6 +53,53 @@ describe('GhostMesh', () => {
     expect(sharedDisposed).toBe(1);
   });
 
+  it('samples the ground only under new ghosts, and again for all of them once the terrain changed (#1603)', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    let ground = 5;
+    const sampled: number[] = [];
+    const surfaceY = (x: number) => { sampled.push(x); return ground; };
+
+    gm.sync([makePreview(1), makePreview(2)], surfaceY);
+    expect(sampled).toEqual([3, 6]);
+    expect(gm.getGroup(1)!.position.y).toBeCloseTo(5 + 0.45);
+
+    sampled.length = 0;
+    gm.sync([makePreview(1, { claimed: true }), makePreview(2), makePreview(3)], surfaceY);
+    expect(sampled).toEqual([9]); // only the new one
+
+    sampled.length = 0;
+    ground = 2;
+    gm.sync([makePreview(1), makePreview(2), makePreview(3)], surfaceY, true);
+    expect(sampled).toEqual([3, 6, 9]);
+    gm.dispose();
+  });
+
+  it('draws debris ghosts as instanced slots, restyled by moving between batches (#1603)', () => {
+    const scene = new THREE.Scene();
+    const gm = new GhostMesh(scene);
+    const [blue, claimed, red] = gm.materials;
+    const debris = (id: number, over: Partial<GhostPreview> = {}) => makePreview(id, { type: id % 2 ? 'haul_debris' : 'fragment_debris', ...over });
+    gm.sync([debris(1), debris(2), debris(3), makePreview(4)]);
+
+    expect(gm.count).toBe(4);
+    expect(gm.getGroup(1)).toBeNull(); // no object of its own
+    expect(gm.getGroup(4)).not.toBeNull(); // other orders keep theirs
+    expect(gm.batchOf(blue!)!.count).toBe(3);
+    expect(scene.children).toHaveLength(2); // one batch + the drill ghost
+
+    gm.sync([debris(1, { claimed: true }), debris(2, { unreachable: true }), makePreview(4)]);
+    expect(gm.count).toBe(3);
+    expect(gm.batchOf(blue!)!.count).toBe(0);
+    expect(gm.batchOf(claimed!)!.count).toBe(1);
+    expect(gm.batchOf(red!)!.count).toBe(1);
+
+    gm.clearAll();
+    expect(gm.count).toBe(0);
+    gm.dispose();
+    expect(scene.children).toHaveLength(0);
+  });
+
   it('sync adds a mesh per preview', () => {
     const scene = new THREE.Scene();
     const gm = new GhostMesh(scene);

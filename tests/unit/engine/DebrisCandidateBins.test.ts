@@ -8,7 +8,7 @@ import {
   DEBRIS_SELECTION_BIN_PROBES,
   DEBRIS_SELECTION_BINNING_MIN,
   DEBRIS_SELECTION_MAX_BINS,
-  DEBRIS_SELECTION_MAX_BINS_TRIED,
+  DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND,
 } from '../../../src/core/config/balance.js';
 
 type Kind = PendingAction['type'];
@@ -99,12 +99,24 @@ describe('thinDebrisCandidates', () => {
     for (const a of here) expect(out).toContain(a);
   });
 
-  it('gives up after trying the nearest bins when no rock can be taken', () => {
-    const state = pool(DEBRIS_SELECTION_BINNING_MIN + DEBRIS_SELECTION_MAX_BINS_TRIED * 2);
+  it('gives up on a kind after trying its nearest bins when none of its rock can be taken', () => {
+    const state = pool(DEBRIS_SELECTION_BINNING_MIN + DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND * 2);
     let gateCalls = 0;
     const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, barren, () => { gateCalls++; return false; });
     expect(out).toEqual([]);
-    expect(gateCalls).toBe(DEBRIS_SELECTION_MAX_BINS_TRIED); // one member per bin here
+    expect(gateCalls).toBe(DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND); // one member per bin here
+  });
+
+  it('ore nobody can store never hides barren rock farther out', () => {
+    // A near band of ore bins the gates refuse, then barren bins past it.
+    const near = pool(DEBRIS_SELECTION_BINNING_MIN + DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND * 3);
+    const oreIds = new Set(near.pendingActions.map(a => a.id));
+    const far = Array.from({ length: 4 }, (_, k) => order(90_000 + k, (500 + k) * CELL, ROW_Z));
+    near.pendingActions.push(...far);
+    near.nextPendingActionId = 90_010;
+    const carriesOre = (a: PendingAction) => oreIds.has(a.id);
+    const out = thinDebrisCandidates(near, origin, near.pendingActions, isDebris, carriesOre, a => !oreIds.has(a.id));
+    expect(out.map(a => a.id).sort((a, b) => a - b)).toEqual(far.map(a => a.id));
   });
 
   it('sees orders queued after an earlier search', () => {
