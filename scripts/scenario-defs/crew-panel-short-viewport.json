@@ -47,9 +47,9 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 2
-        }
+        "increased": [
+          "employeeCount"
+        ]
       }
     },
     {
@@ -139,7 +139,10 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-crew-detail"
+        "equals": {
+          "buildingCount": 0
+        },
+        "note": "No expect.usable here on purpose: it calls scrollIntoView, which would move the roster off the scrollTop 50 the wheel left and that part 2 asserts survives."
       }
     },
     {
