@@ -371,23 +371,28 @@ function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Pr
 const tutorial = new TutorialOverlay(uiContainer, { clockFollowsTimer: !scenarioMode });
 tutorial.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 const tutorialPitLevel = getLevel(TUTORIAL_LEVEL_ID);
-mainMenu.setOnTutorial(() => {
+/** Enter the fresh tutorial level and start the guide (the tutorial's steps are
+ *  tuned to that specific map — tutorialStages.ts's REGION table). */
+function startTutorial(): void {
   mainMenu.hide();
   void enterLevel(
     ['new_game seed:42 size:24', `campaign start level:${TUTORIAL_LEVEL_ID}`],
     tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
   ).then(() => { tutorial.start(ctx.state ?? undefined); });
+}
+// A live game is discarded by the tutorial, so ask first; Cancel leaves the menu and RESUME intact.
+mainMenu.setOnTutorial(() => {
+  if (!isLiveGame()) { startTutorial(); return; }
+  uiManager.showConfirm({
+    icon: 'warn',
+    title: t('ui.settings.replay_confirm_title'),
+    body: t('ui.settings.replay_confirm_body'),
+    confirmLabel: t('ui.settings.replay_confirm_button'),
+    onConfirm: startTutorial,
+  });
 });
-// Settings' REPLAY TUTORIAL button (10.x): same fresh-tutorial-level entry
-// point as MainMenu's own TUTORIAL button above — the tutorial's steps are
-// tuned to that specific map (tutorialStages.ts's REGION table), not to
-// whatever the player currently has loaded.
-uiManager.setReplayTutorialHandler(() => {
-  void enterLevel(
-    ['new_game seed:42 size:24', `campaign start level:${TUTORIAL_LEVEL_ID}`],
-    tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
-  ).then(() => { tutorial.start(ctx.state ?? undefined); });
-});
+// Settings' REPLAY TUTORIAL button (10.x): same entry point as MainMenu's TUTORIAL.
+uiManager.setReplayTutorialHandler(startTutorial);
 
 // --- Settings: persistence wiring (redesign P10; audio wired below, once
 // audioMgr exists) ---
