@@ -1220,3 +1220,81 @@ describe('keyboard cannot bypass the rails (#1597)', () => {
     }
   });
 });
+
+// #1626: an unissued step order holds the clock after the budget, whatever
+// unrelated work is in flight; the step's own order releases the grace.
+describe('TutorialRails — unissued order holds the clock (#1626)', () => {
+  const pending = (): GameState['pendingActions'][number] =>
+    ({ id: 1, type: 'haul_debris', status: 'queued', payload: {} }) as unknown as GameState['pendingActions'][number];
+
+  function busy(): GameState {
+    const s = state();
+    s.pendingActions = Array.from({ length: 50 }, pending);
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: 3, destinationZ: 4, qualifications: [], trainingState: null } as never,
+    ];
+    return s;
+  }
+
+  const planned = (type: string) =>
+    [{ id: 1, buildingId: 1, type, tier: 1, x: 1, z: 1, actionId: 1, cost: 1 } as never];
+
+  const cases: Array<{
+    id: string; budget: number; issue: (s: GameState) => void;
+  }> = [
+    { id: 'build-driving-center', budget: 60, issue: (s) => { s.plannedBuildings = planned('driving_center'); } },
+    { id: 'build-storage', budget: 60, issue: (s) => { s.plannedBuildings = planned('freight_warehouse'); } },
+    {
+      id: 'train-fragmenter', budget: 25,
+      issue: (s) => {
+        s.employees.employees = [
+          ...s.employees.employees,
+          { activeActionId: null, pendingDriverVehicleId: null, destinationX: null, qualifications: [],
+            trainingState: { buildingId: 1, skill: 'driving.rock_fragmenter', ticksRemaining: 90, fee: 1 } } as never,
+        ];
+      },
+    },
+    {
+      id: 'sell-ore', budget: 40,
+      issue: (s) => { s.contracts.active = [{ id: 1, type: 'ore_sale', completed: false } as never]; },
+    },
+  ];
+
+  for (const c of cases) {
+    it(`${c.id}: holds after the budget with unrelated work in flight while the order is not issued`, () => {
+      const s = busy();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: c.id, tickBudget: c.budget, waitsOnWork: true }, s);
+      s.tickCount = c.budget + 10;
+      expect(rails.updateClock(s)).toBe(true);
+      expect(s.isPaused).toBe(true);
+    });
+
+    it(`${c.id}: releases the clock once the order is issued`, () => {
+      const s = busy();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: c.id, tickBudget: c.budget, waitsOnWork: true }, s);
+      s.tickCount = c.budget + 10;
+      expect(rails.updateClock(s)).toBe(true);
+      c.issue(s);
+      expect(rails.updateClock(s)).toBe(false);
+      expect(s.isPaused).toBe(false);
+    });
+
+    it(`${c.id}: does not hold inside the budget while the order is not issued`, () => {
+      const s = busy();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: c.id, tickBudget: c.budget, waitsOnWork: true }, s);
+      s.tickCount = c.budget - 1;
+      expect(rails.updateClock(s)).toBe(false);
+    });
+  }
+
+  it('haul-debris keeps running past the budget with work in flight (no player order)', () => {
+    const s = busy();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'haul-debris', tickBudget: 30, waitsOnWork: true }, s);
+    s.tickCount = 40;
+    expect(rails.updateClock(s)).toBe(false);
+  });
+});
