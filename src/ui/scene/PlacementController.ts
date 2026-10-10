@@ -128,6 +128,10 @@ export class PlacementController {
   get hoveredTile(): { x: number; z: number } | null { return this.hoverTile; }
   /** The region the current step pins the selection to, or null when unconstrained. Read by the overlay to dim outside tiles. */
   get activeRegion(): TileRegion | null { return this.region; }
+
+  /** Where a point ghost previews while hovering: the exact region's pin when the hovered tile is live, else the raw hovered tile, else null. */
+  get previewOrigin(): { x: number; z: number } | null { return null; // TODO: implement
+  }
   /** Tile the pointer is over that the region refuses, or null. The overlay marks it red and the strip explains it. */
   get refusedTile(): { x: number; z: number } | null { return this.blockedTile; }
   /**
