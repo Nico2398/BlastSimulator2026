@@ -896,3 +896,49 @@ describe('exit and Settings session controls are always allowed (#1332)', () => 
     expect(s['replay']!.classList.contains(ALLOWED_CLASS)).toBe(false);
   });
 });
+
+describe('TutorialRails — evacuate-zone waiting for clearance (#1591)', () => {
+  function waitingModal(phase: 'evacuating' | 'stranded'): { fire: HTMLElement; cancel: HTMLElement } {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    const open = document.createElement('button');
+    open.dataset['panel'] = 'blast';
+    toolbar.appendChild(open);
+    document.body.appendChild(toolbar);
+    withBox(open);
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    const exec = document.createElement('button');
+    exec.dataset['action'] = 'execute';
+    panel.appendChild(exec);
+    document.body.appendChild(panel);
+    withBox(exec);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'bs-confirm-overlay';
+    const waiting = document.createElement('div');
+    waiting.dataset['role'] = 'preflight-waiting';
+    waiting.dataset['phase'] = phase;
+    const cancel = document.createElement('button');
+    cancel.dataset['action'] = 'preflight-cancel-detonation';
+    const fire = document.createElement('button');
+    fire.dataset['action'] = 'preflight-fire-anyway';
+    overlay.append(waiting, cancel, fire);
+    document.body.appendChild(overlay);
+    withBox(waiting); withBox(cancel); withBox(fire);
+    return { fire, cancel };
+  }
+
+  for (const phase of ['evacuating', 'stranded'] as const) {
+    it(`${phase}: Fire anyway is not allowed, Cancel detonation is`, () => {
+      const { fire, cancel } = waitingModal(phase);
+      const rails = new TutorialRails();
+      const s = state();
+      rails.beginStep({ id: 'evacuate-zone' }, s);
+      rails.refresh(s);
+      expect(fire.classList.contains(ALLOWED_CLASS)).toBe(false);
+      expect(cancel.classList.contains(ALLOWED_CLASS)).toBe(true);
+    });
+  }
+});

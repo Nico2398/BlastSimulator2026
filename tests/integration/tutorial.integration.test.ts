@@ -770,9 +770,11 @@ describe('full tutorial playthrough ends WON by following the cards then playing
 
       if (step.id === 'evacuate-zone') {
         // #1362: the player presses Fire -> Detonate. That arms the sequence
-        // (horn + auto-fire); the step is done once it is armed or fired.
+        // (horn + auto-fire); the step is done only once the blast really fires
+        // (#1591), so keep ticking while the zone clears.
         const armed = run('blast detonate');
         expect(armed.success, armed.output).toBe(true);
+        tickUntil(run, state, maxTicks, complete);
         expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }

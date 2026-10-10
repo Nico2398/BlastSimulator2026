@@ -84,6 +84,7 @@ export class PreflightModal {
     this.warningsEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
 
     this.waitingEl = el('div');
+    this.waitingEl.dataset['role'] = 'preflight-waiting';
     this.waitingEl.style.cssText = 'display:none;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
 
     this.refusalEl = el('div');
@@ -256,7 +257,8 @@ export class PreflightModal {
       ? [this.cancelDetonationBtn, this.fireAnywayBtn]
       : [this.cancelBtn, this.detonateBtn]));
     this.waitingEl.style.display = waiting ? 'flex' : 'none';
-    if (!waiting) { this.waitingEl.replaceChildren(); return; }
+    if (!waiting) { this.waitingEl.replaceChildren(); delete this.waitingEl.dataset['phase']; return; }
+    this.waitingEl.dataset['phase'] = phase.kind;
     const body = phase.kind === 'stranded'
       ? t('ui.blast_workshop.preflight.stranded_names', { names: phase.names.join(', ') })
       : t('ui.blast_workshop.preflight.detonating_remaining', { count: phase.kind === 'evacuating' ? phase.remaining : 0 });

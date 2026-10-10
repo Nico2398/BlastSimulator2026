@@ -355,10 +355,10 @@ function blastsPerformed(state: GameState): number {
 }
 
 /**
- * Helper: create the evacuate-zone step (#557, #1362) — completes once
- * DETONATE has armed the sequence (state.pendingDetonation) or the blast has
- * already fired (blastsPerformed rose since the snapshot, when the zone was
- * clear at once). Kept as a factory (like the other create*Step helpers above)
+ * Helper: create the evacuate-zone step (#557, #1362, #1591) — completes only
+ * when the blast has actually fired (blastsPerformed rose since the snapshot).
+ * DETONATE merely arms the sequence; the crew must leave the zone first, and
+ * a zone clear at once fires synchronously. Kept as a factory (like the other create*Step helpers above)
  * so tutorialSteps.ts — a grandfathered, may-only-shrink file — carries just
  * the one call site instead of the full step object.
  */
@@ -372,8 +372,7 @@ export function createEvacuateZoneStep(): TutorialStep {
     waitsOnWork: true,
     captureSnapshot: (state: GameState) => ({ prevBlasts: blastsPerformed(state) }),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) =>
-      (state.pendingDetonation ?? null) !== null
-      || blastsPerformed(state) > ((snapshot.prevBlasts as number | undefined) ?? 0),
+      blastsPerformed(state) > ((snapshot.prevBlasts as number | undefined) ?? 0),
   };
 }
 

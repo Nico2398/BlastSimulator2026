@@ -767,9 +767,8 @@ describe('tutorialSteps', () => {
       expect(step.highlightTarget).toBe('#bs-toolbar [data-panel="blast"]');
     });
 
-    // #1362: DETONATE arms the sequence (horn + auto-fire). The step is done
-    // once the detonation is armed or a blast already went off (clear zone:
-    // DETONATE fires in the same call, pendingDetonation never observed).
+    // #1362/#1591: DETONATE arms the sequence (horn + auto-fire). The step is
+    // done only once a blast actually fired (blastsPerformed rose), never on arming.
     const armed = { armedTick: 1, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 1 };
     const baseState = (over: Record<string, unknown> = {}): GameState => ({
       drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
@@ -791,10 +790,19 @@ describe('tutorialSteps', () => {
       expect(step.isComplete(state, snapshotOf(state))).toBe(false);
     });
 
-    it('completes once a detonation is armed, even though the zone is still occupied', () => {
+    it('does not complete while a detonation is only armed and the zone is still occupied (#1591)', () => {
       const state = baseState();
       const snap = snapshotOf(state);
       (state as unknown as { pendingDetonation: unknown }).pendingDetonation = armed;
+      expect(step.isComplete(state, snap)).toBe(false);
+    });
+
+    it('completes once the armed blast fires (blastsPerformed rises) (#1591)', () => {
+      const state = baseState();
+      const snap = snapshotOf(state);
+      (state as unknown as { pendingDetonation: unknown }).pendingDetonation = armed;
+      (state as unknown as { levelStats: { blastsPerformed: number } }).levelStats = { blastsPerformed: 1 };
+      (state as unknown as { pendingDetonation: unknown }).pendingDetonation = null;
       expect(step.isComplete(state, snap)).toBe(true);
     });
 

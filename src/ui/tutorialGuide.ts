@@ -389,6 +389,10 @@ function isWorkInProgress(state: GameState): boolean {
  * `clockMustRun` overrides all of the above once the allowance is spent: the
  * step's own condition cannot be met while the world is frozen, so the clock
  * is never held (#1336).
+ *
+ * An armed detonation (`state.pendingDetonation`) overrides the hold the same
+ * way: it only resolves on ticks (the crew walks out, then the blast fires),
+ * so holding the clock would freeze the evacuation forever (#1591).
  */
 export function decideClock(
   state: GameState,
@@ -410,7 +414,7 @@ export function decideClock(
   // offer yet, so the market must keep refreshing): never hold, whether or
   // not the step waits on work. The signature is re-read each call so the
   // grace window re-anchors once the flag clears.
-  if (clockMustRun) {
+  if (clockMustRun || state.pendingDetonation != null) {
     return {
       hold: false, spent, progressSignature: workSignature(state), lastProgressTick: tickCount, trainingActive,
     };

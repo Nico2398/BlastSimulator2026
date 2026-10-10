@@ -645,6 +645,25 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 90,
+      "role": "player",
+      "description": "#1591: DETONATE armed the sequence and the zone is not clear yet. The modal swaps to the waiting body; the tutorial must leave Fire anyway inert so the blast can only fire once everybody (and the drill rig) is out.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-role=\"preflight-waiting\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "blocked": "[data-action=\"preflight-fire-anyway\"]",
+        "note": "Fire anyway would kill whoever is still inside and destroy the parked drill rig; the guided tutorial never offers it (#1591)."
+      }
+    },
+    {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "timeout": 330,
       "role": "player",
@@ -660,7 +679,11 @@
       ],
       "expect": {
         "equals": {
-          "holeCount": 0
+          "holeCount": 0,
+          "deathCount": 0
+        },
+        "changedBy": {
+          "vehicleCount": 0
         },
         "tutorialStep": "blast"
       }
@@ -691,7 +714,8 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0
+          "chargedCount": 0,
+          "deathCount": 0
         },
         "note": "Close dismisses BlastReportModal, which auto-opens with the real report right after DETONATE; scores card waits for a player action (#1334), so the next beat inspects the scores HUD (mirrors tutorial.json's own choice not to assert it here). holeCount/chargedCount resetting to 0 is checkable in both modes and goes beyond what the DOM-only playtest reference could prove."
       }
