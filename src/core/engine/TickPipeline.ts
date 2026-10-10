@@ -141,6 +141,8 @@ function recentVillageVibration(state: GameState): number {
 function runTaxAuditStep(state: GameState, smugglingIncome: number, emitter: EventEmitter): AuditOutcome | null {
   const legit = getOperatingIncomePerHour(state.finances, state.tickCount, 1);
   bookTaxAuditIncome(state.taxAudit, state.tickCount, legit, smugglingIncome);
+  // No audits on a level with events disabled (the tutorial): nothing to audit, and no toast.
+  if (state.events.eventFreqMultiplier === 0) return null;
   const outcome = tickTaxAudit(state.taxAudit, state.tickCount, taxAuditRng(state.seed, state.tickCount));
   settleTaxAudit(state, outcome, legit + smugglingIncome, emitter);
   return outcome;

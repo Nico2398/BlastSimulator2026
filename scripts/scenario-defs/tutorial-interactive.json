@@ -574,7 +574,11 @@
       "expect": {
         "increased": [
           "orderedChargeCount"
-        ]
+        ],
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
       }
     },
     {
@@ -593,7 +597,9 @@
       "expect": {
         "tutorialStep": "evacuate-zone",
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 9,
+          "weather": "sunny",
+          "wetHoleCount": 0
         }
       },
       "timeout": 180
@@ -630,7 +636,13 @@
           "type": "clickSelector",
           "selector": "[data-action=\"preflight-detonate\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
+      }
     },
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
@@ -1115,7 +1127,7 @@
     {
       "command": "contract deliver type:ore_sale fillable:true amount:100000",
       "timeout": 120,
-      "description": "#959, the issue's own missing half, second beat: Deliver clicked on the accepted contract, and with it the tutorial finally turns blasted ore into money. Nothing is typed into the amount field: ContractsPanel pre-fills it with `min(remaining, stored)` (`maxDeliverable`), so a plain click delivers exactly what storage can cover, which is the mechanic the 'sell-ore' card's own text teaches. #1042 CI-fix: click scoped to `[data-contract-type=\"ore_sale\"]` alone (no `material:dirtite` pin, same reasoning as the accept step above) -- safe unscoped-by-material here because the accept step already narrowed the pool to exactly one active contract, the same way tutorial-steps-visual.json's own sibling step does it. `commandOutcome: 'either'` for the same command-mode trajectory reason as the accept step. Reaching 'set-policy' rather than 'sell-ore''s immediate successor is deliberate: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat, so whichever is showing when this step's goal is evaluated would be a race -- 'set-policy' is the next card that waits for a click and therefore stays put once reached. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card.",
+      "description": "#959, the issue's own missing half, second beat: Deliver clicked on the accepted contract, and with it the tutorial finally turns blasted ore into money. Nothing is typed into the amount field: ContractsPanel pre-fills it with `min(remaining, stored)` (`maxDeliverable`), so a plain click delivers exactly what storage can cover, which is the mechanic the 'sell-ore' card's own text teaches. #1042 CI-fix: click scoped to `[data-contract-type=\"ore_sale\"]` alone (no `material:dirtite` pin, same reasoning as the accept step above) -- safe unscoped-by-material here because the accept step already narrowed the pool to exactly one active contract, the same way tutorial-steps-visual.json's own sibling step does it. `commandOutcome: 'either'` for the same command-mode trajectory reason as the accept step. Reaching 'set-policy' rather than 'sell-ore''s immediate successor is deliberate: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat, so whichever is showing when this step's goal is evaluated would be a race -- 'set-policy' is the next card that waits for a click and therefore stays put once reached. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card. #1585: with the tutorial sky pinned sunny the scripted blast no longer fizzles in the rain, so this one sale of its full-yield ore already clears the +$5,000 profit target: the level is won on this click (the card passes through free-play to congratulations within a tick), not after a free-play stretch. The step therefore waits on the level ending, a condition that holds however fast the win lands, rather than on the transient 'free-play' card.",
       "role": "player",
       "interaction": [
         {
@@ -1374,14 +1386,16 @@
           "type": "waitUntil",
           "field": "levelEnded",
           "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
       "expect": {
         "equals": {
-          "levelEnded": true
-        }
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#959/#1328/#1585: a COMPLETED ore_sale advances 'sell-ore'; the level ending as a genuine win is the proof the tutorial sold the ore it blasted and that the money counted."
       }
     },
     {

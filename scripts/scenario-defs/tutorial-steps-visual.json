@@ -751,7 +751,11 @@
         "tutorialStep": "charge",
         "increased": [
           "orderedChargeCount"
-        ]
+        ],
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
       }
     },
     {
@@ -779,7 +783,9 @@
         "tutorialStep": "evacuate-zone",
         "equals": {
           "chargedCount": 9,
-          "orderedChargeCount": 0
+          "orderedChargeCount": 0,
+          "weather": "sunny",
+          "wetHoleCount": 0
         }
       }
     },
@@ -831,7 +837,13 @@
           "type": "clickSelector",
           "selector": "[data-action=\"preflight-detonate\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
+      }
     },
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
@@ -1302,14 +1314,14 @@
       "role": "observe"
     },
     {
-      "command": "wait_until field:fillableDirtiteSaleOffered equals:true max_ticks:60000",
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:60000",
       "timeout": 650,
       "description": "#1042 CI-fix: replaced the fixed `tick 200` + eight `tick 20` pad that stood here with the same `wait_until fillableOreSaleOffered` pattern #1048 already proved for this exact fragility in tutorial-steps-visual.json. #1042's evacuate-zone fix (a qualified employee now genuinely drives a driverless vehicle clear instead of the horn stranding it unconditionally) shifts every tick this file's own trajectory lands on downstream of Sound the Horn -- direct-traced (interaction mode, this fix): tickCount 680 after this step used to require `tick 200` alone to reach 771, and the old fixed pad of eight further `tick 20` calls (aimed at tick 832, where dirtite offer #47 was confirmed present under the pre-#1042 timing) instead rotated a fillable offer that was already on the board at 680 back out by 821 -- `fillableOreSaleOffered` read true at 680 and false again at 821, which is exactly the shape of failure #1048's own history describes: a fixed pad aimed at one pool instance breaks the moment anything upstream re-times the run into a different one. `fillableOreSaleOffered` (console-api.ts) waits on the real condition -- the pool holding an ore_sale asking no more of its ore than the site already has -- rather than a tick count guessed against one trajectory, so it holds regardless of how many ticks evacuate-zone or any future upstream change spends. Dropped the `material:dirtite` pin on the two steps below for the same reason: this pit's two blasts only ever produce dirtite in fillable quantity (every other offer this file's own history sees -- absurdium/rustite/craktonite/blingite -- is never actually held in storage), so a generic fillable match resolves to dirtite in practice without re-pinning the scenario to one pool composition an upstream retime can roll away from under it, same as #1048's own fix. #1091-followup: max_ticks 400 -> 4200 (timeoutMs 120000 -> 600000) -- #1090's dispatch-cost reordering changes the absolute tick this run's RNG stream rolls a fillable ore_sale offer on (same condition, different draw sequence; see the new_game step's own #1091-followup note on the matching cash bump this required). Direct-traced (command mode) the match now lands 3798 ticks into this wait (tickCount 4300), not within the old 400-tick budget. 4200 keeps ~400 ticks of margin above that measured landing point, the same margin-over-measured-landing philosophy every earlier retune of this exact step already used. #1131 CI-fix: max_ticks 4200 -> 60000 -- the #1091-followup retune above was measured in command mode only, and CI's shard 5/10 (interaction mode) stalled at max_ticks:4200 as a result. Direct-traced (interaction mode, real browser, this fix, same PR): this run's own RNG stream lands the match at tickCount 14100, 13634 ticks into this wait (it starts at tick 466) -- over 3x command mode's own 3798-tick landing, and well past the old 4200-tick budget. 60000 keeps ~46000 ticks of margin above that measured interaction-mode landing point; wall-clock cost of the extra ticks is cheap (this whole 53-step scenario, end to end, ran in well under 400s in this fix's own verification run) so the ceiling is set generously rather than tightly retuned, matching this file's own #1015/#1091 precedent of paying real margin over the measured landing rather than the minimum that clears it. Re-verified command mode at the same max_ticks: still lands at tickCount 4300 (3798 ticks in), unaffected -- raising the ceiling doesn't change where a mode's own RNG stream resolves, only how much headroom is left above it. See the new_game step's own #1131 CI-fix note for the matching cash bump this required (2,000,000 -> 50,000,000) to keep interaction mode's much longer wait solvent.",
       "role": "player",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "fillableDirtiteSaleOffered",
+          "field": "fillableOreSaleOffered",
           "equals": true,
           "maxTicks": 60000,
           "timeoutMs": 600000
@@ -1317,7 +1329,7 @@
       ],
       "expect": {
         "equals": {
-          "fillableDirtiteSaleOffered": true
+          "fillableOreSaleOffered": true
         },
         "increased": [
           "tickCount"
@@ -1496,7 +1508,7 @@
     {
       "command": "contract deliver fillable:true amount:100000",
       "timeout": 120,
-      "description": "Free play sale 1: click Deliver; payment lands.",
+      "description": "#959, the issue's own missing half, second beat: Deliver clicked on the accepted contract, and with it the tutorial finally turns blasted ore into money. Nothing is typed into the amount field: ContractsPanel pre-fills it with `min(remaining, stored)` (`maxDeliverable`), so a plain click delivers exactly what storage can cover, which is the mechanic the 'sell-ore' card's own text teaches. #1042 CI-fix: click scoped to `[data-contract-type=\"ore_sale\"]` alone (no `material:dirtite` pin, same reasoning as the accept step above) -- safe unscoped-by-material here because the accept step already narrowed the pool to exactly one active contract, the same way tutorial-steps-visual.json's own sibling step does it. `commandOutcome: 'either'` for the same command-mode trajectory reason as the accept step. Reaching 'set-policy' rather than 'sell-ore''s immediate successor is deliberate: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat, so whichever is showing when this step's goal is evaluated would be a race -- 'set-policy' is the next card that waits for a click and therefore stays put once reached. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card. #1585: with the tutorial sky pinned sunny the scripted blast no longer fizzles in the rain, so this one sale of its full-yield ore already clears the +$5,000 profit target: the level is won on this click (the card passes through free-play to congratulations within a tick), not after a free-play stretch. The step therefore waits on the level ending, a condition that holds however fast the win lands, rather than on the transient 'free-play' card.",
       "role": "player",
       "interaction": [
         {
@@ -1614,14 +1626,16 @@
           "type": "waitUntil",
           "field": "levelEnded",
           "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
       "expect": {
         "equals": {
-          "levelEnded": true
-        }
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#959/#1328/#1585: a COMPLETED ore_sale advances 'sell-ore'; the level ending as a genuine win is the proof the tutorial sold the ore it blasted and that the money counted."
       }
     },
     {

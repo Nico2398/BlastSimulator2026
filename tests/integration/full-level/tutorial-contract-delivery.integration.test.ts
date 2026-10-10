@@ -216,11 +216,11 @@ describe('Tutorial Level — Contract Delivery', () => {
    * delivery completes (pickup leg + haul-to-warehouse leg).
    */
   function haulFragmentToStorage(vehicleId: number, fragmentId: number): void {
-    const haulResult = vehicleCommand(ctx, ['haul', String(vehicleId)], {
-      fragment: String(fragmentId),
-    });
-    expect(haulResult.success).toBe(true);
-
+    const tracked = (): { state: string } | undefined =>
+      ctx.state!.logistics.fragments.find(f => f.fragment.id === fragmentId);
+    // The level opens with a spoil heap (#1574), so a hauler that boards during
+    // setup self-dispatches (#552) onto barren rock at once and is briefly busy
+    // — the manual haul is retried each tick until the vehicle frees up.
     // Tick until delivered rather than a flat padding count (#553): the
     // drill site and fragment field sit wherever the grid landed relative to
     // the depot, so the ticks a haul actually needs vary — and one caller
@@ -228,13 +228,18 @@ describe('Tutorial Level — Contract Delivery', () => {
     // whose deadlineTicks (30-100, Contract.ts's generateContracts) a fixed,
     // always-spent 100-tick pad could run past even after delivery finished
     // long before that. Capped generously above what any same-map haul needs.
-    const tracked = (): { state: string } | undefined =>
-      ctx.state!.logistics.fragments.find(f => f.fragment.id === fragmentId);
-    for (let i = 0; i < 150 && tracked()?.state !== 'stored'; i++) {
+    let lastRefusal = '';
+    let claimed = false;
+    for (let i = 0; i < 300 && tracked()?.state !== 'stored'; i++) {
+      if (!claimed && tracked()?.state === 'on_ground') {
+        const haulResult = vehicleCommand(ctx, ['haul', String(vehicleId)], { fragment: String(fragmentId) });
+        claimed = haulResult.success;
+        lastRefusal = haulResult.output;
+      }
       tickWithEvents(ctx, 1);
     }
 
-    expect(tracked()?.state).toBe('stored');
+    expect(tracked()?.state, `fragment never stored; last haul refusal: ${lastRefusal}`).toBe('stored');
   }
 
   // ── (a) Blast shortcut is closed: no instant cash/ore payout ─────────────
