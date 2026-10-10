@@ -432,6 +432,27 @@
         }
       ],
       "role": "setup",
+      "description": "#1586: one more chunk. Charge dispatch now picks the lowest real (path-resolved) cost, so the blaster visits the holes in a different order and the fourth charge lands inside this extra 20 ticks instead of the previous four chunks. The check that follows still proves all four charges loaded and none still ordered."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
       "expect": {
         "equals": {
           "chargedCount": 4,

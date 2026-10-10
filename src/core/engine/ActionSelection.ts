@@ -26,6 +26,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 // function bodies, never evaluated at module-load time (same reasoning as
 // the documented VehicleReservation.ts <-> MoveTo.ts/PlanItinerary.ts cycle).
 import { planItinerary } from './PlanItinerary.js';
+import { withUnderRepairIndex } from './VehicleReservation.js';
 import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { actionBlocked } from '../events/ActiveModifiers.js';
@@ -207,10 +208,20 @@ export function estimateActionCost(
   action: PendingAction,
   fragmentOf?: FragmentLookup,
 ): number {
+  return estimateWithBonus(state, employee, action, fragmentOf).cost;
+}
+
+/** `estimateActionCost` plus the ranking bonus it subtracted, so selection can apply it to the real cost too. */
+function estimateWithBonus(
+  state: GameState,
+  employee: Employee,
+  action: PendingAction,
+  fragmentOf?: FragmentLookup,
+): { cost: number; bonus: number } {
   const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'estimate', { action });
   const rawCost = itinerary !== null ? itinerary.estTotalTicks : Infinity;
   const bonus = haulActionCarriesOre(state, action, fragmentOf) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
-  return Math.max(0, rawCost - bonus);
+  return { cost: Math.max(0, rawCost - bonus), bonus };
 }
 
 /**
@@ -314,9 +325,20 @@ export interface SelectedAction {
  * Picks the best action for `employee` out of `candidates`. First filters out
  * every candidate the optional `isClaimable` predicate rejects, then ranks
  * the remainder by `estimateActionCost` (ties broken by lowest `action.id`),
- * then resolves the real cost (via `resolveActionCost`) for the top ranked
- * candidates up to `ACTION_SELECTION_MAX_PATH_ATTEMPTS`, returning the first
- * reachable one.
+ * then resolves the real cost (via `resolveActionCost`) down the ranked list,
+ * keeping the reachable candidate with the lowest bonus-adjusted real cost
+ * (the same ore-haul bonus the estimate got; the returned `totalTicks` stays
+ * raw). The estimate is an approximate lower bound on the real cost (weighted
+ * A* vs. octile mismatch: ~35.63 estimated vs ~35.11 real seen on open
+ * ground), so the scan stops once a candidate's estimate reaches the best real
+ * cost found; this may rarely skip a marginally better candidate (<~2%,
+ * harmless). Ties keep the earlier (lower-id) candidate.
+ *
+ * Cost per selection: O(P) to index under-repair vehicles once
+ * (P = pending actions; was O(P) per vehicle per candidate, ~2e9 scans in
+ * level2-playthrough-win), O(C * R * V) estimates over C claimable
+ * candidates, R vehicle roles, V vehicles, plus at most `ACTION_SELECTION_MAX_PATH_ATTEMPTS` (5) real
+ * pathfinds, typically ~1 on open ground where the estimate is near-exact.
  *
  * `isClaimable` (default: always true) lets a caller apply a claim-time gate
  * — e.g. EmployeeDispatchSteps.ts's vehicle-availability check (`findVehicleForClaim`) —
@@ -432,6 +454,15 @@ export function selectBestActionForEmployee(
   isClaimable: (action: PendingAction) => boolean = () => true,
 ): SelectedAction | null {
   if (candidates.length === 0) return null;
+  return withUnderRepairIndex(state, () => selectWithinIndex(state, employee, candidates, isClaimable));
+}
+
+function selectWithinIndex(
+  state: GameState,
+  employee: Employee,
+  candidates: PendingAction[],
+  isClaimable: (action: PendingAction) => boolean,
+): SelectedAction | null {
 
   // Event modifiers (#1414): a stoppage, drill ban or haul pause keeps the action unclaimed.
   const claimable = candidates.filter(a =>
@@ -445,12 +476,11 @@ export function selectBestActionForEmployee(
   // createFragmentLookup exists for (HaulDispatch.ts). Same order as
   // before — cost ascending, id ascending on a tie.
   const fragmentOf = createFragmentLookup(state);
-  const costed = claimable.map(action => ({ action, cost: estimateActionCost(state, employee, action, fragmentOf) }));
+  const costed = claimable.map(action => ({ action, ...estimateWithBonus(state, employee, action, fragmentOf) }));
   costed.sort((a, b) => {
     const costDiff = a.cost - b.cost;
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
-  const ranked = costed.map(c => c.action);
 
   // Cheap, exact pre-filter (#953): a candidate outside the employee's own
   // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
@@ -462,9 +492,14 @@ export function selectBestActionForEmployee(
     ? NavGrid.computeClimbReachableSet(state.navGrid, employee.x, employee.z)
     : null;
 
+  let best: SelectedAction | null = null;
+  let bestAdjusted = Infinity;
   let attemptsSpent = 0;
-  for (let i = 0; i < ranked.length && attemptsSpent < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
-    const candidate = ranked[i]!;
+  for (let i = 0; i < costed.length && attemptsSpent < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
+    const { action: candidate, cost: estimate, bonus } = costed[i]!;
+
+    // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
+    if (best !== null && estimate >= bestAdjusted) break;
 
     if (climbReachable !== null && state.navGrid !== null) {
       const cx = state.navGrid.clampX(candidate.targetX);
@@ -474,10 +509,13 @@ export function selectBestActionForEmployee(
 
     attemptsSpent++;
     const resolved = resolveActionCost(state, employee, candidate);
-    if (resolved !== null) {
-      return { action: candidate, totalTicks: resolved.totalTicks };
+    if (resolved === null) continue;
+    const adjusted = Math.max(0, resolved.totalTicks - bonus);
+    if (adjusted < bestAdjusted) {
+      best = { action: candidate, totalTicks: resolved.totalTicks };
+      bestAdjusted = adjusted;
     }
   }
 
-  return null;
+  return best;
 }

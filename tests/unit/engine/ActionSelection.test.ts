@@ -847,6 +847,116 @@ describe('selectBestActionForEmployee', () => {
     exactPathSpy.mockRestore();
   });
 
+  // ── Real-cost choice among the shortlist (#1586) ───────────────────────
+
+  /** Wall at x=15 with its only gap at z=29: the far side is a long detour. */
+  function wallWithFarGap(grid: NavGrid): void {
+    for (let z = 0; z < grid.height - 1; z++) grid.cells[z]![15] = makeCell('blocked');
+  }
+
+  it('of two candidates tied on estimate, the cheaper REAL cost wins over the lower id (#1586)', () => {
+    const state = makeState(30, 30);
+    wallWithFarGap(state.navGrid!);
+    const emp = makeEmployee(state, 10, 10);
+
+    const behindWall = makeAction({ id: 1, targetX: 20, targetZ: 10 }); // octile 10, real detour ~ 40
+    const direct = makeAction({ id: 2, targetX: 10, targetZ: 20 });     // octile 10, real ~ 10
+
+    expect(estimateActionCost(state, emp, behindWall)).toBeCloseTo(estimateActionCost(state, emp, direct), 10);
+    const behindReal = resolveActionCost(state, emp, behindWall)!.totalTicks;
+    const directReal = resolveActionCost(state, emp, direct)!.totalTicks;
+    expect(directReal).toBeLessThan(behindReal);
+
+    const result = selectBestActionForEmployee(state, emp, [behindWall, direct]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(2);
+    expect(result!.totalTicks).toBeCloseTo(directReal, 10);
+  });
+
+  it('candidate order in the input array does not change the real-cost choice (#1586)', () => {
+    const state = makeState(30, 30);
+    wallWithFarGap(state.navGrid!);
+    const emp = makeEmployee(state, 10, 10);
+    const behindWall = makeAction({ id: 1, targetX: 20, targetZ: 10 });
+    const direct = makeAction({ id: 2, targetX: 10, targetZ: 20 });
+
+    expect(selectBestActionForEmployee(state, emp, [direct, behindWall])!.action.id).toBe(2);
+  });
+
+  it('a second-ranked candidate cheaper by real cost beats a first-ranked reachable one with a lower estimate (#1586)', () => {
+    const state = makeState(30, 30);
+    wallWithFarGap(state.navGrid!);
+    const emp = makeEmployee(state, 10, 10);
+
+    const nearBehindWall = makeAction({ id: 1, targetX: 17, targetZ: 10 }); // octile 7, detour
+    const farDirect = makeAction({ id: 2, targetX: 10, targetZ: 19 });      // octile 9, direct
+
+    expect(estimateActionCost(state, emp, nearBehindWall)).toBeLessThan(estimateActionCost(state, emp, farDirect));
+
+    const result = selectBestActionForEmployee(state, emp, [nearBehindWall, farDirect]);
+
+    expect(result!.action.id).toBe(2);
+  });
+
+  it('on open flat ground with tied candidates, the lowest id wins and only ~one real pathfind is spent (#1586)', () => {
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 10, 10);
+    const tied = [
+      makeAction({ id: 4, targetX: 20, targetZ: 10 }),
+      makeAction({ id: 2, targetX: 0, targetZ: 10 }),
+      makeAction({ id: 3, targetX: 10, targetZ: 0 }),
+      makeAction({ id: 1, targetX: 10, targetZ: 20 }),
+    ];
+    const exactPathSpy = vi.spyOn(PathfindingModule, 'findFootPathWithVehicleFallback');
+
+    const result = selectBestActionForEmployee(state, emp, tied);
+
+    expect(result!.action.id).toBe(1);
+    // Estimate is a lower bound: once one real cost equals the next estimate, stop.
+    expect(exactPathSpy.mock.calls.length).toBeLessThanOrEqual(2);
+    exactPathSpy.mockRestore();
+  });
+
+  it('never spends more than ACTION_SELECTION_MAX_PATH_ATTEMPTS real pathfinds even when every candidate must be resolved (#1586)', () => {
+    const state = makeState(30, 30);
+    wallWithFarGap(state.navGrid!);
+    const emp = makeEmployee(state, 10, 10);
+    // Eight tied candidates behind the wall: each real cost >> estimate, none can stop early.
+    const behind: PendingAction[] = [];
+    for (let i = 0; i < 8; i++) behind.push(makeAction({ id: i + 1, targetX: 20, targetZ: 6 + i }));
+    const exactPathSpy = vi.spyOn(PathfindingModule, 'findFootPathWithVehicleFallback');
+
+    const result = selectBestActionForEmployee(state, emp, behind);
+
+    expect(result).not.toBeNull();
+    expect(exactPathSpy.mock.calls.length).toBeLessThanOrEqual(ACTION_SELECTION_MAX_PATH_ATTEMPTS);
+    expect(exactPathSpy.mock.calls.length).toBeGreaterThan(1);
+    exactPathSpy.mockRestore();
+  });
+
+  it('equal real cost keeps the lower-id candidate (#1586)', () => {
+    const state = makeState(30, 30);
+    const emp = makeEmployee(state, 10, 10);
+    const a = makeAction({ id: 7, targetX: 20, targetZ: 10 });
+    const b = makeAction({ id: 3, targetX: 0, targetZ: 10 });
+
+    expect(selectBestActionForEmployee(state, emp, [a, b])!.action.id).toBe(3);
+  });
+
+  it('returns null when no shortlisted candidate is reachable (#1586)', () => {
+    const state = makeState(30, 30);
+    blockColumn(state.navGrid!, 15);
+    const emp = makeEmployee(state, 10, 10);
+
+    const result = selectBestActionForEmployee(state, emp, [
+      makeAction({ id: 1, targetX: 20, targetZ: 10 }),
+      makeAction({ id: 2, targetX: 25, targetZ: 5 }),
+    ]);
+
+    expect(result).toBeNull();
+  });
+
   // ── Climb-limit pocket starvation (#953) ───────────────────────────────
   //
   // A fresh blast crater's own interior sinks well below the slope limit
