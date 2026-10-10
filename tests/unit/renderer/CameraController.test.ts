@@ -332,6 +332,41 @@ describe('CameraController', () => {
       expect(controller.rightButtonDragged).toBe(false);
     });
 
+    it('rightGesturePeakPx tracks the peak displacement of the right gesture (#1593)', () => {
+      down(2, 100, 100);
+      expect(controller.rightGesturePeakPx).toBe(0);
+      move(103, 104); // 5px
+      expect(controller.rightGesturePeakPx).toBeCloseTo(5, 5);
+      move(130, 100); // 30px
+      move(110, 100); // back in, peak is kept
+      up(2, 110, 100);
+      expect(controller.rightGesturePeakPx).toBeCloseTo(30, 5);
+      expect(controller.rightButtonDragged).toBe(true);
+    });
+
+    it('rightGesturePeakPx resets on the next right mousedown (#1593)', () => {
+      down(2, 100, 100);
+      move(140, 100);
+      up(2, 140, 100);
+      expect(controller.rightGesturePeakPx).toBeCloseTo(40, 5);
+      down(2, 200, 200);
+      expect(controller.rightGesturePeakPx).toBe(0);
+    });
+
+    it('rightButtonDragged keeps its 5px threshold while the peak is recorded (#1593)', () => {
+      down(2, 100, 100);
+      move(104, 100); // 4px
+      up(2, 104, 100);
+      expect(controller.rightGesturePeakPx).toBeCloseTo(4, 5);
+      expect(controller.rightButtonDragged).toBe(false);
+    });
+
+    it('a left-button drag leaves rightGesturePeakPx at 0 (#1593)', () => {
+      down(0, 100, 100);
+      move(150, 100);
+      expect(controller.rightGesturePeakPx).toBe(0);
+    });
+
     it('never sets true for a left-button drag', () => {
       down(0, 100, 100);
       move(110, 100); // 10px, would be past threshold if this were tracked

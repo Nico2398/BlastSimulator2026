@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
-import { PlacementController } from '../../../src/ui/scene/PlacementController.js';
+import { PlacementController, GUIDED_RIGHT_CLICK_TOLERANCE_PX } from '../../../src/ui/scene/PlacementController.js';
 import {
   setPickerRegion, liveArea, regionCenter, regionSpan, EXACT_LIVE_MARGIN,
 } from '../../../src/ui/tutorialPickerRegion.js';
@@ -38,7 +38,7 @@ let controller: PlacementController;
  * tests flip it directly rather than simulating real mouse gestures, mirroring
  * how `setArmedRemap` is already a bare spy rather than a real remap.
  */
-const cameraController = { setArmedRemap: vi.fn(), rightButtonDragged: false };
+const cameraController = { setArmedRemap: vi.fn(), rightButtonDragged: false, rightGesturePeakPx: 0 };
 
 function press(x: number, z: number): void {
   tileUnderCursor = { x, z };
@@ -59,6 +59,7 @@ beforeEach(() => {
   setPickerRegion(null);
   tileUnderCursor = null;
   cameraController.rightButtonDragged = false;
+  cameraController.rightGesturePeakPx = 0;
   canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
   controller = new PlacementController(
@@ -318,6 +319,58 @@ describe('cancel via right-click vs right-drag (#544)', () => {
 
     expect(controller.currentPhase).toBe('idle');
     expect(onCancel).not.toHaveBeenCalled();
+  });
+});
+
+describe('guided right-click tolerates incidental drift (#1593)', () => {
+  function rightGesture(peakPx: number, dragged: boolean): void {
+    cameraController.rightButtonDragged = dragged;
+    cameraController.rightGesturePeakPx = peakPx;
+    canvas.dispatchEvent(new MouseEvent('mousedown', { button: 2, clientX: 1, clientY: 1, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { button: 2, clientX: 1, clientY: 1, bubbles: true }));
+  }
+
+  function armGuided(): ReturnType<typeof vi.fn> {
+    setPickerRegion(EXACT);
+    controller.arm({ shape: 'rect' });
+    const onCancel = vi.fn();
+    controller.setCancelHandler(onCancel);
+    return onCancel;
+  }
+
+  it('tolerance is larger than the 5px orbit threshold', () => {
+    expect(GUIDED_RIGHT_CLICK_TOLERANCE_PX).toBeGreaterThan(5);
+  });
+
+  it.each([6, 20, 40])('a %ipx right-drag cancels on release while guided', (peak) => {
+    const onCancel = armGuided();
+    rightGesture(peak, true);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(controller.isArmed).toBe(false);
+  });
+
+  it('a right-drag past the tolerance orbits and stays armed', () => {
+    const onCancel = armGuided();
+    rightGesture(GUIDED_RIGHT_CLICK_TOLERANCE_PX + 1, true);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(controller.isArmed).toBe(true);
+  });
+
+  it('a still right-click (peak 0) cancels while guided', () => {
+    const onCancel = armGuided();
+    rightGesture(0, false);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(controller.isArmed).toBe(false);
+  });
+
+  it('non-guided play keeps #544: a 6px right-drag does not cancel', () => {
+    controller.arm({ shape: 'rect' });
+    const onCancel = vi.fn();
+    controller.setCancelHandler(onCancel);
+    rightGesture(6, true);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(controller.isArmed).toBe(true);
   });
 });
 
