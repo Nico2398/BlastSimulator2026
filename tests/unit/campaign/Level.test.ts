@@ -394,3 +394,16 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
     expect(getLevel('grumpstone_ridge')!.contractPriceMultiplier).toBeLessThan(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER);
   });
 });
+
+describe('fixed weather per level (#1585)', () => {
+  it('tutorial_pit pins sunny weather', () => {
+    expect(getLevel('tutorial_pit')!.fixedWeather).toBe('sunny');
+  });
+
+  it('every other level keeps its weather cycle', () => {
+    for (const level of getAllLevels()) {
+      if (level.id === 'tutorial_pit') continue;
+      expect(level.fixedWeather, level.id).toBeUndefined();
+    }
+  });
+});

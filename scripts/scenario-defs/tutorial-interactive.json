@@ -574,7 +574,11 @@
       "expect": {
         "increased": [
           "orderedChargeCount"
-        ]
+        ],
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
       }
     },
     {
@@ -593,7 +597,9 @@
       "expect": {
         "tutorialStep": "evacuate-zone",
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 9,
+          "weather": "sunny",
+          "wetHoleCount": 0
         }
       },
       "timeout": 180
@@ -630,7 +636,13 @@
           "type": "clickSelector",
           "selector": "[data-action=\"preflight-detonate\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
+      }
     },
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",

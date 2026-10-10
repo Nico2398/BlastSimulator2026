@@ -403,3 +403,63 @@ describe('forecast vs tickWeather (#1403)', () => {
     expect(predicted[n - 1]).toBe(live.current);
   });
 });
+
+describe('pinned weather cycle (#1585)', () => {
+  it('createWeatherCycle(seed, state) pins to that state', () => {
+    const c = createWeatherCycle(42, 'sunny');
+    expect(c.current).toBe('sunny');
+    expect(c.pinned).toBe(true);
+  });
+
+  it('pins to a non-default state too', () => {
+    const c = createWeatherCycle(42, 'storm');
+    expect(c.current).toBe('storm');
+    expect(c.pinned).toBe(true);
+    expect(c.history).toEqual(['storm']);
+  });
+
+  it('an unpinned cycle is unchanged: pinned undefined', () => {
+    const c = createWeatherCycle(42);
+    expect(c.pinned).toBeUndefined();
+    expect(c.current).toBe('sunny');
+  });
+
+  it('tickWeather holds the pinned state for 5000 ticks without growing history or moving the rng', () => {
+    const c = createWeatherCycle(42, 'sunny');
+    const rngBefore = c.rngState;
+    for (let i = 0; i < 5000; i++) {
+      expect(tickWeather(c)).toBe('sunny');
+    }
+    expect(c.current).toBe('sunny');
+    expect(c.history).toHaveLength(1);
+    expect(c.rngState).toBe(rngBefore);
+    expect(c.pinned).toBe(true);
+  });
+
+  it('forecast of a pinned cycle is 14 sunny days and leaves the cycle untouched', () => {
+    const c = createWeatherCycle(42, 'sunny');
+    const snapshot = JSON.parse(JSON.stringify(c));
+    expect(forecast(c, 14)).toEqual(Array(14).fill('sunny'));
+    expect(c).toEqual(snapshot);
+  });
+
+  it('an unpinned forecast still varies over a long horizon', () => {
+    expect(new Set(forecast(createWeatherCycle(42), 60)).size).toBeGreaterThan(1);
+  });
+
+  it('setWeather on a pinned cycle re-pins to the new state for tick and forecast', () => {
+    const c = createWeatherCycle(42, 'sunny');
+    setWeather(c, 'storm');
+    for (let i = 0; i < 500; i++) tickWeather(c);
+    expect(c.current).toBe('storm');
+    expect(forecast(c, 7)).toEqual(Array(7).fill('storm'));
+  });
+
+  it('survives a JSON round trip', () => {
+    const c = createWeatherCycle(42, 'sunny');
+    const copy = JSON.parse(JSON.stringify(c));
+    expect(copy.pinned).toBe(true);
+    for (let i = 0; i < 300; i++) tickWeather(copy);
+    expect(copy.current).toBe('sunny');
+  });
+});
