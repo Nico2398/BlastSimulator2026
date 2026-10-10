@@ -28,6 +28,8 @@ import { SkyboxWeather } from './SkyboxWeather.js';
 import { WindState } from './ambient/WindState.js';
 import { Random } from '../core/math/Random.js';
 import { CloudLayer } from './ambient/CloudLayer.js';
+import { RainField } from './ambient/RainField.js';
+import type { GroundSampler } from './ambient/RainSplashes.js';
 import { BirdFlocks } from './ambient/BirdFlocks.js';
 import { ChimneySmoke } from './ambient/ChimneySmoke.js';
 import { WaterSurface } from './ambient/WaterSurface.js';
@@ -78,6 +80,7 @@ export interface SceneSetupDeps {
   skybox: SkyboxWeather | null;
   windState: WindState | null;
   clouds: CloudLayer | null;
+  rain: RainField | null;
   birds: BirdFlocks | null;
   smoke: ChimneySmoke | null;
   water: WaterSurface | null;
@@ -113,6 +116,8 @@ export interface SceneSetupDeps {
   playableCut: (grid: VoxelGrid, edgeHeight?: (x: number, z: number) => number) => PlayableCut;
   rebuildBorderWall: (ctx: MiningContext) => void;
   siteBoundsChanged: (grid: VoxelGrid | null) => boolean;
+  /** Ground height rain splashes land on, read every frame — null where there is no ground to splash (#1601). */
+  getRainGroundY: GroundSampler;
 }
 
 /** Whole-scene rebuild on a new game/level (#474: runs all three load stages, then frames the camera). */
@@ -186,6 +191,8 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // frameCameraOnGrid() frames the camera on.
   deps.windState = new WindState(state.seed);
   deps.clouds = new CloudLayer(scene, state.seed, grid.minX + grid.sizeX / 2, grid.minZ + grid.sizeZ / 2);
+  // Rain (#1601): world-anchored around the view, falling on game time.
+  deps.rain = new RainField(scene, state.seed, deps.getRainGroundY);
 
   // Fragments (empty until blast runs) — shares terrain's material so a
   // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
@@ -378,6 +385,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.characters?.clearAll();
   deps.skybox?.dispose();
   deps.clouds?.dispose();
+  deps.rain?.dispose();
   if (deps.borderWall) unmarkSceneOverlay(deps.borderWall.object3d);
   deps.borderWall?.dispose();
   disposeAmbientModules(deps);
@@ -409,6 +417,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.borderWall = null;
   deps.windState = null;
   deps.clouds = null;
+  deps.rain = null;
   deps.birds = null;
   deps.smoke = null;
   deps.water = null;
