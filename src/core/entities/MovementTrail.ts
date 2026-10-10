@@ -10,6 +10,19 @@ export interface TrailPoint {
   z: number;
 }
 
+export type TrailHostKind = 'vehicle' | 'building';
+
+export type TrailHostEvent = 'board' | 'enter' | 'alight' | 'leave';
+
+/** A host transition recorded on the trail: the trail point it happened at and the host's position. */
+export interface TrailHostMarker {
+  pointIndex: number;
+  event: TrailHostEvent;
+  hostKind: TrailHostKind;
+  hostX: number;
+  hostZ: number;
+}
+
 export interface MovementTrail {
   /**
    * Positions in the order the entity occupied them. `points[0]` is where it
@@ -23,6 +36,8 @@ export interface MovementTrail {
    * relocation). The renderer snaps instead of gliding through such a jump.
    */
   relocated: boolean;
+  /** Board / enter / alight / leave transitions along `points`, in order. */
+  hostMarkers: TrailHostMarker[];
 }
 
 /** Upper bound on recorded points — a long console batch drops the oldest, never grows unbounded. */
@@ -35,7 +50,7 @@ export function isSameTrailPoint(a: TrailPoint, bx: number, bz: number): boolean
 
 /** A fresh trail anchored at (x, z) — what every entity carries when a batch opens. */
 export function openMovementTrail(x: number, z: number): MovementTrail {
-  return { points: [{ x, z }], relocated: false };
+  return { points: [{ x, z }], relocated: false, hostMarkers: [] };
 }
 
 /**
@@ -56,4 +71,22 @@ export function appendToTrail(trail: MovementTrail, fromX: number, fromZ: number
   }
   const overflow = trail.points.length - MOVEMENT_TRAIL_MAX_POINTS;
   if (overflow > 0) trail.points.splice(0, overflow);
+}
+
+/**
+ * Records a host transition at (x, z): appends the point unless it is already
+ * the tail, then pushes a marker at the last point's index. Never sets
+ * `relocated`. Mutates `trail`.
+ */
+export function appendHostTransition(
+  trail: MovementTrail,
+  x: number,
+  z: number,
+  event: TrailHostEvent,
+  hostKind: TrailHostKind,
+  hostX: number,
+  hostZ: number,
+): void {
+  // TODO: implement
+  void trail; void x; void z; void event; void hostKind; void hostX; void hostZ;
 }

@@ -951,8 +951,8 @@ describe('tickLocomotion — walk trail across a tick batch (#1199)', () => {
     const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 3, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 2, 1);
     openMovementTrails(state);
-    expect(employee.walkTrail).toEqual({ points: [{ x: 3, z: 1 }], relocated: false });
-    expect(vehicle.walkTrail).toEqual({ points: [{ x: 5, z: 2 }], relocated: false });
+    expect(employee.walkTrail).toEqual({ points: [{ x: 3, z: 1 }], relocated: false, hostMarkers: [] });
+    expect(vehicle.walkTrail).toEqual({ points: [{ x: 5, z: 2 }], relocated: false, hostMarkers: [] });
   });
 
   it('records every tick of a drive on both the driver and the vehicle, ending at their position', () => {

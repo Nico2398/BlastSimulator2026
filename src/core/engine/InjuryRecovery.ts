@@ -1,6 +1,7 @@
 // InjuryRecovery — injured employees recover over time, faster in better living quarters (#1382).
 
 import type { GameState } from '../state/GameState.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import { healEmployee, injuryTicksOf } from '../entities/Employee.js';
 import { isInsideBuilding, isMounted } from '../entities/EmployeeLocomotion.js';
@@ -32,7 +33,7 @@ function seekBed(state: GameState, emp: Employee): void {
 }
 
 /** Advance recovery for every injured employee, healing those that finish. */
-export function tickInjuryRecovery(state: GameState): void {
+export function tickInjuryRecovery(state: GameState, emitter?: EventEmitter): void {
   for (const emp of state.employees.employees) {
     if (!emp.alive || !emp.injured) continue;
     emp.injuryTicksRemaining = injuryTicksOf(emp);
@@ -46,7 +47,7 @@ export function tickInjuryRecovery(state: GameState): void {
     emp.injuryTicksRemaining -= injuryRecoveryRate(livingQuartersTierOf(state, emp));
     if (emp.injuryTicksRemaining <= 0) {
       healEmployee(state.employees, emp.id);
-      leaveBuildingIfInside(state, emp);
+      leaveBuildingIfInside(state, emp, emitter);
     }
   }
 }

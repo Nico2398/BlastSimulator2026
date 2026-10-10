@@ -498,7 +498,7 @@ describe('CharacterMesh — model animation (real assets)', () => {
 
       emp.x = 4;
       emp.z = 4;
-      emp.walkTrail = { points: [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 4 }], relocated: false };
+      emp.walkTrail = { points: [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 4 }], relocated: false, hostMarkers: [] };
       cm.update([emp], MOVE_TWEEN_DURATION_S / 2);
 
       expect(group.position.x).toBeCloseTo(4);
@@ -515,7 +515,7 @@ describe('CharacterMesh — model animation (real assets)', () => {
 
       emp.x = 3;
       emp.z = 2;
-      emp.walkTrail = { points: [{ x: 3, z: 2 }], relocated: false };
+      emp.walkTrail = { points: [{ x: 3, z: 2 }], relocated: false, hostMarkers: [] };
       cm.update([emp], 0.01);
 
       expect(group.position.x).toBe(3);

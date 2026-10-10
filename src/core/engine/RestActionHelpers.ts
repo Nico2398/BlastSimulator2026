@@ -10,6 +10,7 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { getBuildingDef, getBuildingPeopleCapacity, findNearestActiveBuildingOfType, type Building, type BuildingType } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { addExpense } from '../economy/Finance.js';
 import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
@@ -220,7 +221,7 @@ export function resolveRestBuildingId(payload: Record<string, unknown>): number 
  * restTicksRemaining/activeActionId so the employee returns to normal task
  * dispatch. Callers own any remaining wrap-up specific to their rest source.
  */
-export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey, buildingId?: number): void {
+export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey, buildingId?: number, emitter?: EventEmitter): void {
   // #1204: the exact living_quarters this rest walked to and entered, if it
   // still exists — not re-derived from the employee's current position (they
   // never moved from it while resting inside). No-building rest (buildingId
@@ -259,7 +260,7 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
   // #1204: put a resting-inside employee back out on their living_quarters'
   // ring now that the visit is over — a no-op for mounted rest or a
   // no-building rest, neither of which ever entered a building.
-  leaveBuildingIfInside(state, emp);
+  leaveBuildingIfInside(state, emp, emitter);
 }
 
 /**

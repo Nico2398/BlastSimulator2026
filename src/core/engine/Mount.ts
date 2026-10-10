@@ -19,6 +19,7 @@ import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
+import type { NavGrid } from '../nav/NavGrid.js';
 import { isStepClimbable } from '../nav/NavGrid.js';
 import { isImpassable } from '../nav/Pathfinding.js';
 
@@ -166,7 +167,7 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
 /** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
 function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter): void {
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  const cell = findAlightCell(state, vehicle);
+  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z);
   releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
   emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
 }
@@ -193,21 +194,26 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
  * The vehicle's own cell stays the fallback: whatever the terrain around it,
  * the vehicle drove there, so standing on it is reachable by construction.
  */
-function findAlightCell(state: GameState, vehicle: Vehicle): { x: number; z: number } {
-  const grid = state.navGrid;
-  if (!grid) return { x: vehicle.x, z: vehicle.z };
+export function findAlightCell(
+  grid: NavGrid | undefined,
+  vx: number,
+  vz: number,
+  toward?: { x: number; z: number },
+): { x: number; z: number } {
+  void toward; // TODO: implement
+  if (!grid) return { x: vx, z: vz };
 
-  const from = grid.cellAt(vehicle.x, vehicle.z)?.surfaceY;
+  const from = grid.cellAt(vx, vz)?.surfaceY;
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-    const x = vehicle.x + dx;
-    const z = vehicle.z + dz;
+    const x = vx + dx;
+    const z = vz + dz;
     const cell = grid.cellAt(x, z);
     if (!cell || isImpassable(cell, true)) continue;
     if (!isStepClimbable(from, cell.surfaceY, Math.hypot(dx, dz))) continue;
     return { x, z };
   }
 
-  return { x: vehicle.x, z: vehicle.z };
+  return { x: vx, z: vz };
 }
 
 /**
