@@ -100,6 +100,68 @@
         { "type": "awaitUsable", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
       ],
       "expect": { "usable": "#bs-employee-panel [data-role=\"driller\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1634: live game, player opens Settings and clicks Return to Main Menu (confirm); the main menu shows a usable Resume.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" },
+        { "type": "clickSelector", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
+        { "type": "awaitUsable", "selector": "#bs-menu-resume" }
+      ],
+      "expect": { "usable": "#bs-menu-resume" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1634: with a live game behind the menu, clicking TUTORIAL asks for confirmation instead of starting; Resume is still offered.",
+      "role": "player",
+      "interaction": [
+        { "type": "awaitUsable", "selector": "#bs-main-menu #bs-menu-tutorial" },
+        { "type": "clickSelector", "selector": "#bs-main-menu #bs-menu-tutorial" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" }
+      ],
+      "expect": { "usable": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1634: the confirm still shows the Resume button underneath.",
+      "role": "player",
+      "interaction": [
+        { "type": "awaitUsable", "selector": "#bs-menu-resume" }
+      ],
+      "expect": { "usable": "#bs-menu-resume" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1634: player cancels; the confirm is gone and Resume is still usable.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-cancel\"]" },
+        { "type": "awaitUsable", "selector": "#bs-menu-resume" }
+      ],
+      "expect": { "usable": "#bs-menu-resume", "blocked": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1634: player clicks TUTORIAL again and confirms; the tutorial restarts at its first step.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-main-menu #bs-menu-tutorial" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
+        { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
+        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+      ],
+      "expect": { "tutorialStep": "hire-surveyor" }
     }
   ]
 }
