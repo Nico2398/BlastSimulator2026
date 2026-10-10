@@ -420,3 +420,13 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
   };
 }
 
+
+/** True if `contracts.active` holds an incomplete ore_sale contract (#1626). */
+export function hasActiveOreSale(_state: GameState): boolean {
+  return false; // TODO: implement (#1626)
+}
+
+/** True if any employee has a booked/active training in `skill` (#1626). */
+export function hasBookedTraining(_state: GameState, _skill: string): boolean {
+  return false; // TODO: implement (#1626)
+}

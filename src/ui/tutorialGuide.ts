@@ -268,6 +268,14 @@ export interface ClockProgress {
 }
 
 /**
+ * Whether the current step's player order has been issued: `true` once issued,
+ * `false` while pending, `null` when the step has no player order (#1626).
+ */
+export function resolveOrderIssued(_stages: TutorialStage[], _state: GameState | null): boolean | null {
+  return null; // TODO: implement (#1626)
+}
+
+/**
  * Whether an employee still has work outstanding: a queued/active action, or
  * movement in flight with no action attached yet (see `isWorkInProgress`).
  * Shared by `isWorkInProgress` and `workSignature` so the two stay in sync.
@@ -403,6 +411,7 @@ export function decideClock(
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
   clockMustRun: boolean = false,
+  _orderPending: boolean = false, // TODO: implement (#1626) — player order issued but not yet resolved
 ): ClockDecision {
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);
