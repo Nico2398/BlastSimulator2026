@@ -130,7 +130,10 @@ export class PlacementController {
   get activeRegion(): TileRegion | null { return this.region; }
 
   /** Where a point ghost previews while hovering: the exact region's pin when the hovered tile is live, else the raw hovered tile, else null. */
-  get previewOrigin(): { x: number; z: number } | null { return null; // TODO: implement
+  get previewOrigin(): { x: number; z: number } | null {
+    const tile = this.hoverTile;
+    if (!tile) return null;
+    return this.checkOrigin(tile);
   }
   /** Tile the pointer is over that the region refuses, or null. The overlay marks it red and the strip explains it. */
   get refusedTile(): { x: number; z: number } | null { return this.blockedTile; }
@@ -304,6 +307,12 @@ export class PlacementController {
     return regionContains(live, tile.x, tile.z);
   }
 
+  /** Tile a placement at `tile` is judged and previewed at: the exact region's pin when `tile` is live, else `tile` itself. */
+  private checkOrigin(tile: { x: number; z: number }): { x: number; z: number } {
+    if (this.region?.exact && this.isLive(tile)) return { x: this.region.x1, z: this.region.z1 };
+    return tile;
+  }
+
   /**
    * Region-liveness, claim-refusal and footprint-check outcome for a single
    * tile, shared by onMouseMove/onMouseDown/paintRect so the three tile-check
@@ -316,11 +325,14 @@ export class PlacementController {
     footprintCheckFailed: boolean;
   } {
     const regionLive = tile !== null && this.isLive(tile);
-    const claimRefusalReason = tile !== null && regionLive
-      ? (this.claimCheck?.(tile.x, tile.z) ?? null)
+    // An exact region pins the placement, so claim and footprint are judged at
+    // the pin however the cursor sits in the margin (#1594); liveness stays raw.
+    const at = tile !== null && regionLive ? this.checkOrigin(tile) : null;
+    const claimRefusalReason = at !== null
+      ? (this.claimCheck?.(at.x, at.z) ?? null)
       : null;
-    const footprintCheckFailed = tile !== null && regionLive && claimRefusalReason === null && this.footprintCheck !== null
-      ? !this.footprintCheck(tile.x, tile.z)
+    const footprintCheckFailed = at !== null && claimRefusalReason === null && this.footprintCheck !== null
+      ? !this.footprintCheck(at.x, at.z)
       : false;
     return { regionLive, claimRefusalReason, footprintCheckFailed };
   }
@@ -336,9 +348,12 @@ export class PlacementController {
 
     this.hoverTile = tile;
     const { regionLive, claimRefusalReason, footprintCheckFailed } = this.evaluateTileChecks(tile);
-    this.claimRefusalReason = claimRefusalReason;
-    this.footprintCheckFailed = footprintCheckFailed;
-    const live = regionLive && this.claimRefusalReason === null;
+    // Once selected, the verdict stays as at selection time; only the hover moves.
+    if (this.phase !== 'selected') {
+      this.claimRefusalReason = claimRefusalReason;
+      this.footprintCheckFailed = footprintCheckFailed;
+    }
+    const live = regionLive && claimRefusalReason === null;
     // Out-of-bounds (region OR claim refusal) reads as refused rather than as
     // nothing at all: the overlay paints this tile red and the strip says why.
     this.blockedTile = tile !== null && !live ? tile : null;
