@@ -17,7 +17,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   tutorialHazards, chebyshevRectDistance, tutorialSiteFootprintRect, isTutorialSiteHazardClear,
-  routeDistanceToRect, REGION, type TutorialHazard,
+  routeDistanceToRect, REGION, tutorialVehicleSpawnPoint, TUTORIAL_POST_SURVEY_WORLD_SIZE,
+  type TutorialHazard,
 } from '../../../src/ui/tutorialStages.js';
 import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import {
@@ -36,7 +37,8 @@ import {
   type BuildingType, type BuildingTier, type FootprintOccupant,
 } from '../../../src/core/entities/Building.js';
 import { siteBounds } from '../../../src/console/commands/buildingHelpers.js';
-import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { NavGrid, isStepClimbable, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { findPath } from '../../../src/core/nav/Pathfinding.js';
 
 /**
  * The three tutorial pins, in the order the tutorial rail actually orders
@@ -305,6 +307,123 @@ describe('tutorial site layout rule (#1040)', () => {
 
       const distance = routeDistanceToRect(ctx.state!.navGrid!, pin.region, drillHazardRegion);
       expect(distance).toBeLessThanOrEqual(TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST);
+    });
+  });
+
+
+  // ── #1587: the drill pattern sits on drivable ground, vehicles spawn off it ──
+
+  describe('post-survey drill area (#1587)', () => {
+    let state: NonNullable<MiningContext['state']>;
+    let navGrid: NavGrid;
+    /** Vehicle tiles right after each real purchase, in purchase order. */
+    const purchased: Array<{ type: string; x: number; z: number }> = [];
+
+    /** Planned hole cells: every GRID_SPACING-th cell across REGION.drill. */
+    const SPACING = 4;
+    const holes: Array<{ x: number; z: number }> = [];
+    for (let z = REGION.drill.z1; z <= REGION.drill.z2; z += SPACING) {
+      for (let x = REGION.drill.x1; x <= REGION.drill.x2; x += SPACING) holes.push({ x, z });
+    }
+
+    beforeAll(() => {
+      const { runner, ctx: c } = createRunner();
+      const run = (cmd: string): void => {
+        const r = runner.run(cmd);
+        expect(r.success, `${cmd}: ${r.output}`).toBe(true);
+      };
+      run('campaign start level:tutorial_pit');
+      run('tutorial_start');
+      run('time resume');
+      run('employee hire role:surveyor');
+      const surveyor = c.state!.employees.employees[0]!;
+      run(`employee assign_skill ${surveyor.id} skill:geology level:3`);
+      run(`survey seismic x:${REGION.survey.x1} z:${REGION.survey.z1}`);
+      for (let i = 0; i < 40; i++) run('tick 10');
+
+      state = c.state!;
+      expect(state.navGrid).not.toBeNull();
+      navGrid = state.navGrid!;
+      state.cash = 10_000_000;
+
+      for (const type of ['drill_rig', 'rock_digger', 'debris_hauler']) {
+        run(`vehicle buy ${type}`);
+        const v = state.vehicles.vehicles[state.vehicles.vehicles.length - 1]!;
+        purchased.push({ type, x: v.x, z: v.z });
+      }
+    });
+
+    it('the survey grows the world to TUTORIAL_POST_SURVEY_WORLD_SIZE', () => {
+      expect(state.world.sizeX).toBe(TUTORIAL_POST_SURVEY_WORLD_SIZE);
+      expect(state.world.sizeZ).toBe(TUTORIAL_POST_SURVEY_WORLD_SIZE);
+    });
+
+    it('every 8-neighbour step in REGION.drill plus a 1-cell margin is climbable', () => {
+      const x1 = REGION.drill.x1 - 1, x2 = REGION.drill.x2 + 1;
+      const z1 = REGION.drill.z1 - 1, z2 = REGION.drill.z2 + 1;
+      const bad: string[] = [];
+      for (let z = z1; z <= z2; z++) {
+        for (let x = x1; x <= x2; x++) {
+          const from = navGrid.cells[z]?.[x];
+          if (!from) continue;
+          for (let dz = -1; dz <= 1; dz++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dz === 0) continue;
+              const nx = x + dx, nz = z + dz;
+              if (nx < x1 || nx > x2 || nz < z1 || nz > z2) continue;
+              const to = navGrid.cells[nz]?.[nx];
+              if (!to) continue;
+              if (!isStepClimbable(from.surfaceY, to.surfaceY, Math.hypot(dx, dz))) {
+                bad.push(`(${x},${z})->(${nx},${nz})`);
+              }
+            }
+          }
+        }
+      }
+      expect(bad, `unclimbable steps: ${bad.length}`).toEqual([]);
+    });
+
+    it('the worst hole-pair path cost is within 1.5x the octile distance', () => {
+      const octile = (dx: number, dz: number): number => {
+        const a = Math.abs(dx), b = Math.abs(dz);
+        return Math.max(a, b) + (Math.SQRT2 - 1) * Math.min(a, b);
+      };
+      let worst = 0;
+      let worstPair = '';
+      for (const a of holes) {
+        for (const b of holes) {
+          if (a === b) continue;
+          const path = findPath(navGrid, {
+            agentId: -1, fromX: a.x, fromZ: a.z, toX: b.x, toZ: b.z, avoidVehicles: false,
+          });
+          const ratio = path.found ? path.totalCost / octile(b.x - a.x, b.z - a.z) : Infinity;
+          if (ratio > worst) { worst = ratio; worstPair = `(${a.x},${a.z})->(${b.x},${b.z})`; }
+        }
+      }
+      expect(holes.length).toBeGreaterThan(1);
+      expect(worst, `worst pair ${worstPair}`).toBeLessThanOrEqual(1.5);
+    });
+
+    it('purchased vehicles (rig, digger, third slot) all spawn outside REGION.drill', () => {
+      expect(purchased).toHaveLength(3);
+      for (const v of purchased) {
+        const inside = v.x >= REGION.drill.x1 && v.x <= REGION.drill.x2
+          && v.z >= REGION.drill.z1 && v.z <= REGION.drill.z2;
+        expect(inside, `${v.type} at (${v.x},${v.z})`).toBe(false);
+      }
+    });
+
+    it('no purchased vehicle starts on a planned hole', () => {
+      for (const v of purchased) {
+        expect(holes.some((h) => h.x === v.x && h.z === v.z), `${v.type} at (${v.x},${v.z})`).toBe(false);
+      }
+    });
+
+    it('tutorialVehicleSpawnPoint(realNavGrid) equals the first real purchase position', () => {
+      const spawn = tutorialVehicleSpawnPoint(navGrid);
+      expect(spawn.x1).toBe(spawn.x2);
+      expect(spawn.z1).toBe(spawn.z2);
+      expect({ x: spawn.x1, z: spawn.z1 }).toEqual({ x: purchased[0]!.x, z: purchased[0]!.z });
     });
   });
 

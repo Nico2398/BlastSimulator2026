@@ -22,6 +22,7 @@ import {
 import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
+import { REGION } from '../../../src/ui/tutorialStages.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { HIRING_COSTS, BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../../src/core/config/balance.js';
 
@@ -39,25 +40,16 @@ interface PinnedRegion {
 
 /**
  * The tutorial's guided-build regions (`REGION.warehouse`/`drivingCenter`/
- * `livingQuarters` in src/ui/tutorialStages.ts, duplicated here rather than
- * imported — this is an integration test for core/console behaviour, not a
- * UI dependency). Pinned to coordinates verified flat against the real
+ * `livingQuarters` in src/ui/tutorialStages.ts, derived from REGION so the
+ * pins can never go stale). Pinned to coordinates verified flat against the real
  * generated tutorial_pit seed-42 terrain for their own building's footprint
  * (#1008 — the real placement path now enforces flatness, and the tutorial
  * must land on ground that actually satisfies it).
  */
 const PINNED_REGIONS: Record<'warehouse' | 'drivingCenter' | 'livingQuarters', PinnedRegion> = {
-  warehouse: { type: 'freight_warehouse', tier: 1, x: 6, z: 9 },
-  drivingCenter: { type: 'driving_center', tier: 1, x: 6, z: 7 },
-  // #1008-followup (PR #1023): moved from (12,15) to (6,16) — flat (this
-  // test's own Test 2 proves that), then to (29,12) — also flat — after a
-  // second real interaction-mode CI run showed (6,16) deadlocks box-cut too,
-  // just a different way (a fatigue/rest round-trip livelock, not a
-  // stranding). Flatness alone was never sufficient; see tutorialStages.ts's
-  // own REGION comment for the full trace and the new coordinate's
-  // clearance margin against every hazard this file's history has actually
-  // reproduced a deadlock at.
-  livingQuarters: { type: 'living_quarters', tier: 1, x: 29, z: 12 },
+  warehouse: { type: 'freight_warehouse', tier: 1, x: REGION.warehouse.x1, z: REGION.warehouse.z1 },
+  drivingCenter: { type: 'driving_center', tier: 1, x: REGION.drivingCenter.x1, z: REGION.drivingCenter.z1 },
+  livingQuarters: { type: 'living_quarters', tier: 1, x: REGION.livingQuarters.x1, z: REGION.livingQuarters.z1 },
 };
 
 /**
@@ -253,9 +245,9 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
     // Helper to collect surface height info for diagnostic purposes
     const coords: Array<[number, number, string]> = [
       [10, 10, 'survey target'],
-      [6, 9, 'warehouse footprint origin'],
-      [6, 7, 'driving center footprint origin'],
-      [29, 12, 'living quarters footprint origin'],
+      [PINNED_REGIONS.warehouse.x, PINNED_REGIONS.warehouse.z, 'warehouse footprint origin'],
+      [PINNED_REGIONS.drivingCenter.x, PINNED_REGIONS.drivingCenter.z, 'driving center footprint origin'],
+      [PINNED_REGIONS.livingQuarters.x, PINNED_REGIONS.livingQuarters.z, 'living quarters footprint origin'],
       [10, 16, 'ramp origin'],
     ];
 

@@ -4,7 +4,7 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSt
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { victoryProgress, goalChipParams } from '../../../src/ui/tutorialStepsClosing.js';
-import { TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_STAGES, REGION } from '../../../src/ui/tutorialStages.js';
 import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';
 import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
@@ -906,10 +906,10 @@ describe('tutorialSteps', () => {
   // thresholds (BlastExecution.ts) are untouched — only the tutorial's plan
   // parameters move.
   describe('retuned scripted blast plan (#949)', () => {
-    it('drill-plan orders a 4m-spacing grid at start:22,20, not the old overloaded 5m-spacing plan', () => {
+    it('drill-plan orders a 4m-spacing grid at the REGION.drill origin, not the old overloaded 5m-spacing plan', () => {
       const step = TUTORIAL_STEPS.find((s) => s.id === 'drill-plan')!;
       expect(step.commands).toEqual([
-        'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20',
+        `drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${REGION.drill.x1},${REGION.drill.z1}`,
       ]);
     });
 
