@@ -9,7 +9,10 @@ import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import type { MovementTrail } from '../core/entities/MovementTrail.js';
 import { tagPickable } from './Pickable.js';
-import { applyEasedPosition, createTween, type MovementTween } from './MovementInterpolation.js';
+import {
+  applyEasedPosition, createTween, startSpanPlayback, stepSpanPlayback, trailLength, visibleTrailSpans,
+  type MovementTween, type TrailSpan,
+} from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { workerModelId } from './models/ModelIds.js';
@@ -67,7 +70,17 @@ interface CharacterEntry {
   /** Walk-cycle phase (radians) and how much of the gait is blended in (0..1). */
   phase: number;
   stride: number;
+  /** Full trail length the span pace is measured against (#1589). */
+  fullTrailLength: number;
+  /** True while the mesh plays its last spans up to a host marker before removal (#1589). */
+  retiring: boolean;
+  /** True on the frame a span ended and the next one has not begun — the gap is hidden (#1589). */
+  gapHidden: boolean;
 }
+
+const EXIT_EVENTS = new Set(['alight', 'leave']);
+/** Most visible spans a retiring mesh plays; trips in between are skipped. */
+const MAX_RETIRING_SPANS = 2;
 
 // ---------- Main class ----------
 
@@ -83,16 +96,27 @@ export class CharacterMesh {
   }
 
   addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail): void {
-    void trail; // TODO: implement (#1589) spawn at alight/leave marker
+    this.removeEmployee(employee.id); // a mesh still retiring is dropped first (#1589)
+    const exitSpan = trail && !trail.relocated && trail.hostMarkers.some(m => EXIT_EVENTS.has(m.event))
+      ? visibleTrailSpans(trail).filter(sp => !sp.endsInHost).pop()
+      : undefined;
+    const start = exitSpan?.points[0] ?? employee;
     const group = new THREE.Group();
     const { instance, nodes } = this.attachModel(group, employee);
-    group.position.set(employee.x, surfaceY, employee.z);
+    group.position.set(start.x, surfaceY, start.z);
     tagPickable(group, 'employee', employee.id);
     this.scene.add(group);
+    const tween = createTween(start.x, start.z);
+    const fullTrailLength = trail ? trailLength(trail.points) : 0;
+    if (exitSpan) {
+      // Walk out of the host along the recorded span; no fresh chord tween (#1589).
+      tween.targetX = employee.x;
+      tween.targetZ = employee.z;
+      startSpanPlayback(tween, [exitSpan], fullTrailLength);
+    }
     this.characters.set(employee.id, {
       group, instance, nodes, employee, evacuating: false,
-      tween: createTween(employee.x, employee.z),
-      phase: 0, stride: 0,
+      tween, phase: 0, stride: 0, fullTrailLength, retiring: false, gapHidden: false,
     });
   }
 
@@ -117,6 +141,17 @@ export class CharacterMesh {
       // route the simulation actually walked this batch (#1199).
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
+      if (entry.retiring || (entry.tween.spans && this.tweenTargetIs(entry, emp))) {
+        const finished = this.playSpans(entry, dt, heightAt);
+        this.animateGait(entry, entry.group.position.x - fromX, entry.group.position.z - fromZ, dt);
+        if (finished && entry.retiring) {
+          this.removeEmployee(emp.id);
+          continue;
+        }
+        entry.group.visible = !entry.gapHidden;
+        continue;
+      }
+      entry.tween.spans = undefined;
       const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, emp.x, emp.z, dt, heightAt, emp.walkTrail);
       this.animateGait(entry, eased.x - fromX, eased.z - fromZ, dt);
 
@@ -170,15 +205,40 @@ export class CharacterMesh {
     }
   }
 
-  /** Keep the mesh until it reaches the host enter/board marker, then remove it (#1589). */
+  /**
+   * Keep the mesh and play its trail up to the host board/enter marker, then remove it (#1589).
+   * Without a usable walk trail the mesh goes at once.
+   */
   retireEmployee(employee: Employee): void {
-    void employee; // TODO: implement
+    const entry = this.characters.get(employee.id);
+    if (!entry || entry.retiring) return;
+    const trail = employee.walkTrail;
+    const spans = trail ? visibleTrailSpans(trail) : [];
+    const first = spans[0];
+    if (!trail || !first) {
+      this.removeEmployee(employee.id);
+      return;
+    }
+    const played: TrailSpan[] = spans.length > MAX_RETIRING_SPANS ? [first, spans[spans.length - 1]!] : spans;
+    // Start from where the mesh really is, so it walks on rather than popping to the trail start.
+    const { x, z } = entry.group.position;
+    const head = first.points[0]!;
+    const lead = Math.hypot(head.x - x, head.z - z);
+    if (lead > 1e-6) played[0] = { ...first, points: [{ x, z }, ...first.points] };
+    entry.retiring = true;
+    entry.gapHidden = false;
+    entry.fullTrailLength = trailLength(trail.points) + lead;
+    startSpanPlayback(entry.tween, played, entry.fullTrailLength);
   }
 
   /** True while a mesh is playing out its final span before removal (#1589). */
   isRetiring(id: number): boolean {
-    void id;
-    return false; // TODO: implement
+    return this.characters.get(id)?.retiring ?? false;
+  }
+
+  /** Ids of meshes still playing out their final span (#1589). */
+  retiringIds(): number[] {
+    return [...this.characters.entries()].filter(([, e]) => e.retiring).map(([id]) => id);
   }
 
   removeEmployee(id: number): void {
@@ -254,6 +314,26 @@ export class CharacterMesh {
       legR: instance.node('LegR'),
     };
     return { instance, nodes };
+  }
+
+  private tweenTargetIs(entry: CharacterEntry, emp: Employee): boolean {
+    return entry.tween.targetX === emp.x && entry.tween.targetZ === emp.z;
+  }
+
+  /** Steps span playback and places the group; returns true once the last span has finished. */
+  private playSpans(entry: CharacterEntry, dt: number, heightAt?: (x: number, z: number) => number): boolean {
+    const { position } = entry.group;
+    const step = stepSpanPlayback(entry.tween, position.x, position.z, dt, entry.fullTrailLength);
+    position.x = step.x;
+    position.z = step.z;
+    if (heightAt) position.y = heightAt(step.x, step.z);
+    // Hidden for the frame that crosses from one span to the next (the ride in between is not shown).
+    entry.gapHidden = step.spanDone && !step.finished;
+    if (step.finished && !entry.retiring) {
+      entry.tween.spans = undefined;
+      entry.tween.path = null;
+    }
+    return step.finished;
   }
 
   /** Face the direction of travel and swing limbs while moving; settle back to rest when still. */

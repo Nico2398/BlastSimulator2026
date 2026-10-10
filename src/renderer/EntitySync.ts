@@ -97,19 +97,21 @@ export function syncEntitySets(
     // picked in the scene either; leaving brings the mesh back.
     for (const e of state.employees.employees) {
       if (isOccupyingHost(e.locomotion)) {
+        // The mesh walks on to the host's door/seat before it goes (#1589).
         if (renderedEmployeeIds.has(e.id)) {
-          characters.removeEmployee(e.id);
+          characters.retireEmployee(e);
           renderedEmployeeIds.delete(e.id);
         }
         continue;
       }
       if (!renderedEmployeeIds.has(e.id)) {
-        characters.addEmployee(e);
+        characters.addEmployee(e, getSurfaceY(e.x, e.z), e.walkTrail);
         renderedEmployeeIds.add(e.id);
       }
     }
-    for (const id of [...renderedEmployeeIds]) {
-      if (!state.employees.employees.find(e => e.id === id)) {
+    const liveIds = new Set(state.employees.employees.map(e => e.id));
+    for (const id of [...renderedEmployeeIds, ...characters.retiringIds()]) {
+      if (!liveIds.has(id)) {
         characters.removeEmployee(id);
         renderedEmployeeIds.delete(id);
       }

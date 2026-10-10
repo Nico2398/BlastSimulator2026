@@ -21,7 +21,7 @@ export interface MovementTween {
    */
   path: TrailPoint[] | null;
   /** Visible spans of the trail, split at host markers (#1589). Absent for a plain glide. */
-  spans?: TrailSpan[];
+  spans?: TrailSpan[] | undefined;
   /** Index into `spans` of the span currently playing (#1589). */
   spanIndex?: number;
   /** Real seconds the current span takes to play (#1589). */
@@ -40,19 +40,60 @@ export interface TrailSpan {
 /**
  * Splits a trail at its host markers into visible spans: start..first board/enter,
  * alight/leave..next board/enter, ..., last exit..end. No markers: one span, all points.
+ * A trail that starts with an exit begins hosted, so its first span starts at that exit.
  */
 export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
-  void trail;
-  return []; // TODO: implement
+  const { points, hostMarkers } = trail;
+  if (points.length === 0) return [];
+  if (hostMarkers.length === 0) return [{ points: points.slice(), endsInHost: false }];
+  if (trail.relocated) return [];
+  const last = points.length - 1;
+  const spans: TrailSpan[] = [];
+  const firstEvent = hostMarkers[0]!.event;
+  let inBody = firstEvent !== 'alight' && firstEvent !== 'leave';
+  let start = 0;
+  for (const m of hostMarkers) {
+    const idx = Math.min(last, Math.max(0, m.pointIndex));
+    const exits = m.event === 'alight' || m.event === 'leave';
+    if (!exits && inBody) {
+      spans.push({ points: points.slice(start, idx + 1), endsInHost: true });
+      inBody = false;
+    } else if (exits && !inBody) {
+      start = idx;
+      inBody = true;
+    }
+  }
+  if (inBody) spans.push({ points: points.slice(start), endsInHost: false });
+  return spans;
 }
 
 /** Arc length of a polyline. */
 export function trailLength(points: readonly TrailPoint[]): number {
-  void points;
-  return 0; // TODO: implement
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.z - points[i - 1]!.z);
+  }
+  return total;
 }
 
-/** Advances span playback by dt; reports the new position and whether the span / whole trail finished. */
+function spanDuration(span: TrailSpan | undefined, fullTrailLength: number): number {
+  if (!span || fullTrailLength <= 0) return 0;
+  return MOVE_TWEEN_DURATION_S * trailLength(span.points) / fullTrailLength;
+}
+
+/** Begins playing `spans` from the first one; pace stays constant across the whole trail. */
+export function startSpanPlayback(tween: MovementTween, spans: TrailSpan[], fullTrailLength: number): void {
+  tween.spans = spans;
+  tween.spanIndex = 0;
+  tween.elapsedS = 0;
+  tween.spanDurationS = spanDuration(spans[0], fullTrailLength);
+}
+
+/**
+ * Advances span playback by dt; reports the new position and whether the span / whole trail finished.
+ * On a finished span that is not the last, the tween moves on to the next span (position reported is the
+ * finished span's end, so the caller can hide the gap).
+ */
 export function stepSpanPlayback(
   tween: MovementTween,
   renderX: number,
@@ -60,8 +101,22 @@ export function stepSpanPlayback(
   dt: number,
   fullTrailLength: number,
 ): { x: number; z: number; spanDone: boolean; finished: boolean } {
-  void tween; void renderX; void renderZ; void dt; void fullTrailLength;
-  return { x: 0, z: 0, spanDone: false, finished: false }; // TODO: implement
+  const spans = tween.spans ?? [];
+  const index = tween.spanIndex ?? 0;
+  const span = spans[index];
+  if (!span || span.points.length === 0) return { x: renderX, z: renderZ, spanDone: true, finished: true };
+  const duration = tween.spanDurationS ?? 0;
+  tween.elapsedS += dt;
+  const done = tween.elapsedS >= duration;
+  const pos = pointAlongTrail(span.points, done ? 1 : tween.elapsedS / duration);
+  if (!done) return { ...pos, spanDone: false, finished: false };
+  const finished = index >= spans.length - 1;
+  if (!finished) {
+    tween.spanIndex = index + 1;
+    tween.elapsedS = 0;
+    tween.spanDurationS = spanDuration(spans[index + 1], fullTrailLength);
+  }
+  return { ...pos, spanDone: true, finished };
 }
 
 // Real seconds a mesh takes to ease from one GameState position update to the next.
