@@ -631,6 +631,24 @@ function explosiveTierResolver(
   return (x, z) => tiers[(z - box.minZ) * nx + (x - box.minX)]!;
 }
 
+/**
+ * Generate now the terrain a blast of `holes` would read (#1603).
+ *
+ * Rock below the surface is generated lazily, slab by slab, the first time
+ * anything reads it — and a blast's zone reaches deeper than anything else
+ * usually does, so detonating used to pay for generating it: about a quarter of
+ * a large blast's frame. Calling this as each charge is loaded moves that work
+ * to the charging, a few slabs at a time. The blast reads the same values
+ * either way; only when the generation happens changes.
+ */
+export function prefetchBlastZone(grid: VoxelGrid, holes: readonly DrillHole[]): void {
+  if (holes.length === 0) return;
+  const holeSurfaceYs: Record<string, number> = {};
+  for (const hole of holes) holeSurfaceYs[hole.id] = firstEmptyLayerAboveGround(grid, hole.x, hole.z);
+  const zone = calculateBlastZone(holes, holeSurfaceYs);
+  grid.prefetchSlabs(zone.minX, zone.maxX, zone.minY, zone.maxY, zone.minZ, zone.maxZ);
+}
+
 function calculateBlastZone(
   holes: readonly DrillHole[],
   holeSurfaceYs: Record<string, number>,

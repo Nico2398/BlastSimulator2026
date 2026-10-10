@@ -10,7 +10,9 @@ import {
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
-import { executeBlast, buildBlastReport, villagePositions, averageVibrationMod, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport, villagePositions, averageVibrationMod, prefetchBlastZone, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
+import { chunkIndexOf } from '../../../src/core/world/VoxelGrid.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { GRAVITY } from '../../../src/core/config/balance.js';
@@ -570,5 +572,47 @@ describe('averageVibrationMod', () => {
     const a = run('pop_rock');
     const b = run('big_bada_boom');
     expect(a.vib / a.mod).toBeCloseTo(b.vib / b.mod, 6);
+  });
+});
+
+describe('prefetchBlastZone (#1603)', () => {
+  const site = () => generateTerrain({ sizeX: 48, datum: 40, sizeZ: 48, seed: 11, climateBias: [0, 0] });
+  const planOn = () => {
+    const holes = createGridPlan({ nextHoleId: 1 }, { x: 18, z: 18 }, 2, 3, 4, 10, 0.15);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'boomite', 8, 2);
+    return { holes, plan: assembleBlastPlan(holes, charges) };
+  };
+
+  it('generates the slabs the blast zone reaches before any blast reads them', () => {
+    const grid = site();
+    const { holes } = planOn();
+    const deepest = Math.min(...holes.map(h => computeVoxelColumnSurfaceY(grid, h.x, h.z)! - h.depth)) - 5;
+    const before = grid.allocatedCyRange(chunkIndexOf(18), chunkIndexOf(18));
+    prefetchBlastZone(grid, holes);
+    const after = grid.allocatedCyRange(chunkIndexOf(18), chunkIndexOf(18))!;
+    expect(after.min).toBeLessThanOrEqual(chunkIndexOf(deepest));
+    expect(after).not.toEqual(before);
+  });
+
+  it('leaves the blast it precedes exactly as it would have been', () => {
+    const plain = site();
+    const prefetched = site();
+    const { holes, plan } = planOn();
+    prefetchBlastZone(prefetched, holes);
+    const a = executeBlast(plan, plain, [])!;
+    const b = executeBlast(plan, prefetched, [])!;
+    expect(b.fragmentCount).toBeGreaterThan(0);
+    expect(b.fragments).toEqual(a.fragments);
+    expect(b.flights).toEqual(a.flights);
+    expect(b.clearedColumns).toEqual(a.clearedColumns);
+  });
+
+  it('does nothing for an empty hole list', () => {
+    const grid = site();
+    const before = grid.allocatedCyRange(1, 1);
+    prefetchBlastZone(grid, []);
+    expect(grid.allocatedCyRange(1, 1)).toEqual(before);
   });
 });

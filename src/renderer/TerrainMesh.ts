@@ -13,13 +13,17 @@
 
 import * as THREE from 'three';
 import { CHUNK_SIZE as VOXEL_CHUNK_SIZE, chunkIndexOf, computeColumnRangeY, type VoxelGrid, getSmoothTerrainSurfaceY } from '../core/world/VoxelGrid.js';
-import { surfaceDensityAt } from '../core/world/TerrainGen.js';
-import { haloSurfaceHeight, meshedCellRect } from './terrain/PlayableCoverage.js';
+import { meshedCellRect } from './terrain/PlayableCoverage.js';
+import { ChunkRemeshBatch, type QueuedChunk } from './terrain/ChunkRemeshBatch.js';
+import { ChunkFieldCache, CUBE_CORNER_OFFSETS, type CornerSample, type EdgeHeightSampler } from './terrain/TerrainField.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { EDGE_TABLE, TRI_TABLE } from './MarchingCubesTables.js';
 import { TerrainMaterial } from './terrain/TerrainMaterial.js';
 import { SurveyConfidenceOverlay } from './SurveyConfidenceOverlay.js';
+
+// The density field moved to terrain/TerrainField.ts (#1603); its public samplers stay importable from here.
+export { densityGradientNormal, virtualEdgeDensity, type EdgeHeightSampler } from './terrain/TerrainField.js';
 
 // Re-export survey overlay types/class so consumers can import from either location.
 export { SurveyConfidenceOverlay, confidenceToColor } from './SurveyConfidenceOverlay.js';
@@ -52,28 +56,6 @@ export interface DirtyRegion {
   maxX: number; maxY: number; maxZ: number;
 }
 
-export type EdgeHeightSampler = (x: number, z: number) => number;
-
-/**
- * Density for a column TerrainMesh does not own, standing in the neighbouring
- * landscape's ground where the grid has nothing (#559 for normals, #907 for
- * geometry).
- *
- * This is `TerrainGen.surfaceDensityAt` — literally the function the core fills
- * a real column with — not a look-alike beside it. That matters twice over.
- * The obvious reason is that the halo column then reads exactly as if the grid
- * owned it, so nothing about the mesh changes character at the site edge. The
- * sharper one is the band width: `surfaceDensityAt` ramps over two voxels
- * precisely so that the two samples straddling the surface are both unclamped
- * and marching cubes' linear crossing lands on the height exactly. The one-
- * voxel ramp this used to carry (`surfaceHeight + 0.5 - y`) always clamps on
- * one side of the crossing, which bends it by up to 8.6 cm — tolerable when it
- * only tilted a normal, a visible step once it decides where the ground is.
- */
-export function virtualEdgeDensity(surfaceHeight: number, y: number): number {
-  return surfaceDensityAt(y, surfaceHeight);
-}
-
 // ---------- Edge vertex lookup: for each of 12 cube edges, which 2 corners ----------
 const EDGE_CORNERS: readonly [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 0],
@@ -82,128 +64,7 @@ const EDGE_CORNERS: readonly [number, number][] = [
 ];
 
 // Corner offsets in (dx, dy, dz) within a cube cell
-const CORNER_OFFSETS: readonly [number, number, number][] = [
-  [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
-  [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
-];
-
-/** Per-corner samples used both for the surface threshold and the emitted vertex attributes. */
-interface CornerSample {
-  density: number;
-  rockId: string;
-  /** Highest-density ore id at this corner, or '' if none. */
-  oreId: string;
-  oreAmt: number;
-}
-
-/**
- * Density at one integer lattice corner: the grid's own where it owns the
- * column, and the neighbouring landscape's ground where it does not.
- *
- * Geometry and normals read the SAME field. #559 extended the field past the
- * site for normals only, on the reasoning that topology should stay the grid's
- * business — but that left the halo cube marching solid rock against air, so
- * the mesh's outer boundary fell on the x/z-edge crossings roughly half a metre
- * inside the halo and a voxel below the surface, while the landscape stopped a
- * full metre out. The half-metre of ground between them belonged to nobody, and
- * that slot, with the step at its lip, is the gap #907 reports. Filling the halo
- * column with the neighbouring ground instead puts the outermost vertex on the
- * halo node itself, at exactly the height the landscape samples there, so the
- * two sheets share that node (see `virtualEdgeDensity`).
- *
- * With no sampler installed — tests, and any caller with no landscape — an
- * unowned column reads as air exactly as before.
- */
-function cornerDensityForNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number {
-  const virtual = virtualColumnDensity(grid, sampler, x, y, z);
-  return virtual ?? grid.densityAt(x, y, z);
-}
-
-/** The landscape-ground density standing in for an unowned column at (x, y, z),
- *  or null when the grid owns the column or no sampler can answer for it. */
-function virtualColumnDensity(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number | null {
-  if (!sampler || grid.containsColumn(x, z)) return null;
-  const height = haloSurfaceHeight(grid, sampler(x, z));
-  if (!Number.isFinite(height)) return null;
-  return virtualEdgeDensity(height, y);
-}
-
-/** Density with trilinear interpolation, so the gradient below is continuous. */
-function densityAtSmooth(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number {
-  const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
-  const fx = x - x0, fy = y - y0, fz = z - z0;
-  let acc = 0;
-  for (let k = 0; k < 8; k++) {
-    const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
-    const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
-    if (w > 0) acc += w * cornerDensityForNormal(grid, sampler, x0 + dx, y0 + dy, z0 + dz);
-  }
-  return acc;
-}
-
-/**
- * Surface normal from the density field, rather than from the triangles.
- *
- * computeVertexNormals() averages the faces meeting at a vertex, and marching
- * cubes lays those faces on a regular lattice with a fixed diagonal split. The
- * averaged normals inherit that diagonal, and it reads as fine hatching ruled
- * across the terrain at the triangle scale — at every zoom, and impossible to
- * remove in the fragment shader because it is already in the normals before
- * shading runs.
- *
- * An iso-surface's true normal is the negated gradient of the field it is an
- * iso-surface of, which owes nothing to how the triangles were cut.
- *
- * Exported because the landscape has to light the ring node it SHARES with this
- * mesh exactly the way this mesh lights it. #907 made both sheets take that
- * node's height from one authority; its normal was still derived twice, once
- * from this gradient and once from the landscape's own height-field slope, and
- * the two disagree by ~7 degrees on real ground. A normal that jumps across a
- * shared edge is a lighting crease, and this edge runs the site's whole
- * perimeter (#1077).
- */
-export function densityGradientNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): [number, number, number] {
-  const e = 0.85;
-  const gx = densityAtSmooth(grid, sampler, x + e, y, z) - densityAtSmooth(grid, sampler, x - e, y, z);
-  const gy = densityAtSmooth(grid, sampler, x, y + e, z) - densityAtSmooth(grid, sampler, x, y - e, z);
-  const gz = densityAtSmooth(grid, sampler, x, y, z + e) - densityAtSmooth(grid, sampler, x, y, z - e);
-  const len = Math.hypot(gx, gy, gz);
-  // A vertex in a locally uniform region has no gradient to speak of. Falling
-  // back to "up" beats emitting a zero normal, which shades black.
-  if (len < 1e-6) return [0, 1, 0];
-  // Negated: the gradient points toward increasing density (into the rock),
-  // and the outward normal is its opposite. An earlier revision returned the
-  // un-negated gradient to match the mesh's then-inverted triangle winding;
-  // marchCube now emits outside-facing triangles as front faces, so the
-  // mathematically correct sign is also the one the renderer expects.
-  return [-gx / len, -gy / len, -gz / len];
-}
-
-function sampleCorner(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): CornerSample {
-  const virtual = virtualColumnDensity(grid, sampler, x, y, z);
-  if (virtual !== null) {
-    // Ground beside the site: the landscape carries no ore (#458 A18), and its
-    // rock comes from the nearest owned column at the same height rather than
-    // from the sampler. Both sheets read one strata pipeline, so a column one
-    // metre apart resolves to the same surface rock in all but a stratum
-    // contour's own width — and it is the rock already drawn a metre inside the
-    // edge, so the halo cannot introduce a colour break the site does not
-    // already have. An air corner keeps rockId '' and inherits from the other
-    // end of its edge, exactly as an out-of-grid corner does today.
-    return { density: virtual, rockId: nearestOwnedRock(grid, x, y, z), oreId: '', oreAmt: 0 };
-  }
-  const density = grid.densityAt(x, y, z);
-  const rockId = grid.dominantRockAt(x, y, z);
-  const ores = grid.oresAt(x, y, z);
-  let oreId = '';
-  let oreAmt = 0;
-  if (ores) {
-    for (const [id, amt] of Object.entries(ores)) {
-      if (amt > oreAmt) { oreId = id; oreAmt = amt; }
-    }
-  }
-  return { density, rockId, oreId, oreAmt };
-}
+const CORNER_OFFSETS = CUBE_CORNER_OFFSETS;
 
 /**
  * Real ground altitude range `[minY, maxY]` across `grid`, for the terrain
@@ -218,13 +79,14 @@ export function gridHeightRange(grid: VoxelGrid): [number, number] {
   return [range.minY, range.maxY];
 }
 
-/** Dominant rock at the owned column nearest (x, z), same y — '' when that
- *  column is air there or the site owns nothing at all. */
-function nearestOwnedRock(grid: VoxelGrid, x: number, y: number, z: number): string {
-  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, x));
-  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, z));
-  return grid.dominantRockAt(cx, y, cz);
-}
+/** Scratch reused by every marchCube call — one cube's corners and crossed-edge vertices (#1603). */
+const MARCH_CORNERS: CornerSample[] = new Array<CornerSample>(8);
+const EDGE_SLOT = new Int8Array(12);
+const EDGE_POS: number[] = [];
+const EDGE_ROCK_A: number[] = [];
+const EDGE_ROCK_B: number[] = [];
+const EDGE_ROCK_W: number[] = [];
+const EDGE_ORE: number[] = [];
 
 /** Appends one interpolated vertex's position and rock/ore attributes to the output arrays. */
 function emitVertex(
@@ -267,6 +129,12 @@ export class TerrainMesh {
   /** Packed signed chunk coordinate -> its Mesh, or null for a built-but-empty chunk (no triangles). */
   private readonly chunks = new Map<number, THREE.Mesh | null>();
   private edgeHeightSampler: EdgeHeightSampler | null = null;
+  /** A blast's chunks, marched across frames and swapped in together (#1603). */
+  private readonly remeshBatch = new ChunkRemeshBatch<THREE.Mesh | null>(
+    ({ cx, cy, cz }) => this.marchChunk(cx, cy, cz),
+    ({ key }, mesh) => this.installChunk(key, mesh),
+    mesh => mesh?.geometry.dispose(),
+  );
 
   constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
     this.scene = scene;
@@ -297,6 +165,7 @@ export class TerrainMesh {
   setGrid(grid: VoxelGrid): void {
     console.log(`[TerrainMesh] setGrid: old=${this.grid.id} new=${grid.id}`);
     this.grid = grid;
+    this.remeshBatch.clear(); // marched from the old grid
     this.material.setHeightRange(...gridHeightRange(grid));
   }
 
@@ -400,6 +269,42 @@ export class TerrainMesh {
    * side only.
    */
   remeshRegion(region: DirtyRegion): void {
+    // A blast's batch still in flight holds older geometry for some of these
+    // chunks: land it first, so this edit is marched over the newest voxels
+    // and never overwritten by the batch afterwards.
+    this.remeshBatch.finish();
+    const chunks = this.chunksInRegion(region);
+    for (const { cx, cy, cz } of chunks) this.rebuildChunk(cx, cy, cz);
+    console.log(`[TerrainMesh] remeshRegion: grid=${this.grid.id} chunksRemeshed=${chunks.length}`);
+  }
+
+  /**
+   * Queue the chunks `region` touches to be re-marched across later frames and
+   * swapped in together (ChunkRemeshBatch, #1603) — for a blast, whose dozen
+   * chunks would otherwise all be marched inside the detonate frame. The old
+   * meshes stay on screen until `stepPendingRemesh` lands the whole batch.
+   */
+  queueRegion(region: DirtyRegion): void {
+    this.remeshBatch.queue(this.chunksInRegion(region));
+  }
+
+  /** Spend up to `budgetMs` on the queued batch; true when this call swapped it in. */
+  stepPendingRemesh(budgetMs: number, now: () => number = () => performance.now()): boolean {
+    return this.remeshBatch.step(budgetMs, now);
+  }
+
+  /** Finish and swap in the queued batch now; true when one was pending. */
+  finishPendingRemesh(): boolean {
+    return this.remeshBatch.finish();
+  }
+
+  /** Chunks queued by `queueRegion` and not swapped in yet. */
+  get pendingRemeshCount(): number {
+    return this.remeshBatch.pending;
+  }
+
+  /** Owned chunks a dirty region touches, with their mesh keys. */
+  private chunksInRegion(region: DirtyRegion): QueuedChunk[] {
     const cxMin = chunkIndexOf(region.minX - 1);
     const cxMax = chunkIndexOf(region.maxX);
     const cyMin = chunkIndexOf(region.minY - 1);
@@ -407,7 +312,7 @@ export class TerrainMesh {
     const czMin = chunkIndexOf(region.minZ - 1);
     const czMax = chunkIndexOf(region.maxZ);
 
-    let remeshed = 0;
+    const chunks: QueuedChunk[] = [];
     for (let cz = czMin; cz <= czMax; cz++) {
       for (let cy = cyMin; cy <= cyMax; cy++) {
         for (let cx = cxMin; cx <= cxMax; cx++) {
@@ -415,12 +320,11 @@ export class TerrainMesh {
           // an already-built neighbour may need its sealing wall re-marched,
           // which the owned-chunk pass below covers.
           if (!this.grid.hasChunk(cx, cz)) continue;
-          this.rebuildChunk(cx, cy, cz);
-          remeshed++;
+          chunks.push({ key: this.chunkKey(cx, cy, cz), cx, cy, cz });
         }
       }
     }
-    console.log(`[TerrainMesh] remeshRegion: grid=${this.grid.id} chunksRemeshed=${remeshed}`);
+    return chunks;
   }
 
   /** Remove all terrain meshes from the scene and release geometry. */
@@ -535,6 +439,7 @@ export class TerrainMesh {
   }
 
   private disposeAllChunks(): void {
+    this.remeshBatch.clear();
     for (const mesh of this.chunks.values()) {
       if (!mesh) continue;
       this.scene.remove(mesh);
@@ -545,14 +450,24 @@ export class TerrainMesh {
 
   /** Dispose and re-march one chunk. Returns its vertex count (0 if empty — stored as null, no mesh added). */
   private rebuildChunk(cx: number, cy: number, cz: number): number {
-    const key = this.chunkKey(cx, cy, cz);
+    const mesh = this.marchChunk(cx, cy, cz);
+    this.installChunk(this.chunkKey(cx, cy, cz), mesh);
+    return mesh ? mesh.geometry.getAttribute('position').count : 0;
+  }
+
+  /** Replace chunk `key`'s mesh with `mesh` (null: the chunk has no surface). */
+  private installChunk(key: number, mesh: THREE.Mesh | null): void {
     const old = this.chunks.get(key);
     if (old) {
       this.scene.remove(old);
       old.geometry.dispose();
     }
-    this.chunks.delete(key);
+    if (mesh) this.scene.add(mesh);
+    this.chunks.set(key, mesh);
+  }
 
+  /** March one chunk off-screen: its mesh, or null when nothing in it crosses the surface. */
+  private marchChunk(cx: number, cy: number, cz: number): THREE.Mesh | null {
     const positions: number[] = [];
     const rockA: number[] = [];
     const rockB: number[] = [];
@@ -567,14 +482,8 @@ export class TerrainMesh {
     // the two drifted; there is one of them now, so they cannot (#907).
     const rect = this.grid.chunkRect(cx, cz);
     const meshed = meshedCellRect(this.grid, cx, cz);
-    if (!rect || !meshed) {
-      this.chunks.set(key, null);
-      return 0;
-    }
-    if (this.canSkipChunkMarch(cx, cy, cz, rect)) {
-      this.chunks.set(key, null);
-      return 0;
-    }
+    if (!rect || !meshed) return null;
+    if (this.canSkipChunkMarch(cx, cy, cz, rect)) return null;
     const oy = cy * CHUNK_SIZE;
     const xStart = meshed.minX;
     const zStart = meshed.minZ;
@@ -596,18 +505,18 @@ export class TerrainMesh {
     // surrounding ground would have been skipped, leaving a see-through pit. The
     // cutoff still guards whole-chunk skipping, where the same slab-is-below-both
     // -surfaces reasoning does hold (canSkipChunkMarch).
+    const field = new ChunkFieldCache(this.grid, this.edgeHeightSampler, {
+      minX: xStart, minY: yStart, minZ: zStart, maxX: xEnd, maxY: yEnd, maxZ: zEnd,
+    });
     for (let z = zStart; z < zEnd; z++) {
       for (let y = yStart; y < yEnd; y++) {
         for (let x = xStart; x < xEnd; x++) {
-          this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
+          this.marchCube(field, x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }
     }
 
-    if (positions.length === 0) {
-      this.chunks.set(key, null);
-      return 0;
-    }
+    if (positions.length === 0) return null;
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -618,7 +527,7 @@ export class TerrainMesh {
     // Normals from the field, not the triangulation — see densityGradientNormal.
     const normals = new Float32Array(positions.length);
     for (let i = 0; i < positions.length; i += 3) {
-      const n = densityGradientNormal(this.grid, this.edgeHeightSampler, positions[i]!, positions[i + 1]!, positions[i + 2]!);
+      const n = field.normal(positions[i]!, positions[i + 1]!, positions[i + 2]!);
       normals[i] = n[0]; normals[i + 1] = n[1]; normals[i + 2] = n[2];
     }
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
@@ -628,9 +537,7 @@ export class TerrainMesh {
     mesh.frustumCulled = true;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    this.scene.add(mesh);
-    this.chunks.set(key, mesh);
-    return positions.length / 3;
+    return mesh;
   }
 
   /**
@@ -778,56 +685,43 @@ export class TerrainMesh {
   }
 
   private marchCube(
+    field: ChunkFieldCache,
     x: number, y: number, z: number,
     outPos: number[],
     outRockA: number[], outRockB: number[], outRockWeight: number[], outOre: number[],
   ): void {
-    const corners: CornerSample[] = new Array(8);
-    for (let i = 0; i < 8; i++) {
-      const [dx, dy, dz] = CORNER_OFFSETS[i]!;
-      corners[i] = sampleCorner(this.grid, this.edgeHeightSampler, x + dx, y + dy, z + dz);
-    }
-
-    let cubeIndex = 0;
-    for (let i = 0; i < 8; i++) {
-      if (corners[i]!.density >= SURFACE_THRESHOLD) cubeIndex |= (1 << i);
-    }
+    // Density alone decides whether the cube crosses the surface; the full
+    // corner samples (rock, ore) are only fetched once it does (#1603).
+    const cubeIndex = field.cubeIndex(x, y, z, SURFACE_THRESHOLD);
     if (cubeIndex === 0 || cubeIndex === 255) return; // all air or all solid
 
     const edgeMask = EDGE_TABLE[cubeIndex]!;
     if (!edgeMask) return;
+    const tris = TRI_TABLE[cubeIndex];
+    if (!tris) return;
 
-    const edgeVerts: [number, number, number][] = new Array(12);
-    const edgeRockA: number[] = new Array(12);
-    const edgeRockB: number[] = new Array(12);
-    const edgeRockWeight: number[] = new Array(12);
-    const edgeOre: [number, number][] = new Array(12);
+    const corners = MARCH_CORNERS;
+    for (let i = 0; i < 8; i++) {
+      const [dx, dy, dz] = CORNER_OFFSETS[i]!;
+      corners[i] = field.corner(x + dx, y + dy, z + dz);
+    }
 
+    // Each crossed edge's vertex, emitted once into the scratch buffers; the
+    // triangles below copy from its slot.
+    EDGE_POS.length = 0; EDGE_ROCK_A.length = 0; EDGE_ROCK_B.length = 0; EDGE_ROCK_W.length = 0; EDGE_ORE.length = 0;
+    let slots = 0;
     for (let e = 0; e < 12; e++) {
       if (!(edgeMask & (1 << e))) continue;
       const [c0i, c1i] = EDGE_CORNERS[e]!;
       const [dx0, dy0, dz0] = CORNER_OFFSETS[c0i]!;
       const [dx1, dy1, dz1] = CORNER_OFFSETS[c1i]!;
-
-      const tempPos: number[] = [];
-      const tempRockA: number[] = [];
-      const tempRockB: number[] = [];
-      const tempRockW: number[] = [];
-      const tempOre: number[] = [];
       emitVertex(
         [x + dx0, y + dy0, z + dz0], corners[c0i]!,
         [x + dx1, y + dy1, z + dz1], corners[c1i]!,
-        tempPos, tempRockA, tempRockB, tempRockW, tempOre,
+        EDGE_POS, EDGE_ROCK_A, EDGE_ROCK_B, EDGE_ROCK_W, EDGE_ORE,
       );
-      edgeVerts[e] = [tempPos[0]!, tempPos[1]!, tempPos[2]!];
-      edgeRockA[e] = tempRockA[0]!;
-      edgeRockB[e] = tempRockB[0]!;
-      edgeRockWeight[e] = tempRockW[0]!;
-      edgeOre[e] = [tempOre[0]!, tempOre[1]!];
+      EDGE_SLOT[e] = slots++;
     }
-
-    const tris = TRI_TABLE[cubeIndex];
-    if (!tris) return;
 
     // Emitted in REVERSED order relative to TRI_TABLE. This table's order
     // winds the surface clockwise when seen from outside the rock, which made
@@ -839,13 +733,13 @@ export class TerrainMesh {
     // it. Reversing here makes outside-facing mean front-facing, the same
     // convention the landscape mesh already uses.
     for (let i = 0; i < tris.length; i += 3) {
-      const e0 = tris[i]!, e1 = tris[i + 1]!, e2 = tris[i + 2]!;
-      for (const e of [e2, e1, e0]) {
-        outPos.push(...edgeVerts[e]!);
-        outRockA.push(edgeRockA[e]!);
-        outRockB.push(edgeRockB[e]!);
-        outRockWeight.push(edgeRockWeight[e]!);
-        outOre.push(...edgeOre[e]!);
+      for (let k = 2; k >= 0; k--) {
+        const slot = EDGE_SLOT[tris[i + k]!]!;
+        outPos.push(EDGE_POS[slot * 3]!, EDGE_POS[slot * 3 + 1]!, EDGE_POS[slot * 3 + 2]!);
+        outRockA.push(EDGE_ROCK_A[slot]!);
+        outRockB.push(EDGE_ROCK_B[slot]!);
+        outRockWeight.push(EDGE_ROCK_W[slot]!);
+        outOre.push(EDGE_ORE[slot * 2]!, EDGE_ORE[slot * 2 + 1]!);
       }
     }
   }

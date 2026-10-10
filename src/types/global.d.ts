@@ -11,6 +11,8 @@ declare global {
     __skipBlastPlayback: () => void;
     __seekBlastPlayback: (t: number) => void;
     __blastPlaybackDuration: () => number;
+    /** Terrain chunks a blast queued and has not swapped in yet (#1603) — 0 once its crater is on screen. */
+    __terrainRemeshPending: () => number;
     __startTutorial: () => void;
     __uiActions: () => ReturnType<typeof probeUiActions>;
     __probeSelector: (selector: string) => ReturnType<typeof probeSelector>;

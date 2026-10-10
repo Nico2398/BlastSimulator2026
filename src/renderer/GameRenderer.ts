@@ -50,7 +50,7 @@ import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.j
 
 import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions } from './GameRendererSync.js';
 import {
-  rebuildTerrain, remeshTerrainRegion, siteBoundsChanged, playableCut,
+  rebuildTerrain, remeshTerrainRegion, stepTerrainRemesh, finishTerrainRemesh, siteBoundsChanged, playableCut,
   landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY, getSmoothTerrainSurfaceY,
   updateLandscapeStreaming,
   type TerrainDeps,
@@ -425,6 +425,13 @@ export class GameRenderer {
       this.blastEffects.update(dt);
     }
 
+    // A blast's crater, marched a few chunks a frame and swapped in whole (#1603).
+    if (this.terrain?.pendingRemeshCount) {
+      const deps = this.terrainDeps();
+      stepTerrainRemesh(deps);
+      this.applyTerrainDeps(deps);
+    }
+
     // A level entered before every model asset arrived shows stand-in boxes;
     // once the library grows, swap them for the real models.
     if (modelLibrary.revision !== this.lastModelRevision) {
@@ -564,10 +571,18 @@ export class GameRenderer {
     this.applyTerrainDeps(deps);
   }
 
-  /** Re-mesh only the chunks a terrain:updated region touches (#458 T3.1). See GameRendererTerrain.ts. */
-  remeshTerrainRegion(ctx: MiningContext, region: DirtyRegion): void {
+  /** Re-mesh only the chunks a terrain:updated region touches (#458 T3.1); `defer` spreads a blast's over the next frames (#1603). See GameRendererTerrain.ts. */
+  remeshTerrainRegion(ctx: MiningContext, region: DirtyRegion, opts?: { defer?: boolean }): void {
     const deps = this.terrainDeps();
-    remeshTerrainRegion(deps, ctx, region);
+    remeshTerrainRegion(deps, ctx, region, opts?.defer ?? false);
+    this.applyTerrainDeps(deps);
+  }
+
+  /** Land any deferred blast remesh now — for a harness capturing the settled terrain. */
+  finishTerrainRemesh(): void {
+    if (!this.terrain?.pendingRemeshCount) return;
+    const deps = this.terrainDeps();
+    finishTerrainRemesh(deps);
     this.applyTerrainDeps(deps);
   }
 

@@ -1199,3 +1199,44 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
     expect(renderer.blastPlayback.isPlaying).toBe(false);
   });
 });
+
+describe('GameRenderer — deferred blast remesh (#1603)', () => {
+  /** A synced renderer whose site has a small pit carved at (20, 20), and the region it dirtied. */
+  function carved() {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const grid = ctx.grid!;
+    let top = 0;
+    for (let y = 120; y > -40; y--) if (grid.densityAt(20, y, 20) >= 0.5) { top = y; break; }
+    for (let x = 18; x <= 22; x++) for (let z = 18; z <= 22; z++) for (let y = top - 3; y <= top; y++) grid.clearVoxel(x, y, z);
+    const region = { minX: 18, maxX: 22, minY: top - 3, maxY: top, minZ: 18, maxZ: 22 };
+    return { renderer, ctx, region };
+  }
+
+  it('a deferred region moves the terrain revision only when its batch lands, frames later', () => {
+    const { renderer, ctx, region } = carved();
+    const revision = renderer.terrainMeshRevisionCount;
+
+    renderer.remeshTerrainRegion(ctx, region, { defer: true });
+    expect(renderer.terrain!.pendingRemeshCount).toBeGreaterThan(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision);
+
+    for (let i = 0; i < 100 && renderer.terrain!.pendingRemeshCount > 0; i++) renderer.update(1 / 60);
+    expect(renderer.terrain!.pendingRemeshCount).toBe(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision + 1);
+  });
+
+  it('finishTerrainRemesh lands a deferred batch at once; an immediate remesh never defers', () => {
+    const { renderer, ctx, region } = carved();
+    const revision = renderer.terrainMeshRevisionCount;
+    renderer.remeshTerrainRegion(ctx, region, { defer: true });
+    renderer.finishTerrainRemesh();
+    expect(renderer.terrain!.pendingRemeshCount).toBe(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision + 1);
+
+    renderer.remeshTerrainRegion(ctx, region);
+    expect(renderer.terrain!.pendingRemeshCount).toBe(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision + 2);
+  });
+});

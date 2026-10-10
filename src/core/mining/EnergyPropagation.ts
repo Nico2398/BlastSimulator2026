@@ -78,6 +78,14 @@ const NEIGHBOUR_OFFSETS: ReadonlyArray<readonly [number, number, number, number]
   return out;
 })();
 
+/** NEIGHBOUR_OFFSETS split into flat arrays for the propagation loop (#1603). */
+const NEIGHBOUR_COUNT = NEIGHBOUR_OFFSETS.length;
+const NEIGHBOUR_DX = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[0]);
+const NEIGHBOUR_DY = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[1]);
+const NEIGHBOUR_DZ = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[2]);
+/** `1 / dist` per neighbour — the same double the loop used to compute inline. */
+const NEIGHBOUR_INV_DIST = Float64Array.from(NEIGHBOUR_OFFSETS, o => 1 / o[3]);
+
 /**
  * Per-voxel blast state over one bounding box.
  *
@@ -399,8 +407,7 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
   const cellCount = field.effective.length;
   let currentEnergy = new Float64Array(cellCount);
   let nextEnergy = new Float64Array(cellCount);
-  let currentActive: number[] = [];
-  let nextActive: number[] = [];
+  const seeded: number[] = [];
   // Marks cells already on the next frontier, replacing a Set-and-sort per
   // wave; `nextEnergy[ti] === 0` cannot double as the mark because two shares
   // can cancel to exactly zero.
@@ -419,20 +426,34 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
       field.dissipated += seed.energy;
       continue;
     }
-    if (currentEnergy[i] === 0) currentActive.push(i);
+    if (currentEnergy[i] === 0) seeded.push(i);
     currentEnergy[i]! += seed.energy;
   }
-  // Two seeds can land in one cell; keep each active cell listed once, in
-  // ascending order so the wave sweeps cells deterministically.
-  currentActive = [...new Set(currentActive)].sort((a, b) => a - b);
+  // The frontier is a flat index list in a preallocated buffer, sorted in place
+  // per wave (#1603): a number[] re-sorted through a comparator every wave was
+  // a measurable share of a large blast. Two seeds can land in one cell; keep
+  // each active cell listed once, in ascending order so the wave sweeps cells
+  // deterministically.
+  let currentActive = new Int32Array(cellCount);
+  let nextActive = new Int32Array(cellCount);
+  const firstWave = [...new Set(seeded)].sort((a, b) => a - b);
+  currentActive.set(firstWave);
+  let currentCount = firstWave.length;
+  let nextCount = 0;
 
-  const { nx, ny, box } = field;
+  const { nx, ny, nz } = field;
+  // Neighbour k of flat index i is i + NEIGHBOUR_STEP[k] once its local
+  // coordinate is known to stay inside the box — the same neighbours, in the
+  // same order, as walking NEIGHBOUR_OFFSETS through contains()/indexOf().
+  const neighbourStep = Int32Array.from(NEIGHBOUR_OFFSETS, ([dx, dy, dz]) => dx + nx * (dy + ny * dz));
+
   let iterations = 0;
 
-  while (currentActive.length > 0 && iterations < MAX_PROPAGATION_ITERATIONS) {
+  while (currentCount > 0 && iterations < MAX_PROPAGATION_ITERATIONS) {
     iterations++;
 
-    for (const i of currentActive) {
+    for (let a = 0; a < currentCount; a++) {
+      const i = currentActive[a]!;
       const incoming = currentEnergy[i]!;
       currentEnergy[i] = 0;
       if (incoming <= PROPAGATION_ENERGY_EPSILON) {
@@ -455,23 +476,19 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
       field.dissipated += lost;
       const transmit = leftover - lost;
 
-      // Decode the flat index back to world coordinates to walk neighbours.
-      const local = i;
-      const lx = local % nx;
-      const ly = Math.floor(local / nx) % ny;
-      const lz = Math.floor(local / (nx * ny));
-      const x = lx + box.minX;
-      const y = ly + box.minY;
-      const z = lz + box.minZ;
+      // Decode the flat index back to box-local coordinates to walk neighbours.
+      const lx = i % nx;
+      const ly = Math.floor(i / nx) % ny;
+      const lz = Math.floor(i / (nx * ny));
 
       const ownDistAir = field.distAir[i]!;
 
       let weightTotal = 0;
       let targetCount = 0;
-      for (const [dx, dy, dz, dist] of NEIGHBOUR_OFFSETS) {
-        const nxx = x + dx, nyy = y + dy, nzz = z + dz;
-        if (!contains(field, nxx, nyy, nzz)) continue;
-        const ni = indexOf(field, nxx, nyy, nzz);
+      for (let k = 0; k < NEIGHBOUR_COUNT; k++) {
+        const ax = lx + NEIGHBOUR_DX[k]!, ay = ly + NEIGHBOUR_DY[k]!, az = lz + NEIGHBOUR_DZ[k]!;
+        if (ax < 0 || ay < 0 || az < 0 || ax >= nx || ay >= ny || az >= nz) continue;
+        const ni = i + neighbourStep[k]!;
         if (field.air[ni] === 1) continue;
         if (field.effective[ni]! >= field.threshold[ni]!) continue;
         // Gas takes the path that offers relief. Spreading overflow evenly in
@@ -479,7 +496,7 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
         // and never reaches the surface, however large the charge — the burden
         // has to fail *toward* the free face, the way a real bench blast does.
         const relief = Math.max(0, ownDistAir - field.distAir[ni]!);
-        const w = (1 / dist) * (1 + FREE_FACE_BIAS * relief);
+        const w = NEIGHBOUR_INV_DIST[k]! * (1 + FREE_FACE_BIAS * relief);
         targetScratch[targetCount] = ni;
         weightScratch[targetCount] = w;
         targetCount++;
@@ -498,7 +515,7 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
         const share = transmit * (weightScratch[k]! / weightTotal);
         if (queued[ti] === 0) {
           queued[ti] = 1;
-          nextActive.push(ti);
+          nextActive[nextCount++] = ti;
         }
         nextEnergy[ti]! += share;
       }
@@ -509,17 +526,19 @@ export function seedEnergy(field: EnergyField, seeds: readonly EnergySeed[]): vo
     nextEnergy = swapEnergy;
     // Ascending order keeps the sweep deterministic whatever order neighbours
     // joined the frontier in.
-    nextActive.sort((a, b) => a - b);
-    for (const i of nextActive) queued[i] = 0;
+    nextActive.subarray(0, nextCount).sort();
+    for (let a = 0; a < nextCount; a++) queued[nextActive[a]!] = 0;
     const swapActive = currentActive;
     currentActive = nextActive;
     nextActive = swapActive;
-    nextActive.length = 0;
+    currentCount = nextCount;
+    nextCount = 0;
   }
 
   // Whatever is still in flight when the guard trips is energy we chose not to
   // keep tracking — count it so the conservation invariant still holds.
-  for (const i of currentActive) {
+  for (let a = 0; a < currentCount; a++) {
+    const i = currentActive[a]!;
     field.dissipated += currentEnergy[i]!;
     currentEnergy[i] = 0;
   }

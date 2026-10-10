@@ -483,13 +483,20 @@ emitter.on('revolt:warning', ({ ticksRemaining }) => {
 // A grid-identity change (new_game, campaign start, load) is handled
 // separately by syncFromContext()'s own comparison, which runs right after
 // this and does a full rebuildTerrain() with the new grid's real dimensions.
+// A blast's region is the exception (#1603): its dozen chunks are marched over
+// the next few frames and swapped in together, under the flash and dust, so
+// the detonate frame does not pay for them. executeBlast brackets its carve
+// with blast:started/blast:ended, which is what marks the region as a blast's.
+let blastCarving = false;
 emitter.on('terrain:updated', ({ region }) => {
-  gameRenderer.remeshTerrainRegion(ctx, region);
+  gameRenderer.remeshTerrainRegion(ctx, region, { defer: blastCarving });
 });
 // Bird flocks near a blast panic and scatter for a few seconds (#458 T7.2/D12/A26).
 emitter.on('blast:started', ({ originX, originZ }) => {
+  blastCarving = true;
   gameRenderer.notifyBlastScatter(originX, originZ);
 });
+emitter.on('blast:ended', () => { blastCarving = false; });
 
 wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
 wireResearchNotifications(emitter, n => uiManager.notify(n));
@@ -817,7 +824,8 @@ if (scenarioMode) scene.setDrawingEnabled(false);
 // enters a level through __gameConsole skips enterLevel()'s wait on this, so
 // it awaits it here before capturing a frame it wants to show real assets.
 window.__modelsReady = () => modelsReady.then(r => ({ loaded: r.loaded.length, failed: r.failed }));
-window.__renderFrame = () => { scene.renderFrame(); };
+// A forced frame shows settled terrain: a deferred blast remesh lands first (#1603).
+window.__renderFrame = () => { gameRenderer.finishTerrainRemesh(); scene.renderFrame(); };
 // Landscape chunks still queued for the current camera position (#1153's
 // streamer is budgeted per frame). A capture taken while this is non-zero
 // shows sky where ground has not been built yet, with scenery floating in
@@ -1002,6 +1010,7 @@ window.__worldToScreen = (x, z) => {
 // skipping it changes nothing — and without a GPU it would otherwise take
 // minutes of wall clock to play out (#475).
 window.__skipBlastPlayback = () => {
+  gameRenderer.finishTerrainRemesh();
   gameRenderer.skipFragmentPlayback();
 };
 // Hold the collapse at a chosen moment, so a harness can step through it at the
@@ -1010,6 +1019,8 @@ window.__seekBlastPlayback = (t: number) => {
   gameRenderer.seekFragmentPlayback(t);
 };
 window.__blastPlaybackDuration = () => gameRenderer.fragmentPlaybackDuration;
+// How far a blast's deferred crater remesh has to go (#1603), for a harness waiting on it.
+window.__terrainRemeshPending = () => gameRenderer.terrain?.pendingRemeshCount ?? 0;
 
 // Loading screen debug/preview bridge (#493) — see the declare-global doc comment.
 window.__loadingScreenPreview = (kind = 'level', locale) => {

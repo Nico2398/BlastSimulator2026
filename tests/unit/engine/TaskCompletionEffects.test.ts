@@ -10,7 +10,9 @@ import { describe, it, expect } from 'vitest';
 import { applyTaskCompletion } from '../../../src/core/engine/TaskCompletionEffects.js';
 import { createGame, type BuiltRamp, type PendingAction, type PlannedRamp, type PlannedBuilding } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, chunkIndexOf, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
+import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
+import { BLAST_ZONE_RADIUS } from '../../../src/core/config/balance.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
@@ -429,5 +431,26 @@ describe('applyTaskCompletion — finished ramps become BuiltRamps (#1298)', () 
       expect(f.state.builtRamps[0]!.footprint).toEqual(rampFootprint(DEF, 5));
       expect(f.state.nextBuiltRampId).toBe(2);
     });
+  });
+});
+
+describe('applyTaskCompletion — charge_hole generates the rock it will blast (#1603)', () => {
+  it('loads the charge and makes the hole\'s blast zone resident, down past the hole bottom', () => {
+    const state = createGame({ seed: SEED });
+    const grid = generateTerrain({ sizeX: 48, datum: 40, sizeZ: 48, seed: 11, climateBias: [0, 0] });
+    const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    const surface = computeVoxelColumnSurfaceY(grid, 20, 20)!;
+    state.drillHoles.push({ id: 'H1', x: 20, z: 20, depth: 12, diameter: 0.15 });
+    state.plannedChargesByHole['H1'] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } as typeof state.plannedChargesByHole[string];
+    const zoneBottomCy = chunkIndexOf(surface + 1 - 12 - BLAST_ZONE_RADIUS);
+    expect(grid.allocatedCyRange(chunkIndexOf(20), chunkIndexOf(20))?.min ?? Infinity).toBeGreaterThan(zoneBottomCy);
+
+    const report = applyTaskCompletion(state, grid, employee, baseProgress({
+      actionType: 'charge_hole',
+      actionPayload: { holeId: 'H1' },
+    }), new EventEmitter());
+
+    expect(report.chargeLoaded?.holeId).toBe('H1');
+    expect(grid.allocatedCyRange(chunkIndexOf(20), chunkIndexOf(20))!.min).toBeLessThanOrEqual(zoneBottomCy);
   });
 });
