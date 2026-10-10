@@ -173,7 +173,7 @@ export class ParamStrip {
       ...(config.confirmDisabledReason ? { title: config.confirmDisabledReason } : {}),
     });
     confirmBtn.id = 'bs-tile-select-confirm'; // preserved id — every scenario def targeting the old 2D picker's Confirm keeps resolving
-    const escBtn = button('ghost', t('shell.placement.esc'), { onClick: () => this.onCancelHandler?.() });
+    const escBtn = button('ghost', t('shell.placement.esc'), { dataAction: 'cancel', onClick: () => this.onCancelHandler?.() });
     actions.append(confirmBtn, escBtn);
 
     this.bar.replaceChildren(titleBlock, ...fieldEls, resultBlock, actions);

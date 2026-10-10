@@ -100,6 +100,8 @@ export class CameraController {
   private rightButtonDown = false;
   private rightDownX = 0;
   private rightDownY = 0;
+  /** Largest distance (px) the pointer reached from the right-button press point. */
+  private rightGesturePeak = 0;
   /**
    * True once the current (or just-finished) right-button gesture has moved
    * past RIGHT_DRAG_THRESHOLD_PX from its mousedown position. Single source
@@ -169,7 +171,7 @@ export class CameraController {
 
   /** Peak pointer travel (px) of the current/last right-button gesture. */
   get rightGesturePeakPx(): number {
-    return 0; // TODO: implement
+    return this.rightGesturePeak;
   }
 
   /** Point the camera looks at (can be updated externally for tracking). */
@@ -318,6 +320,7 @@ export class CameraController {
       this.rightDownX = e.clientX;
       this.rightDownY = e.clientY;
       this.rightGestureMoved = false;
+      this.rightGesturePeak = 0;
     }
     this.prevMouseX = e.clientX;
     this.prevMouseY = e.clientY;
@@ -335,14 +338,14 @@ export class CameraController {
       this.pan(dx, dy);
     }
 
-    if (this.rightButtonDown && !this.rightGestureMoved) {
+    if (this.rightButtonDown) {
       // Peak displacement from the press point, not net displacement — a
       // drag that returns to the press point before release still counts.
       const rdx = e.clientX - this.rightDownX;
       const rdy = e.clientY - this.rightDownY;
-      if (Math.sqrt(rdx * rdx + rdy * rdy) > RIGHT_DRAG_THRESHOLD_PX) {
-        this.rightGestureMoved = true;
-      }
+      const dist = Math.sqrt(rdx * rdx + rdy * rdy);
+      if (dist > this.rightGesturePeak) this.rightGesturePeak = dist;
+      if (dist > RIGHT_DRAG_THRESHOLD_PX) this.rightGestureMoved = true;
     }
   };
 

@@ -76,7 +76,7 @@ export interface TutorialStage {
 // either way — the canvas is neither a button, select, nor input, so the
 // tutorial rail's CSS block never touched it — purely resolveStageIndex's
 // signal for when to advance past "open the panel" / "press Run".
-const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
+export const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 // Only an ore offer the pit can fill in full: rubble, supply and unfillable
 // offers' Accept stays visible but outside the rails allow set (#1335).
@@ -85,6 +85,10 @@ const FILLABLE_ORE_ACCEPT =
 
 /**
  * Pick a tile, then confirm — the shared tail of every placement step.
+ *
+ * Both stages allow `PICKER_CANCEL` (#1593): a player who changed their mind
+ * must be able to back out of the tool (Esc button; Esc and right-click work
+ * regardless) without the rails locking the strip's cancel control.
  *
  * `extraAlso` (#949): the grid tool's own spacing/depth steppers live on the
  * shared `ParamStrip` (`#bs-param-strip-bar`), rendered alongside the canvas
@@ -111,11 +115,11 @@ function pickerStages(
   confirmSpent?: { spentWhen: (state: GameState) => boolean; waitingKey: string },
 ): TutorialStage[] {
   return [
-    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: extraAlso },
+    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: [PICKER_CANCEL, ...extraAlso] },
     {
       target: PICKER_CONFIRM,
       hintKey: 'tutorial.stage.picker_confirm',
-      also: [PICKER_CANVAS, ...extraAlso],
+      also: [PICKER_CANVAS, PICKER_CANCEL, ...extraAlso],
       region,
       ...(confirmSpent ? { spentWhen: confirmSpent.spentWhen, waitingKey: confirmSpent.waitingKey } : {}),
     },
