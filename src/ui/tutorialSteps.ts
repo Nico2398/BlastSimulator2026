@@ -386,7 +386,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // the step as already resolved and stalls waiting on a count that hasn't
   // changed yet -- same gap 'drill-plan'/'charge' document above.
   // tickBudget 60 comfortably clears the build plus walk time.
-  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:2,14'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:2,12'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
 
   // ── Step 14b: haul-debris ──
   // Fires when stored mass increases — the same "value went up" pattern every

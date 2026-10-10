@@ -160,7 +160,7 @@ const DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn
  * corridor, sat within the old straight-line bound but far outside a real
  * route's cost once slope gating made the only walkable path a long detour.
  * Moved the whole cluster west of the box-cut corridor instead, to
- * livingQuarters (8,15), drivingCenter (6,15), warehouse (2,14).
+ * livingQuarters (8,15), drivingCenter (6,15), warehouse (2,12).
  *
  * #1587: the drill pattern used to sit on the (22,20)-(30,28) slope, where
  * 36.7% of 8-neighbour steps were unclimbable and the rig drove switchbacks
@@ -172,7 +172,7 @@ const DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn
  * 4kg/2.5m shot rates `good` there, but `catastrophic` (168 projections) from
  * those two. The
  * box-cut moved with it to x=10, west of the drill, and the warehouse pin to
- * (2,14) to stay in round-trip range. Measured on the seed-42 post-survey
+ * (2,12) to stay in round-trip range. Measured on the seed-42 post-survey
  * grid (the world grows 32 -> 48 after the seismic survey).
  */
 export const REGION = {
@@ -191,7 +191,7 @@ export const REGION = {
   // #1008-followup) this superseded. #1170: moved west of the box-cut
   // corridor, alongside livingQuarters (8,15) and drivingCenter (6,15) — see
   // this file's own REGION doc comment above for the full trace.
-  warehouse: { x1: 2, z1: 14, x2: 2, z2: 14, exact: true },
+  warehouse: { x1: 2, z1: 12, x2: 2, z2: 12, exact: true },
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
@@ -201,16 +201,16 @@ export const REGION = {
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
-  // corridor, alongside livingQuarters (8,15) and warehouse (2,14) — see this
+  // corridor, alongside livingQuarters (8,15) and warehouse (2,12) — see this
   // file's own REGION doc comment above for the full trace.
   drivingCenter: { x1: 6, z1: 15, x2: 6, z2: 15, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
-  // corridor, alongside drivingCenter (6,15) and warehouse (2,14) — see this
+  // corridor, alongside drivingCenter (6,15) and warehouse (2,12) — see this
   // file's own REGION doc comment above for the full trace. Non-overlapping
   // with drivingCenter's own 2x2 footprint at (6,15)-(7,16) and adjacent to
-  // (not overlapping) warehouse's 4x4 footprint at (2,14):
+  // (not overlapping) warehouse's 4x4 footprint at (2,12):
   // checkFootprintPlacement refuses an actual overlap, so the pins are
   // placed in the same order the tutorial rail orders them (living_quarters,
   // then driving_center, then freight_warehouse) with each one checked
