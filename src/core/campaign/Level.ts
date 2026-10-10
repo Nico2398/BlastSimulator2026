@@ -3,6 +3,7 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
+import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
@@ -51,6 +52,8 @@ export interface LevelDef {
   contractPriceMultiplier: number;
   /** Pre-hired roster, fleet and buildings this level opens with (#1363). */
   startingSite?: StartingSiteComposition;
+  /** Weather pinned for the whole level; omitted = normal weather cycle (#1585). */
+  fixedWeather?: WeatherState;
   /** Per-tick score decay rate (higher = harder to maintain scores). */
   scoreDecayRate: number;
   /**

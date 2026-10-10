@@ -56,6 +56,8 @@ export interface WeatherCycleState {
   history: WeatherState[];
   /** Internal PRNG state of the cycle's own stream, persisted with the save. */
   rngState: number;
+  /** When true the cycle holds `current` forever (fixed-weather levels, #1585). */
+  pinned?: boolean;
 }
 
 /** True when `value` is a weather state name (type guard for untrusted/saved data). */
@@ -64,7 +66,8 @@ export function isWeatherState(value: unknown): value is WeatherState {
 }
 
 /** Create initial weather cycle from seed. */
-export function createWeatherCycle(seed: number): WeatherCycleState {
+/** `pinned` (optional) fixes the weather to that state for the whole game. */
+export function createWeatherCycle(seed: number, _pinned?: WeatherState): WeatherCycleState {
   const rngState = (seed + WEATHER_RNG_SEED_OFFSET) | 0;
   const rng = new Random(rngState);
   const initial: WeatherState = 'sunny';
