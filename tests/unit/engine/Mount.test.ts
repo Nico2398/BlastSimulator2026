@@ -316,6 +316,35 @@ describe('alight', () => {
     expect(employee.z).toBe(vehicle.z);
   });
 
+  it('marks the vehicle\'s cell occupied when its driver alights mid-route, so foot paths route around it (#1586)', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5.16);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeNavGrid(3, 3, 5, 5, () => cell('walkable', false));
+
+    expect(state.navGrid.cellAt(5, 5)?.vehicleOccupied).toBe(false);
+
+    alight(state, vehicle.id);
+
+    expect(state.navGrid.cellAt(5, 5)?.vehicleOccupied).toBe(true);
+  });
+
+  it('leaves the cell flag alone when another occupant stays aboard after the alight (#1586)', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id, 999];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeNavGrid(3, 3, 5, 5, () => cell('walkable', false));
+
+    alight(state, vehicle.id);
+
+    expect(vehicle.occupantIds.length).toBeGreaterThan(0);
+    expect(state.navGrid.cellAt(5, 5)?.vehicleOccupied).toBe(false);
+  });
+
   it('falls back to the vehicle\'s own cell when none of the 8 neighbours are free', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);

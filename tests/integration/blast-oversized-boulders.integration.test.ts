@@ -32,7 +32,12 @@ import { makeGameContext } from '../helpers/gameContext.js';
  * asserts anything about money.
  */
 function makeCtx(): GameContext {
-  return makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 1000000 });
+  // Seed 1 (was 42): the final tail of this test hauls a resulting piece into the
+  // freight_warehouse, which only takes ore-bearing rock (barren rock goes to a
+  // spoil heap, #1530). Seed 42's blast now leaves only barren fragments because
+  // real-cost action selection (#1586) drills the four holes in a different
+  // order, which changes the blast; the seed is just the rock fixture.
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash: 1000000 });
 }
 
 /**

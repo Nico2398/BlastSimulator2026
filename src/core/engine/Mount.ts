@@ -23,6 +23,7 @@ import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { isStepClimbable } from '../nav/NavGrid.js';
 import { findPath, isImpassable } from '../nav/Pathfinding.js';
+import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
 type MountResult = { success: true } | ({ success: false; error: string } & RefusalKey);
 
@@ -183,6 +184,12 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
   const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
   releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
   if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
+  // A driver who alights mid-route (rest, death) leaves the vehicle parked on a
+  // cell its drive leg never marked: without the flag, foot paths route through it
+  // and every hop is then refused by the occupancy ledger, stranding the walker.
+  if (vehicle.occupantIds.length === 0) {
+    updateVehicleCellOccupancy(state, vehicle, true, true, Math.round(vehicle.x), Math.round(vehicle.z));
+  }
   emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
 }
 

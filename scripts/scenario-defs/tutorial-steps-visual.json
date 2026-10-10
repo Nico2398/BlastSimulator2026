@@ -238,7 +238,7 @@
         }
       ],
       "role": "player",
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023, CI): (12,15), while flat, deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31). A first fix attempt moved it to (6,16) (10 tiles clear of those hazards), which traded that deadlock for a different one: a fatigue/rest round-trip livelock -- the walk out to (6,16) and back is long enough that the excavator's fatigue crosses back over the rest threshold before a single box-cut ramp segment carves (confirmed live: `state full`'s navGrid.cellTypeCounts.ramp count never moved across 5000 ticks of direct observation). (29,12) cleared the vehicle spawn, the box-cut corridor, and the drill grid by >=5 tiles each while sitting only 12 tiles (Chebyshev) from the dig site, roughly half (6,16)'s round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (8,18) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed; the wait step right below drives the site to completion, matching tutorial-interactive.json's own equivalent fix. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023, CI): (12,15), while flat, deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31). A first fix attempt moved it to (6,16) (10 tiles clear of those hazards), which traded that deadlock for a different one: a fatigue/rest round-trip livelock -- the walk out to (6,16) and back is long enough that the excavator's fatigue crosses back over the rest threshold before a single box-cut ramp segment carves (confirmed live: `state full`'s navGrid.cellTypeCounts.ramp count never moved across 5000 ticks of direct observation). (29,12) cleared the vehicle spawn, the box-cut corridor, and the drill grid by >=5 tiles each while sitting only 12 tiles (Chebyshev) from the dig site, roughly half (6,16)'s round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (2,12) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
       "expect": {
         "increased": [
           "orderedBuildingCount"
@@ -286,7 +286,7 @@
         }
       ],
       "role": "setup",
-      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,10) and builds the tier-1 living_quarters. The level opens with a free spoil heap (#1574), so this is the second building and buildingCount settles at exactly 2. #1170 follow-up: living_quarters pin moved west of the box-cut corridor to (8,15), alongside driving_center (6,15) and freight_warehouse (8,18) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
+      "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,10) and builds the tier-1 living_quarters. The level opens with a free spoil heap (#1574), so this is the second building and buildingCount settles at exactly 2. #1170 follow-up: living_quarters pin moved west of the box-cut corridor to (8,15), alongside driving_center (6,15) and freight_warehouse (2,12) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
       "expect": {
         "equals": {
           "buildingCount": 2
@@ -417,8 +417,8 @@
       }
     },
     {
-      "command": "build_ramp start:16,19 end:16,31 depth:6",
-      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure. #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward -- so box-cut now advances straight to 'drill-plan', same as before #923.",
+      "command": "build_ramp start:10,23 end:10,35 depth:6",
+      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 10,23-10,35), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure. #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward -- so box-cut now advances straight to 'drill-plan', same as before #923.",
       "timeout": 90,
       "interaction": [
         {
@@ -435,10 +435,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 16,
-          "z1": 19,
-          "x2": 16,
-          "z2": 31
+          "x1": 10,
+          "z1": 23,
+          "x2": 10,
+          "z2": 35
         },
         {
           "type": "screenshot"
@@ -462,7 +462,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089",
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24 diameter:0.089",
       "timeout": 90,
       "interaction": [
         {
@@ -479,10 +479,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 22,
-          "z1": 20,
-          "x2": 30,
-          "z2": 28
+          "x1": 14,
+          "z1": 24,
+          "x2": 22,
+          "z2": 32
         },
         {
           "type": "screenshot"
@@ -496,7 +496,7 @@
         }
       ],
       "role": "player",
-      "description": "#949-followup: added the spacing (3->4, one increment click, 1m/step) and depth (6->8, two increment clicks, 1m/step) stepper clicks before the drag -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), rendered the instant the grid tool arms, and were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix). Without these clicks the drag alone produced a mis-spaced grid at the panel's own defaults (wrong spacing/depth), not the retuned 3x3/spacing:4/depth:8 plan #949 asks for. #553: confirming the 3x3/9-hole grid now only ORDERS the 9 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. #949: spacing/depth/start retuned from 3/6/(20,20) to 4/8/(22,20), mirroring the exact retune tutorialSteps.ts's own 'drill-plan' stage applies (verified live against the real engine to rate the shot PERFECT with zero casualties/destruction, replacing the old 5m-spacing/8m-depth-at-(20,20) plan that rated CATASTROPHIC). rows/cols/diameter unchanged (still 3/3/0.089). `dragTiles` moved to (22,20)-(30,28) to match the new footprint. GAP CLOSED: REGION.drill (tutorialStages.ts) used to exact-gate the picker to the OLD (20,20)-(26,26) box (#601-followup, this same file's prior note), which would have rejected every tile outside that stale gate for a real click-mode drag (`.claude/rules/scenario-defs.md`: \"pickers reject tiles outside the step's region\"); the tutorial rail's own region has since been widened/moved to (22,20)-(30,28) alongside this retune, so the drag above lands cleanly. CI cash mismatch fix (unchanged from the prior pass, still applies): this command carries `diameter:0.089`, the real Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter falls back to the console-only 0.15 default and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter, so this keeps command mode's drill_rig busy-time matching a real click's. Downstream cash/tick checkpoints through the blast step below were re-derived against the new 4/8/(22,20) plan and verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end confirming Spacing 4.0m/Depth 8.0m/3x3=9 holes and Amount 4kg/Stemming 2.4m reached by real clicks. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
+      "description": "#949-followup: added the spacing (3->4, one increment click, 1m/step) and depth (6->8, two increment clicks, 1m/step) stepper clicks before the drag -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), rendered the instant the grid tool arms, and were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix). Without these clicks the drag alone produced a mis-spaced grid at the panel's own defaults (wrong spacing/depth), not the retuned 3x3/spacing:4/depth:8 plan #949 asks for. #553: confirming the 3x3/9-hole grid now only ORDERS the 9 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. #949: spacing/depth/start retuned from 3/6/(20,20) to 4/8/(22,20), mirroring the exact retune tutorialSteps.ts's own 'drill-plan' stage applies (verified live against the real engine to rate the shot PERFECT with zero casualties/destruction, replacing the old 5m-spacing/8m-depth-at-(20,20) plan that rated CATASTROPHIC). rows/cols/diameter unchanged (still 3/3/0.089). `dragTiles` moved to (14,24)-(22,32) to match the new footprint. GAP CLOSED: REGION.drill (tutorialStages.ts) used to exact-gate the picker to the OLD (20,20)-(26,26) box (#601-followup, this same file's prior note), which would have rejected every tile outside that stale gate for a real click-mode drag (`.claude/rules/scenario-defs.md`: \"pickers reject tiles outside the step's region\"); the tutorial rail's own region has since been widened/moved to (14,24)-(22,32) alongside this retune, so the drag above lands cleanly. CI cash mismatch fix (unchanged from the prior pass, still applies): this command carries `diameter:0.089`, the real Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter falls back to the console-only 0.15 default and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter, so this keeps command mode's drill_rig busy-time matching a real click's. Downstream cash/tick checkpoints through the blast step below were re-derived against the new 4/8/(22,20) plan and verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end confirming Spacing 4.0m/Depth 8.0m/3x3=9 holes and Amount 4kg/Stemming 2.4m reached by real clicks. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "expect": {
         "equals": {
           "orderedHoleCount": 9,
@@ -751,7 +751,11 @@
         "tutorialStep": "charge",
         "increased": [
           "orderedChargeCount"
-        ]
+        ],
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
       }
     },
     {
@@ -779,13 +783,15 @@
         "tutorialStep": "evacuate-zone",
         "equals": {
           "chargedCount": 9,
-          "orderedChargeCount": 0
+          "orderedChargeCount": 0,
+          "weather": "sunny",
+          "wetHoleCount": 0
         }
       }
     },
     {
       "command": "tick 60",
-      "description": "#707: converges the blast step's own deathCount across command and interaction mode, using the same absolute-tickCount waitUntil idiom as the the retired accept step (#1335) step further down this file (both retargeted together -- see that step's own note for the offer-pool side of this change). forceShiftRestIfNeededByPolicy (GameLoop.ts) now gives idle employees the same proactive rest as working ones, so once Kurt Pickaxe (driller) and Walt Dusty (surveyor) finish their last queued task they get routed away from the grid toward living_quarters within a handful of ticks -- a tick-by-tick command-mode probe from the chargedCount:9 landing point (npx tsx scripts/scenario-test.ts, custom script replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found BOTH employees still standing in the blast footprint (Walt mid-dig in the build_ramp start:16,19 end:16,31 shaft, Kurt at the drill grid's own spawn point) for the first 5 ticks after chargedCount lands (deathCount:2), Walt alone for exactly 1 more tick (deathCount:1), and both clear (deathCount:0) from 6 ticks onward, continuously through at least 900 ticks past that point. Command mode's own chargedCount:9 lands at tick 337-338; interaction mode's lands at tick 428 (direct-traced both ways, real interaction-mode run) -- a raw `tick 50` command here does NOT work in interaction mode: tutorial_start's own pause (tutorialRails.ts's clock-hold) means a single multi-tick console command's internal loop breaks after its first iteration once state.isPaused is true (events.ts's tickCommand checks `if (state.isPaused) break` at the end of each loop iteration), so it silently advances only 1 tick regardless of the requested count -- the same class of bug the file's own step-2 \"time resume\" step already documents as command-mode-only. `waitUntil` sidesteps this entirely (interaction-executor.ts loops the console's own `tick 1` directly, same mechanism `wait_until field:chargedCount`/`field:holeCount` above already rely on, never affected by the pause-triggered early break since each individual `tick 1` call completes its one iteration before any break check matters) -- so this step targets a fixed absolute tickCount (480) comfortably past both modes' own chargedCount-landing tick plus the 6-tick danger window, the same absolute-target technique the file's own the retired accept step (#1335) step below already established (tickCount is reseeded fresh per tick via `new Random(state.seed + state.tickCount)`, so which tick a run's own path happens to land the wait on does not change what a shared target tick means). Verified in both command mode and a real interaction-mode run: deathCount is 0 at the blast step below in both. RETARGETED for #556: the absolute target (tickCount 480) is long behind us — ordering the living quarters and the driving centre is real queued work now, and this beat lands past tick 500. The waitUntil therefore spent its whole 200-tick budget going nowhere, and with wellBeing already at zero coming out of the charge phase those 200 idle ticks ran the revolt clock (REVOLT_TICKS 120) out and ended the level in a worker_revolt before the blast below. What the step is actually for is the handful of ticks it takes forceShiftRestIfNeededByPolicy to route the crew off the grid, so it is a plain short tick block now rather than an absolute tick target that has to be re-measured every time anything upstream moves. Lengthened 40 -> 60 (#556): the surveyor now shares the charge dispatches, so there are two people to route off the pattern before the shot rather than one.",
+      "description": "#707: converges the blast step's own deathCount across command and interaction mode, using the same absolute-tickCount waitUntil idiom as the the retired accept step (#1335) step further down this file (both retargeted together -- see that step's own note for the offer-pool side of this change). forceShiftRestIfNeededByPolicy (GameLoop.ts) now gives idle employees the same proactive rest as working ones, so once Kurt Pickaxe (driller) and Walt Dusty (surveyor) finish their last queued task they get routed away from the grid toward living_quarters within a handful of ticks -- a tick-by-tick command-mode probe from the chargedCount:9 landing point (npx tsx scripts/scenario-test.ts, custom script replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found BOTH employees still standing in the blast footprint (Walt mid-dig in the build_ramp start:10,23 end:10,35 shaft, Kurt at the drill grid's own spawn point) for the first 5 ticks after chargedCount lands (deathCount:2), Walt alone for exactly 1 more tick (deathCount:1), and both clear (deathCount:0) from 6 ticks onward, continuously through at least 900 ticks past that point. Command mode's own chargedCount:9 lands at tick 337-338; interaction mode's lands at tick 428 (direct-traced both ways, real interaction-mode run) -- a raw `tick 50` command here does NOT work in interaction mode: tutorial_start's own pause (tutorialRails.ts's clock-hold) means a single multi-tick console command's internal loop breaks after its first iteration once state.isPaused is true (events.ts's tickCommand checks `if (state.isPaused) break` at the end of each loop iteration), so it silently advances only 1 tick regardless of the requested count -- the same class of bug the file's own step-2 \"time resume\" step already documents as command-mode-only. `waitUntil` sidesteps this entirely (interaction-executor.ts loops the console's own `tick 1` directly, same mechanism `wait_until field:chargedCount`/`field:holeCount` above already rely on, never affected by the pause-triggered early break since each individual `tick 1` call completes its one iteration before any break check matters) -- so this step targets a fixed absolute tickCount (480) comfortably past both modes' own chargedCount-landing tick plus the 6-tick danger window, the same absolute-target technique the file's own the retired accept step (#1335) step below already established (tickCount is reseeded fresh per tick via `new Random(state.seed + state.tickCount)`, so which tick a run's own path happens to land the wait on does not change what a shared target tick means). Verified in both command mode and a real interaction-mode run: deathCount is 0 at the blast step below in both. RETARGETED for #556: the absolute target (tickCount 480) is long behind us — ordering the living quarters and the driving centre is real queued work now, and this beat lands past tick 500. The waitUntil therefore spent its whole 200-tick budget going nowhere, and with wellBeing already at zero coming out of the charge phase those 200 idle ticks ran the revolt clock (REVOLT_TICKS 120) out and ended the level in a worker_revolt before the blast below. What the step is actually for is the handful of ticks it takes forceShiftRestIfNeededByPolicy to route the crew off the grid, so it is a plain short tick block now rather than an absolute tick target that has to be re-measured every time anything upstream moves. Lengthened 40 -> 60 (#556): the surveyor now shares the charge dispatches, so there are two people to route off the pattern before the shot rather than one.",
       "interaction": [
         {
           "type": "command",
@@ -831,7 +837,13 @@
           "type": "clickSelector",
           "selector": "[data-action=\"preflight-detonate\"]"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "weather": "sunny",
+          "wetHoleCount": 0
+        }
+      }
     },
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
@@ -1149,7 +1161,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:8,18",
+      "command": "build freight_warehouse at:2,12",
       "timeout": 90,
       "interaction": [
         {
@@ -1170,8 +1182,8 @@
         },
         {
           "type": "pickTile",
-          "x": 8,
-          "z": 18
+          "x": 2,
+          "z": 12
         },
         {
           "type": "screenshot"
@@ -1182,7 +1194,7 @@
         }
       ],
       "role": "player",
-      "description": "Site corrected from the file's original 12,8 to 6,6, and again to 6,9 (#1008 — the terrain flatness gate the real placement path was missing, verified against seed-42 tutorial_pit ground). #1040: moved again to (25,12), alongside living_quarters (29,11) and driving_center (29,14), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts). The tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (8,18) (tutorialStages.ts) -- #1170 follow-up: moved west of the box-cut corridor, alongside living_quarters (8,15) and driving_center (6,15), see tutorialStages.ts's own REGION doc comment for the full trace. tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556/#1338: the real starting cash covers every purchase up to here, so this step is an ordinary click with no bypass.",
+      "description": "Site corrected from the file's original 12,8 to 6,6, and again to 6,9 (#1008 — the terrain flatness gate the real placement path was missing, verified against seed-42 tutorial_pit ground). #1040: moved again to (25,12), alongside living_quarters (29,11) and driving_center (29,14), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts). The tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (2,12) (tutorialStages.ts) -- #1170 follow-up: moved west of the box-cut corridor, alongside living_quarters (8,15) and driving_center (6,15), see tutorialStages.ts's own REGION doc comment for the full trace. tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556/#1338: the real starting cash covers every purchase up to here, so this step is an ordinary click with no bypass.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 1
@@ -1302,14 +1314,14 @@
       "role": "observe"
     },
     {
-      "command": "wait_until field:fillableDirtiteSaleOffered equals:true max_ticks:60000",
+      "command": "wait_until field:fillableRustiteSaleOffered equals:true max_ticks:60000",
       "timeout": 650,
       "description": "#1042 CI-fix: replaced the fixed `tick 200` + eight `tick 20` pad that stood here with the same `wait_until fillableOreSaleOffered` pattern #1048 already proved for this exact fragility in tutorial-steps-visual.json. #1042's evacuate-zone fix (a qualified employee now genuinely drives a driverless vehicle clear instead of the horn stranding it unconditionally) shifts every tick this file's own trajectory lands on downstream of Sound the Horn -- direct-traced (interaction mode, this fix): tickCount 680 after this step used to require `tick 200` alone to reach 771, and the old fixed pad of eight further `tick 20` calls (aimed at tick 832, where dirtite offer #47 was confirmed present under the pre-#1042 timing) instead rotated a fillable offer that was already on the board at 680 back out by 821 -- `fillableOreSaleOffered` read true at 680 and false again at 821, which is exactly the shape of failure #1048's own history describes: a fixed pad aimed at one pool instance breaks the moment anything upstream re-times the run into a different one. `fillableOreSaleOffered` (console-api.ts) waits on the real condition -- the pool holding an ore_sale asking no more of its ore than the site already has -- rather than a tick count guessed against one trajectory, so it holds regardless of how many ticks evacuate-zone or any future upstream change spends. Dropped the `material:dirtite` pin on the two steps below for the same reason: this pit's two blasts only ever produce dirtite in fillable quantity (every other offer this file's own history sees -- absurdium/rustite/craktonite/blingite -- is never actually held in storage), so a generic fillable match resolves to dirtite in practice without re-pinning the scenario to one pool composition an upstream retime can roll away from under it, same as #1048's own fix. #1091-followup: max_ticks 400 -> 4200 (timeoutMs 120000 -> 600000) -- #1090's dispatch-cost reordering changes the absolute tick this run's RNG stream rolls a fillable ore_sale offer on (same condition, different draw sequence; see the new_game step's own #1091-followup note on the matching cash bump this required). Direct-traced (command mode) the match now lands 3798 ticks into this wait (tickCount 4300), not within the old 400-tick budget. 4200 keeps ~400 ticks of margin above that measured landing point, the same margin-over-measured-landing philosophy every earlier retune of this exact step already used. #1131 CI-fix: max_ticks 4200 -> 60000 -- the #1091-followup retune above was measured in command mode only, and CI's shard 5/10 (interaction mode) stalled at max_ticks:4200 as a result. Direct-traced (interaction mode, real browser, this fix, same PR): this run's own RNG stream lands the match at tickCount 14100, 13634 ticks into this wait (it starts at tick 466) -- over 3x command mode's own 3798-tick landing, and well past the old 4200-tick budget. 60000 keeps ~46000 ticks of margin above that measured interaction-mode landing point; wall-clock cost of the extra ticks is cheap (this whole 53-step scenario, end to end, ran in well under 400s in this fix's own verification run) so the ceiling is set generously rather than tightly retuned, matching this file's own #1015/#1091 precedent of paying real margin over the measured landing rather than the minimum that clears it. Re-verified command mode at the same max_ticks: still lands at tickCount 4300 (3798 ticks in), unaffected -- raising the ceiling doesn't change where a mode's own RNG stream resolves, only how much headroom is left above it. See the new_game step's own #1131 CI-fix note for the matching cash bump this required (2,000,000 -> 50,000,000) to keep interaction mode's much longer wait solvent.",
       "role": "player",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "fillableDirtiteSaleOffered",
+          "field": "fillableRustiteSaleOffered",
           "equals": true,
           "maxTicks": 60000,
           "timeoutMs": 600000
@@ -1317,7 +1329,7 @@
       ],
       "expect": {
         "equals": {
-          "fillableDirtiteSaleOffered": true
+          "fillableRustiteSaleOffered": true
         },
         "increased": [
           "tickCount"
@@ -1325,9 +1337,9 @@
       }
     },
     {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:ore_sale material:rustite fillable:true",
       "timeout": 120,
-      "description": "#959, the issue's own missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blasts produced and its own haulers carried in. #1042 CI-fix: scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to `material:dirtite` -- which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins this step to a pool composition that any upstream re-timing (like #1042's own evacuate-zone fix) re-rolls, same failure #1048 already fixed this same way in tutorial-steps-visual.json. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. A `waitForSelector` ahead of the click gives the refresh cycle time to surface the right card rather than assuming it's there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 22` in command mode), so the same wait_until above lands command mode on a different offer pool, where the console can refuse this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all. #1574: interaction click pinned to dirtite. The starting spoil heap re-times the run so the first fillable offer was a 410 kg rustite sale ($353,895), one sale past the +$5,000 profit target: the level was won on the spot and the tutorial jumped past free-play to the closing card before the next beat could prove the rails lifting. Dirtite is the pit's bulk ore (1,000+ kg stored) at a fraction of rustite's price, so the first sale lands the tutorial in free-play and the profit target still takes several sales. The preceding wait_until polls `fillableDirtiteSaleOffered`, so a fillable dirtite card is on the board by now.",
+      "description": "#959, the issue's own missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blasts produced and its own haulers carried in. #1042 CI-fix: scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to `material:dirtite` -- which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins this step to a pool composition that any upstream re-timing (like #1042's own evacuate-zone fix) re-rolls, same failure #1048 already fixed this same way in tutorial-steps-visual.json. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. A `waitForSelector` ahead of the click gives the refresh cycle time to surface the right card rather than assuming it's there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 22` in command mode), so the same wait_until above lands command mode on a different offer pool, where the console can refuse this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all. #1574: interaction click pinned to dirtite. The starting spoil heap re-times the run so the first fillable offer was a 410 kg rustite sale ($353,895), one sale past the +$5,000 profit target: the level was won on the spot and the tutorial jumped past free-play to the closing card before the next beat could prove the rails lifting. Dirtite is the pit's bulk ore (1,000+ kg stored) at a fraction of rustite's price, so the first sale lands the tutorial in free-play and the profit target still takes several sales. The preceding wait_until polls `fillableDirtiteSaleOffered`, so a fillable dirtite card is on the board by now. #1587: the drill pattern moved to the climbable west plateau, whose haul loads are mostly dirtite ($240/kg), so a generic fillable match can land on a dirtite offer worth less than the operating deficit the running payroll has piled up, and the level does not end on the first sale. The sale pins rustite (the pit's one valuable ore, ~$960/kg): the wait is on a fillable rustite offer and accept/deliver name it, as a player picks the best-paying card on the board.",
       "role": "player",
       "interaction": [
         {
@@ -1336,7 +1348,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 30000
         },
         {
@@ -1344,7 +1356,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "expect": {
@@ -1353,9 +1365,9 @@
       }
     },
     {
-      "command": "contract deliver type:ore_sale fillable:true amount:100000",
+      "command": "contract deliver type:ore_sale material:rustite fillable:true amount:100000",
       "timeout": 120,
-      "description": "#959, the issue's own missing half, second beat: Deliver clicked on the accepted contract, and with it the tutorial finally turns blasted ore into money. Nothing is typed into the amount field: ContractsPanel pre-fills it with `min(remaining, stored)` (`maxDeliverable`), so a plain click delivers exactly what storage can cover, which is the mechanic the 'sell-ore' card's own text teaches. #1042 CI-fix: click scoped to `[data-contract-type=\"ore_sale\"]` alone (no `material:dirtite` pin, same reasoning as the accept step above) -- safe unscoped-by-material here because the accept step already narrowed the pool to exactly one active contract, the same way tutorial-steps-visual.json's own sibling step does it. `commandOutcome: 'either'` for the same command-mode trajectory reason as the accept step. Reaching 'set-policy' rather than 'sell-ore''s immediate successor is deliberate: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat, so whichever is showing when this step's goal is evaluated would be a race -- 'set-policy' is the next card that waits for a click and therefore stays put once reached. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card.",
+      "description": "#959, the issue's own missing half, second beat: Deliver clicked on the accepted contract, and with it the tutorial finally turns blasted ore into money. Nothing is typed into the amount field: ContractsPanel pre-fills it with `min(remaining, stored)` (`maxDeliverable`), so a plain click delivers exactly what storage can cover, which is the mechanic the 'sell-ore' card's own text teaches. #1042 CI-fix: click scoped to `[data-contract-type=\"ore_sale\"]` alone (no `material:dirtite` pin, same reasoning as the accept step above) -- safe unscoped-by-material here because the accept step already narrowed the pool to exactly one active contract, the same way tutorial-steps-visual.json's own sibling step does it. `commandOutcome: 'either'` for the same command-mode trajectory reason as the accept step. Reaching 'set-policy' rather than 'sell-ore''s immediate successor is deliberate: 'finances' and 'needs' after it are auto-advance cards that move on by themselves after a fixed beat, so whichever is showing when this step's goal is evaluated would be a race -- 'set-policy' is the next card that waits for a click and therefore stays put once reached. Before #959 this beat did not exist at all: the tutorial hauled its muck pile to storage and then walked past it to the closing card. #1585: with the tutorial sky pinned sunny the scripted blast no longer fizzles in the rain, so this one sale of its full-yield ore already clears the +$5,000 profit target: the level is won on this click (the card passes through free-play to congratulations within a tick), not after a free-play stretch. The step therefore waits on the level ending, a condition that holds however fast the win lands, rather than on the transient 'free-play' card.",
       "role": "player",
       "interaction": [
         {
@@ -1364,7 +1376,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-deliver",
           "timeout": 30000
         },
         {
@@ -1372,999 +1384,22 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-deliver"
         },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "free-play",
-          "timeout": 60000
-        }
-      ],
-      "expect": {
-        "tutorialStep": "free-play",
-        "note": "#959/#1328: a COMPLETED ore_sale is what advances 'sell-ore'; the card landing on free-play (rails lifted) is the proof the tutorial sold the ore it blasted."
-      }
-    },
-    {
-      "command": "state",
-      "timeout": 90,
-      "role": "observe",
-      "description": "#1328: the first ore sale ends the guided part. The tutorial rails lift -- body loses bs-tutorial-guided, so no control is disabled by the tutorial -- and the goal chip (net profit vs the +$5,000 win target) is shown. Observes only; the player step right below proves a control the rails used to block now answers a real click.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "body:not(.bs-tutorial-guided)",
-          "timeout": 15000
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-tutorial-goal:not([style*='display:none'])",
-          "timeout": 15000
-        },
-        {
-          "type": "assert",
-          "selector": ".bs-tutorial-goal",
-          "property": "className",
-          "expectedValue": "bs-tutorial-chip bs-tutorial-goal"
-        },
-        {
-          "type": "screenshot"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "free-play"
-      }
-    },
-    {
-      "command": "set_policy mode:continuous fatigue:65",
-      "timeout": 90,
-      "role": "player",
-      "description": "#1328: free play, rails lifted. Apply in the Operations panel was inert outside the old set-policy step (every control not on the current stage was disabled); now it is an ordinary control. Real click, no console fallback; the card stays on free-play because applying a policy is no longer a tutorial step. The panel applies its current shift mode and rest threshold, so the command re-applies continuous at 65 (#1338).",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"ops\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-policy-apply"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-policy-apply"
-        }
-      ],
-      "expect": {
-        "usable": "#bs-policy-apply",
-        "tutorialStep": "free-play"
-      }
-    },
-    {
-      "command": "tick 60",
-      "timeout": 90,
-      "role": "setup",
-      "description": "Free play: let the hauling crew bring more ore into the warehouse before the first free-play sale. #1588: alighting now steps onto a real neighbour cell, which shifts crew timing and the RNG draws that roll the contract pool, so the sales that follow are smaller; more stocked ore keeps them large enough to reach the profit target. A pad rather than a wait_until because no observable field marks 'enough ore for a big sale' -- fillableOreSaleOffered is already true for a small offer.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 60"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 1: the rails are lifted and the clock runs; wait on the condition (an ore_sale offer that storage already covers in full), never a tick pad. Barren rock now goes to a spoil heap and ore trips no longer share a batch with it (#1530), so the ore reaches the warehouse slower and the first big sale waits for it; rubble sales alone pay too little to reach the profit target.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableOreSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      }
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 1: click Accept on an ore_sale offer the site can fill in full.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      }
-    },
-    {
-      "command": "contract deliver type:ore_sale fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 1: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 2: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338). #1588: command mode plays this first extra sale as well (interaction mode skips it once the level has ended): the offer pool is rolled by the RNG, so the free-play sales alone can land just short of the profit target.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "skipWhenLevelEnded": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 2: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "skipWhenLevelEnded": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 2: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "skipWhenLevelEnded": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 3: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 3: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 3: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 4: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 4: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 4: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 5: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 5: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 5: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 6: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 6: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 6: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 7: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 7: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 7: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 8: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 8: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 8: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 9: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 9: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 9: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 10: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 10: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 10: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "Free play sale 11: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "fillableSaleOffered",
-          "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "fillableSaleOffered": true
-        }
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract accept fillable:true",
-      "timeout": 120,
-      "description": "Free play sale 11: click Accept on an offer the site can fill in full (ore or rubble).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "contract deliver fillable:true amount:100000",
-      "timeout": 120,
-      "description": "Free play sale 11: click Deliver; payment lands.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "interactionOnly": true
-    },
-    {
-      "command": "wait_until field:levelEnded equals:true max_ticks:6000",
-      "timeout": 650,
-      "role": "player",
-      "description": "The tutorial is won by playing on: wait for the level to end on its own (profit threshold reached), no campaign complete shortcut (#1338).",
-      "interaction": [
         {
           "type": "waitUntil",
           "field": "levelEnded",
           "equals": true,
-          "maxTicks": 6000,
-          "timeoutMs": 600000
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
       "expect": {
         "equals": {
-          "levelEnded": true
-        }
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#959/#1328/#1585: a COMPLETED ore_sale advances 'sell-ore'; the level ending as a genuine win is the proof the tutorial sold the ore it blasted and that the money counted."
       }
     },
     {

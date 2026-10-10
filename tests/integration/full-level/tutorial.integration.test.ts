@@ -28,6 +28,7 @@ import { accumulateOreMass } from '../../../src/core/mining/BlastOreReport.js';
 import { createGameEngine } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
 import { countNavCellsByType } from '../../../src/ui/tutorialStepHelpers.js';
+import { REGION } from '../../../src/ui/tutorialStages.js';
 
 /** Starting cash comes from the level catalogue, not a copy of it. */
 const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
@@ -364,7 +365,7 @@ describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
     expect(runCommand(engine, 'build living_quarters at:12,15').success).toBe(true);
     expect(runCommand(engine, 'tick 40').success).toBe(true);
     expect(runCommand(engine, 'set_policy mode:continuous').success).toBe(true);
-    expect(runCommand(engine, 'build_ramp start:16,19 end:16,31 depth:6').success).toBe(true);
+    expect(runCommand(engine, `build_ramp start:${REGION.boxcut.x1},${REGION.boxcut.z1} end:${REGION.boxcut.x2},${REGION.boxcut.z2} depth:6`).success).toBe(true);
 
     const state = engine.ctx.state!;
     const prevRampCount = state.navGrid ? countNavCellsByType(state.navGrid.cells, 'ramp') : 0;

@@ -136,6 +136,7 @@ export function createGameForLevel(
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
     ...(startingSite ? { startingSite } : {}),
+    ...(level.fixedWeather ? { fixedWeather: level.fixedWeather } : {}),
   };
 
   const newState = createGame(config);

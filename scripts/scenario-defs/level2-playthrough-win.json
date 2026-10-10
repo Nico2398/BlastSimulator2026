@@ -4046,7 +4046,7 @@
       }
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:350",
+      "command": "contract deliver type:rubble_disposal amount:430",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -4055,14 +4055,15 @@
         {
           "type": "set",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
-          "value": "350"
+          "value": "430"
         },
         {
           "type": "clickSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "description": " #1586: amount 350 -> 430. The rubble_disposal offer accepted on the step above now rolls a 430 kg quantity (the contract RNG draws against a shifted trajectory once action selection takes the lowest real-cost action); delivering 350 left 80 kg outstanding and the contract still active, so the amount tracks the offer, exactly as it did before."
     },
     {
       "command": "finances",
