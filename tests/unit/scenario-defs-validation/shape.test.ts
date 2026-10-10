@@ -240,16 +240,6 @@ describe('Scenario realTutorialClock field is a boolean when present (#1598)', (
 //     BOOTSTRAP_COMMAND_ALLOWLIST (interaction-executor.ts), not a flag any
 //     scenario can reach for on its own say-so.
 // ──────────────────────────────────────────────
-describe('Scenario realTutorialClock field is a boolean when present (#1598)', () => {
-  for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — realTutorialClock is boolean, or absent`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
-      if (scenario.realTutorialClock === undefined) return;
-      expect(typeof scenario.realTutorialClock).toBe('boolean');
-    });
-  }
-});
-
 describe('Scenario skipBlastPlayback field is a boolean when present (#761)', () => {
   for (const name of ALL_SCENARIO_NAMES) {
     it(`${name} — skipBlastPlayback is boolean, or absent`, () => {

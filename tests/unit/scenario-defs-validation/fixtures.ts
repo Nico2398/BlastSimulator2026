@@ -39,8 +39,6 @@ export const KNOWN_INTERACTION_ACTION_TYPES = [
   // Drives a -/value/+ stepper to an explicit value instead of encoding it
   // as a click count. See InteractionStepAction.
   'setStepper',
-  // Waits on the tutorial's REAL guide clock and fails on a held-clock stall (#1598).
-  'awaitTutorialStep',
 ] as const;
 
 /**

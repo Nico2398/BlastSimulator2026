@@ -445,14 +445,13 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
     case 'awaitTutorialStep': {
       const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
       const deadline = Date.now() + (action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-      // Drive the page's rAF tick loop for the duration of this wait only, and
-      // restore it on the way out so every other scripted action keeps the
-      // deterministic scenarioMode clock. The guide clock (decideClock hold/
-      // release) follows that loop only when the scenario opted in via
-      // `realTutorialClock`; otherwise scenario mode does not follow the clock
-      // and this wait only drives the rAF tick loop. With the opt-in, a clock
-      // held with no step/stage/tick progress for HELD_STALL_FAIL_AFTER_MS is
-      // a stall a real player could not get past.
+      // Drive the page's rAF tick loop for this wait only, restoring it on the
+      // way out so every other scripted action keeps the deterministic
+      // scenarioMode clock. Stall detection applies to awaitTutorialStep waits
+      // only: with `realTutorialClock` the guide holds/releases the clock as
+      // for a player, and a hold with no step/stage/tick progress for
+      // HELD_STALL_FAIL_AFTER_MS fails by step id. Without the opt-in the
+      // clock never holds, so the stall check never fires.
       await setAutoTick(page, true);
       try {
         let seen: TutorialSnapshot | null = null;

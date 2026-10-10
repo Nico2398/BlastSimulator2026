@@ -1,6 +1,6 @@
 {
   "name": "tutorial-real-clock",
-  "description": "#1598: plays Tutorial Pit from the first card through drill -> evacuate -> blast -> report with the tutorial's REAL guide clock (realTutorialClock): every wait is awaitTutorialStep, which runs the page's own rAF clock so the guide holds and releases the clock exactly as a player experiences it. A step that stays on a held clock with no progress fails naming the step id (HELD_STALL_FAIL_AFTER_MS) instead of timing out blind -- the class tutorial-interactive cannot see, since its scenario-mode clock never holds. Every gameplay step is a real click (role player); setup is limited to campaign start, tutorial_start and time resume; there are no tick or wait_until fallbacks.",
+  "description": "#1598: plays Tutorial Pit from the first card through drill -> evacuate -> blast -> report with the tutorial's REAL guide clock (realTutorialClock): every wait is awaitTutorialStep, which runs the page's own rAF clock so the guide holds and releases the clock exactly as a player experiences it. A step that stays on a held clock with no progress fails naming the step id (HELD_STALL_FAIL_AFTER_MS) instead of timing out blind -- the class tutorial-interactive cannot see, since its scenario-mode clock never holds. Every gameplay step is a real click (role player); setup is limited to campaign start, tutorial_start and time resume; there are no tick or wait_until fallbacks. Sibling of tutorial-interactive.json, which plays the same tutorial on the deterministic scenario-mode clock; the real clock is the only difference.",
   "realTutorialClock": true,
   "skipBlastPlayback": true,
   "steps": [
@@ -386,7 +386,7 @@
       "command": "state",
       "timeout": 150,
       "description": "#556/#816: build-living-quarters complete (#1574: buildingCount 2 -- the level's free opening spoil heap plus the living_quarters) -- the driller or surveyor (both idle, no skill required for place_building) walks to (8,15) and builds the tier-1 living_quarters over its ~40-tick base duration. Waits on buildingCount itself rather than waitForTutorialStep, matching the drill-plan/charge waits below -- the tutorial card only flips to 'set-early-policy' once the building genuinely exists. #1170: pin moved west of the box-cut corridor alongside driving_center (6,15) and freight_warehouse (2,12) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
-      "role": "player",
+      "role": "observe",
       "interaction": [
         {
           "type": "awaitTutorialStep",
@@ -700,7 +700,7 @@
       "command": "state",
       "timeout": 540,
       "description": "#553: drill-plan complete: the driller drives the drill_rig to all 9 ordered holes and drills them (sandbox-measured: a single driller/drill_rig lands a 3x3 spacing:3 grid on tutorial_pit comfortably inside 400 ticks door-to-door). #554-followup round 6 (issue #586 CI): previously used waitForTutorialStep(stepId:'charge'), which resolves the instant the FIRST hole lands (createComparisonStep's isComplete fires on the first increase past its snapshot -- 'drill-plan' advances to 'charge' after hole 1 of 9, not all 9). The very next step's `charge hole:*` order then only covered whatever was drilled AT THAT MOMENT -- usually just the one hole -- leaving the other 8 permanently uncharged (no later step re-issues the order), which is what left 'Auto Sequence' unreachable further down: charging never actually finished. Switched to waitUntil on holeCount itself so this step keeps waiting until every hole is actually down, in both modes, rather than stopping the moment the tutorial card first flips.",
-      "role": "player",
+      "role": "observe",
       "interaction": [
         {
           "type": "awaitTutorialStep",
