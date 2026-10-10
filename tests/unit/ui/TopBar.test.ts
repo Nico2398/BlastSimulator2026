@@ -668,12 +668,11 @@ describe('TopBar (redesign P1)', () => {
       topBar.dispose();
     });
 
-    it('pointerenter on #bs-hud-scores increments dataset.inspectCount', () => {
+    it('pointerenter on #bs-hud-scores does NOT count as an inspection (#1595)', () => {
       const { topBar, hud } = mount();
       hud.dispatchEvent(new Event('pointerenter'));
-      expect(hud.dataset['inspectCount']).toBe('1');
       hud.dispatchEvent(new Event('pointerenter'));
-      expect(hud.dataset['inspectCount']).toBe('2');
+      expect(hud.dataset['inspectCount']).toBe('0');
       topBar.dispose();
     });
 
@@ -686,7 +685,7 @@ describe('TopBar (redesign P1)', () => {
 
     it('survives a repaint of the scores', () => {
       const { topBar, hud } = mount();
-      hud.dispatchEvent(new Event('pointerenter'));
+      hud.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       topBar.update(makeState(), new NotificationCenter());
       expect(hud.dataset['inspectCount']).toBe('1');
       topBar.dispose();

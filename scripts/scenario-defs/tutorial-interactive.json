@@ -118,6 +118,40 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: seismic is the scripted survey method; the core-sample row must be inert (rows are plain divs railed through CSS).",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-survey-panel [data-method=\"core_sample\"]",
+        "tutorialStep": "survey"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: ...and so must the aerial row.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-survey-panel [data-method=\"aerial\"]",
+        "tutorialStep": "survey"
+      }
+    },
+    {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
       "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
@@ -147,6 +181,58 @@
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         },
+        {
+          "type": "waitForProperty",
+          "selector": ".bs-tutorial-box .bs-tutorial-stage",
+          "property": "textContent",
+          "expectedValue": "Order placed — waiting for the surveyor to report back.",
+          "timeoutMs": 30000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "survey"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: once the survey is ordered, Run survey (each re-run costs money) and the other methods are spent/off-script and must be inert while the surveyor works.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-tutorial-waiting:not([style*='display:none'])",
+          "timeout": 15000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-survey-run",
+        "tutorialStep": "survey"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: ...core sample stays inert while the survey is waiting.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-tutorial-waiting:not([style*='display:none'])",
+          "timeout": 15000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-survey-panel [data-method=\"core_sample\"]",
+        "tutorialStep": "survey"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "role": "observe",
+      "description": "survey complete: the surveyor reports back and the tutorial moves to the overlay toggle.",
+      "interaction": [
         {
           "type": "waitForTutorialStep",
           "stepId": "toggle-survey-overlay",
@@ -387,18 +473,60 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: at buy-drill-rig-assign the tutorial buys the tier-1 drill_rig only; the tier-3 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"1\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"3\"]",
+        "tutorialStep": "buy-drill-rig-assign"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: at buy-drill-rig-assign the tutorial buys the tier-1 drill_rig only; the tier-2 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"1\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"2\"]",
+        "tutorialStep": "buy-drill-rig-assign"
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "timeout": 90,
       "description": "buy-drill-rig-assign complete (#921): a vehicle's driver is claimed automatically now (VehicleReservation/ArrivalGate) -- there is no Assign click and no `vehicle driver` command left to issue, so the purchase itself is the whole step. Vehicles panel open, tier-1 drill_rig bought and placed on the terrain surface; the tutorial rail advances straight to 'train-digger' on the purchase alone -- the newly-licensed driller (employee #2) boards it on their own once drill-plan below queues vehicle-gated work, with no further player input.",
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"]"
+          "selector": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         },
         {
           "type": "waitForTutorialStep",
@@ -414,6 +542,48 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: at buy-rock-digger-assign the tutorial buys the tier-1 rock_digger only; the tier-3 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"rock_digger\"][data-tier=\"1\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel button[data-vtype=\"rock_digger\"][data-tier=\"3\"]",
+        "tutorialStep": "buy-rock-digger-assign"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: at buy-rock-digger-assign the tutorial buys the tier-1 rock_digger only; the tier-2 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"rock_digger\"][data-tier=\"1\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel button[data-vtype=\"rock_digger\"][data-tier=\"2\"]",
+        "tutorialStep": "buy-rock-digger-assign"
+      }
+    },
+    {
       "command": "vehicle buy rock_digger",
       "timeout": 90,
       "description": "buy-rock-digger-assign complete (#921): same retarget as buy-drill-rig-assign above -- a vehicle's driver is claimed automatically now, so the purchase alone is the whole step. Vehicles panel open, tier-1 rock_digger bought and placed on the terrain surface; the tutorial rail advances straight to 'box-cut' on the purchase alone -- the newly-licensed digger (employee #1) boards it on their own once box-cut's dig_ramp_segment work queues below, with no further player input.",
@@ -425,7 +595,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"]"
+          "selector": "#bs-vehicle-panel button[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
         },
         {
           "type": "waitForTutorialStep",
@@ -826,7 +996,7 @@
     {
       "command": "scores",
       "timeout": 90,
-      "description": "#1334: scores card does not auto-dismiss. The player inspects the scores HUD with a real click on #bs-hud-scores (pointerenter/click raise its inspectCount); only that action completes the card, after which the scripted consultant event fires. Waits on the tutorial reaching the next card, not on a delay.",
+      "description": "#1334: scores card does not auto-dismiss. The player inspects the scores HUD with a real click on #bs-hud-scores (only a click raises its inspectCount; hovering does not complete the card, #1595); only that action completes the card, after which the scripted consultant event fires. Waits on the tutorial reaching the next card, not on a delay.",
       "role": "player",
       "interaction": [
         {
@@ -952,18 +1122,60 @@
       }
     },
     {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: at vehicle-buy-assign the tutorial buys the tier-1 debris_hauler only; the tier-3 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"1\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"3\"]",
+        "tutorialStep": "vehicle-buy-assign"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "guard",
+      "description": "#1595: at vehicle-buy-assign the tutorial buys the tier-1 debris_hauler only; the tier-2 dealership button must be genuinely inert (tier 2/3 cost 2x/4x and need driving skills the crew lacks, which would soft-lock the next step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"1\"]",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"2\"]",
+        "tutorialStep": "vehicle-buy-assign"
+      }
+    },
+    {
       "command": "vehicle buy debris_hauler",
       "timeout": 90,
       "description": "vehicle-buy-assign complete (#921): the purchase is the whole step now — a vehicle's driver is claimed automatically (VehicleReservation/ArrivalGate), so there is no Assign click and no `vehicle driver` command left to issue. Vehicles panel open, tier-1 hauler bought and placed on the terrain surface; the tutorial rail advances straight to 'build-storage' on the purchase alone. The driver hired and licensed above (employee #4) boards it on their own once haul-debris queues vehicle-gated work further down, with no further player input — the #478 deadlock path is exercised through the automatic claim path instead of a manual Assign click. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely.",
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"]"
+          "selector": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
         {
           "type": "waitForTutorialStep",

@@ -180,6 +180,19 @@ describe('OperationsPanel', () => {
     expect(btn12h.style.background).toContain('--bsx-amber');
   });
 
+  it('marks the active shift button aria-pressed so the tutorial rails can read it (#1595)', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+    const q = (m: string) => panel.root.querySelector(`[data-shift-mode="${m}"]`) as HTMLElement;
+    expect(q('shift_8h').getAttribute('aria-pressed')).toBe('true');
+    expect(q('continuous').getAttribute('aria-pressed')).toBe('false');
+    q('continuous').click();
+    expect(q('continuous').getAttribute('aria-pressed')).toBe('true');
+    expect(q('shift_8h').getAttribute('aria-pressed')).toBe('false');
+    expect(q('shift_12h').getAttribute('aria-pressed')).toBe('false');
+  });
+
   it('renders exactly three shift mode buttons and no custom one (#1388)', () => {
     const { panel } = makePanel();
     panel.show();
