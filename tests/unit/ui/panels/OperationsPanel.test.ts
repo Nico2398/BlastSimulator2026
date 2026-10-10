@@ -567,3 +567,29 @@ describe('OperationsPanel — scroll-bounded Work Queue / Incidents sections (#9
     expect(wrapper.textContent).toContain(t('ui.operations.no_incidents'));
   });
 });
+
+// ── Scroll survives a live refresh (#1592) ──
+
+describe('OperationsPanel — scroll survives a refresh (#1592)', () => {
+  const bounded = (panel: OperationsPanel): HTMLElement[] =>
+    Array.from(panel.root.querySelectorAll<HTMLElement>('div'))
+      .filter(d => d.style.overflowY === 'auto' && /^(200|220)px$/.test(d.style.maxHeight));
+
+  it('keeps the work-queue and incidents scrollTop when the queue content changes', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    addEmployee(state, { id: 1 });
+    panel.show();
+    panel.update(state);
+    const before = bounded(panel);
+    expect(before.length).toBeGreaterThanOrEqual(2);
+    before.forEach((s, i) => { s.scrollTop = 20 + i * 10; });
+
+    state.damage.accidents.push(makeAccident());
+    state.employees.employees[0]!.injured = true;
+    panel.update(state);
+
+    const after = bounded(panel);
+    expect(after.map(s => s.scrollTop)).toEqual(before.map((_, i) => 20 + i * 10));
+  });
+});

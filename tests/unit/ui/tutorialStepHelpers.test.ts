@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  createUiActionStep, isPanelVisible, readScoresInspectCount,
+  createUiActionStep, isPanelVisible, readScoresInspectCount, createEvacuateZoneStep,
 } from '../../../src/ui/tutorialStepHelpers.js';
 import type { TutorialUiAction } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -173,5 +173,39 @@ describe('tutorialStepHelpers UI-action steps (#1334)', () => {
       addPanel('bs-employee-panel', 'block');
       expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(false);
     });
+  });
+});
+
+describe('createEvacuateZoneStep completes on the real fire, not on arming (#1591)', () => {
+  const step = createEvacuateZoneStep();
+  const ARMED = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
+  const make = (blasts: number, armed: boolean): GameState => ({
+    levelStats: { blastsPerformed: blasts },
+    pendingDetonation: armed ? ARMED : null,
+  }) as unknown as GameState;
+
+  it('is not complete when only a detonation is armed', () => {
+    const snapshot = step.captureSnapshot!(make(0, false));
+    expect(step.isComplete(make(0, true), snapshot)).toBe(false);
+  });
+
+  it('is not complete while idle', () => {
+    const snapshot = step.captureSnapshot!(make(2, false));
+    expect(step.isComplete(make(2, false), snapshot)).toBe(false);
+  });
+
+  it('is complete once blastsPerformed exceeds the snapshot', () => {
+    const snapshot = step.captureSnapshot!(make(2, false));
+    expect(step.isComplete(make(3, false), snapshot)).toBe(true);
+  });
+
+  it('is complete after the fire even when a detonation is still recorded as armed', () => {
+    const snapshot = step.captureSnapshot!(make(0, false));
+    expect(step.isComplete(make(1, true), snapshot)).toBe(true);
+  });
+
+  it('with no prevBlasts in the snapshot and 0 blasts, is not complete', () => {
+    expect(step.isComplete(make(0, false), {})).toBe(false);
+    expect(step.isComplete(make(0, true), {})).toBe(false);
   });
 });
