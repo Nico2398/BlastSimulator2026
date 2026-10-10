@@ -10,9 +10,10 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  board, alight, enterBuilding, findAlightCell, flushUnannouncedLeaves, leaveBuilding, releaseOccupantsOfRemovedBuildings,
+  board, alight, alightIfMounted, enterBuilding, findAlightCell, flushUnannouncedLeaves, leaveBuilding, releaseOccupantsOfRemovedBuildings,
   releaseOccupantsOfRemovedVehicles,
 } from '../../../src/core/engine/Mount.js';
+import { dismountVehicleDriver } from '../../../src/core/engine/VehicleReservation.js';
 import { placeBuilding, destroyBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
@@ -457,6 +458,46 @@ function schoolNavGrid(occupied: ReadonlyArray<readonly [number, number]> = []):
     return cell('walkable', taken.has(`${x},${z}`));
   });
 }
+
+describe('alightIfMounted (#1611)', () => {
+  function mountedGame() {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5.16);
+    const employee = hireTruckDriver(state, 5, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeNavGrid(3, 3, 5, 5, () => cell('walkable', false));
+    return { state, vehicle, employee };
+  }
+
+  it('alightIfMounted (hard-collapse path) marks the vehicle cell occupied exactly like dismountVehicleDriver (#1611)', () => {
+    const a = mountedGame();
+    expect(a.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(false);
+
+    alightIfMounted(a.state, a.employee, undefined, { x: 7, z: 5 });
+
+    expect(a.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(true);
+    expect(a.employee.locomotion.kind).toBe('on_foot');
+    expect(a.vehicle.occupantIds).toEqual([]);
+
+    // Parity with the soft path.
+    const b = mountedGame();
+    dismountVehicleDriver(b.state, b.vehicle);
+    expect(b.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(true);
+    expect(a.state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(b.state.navGrid!.cellAt(5, 5)?.vehicleOccupied);
+  });
+
+  it('is a no-op for an unmounted employee and leaves the cell flag false (#1611)', () => {
+    const { state, vehicle, employee } = mountedGame();
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'on_foot' };
+
+    alightIfMounted(state, employee, undefined, { x: 7, z: 5 });
+
+    expect(state.navGrid!.cellAt(5, 5)?.vehicleOccupied).toBe(false);
+    expect(employee.locomotion.kind).toBe('on_foot');
+  });
+});
 
 describe('enterBuilding', () => {
   it('takes an on-foot employee standing on the ring inside, both sides together', () => {
