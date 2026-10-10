@@ -13,6 +13,7 @@ import {
   applyRails,
   clearRails,
   decideClock,
+  resolveOrderIssued,
   ALLOWED_CLASS,
   HIGHLIGHT_CLASS,
   DEFAULT_TICK_BUDGET,
@@ -22,6 +23,7 @@ import {
 import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
 import type { ClockProgress, StageWaitStatus } from '../../../src/ui/tutorialGuide.js';
+import { hasActiveOreSale, hasBookedTraining } from '../../../src/ui/tutorialStepHelpers.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -1553,5 +1555,228 @@ describe('conditional and spent allow-sets (#1595)', () => {
     applyRails({ target: '#a', hintKey: 'k' }, document, ['#base'], true);
     expect(base.classList.contains(ALLOWED_CLASS)).toBe(true);
     expect(ok.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+});
+
+// -- #1626: an unissued step order holds the clock after the budget, whatever
+// unrelated work is in flight; once issued, the work grace applies unchanged.
+describe('decideClock — unissued step order (#1626)', () => {
+  function busyState(): GameState {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.tickCount = DEFAULT_TICK_BUDGET + 5;
+    // 442 blocked haul orders from the blast plus a crew member on a rest walk.
+    s.pendingActions = Array.from({ length: 442 }, () => pendingAction('haul_debris'));
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: 4, destinationZ: 9 } as never,
+    ];
+    return s;
+  }
+
+  it('holds when the order is pending, despite many pending actions and a walking employee', () => {
+    expect(decideClock(busyState(), 0, DEFAULT_TICK_BUDGET, true, undefined, false, true).hold).toBe(true);
+  });
+
+  it('keeps the existing grace behaviour when the order is not pending', () => {
+    expect(decideClock(busyState(), 0, DEFAULT_TICK_BUDGET, true, undefined, false, false).hold).toBe(false);
+  });
+
+  it('does not hold while the step still has allowance, even with the order pending', () => {
+    const s = busyState();
+    s.tickCount = DEFAULT_TICK_BUDGET - 1;
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, false, true).hold).toBe(false);
+  });
+
+  it('clockMustRun still overrides a pending order (#1336)', () => {
+    expect(decideClock(busyState(), 0, DEFAULT_TICK_BUDGET, true, undefined, true, true).hold).toBe(false);
+  });
+
+  it('an armed detonation still overrides a pending order (#1591)', () => {
+    const s = busyState();
+    s.pendingDetonation = {} as never;
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, false, true).hold).toBe(false);
+  });
+
+  it('still holds with a pending order far past the grace cap', () => {
+    const s = busyState();
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, false, true).hold).toBe(true);
+  });
+});
+
+describe('resolveOrderIssued (#1626)', () => {
+  const fresh = () => createGame({ seed: 42, mineType: 'desert' });
+  const employee = (skill: string | null) =>
+    ({
+      activeActionId: null, pendingDriverVehicleId: null, destinationX: null, destinationZ: null,
+      qualifications: [], trainingState: skill ? { buildingId: 1, skill, ticksRemaining: 50, fee: 100 } : null,
+    }) as never;
+  const oreContract = (over: Record<string, unknown> = {}) =>
+    ({ id: 1, type: 'ore_sale', completed: false, quantityKg: 100, deliveredKg: 0, ...over }) as never;
+
+  it('is null for a step with no player order (haul-debris)', () => {
+    expect(resolveOrderIssued(TUTORIAL_STAGES['haul-debris']!, fresh())).toBeNull();
+  });
+
+  it('is null for an empty stage list', () => {
+    expect(resolveOrderIssued([], fresh())).toBeNull();
+  });
+
+  it('is null when there is no state', () => {
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-driving-center']!, null)).toBeNull();
+  });
+
+  it('build-driving-center: false before, true once a driving_center is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-driving-center']!, s)).toBe(false);
+    s.plannedBuildings = [{ id: 1, buildingId: 1, type: 'driving_center', tier: 1, x: 6, z: 15, actionId: 1, cost: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-driving-center']!, s)).toBe(true);
+  });
+
+  it('build-driving-center: a planned warehouse does not count', () => {
+    const s = fresh();
+    s.plannedBuildings = [{ id: 1, buildingId: 1, type: 'freight_warehouse', tier: 1, x: 2, z: 12, actionId: 1, cost: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-driving-center']!, s)).toBe(false);
+  });
+
+  it('build-storage: false before, true once a freight_warehouse is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-storage']!, s)).toBe(false);
+    s.plannedBuildings = [{ id: 1, buildingId: 1, type: 'freight_warehouse', tier: 1, x: 2, z: 12, actionId: 1, cost: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-storage']!, s)).toBe(true);
+  });
+
+  it('train-fragmenter: false before, true once an employee is booked on driving.rock_fragmenter', () => {
+    const s = fresh();
+    s.employees.employees = [employee(null)];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['train-fragmenter']!, s)).toBe(false);
+    s.employees.employees = [employee('driving.rock_fragmenter')];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['train-fragmenter']!, s)).toBe(true);
+  });
+
+  it('train-fragmenter: a course in another skill does not count', () => {
+    const s = fresh();
+    s.employees.employees = [employee('driving.drill_rig')];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['train-fragmenter']!, s)).toBe(false);
+  });
+
+  it('sell-ore: false before, true once an incomplete ore_sale contract is active', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['sell-ore']!, s)).toBe(false);
+    s.contracts.active = [oreContract()];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['sell-ore']!, s)).toBe(true);
+  });
+
+  it('drill-plan: false before, true once a hole is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['drill-plan']!, s)).toBe(false);
+    s.plannedDrillHoles = [{ id: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['drill-plan']!, s)).toBe(true);
+  });
+
+  it('charge: false before, true once a charge is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['charge']!, s)).toBe(false);
+    s.plannedChargesByHole = { '1': {} as never };
+    expect(resolveOrderIssued(TUTORIAL_STAGES['charge']!, s)).toBe(true);
+  });
+
+  it('box-cut: false before, true once a ramp is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['box-cut']!, s)).toBe(false);
+    s.plannedRamps = [{ id: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['box-cut']!, s)).toBe(true);
+  });
+
+  it('survey: false before, true once a survey action is pending', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['survey']!, s)).toBe(false);
+    s.pendingActions = [{ type: 'survey' } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['survey']!, s)).toBe(true);
+  });
+
+  it('build-living-quarters: false before, true once living_quarters is planned', () => {
+    const s = fresh();
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-living-quarters']!, s)).toBe(false);
+    s.plannedBuildings = [{ id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 2, z: 12, actionId: 1, cost: 1 } as never];
+    expect(resolveOrderIssued(TUTORIAL_STAGES['build-living-quarters']!, s)).toBe(true);
+  });
+});
+
+describe('hasActiveOreSale (#1626)', () => {
+  const fresh = () => createGame({ seed: 42, mineType: 'desert' });
+  const contract = (type: string, completed: boolean) => ({ id: 1, type, completed }) as never;
+
+  it('is false with no active contracts', () => {
+    expect(hasActiveOreSale(fresh())).toBe(false);
+  });
+
+  it('is true for an active incomplete ore_sale', () => {
+    const s = fresh();
+    s.contracts.active = [contract('ore_sale', false)];
+    expect(hasActiveOreSale(s)).toBe(true);
+  });
+
+  it('is false for a completed ore_sale', () => {
+    const s = fresh();
+    s.contracts.active = [contract('ore_sale', true)];
+    expect(hasActiveOreSale(s)).toBe(false);
+  });
+
+  it('is false for an active contract of another type', () => {
+    const s = fresh();
+    s.contracts.active = [contract('rubble_disposal', false)];
+    expect(hasActiveOreSale(s)).toBe(false);
+  });
+
+  it('ignores ore_sale offers that are only available, not accepted', () => {
+    const s = fresh();
+    s.contracts.available = [contract('ore_sale', false)];
+    expect(hasActiveOreSale(s)).toBe(false);
+  });
+});
+
+describe('hasBookedTraining (#1626)', () => {
+  const fresh = () => createGame({ seed: 42, mineType: 'desert' });
+  const trainee = (skill: string) =>
+    ({ qualifications: [], trainingState: { buildingId: 1, skill, ticksRemaining: 9, fee: 1 } }) as never;
+
+  it('is false with no employee in training', () => {
+    const s = fresh();
+    s.employees.employees = [{ qualifications: [], trainingState: null } as never];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(false);
+  });
+
+  it('is true when an employee trains the named skill', () => {
+    const s = fresh();
+    s.employees.employees = [trainee('driving.rock_fragmenter')];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(true);
+  });
+
+  it('is false when the training is a different skill', () => {
+    const s = fresh();
+    s.employees.employees = [trainee('driving.drill_rig')];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(false);
+  });
+
+  it('is true when the course is still a pending booking (walking to the school)', () => {
+    const s = fresh();
+    s.employees.employees = [
+      { qualifications: [], trainingState: null, pendingTrainingState: { buildingId: 1, skill: 'driving.rock_fragmenter', fee: 1 } } as never,
+    ];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(true);
+  });
+
+  it('is true once the course finished and left the qualification', () => {
+    const s = fresh();
+    s.employees.employees = [
+      { qualifications: [{ category: 'driving.rock_fragmenter' }], trainingState: null } as never,
+    ];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(true);
+  });
+
+  it('is false with an empty roster', () => {
+    const s = fresh();
+    s.employees.employees = [];
+    expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(false);
   });
 });

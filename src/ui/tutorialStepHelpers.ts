@@ -326,11 +326,14 @@ export function isHaulDispatched(state: GameState): boolean {
  * has stock in `collectedOre`.
  */
 export function isSellOreWaiting(state: GameState): boolean {
-  const activeOreSales = (state.contracts?.active ?? []).filter(
-    (c) => c.type === 'ore_sale' && !c.completed,
-  );
-  if (activeOreSales.length === 0) return false;
-  return activeOreSales.every((c) => (state.collectedOre?.[c.materialId] ?? 0) <= 0);
+  const sales = activeOreSales(state);
+  if (sales.length === 0) return false;
+  return sales.every((c) => (state.collectedOre?.[c.materialId] ?? 0) <= 0);
+}
+
+/** Active, incomplete ore_sale contracts; tolerant of a minimal/mock GameState. */
+function activeOreSales(state: GameState) {
+  return (state.contracts?.active ?? []).filter((c) => c.type === 'ore_sale' && !c.completed);
 }
 
 /** Count vehicles with a driver aboard — the driver seat is `occupantIds[0]` (#1092). */
@@ -420,3 +423,19 @@ export function createSurveyOverlayToggleStep(): TutorialStep {
   };
 }
 
+/** True if `contracts.active` holds an incomplete ore_sale contract (#1626). */
+export function hasActiveOreSale(state: GameState): boolean {
+  return activeOreSales(state).length > 0;
+}
+
+/** True if any employee has a booked (walking in), active or finished training in `skill` (#1626). */
+export function hasBookedTraining(state: GameState, skill: string): boolean {
+  // Booking first lands in `pendingTrainingState` (the walk to the school) and
+  // moves to `trainingState` on arrival (#1203): either one is a booked course.
+  return state.employees.employees.some(
+    (e) => e.trainingState?.skill === skill
+      || e.pendingTrainingState?.skill === skill
+      // A finished course leaves the qualification: the order stays issued.
+      || e.qualifications.some((q) => q.category === skill),
+  );
+}

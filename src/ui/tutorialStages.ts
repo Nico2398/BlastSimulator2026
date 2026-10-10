@@ -12,7 +12,7 @@
 
 import {
   TOOLBAR_TARGET,
-  hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
+  hasActiveOreSale, hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
@@ -86,6 +86,12 @@ export interface TutorialStage {
    * second order) doesn't mask the wait.
    */
   spentWhen?: (state: GameState) => boolean;
+  /**
+   * Whether the player's order for this step has been issued (#1626). `null`
+   * marks a step with no player order. Overrides `spentWhen` as the
+   * "order issued" signal; `undefined` falls back to `spentWhen`.
+   */
+  orderIssuedWhen?: ((state: GameState) => boolean) | null;
   /** i18n key for the waiting line shown once `spentWhen` fires. Required whenever `spentWhen` is set. */
   waitingKey?: string;
 }
@@ -487,6 +493,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: TOOLBAR_TARGET.vehicles,
       hintKey: 'tutorial.stage.vehicle_watch',
       spentWhen: isHaulDispatched,
+      orderIssuedWhen: null, // no player order: hauling self-dispatches
       waitingKey: 'tutorial.waiting.hauling',
     },
   ],
@@ -511,6 +518,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       // resolved instead of regressing to "open the Contracts panel" (#1335).
       doneTarget: '#bs-contract-panel [data-contract-type="ore_sale"] .bs-contract-deliver',
       spentWhen: isSellOreWaiting,
+      orderIssuedWhen: hasActiveOreSale,
       waitingKey: 'tutorial.waiting.delivering',
     },
   ],
