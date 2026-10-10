@@ -2,6 +2,7 @@
 // Pure per-tick position easing shared by CharacterMesh and VehicleMesh.
 
 import { describe, it, expect } from 'vitest';
+import type { MovementTrail, TrailPoint } from '../../../src/core/entities/MovementTrail.js';
 import {
   createTween,
   computeInterpolatedPosition,
@@ -10,6 +11,10 @@ import {
   pointAlongTrail,
   MOVE_TWEEN_DURATION_S,
   MOVE_TELEPORT_DISTANCE,
+  visibleTrailSpans,
+  trailLength,
+  stepSpanPlayback,
+  type TrailSpan,
 } from '../../../src/renderer/MovementInterpolation.js';
 
 describe('MovementInterpolation', () => {
@@ -367,5 +372,159 @@ describe('MovementInterpolation — following a walk trail (#1199)', () => {
     const tween = createTween(0, 0);
     const pos = stepTween(tween, 0, 0, 3, 0, 0.01, { points: [{ x: 3, z: 0 }], relocated: false, hostMarkers: [] });
     expect(pos).toEqual({ x: 3, z: 0 });
+  });
+});
+
+// ── Trail spans split at host markers (#1589) ───────────────────────────────
+
+const pts = (...xs: number[]): TrailPoint[] => xs.map(x => ({ x, z: 0 }));
+type Marker = MovementTrail['hostMarkers'][number];
+const marker = (pointIndex: number, event: Marker['event']): Marker => ({
+  pointIndex, event, hostKind: 'vehicle', hostX: 0, hostZ: 0,
+});
+const trailOf = (points: TrailPoint[], hostMarkers: Marker[] = [], relocated = false): MovementTrail =>
+  ({ points, relocated, hostMarkers });
+const xsOf = (span: TrailSpan): number[] => span.points.map(p => p.x);
+
+describe('visibleTrailSpans (#1589)', () => {
+  it('no markers: one span holding every point, not ending in a host', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2)));
+    expect(spans).toHaveLength(1);
+    expect(xsOf(spans[0]!)).toEqual([0, 1, 2]);
+    expect(spans[0]!.endsInHost).toBe(false);
+  });
+
+  it('board marker at the last point: one span of all points ending in the host', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2), [marker(2, 'board')]));
+    expect(spans).toHaveLength(1);
+    expect(xsOf(spans[0]!)).toEqual([0, 1, 2]);
+    expect(spans[0]!.endsInHost).toBe(true);
+  });
+
+  it('enter marker mid-trail: the span stops at the marker point', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2, 3), [marker(1, 'enter')]));
+    expect(spans).toHaveLength(1);
+    expect(xsOf(spans[0]!)).toEqual([0, 1]);
+    expect(spans[0]!.endsInHost).toBe(true);
+  });
+
+  it('alight marker: one span starting at the marker point and running to the end', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2, 3), [marker(1, 'alight')]));
+    expect(spans).toHaveLength(1);
+    expect(xsOf(spans[0]!)).toEqual([1, 2, 3]);
+    expect(spans[0]!.endsInHost).toBe(false);
+  });
+
+  it('leave marker behaves like alight', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2), [marker(0, 'leave')]));
+    expect(spans.map(xsOf)).toEqual([[0, 1, 2]]);
+    expect(spans[0]!.endsInHost).toBe(false);
+  });
+
+  it('board then alight in one batch: two spans, the stretch inside the host is dropped', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2, 3, 4, 5), [marker(2, 'board'), marker(4, 'alight')]));
+    expect(spans.map(xsOf)).toEqual([[0, 1, 2], [4, 5]]);
+    expect(spans.map(s => s.endsInHost)).toEqual([true, false]);
+  });
+
+  it('alight then board (started mounted): a single span between the markers', () => {
+    const spans = visibleTrailSpans(trailOf(pts(0, 1, 2, 3), [marker(1, 'alight'), marker(3, 'board')]));
+    expect(spans.map(xsOf)).toEqual([[1, 2, 3]]);
+    expect(spans[0]!.endsInHost).toBe(true);
+  });
+
+  it('a relocated trail with markers yields no spans (the renderer snaps)', () => {
+    expect(visibleTrailSpans(trailOf(pts(0, 1, 2), [marker(2, 'board')], true))).toEqual([]);
+  });
+
+  it('an empty trail yields no spans', () => {
+    expect(visibleTrailSpans(trailOf([]))).toEqual([]);
+  });
+
+  it('clamps an out-of-range marker pointIndex into the trail', () => {
+    const high = visibleTrailSpans(trailOf(pts(0, 1, 2), [marker(99, 'board')]));
+    expect(high.map(xsOf)).toEqual([[0, 1, 2]]);
+    expect(high[0]!.endsInHost).toBe(true);
+    const low = visibleTrailSpans(trailOf(pts(0, 1, 2), [marker(-5, 'alight')]));
+    expect(low.map(xsOf)).toEqual([[0, 1, 2]]);
+  });
+});
+
+describe('trailLength (#1589)', () => {
+  it('sums segment lengths along the polyline', () => {
+    expect(trailLength([{ x: 0, z: 0 }, { x: 3, z: 0 }, { x: 3, z: 4 }])).toBe(7);
+  });
+
+  it('is 0 for an empty or single-point polyline', () => {
+    expect(trailLength([])).toBe(0);
+    expect(trailLength([{ x: 5, z: 5 }])).toBe(0);
+  });
+});
+
+describe('stepSpanPlayback (#1589)', () => {
+  // A span of `cells` straight cells inside a trail twice as long, so it must
+  // take MOVE_TWEEN_DURATION_S * cells / (2 * cells) = half the tween.
+  function spanTween(spans: TrailSpan[], fullLen: number) {
+    const tween = createTween(spans[0]!.points[0]!.x, spans[0]!.points[0]!.z);
+    tween.spans = spans;
+    tween.spanIndex = 0;
+    const len = trailLength(spans[0]!.points);
+    tween.spanDurationS = fullLen === 0 ? 0 : MOVE_TWEEN_DURATION_S * len / fullLen;
+    tween.elapsedS = 0;
+    return tween;
+  }
+  const straight = (cells: number): TrailSpan =>
+    ({ points: [{ x: 0, z: 0 }, { x: cells, z: 0 }], endsInHost: true });
+
+  for (const cells of [1, 2, 4]) {
+    it(`batch of ${cells}: a span of ${cells} cells completes in the proportional share of the tween`, () => {
+      const tween = spanTween([straight(cells)], 2 * cells);
+      const dt = MOVE_TWEEN_DURATION_S / 8; // exact in binary
+      let r = { x: 0, z: 0, spanDone: false, finished: false };
+      for (let i = 0; i < 3; i++) r = stepSpanPlayback(tween, 0, 0, dt, 2 * cells);
+      expect(r.spanDone).toBe(false);
+      expect(r.x).toBeCloseTo(cells * 0.75, 9);
+      r = stepSpanPlayback(tween, r.x, r.z, dt, 2 * cells);
+      expect(r.spanDone).toBe(true);
+      expect(r.x).toBeCloseTo(cells, 9);
+      expect(r.z).toBeCloseTo(0, 9);
+    });
+
+    it(`batch of ${cells}: never overshoots the span end, however large dt`, () => {
+      const tween = spanTween([straight(cells)], 2 * cells);
+      const r = stepSpanPlayback(tween, 0, 0, 100, 2 * cells);
+      expect(r.x).toBeCloseTo(cells, 9);
+      expect(r.spanDone).toBe(true);
+    });
+  }
+
+  it('finished is true when the last span completes', () => {
+    const tween = spanTween([straight(2)], 2);
+    expect(stepSpanPlayback(tween, 0, 0, 100, 2).finished).toBe(true);
+  });
+
+  it('finished stays false when a span completes but another follows', () => {
+    const second: TrailSpan = { points: [{ x: 5, z: 0 }, { x: 6, z: 0 }], endsInHost: false };
+    const tween = spanTween([straight(2), second], 3);
+    const r = stepSpanPlayback(tween, 0, 0, 100, 3);
+    expect(r.spanDone).toBe(true);
+    expect(r.finished).toBe(false);
+  });
+
+  it('follows a turn along the span instead of cutting the chord', () => {
+    const span: TrailSpan = { points: [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 2, z: 2 }], endsInHost: true };
+    const tween = spanTween([span], 4);
+    const r = stepSpanPlayback(tween, 0, 0, MOVE_TWEEN_DURATION_S / 2, 4);
+    expect(r.x).toBeCloseTo(2, 9);
+    expect(r.z).toBeCloseTo(0, 9);
+  });
+
+  it('fullTrailLength 0 finishes on the next frame', () => {
+    const span: TrailSpan = { points: [{ x: 3, z: 3 }], endsInHost: false };
+    const tween = spanTween([span], 0);
+    const r = stepSpanPlayback(tween, 3, 3, 0.016, 0);
+    expect(r.finished).toBe(true);
+    expect(r.x).toBe(3);
+    expect(r.z).toBe(3);
   });
 });
