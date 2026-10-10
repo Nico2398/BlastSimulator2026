@@ -245,7 +245,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // beginRestTravel's moveTo still plans a route for whatever locomotion
     // state the employee ends up in, mounted or on foot.
     alightIfMounted(state, emp, _emitter);
-    beginRestTravel(state, emp, targetX, targetZ, buildingId);
+    beginRestTravel(state, emp, targetX, targetZ, buildingId, _emitter);
 
     // A taskQueue entry (not yet active — e.g. walk-only-pinned back to this
     // employee after its vehicle was destroyed mid-drive) predating this

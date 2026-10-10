@@ -74,7 +74,7 @@ function finishForceRest(
 ): void {
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
-  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ, resolveRestBuildingId(restAction.payload));
+  beginRestTravel(state, emp, restAction.targetX, restAction.targetZ, resolveRestBuildingId(restAction.payload), _emitter);
   releaseUnboardedTaskQueueVehicleReservations(state, emp);
   shiftRested.push(emp.id);
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });

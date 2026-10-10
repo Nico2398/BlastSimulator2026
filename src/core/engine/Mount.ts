@@ -10,6 +10,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
+import { appendHostTransition, type TrailHostEvent, type TrailHostKind } from '../entities/MovementTrail.js';
 import type { Locomotion } from '../entities/EmployeeLocomotion.js';
 import { canAssignDriver, canReleaseDriver, vehicleDriverId } from '../entities/Vehicle.js';
 import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
@@ -84,6 +85,11 @@ function releaseOccupant(host: OccupancyHost | undefined, employeeId: number, em
   employee.destinationZ = null;
 }
 
+/** Records a host transition on the employee's trail at their current position; no-op without a trail. */
+function markTransition(employee: Employee, event: TrailHostEvent, hostKind: TrailHostKind, hostX: number, hostZ: number): void {
+  if (employee.walkTrail) appendHostTransition(employee.walkTrail, employee.x, employee.z, event, hostKind, hostX, hostZ);
+}
+
 /**
  * Whether two points are within one tile of each other (Chebyshev distance
  * <= 1) — the "close enough to board" test `board` itself uses. Locomotion.ts's
@@ -122,6 +128,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   }
   employee.x = vehicle.x;
   employee.z = vehicle.z;
+  markTransition(employee, 'board', 'vehicle', vehicle.x, vehicle.z);
   // #1206: a mounted employee holds no ground cell of their own — the
   // vehicle they now ride claims one instead (AgentOccupancy.ts's own
   // rebuild already excludes a mounted/inside employee; releasing here keeps
@@ -167,8 +174,12 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
 /** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
 function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter): void {
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z);
+  // Read the next destination before releaseOccupant clears the itinerary.
+  const next = employee?.itinerary?.legs[1];
+  const toward = next ? { x: next.destX, z: next.destZ } : undefined;
+  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
   releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
+  if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
   emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
 }
 
@@ -200,20 +211,29 @@ export function findAlightCell(
   vz: number,
   toward?: { x: number; z: number },
 ): { x: number; z: number } {
-  void toward; // TODO: implement
   if (!grid) return { x: vx, z: vz };
 
-  const from = grid.cellAt(vx, vz)?.surfaceY;
+  const vcx = Math.round(vx);
+  const vcz = Math.round(vz);
+  const from = grid.cellAt(vcx, vcz)?.surfaceY;
+  let best: { x: number; z: number } | undefined;
+  let bestDist = Infinity;
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-    const x = vx + dx;
-    const z = vz + dz;
+    const x = vcx + dx;
+    const z = vcz + dz;
+    if (!grid.containsCell(x, z)) continue;
     const cell = grid.cellAt(x, z);
     if (!cell || isImpassable(cell, true)) continue;
     if (!isStepClimbable(from, cell.surfaceY, Math.hypot(dx, dz))) continue;
-    return { x, z };
+    if (!toward) return { x, z };
+    const dist = Math.hypot(x - toward.x, z - toward.z);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = { x, z };
+    }
   }
 
-  return { x: vx, z: vz };
+  return best ?? { x: vx, z: vz };
 }
 
 /**
@@ -283,6 +303,7 @@ export function enterBuilding(state: GameState, buildingId: number, employeeId: 
   if (!admitOccupant(building, capacity, employee, { kind: 'inside', buildingId })) {
     return { success: false, error: t('building.full') };
   }
+  markTransition(employee, 'enter', 'building', building.x, building.z);
   // #1206: same reasoning as `board`'s own release above — an employee inside
   // a building holds no ground cell.
   state.agentOccupancy?.release({ kind: 'employee', id: employeeId });
@@ -308,6 +329,7 @@ export function leaveBuilding(state: GameState, employeeId: number, emitter?: Ev
     ? findBuildingExitCell(state.navGrid, building, getBuildingDef(building.type, building.tier), employee.x, employee.z)
     : { x: employee.x, z: employee.z };
   releaseOccupant(building, employeeId, employee, cell.x, cell.z);
+  markTransition(employee, 'leave', 'building', building?.x ?? cell.x, building?.z ?? cell.z);
 
   emitter?.emit('employee:left_building', { employeeId, buildingId });
   return { success: true };

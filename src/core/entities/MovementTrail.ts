@@ -32,7 +32,7 @@ export interface MovementTrail {
   points: TrailPoint[];
   /**
    * True once the entity's position changed during the batch by something
-   * other than a recorded walk (a placement, a boarding snap, a driverless
+   * other than a recorded walk or host transition (a placement, a driverless
    * relocation). The renderer snaps instead of gliding through such a jump.
    */
   relocated: boolean;
@@ -64,13 +64,18 @@ export function appendToTrail(trail: MovementTrail, fromX: number, fromZ: number
   if (!tail || !isSameTrailPoint(tail, fromX, fromZ)) {
     trail.relocated = true;
     trail.points = [{ x: fromX, z: fromZ }];
+    trail.hostMarkers = [];
   }
   for (const hop of hops) {
     const last = trail.points[trail.points.length - 1]!;
     if (!isSameTrailPoint(last, hop.x, hop.z)) trail.points.push({ x: hop.x, z: hop.z });
   }
   const overflow = trail.points.length - MOVEMENT_TRAIL_MAX_POINTS;
-  if (overflow > 0) trail.points.splice(0, overflow);
+  if (overflow > 0) {
+    trail.points.splice(0, overflow);
+    for (const m of trail.hostMarkers) m.pointIndex -= overflow;
+    trail.hostMarkers = trail.hostMarkers.filter(m => m.pointIndex >= 0);
+  }
 }
 
 /**
@@ -87,6 +92,7 @@ export function appendHostTransition(
   hostX: number,
   hostZ: number,
 ): void {
-  // TODO: implement
-  void trail; void x; void z; void event; void hostKind; void hostX; void hostZ;
+  const tail = trail.points[trail.points.length - 1];
+  if (!tail || !isSameTrailPoint(tail, x, z)) trail.points.push({ x, z });
+  trail.hostMarkers.push({ pointIndex: trail.points.length - 1, event, hostKind, hostX, hostZ });
 }

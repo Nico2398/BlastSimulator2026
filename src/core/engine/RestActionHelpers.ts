@@ -301,14 +301,14 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  * degrading that refusal into the ordinary reposition every other rest still
  * gets.
  */
-export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number, buildingId?: number): void {
+export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number, buildingId?: number, emitter?: EventEmitter): void {
   const wasMounted = isMounted(emp.locomotion);
   const viaBuilding = !wasMounted && buildingId !== undefined
-    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true })
+    ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true }, emitter)
     : undefined;
   const result = viaBuilding?.success
     ? viaBuilding
-    : moveTo(state, emp.id, { x, z }, { allowUnreachable: true });
+    : moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   if (wasMounted && result.success && !hasClaimableSameRoleFollowUp(state, emp)) {
     alightOnArrival(emp);
   }
