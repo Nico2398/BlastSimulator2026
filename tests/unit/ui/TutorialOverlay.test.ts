@@ -1554,3 +1554,55 @@ describe('TutorialOverlay clockFollowsTimer option (#1550)', () => {
     expect(internals.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
   });
 });
+
+describe('TutorialOverlay.resume clock (#1627)', () => {
+  let container: HTMLDivElement;
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+  afterEach(() => { container.remove(); });
+
+  function suspendedAt(id: string) {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    while (TUTORIAL_STEPS[tut.stepIndex]!.id !== id) tut.advanceToNextStep();
+    tut.suspend();
+    state.campaign.activeLevelId = 'tutorial_pit';
+    return { tut, state };
+  }
+
+  it('leaves the clock running when the waits-on-work step already has work in flight', () => {
+    const { tut, state } = suspendedAt('train-fragmenter');
+    state.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: null, qualifications: [],
+        trainingState: { buildingId: 1, skill: 'driving.rock_fragmenter', ticksRemaining: 90, fee: 1 } } as never,
+    ];
+    expect(tut.resume(state)).toBe(true);
+    expect(state.isPaused).toBe(false);
+    tut.dispose();
+  });
+
+  it('stays paused when nothing is in flight on a waits-on-work step', () => {
+    const { tut, state } = suspendedAt('train-fragmenter');
+    expect(tut.resume(state)).toBe(true);
+    expect(state.isPaused).toBe(true);
+    tut.dispose();
+  });
+
+  it('stays paused on a step without a waiting order', () => {
+    const { tut, state } = suspendedAt('survey');
+    expect(tut.resume(state)).toBe(true);
+    expect(state.isPaused).toBe(true);
+    tut.dispose();
+  });
+
+  it('start() still ends paused (#1333)', () => {
+    const tut = new TutorialOverlay(container) as any;
+    const state = createMockState();
+    tut.start(state);
+    expect(state.isPaused).toBe(true);
+    tut.dispose();
+  });
+});
