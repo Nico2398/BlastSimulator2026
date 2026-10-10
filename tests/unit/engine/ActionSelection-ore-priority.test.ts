@@ -239,6 +239,62 @@ describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// selectBestActionForEmployee — the bonus applies to the REAL cost (#1586)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('selectBestActionForEmployee — ore bonus applies to the real cost (#1586)', () => {
+  /**
+   * Employee (58,45) with a plain candidate 5 cells north behind a wall (z=43,
+   * only gap at x=0): cheapest estimate, but a long real detour. An ore candidate
+   * far to the south-east: higher estimate AND higher raw real cost than the plain
+   * one, yet its bonus-adjusted real cost (raw - ORE_HAUL_PRIORITY_BONUS_TICKS) is
+   * lower than the plain one's real cost.
+   */
+  function makeWalledLayout() {
+    const state = makeState(120, 120);
+    for (let x = 1; x < 120; x++) state.navGrid!.cells[43]![x] = makeCell('blocked');
+    const emp = makeHaulerEmployee(state, 58, 45);
+    addBlastFragments(state.logistics, [
+      makeFragment(1, 58, 40, {}),
+      makeFragment(2, 70, 80, { gloomium: 0.2 }),
+    ]);
+    const plain = makeHaulAction({ id: 1, targetX: 58, targetZ: 40, payload: { fragmentId: 1 } });
+    const ore = makeHaulAction({ id: 2, targetX: 70, targetZ: 80, payload: { fragmentId: 2 } });
+    return { state, emp, plain, ore };
+  }
+
+  it('the ore candidate with the higher raw real cost but lower bonus-adjusted real cost wins; totalTicks stays raw', () => {
+    const { state, emp, plain, ore } = makeWalledLayout();
+
+    const plainReal = resolveActionCost(state, emp, plain)!.totalTicks;
+    const oreReal = resolveActionCost(state, emp, ore)!.totalTicks;
+    // Fixture preconditions: plain is first by estimate, cheaper by raw real cost,
+    // but dearer than the ore candidate once the bonus is subtracted.
+    expect(estimateActionCost(state, emp, plain)).toBeLessThan(estimateActionCost(state, emp, ore));
+    expect(plainReal).toBeLessThan(oreReal);
+    expect(oreReal - ORE_HAUL_PRIORITY_BONUS_TICKS).toBeLessThan(plainReal);
+
+    const result = selectBestActionForEmployee(state, emp, [plain, ore]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(ore.id);
+    expect(result!.totalTicks).toBeCloseTo(oreReal, 10);
+  });
+
+  it('without the ore fragment the plain candidate (lower real cost) is still chosen', () => {
+    const { state, emp, plain } = makeWalledLayout();
+    addBlastFragments(state.logistics, [makeFragment(3, 70, 80, {})]);
+    // Same position as the ore candidate but barren: no bonus, so real cost decides.
+    const barren = makeHaulAction({ id: 3, targetX: 70, targetZ: 80, payload: { fragmentId: 3 } });
+
+    const result = selectBestActionForEmployee(state, emp, [plain, barren]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(plain.id);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // resolveActionCost — the bonus is ranking-only, never leaks into duration
 // ═══════════════════════════════════════════════════════════════════════════
 
