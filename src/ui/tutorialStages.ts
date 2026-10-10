@@ -113,16 +113,10 @@ const FILLABLE_ORE_ACCEPT =
  * must be able to back out of the tool (Esc button; Esc and right-click work
  * regardless) without the rails locking the strip's cancel control.
  *
- * `extraAlso` (#949): the grid tool's own spacing/depth steppers live on the
- * shared `ParamStrip` (`#bs-param-strip-bar`), rendered alongside the canvas
- * the instant the tool arms — not gated behind a selection existing, so they
- * are reachable for the whole picker stage. Without listing them here they
- * stayed `pointer-events: none` for this stage's entire duration, same as
- * Charge's amount/stemming steppers below: a player could drag a grid but
- * never actually retune spacing/depth off the tool's own defaults. The drill
- * picker passes both steppers and the box-cut picker passes depth (#1151 —
- * see DEPTH_STEPPER); the survey and build pickers have nothing to tune, so
- * they keep the empty default.
+ * Spacing, depth, charge amount, stemming and ramp depth steppers are never
+ * allowlisted (#1596): they are shown, not editable -- the panel defaults
+ * already equal the scripted values (#1330) and ramp depth is clamped at arm
+ * time.
  *
  * `confirmSpent` (#1014): every picker-backed step's Confirm click issues an
  * order the simulation then owns (a survey, a building, a drill grid, a ramp)
@@ -134,38 +128,19 @@ const FILLABLE_ORE_ACCEPT =
 function pickerStages(
   pickHintKey: string,
   region: TileRegion,
-  extraAlso: string[] = [],
   confirmSpent?: { spentWhen: (state: GameState) => boolean; waitingKey: string },
 ): TutorialStage[] {
   return [
-    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: [PICKER_CANCEL, ...extraAlso] },
+    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: [PICKER_CANCEL] },
     {
       target: PICKER_CONFIRM,
       hintKey: 'tutorial.stage.picker_confirm',
-      also: [PICKER_CANVAS, PICKER_CANCEL, ...extraAlso],
+      also: [PICKER_CANVAS, PICKER_CANCEL],
       region,
       ...(confirmSpent ? { spentWhen: confirmSpent.spentWhen, waitingKey: confirmSpent.waitingKey } : {}),
     },
   ];
 }
-
-// #949: the spacing/depth steppers, rendered on the shared ParamStrip
-// (`#bs-param-strip-bar`, ParamStrip.ts) once a placement tool is armed —
-// same `data-field`/`.bsx-stepper-btn` convention Charge.ts's amount/stemming
-// steppers use below. Both buttons (inc and dec) are allowlisted, not just
-// increment: a player over- or under-shooting a click needs the other one too.
-//
-// #1151: DEPTH_STEPPER is shared by the grid tool and the ramp tool, which
-// render depth on the same strip under the same data-field. The box-cut stage
-// needs it for the same reason the drill stage does — the value the step
-// teaches is not the tool's default. buildRampCommand defaults depth to 8,
-// but the box-cut's line is region-pinned to 12 tiles (REGION.boxcut) and the
-// slope gate caps a 12-long ramp at 6m of drop, so the default now cuts a
-// ramp too steep to walk. Left off the box-cut stage the stepper is inert
-// while placement is armed, and the tutorial asks for a ramp whose depth no
-// player could set.
-const GRID_SPACING_STEPPER = '#bs-param-strip-bar [data-field="spacing"] .bsx-stepper-btn';
-const DEPTH_STEPPER = '#bs-param-strip-bar [data-field="depth"] .bsx-stepper-btn';
 
 /**
  * Where each guided placement belongs, in tiles on the tutorial map (#458
@@ -347,7 +322,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // exactly the kind of mismatch that loses a player.
     { target: '#bs-survey-panel [data-method="seismic"]', hintKey: 'tutorial.stage.survey_method' },
     { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run', also: ['#bs-survey-panel [data-method="seismic"]'] },
-    ...pickerStages('tutorial.stage.survey_target', REGION.survey, [], {
+    ...pickerStages('tutorial.stage.survey_target', REGION.survey, {
       spentWhen: (state) => hasPendingActionOfType(state, 'survey'),
       waitingKey: 'tutorial.waiting.surveying',
     }),
@@ -361,7 +336,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="living_quarters"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_living_quarters',
     },
-    ...pickerStages('tutorial.stage.build_site', REGION.livingQuarters, [], {
+    ...pickerStages('tutorial.stage.build_site', REGION.livingQuarters, {
       spentWhen: (state) => hasPlannedBuildingOfType(state, 'living_quarters'),
       waitingKey: 'tutorial.waiting.building',
     }),
@@ -406,7 +381,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="driving_center"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_driving_center',
     },
-    ...pickerStages('tutorial.stage.build_site', REGION.drivingCenter, [], {
+    ...pickerStages('tutorial.stage.build_site', REGION.drivingCenter, {
       spentWhen: (state) => hasPlannedBuildingOfType(state, 'driving_center'),
       waitingKey: 'tutorial.waiting.building',
     }),
@@ -419,26 +394,19 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'tutorial.stage.grid_tool' },
-    ...pickerStages('tutorial.stage.drill_area', REGION.drill, [GRID_SPACING_STEPPER, DEPTH_STEPPER], {
+    ...pickerStages('tutorial.stage.drill_area', REGION.drill, {
       spentWhen: (state) => state.plannedDrillHoles.length > 0,
       waitingKey: 'tutorial.waiting.drilling',
     }),
   ],
 
-  // #949: `also` lists the amount/stemming steppers (Charge.ts, `data-field`
-  // convention) alongside Charge All. The panel defaults now equal the scripted
-  // plan (CHARGE_DEFAULT_*, #1330), but the steppers stay reachable for
-  // adjustments. Both buttons (inc/dec) are allowed, not just the direction
-  // the plan happens to need.
+  // #1596: no amount/stemming steppers -- the panel defaults equal the
+  // scripted plan (CHARGE_DEFAULT_*, #1330), so only Charge All is live.
   charge: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     {
       target: '#bs-blast-panel [data-action="charge-all"]',
       hintKey: 'tutorial.stage.charge_all',
-      also: [
-        '#bs-blast-panel [data-field="amount"] .bsx-stepper-btn',
-        '#bs-blast-panel [data-field="stemming"] .bsx-stepper-btn',
-      ],
       spentWhen: (state) => Object.keys(state.plannedChargesByHole).length > 0,
       waitingKey: 'tutorial.waiting.charging',
     },
@@ -502,7 +470,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: '#bs-build-panel [data-build-type="freight_warehouse"] .bs-build-buy-btn',
       hintKey: 'tutorial.stage.build_warehouse',
     },
-    ...pickerStages('tutorial.stage.build_site', REGION.warehouse, [], {
+    ...pickerStages('tutorial.stage.build_site', REGION.warehouse, {
       spentWhen: (state) => hasPlannedBuildingOfType(state, 'freight_warehouse'),
       waitingKey: 'tutorial.waiting.building',
     }),
@@ -548,7 +516,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'box-cut': [
     { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
     { target: '#bs-build-panel .bs-build-ramp-btn', hintKey: 'tutorial.stage.ramp_tool' },
-    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut, [DEPTH_STEPPER], {
+    ...pickerStages('tutorial.stage.boxcut_area', REGION.boxcut, {
       spentWhen: (state) => state.plannedRamps.length > 0,
       waitingKey: 'tutorial.waiting.excavating',
     }),

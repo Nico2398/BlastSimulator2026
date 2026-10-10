@@ -18,10 +18,9 @@ import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 const UI_DIR = resolve(import.meta.dirname, '../../../src/ui');
 
-/** Every .ts source in src/ui, concatenated — where selectors are produced. */
-const UI_SOURCE = readdirSync(UI_DIR)
-  .filter(f => f.endsWith('.ts'))
-  .map(f => readFileSync(resolve(UI_DIR, f), 'utf-8'))
+/** Every .ts source in src/ui and src/ui/scene, concatenated — where selectors are produced. */
+const UI_SOURCE = [UI_DIR, resolve(UI_DIR, 'scene')]
+  .flatMap(dir => readdirSync(dir).filter(f => f.endsWith('.ts')).map(f => readFileSync(resolve(dir, f), 'utf-8')))
   .join('\n');
 
 const messages = en as Record<string, string>;
@@ -612,5 +611,23 @@ describe('tutorial stage allow-set pins the scripted choice (#1595)', () => {
   it('set-early-policy highlights the Operations toolbar button, not settings', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'set-early-policy')!;
     expect(step.highlightTarget).toBe(TOOLBAR_TARGET.ops);
+  });
+});
+
+describe('guided first-blast steps allow no stepper (#1596)', () => {
+  it.each(['box-cut', 'drill-plan', 'charge'])('%s stages expose no stepper control', (stepId) => {
+    const stages = stagesFor(stepId);
+    expect(stages.length).toBeGreaterThan(0);
+    for (const st of stages) {
+      const selectors = [
+        st.target,
+        ...(st.also ?? []),
+        ...(st.alsoWhen ?? []).map((c) => c.selector),
+      ].filter((x): x is string => typeof x === 'string');
+      for (const sel of selectors) {
+        expect(sel, `${stepId}: ${sel}`).not.toContain('[data-field=');
+        expect(sel, `${stepId}: ${sel}`).not.toContain('bsx-stepper');
+      }
+    }
   });
 });

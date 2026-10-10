@@ -218,15 +218,22 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 5: drill-plan ──
-  // #554-followup: drilling is real, queued work (was instant pre-#553) --
-  // same waitsOnWork gap as 'charge' below, just on the drilling
-  // stage: isComplete fires after the FIRST ordered hole lands, not all of
-  // them, so without waitsOnWork the rail holds the clock (tutorialGuide.ts's
-  // decideClock) well before a multi-hole grid finishes drilling -- and once
-  // held, every subsequent scenario `tick N` is capped to exactly 1 real tick
-  // per call (events.ts's tickCommand checks isPaused only at the end of each
-  // iteration), so no tick budget, however large, ever recovers from it.
-  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
+  // #554-followup: drilling is real, queued work -- same waitsOnWork gap as
+  // 'charge' below. #1596: complete only once at least one hole is drilled AND
+  // no ordered hole is still waiting to be drilled, so the first blast is
+  // always the full scripted grid. waitsOnWork keeps the rail from holding the
+  // clock (tutorialGuide.ts's decideClock) while the crew is still drilling.
+  {
+    id: 'drill-plan',
+    titleKey: 'tutorial.step5.title',
+    textKey: 'tutorial.step5',
+    commands: ['drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24'],
+    highlightTarget: TOOLBAR_TARGET.blast,
+    tickBudget: 20,
+    waitsOnWork: true,
+    isComplete: (state: GameState) =>
+      (state.drillHoles?.length ?? 0) > 0 && (state.plannedDrillHoles ?? []).length === 0,
+  },
 
   // ── Step 5: charge ──
   // #554: charging is real, queued work now (was instant) -- without
@@ -241,8 +248,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // increased" fired the instant the FIRST of nine holes charged, moving the
   // tutorial on while the crew was still mid-charge. The panel
   // (suggestStep, BlastWorkshop.ts) rightly keeps showing the Charge tab
-  // until every hole is charged. Completion now matches suggestStep's own
-  // criterion exactly, so the step and the panel never disagree about which one is current.
+  // until every hole is charged. #1596: isComplete additionally requires no
+  // planned drill holes and no planned charge orders still queued, so the step
+  // does not advance while the crew is mid-work. That is stricter than
+  // suggestStep's "every drilled hole is charged" check alone.
   {
     id: 'charge',
     titleKey: 'tutorial.step6.title',
@@ -254,7 +263,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     isComplete: (state: GameState) => {
       const holes = state.drillHoles ?? [];
       const chargesByHole = state.chargesByHole ?? {};
-      return holes.length > 0 && holes.every((h) => chargesByHole[h.id]);
+      return (
+        holes.length > 0 &&
+        (state.plannedDrillHoles ?? []).length === 0 &&
+        holes.every((h) => chargesByHole[h.id]) &&
+        Object.keys(state.plannedChargesByHole ?? {}).length === 0
+      );
     },
   },
 

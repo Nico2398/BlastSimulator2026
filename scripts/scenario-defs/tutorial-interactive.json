@@ -699,6 +699,33 @@
       }
     },
     {
+      "command": "wait_until field:holeCount equals:1 max_ticks:200",
+      "timeout": 120,
+      "role": "guard",
+      "description": "#1596: Charge All right after the FIRST of the nine ordered holes lands must be inert, and the card must stay on drill-plan: the step only completes once the whole planned pattern is drilled (8 holes still ordered here), so the blast can never fire a 1-3 hole subset. The wait is a waitUntil on holeCount, so the moment measured is the first hole, not a guessed delay.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 1,
+          "maxTicks": 200,
+          "timeoutMs": 90000
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 1,
+          "orderedHoleCount": 8
+        },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "tutorialStep": "drill-plan"
+      }
+    },
+    {
       "command": "wait_until field:holeCount equals:9 max_ticks:400",
       "timeout": 180,
       "description": "#553: drill-plan complete: the driller drives the drill_rig to all 9 ordered holes and drills them (sandbox-measured: a single driller/drill_rig lands a 3x3 spacing:3 grid on tutorial_pit comfortably inside 400 ticks door-to-door). #554-followup round 6 (issue #586 CI): previously used waitForTutorialStep(stepId:'charge'), which resolves the instant the FIRST hole lands (createComparisonStep's isComplete fires on the first increase past its snapshot -- 'drill-plan' advances to 'charge' after hole 1 of 9, not all 9). The very next step's `charge hole:*` order then only covered whatever was drilled AT THAT MOMENT -- usually just the one hole -- leaving the other 8 permanently uncharged (no later step re-issues the order), which is what left 'Auto Sequence' unreachable further down: charging never actually finished. Switched to waitUntil on holeCount itself so this step keeps waiting until every hole is actually down, in both modes, rather than stopping the moment the tutorial card first flips.",
@@ -715,7 +742,8 @@
       "expect": {
         "tutorialStep": "charge",
         "equals": {
-          "holeCount": 9
+          "holeCount": 9,
+          "orderedHoleCount": 0
         }
       }
     },
@@ -736,6 +764,18 @@
       "description": "charge ordered: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed). #949: standardized on boomite (matching tutorial-playthrough.json/tutorial-steps-visual.json, and the panel's own DEFAULT_EXPLOSIVE, Charge.ts) -- the old pop_rock/3kg/2m command never actually matched what a real click produced anyway (Charge All always applies the panel's own boomite/5kg/2m defaults, a pre-existing command/click divergence this file carried before #949), so no explosive-selector click is needed. Amount/stemming steppers now clicked explicitly to reach the retuned amount:4/stemming: the amount stepper's step is 1kg (5->4, one decrement click) and the stemming stepper's step is 0.2m (2.0->2.2->2.5, two increment clicks) -- 2.5m is the closest reachable value to the 2.5 this step first declared (the command now declares 2.5 too, so both channels run the same value -- setStepper refuses a target the control cannot reach), and functionally equivalent to it: both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.5m at this pattern's depth:8), so the extra 0.1m the console command asks for does nothing more. The stepper click count/selectors were verified against a real interaction-mode run (Puppeteer, screenshots). #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "role": "player",
       "interaction": [
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "4 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.5 m"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
@@ -769,7 +809,10 @@
         "equals": {
           "chargedCount": 9,
           "weather": "sunny",
-          "wetHoleCount": 0
+          "wetHoleCount": 0,
+          "holeCount": 9,
+          "orderedHoleCount": 0,
+          "orderedChargeCount": 0
         }
       },
       "timeout": 180

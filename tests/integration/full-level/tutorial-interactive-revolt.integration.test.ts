@@ -140,7 +140,7 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // starts; the driving_center now comes after the blast, #1339), "every
       // ordered hole has actually landed", and "blast fired".
       const drivingCenterIdx = steps.findIndex(s => s.command.startsWith('build living_quarters'));
-      const drillPlanWaitIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount'));
+      const drillPlanWaitIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount equals:9'));
       const blastIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount equals:0'));  // #1362: DETONATE arms, the auto-fire empties the plan
       expect(drivingCenterIdx).toBeGreaterThan(-1);
       expect(drillPlanWaitIdx).toBeGreaterThan(drivingCenterIdx);
