@@ -1400,48 +1400,14 @@ describe('decideClock', () => {
   });
 });
 
-describe('sell-ore step clockMustRun (#1336)', () => {
-  const step = TUTORIAL_STEPS.find(x => x.id === 'sell-ore')!;
-  const offer = (materialId: string, quantityKg: number) =>
-    ({ id: 1, type: 'ore_sale', materialId, quantityKg } as never);
-
-  function withBoard(available: unknown[], collectedOre: Record<string, number>): GameState {
-    const s = createGame({ seed: 42, mineType: 'desert' });
-    s.contracts.available = available as never;
-    s.collectedOre = collectedOre;
-    return s;
-  }
-
-  it('is defined on the sell-ore step', () => {
-    expect(typeof step.clockMustRun).toBe('function');
+describe('sell-ore step does not wait on the RNG (#1600)', () => {
+  it('has no clockMustRun: the scripted ore-sale offer is on the board from the start', () => {
+    const step = TUTORIAL_STEPS.find(x => x.id === 'sell-ore')!;
+    expect(step.clockMustRun).toBeUndefined();
   });
 
-  it('is true when the board is empty', () => {
-    expect(step.clockMustRun!(withBoard([], { iron: 5000 }))).toBe(true);
-  });
-
-  it('is true when an offer exists but stored ore is below its quantity', () => {
-    expect(step.clockMustRun!(withBoard([offer('iron', 1000)], { iron: 999 }))).toBe(true);
-  });
-
-  it('is true when the only offer is for an ore not in storage', () => {
-    expect(step.clockMustRun!(withBoard([offer('gold', 10)], { iron: 5000 }))).toBe(true);
-  });
-
-  it('is false when a fillable offer exists (boundary: stored equals quantity)', () => {
-    expect(step.clockMustRun!(withBoard([offer('iron', 1000)], { iron: 1000 }))).toBe(false);
-  });
-
-  it('is true, without crashing, when contracts and collectedOre are undefined', () => {
-    const s = createGame({ seed: 42, mineType: 'desert' });
-    (s as unknown as Record<string, unknown>).contracts = undefined;
-    (s as unknown as Record<string, unknown>).collectedOre = undefined;
-    expect(step.clockMustRun!(s)).toBe(true);
-  });
-
-  it('is set on no other step', () => {
-    const others = TUTORIAL_STEPS.filter(x => x.id !== 'sell-ore' && x.clockMustRun !== undefined);
-    expect(others.map(x => x.id)).toEqual([]);
+  it('no tutorial step carries clockMustRun', () => {
+    expect(TUTORIAL_STEPS.filter(x => x.clockMustRun !== undefined).map(x => x.id)).toEqual([]);
   });
 });
 

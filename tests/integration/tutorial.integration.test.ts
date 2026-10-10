@@ -27,12 +27,15 @@ import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { getOperatingProfit } from '../../src/core/economy/Finance.js';
-import { isFillableSaleOffer } from '../../src/core/economy/Contract.js';
+import { isFillableSaleOffer, hasFillableOreSaleOffer } from '../../src/core/economy/Contract.js';
 import {
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
   CHARGE_DEFAULT_AMOUNT_KG,
   CHARGE_DEFAULT_STEMMING_M,
+  ORE_PRICES,
+  TUTORIAL_HIRING_SCRIPT,
+  TUTORIAL_ORE_SALE_OFFER,
 } from '../../src/core/config/balance.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
@@ -894,4 +897,111 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       expect(state.isPaused).toBe(false);
     }
   }, 120_000);
+});
+
+
+// ── Determinism: nothing the tutorial offers depends on click timing (#1600) ──
+
+describe('Tutorial determinism (#1600)', () => {
+  const HIRE_ROLES = ['surveyor', 'driller', 'manager', 'driver', 'blaster'] as const;
+
+  /** Fresh tutorial with ample cash; idles `idleTicks` ticks, then hires one of every role. */
+  function hireAfterIdling(idleTicks: number) {
+    const { runner, ctx } = createRunner();
+    const run: Run = (cmd) => runner.run(cmd);
+    expect(run('campaign start level:tutorial_pit cash:5000000').success).toBe(true);
+    const state = ctx.state!;
+    for (let i = 0; i < idleTicks; i++) playTick(run, state);
+    for (const role of HIRE_ROLES) expect(run(`employee hire role:${role}`).success).toBe(true);
+    return state.employees.employees
+      .filter((e) => e.hiredAtTick === state.tickCount)
+      .map((e) => ({ role: e.role, name: e.name, unionized: e.unionized, salary: e.salary, qualifications: e.qualifications }));
+  }
+
+  it('two runs with different click timing hire identical employees', () => {
+    const early = hireAfterIdling(0);
+    const late = hireAfterIdling(137);
+    expect(early).toHaveLength(HIRE_ROLES.length);
+    expect(late).toEqual(early);
+  });
+
+  it('hires are independent of the refresh phase (24-tick boundary and beyond)', () => {
+    const base = hireAfterIdling(0);
+    for (const idle of [23, 24, 25, 100]) expect(hireAfterIdling(idle)).toEqual(base);
+  });
+
+  it('the hired employees are the scripted candidates', () => {
+    const hired = hireAfterIdling(60);
+    for (const h of hired) {
+      const scripted = TUTORIAL_HIRING_SCRIPT.find((c) => c.role === h.role)!;
+      expect(h.name).toBe(scripted.name);
+      expect(h.unionized).toBe(scripted.unionized);
+    }
+  });
+
+  it('the tutorial hiring pool offers one scripted candidate per role right after campaign start', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
+    const pool = ctx.state!.hiringPool;
+    expect(pool.candidates.map((c) => c.id).sort((a, b) => a - b)).toEqual(TUTORIAL_HIRING_SCRIPT.map((c) => c.id));
+  });
+
+  it('non-tutorial levels keep seeded 3-per-role pools', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('new_game seed:42 size:24').success).toBe(true);
+    expect(ctx.state!.hiringPool.candidates).toHaveLength(15);
+    expect(ctx.state!.contracts.available.every((c) => c.quantityKg !== TUTORIAL_ORE_SALE_OFFER.quantityKg
+      || c.deadlineTicks !== TUTORIAL_ORE_SALE_OFFER.deadlineTicks)).toBe(true);
+  });
+
+  function scriptedOffers(state: GameState) {
+    const o = TUTORIAL_ORE_SALE_OFFER;
+    return state.contracts.available.filter((c) => c.type === 'ore_sale' && c.materialId === o.materialId
+      && c.quantityKg === o.quantityKg && c.deadlineTicks === o.deadlineTicks);
+  }
+
+  it('a fillable scripted ore-sale offer exists right after campaign start, with fixed terms', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
+    const state = ctx.state!;
+    const o = TUTORIAL_ORE_SALE_OFFER;
+    expect(scriptedOffers(state)).toHaveLength(1);
+    expect(hasFillableOreSaleOffer(state.contracts.available, { [o.materialId]: o.quantityKg })).toBe(true);
+    const multiplier = getLevel('tutorial_pit')!.contractPriceMultiplier;
+    expect(scriptedOffers(state)[0]!.pricePerKg)
+      .toBeCloseTo((ORE_PRICES as Record<string, number>)[o.materialId]! * o.priceFactor * multiplier, 6);
+  });
+
+  it('the scripted offer is still on the board after 0, 50, 500 and 2000 ticks, identical each time', () => {
+    const { runner, ctx } = createRunner();
+    const run: Run = (cmd) => runner.run(cmd);
+    expect(run('campaign start level:tutorial_pit cash:50000000').success).toBe(true);
+    const state = ctx.state!;
+    const first = scriptedOffers(state)[0];
+    expect(first).toBeDefined();
+    const o = TUTORIAL_ORE_SALE_OFFER;
+    for (const checkpoint of [0, 50, 500, 2000]) {
+      while (state.tickCount < checkpoint && !state.levelEnded) playTick(run, state);
+      const offers = scriptedOffers(state);
+      expect(offers, `tick ${checkpoint}`).toHaveLength(1);
+      expect(offers[0]!.pricePerKg, `tick ${checkpoint}`).toBe(first!.pricePerKg);
+      expect(hasFillableOreSaleOffer(state.contracts.available, { [o.materialId]: o.quantityKg }), `tick ${checkpoint}`).toBe(true);
+    }
+  }, 120_000);
+
+  it('the offer terms are identical across two runs idling different lengths', () => {
+    const terms = (idle: number) => {
+      const { runner, ctx } = createRunner();
+      const run: Run = (cmd) => runner.run(cmd);
+      run('campaign start level:tutorial_pit cash:50000000');
+      for (let i = 0; i < idle; i++) playTick(run, ctx.state!);
+      const c = scriptedOffers(ctx.state!)[0]!;
+      return { materialId: c.materialId, quantityKg: c.quantityKg, pricePerKg: c.pricePerKg, deadlineTicks: c.deadlineTicks };
+    };
+    expect(terms(137)).toEqual(terms(0));
+  });
+
+  it('sell-ore starts without clockMustRun', () => {
+    expect(TUTORIAL_STEPS.find((s) => s.id === 'sell-ore')!.clockMustRun).toBeUndefined();
+  });
 });
