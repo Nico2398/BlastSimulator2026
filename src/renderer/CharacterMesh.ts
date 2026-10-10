@@ -7,10 +7,10 @@
 
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
-import type { MovementTrail } from '../core/entities/MovementTrail.js';
+import { isSameTrailPoint, type MovementTrail } from '../core/entities/MovementTrail.js';
 import { tagPickable } from './Pickable.js';
 import {
-  applyEasedPosition, createTween, startSpanPlayback, stepSpanPlayback, trailLength, visibleTrailSpans,
+  applyEasedPosition, createTween, exitSpanOf, startSpanPlayback, stepSpanPlayback, trailLength, visibleTrailSpans, withLeadIn,
   type MovementTween, type TrailSpan,
 } from './MovementInterpolation.js';
 import { headingFromDelta, turnToward } from './Heading.js';
@@ -78,7 +78,6 @@ interface CharacterEntry {
   gapHidden: boolean;
 }
 
-const EXIT_EVENTS = new Set(['alight', 'leave']);
 /** Most visible spans a retiring mesh plays; trips in between are skipped. */
 const MAX_RETIRING_SPANS = 2;
 
@@ -97,9 +96,7 @@ export class CharacterMesh {
 
   addEmployee(employee: Employee, surfaceY: number = 0, trail?: MovementTrail): void {
     this.removeEmployee(employee.id); // a mesh still retiring is dropped first (#1589)
-    const exitSpan = trail && !trail.relocated && trail.hostMarkers.some(m => EXIT_EVENTS.has(m.event))
-      ? visibleTrailSpans(trail).filter(sp => !sp.endsInHost).pop()
-      : undefined;
+    const exitSpan = exitSpanOf(trail);
     const start = exitSpan?.points[0] ?? employee;
     const group = new THREE.Group();
     const { instance, nodes } = this.attachModel(group, employee);
@@ -223,13 +220,11 @@ export class CharacterMesh {
     const played: TrailSpan[] = spans.length > MAX_RETIRING_SPANS ? [first, spans[spans.length - 1]!] : spans;
     // Start from where the mesh really is, so it walks on rather than popping to the trail start.
     const { x, z } = entry.group.position;
-    const head = first.points[0]!;
-    const lead = Math.hypot(head.x - x, head.z - z);
-    if (lead > 1e-6) played[0] = { ...first, points: [{ x, z }, ...first.points] };
+    const lead = withLeadIn(played, x, z, trail.points);
     entry.retiring = true;
     entry.gapHidden = false;
-    entry.fullTrailLength = trailLength(trail.points) + lead;
-    startSpanPlayback(entry.tween, played, entry.fullTrailLength);
+    entry.fullTrailLength = lead.fullTrailLength;
+    startSpanPlayback(entry.tween, lead.spans, entry.fullTrailLength);
   }
 
   /** True while a mesh is playing out its final span before removal (#1589). */
@@ -330,16 +325,14 @@ export class CharacterMesh {
     if (!trail || trail.relocated || trail.hostMarkers.length === 0) return;
     const spans = visibleTrailSpans(trail);
     const last = trail.points[trail.points.length - 1];
-    if (spans.length < 2 || !last || last.x !== emp.x || last.z !== emp.z) return;
+    if (spans.length < 2 || !last || !isSameTrailPoint(last, emp.x, emp.z)) return;
     const { x, z } = entry.group.position;
-    const head = spans[0]!.points[0]!;
-    const lead = Math.hypot(head.x - x, head.z - z);
-    if (lead > 1e-6) spans[0] = { ...spans[0]!, points: [{ x, z }, ...spans[0]!.points] };
+    const lead = withLeadIn(spans, x, z, trail.points);
     entry.tween.targetX = emp.x;
     entry.tween.targetZ = emp.z;
-    entry.fullTrailLength = trailLength(trail.points) + lead;
+    entry.fullTrailLength = lead.fullTrailLength;
     entry.gapHidden = false;
-    startSpanPlayback(entry.tween, spans, entry.fullTrailLength);
+    startSpanPlayback(entry.tween, lead.spans, entry.fullTrailLength);
   }
 
   /** Steps span playback and places the group; returns true once the last span has finished. */

@@ -8,6 +8,7 @@ import { isOccupyingHost } from '../core/entities/Employee.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
+import { exitSpanOf } from './MovementInterpolation.js';
 
 /**
  * Terrain surface height for a building's whole footprint, not just its
@@ -105,7 +106,9 @@ export function syncEntitySets(
         continue;
       }
       if (!renderedEmployeeIds.has(e.id)) {
-        characters.addEmployee(e, getSurfaceY(e.x, e.z), e.walkTrail);
+        // Spawning out of a host: the mesh appears at the exit span's start, not at its destination.
+        const spawn = exitSpanOf(e.walkTrail)?.points[0] ?? e;
+        characters.addEmployee(e, getSurfaceY(spawn.x, spawn.z), e.walkTrail);
         renderedEmployeeIds.add(e.id);
       }
     }

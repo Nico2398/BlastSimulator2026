@@ -35,6 +35,11 @@ export interface TrailSpan {
   endsInHost: boolean;
 }
 
+/** True for a host marker event that puts the character back on foot (#1589). */
+function isExitEvent(event: string): boolean {
+  return event === 'alight' || event === 'leave';
+}
+
 /**
  * Splits a trail at its host markers into visible spans: start..first board/enter,
  * alight/leave..next board/enter, ..., last exit..end. No markers: one span, all points.
@@ -48,11 +53,11 @@ export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
   const last = points.length - 1;
   const spans: TrailSpan[] = [];
   const firstEvent = hostMarkers[0]!.event;
-  let inBody = firstEvent !== 'alight' && firstEvent !== 'leave';
+  let inBody = !isExitEvent(firstEvent);
   let start = 0;
   for (const m of hostMarkers) {
     const idx = Math.min(last, Math.max(0, m.pointIndex));
-    const exits = m.event === 'alight' || m.event === 'leave';
+    const exits = isExitEvent(m.event);
     if (!exits && inBody) {
       spans.push({ points: points.slice(start, idx + 1), endsInHost: true });
       inBody = false;
@@ -63,6 +68,15 @@ export function visibleTrailSpans(trail: MovementTrail): TrailSpan[] {
   }
   if (inBody) spans.push({ points: points.slice(start), endsInHost: false });
   return spans;
+}
+
+/**
+ * The final on-foot span of a walk trail that leaves a host (alight/leave), or undefined when the
+ * trail has no usable exit. Its first point is where the character appears (#1589).
+ */
+export function exitSpanOf(trail: MovementTrail | undefined): TrailSpan | undefined {
+  if (!trail || trail.relocated || !trail.hostMarkers.some(m => isExitEvent(m.event))) return undefined;
+  return visibleTrailSpans(trail).filter(sp => !sp.endsInHost).pop();
 }
 
 /** Arc length of a polyline. */
@@ -77,6 +91,24 @@ export function trailLength(points: readonly TrailPoint[]): number {
 function spanDuration(span: TrailSpan | undefined, fullTrailLength: number): number {
   if (!span || fullTrailLength <= 0) return 0;
   return MOVE_TWEEN_DURATION_S * trailLength(span.points) / fullTrailLength;
+}
+
+// Distance below which the mesh is considered already at the first span's start.
+const LEAD_TOLERANCE = 1e-6;
+
+/**
+ * Makes `spans` start from (x, z) — where the mesh really is — rather than popping to the trail start.
+ * Returns the spans (first one extended by the lead-in) and the full trail length including that lead.
+ */
+export function withLeadIn(
+  spans: TrailSpan[], x: number, z: number, trailPoints: readonly TrailPoint[],
+): { spans: TrailSpan[]; fullTrailLength: number } {
+  const first = spans[0]!;
+  const head = first.points[0]!;
+  const lead = Math.hypot(head.x - x, head.z - z);
+  const out = spans.slice();
+  if (lead > LEAD_TOLERANCE) out[0] = { ...first, points: [{ x, z }, ...first.points] };
+  return { spans: out, fullTrailLength: trailLength(trailPoints) + lead };
 }
 
 /** Begins playing `spans` from the first one; pace stays constant across the whole trail. */
@@ -134,10 +166,7 @@ export function createTween(x: number, z: number): MovementTween {
 export function pointAlongTrail(points: readonly TrailPoint[], fraction: number): { x: number; z: number } {
   const first = points[0];
   if (!first) return { x: 0, z: 0 };
-  let total = 0;
-  for (let i = 1; i < points.length; i++) {
-    total += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.z - points[i - 1]!.z);
-  }
+  const total = trailLength(points);
   const last = points[points.length - 1]!;
   if (total === 0) return { x: last.x, z: last.z };
   let remaining = Math.min(1, Math.max(0, fraction)) * total;
