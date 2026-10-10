@@ -331,8 +331,31 @@ export function leaveBuilding(state: GameState, employeeId: number, emitter?: Ev
   releaseOccupant(building, employeeId, employee, cell.x, cell.z);
   markTransition(employee, 'leave', 'building', building?.x ?? cell.x, building?.z ?? cell.z);
 
-  emitter?.emit('employee:left_building', { employeeId, buildingId });
+  if (emitter) emitter.emit('employee:left_building', { employeeId, buildingId });
+  else queueUnannouncedLeave(state, employeeId, buildingId);
   return { success: true };
+}
+
+/**
+ * Leaves made by a caller holding no emitter (a console command, a deep
+ * helper) wait here, keyed by state, until the next tick announces them — so
+ * every leave fires `employee:left_building` without threading an emitter
+ * through every call chain.
+ */
+const unannouncedLeaves = new WeakMap<GameState, Array<{ employeeId: number; buildingId: number }>>();
+
+function queueUnannouncedLeave(state: GameState, employeeId: number, buildingId: number): void {
+  const queue = unannouncedLeaves.get(state);
+  if (queue) queue.push({ employeeId, buildingId });
+  else unannouncedLeaves.set(state, [{ employeeId, buildingId }]);
+}
+
+/** Announce every leave that was made without an emitter. */
+export function flushUnannouncedLeaves(state: GameState, emitter: EventEmitter): void {
+  const queue = unannouncedLeaves.get(state);
+  if (!queue?.length) return;
+  unannouncedLeaves.delete(state);
+  for (const leave of queue) emitter.emit('employee:left_building', leave);
 }
 
 /** Leave the building `emp` is inside, if any — the building counterpart of `alightIfMounted`. */

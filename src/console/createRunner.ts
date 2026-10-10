@@ -2,6 +2,7 @@
 // Creates a fully-configured ConsoleRunner with all game commands registered.
 // Used by both console.ts (CLI mode) and main.ts (browser console bridge).
 
+import { flushUnannouncedLeaves } from '../core/engine/Mount.js';
 import { ConsoleRunner, parseCommand, type CommandResult } from './ConsoleRunner.js';
 import { refreshOrderReachability } from '../core/engine/OrderReachability.js';
 import { incrementActionCount } from '../core/events/EventSystem.js';
@@ -145,6 +146,8 @@ export function createRunner(): RunnerWithContext {
   const runner = new ConsoleRunner({
     afterCommand: input => {
       const state = ctx.state;
+      // A leave made by a command holds no emitter; announce it within that command.
+      if (state !== null) flushUnannouncedLeaves(state, emitter);
       if (state === null || !state.isPaused || parseCommand(input).command === 'tick') return;
       if (state.pendingActions.some(a => a.status === 'queued')) refreshOrderReachability(state);
     },

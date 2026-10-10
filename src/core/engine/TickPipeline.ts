@@ -66,7 +66,7 @@ import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInva
 import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
-import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles } from './Mount.js';
+import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles, flushUnannouncedLeaves } from './Mount.js';
 
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
@@ -401,6 +401,8 @@ export function runTick(
   // Same for riders of a vehicle removed this tick (blast clearing, flying
   // rock): they end up on foot where it stood.
   releaseOccupantsOfRemovedVehicles(state, emitter);
+  // Leaves made by emitter-less callers (console commands, deep helpers).
+  flushUnannouncedLeaves(state, emitter);
 
   // 8z. Tax audit (#1409) — books this tick's income, may audit, and settles the debt from
   // cash above the bankruptcy floor; the rest is collected from later income. Own rng stream.
