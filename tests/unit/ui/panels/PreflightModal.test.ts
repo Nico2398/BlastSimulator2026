@@ -388,3 +388,55 @@ describe('PreflightModal — armed detonation waiting body (#1362)', () => {
     expect(gameConsole).not.toHaveBeenCalled();
   });
 });
+
+describe('PreflightModal — waiting block hooks for the tutorial (#1591)', () => {
+  const WAITING = '[data-role="preflight-waiting"]';
+
+  function occupied(stranded: boolean): GameState {
+    const state = chargedPlan();
+    state.employees.employees.push({
+      id: 7, name: 'Oz Trill', role: 'driller', salary: 500, morale: 60,
+      unionized: false, injured: false, alive: true, x: 11, z: 11,
+      qualifications: [], trainingState: null, activeActionId: null,
+      fatigue: 0, collapsing: false, interruptedActionPayload: null,
+      ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+      activeTaskSkill: null, destinationX: null, destinationZ: null,
+      moveConsecutiveFailures: 0, isMoveStuck: false,
+      pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+      pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+      taskQueue: [], locomotion: { kind: 'on_foot' },
+      itinerary: null, vehicleWaitingTicks: 0,
+    });
+    state.pendingDetonation = {
+      armedTick: 0, strandedEmployeeIds: stranded ? [7] : [], strandedVehicleIds: [], lastEvacuationTick: 0,
+    };
+    return state;
+  }
+
+  it('is absent when idle', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(chargedPlan(), 'sunny');
+    const el = modal.root.querySelector(WAITING) as HTMLElement | null;
+    // Either not in the DOM, or present but hidden and empty.
+    expect(el === null || (el.style.display === 'none' && el.dataset['phase'] === undefined)).toBe(true);
+  });
+
+  it('carries data-phase="evacuating" while the zone is clearing', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(occupied(false), 'sunny');
+    const el = modal.root.querySelector(WAITING) as HTMLElement;
+    expect(el).not.toBeNull();
+    expect(el.dataset['phase']).toBe('evacuating');
+  });
+
+  it('carries data-phase="stranded" when an occupant cannot leave', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(occupied(true), 'sunny');
+    const el = modal.root.querySelector(WAITING) as HTMLElement;
+    expect(el).not.toBeNull();
+    expect(el.dataset['phase']).toBe('stranded');
+  });
+});

@@ -25,6 +25,8 @@ import type { ClockProgress, StageWaitStatus } from '../../../src/ui/tutorialGui
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 /**
  * jsdom reports every element as zero-size, so `isReachable`'s size check would
@@ -953,6 +955,41 @@ describe('decideClock', () => {
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, true).hold).toBe(false);
   });
 
+  // -- #1591: an armed detonation waits on the world moving (the crew walks
+  // out); holding the clock freezes the evacuation forever.
+  describe('armed detonation (#1591)', () => {
+    const ARMED = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
+
+    it('never holds with the budget spent and waitsOnWork false', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+      s.pendingDetonation = ARMED;
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, false).hold).toBe(false);
+    });
+
+    it('never holds with the budget spent and waitsOnWork true, past the grace cap', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+      s.pendingDetonation = ARMED;
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('still holds a spent, non-work-waiting step when nothing is armed', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.pendingDetonation = null;
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, false).hold).toBe(true);
+    });
+
+    it('still holds a spent work-waiting step past the grace cap when nothing is armed', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS;
+      s.pendingDetonation = null;
+      s.pendingActions = [{ id: 1 } as unknown as GameState['pendingActions'][number]];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+    });
+  });
+
   it('clockMustRun overrides the hold on a step that does not wait on work', () => {
     const s = state();
     s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
@@ -1405,5 +1442,93 @@ describe('sell-ore step clockMustRun (#1336)', () => {
   it('is set on no other step', () => {
     const others = TUTORIAL_STEPS.filter(x => x.id !== 'sell-ore' && x.clockMustRun !== undefined);
     expect(others.map(x => x.id)).toEqual([]);
+  });
+});
+
+// #1591: while an armed detonation waits for clearance, the guide must point
+// INSIDE the pre-flight modal so Fire anyway is not on the allowed list.
+describe('evacuate-zone stages while a detonation waits for clearance (#1591)', () => {
+  const stages = TUTORIAL_STAGES['evacuate-zone']!;
+  const WAITING = '[data-role="preflight-waiting"]';
+
+  function baseFixture(): void {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    document.body.appendChild(toolbar);
+    const open = document.createElement('button');
+    open.setAttribute('data-panel', 'blast');
+    toolbar.appendChild(open);
+    withBox(open);
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    document.body.appendChild(panel);
+    const exec = document.createElement('button');
+    exec.setAttribute('data-action', 'execute');
+    panel.appendChild(exec);
+    withBox(exec);
+  }
+
+  function modal(phase: 'idle' | 'evacuating' | 'stranded'): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'bs-confirm-overlay';
+    document.body.appendChild(overlay);
+    if (phase === 'idle') {
+      const det = document.createElement('button');
+      det.className = 'bs-btn-danger';
+      det.setAttribute('data-action', 'preflight-detonate');
+      overlay.appendChild(det);
+      withBox(det);
+      return;
+    }
+    const waiting = document.createElement('div');
+    waiting.setAttribute('data-role', 'preflight-waiting');
+    waiting.setAttribute('data-phase', phase);
+    overlay.appendChild(waiting);
+    withBox(waiting);
+    for (const action of ['preflight-cancel-detonation', 'preflight-fire-anyway']) {
+      const b = document.createElement('button');
+      b.setAttribute('data-action', action);
+      overlay.appendChild(b);
+      withBox(b);
+    }
+  }
+
+  it('evacuating waiting block resolves to a stage inside the modal targeting the evacuating phase', () => {
+    baseFixture();
+    modal('evacuating');
+    const stage = stages[resolveStageIndex(stages)]!;
+    expect(stage.target).toContain(WAITING);
+    expect(stage.target).toContain('[data-phase="evacuating"]');
+    expect(stage.hintKey).toBe('tutorial.stage.detonation_clearing');
+    expect(allowedSelectors(stage).join(' ')).toContain('[data-action="preflight-cancel-detonation"]');
+    expect(allowedSelectors(stage).join(' ')).not.toContain('preflight-fire-anyway');
+  });
+
+  it('stranded waiting block resolves to the stranded-phase stage', () => {
+    baseFixture();
+    modal('stranded');
+    const stage = stages[resolveStageIndex(stages)]!;
+    expect(stage.target).toContain('[data-phase="stranded"]');
+    expect(stage.hintKey).toBe('tutorial.stage.detonation_stranded');
+    expect(allowedSelectors(stage).join(' ')).toContain('[data-action="preflight-cancel-detonation"]');
+    expect(allowedSelectors(stage).join(' ')).not.toContain('preflight-fire-anyway');
+  });
+
+  it('idle modal still resolves to the DETONATE stage', () => {
+    baseFixture();
+    modal('idle');
+    const stage = stages[resolveStageIndex(stages)]!;
+    expect(stage.hintKey).toBe('tutorial.stage.detonate');
+  });
+
+  it('both new hint keys have distinct en and fr text', () => {
+    for (const key of ['tutorial.stage.detonation_clearing', 'tutorial.stage.detonation_stranded']) {
+      const enText = (en as Record<string, string>)[key];
+      const frText = (fr as Record<string, string>)[key];
+      expect(enText, `en ${key}`).toBeTruthy();
+      expect(frText, `fr ${key}`).toBeTruthy();
+      expect(enText).not.toBe(frText);
+    }
   });
 });
