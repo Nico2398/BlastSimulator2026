@@ -82,7 +82,7 @@ export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: num
 }
 
 /** Build the fixed candidate a script entry describes (#1600). */
-export function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
+function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
   const qualifications = ROLE_STARTING_QUALIFICATIONS[s.role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
   const primary = qualifications[0];
   if (primary && s.skillBonus > 0) {
