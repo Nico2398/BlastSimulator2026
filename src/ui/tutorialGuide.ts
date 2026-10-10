@@ -132,9 +132,12 @@ const MODAL_SELECTOR = '.bs-confirm-overlay';
 export const MODAL_DISMISS_SELECTOR = '[data-action$="-cancel"], [data-action$="-close"], .bs-event-dismiss';
 
 /** Every selector the player may interact with during a stage. */
-export function allowedSelectors(stage: TutorialStage | undefined, _root?: ParentNode): string[] {
+export function allowedSelectors(stage: TutorialStage | undefined, root?: ParentNode): string[] {
   if (!stage) return [];
-  return [stage.target, ...(stage.also ?? [])];
+  const conditional = root
+    ? (stage.alsoWhen ?? []).filter((c) => c.when(root)).map((c) => c.selector)
+    : [];
+  return [stage.target, ...(stage.also ?? []), ...conditional];
 }
 
 /**
@@ -163,7 +166,7 @@ function isStageTargetInsideModal(
   modal: Element,
   root: ParentNode,
 ): boolean {
-  for (const selector of allowedSelectors(stage)) {
+  for (const selector of allowedSelectors(stage, root)) {
     for (const el of Array.from(root.querySelectorAll(selector))) {
       if (modal.contains(el)) return true;
     }
@@ -187,10 +190,10 @@ export function applyRails(
   // step (#1015, `BASE_PERMANENTLY_ALLOWED` in tutorialRails.ts).
   extraAllowed: readonly string[] = [],
   // True once some stage's `spentWhen` has fired (see `resolveWaitStatus`) —
-  // the DOM-side half of the waiting state: the issued order's control stays
-  // allowed (so a player free-clicking around the panel doesn't get blocked
-  // by rails pointing nowhere) but stops glowing, since it is no longer the
-  // next thing to do.
+  // the DOM-side half of the waiting state: the issued order is spent, so the
+  // stage's target/also/alsoWhen controls are no longer allowed (re-running
+  // would repeat the order) and nothing glows. Only `extraAllowed`, open
+  // modals and their dismiss controls stay live.
   spent: boolean = false,
 ): void {
   for (const el of Array.from(root.querySelectorAll(`.${ALLOWED_CLASS}`))) {
@@ -220,14 +223,13 @@ export function applyRails(
     }
   }
 
-  if (!stage) return;
+  if (!stage || spent) return;
 
-  for (const selector of allowedSelectors(stage)) {
+  for (const selector of allowedSelectors(stage, root)) {
     for (const el of Array.from(root.querySelectorAll(selector))) {
       el.classList.add(ALLOWED_CLASS);
     }
   }
-  if (spent) return;
   const target = root.querySelector(stage.target);
   if (target) target.classList.add(HIGHLIGHT_CLASS);
 }

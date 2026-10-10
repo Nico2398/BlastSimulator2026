@@ -256,13 +256,11 @@ export class SurveyPanel extends PanelBase {
     const accuracy = Math.round((1 - SURVEY_BASE_ERROR[method]) * 100);
     const selected = method === this.selectedMethod;
 
-    // A real <button> here gets blocked by the tutorial rails' CSS
-    // (body.bs-tutorial-guided button:not(.bs-tutorial-allowed) { pointer-
-    // events: none }) whenever this isn't the rails' current highlighted
-    // stage — which it usually isn't, since seismic is pre-selected and
-    // resolveStageIndex's "last reachable wins" skips straight to the Run
-    // button. A plain div with a click listener isn't covered by that CSS
-    // selector at all, matching the old SurveyUI.ts's own element choice here.
+    // A plain div, not a <button>: the tutorial rails' button rule would block
+    // it unless it were the stage target, and seismic is pre-selected so the
+    // rails skip straight to Run. The rails block it through the explicit
+    // `.bs-survey-method` rule in styles.ts instead, and the survey-run stage
+    // allows only the seismic row, so other methods are inert.
     const row = el('div', {
       className: 'bs-survey-method',
       attrs: {

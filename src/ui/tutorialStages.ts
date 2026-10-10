@@ -32,6 +32,16 @@ export const PICKER_CANCEL = PLACEMENT_CANCEL_SELECTOR;
 export const TUTORIAL_POLICY_FATIGUE_MIN = 50;
 export const TUTORIAL_POLICY_FATIGUE_MAX = 69;
 
+/** Continuous selected and fatigue threshold inside the tutorial's range. */
+function isPolicyApplicable(root: ParentNode): boolean {
+  const continuous = root.querySelector('#bs-policy-shift button[data-shift-mode="continuous"]');
+  if (continuous?.getAttribute('aria-pressed') !== 'true') return false;
+  const input = root.querySelector('#bs-policy-fatigue') as HTMLInputElement | null;
+  if (!input || input.value.trim() === '') return false;
+  const fatigue = Number(input.value);
+  return fatigue >= TUTORIAL_POLICY_FATIGUE_MIN && fatigue <= TUTORIAL_POLICY_FATIGUE_MAX;
+}
+
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
   target: string;
@@ -332,7 +342,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // name. Pointing the glow at a different method than the card describes is
     // exactly the kind of mismatch that loses a player.
     { target: '#bs-survey-panel [data-method="seismic"]', hintKey: 'tutorial.stage.survey_method' },
-    { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run' },
+    { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run', also: ['#bs-survey-panel [data-method="seismic"]'] },
     ...pickerStages('tutorial.stage.survey_target', REGION.survey, [], {
       spentWhen: (state) => hasPendingActionOfType(state, 'survey'),
       waitingKey: 'tutorial.waiting.surveying',
@@ -380,7 +390,9 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       // the one choice this early step actually requires the player to make.
       target: '#bs-policy-shift button[data-shift-mode="continuous"]',
       hintKey: 'tutorial.stage.policy_continuous',
-      also: ['#bs-policy-apply', '#bs-policy-fatigue'],
+      also: ['#bs-policy-fatigue'],
+      // Apply only once Continuous is selected and the fatigue threshold is in range.
+      alsoWhen: [{ selector: '#bs-policy-apply', when: isPolicyApplicable }],
     },
   ],
 
@@ -477,7 +489,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   // claimed automatically now, so the step completes on purchase alone.
   'vehicle-buy-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel [data-vtype="debris_hauler"]', hintKey: 'tutorial.stage.vehicle_buy' },
+    { target: '#bs-vehicle-panel button[data-vtype="debris_hauler"][data-tier="1"]', hintKey: 'tutorial.stage.vehicle_buy' },
   ],
 
   'build-storage': [

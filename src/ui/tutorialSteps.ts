@@ -141,7 +141,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step_earlypolicy.title',
     textKey: 'tutorial.step_earlypolicy',
     commands: ['set_policy mode:continuous'],
-    highlightTarget: TOOLBAR_TARGET.settings,
+    highlightTarget: TOOLBAR_TARGET.ops,
     captureSnapshot: (state: GameState) => ({
       policyRevision: state.sitePolicy?.revision ?? 0,
     }),

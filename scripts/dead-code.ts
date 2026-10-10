@@ -58,6 +58,10 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Tutorial rail whitelist (#1595): the per-step whitelist test reads the single always-allowed list and the policy range; production uses them inside their modules.
+  'src/ui/tutorialRails.ts:BASE_PERMANENTLY_ALLOWED',
+  'src/ui/tutorialStages.ts:TUTORIAL_POLICY_FATIGUE_MAX',
+  'src/ui/tutorialStages.ts:TUTORIAL_POLICY_FATIGUE_MIN',
   // Balance-model functions and types of the tax audit (#1409): the unit-tested contract (docs/plans/issue-1409-smuggling-balance.md §9); production composes them inside tickTaxAudit/closingAudit.
   'src/core/events/TaxAudit.ts:AuditBucket',
   'src/core/events/TaxAudit.ts:DEFAULT_TAX_AUDIT_PARAMS',

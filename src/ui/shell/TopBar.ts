@@ -232,7 +232,6 @@ export class TopBar {
     const countInspect = (): void => {
       this.scoresEl.dataset['inspectCount'] = String(Number(this.scoresEl.dataset['inspectCount']) + 1);
     };
-    this.scoresEl.addEventListener('pointerenter', countInspect);
     this.scoresEl.addEventListener('click', countInspect);
 
     // ── Right cluster: log, saves, site map ──

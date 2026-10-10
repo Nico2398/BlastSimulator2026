@@ -378,6 +378,7 @@ export class OperationsPanel extends PanelBase {
     this.activeShift = mode;
     for (const [m, btn] of Object.entries(this.shiftButtons) as [ShiftMode, HTMLButtonElement][]) {
       const active = m === mode;
+      btn.setAttribute('aria-pressed', String(active));
       btn.style.background = active ? 'var(--bsx-amber)' : 'transparent';
       btn.style.color = active ? 'var(--bsx-text-on-amber)' : 'var(--bsx-text-secondary)';
     }
