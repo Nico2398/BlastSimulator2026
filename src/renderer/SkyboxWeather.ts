@@ -101,9 +101,37 @@ export interface SunLightSource {
 }
 
 // ---------- Storm flash ----------
-const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
-const STORM_FLASH_INTERVAL_MAX = 8.0;
-const STORM_FLASH_DURATION = 0.08;     // seconds the flash lasts
+export const STORM_FLASH_INTERVAL_MIN = 3.0;  // seconds between lightning
+export const STORM_FLASH_INTERVAL_MAX = 8.0;
+export const STORM_FLASH_FIRST_DELAY = 4.0;   // seconds until the first flash
+export const STORM_FLASH_PEAK_BOOST = 3.4;    // sun intensity added at envelope level 1
+
+/** Flash brightness keyframes: `at` seconds into the flash, `level` 0..1. */
+export const STORM_FLASH_ENVELOPE: readonly { at: number; level: number }[] = [
+  { at: 0, level: 1 },
+  { at: 0.06, level: 1 },
+  { at: 0.10, level: 0 },
+  { at: 0.16, level: 0 },
+  { at: 0.19, level: 0.6 },
+  { at: 0.28, level: 0 },
+];
+
+/** Seconds the whole flash lasts — the last envelope keyframe. */
+export const STORM_FLASH_DURATION = 0.28;
+
+/** Source of randomness in [0, 1) for flash spacing. */
+export type FlashRandom = () => number;
+
+export interface SkyboxWeatherOptions {
+  /** Injectable for deterministic tests; defaults to the renderer's own source. */
+  random?: () => number;
+}
+
+/** Flash brightness level (0..1) `t` seconds into a flash, interpolated from STORM_FLASH_ENVELOPE. */
+export function flashLevel(t: number): number {
+  void t;
+  return 0; // TODO: implement
+}
 
 // ---------- Gradient sky dome (#458 T7.1/D12/A25) ----------
 // Comfortably bigger than the far plane (6000, #458 T6.1/D13) so the dome
@@ -167,7 +195,9 @@ export class SkyboxWeather {
     sun: SunLightSource,
     ambient: THREE.AmbientLight,
     fill: SunLightSource,
+    options: SkyboxWeatherOptions = {},
   ) {
+    void options; // TODO: implement — injected random source
     this.scene = scene;
     this.sun = sun;
     this.ambient = ambient;
