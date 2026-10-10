@@ -429,3 +429,18 @@ describe('createGameForLevel staffed is tri-state (#1363)', () => {
     expect(state.employees.employees).toHaveLength(0);
   });
 });
+
+describe('createGameForLevel fixed weather (#1585)', () => {
+  it('tutorial_pit game has a pinned sunny weather cycle', () => {
+    const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
+    expect(state.weather.pinned).toBe(true);
+    expect(state.weather.current).toBe('sunny');
+  });
+
+  it('dusty_hollow game has an unpinned weather cycle', () => {
+    const campaign = createCampaignState();
+    campaign.levels['dusty_hollow']!.unlocked = true;
+    const state = createGameForLevel(campaign, 'dusty_hollow')!;
+    expect(state.weather.pinned).toBeUndefined();
+  });
+});

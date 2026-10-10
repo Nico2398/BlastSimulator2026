@@ -56,6 +56,8 @@ export interface WeatherCycleState {
   history: WeatherState[];
   /** Internal PRNG state of the cycle's own stream, persisted with the save. */
   rngState: number;
+  /** When true the cycle holds `current` forever (fixed-weather levels, #1585). */
+  pinned?: boolean;
 }
 
 /** True when `value` is a weather state name (type guard for untrusted/saved data). */
@@ -63,9 +65,12 @@ export function isWeatherState(value: unknown): value is WeatherState {
   return typeof value === 'string' && (ALL_WEATHER_STATES as readonly string[]).includes(value);
 }
 
-/** Create initial weather cycle from seed. */
-export function createWeatherCycle(seed: number): WeatherCycleState {
+/** Create initial weather cycle from seed. `pinned` (optional) fixes the weather to that state for the whole game. */
+export function createWeatherCycle(seed: number, pinned?: WeatherState): WeatherCycleState {
   const rngState = (seed + WEATHER_RNG_SEED_OFFSET) | 0;
+  if (pinned) {
+    return { current: pinned, ticksRemaining: DURATION_RANGES[pinned][1], history: [pinned], rngState, pinned: true };
+  }
   const rng = new Random(rngState);
   const initial: WeatherState = 'sunny';
   const duration = rng.nextInt(DURATION_RANGES[initial][0], DURATION_RANGES[initial][1]);
@@ -111,6 +116,7 @@ function withCycleRng(cycle: WeatherCycleState, step: (rng: Random) => void): vo
 
 /** Advance the cycle one tick on its own persisted PRNG stream; returns the resulting weather. */
 export function tickWeather(cycle: WeatherCycleState): WeatherState {
+  if (cycle.pinned) return cycle.current;
   withCycleRng(cycle, rng => advanceWeather(cycle, rng));
   return cycle.current;
 }
