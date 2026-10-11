@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import type { BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
+import type { BlastReport } from '../core/mining/BlastExecution.js';
 import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -95,6 +96,8 @@ export class GameRenderer {
   private fragmentAnimator: FragmentAnimator | null = null;
   /** Rendered (capped-dt) seconds since the last blast began (or since construction, before any blast); reset at every onBlast. */
   private blastPlaybackClockS = 0;
+  /** Report of the blast the playback clock is timing; null before any blast. */
+  private blastPlaybackReport: BlastReport | null = null;
   private blastEffects: BlastEffects | null = null;
   /** Public (like `terrain`) so aiming/raycasting can fall back to landscape meshes past the site's claimed edge (#558). */
   public landscape: LandscapeMesh | null = null;
@@ -337,6 +340,7 @@ export class GameRenderer {
    */
   get blastPlayback(): BlastPlaybackSnapshot {
     return {
+      report: this.blastPlaybackReport,
       elapsedS: this.blastPlaybackClockS,
       durationS: this.fragmentAnimator?.durationS ?? 0,
       // Derived by FragmentAnimator from its own elapsed < endsAt, so a seek
@@ -561,14 +565,20 @@ export class GameRenderer {
 
   /** Trigger blast visual effects. Call from main.ts immediately after a successful blast command. See GameRendererBlastVisuals.ts. */
   onBlast(ctx: MiningContext): void {
-    this.blastPlaybackClockS = 0;
+    this.restartBlastPlayback(ctx);
     onBlast(this.blastVisualsDeps(), ctx);
   }
 
   /** `onBlast`, spawning the fragments a slice at a time (#1603). */
   *onBlastSteps(ctx: MiningContext): Steps<void> {
-    this.blastPlaybackClockS = 0;
+    this.restartBlastPlayback(ctx);
     yield* onBlastSteps(this.blastVisualsDeps(), ctx);
+  }
+
+  /** Start timing the playback of the blast whose report `ctx` now holds. */
+  private restartBlastPlayback(ctx: MiningContext): void {
+    this.blastPlaybackClockS = 0;
+    this.blastPlaybackReport = ctx.state?.lastBlastReport ?? null;
   }
 
   /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). See GameRendererTerrain.ts. */

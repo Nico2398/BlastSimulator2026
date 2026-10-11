@@ -17,6 +17,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
+import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import { GhostMesh } from '../../../src/renderer/GhostMesh.js';
 
 import { makeMockSceneManager, makeCtx } from '../../helpers/rendererFixtures.js';
@@ -1098,7 +1099,7 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
   it('is idle before any blast', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     renderer.syncFromContext(makeCtx());
-    expect(renderer.blastPlayback).toEqual({ elapsedS: 0, durationS: 0, isPlaying: false });
+    expect(renderer.blastPlayback).toEqual({ report: null, elapsedS: 0, durationS: 0, isPlaying: false });
     expect(renderer.blastPlayback.elapsedS).toBe(0);
   });
 
@@ -1199,7 +1200,27 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
 
     expect(renderer.fragmentPlaybackDuration).toBe(0);
     expect(renderer.blastPlayback.elapsedS).toBe(0);
-    expect(renderer.blastPlayback).toEqual({ elapsedS: 0, durationS: 0, isPlaying: false });
+    expect(renderer.blastPlayback).toEqual({ report: null, elapsedS: 0, durationS: 0, isPlaying: false });
+  });
+
+  it('names the blast it plays by its report, from the moment the renderer starts on it', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = longBlastCtx();
+    renderer.syncFromContext(ctx);
+    const first = { tick: 1 } as BlastReport;
+    ctx.state!.lastBlastReport = first;
+    renderer.onBlast(ctx);
+    expect(renderer.blastPlayback.report).toBe(first);
+
+    // A sliced blast's report reaches the state before its landing is stepped (#1603):
+    // until then the snapshot still names the earlier blast.
+    const second = { tick: 2 } as BlastReport;
+    ctx.state!.lastBlastReport = second;
+    const steps = renderer.onBlastSteps(ctx);
+    expect(renderer.blastPlayback.report).toBe(first);
+    steps.next();
+    expect(renderer.blastPlayback.report).toBe(second);
+    expect(renderer.blastPlayback.elapsedS).toBe(0);
   });
 
   it('skipFragmentPlayback makes isPlaying false', () => {

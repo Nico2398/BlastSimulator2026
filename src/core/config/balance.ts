@@ -2334,3 +2334,6 @@ export const SMUGGLING_MIGRATED_VOLUME = 0.25;
 
 /** Minimum rendered seconds of blast playback before the blast report may open (#1590). */
 export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
+
+/** Rendered seconds after which the blast report opens even if some debris is still moving. */
+export const BLAST_REPORT_MAX_PLAYBACK_S = 8;

@@ -19,7 +19,7 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { BlastReportModal } from '../../../src/ui/panels/BlastReportModal.js';
-import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../../src/core/config/balance.js';
+import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../../src/core/mining/BlastPlayback.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
@@ -27,12 +27,14 @@ import type { PlacementController } from '../../../src/ui/scene/PlacementControl
 
 setupEvents();
 
-function finishedPlayback(elapsedS: number = BLAST_REPORT_MIN_PLAYBACK_S): BlastPlaybackSnapshot {
-  return { elapsedS, durationS: 0, isPlaying: false };
+/** The renderer's snapshot once it plays the blast whose report `state` holds, collapse at rest. */
+function finishedPlayback(state: GameState, elapsedS: number = BLAST_REPORT_MIN_PLAYBACK_S): BlastPlaybackSnapshot {
+  return { report: state.lastBlastReport, elapsedS, durationS: 0, isPlaying: false };
 }
 
-function playingPlayback(elapsedS: number): BlastPlaybackSnapshot {
-  return { elapsedS, durationS: 100, isPlaying: true };
+/** The renderer's snapshot once it plays the blast whose report `state` holds, debris still moving. */
+function playingPlayback(state: GameState, elapsedS: number): BlastPlaybackSnapshot {
+  return { report: state.lastBlastReport, elapsedS, durationS: 100, isPlaying: true };
 }
 
 function makeState() {
@@ -493,7 +495,7 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     const state = makeStateWithReport(10);
     uiManager.update(state); // arms the report (pending)
 
-    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S)); // delay elapsed — report opens
+    uiManager.update(state, finishedPlayback(state, BLAST_REPORT_MIN_PLAYBACK_S)); // delay elapsed — report opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     // A second site's freshly-entered state — mirrors main.ts's
@@ -530,7 +532,7 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
 
     expect(uiManager.blastReportModalPending).toBe(false);
 
-    uiManager.update(freshState, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(freshState, finishedPlayback(freshState, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -589,7 +591,7 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
     uiManager.update(state); // arms
-    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S)); // opens
+    uiManager.update(state, finishedPlayback(state, BLAST_REPORT_MIN_PLAYBACK_S)); // opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
@@ -603,7 +605,7 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
 
     uiManager.closeStaleLevelOverlays(reloadedState);
 
-    uiManager.update(reloadedState, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(reloadedState, finishedPlayback(reloadedState, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -614,7 +616,7 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
     uiManager.update(state);
-    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(state, finishedPlayback(state, BLAST_REPORT_MIN_PLAYBACK_S));
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
     const reloadedState = createGame({ seed: 1, mineType: 'desert' });
@@ -624,11 +626,11 @@ describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport in
     // A brand-new blast fires on the reloaded state — a fresh object, never
     // shown before.
     reloadedState.lastBlastReport = makeBlastReport(20);
-    uiManager.update(reloadedState, playingPlayback(0)); // arms the new report (collapse just began)
+    uiManager.update(reloadedState, playingPlayback(reloadedState, 0)); // arms the new report (collapse just began)
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(true);
 
-    uiManager.update(reloadedState, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(reloadedState, finishedPlayback(reloadedState, BLAST_REPORT_MIN_PLAYBACK_S));
 
     expect(uiManager.blastReportModalVisible).toBe(true);
   });
@@ -684,7 +686,7 @@ describe('UIManager — blast report deferral holds the event modal (#545)', () 
     const state = makeStateWithReportAndEvent(10);
     uiManager.update(state); // arms the report
 
-    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S)); // report opens
+    uiManager.update(state, finishedPlayback(state, BLAST_REPORT_MIN_PLAYBACK_S)); // report opens
 
     expect(uiManager.blastReportModalVisible).toBe(true);
     let eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
@@ -969,10 +971,21 @@ describe('UIManager — blast report follows the playback snapshot (#1590)', () 
     vi.restoreAllMocks();
   });
 
-  it('stays closed while the snapshot says the collapse is playing, however long it has been', () => {
+  it('stays closed while the snapshot says the collapse is playing, up to the cap', () => {
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
-    for (const s of [0, 1, BLAST_REPORT_MIN_PLAYBACK_S, 50]) uiManager.update(state, playingPlayback(s));
+    for (const s of [0, 1, BLAST_REPORT_MIN_PLAYBACK_S, BLAST_REPORT_MAX_PLAYBACK_S - 0.01]) uiManager.update(state, playingPlayback(state, s));
+    expect(uiManager.blastReportModalVisible).toBe(false);
+    expect(uiManager.blastReportModalPending).toBe(true);
+    uiManager.update(state, playingPlayback(state, BLAST_REPORT_MAX_PLAYBACK_S));
+    expect(uiManager.blastReportModalVisible).toBe(true);
+  });
+
+  it('stays closed on a snapshot of another blast, however long it has been finished', () => {
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+    const previous: BlastPlaybackSnapshot = { report: { ...state.lastBlastReport! }, elapsedS: 600, durationS: 4, isPlaying: false };
+    for (let frame = 0; frame < 5; frame++) uiManager.update(state, previous);
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(true);
   });
@@ -980,8 +993,8 @@ describe('UIManager — blast report follows the playback snapshot (#1590)', () 
   it('opens when the snapshot turns finished with the floor reached', () => {
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
-    uiManager.update(state, playingPlayback(1));
-    uiManager.update(state, finishedPlayback(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(state, playingPlayback(state, 1));
+    uiManager.update(state, finishedPlayback(state, BLAST_REPORT_MIN_PLAYBACK_S));
     expect(uiManager.blastReportModalVisible).toBe(true);
   });
 
@@ -989,16 +1002,16 @@ describe('UIManager — blast report follows the playback snapshot (#1590)', () 
     const wall = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
     const state = makeStateWithReport(10);
-    uiManager.update(state, playingPlayback(0.1));
+    uiManager.update(state, playingPlayback(state, 0.1));
     wall.mockReturnValue(120_000);
-    uiManager.update(state, playingPlayback(0.2));
+    uiManager.update(state, playingPlayback(state, 0.2));
     expect(uiManager.blastReportModalVisible).toBe(false);
   });
 
   it('keeps the event modal deferred while the report is pending behind a still-playing collapse', () => {
     uiManager = new UIManager(container);
     const state = makeStateWithReportAndEvent(10);
-    uiManager.update(state, playingPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 5));
+    uiManager.update(state, playingPlayback(state, BLAST_REPORT_MAX_PLAYBACK_S - 1));
     const eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
     expect(eventDialog.style.display).toBe('none');
     expect(uiManager.blastReportModalPending).toBe(true);
