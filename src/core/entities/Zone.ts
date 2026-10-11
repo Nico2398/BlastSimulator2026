@@ -8,7 +8,7 @@ import { vehicleDriverId } from './Vehicle.js';
 import { moveTo, alightOnArrival } from '../engine/MoveTo.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
-import { findBestEvacuationDriver } from './VehicleDriverAssignment.js';
+import { findBestEvacuationDriver, findAvailableDriverForReposition } from './VehicleDriverAssignment.js';
 
 // ── Zone bounds ──
 
@@ -95,6 +95,13 @@ export function clearZone(
   employees: EmployeeState,
   findSafeDestination: SafeDestinationFinder,
   canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
+  /**
+   * Employees this evacuation already moved out of the zone: when nobody inside
+   * can drive a driverless vehicle out, an idle, licensed one of these is sent
+   * back in for it (#1648). Employees never evacuated are left alone, so a
+   * vehicle nobody was ever near stays stranded.
+   */
+  rescuerIds: readonly number[] = [],
 ): EvacuationResult {
   const result: EvacuationResult = {
     orderedVehicleIds: [],
@@ -172,7 +179,9 @@ export function clearZone(
       )
       .map(e => e.id);
 
-    const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle);
+    const rescuer = rescuerIds.length > 0 ? findAvailableDriverForReposition(v, vehicles, employees, rescuerIds) : null;
+    const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle)
+      ?? (rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null);
     if (!driver) {
       result.strandedVehicleIds.push(v.id);
       continue;

@@ -99,6 +99,8 @@ function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
       candidate.qualifications[idx] = qualificationAtLevel(extra.category, extra.proficiencyLevel);
     }
   }
+  // The role-default salary no longer covers the merged qualifications.
+  candidate.salary = calculateSalary({ role: candidate.role, qualifications: candidate.qualifications, raises: 0 });
   return candidate;
 }
 

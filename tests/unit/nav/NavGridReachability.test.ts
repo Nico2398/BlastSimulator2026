@@ -10,6 +10,7 @@ import {
   computeClimbReachableSet,
   computeClimbReachableSetFromSources,
   computeClimbComponents,
+  countLegalStepNeighbours,
 } from '../../../src/core/nav/NavGridReachability.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 
@@ -266,5 +267,25 @@ describe('computeClimbReachableSetFromSources fill overrides (#1391)', () => {
     expect(grid.cellAt(10, 5)!.type).toBe('walkable');
     expect(grid.cellAt(10, 0)!.type).toBe('blocked');
     expect(computeClimbReachableSetFromSources(grid, src).has(25, 5)).toBe(true);
+  });
+});
+
+describe('countLegalStepNeighbours (#1648)', () => {
+  it('counts all 8 neighbours of an interior cell on open ground', () => {
+    expect(countLegalStepNeighbours(makeGrid(), 5, 5, NAV_CLEARANCE_EMPLOYEE_CELLS)).toBe(8);
+  });
+
+  it('counts only the 3 in-grid neighbours of a corner cell', () => {
+    expect(countLegalStepNeighbours(makeGrid(), 0, 0, NAV_CLEARANCE_EMPLOYEE_CELLS)).toBe(3);
+  });
+
+  it('does not count blocked neighbours: a cell in a one-wide corridor has only 2', () => {
+    const corridor = makeGrid((x, z) => (z === 4 || z === 6) && x < 20 ? BLOCKED : null);
+    expect(countLegalStepNeighbours(corridor, 5, 5, NAV_CLEARANCE_EMPLOYEE_CELLS)).toBe(2);
+  });
+
+  it('does not count neighbours below the required clearance', () => {
+    const grid = makeGrid((x, z) => (x === 6 && z === 5 ? { clearance: 1 } : { clearance: 2 }));
+    expect(countLegalStepNeighbours(grid, 5, 5, NAV_CLEARANCE_VEHICLE_CELLS)).toBe(7);
   });
 });

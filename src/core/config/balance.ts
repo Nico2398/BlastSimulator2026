@@ -274,6 +274,14 @@ export const SPAWN_TILE_SPACING = 3;
 export const CREW_SPAWN_VEHICLE_SEPARATION = 3;
 
 /**
+ * Fewest legal-step neighbours (of 8, at vehicle clearance) a starting
+ * vehicle's cell may have (#1648). A cell with only one or two is a thin
+ * ridge or trench that one building corner can seal, leaving the vehicle
+ * unable to drive out — every order needing its role then reads out of reach.
+ */
+export const CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS = 3;
+
+/**
  * Cells between any two agents — employee or vehicle — when
  * `placeStartingCrew` fills employee cells in around the already-spaced
  * vehicle picks (#1263). Below this, `climbConnectedCells`' own nearest-first
@@ -1343,10 +1351,14 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
       { category: 'driving.rock_fragmenter', proficiencyLevel: 1 },
     ] },
   ],
+  // The charging truck sits in the last spawn slot: the authored row is what
+  // the older fleet's positions (and every seed-pinned playthrough on them)
+  // were tuned against, so a newcomer extends the row rather than shifting it.
   vehicles: [
-    ...BASE_STARTING_VEHICLES,
+    ...BASE_STARTING_VEHICLES.filter(v => v.role !== 'charging_truck'),
     { role: 'rock_digger', tier: 1 },
     { role: 'rock_fragmenter', tier: 1 },
+    ...BASE_STARTING_VEHICLES.filter(v => v.role === 'charging_truck'),
   ],
 } as const;
 
@@ -1400,8 +1412,16 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
  * tier-1 warehouse and delays sales. 9.5 then ends the seed-1138 2x2 style in
  * a revolt (tick 435, $49k profit); 9.75 wins with a thin margin ($83k),
  * 10 wins both styles by ~$7k/$55k (tick 281/301).
+ *
+ * Re-bisected to 12 for the opening charging truck and the blaster's truck
+ * licence (#1648): the licence lifts the blaster's salary and the truck adds
+ * upkeep, so payroll-plus-upkeep rises and the seed-1138 2x3-east style ended
+ * in a revolt (tick 410, $46k profit) at 10, 10.5 and 11. Same styles and
+ * play: 11.5 wins with a $1k margin on the 2x3 (tick 341, $81k), 11.75
+ * $4k, 12 wins both by ~$8k/$75k (tick 341/301, $88k/$155k), 12.5 trims the
+ * 2x2 to ~$5k (tick 281). 12 keeps the thinnest margin at about the old ~$7k.
  */
-export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 10;
+export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 12;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 

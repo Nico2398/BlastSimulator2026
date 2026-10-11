@@ -4,7 +4,7 @@
 // GameState it is handed.
 
 import { NavGrid, isStepClimbable, type NavCell } from '../nav/NavGrid.js';
-import { findNearestNavigableCell } from '../nav/NavGridReachability.js';
+import { findNearestNavigableCell, countLegalStepNeighbours } from '../nav/NavGridReachability.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
@@ -13,6 +13,8 @@ import {
   CREW_SPAWN_SEARCH_RADIUS,
   CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION,
   CREW_SPAWN_VEHICLE_ROUTE_SLACK,
+  CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS,
+  NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../config/balance.js';
 import { isLicensedForRole } from '../engine/VehicleReservation.js';
 import type { GameState } from './GameState.js';
@@ -339,6 +341,49 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
 }
 
 /**
+ * One-time fixup (#1648): move a starting vehicle off a thin ridge or trench
+ * (fewer than CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS legal-step neighbours at
+ * vehicle clearance) onto the nearest roomier spawnable cell, keeping the
+ * vehicle separation. The generic ground snap can land a vehicle on such a
+ * cell; it is connected to the site on a fresh grid, but one building corner
+ * seals it and the vehicle can then never drive out. Run after the snap.
+ * Returns whether anything moved.
+ */
+export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
+  const navGrid = state.navGrid;
+  if (!navGrid) return false;
+  const { employees, vehicles } = { employees: state.employees.employees, vehicles: state.vehicles.vehicles };
+  const open = (c: Cell): number => countLegalStepNeighbours(navGrid, c.x, c.z, NAV_CLEARANCE_VEHICLE_CELLS);
+  const occupied = new Set<string>([
+    ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
+    ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
+  ]);
+  let moved = false;
+
+  for (const vehicle of vehicles) {
+    const from = { x: Math.round(vehicle.x), z: Math.round(vehicle.z) };
+    if (open(from) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS) continue;
+    const others = vehicles.filter(o => o !== vehicle).map(o => ({ x: Math.round(o.x), z: Math.round(o.z) }));
+    let target: Cell | null = null;
+    for (let radius = 1; radius <= CREW_SPAWN_SEARCH_RADIUS && target === null; radius++) {
+      target = [...ringCells(from, radius)].find(c =>
+        !occupied.has(key(c))
+        && isSpawnable(navGrid.cellAt(c.x, c.z))
+        && open(c) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS
+        && others.every(o => chebyshev(o, c) >= CREW_SPAWN_VEHICLE_SEPARATION),
+      ) ?? null;
+    }
+    if (target === null) continue;
+    occupied.delete(key(from));
+    occupied.add(key(target));
+    vehicle.x = target.x;
+    vehicle.z = target.z;
+    moved = true;
+  }
+  return moved;
+}
+
+/**
  * Gather a fresh game's employees and vehicles onto one patch of mutually
  * climb-connected ground, near where the level placed them, when their
  * authored spawn does not survive contact with the terrain (#1166). Returns
@@ -391,7 +436,7 @@ export function placeStartingCrew(state: GameState): boolean {
   // Vehicle separation is what makes the cluster wider than one cell per
   // agent: leave room for the spaced picks plus the employees filling in
   // around them.
-  const searchLimit = agents.length * CREW_SPAWN_VEHICLE_SEPARATION * CREW_SPAWN_VEHICLE_SEPARATION;
+  const searchLimit = 2 * agents.length * CREW_SPAWN_VEHICLE_SEPARATION * CREW_SPAWN_VEHICLE_SEPARATION;
 
   // One trigger, and a deliberately narrow one: how far the crew would
   // actually have to walk to reach the middle of its own site. A level's

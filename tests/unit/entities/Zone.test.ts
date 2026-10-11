@@ -410,6 +410,46 @@ describe('Zone clearing and evacuation', () => {
     expect(employee.pendingDriverVehicleId).toBeNull();
   });
 
+  it('sends back a licensed idle employee this evacuation already moved out, to drive out a driverless vehicle nobody inside can take (#1648)', () => {
+    const state = makeState(36);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const rng = new Random(35);
+    const { employee } = hireEmployee(employees, 'driver', rng, 40, 40);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true, [employee.id]);
+
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('leaves that vehicle stranded when the outside employee was never evacuated by this sequence (#1648)', () => {
+    const state = makeState(38);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const rng = new Random(37);
+    const { employee } = hireEmployee(employees, 'driver', rng, 40, 40);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+  });
+
+  it('still strands that vehicle when the idle outside employee cannot reach it (#1648)', () => {
+    const state = makeState(37);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const rng = new Random(36);
+    const { employee } = hireEmployee(employees, 'driver', rng, 40, 40);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => false, [employee.id]);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+  });
+
   it('strands a driverless vehicle when no safe destination exists, even with a qualified reachable employee — driver assignment must not happen without one (#1042)', () => {
     const state = makeState(34);
     const { vehicles, employees } = state;
