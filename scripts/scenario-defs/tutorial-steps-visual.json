@@ -965,10 +965,10 @@
       }
     },
     {
-      "command": "employee train 3 skill:driving.rock_fragmenter",
+      "command": "state",
       "timeout": 90,
       "role": "player",
-      "description": "#1339: train-fragmenter, click half -- the hired Driver (found by role in the crew panel) is booked on the Rock Fragmenter licence at the driving_center.",
+      "description": "#1629: train-fragmenter, reach half -- open the crew panel and expand the Driver's detail; the Train button for the Rock Fragmenter licence sits in the panel's scrolling body and must be genuinely usable (not clipped or covered) before it is clicked. The tutorial rails scroll it into view once.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -981,7 +981,19 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-employee-role=\"driver\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
-        },
+        }
+      ],
+      "expect": {
+        "usable": "#bs-employee-panel [data-employee-role=\"driver\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]",
+        "tutorialStep": "train-fragmenter"
+      }
+    },
+    {
+      "command": "employee train 3 skill:driving.rock_fragmenter",
+      "timeout": 90,
+      "role": "player",
+      "description": "#1339: train-fragmenter, click half -- the hired Driver (found by role in the crew panel) is booked on the Rock Fragmenter licence at the driving_center.",
+      "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-employee-role=\"driver\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
@@ -1357,6 +1369,10 @@
           "type": "waitForSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 30000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         },
         {
           "type": "screenshot"
