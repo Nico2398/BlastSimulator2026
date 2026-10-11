@@ -1453,6 +1453,8 @@ describe('TutorialRails — scrolls an off-screen target into view once per stag
     const panel = host ?? document.createElement('div');
     if (!host) {
       panel.id = 'bs-employee-panel';
+      // The panel itself scrolls (overflow auto) and spans the viewport, so it never clips.
+      setBox(panel, { top: 0, bottom: 768 });
       document.body.appendChild(panel);
     }
     const scroller = document.createElement('div');
