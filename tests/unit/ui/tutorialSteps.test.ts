@@ -1286,3 +1286,33 @@ describe('free-play step card (#1329/#1328) — honest about progress before the
     });
   });
 });
+
+describe('finances step: panel already open at capture (#1628)', () => {
+  const state = { isPaused: false } as GameState;
+  afterEach(() => { document.body.innerHTML = ''; });
+  const openPanel = (): HTMLElement => {
+    document.body.innerHTML = '';
+    const el = document.createElement('div');
+    el.id = 'bs-finances-panel';
+    el.style.display = 'flex';
+    el.dataset['openCount'] = '1';
+    document.body.appendChild(el);
+    return el;
+  };
+
+  it('polling alone never completes when the panel was open at capture', () => {
+    openPanel();
+    const step = TUTORIAL_STEPS.find((s) => s.id === 'finances')!;
+    const snap = step.captureSnapshot!(state);
+    for (let i = 0; i < 5; i++) expect(step.isComplete(state, snap)).toBe(false);
+  });
+
+  it('completes when the open panel is re-shown (open count bumps)', () => {
+    const el = openPanel();
+    const step = TUTORIAL_STEPS.find((s) => s.id === 'finances')!;
+    const snap = step.captureSnapshot!(state);
+    expect(step.isComplete(state, snap)).toBe(false);
+    el.dataset['openCount'] = '2';
+    expect(step.isComplete(state, snap)).toBe(true);
+  });
+});
