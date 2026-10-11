@@ -378,7 +378,7 @@ describe('unscripted hiring pool is unchanged (#1600)', () => {
 
 describe('scripted extraQualifications (#1648)', () => {
   const one = (extra: ScriptedCandidate['extraQualifications'], role: ScriptedCandidate['role'] = 'blaster', skillBonus: 0 | 1 = 0) =>
-    createHiringPool(1, 0, [{ id: 1, role, name: 'Ex Tra', unionized: false, skillBonus, extraQualifications: extra }]).candidates[0]!;
+    createHiringPool(1, 0, [{ id: 1, role, name: 'Ex Tra', unionized: false, skillBonus, ...(extra !== undefined ? { extraQualifications: extra } : {}) }]).candidates[0]!;
 
   it('appends a new category after the role defaults', () => {
     const c = one([{ category: 'driving.truck', proficiencyLevel: 1 }]);
