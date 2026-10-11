@@ -1,0 +1,56 @@
+{
+  "name": "tutorial-defeat-retry",
+  "description": "#1631: a tutorial run that ends in defeat does not count as completing the tutorial, and RETRY on the defeat screen restarts the guided tutorial from step 1 (Hire Surveyor). Setup forces bankruptcy with zero starting cash; the retry is a real click.",
+  "steps": [
+    {
+      "command": "campaign start level:tutorial_pit cash:0",
+      "timeout": 30,
+      "description": "Setup: load Tutorial Pit with zero cash so running costs bankrupt it.",
+      "role": "setup",
+      "interaction": [{ "type": "command", "command": "campaign start level:tutorial_pit cash:0" }],
+      "expect": { "equals": { "cash": 0, "levelEnded": false } }
+    },
+    {
+      "command": "tutorial_start",
+      "timeout": 30,
+      "description": "Setup: start the tutorial; the card points at hiring a surveyor.",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "tutorial_start" },
+        { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
+        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+      ],
+      "expect": { "tutorialStep": "hire-surveyor" }
+    },
+    {
+      "command": "time resume",
+      "timeout": 30,
+      "description": "Setup: run the clock so payroll and upkeep drain the empty treasury.",
+      "role": "setup",
+      "interaction": [{ "type": "command", "command": "time resume" }]
+    },
+    {
+      "command": "wait_until field:levelEndReason equals:bankruptcy max_ticks:400",
+      "timeout": 120,
+      "description": "Setup: wait for the bankruptcy defeat; the level-end screen appears.",
+      "role": "setup",
+      "interaction": [
+        { "type": "waitUntil", "field": "levelEndReason", "equals": "bankruptcy", "maxTicks": 400, "timeoutMs": 90000 },
+        { "type": "awaitUsable", "selector": "#bs-level-end-screen [data-action=\"retry\"]" }
+      ],
+      "expect": { "equals": { "levelEnded": true, "levelEndReason": "bankruptcy" } }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "Player clicks RETRY on the defeat screen; the tutorial restarts on the first step.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-level-end-screen [data-action=\"retry\"]" },
+        { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
+        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+      ],
+      "expect": { "tutorialStep": "hire-surveyor", "equals": { "levelEnded": false } }
+    }
+  ]
+}

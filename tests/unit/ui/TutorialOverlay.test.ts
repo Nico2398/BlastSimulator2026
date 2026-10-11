@@ -9,6 +9,7 @@ import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { addIncome } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { buildTutorialCard } from '../../../src/ui/tutorialOverlayDom.js';
+import { shouldAutoStartTutorial } from '../../../src/ui/tutorialTrigger.js';
 import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 
 function createMockState(): GameState {
@@ -851,6 +852,91 @@ describe('TutorialOverlay (12.4)', () => {
       // 'completed' is not a defeat reason, so shortCircuitOnDefeat leaves
       // the step wherever normal completion checks put it.
       expect(tut.stepIndex).not.toBe(TOTAL_TUTORIAL_STEPS - 1);
+    });
+  });
+
+  describe('defeat does not complete the tutorial (#1631)', () => {
+    const DEFEATS = ['bankruptcy', 'arrest', 'worker_revolt'] as const;
+    const DONE_KEY = 'bs_tutorial_done';
+
+    afterEach(() => { vi.useRealTimers(); });
+
+    function startAt(stepIndex: number): { tut: any; state: GameState } {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      tut.stepIndex = stepIndex;
+      return { tut, state };
+    }
+
+    it.each(DEFEATS)('%s short-circuit then closing card elapsing never records done', (reason) => {
+      vi.useFakeTimers();
+      const { tut, state } = startAt(5);
+      state.levelEnded = true;
+      state.levelEndReason = reason;
+      tut.onCommandExecuted(state);
+      expect(tut.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
+
+      vi.advanceTimersByTime(4000 + 1000);
+
+      expect(tut.isActive).toBe(false);
+      expect(localStorage.getItem(DONE_KEY)).toBeNull();
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+      expect(shouldAutoStartTutorial('tutorial_pit', TutorialOverlay.isCompleted())).toBe(true);
+    });
+
+    it('defeat landing while already on the last step then finish never records done', () => {
+      vi.useFakeTimers();
+      const { tut, state } = startAt(TOTAL_TUTORIAL_STEPS - 1);
+      state.levelEnded = true;
+      state.levelEndReason = 'bankruptcy';
+      tut.onCommandExecuted(state); // no short-circuit: already on the closing step
+
+      tut.advanceToNextStep(); // player clicks through the closing card
+      vi.advanceTimersByTime(5000);
+
+      expect(tut.isActive).toBe(false);
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+    });
+
+    it('exit() while a defeat is in state never records done', () => {
+      const { tut, state } = startAt(5);
+      state.levelEnded = true;
+      state.levelEndReason = 'arrest';
+      tut.exit();
+
+      expect(tut.isActive).toBe(false);
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+    });
+
+    it('a win (levelEndReason completed) through the closing step still records done', () => {
+      vi.useFakeTimers();
+      const { tut, state } = startAt(5);
+      state.levelEnded = true;
+      state.levelEndReason = 'completed';
+      walkToCongratulations(tut);
+      vi.advanceTimersByTime(5000);
+
+      expect(TutorialOverlay.isCompleted()).toBe(true);
+    });
+
+    it('mid-tutorial exit() without a defeat still records done', () => {
+      const { tut } = startAt(5);
+      tut.exit();
+      expect(TutorialOverlay.isCompleted()).toBe(true);
+    });
+
+    it('abandon() does not record done', () => {
+      const { tut } = startAt(5);
+      tut.abandon();
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+    });
+
+    it('suspend() does not record done', () => {
+      const { tut } = startAt(5);
+      tut.suspend();
+      expect(TutorialOverlay.isCompleted()).toBe(false);
     });
   });
 
