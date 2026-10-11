@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { BlastReportModal } from '../../../../src/ui/panels/BlastReportModal.js';
-import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../../../src/core/config/balance.js';
+import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../../../src/core/mining/BlastPlayback.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
@@ -40,11 +40,15 @@ function makeAccident(overrides: Partial<AccidentRecord> = {}): AccidentRecord {
 }
 
 // The modal reads the renderer's playback snapshot (#1590), never a wall clock.
-// `setPlayback(s)` drives the shared snapshot every `update(state, playback())`
-// call in this file passes: s rendered seconds elapsed, playback finished.
-let currentPlayback: BlastPlaybackSnapshot = { elapsedS: 0, durationS: 0, isPlaying: false };
-function playback(): BlastPlaybackSnapshot { return currentPlayback; }
-function setPlayback(elapsedS: number, extra: Partial<BlastPlaybackSnapshot> = {}): void {
+// `setPlayback(s)` drives the shared snapshot every `update(state, playback(state))`
+// call in this file passes: s rendered seconds elapsed, playback finished, of
+// the blast whose report `state` holds — as the renderer reports it once it
+// has started playing that blast.
+let currentPlayback: Omit<BlastPlaybackSnapshot, 'report'> = { elapsedS: 0, durationS: 0, isPlaying: false };
+function playback(state: GameState): BlastPlaybackSnapshot {
+  return { report: state.lastBlastReport, ...currentPlayback };
+}
+function setPlayback(elapsedS: number, extra: Partial<Omit<BlastPlaybackSnapshot, 'report'>> = {}): void {
   currentPlayback = { elapsedS, durationS: 0, isPlaying: false, ...extra };
 }
 
@@ -73,9 +77,9 @@ function makeReport(overrides: Partial<BlastReport> = {}): BlastReport {
  * call sites that repeated it verbatim.
  */
 function openReport(modal: BlastReportModal, state: GameState, setPlayback: (v: number) => void): void {
-  modal.update(state, playback());
+  modal.update(state, playback(state));
   setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-  modal.update(state, playback());
+  modal.update(state, playback(state));
 }
 
 describe('BlastReportModal', () => {
@@ -95,7 +99,7 @@ describe('BlastReportModal', () => {
     const state = makeState();
     state.lastBlastReport = makeReport();
 
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     expect(modal.visible).toBe(false);
     expect(modal.pending).toBe(true);
@@ -105,10 +109,10 @@ describe('BlastReportModal', () => {
     const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S - 0.01);
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     expect(modal.visible).toBe(false);
     expect(modal.pending).toBe(true);
@@ -131,26 +135,60 @@ describe('BlastReportModal', () => {
     expect(modal.root.textContent).toContain('Good');
   });
 
+  it('waits for its own blast\'s playback: an earlier blast\'s finished playback never opens it', () => {
+    const { modal } = makeModal();
+    const state = makeState();
+    const earlier = makeReport({ tick: 1 });
+    // The renderer is still on an earlier blast whose collapse ended long ago,
+    // and the new report reached the state ahead of the renderer (#1603).
+    const stale: BlastPlaybackSnapshot = { report: earlier, elapsedS: 600, durationS: 4, isPlaying: false };
+    state.lastBlastReport = makeReport({ tick: 2 });
+
+    for (let frame = 0; frame < 10; frame++) modal.update(state, stale);
+    expect(modal.visible).toBe(false);
+    expect(modal.pending).toBe(true);
+
+    // Nor does "no blast played yet" — the first blast of a session.
+    modal.update(state, { report: null, elapsedS: 600, durationS: 0, isPlaying: false });
+    expect(modal.visible).toBe(false);
+    expect(modal.pending).toBe(true);
+  });
+
+  it('opens at the cap while debris is still moving', () => {
+    const { modal, setPlayback } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    modal.update(state, playback(state));
+
+    setPlayback(BLAST_REPORT_MAX_PLAYBACK_S - 0.01, { isPlaying: true, durationS: 30 });
+    modal.update(state, playback(state));
+    expect(modal.visible).toBe(false);
+
+    setPlayback(BLAST_REPORT_MAX_PLAYBACK_S, { isPlaying: true, durationS: 30 });
+    modal.update(state, playback(state));
+    expect(modal.visible).toBe(true);
+  });
+
   it('a second report inside the delay window replaces the first — only the latest is ever rendered (#545)', () => {
     const { modal, setPlayback } = makeModal();
     const state = makeState();
     const reportA = makeReport({ fragmentCount: 47, totalOreValue: 16020 });
     state.lastBlastReport = reportA;
-    modal.update(state, playback()); // arms A
+    modal.update(state, playback(state)); // arms A
     expect(modal.visible).toBe(false);
     expect(modal.root.textContent).not.toContain('16,020');
 
     setPlayback(1);
     const reportB = makeReport({ fragmentCount: 12, totalOreValue: 12345 });
     state.lastBlastReport = reportB;
-    modal.update(state, playback()); // B replaces A well before A's own deadline (3000)
+    modal.update(state, playback(state)); // B replaces A well before A's own deadline (3000)
 
     expect(modal.visible).toBe(false); // A never opened
     expect(modal.root.textContent).not.toContain('16,020'); // A's stat never rendered
 
     // B's own window: playback elapsed reaches the floor.
     setPlayback(1 + BLAST_REPORT_MIN_PLAYBACK_S);
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     expect(modal.visible).toBe(true);
     expect(modal.pending).toBe(false);
@@ -176,7 +214,7 @@ describe('BlastReportModal', () => {
     openReport(modal, state, setPlayback);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
-    modal.update(state, playback()); // same report object, time unchanged
+    modal.update(state, playback(state)); // same report object, time unchanged
 
     expect(modal.visible).toBe(false);
   });
@@ -191,12 +229,12 @@ describe('BlastReportModal', () => {
     // A new blast resets the renderer's playback clock: playing, elapsed 0.
     setPlayback(0, { isPlaying: true });
     state.lastBlastReport = makeReport({ tick: 200 });
-    modal.update(state, playback()); // arms the new report
+    modal.update(state, playback(state)); // arms the new report
 
     expect(modal.visible).toBe(false);
 
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     expect(modal.visible).toBe(true);
   });
@@ -219,12 +257,12 @@ describe('BlastReportModal', () => {
     // A new blast resets the renderer's playback clock: playing, elapsed 0.
     setPlayback(0, { isPlaying: true });
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 12 });
-    modal.update(state, playback()); // arms the second blast's report
+    modal.update(state, playback(state)); // arms the second blast's report
 
     expect(modal.visible).toBe(false); // still waiting out its own delay
 
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     expect(modal.visible).toBe(true);
     expect(modal.root.textContent).toContain('12');
@@ -293,7 +331,7 @@ describe('BlastReportModal', () => {
     const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state, playback()); // arms the report
+    modal.update(state, playback(state)); // arms the report
     expect(modal.pending).toBe(true);
 
     modal.reset();
@@ -306,7 +344,7 @@ describe('BlastReportModal', () => {
     // enteredNewLevel guard, not a reuse of the same stale state object.
     const freshState = makeState();
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 10);
-    modal.update(freshState, playback());
+    modal.update(freshState, playback(freshState));
 
     expect(modal.visible).toBe(false);
     expect(modal.pending).toBe(false);
@@ -353,14 +391,14 @@ describe('BlastReportModal', () => {
 
     const newState = makeState();
     newState.lastBlastReport = reloaded; // same reference just passed to reset()
-    modal.update(newState, playback());
+    modal.update(newState, playback(newState));
 
     expect(modal.pending).toBe(false);
     expect(modal.visible).toBe(false);
 
     // Stays closed even once the report's would-be open delay fully elapses.
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 20);
-    modal.update(newState, playback());
+    modal.update(newState, playback(newState));
 
     expect(modal.pending).toBe(false);
     expect(modal.visible).toBe(false);
@@ -370,7 +408,7 @@ describe('BlastReportModal', () => {
     const { modal, setPlayback } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100 });
-    modal.update(state, playback()); // arms it (pending)
+    modal.update(state, playback(state)); // arms it (pending)
 
     modal.reset(); // no argument — the pre-#571 call shape
 
@@ -379,11 +417,11 @@ describe('BlastReportModal', () => {
 
     const freshState = makeState();
     freshState.lastBlastReport = makeReport({ tick: 999 }); // genuinely new report
-    modal.update(freshState, playback());
+    modal.update(freshState, playback(freshState));
     expect(modal.pending).toBe(true); // arms normally — nothing was wrongly suppressed
 
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-    modal.update(freshState, playback());
+    modal.update(freshState, playback(freshState));
     expect(modal.visible).toBe(true);
   });
 
@@ -392,7 +430,7 @@ describe('BlastReportModal', () => {
     const state = makeState();
     const pending = makeReport({ tick: 50 });
     state.lastBlastReport = pending;
-    modal.update(state, playback()); // arms `pending`, still waiting out its delay
+    modal.update(state, playback(state)); // arms `pending`, still waiting out its delay
     expect(modal.pending).toBe(true);
 
     // A level transition / save-load lands mid-delay: currentReport here is
@@ -406,7 +444,7 @@ describe('BlastReportModal', () => {
     // Even once its original deadline would have elapsed, on the same state
     // object with the same report reference, it stays suppressed.
     setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-    modal.update(state, playback());
+    modal.update(state, playback(state));
 
     expect(modal.pending).toBe(false);
     expect(modal.visible).toBe(false);
@@ -414,17 +452,18 @@ describe('BlastReportModal', () => {
 
   // ── playback-gated opening (#1590, supersedes #545 wall clock / #950) ──
   // The delay is measured in rendered playback seconds (the renderer's capped-dt
-  // clock), never wall time: the report opens only when playback has stopped
-  // AND at least BLAST_REPORT_MIN_PLAYBACK_S rendered seconds have elapsed.
+  // clock), never wall time: the report opens when playback has stopped AND at
+  // least BLAST_REPORT_MIN_PLAYBACK_S rendered seconds have elapsed, or once
+  // BLAST_REPORT_MAX_PLAYBACK_S have elapsed whatever is still moving.
 
   describe('playback-gated opening (#1590)', () => {
-    it('stays closed while the collapse is still playing, however much playback time has elapsed', () => {
+    it('stays closed while the collapse is still playing, short of the cap', () => {
       const { modal } = makeModal();
       const state = makeState();
       state.lastBlastReport = makeReport();
-      for (const elapsedS of [0, 1, BLAST_REPORT_MIN_PLAYBACK_S, 10, 1000]) {
+      for (const elapsedS of [0, 1, BLAST_REPORT_MIN_PLAYBACK_S, BLAST_REPORT_MAX_PLAYBACK_S - 0.01]) {
         setPlayback(elapsedS, { durationS: 2000, isPlaying: true });
-        modal.update(state, playback());
+        modal.update(state, playback(state));
         expect(modal.visible).toBe(false);
         expect(modal.pending).toBe(true);
       }
@@ -435,11 +474,11 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(5, { durationS: 5, isPlaying: true });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(false);
 
       setPlayback(5, { durationS: 5, isPlaying: false });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(true);
       expect(modal.pending).toBe(false);
     });
@@ -449,16 +488,16 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(1, { durationS: 1 });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(false);
       expect(modal.pending).toBe(true);
 
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S - 0.01, { durationS: 1 });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(false);
 
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 1 });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(true);
     });
 
@@ -467,7 +506,7 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 0 });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(true);
     });
 
@@ -476,7 +515,7 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 1);
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(true);
     });
 
@@ -489,7 +528,7 @@ describe('BlastReportModal', () => {
         const { modal } = makeModal();
         const state = makeState();
         state.lastBlastReport = makeReport();
-        modal.update(state, playback());
+        modal.update(state, playback(state));
 
         // 60 s of wall time pass, but the renderer only produced 5 frames
         // (each capped to 0.1 s): 0.5 s of rendered playback.
@@ -499,18 +538,18 @@ describe('BlastReportModal', () => {
         for (let i = 0; i < 5; i++) {
           elapsed += 0.1;
           setPlayback(elapsed, { durationS: 6, isPlaying: true });
-          modal.update(state, playback());
+          modal.update(state, playback(state));
           expect(modal.visible).toBe(false);
         }
         expect(modal.pending).toBe(true);
 
         // Collapse finished early but floor not met: still closed.
         setPlayback(elapsed, { durationS: 6, isPlaying: false });
-        modal.update(state, playback());
+        modal.update(state, playback(state));
         expect(modal.visible).toBe(false);
 
         setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-        modal.update(state, playback());
+        modal.update(state, playback(state));
         expect(modal.visible).toBe(true);
       } finally {
         wall.mockRestore();
@@ -526,10 +565,10 @@ describe('BlastReportModal', () => {
         const state = makeState();
         state.lastBlastReport = makeReport();
         setPlayback(0.2, { durationS: 4, isPlaying: true });
-        modal.update(state, playback());
+        modal.update(state, playback(state));
 
         wall.mockReturnValue(10 * 60_000);
-        for (let i = 0; i < 3; i++) modal.update(state, playback()); // same snapshot, no frames
+        for (let i = 0; i < 3; i++) modal.update(state, playback(state)); // same snapshot, no frames
         expect(modal.visible).toBe(false);
         expect(modal.pending).toBe(true);
       } finally {
@@ -542,14 +581,14 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 1 });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.root.dataset['openedAtPlaybackS']).toBe(BLAST_REPORT_MIN_PLAYBACK_S.toFixed(2));
 
       const second = makeModal();
       const s2 = makeState();
       s2.lastBlastReport = makeReport();
       setPlayback(4.567, { durationS: 4.567 });
-      second.modal.update(s2, playback());
+      second.modal.update(s2, playback(s2));
       expect(second.modal.root.dataset['openedAtPlaybackS']).toBe('4.57');
     });
 
@@ -558,7 +597,7 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(1, { isPlaying: true });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.root.dataset['openedAtPlaybackS']).toBeUndefined();
     });
 
@@ -567,15 +606,15 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport({ fragmentCount: 47, totalOreValue: 16020 });
       setPlayback(2, { isPlaying: true });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
 
       state.lastBlastReport = makeReport({ fragmentCount: 12, totalOreValue: 12345 });
       setPlayback(0, { isPlaying: true }); // renderer reset the clock for blast B
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(false);
 
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S);
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(true);
       expect(modal.root.textContent).toContain('12,345');
       expect(modal.root.textContent).not.toContain('16,020');
@@ -597,11 +636,11 @@ describe('BlastReportModal', () => {
       state.lastBlastReport = makeReport();
       for (let s = 0; s < BLAST_REPORT_MIN_PLAYBACK_S; s += 0.25) {
         setPlayback(s, { durationS: 3, isPlaying: s < 2 });
-        modal.update(state, playback());
+        modal.update(state, playback(state));
         expect(modal.visible).toBe(false);
       }
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S, { durationS: 3 });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(true);
     });
 
@@ -611,16 +650,16 @@ describe('BlastReportModal', () => {
       state.lastBlastReport = makeReport();
 
       setPlayback(1, { isPlaying: true });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.root.dataset['outstanding']).toBe('true');
 
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 2, { isPlaying: true });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.root.dataset['outstanding']).toBe('true');
       expect(modal.visible).toBe(false);
 
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S + 2);
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.root.dataset['outstanding']).toBe('true');
       expect(modal.visible).toBe(true);
 
@@ -633,15 +672,15 @@ describe('BlastReportModal', () => {
       const state = makeState();
       state.lastBlastReport = makeReport();
       setPlayback(1, { isPlaying: true });
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       state.levelEndReason = 'bankruptcy';
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.pending).toBe(false);
       expect(modal.root.dataset['outstanding']).toBe('false');
 
       state.levelEndReason = null;
       setPlayback(BLAST_REPORT_MIN_PLAYBACK_S * 5);
-      modal.update(state, playback());
+      modal.update(state, playback(state));
       expect(modal.visible).toBe(false);
     });
   });
