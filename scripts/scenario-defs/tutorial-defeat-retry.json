@@ -50,7 +50,7 @@
         { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
         { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
       ],
-      "expect": { "tutorialStep": "hire-surveyor", "equals": { "levelEnded": false } }
+      "expect": { "tutorialStep": "hire-surveyor", "blocked": "#bs-level-end-screen [data-action=\"retry\"]" }
     }
   ]
 }
