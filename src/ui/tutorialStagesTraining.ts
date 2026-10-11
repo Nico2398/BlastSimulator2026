@@ -29,6 +29,8 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
       doneTarget: '#bs-employee-panel [data-employee-role="driver"] .bs-training-active[data-skill="driving.rock_fragmenter"]',
       hintKey: 'tutorial.stage.train_fragmenter',
       orderIssuedWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
+      spentWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
+      waitingKey: 'tutorial.waiting.training',
     },
   ],
 

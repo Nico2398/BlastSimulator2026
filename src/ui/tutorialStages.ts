@@ -11,7 +11,7 @@
 // it makes the next stage reachable at once. Closing the panel falls back.
 
 import {
-  TOOLBAR_TARGET,
+  TOOLBAR_TARGET, SURVEY_OVERLAY_TOGGLE_TARGET,
   hasActiveOreSale, hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
@@ -35,16 +35,6 @@ export const PICKER_CANCEL = PLACEMENT_CANCEL_SELECTOR;
  */
 export const TUTORIAL_POLICY_FATIGUE_MIN = 50;
 export const TUTORIAL_POLICY_FATIGUE_MAX = 69;
-
-/** Continuous selected and fatigue threshold inside the tutorial's range. */
-function isPolicyApplicable(root: ParentNode): boolean {
-  const continuous = root.querySelector('#bs-policy-shift button[data-shift-mode="continuous"]');
-  if (continuous?.getAttribute('aria-pressed') !== 'true') return false;
-  const input = root.querySelector('#bs-policy-fatigue') as HTMLInputElement | null;
-  if (!input || input.value.trim() === '') return false;
-  const fatigue = Number(input.value);
-  return fatigue >= TUTORIAL_POLICY_FATIGUE_MIN && fatigue <= TUTORIAL_POLICY_FATIGUE_MAX;
-}
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -100,16 +90,24 @@ export interface TutorialStage {
   hintParams?: Record<string, string | number>;
 }
 
+const CONTINUOUS_BUTTON = '#bs-policy-shift button[data-shift-mode="continuous"]';
+
 /** True when the continuous shift mode button is pressed (#1632). */
 export function isContinuousSelected(root: ParentNode): boolean {
-  void root;
-  return false; // TODO: implement
+  return root.querySelector(CONTINUOUS_BUTTON)?.getAttribute('aria-pressed') === 'true';
 }
 
 /** True when the policy fatigue input holds a value inside the tutorial range (#1632). */
 export function isPolicyFatigueInRange(root: ParentNode): boolean {
-  void root;
-  return false; // TODO: implement
+  const input = root.querySelector('#bs-policy-fatigue') as HTMLInputElement | null;
+  if (!input || input.value.trim() === '') return false;
+  const fatigue = Number(input.value);
+  return fatigue >= TUTORIAL_POLICY_FATIGUE_MIN && fatigue <= TUTORIAL_POLICY_FATIGUE_MAX;
+}
+
+/** Continuous selected and fatigue threshold inside the tutorial's range. */
+function isPolicyApplicable(root: ParentNode): boolean {
+  return isContinuousSelected(root) && isPolicyFatigueInRange(root);
 }
 
 // P3 retired the 2D picker: dragging/clicking now happens directly on the
@@ -366,36 +364,30 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     }),
   ],
 
+  // Continuous, not the shift_8h default: applying shift_8h this early interrupts the queued
+  // drilling/digging work before it can finish (SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter
+  // than a single drill_hole action). Resolution picks the LAST reachable stage, so Apply and the
+  // fatigue hint carry `reachableWhen`: each shows only when it is the next thing to do (#1632).
+  // Apply is never in `also`: it must stay railed until it is applicable.
   'set-early-policy': [
     { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
-    // #689-followup: one stage, not two sequential ones — resolveStageIndex
-    // (tutorialGuide.ts) picks the LAST reachable stage, and #bs-policy-apply
-    // is unconditionally reachable the instant the panel opens (nothing
-    // disables it before a shift mode is chosen). A separate later stage
-    // targeting it is therefore never actually reached as its own stage: the
-    // rail resolves straight past "click Continuous" to "apply" the moment
-    // Operations opens, so a player (or this file's own interaction-mode
-    // scenario) can click Apply immediately and silently keep the shift_8h
-    // default instead of Continuous -- confirmed live (interaction mode
-    // reported the Continuous button itself as inert/unreachable). Matches
-    // the early-policy stage's own working shape: Apply is the
-    // stage's target (so the rail actually reaches it), with the controls
-    // that legitimately need to be clickable alongside it -- shift-mode
-    // included -- allowed via `also`, rather than gated behind a stage of
-    // their own that can never become active.
     {
-      // Continuous, not the shift_8h default: applying shift_8h this early
-      // interrupts the queued drilling/digging work below before it can
-      // finish (SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter than a
-      // single drill_hole action). Continuous still forces rest on
-      // fatigue, just without the shift-length cap. Highlighted
-      // target stays the Continuous button (not Apply) so the glow points at
-      // the one choice this early step actually requires the player to make.
-      target: '#bs-policy-shift button[data-shift-mode="continuous"]',
+      target: CONTINUOUS_BUTTON,
       hintKey: 'tutorial.stage.policy_continuous',
       also: ['#bs-policy-fatigue'],
-      // Apply only once Continuous is selected and the fatigue threshold is in range.
-      alsoWhen: [{ selector: '#bs-policy-apply', when: isPolicyApplicable }],
+    },
+    {
+      target: '#bs-policy-fatigue',
+      hintKey: 'tutorial.stage.policy_fatigue_range',
+      hintParams: { min: TUTORIAL_POLICY_FATIGUE_MIN, max: TUTORIAL_POLICY_FATIGUE_MAX },
+      also: [CONTINUOUS_BUTTON],
+      reachableWhen: () => isContinuousSelected(document) && !isPolicyFatigueInRange(document),
+    },
+    {
+      target: '#bs-policy-apply',
+      hintKey: 'tutorial.stage.policy_apply',
+      also: [CONTINUOUS_BUTTON, '#bs-policy-fatigue'],
+      reachableWhen: () => isPolicyApplicable(document),
     },
   ],
 
@@ -438,7 +430,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
 
   // #557, #1362: open the Blast Workshop, press FIRE (opens the pre-flight
   // modal), then DETONATE inside it, which evacuates the zone and fires once
-  // clear. Same stage shape as the `blast` list below.
+  // clear.
   'evacuate-zone': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="execute"]', hintKey: 'tutorial.stage.execute' },
@@ -459,13 +451,14 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     },
   ],
 
+  // #1362: DETONATE (the evacuate-zone step) fires the blast; this step only closes the report.
   blast: [
-    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
-    { target: '#bs-blast-panel [data-action="execute"]', hintKey: 'tutorial.stage.execute' },
-    {
-      target: '.bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger',
-      hintKey: 'tutorial.stage.blast_confirm',
-    },
+    { target: '[data-action="report-close"]', hintKey: 'tutorial.stage.blast_report_close' },
+  ],
+
+  'toggle-survey-overlay': [
+    { target: TOOLBAR_TARGET.survey, hintKey: 'tutorial.stage.open_survey' },
+    { target: SURVEY_OVERLAY_TOGGLE_TARGET, hintKey: 'tutorial.stage.overlay_toggle' },
   ],
 
   'event-fire-resolve': [

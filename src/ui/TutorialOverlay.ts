@@ -507,6 +507,7 @@ export class TutorialOverlay {
     const view = this.rails.refresh(this.gameState);
     this.stageEl.textContent = view.waiting ? view.waitingHint : view.hint;
     this.stageLine.classList.toggle('bs-tutorial-stage-line--waiting', view.waiting);
+    this.stageLine.style.display = (view.waiting || view.hint) ? '' : 'none';
     this.waitingChipEl.style.display = view.waiting ? '' : 'none';
     this.renderGoalChip();
     this.updateParamStripClearance();
