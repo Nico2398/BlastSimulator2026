@@ -260,6 +260,7 @@ describe('Scenario skipBlastPlayback field is a boolean when present (#761)', ()
   const SKIP_BLAST_PLAYBACK_SCENARIOS: Record<string, string> = {
     'tutorial-interactive': 'functional/bootstrap flow, no blast-visual checkpoint',
     'tutorial-placement-cancel': 'replays tutorial-interactive\'s prefix (incl. its blast) to reach the placement steps; the blast is not what it checks',
+    'tutorial-finances-open-early': 'replays tutorial-interactive\'s prefix (incl. its blast) to reach the finances card (#1628); the blast is not what it checks',
     'tutorial-real-clock': 'functional real-clock deadlock check (#1598), no blast-visual checkpoint',
     'tutorial-steps-visual': 'per-step shots are static settled-aftermath orbits (no frames/interval mid-collapse capture) — identical shape to tutorial-interactive\'s own blast step, just via its own shots array instead of inline screenshot actions; without this its blast step (9 holes/994 fragments, same pattern as tutorial-interactive) blew its 65s effective timeout every run (CI regression)',
   };

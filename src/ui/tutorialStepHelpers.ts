@@ -241,8 +241,10 @@ export function createUiActionStep(
         const visible = isPanelVisible(action.rootSelector);
         // Seeing it hidden clears the flag, so closing then re-opening counts as a fresh open.
         if (!visible && snapshot) snapshot.panelWasVisible = false;
+        // A legacy snapshot without panelOpenCount has no baseline: never infer a re-open from it.
+        const hasBaseline = typeof snapshot?.panelOpenCount === 'number';
         return visible && (snapshot?.panelWasVisible !== true
-          || readPanelOpenCount(action.rootSelector) !== (Number(snapshot?.panelOpenCount) || 0));
+          || (hasBaseline && readPanelOpenCount(action.rootSelector) !== snapshot.panelOpenCount));
       }
       // TopBar resets the DOM counter to 0 on page load while a resumed snapshot
       // keeps the old value, so "changed from baseline, and nonzero" (not ">")
