@@ -57,8 +57,12 @@ export type PlayerAction =
    * clears.
    */
   | { do: 'focusTile'; x: number; z: number; distance?: number; pitch?: number; yaw?: number }
-  /** Wait for a selector to exist and be usable. */
-  | { do: 'awaitUsable'; selector: string; timeoutMs?: number }
+  /**
+   * Wait for a selector to exist and be usable. `inPlace` probes without
+   * scrolling the control into view first, so it asserts the product put it
+   * in reach itself (#1629).
+   */
+  | { do: 'awaitUsable'; selector: string; timeoutMs?: number; inPlace?: boolean }
   /**
    * Wait for the tutorial card to reach a step id, or any of several. Needed
    * because some cards auto-advance on a timer: acting on the next card before

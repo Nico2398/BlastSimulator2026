@@ -120,8 +120,11 @@ export type InteractionStepAction =
   | { type: 'setStepper'; selector: string; value: number; maxClicks?: number; timeout?: number }
   /** Click the first usable control whose label matches (case-insensitive). */
   | { type: 'clickLabel'; label: string; region?: string }
-  /** Wait for a selector to exist and be genuinely usable, not merely present. */
-  | { type: 'awaitUsable'; selector: string; timeoutMs?: number }
+  /**
+   * Wait for a selector to exist and be genuinely usable, not merely present.
+   * `inPlace: true` probes without scrolling it into view first (#1629).
+   */
+  | { type: 'awaitUsable'; selector: string; timeoutMs?: number; inPlace?: boolean }
   /** Scroll the wheel out N ticks, to bring an off-screen tile into view. */
   | { type: 'zoomOut'; ticks?: number }
   /**
