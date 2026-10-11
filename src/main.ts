@@ -313,6 +313,15 @@ levelEndScreen.setOnBackToPortfolio(() => {
   levelEndScreen.hide();
   worldMap.show(ctx.campaignProfile.campaign);
 });
+levelEndScreen.setOnKeepPlaying(() => {
+  const result = runGameCommand('campaign keep_playing');
+  if (!result.success) {
+    uiManager.notify({ severity: 'warn', title: t('ui.level_end.keep_playing'), body: result.output });
+    return;
+  }
+  // Clears the render cache so a later defeat renders; hiding also lets the sim loop resume.
+  levelEndScreen.reset();
+});
 
 // --- Level loading ---
 // Entering a level blocks the main thread for seconds. enterLevel splits that

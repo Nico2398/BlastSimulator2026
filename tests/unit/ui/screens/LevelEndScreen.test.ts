@@ -860,3 +860,71 @@ describe('LevelEndScreen', () => {
     });
   });
 });
+
+describe('LevelEndScreen keep playing (#1647)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    setLocale('en');
+  });
+  const KEEP = '#bs-level-end-screen [data-action="keep-playing"]';
+
+  it.each([
+    ['campaign win', () => stateAtLevelEnd(ONE_STAR, 'dusty_hollow')],
+    ['tutorial win', () => stateAtLevelEnd(ONE_STAR, 'tutorial_pit')],
+    ['last-level win', () => stateAtLevelEnd(ONE_STAR, 'treranium_depths')],
+    ['three-star win', () => stateAtLevelEnd(THREE_STAR, 'dusty_hollow')],
+  ])('victory layout (%s) offers keep-playing', (_n, make) => {
+    const { container, screen } = mount();
+    screen.update(make());
+    const btn = container.querySelector<HTMLButtonElement>(KEEP);
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent).toBe(t('ui.level_end.keep_playing'));
+    expect(btn!.textContent).not.toBe('ui.level_end.keep_playing');
+    screen.dispose();
+  });
+
+  it.each(['bankruptcy', 'arrest', 'ecological_shutdown', 'worker_revolt'] as const)(
+    'defeat layout (%s) has no keep-playing button', reason => {
+      const { container, screen } = mount();
+      screen.update(stateAtDefeat(reason));
+      expect(container.querySelector(KEEP)).toBeNull();
+      screen.dispose();
+    });
+
+  it('sandbox defeat has no keep-playing button', () => {
+    const { container, screen } = mount();
+    const s = stateAtDefeat('bankruptcy');
+    s.campaign.activeLevelId = null;
+    screen.update(s);
+    expect(container.querySelector(KEEP)).toBeNull();
+    screen.dispose();
+  });
+
+  it('click calls the callback set via setOnKeepPlaying, once', () => {
+    const { container, screen } = mount();
+    let calls = 0;
+    screen.setOnKeepPlaying(() => { calls++; });
+    screen.update(stateAtLevelEnd(ONE_STAR, 'dusty_hollow'));
+    container.querySelector<HTMLButtonElement>(KEEP)!.click();
+    expect(calls).toBe(1);
+    screen.dispose();
+  });
+
+  it('keeps the other victory buttons', () => {
+    const { container, screen } = mount();
+    screen.update(stateAtLevelEnd(ONE_STAR, 'dusty_hollow'));
+    expect(container.querySelector('#bs-level-end-screen [data-action="replay"]')).not.toBeNull();
+    expect(container.querySelector('#bs-level-end-screen [data-action="continue"]')).not.toBeNull();
+    screen.dispose();
+  });
+
+  it('keeps the label in the new locale after refreshLocale', () => {
+    const { container, screen } = mount();
+    screen.update(stateAtLevelEnd(ONE_STAR, 'dusty_hollow'));
+    setLocale('fr');
+    screen.refreshLocale();
+    expect(container.querySelector<HTMLButtonElement>(KEEP)!.textContent).toBe(t('ui.level_end.keep_playing'));
+    screen.dispose();
+  });
+});
+

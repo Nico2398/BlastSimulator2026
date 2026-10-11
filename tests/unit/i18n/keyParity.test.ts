@@ -488,7 +488,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1568: +1 key (employees.train_school_closed)
     // #1593: +1 key (tutorial.stage.picker_cancel_tip)
     // #1632: +5 keys (waiting.training, blast_report_close, overlay_toggle, policy_apply, policy_fatigue_range), -1 (stage.blast_confirm), net +4: 3965.
-    expect(Object.keys(en).length).toBe(3965);
+    // #1647: +3 keys (ui.level_end.keep_playing, campaign.keep_playing_success, campaign.keep_playing_refused)
+    expect(Object.keys(en).length).toBe(3968);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

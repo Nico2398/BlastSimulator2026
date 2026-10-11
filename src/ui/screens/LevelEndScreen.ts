@@ -49,6 +49,7 @@ export class LevelEndScreen {
   private readonly starRatingTitle: HTMLElement;
   private readonly starRatingRows: HTMLElement;
   private readonly replayBtn: HTMLButtonElement;
+  private readonly keepPlayingBtn: HTMLButtonElement;
   private readonly continueBtn: HTMLButtonElement;
 
   // ── Defeat ──
@@ -66,6 +67,7 @@ export class LevelEndScreen {
   private onBackToPortfolio?: () => void;
   private onRetrySandbox?: () => void;
   private onBackToSandbox?: () => void;
+  private onKeepPlaying?: () => void;
 
   /** True once rendered for the current terminal-reason transition — reset the instant levelEndReason clears. */
   private rendered = false;
@@ -108,6 +110,10 @@ export class LevelEndScreen {
     this.replayBtn.style.flex = '1';
     this.locale.bindText(this.replayBtn, 'ui.level_end.replay');
 
+    this.keepPlayingBtn = button('ghost', t('ui.level_end.keep_playing'), { dataAction: 'keep-playing', onClick: () => this.onKeepPlaying?.() });
+    this.keepPlayingBtn.style.flex = '1';
+    this.locale.bindText(this.keepPlayingBtn, 'ui.level_end.keep_playing');
+
     this.continueBtn = button('primary', '', { dataAction: 'continue', onClick: () => {
       const state = this.lastState;
       if (!state) return;
@@ -117,7 +123,7 @@ export class LevelEndScreen {
     } });
     this.continueBtn.style.flex = '1.4';
 
-    const victoryFooter = el('div', { attrs: { style: 'display:flex;gap:9px' }, children: [this.replayBtn, this.continueBtn] });
+    const victoryFooter = el('div', { attrs: { style: 'display:flex;gap:9px' }, children: [this.replayBtn, this.keepPlayingBtn, this.continueBtn] });
 
     this.victoryRoot = el('div', {
       attrs: { style: 'display:flex;flex-direction:column;gap:22px' },
@@ -181,6 +187,7 @@ export class LevelEndScreen {
   setOnBackToPortfolio(cb: () => void): void { this.onBackToPortfolio = cb; }
   setOnRetrySandbox(cb: () => void): void { this.onRetrySandbox = cb; }
   setOnBackToSandbox(cb: () => void): void { this.onBackToSandbox = cb; }
+  setOnKeepPlaying(cb: () => void): void { this.onKeepPlaying = cb; }
 
   refreshLocale(): void {
     this.locale.refresh();
@@ -217,10 +224,14 @@ export class LevelEndScreen {
       this.defeatRoot.style.display = 'none';
       this.clearDefeatContent();
       this.victoryRoot.style.display = 'flex';
+      // Re-attach (idempotent) in case a prior defeat render detached it.
+      this.continueBtn.before(this.keepPlayingBtn);
       this.renderVictoryContent(state);
     } else if (reason !== null) {
       this.victoryRoot.style.display = 'none';
       this.clearVictoryContent();
+      // Victory-only control: the hidden victory root stays mounted, so detach it.
+      this.keepPlayingBtn.remove();
       this.defeatRoot.style.display = 'flex';
       this.renderDefeatContent(state, reason);
     }
