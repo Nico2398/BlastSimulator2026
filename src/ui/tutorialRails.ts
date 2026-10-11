@@ -145,7 +145,7 @@ export class TutorialRails {
    * rectangle will be accepted.
    */
   private stageHint(stage: TutorialStage): string {
-    const text = stage.target === PICKER_CANVAS ? `${t(stage.hintKey)} ${t('tutorial.stage.picker_cancel_tip')}` : t(stage.hintKey);
+    const text = stage.target === PICKER_CANVAS ? `${t(stage.hintKey, stage.hintParams)} ${t('tutorial.stage.picker_cancel_tip')}` : t(stage.hintKey, stage.hintParams);
     const r = stage.region;
     if (!r) return text;
     return text

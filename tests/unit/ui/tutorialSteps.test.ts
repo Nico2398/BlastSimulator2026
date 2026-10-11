@@ -247,6 +247,48 @@ describe('tutorialSteps', () => {
       expect(step9.isComplete(state, {})).toBe(false);
     });
 
+    describe('outcome dialog still on screen (#1632)', () => {
+      const resolvedState = {
+        events: { pendingEvent: null, firedEventIds: ['tutorial_synergy_consultant'] },
+      } as unknown as GameState;
+
+      function mountDialog(display?: string): void {
+        const el = document.createElement('div');
+        el.id = 'bs-event-dialog';
+        if (display !== undefined) el.style.display = display;
+        document.body.appendChild(el);
+      }
+
+      afterEach(() => { document.body.innerHTML = ''; });
+
+      it('is not complete while pendingEvent is set', () => {
+        const state = {
+          events: { pendingEvent: { eventId: 'tutorial_synergy_consultant', firedAtTick: 5 }, firedEventIds: ['tutorial_synergy_consultant'] },
+        } as unknown as GameState;
+        expect(step9.isComplete(state, {})).toBe(false);
+      });
+
+      it('is not complete when resolved but the dialog is still displayed', () => {
+        mountDialog('flex');
+        expect(step9.isComplete(resolvedState, {})).toBe(false);
+      });
+
+      it('is complete once the dialog is display:none', () => {
+        mountDialog('none');
+        expect(step9.isComplete(resolvedState, {})).toBe(true);
+      });
+
+      it('is complete when the dialog element is absent', () => {
+        expect(step9.isComplete(resolvedState, {})).toBe(true);
+      });
+
+      it('is not complete before the event fired even with the dialog closed', () => {
+        mountDialog('none');
+        const state = { events: { pendingEvent: null, firedEventIds: [] } } as unknown as GameState;
+        expect(step9.isComplete(state, {})).toBe(false);
+      });
+    });
+
     it('stays complete once resolved, so a fast answer cannot deadlock the tutorial', () => {
       // The old condition was only true while the dialog was open. This is the
       // regression guard: the completion signal must be monotonic.

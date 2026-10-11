@@ -8,11 +8,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
-import { TUTORIAL_STAGES, stagesFor, REGION, PICKER_CANCEL, TUTORIAL_POLICY_FATIGUE_MIN, TUTORIAL_POLICY_FATIGUE_MAX } from '../../../src/ui/tutorialStages.js';
+import {
+  TUTORIAL_STAGES, stagesFor, REGION, PICKER_CANCEL, TUTORIAL_POLICY_FATIGUE_MIN, TUTORIAL_POLICY_FATIGUE_MAX,
+  isContinuousSelected, isPolicyFatigueInRange,
+} from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_HIRING_SCRIPT } from '../../../src/core/config/balance.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
-import { TOOLBAR_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
-import { resolveStageIndex, isReachable } from '../../../src/ui/tutorialGuide.js';
+import { TOOLBAR_TARGET, SURVEY_OVERLAY_TOGGLE_TARGET, isEventDialogOpen } from '../../../src/ui/tutorialStepHelpers.js';
+import { resolveStageIndex, isReachable, resolveWaitStatus, allowedSelectors } from '../../../src/ui/tutorialGuide.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
 import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
@@ -169,7 +174,7 @@ describe('tutorial stage table', () => {
     for (const stepId of [
       // haul-debris (#552) is deliberately excluded: hauling self-dispatches
       // now, so the step is a single watch-only stage, not a click sequence.
-      'hire-surveyor', 'survey', 'drill-plan', 'blast',
+      'hire-surveyor', 'survey', 'drill-plan',
       'vehicle-buy-assign', 'build-storage', 'box-cut',
     ]) {
       expect(TUTORIAL_STAGES[stepId]!.length, `${stepId} should be multi-stage`)
@@ -307,20 +312,53 @@ describe('buy-drill-rig-assign / buy-rock-digger-assign / vehicle-buy-assign sta
   }
 });
 
-describe('toggle-survey-overlay stage fallback (#905)', () => {
-  // Genuinely one click — no explicit TUTORIAL_STAGES entry needed.
-  // stagesFor()'s own fallback (a single stage built from the step's
-  // highlightTarget) already covers it.
-  const TARGET = '#bs-survey-panel [data-role="overlay-toggle"]';
+describe('toggle-survey-overlay stages open the Survey panel first (#1632)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
 
-  it('has no explicit TUTORIAL_STAGES entry', () => {
-    expect(TUTORIAL_STAGES['toggle-survey-overlay']).toBeUndefined();
+  it('has two stages: Survey toolbar button, then the overlay toggle', () => {
+    const stages = stagesFor('toggle-survey-overlay', SURVEY_OVERLAY_TOGGLE_TARGET);
+    expect(stages).toHaveLength(2);
+    expect(stages[0]!.target).toBe(TOOLBAR_TARGET.survey);
+    expect(stages[0]!.hintKey).toBe('tutorial.stage.open_survey');
+    expect(stages[1]!.target).toBe(SURVEY_OVERLAY_TOGGLE_TARGET);
+    expect(stages[1]!.hintKey).toBe('tutorial.stage.overlay_toggle');
   });
 
-  it('stagesFor falls back to a single stage targeting the Survey panel\'s overlay-toggle button', () => {
-    const stages = stagesFor('toggle-survey-overlay', TARGET);
-    expect(stages).toHaveLength(1);
-    expect(stages[0]!.target).toBe(TARGET);
+  function mountToolbarAndPanel(panelDisplay: string): void {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    document.body.appendChild(bar);
+    makeButton({ 'data-panel': 'survey' }, bar);
+    const panel = document.createElement('div');
+    panel.id = 'bs-survey-panel';
+    panel.style.display = panelDisplay;
+    document.body.appendChild(panel);
+    makeButton({ 'data-role': 'overlay-toggle' }, panel);
+  }
+
+  it('resolves to the toolbar button (index 0) while the Survey panel is hidden', () => {
+    mountToolbarAndPanel('none');
+    expect(resolveStageIndex(stagesFor('toggle-survey-overlay', SURVEY_OVERLAY_TOGGLE_TARGET))).toBe(0);
+  });
+
+  it('resolves to the overlay toggle (index 1) once the panel is open', () => {
+    mountToolbarAndPanel('block');
+    expect(resolveStageIndex(stagesFor('toggle-survey-overlay', SURVEY_OVERLAY_TOGGLE_TARGET))).toBe(1);
+  });
+
+  it('highlights the Survey toolbar button while the panel is closed', () => {
+    mountToolbarAndPanel('none');
+    const stages = stagesFor('toggle-survey-overlay', SURVEY_OVERLAY_TOGGLE_TARGET);
+    const stage = stages[resolveStageIndex(stages)]!;
+    expect(allowedSelectors(stage)).toContain(TOOLBAR_TARGET.survey);
+  });
+
+  it('new hint keys exist in en and fr and differ', () => {
+    for (const key of ['tutorial.stage.open_survey', 'tutorial.stage.overlay_toggle']) {
+      expect(messages[key], key).toBeTruthy();
+      expect(messagesFr[key], key).toBeTruthy();
+    }
+    expect(messages['tutorial.stage.overlay_toggle']).not.toBe(messagesFr['tutorial.stage.overlay_toggle']);
   });
 });
 
@@ -425,6 +463,8 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
     'build-driving-center': 'tutorial.waiting.building',
     'build-storage': 'tutorial.waiting.building',
     'sell-ore': 'tutorial.waiting.delivering',
+    // #1632: the driver walks to the course after Train; keep a waiting line.
+    'train-fragmenter': 'tutorial.waiting.training',
   };
 
   for (const [stepId, waitingKey] of Object.entries(WAITS_ON_WORK_WITH_SPENT_WHEN)) {
@@ -439,7 +479,7 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
     });
   }
 
-  it.each(['evacuate-zone', 'train-fragmenter'])(
+  it.each(['evacuate-zone'])(
     '%s carries no spentWhen on any of its stages',
     (stepId) => {
       const stages = TUTORIAL_STAGES[stepId]!;
@@ -595,12 +635,10 @@ describe('tutorial stage allow-set pins the scripted choice (#1595)', () => {
     expect(run.also).toContain('#bs-survey-panel [data-method="seismic"]');
   });
 
-  it('set-early-policy no longer allows Apply unconditionally', () => {
+  it('set-early-policy never allows Apply through `also` (#1632: it is a gated stage target)', () => {
     for (const s of stagesFor('set-early-policy')) {
       expect(s.also ?? []).not.toContain('#bs-policy-apply');
     }
-    const cond = stagesFor('set-early-policy').flatMap(s => s.alsoWhen ?? []);
-    expect(cond.map(c => c.selector)).toContain('#bs-policy-apply');
   });
 
   it('tutorial fatigue range is a non-empty band inside 0..100', () => {
@@ -672,4 +710,293 @@ describe('hire stages target one scripted candidate (#1600)', () => {
       expect(document.querySelectorAll(target)).toHaveLength(1);
     });
   }
+});
+
+describe('blast is one stage: close the Blast Report (#1632)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+  const REPORT_CLOSE = '[data-action="report-close"]';
+
+  it('has a single stage targeting the report Close', () => {
+    const stages = TUTORIAL_STAGES['blast']!;
+    expect(stages).toHaveLength(1);
+    expect(stages[0]!.target).toBe(REPORT_CLOSE);
+    expect(stages[0]!.hintKey).toBe('tutorial.stage.blast_report_close');
+  });
+
+  it('no stage names the retired open_blast / execute / blast_confirm hints', () => {
+    for (const st of TUTORIAL_STAGES['blast']!) {
+      expect(['tutorial.stage.open_blast', 'tutorial.stage.execute', 'tutorial.stage.blast_confirm']).not.toContain(st.hintKey);
+      expect(st.target).not.toContain('execute');
+      expect(st.target).not.toContain('bs-confirm-overlay');
+    }
+  });
+
+  it('resolves to index 0 with the report Close visible', () => {
+    const modal = document.createElement('div');
+    document.body.appendChild(modal);
+    makeButton({ 'data-action': 'report-close' }, modal);
+    expect(resolveStageIndex(TUTORIAL_STAGES['blast']!)).toBe(0);
+  });
+
+  it('armed but report not open: the hint is still the report-close one', () => {
+    const stages = TUTORIAL_STAGES['blast']!;
+    expect(stages[resolveStageIndex(stages)]!.hintKey).toBe('tutorial.stage.blast_report_close');
+  });
+
+  it('blast_report_close exists in en and fr and differs; blast_confirm is gone', () => {
+    expect(messages['tutorial.stage.blast_report_close']).toBeTruthy();
+    expect(messagesFr['tutorial.stage.blast_report_close']).toBeTruthy();
+    expect(messages['tutorial.stage.blast_report_close']).not.toBe(messagesFr['tutorial.stage.blast_report_close']);
+    expect(messages['tutorial.stage.blast_confirm']).toBeUndefined();
+    expect(messagesFr['tutorial.stage.blast_confirm']).toBeUndefined();
+  });
+});
+
+describe('train-fragmenter keeps a waiting line while the driver walks to the course (#1632)', () => {
+  const SKILL = 'driving.rock_fragmenter';
+  function stateWithDriver(patch: Record<string, unknown>): ReturnType<typeof createGame> {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.employees.employees.push({ id: 900, role: 'driver', qualifications: [], ...patch } as never);
+    return s;
+  }
+
+  it('carries exactly one spentWhen stage wired to tutorial.waiting.training', () => {
+    const spent = TUTORIAL_STAGES['train-fragmenter']!.filter(st => typeof st.spentWhen === 'function');
+    expect(spent).toHaveLength(1);
+    expect(spent[0]!.waitingKey).toBe('tutorial.waiting.training');
+    expect(messages['tutorial.waiting.training']).toBeTruthy();
+    expect(messagesFr['tutorial.waiting.training']).toBeTruthy();
+    expect(messages['tutorial.waiting.training']).not.toBe(messagesFr['tutorial.waiting.training']);
+  });
+
+  it('not waiting when nothing is booked', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    expect(resolveWaitStatus(TUTORIAL_STAGES['train-fragmenter']!, s).waiting).toBe(false);
+  });
+
+  it.each([
+    ['pendingTrainingState (walking to the course)', { pendingTrainingState: { skill: SKILL } }],
+    ['trainingState (course running)', { trainingState: { skill: SKILL } }],
+    ['qualification (course finished)', { qualifications: [{ category: SKILL }] }],
+  ])('waiting once the driver has a %s', (_name, patch) => {
+    const s = stateWithDriver(patch);
+    expect(resolveWaitStatus(TUTORIAL_STAGES['train-fragmenter']!, s))
+      .toEqual({ waiting: true, waitingKey: 'tutorial.waiting.training' });
+  });
+
+  it('a booking for a different skill does not make it wait', () => {
+    const s = stateWithDriver({ pendingTrainingState: { skill: 'driving.drill_rig' } });
+    expect(resolveWaitStatus(TUTORIAL_STAGES['train-fragmenter']!, s).waiting).toBe(false);
+  });
+});
+
+describe('set-early-policy walks Ops, Continuous, fatigue range, Apply (#1632)', () => {
+  const APPLY = '#bs-policy-apply';
+  const CONTINUOUS = '#bs-policy-shift button[data-shift-mode="continuous"]';
+  const FATIGUE = '#bs-policy-fatigue';
+
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  function mountOps(pressed: boolean, fatigue: string): void {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    document.body.appendChild(bar);
+    makeButton({ 'data-panel': 'ops' }, bar);
+    const panel = document.createElement('div');
+    panel.id = 'bs-operations-panel';
+    document.body.appendChild(panel);
+    const shift = document.createElement('div');
+    shift.id = 'bs-policy-shift';
+    panel.appendChild(shift);
+    makeButton({ 'data-shift-mode': 'shift_8h', 'aria-pressed': pressed ? 'false' : 'true' }, shift);
+    makeButton({ 'data-shift-mode': 'continuous', 'aria-pressed': pressed ? 'true' : 'false' }, shift);
+    const input = document.createElement('input');
+    input.id = 'bs-policy-fatigue';
+    input.value = fatigue;
+    panel.appendChild(input);
+    withBox(input);
+    makeButton({ id: 'bs-policy-apply' }, panel);
+  }
+
+  const stages = (): ReturnType<typeof stagesFor> => stagesFor('set-early-policy', TOOLBAR_TARGET.ops);
+
+  it('has four stages in order', () => {
+    const st = stages();
+    expect(st).toHaveLength(4);
+    expect(st[0]!.target).toBe(TOOLBAR_TARGET.ops);
+    expect(st[0]!.hintKey).toBe('tutorial.stage.open_ops');
+    expect(st[1]!.target).toBe(CONTINUOUS);
+    expect(st[1]!.hintKey).toBe('tutorial.stage.policy_continuous');
+    expect(st[2]!.target).toBe(FATIGUE);
+    expect(st[2]!.hintKey).toBe('tutorial.stage.policy_fatigue_range');
+    expect(st[2]!.hintParams).toEqual({ min: TUTORIAL_POLICY_FATIGUE_MIN, max: TUTORIAL_POLICY_FATIGUE_MAX });
+    expect(typeof st[2]!.reachableWhen).toBe('function');
+    expect(st[3]!.target).toBe(APPLY);
+    expect(st[3]!.hintKey).toBe('tutorial.stage.policy_apply');
+    expect(typeof st[3]!.reachableWhen).toBe('function');
+  });
+
+  it('Apply is never allowed through `also`; the fatigue input stays allowed from stage 1', () => {
+    const st = stages();
+    for (const s of st) expect(s.also ?? []).not.toContain(APPLY);
+    expect(allowedSelectors(st[1])).toContain(FATIGUE);
+  });
+
+  it('Ops closed: stage 0', () => {
+    mountOps(false, '60');
+    document.getElementById('bs-operations-panel')!.style.display = 'none';
+    expect(resolveStageIndex(stages())).toBe(0);
+  });
+
+  it('Continuous not pressed: stage 1, Apply not allowed', () => {
+    mountOps(false, '60');
+    const st = stages();
+    const idx = resolveStageIndex(st);
+    expect(idx).toBe(1);
+    expect(allowedSelectors(st[idx], document)).not.toContain(APPLY);
+  });
+
+  it.each(['50', '60', '69'])('Continuous pressed with fatigue %s: stage 3 (Apply)', (v) => {
+    mountOps(true, v);
+    const st = stages();
+    const idx = resolveStageIndex(st);
+    expect(idx).toBe(3);
+    expect(allowedSelectors(st[idx], document)).toContain(APPLY);
+  });
+
+  it.each(['49', '70', '80', '', 'abc'])('Continuous pressed with fatigue "%s": stage 2, range hint, Apply not allowed', (v) => {
+    mountOps(true, v);
+    const st = stages();
+    const idx = resolveStageIndex(st);
+    expect(idx).toBe(2);
+    const text = t(st[idx]!.hintKey, st[idx]!.hintParams);
+    expect(text).toContain(String(TUTORIAL_POLICY_FATIGUE_MIN));
+    expect(text).toContain(String(TUTORIAL_POLICY_FATIGUE_MAX));
+    const allowed = allowedSelectors(st[idx], document);
+    expect(allowed).not.toContain(APPLY);
+    expect(allowed).toContain(FATIGUE);
+  });
+
+  it('new hint keys exist in en and fr and differ; range keeps its {min}/{max} placeholders', () => {
+    for (const key of ['tutorial.stage.policy_apply', 'tutorial.stage.policy_fatigue_range']) {
+      expect(messages[key], key).toBeTruthy();
+      expect(messagesFr[key], key).toBeTruthy();
+      expect(messages[key]).not.toBe(messagesFr[key]);
+    }
+    for (const table of [messages, messagesFr]) {
+      expect(table['tutorial.stage.policy_fatigue_range']).toContain('{min}');
+      expect(table['tutorial.stage.policy_fatigue_range']).toContain('{max}');
+    }
+  });
+});
+
+describe('policy DOM predicates (#1632)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  function mount(pressed: string | null, fatigue: string | null): void {
+    const shift = document.createElement('div');
+    shift.id = 'bs-policy-shift';
+    document.body.appendChild(shift);
+    const btn = makeButton({ 'data-shift-mode': 'continuous' }, shift);
+    if (pressed !== null) btn.setAttribute('aria-pressed', pressed);
+    if (fatigue !== null) {
+      const input = document.createElement('input');
+      input.id = 'bs-policy-fatigue';
+      input.value = fatigue;
+      document.body.appendChild(input);
+    }
+  }
+
+  it('isContinuousSelected: true only when the continuous button is aria-pressed', () => {
+    mount('true', null);
+    expect(isContinuousSelected(document)).toBe(true);
+  });
+
+  it('isContinuousSelected: false when not pressed, pressed=false, or absent', () => {
+    mount(null, null);
+    expect(isContinuousSelected(document)).toBe(false);
+    document.body.innerHTML = '';
+    mount('false', null);
+    expect(isContinuousSelected(document)).toBe(false);
+    document.body.innerHTML = '';
+    expect(isContinuousSelected(document)).toBe(false);
+  });
+
+  it.each(['50', '60', '69'])('isPolicyFatigueInRange: true at %s (boundaries inclusive)', (v) => {
+    mount(null, v);
+    expect(isPolicyFatigueInRange(document)).toBe(true);
+  });
+
+  it.each(['49', '70', '0', '100', '', '  ', 'abc'])('isPolicyFatigueInRange: false at "%s"', (v) => {
+    mount(null, v);
+    expect(isPolicyFatigueInRange(document)).toBe(false);
+  });
+
+  it('isPolicyFatigueInRange: false when the input is absent', () => {
+    expect(isPolicyFatigueInRange(document)).toBe(false);
+  });
+
+  it('isPolicyFatigueInRange does not depend on Continuous being selected', () => {
+    mount('false', '60');
+    expect(isPolicyFatigueInRange(document)).toBe(true);
+  });
+});
+
+describe('event-fire-resolve shows Dismiss while the outcome is on screen (#1632)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  function mountDialog(parts: { choice?: boolean; dismiss?: boolean }): void {
+    const dlg = document.createElement('div');
+    dlg.id = 'bs-event-dialog';
+    document.body.appendChild(dlg);
+    if (parts.choice) {
+      makeButton({}, dlg).className = 'bs-event-choice';
+    }
+    if (parts.dismiss) {
+      makeButton({}, dlg).className = 'bs-event-dismiss';
+    }
+  }
+
+  it('choices showing: stage 0 (choose)', () => {
+    mountDialog({ choice: true });
+    expect(resolveStageIndex(TUTORIAL_STAGES['event-fire-resolve']!)).toBe(0);
+  });
+
+  it('outcome showing Dismiss: stage 1 is active', () => {
+    mountDialog({ dismiss: true });
+    const st = TUTORIAL_STAGES['event-fire-resolve']!;
+    expect(resolveStageIndex(st)).toBe(1);
+    expect(st[1]!.hintKey).toBe('tutorial.stage.event_dismiss');
+  });
+});
+
+describe('isEventDialogOpen (#1632)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+
+  function dialog(display?: string): HTMLElement {
+    const el = document.createElement('div');
+    el.id = 'bs-event-dialog';
+    if (display !== undefined) el.style.display = display;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it('false when the dialog element is absent', () => {
+    expect(isEventDialogOpen()).toBe(false);
+  });
+
+  it('false when the dialog is display:none', () => {
+    dialog('none');
+    expect(isEventDialogOpen()).toBe(false);
+  });
+
+  it('true when the dialog is displayed (flex)', () => {
+    dialog('flex');
+    expect(isEventDialogOpen()).toBe(true);
+  });
+
+  it('true when the dialog has no inline display set', () => {
+    dialog();
+    expect(isEventDialogOpen()).toBe(true);
+  });
 });

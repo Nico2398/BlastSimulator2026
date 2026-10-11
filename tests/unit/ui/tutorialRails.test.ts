@@ -9,7 +9,7 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
-import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
+import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
@@ -106,21 +106,53 @@ describe('TutorialRails', () => {
   });
 
   it('omits the counter for a single-stage step', () => {
-    // #1015: 'speed-up-for-dig' is gone — 'toggle-survey-overlay' has no
-    // entry of its own in TUTORIAL_STAGES, so stagesFor falls back to a
-    // single stage built from the step's own highlightTarget, exercising the
-    // same one-stage shape.
-    const panel = document.createElement('div');
-    panel.id = 'bs-survey-panel';
+    // #1632: 'blast' is a single stage (close the Blast Report).
+    const modal = document.createElement('div');
     const btn = document.createElement('button');
-    btn.dataset['role'] = 'overlay-toggle';
-    panel.appendChild(btn);
-    document.body.appendChild(panel);
+    btn.dataset['action'] = 'report-close';
+    modal.appendChild(btn);
+    document.body.appendChild(modal);
     withBox(btn);
 
     const rails = new TutorialRails();
-    rails.beginStep({ id: 'toggle-survey-overlay', highlightTarget: SURVEY_OVERLAY_TOGGLE_TARGET }, state());
-    expect(rails.refresh().hint).not.toContain('/');
+    rails.beginStep({ id: 'blast' }, state());
+    const view = rails.refresh();
+    expect(view.stageTotal).toBe(1);
+    expect(view.hint).not.toContain('/');
+    expect(view.hint).toBe(t('tutorial.stage.blast_report_close'));
+  });
+
+  it('interpolates a stage\'s hintParams into its hint (#1632)', () => {
+    // set-early-policy stage 2: Continuous selected, fatigue out of range.
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    document.body.appendChild(bar);
+    const ops = document.createElement('button');
+    ops.dataset['panel'] = 'ops';
+    bar.appendChild(ops);
+    withBox(ops);
+    const shift = document.createElement('div');
+    shift.id = 'bs-policy-shift';
+    document.body.appendChild(shift);
+    const cont = document.createElement('button');
+    cont.dataset['shiftMode'] = 'continuous';
+    cont.setAttribute('aria-pressed', 'true');
+    shift.appendChild(cont);
+    withBox(cont);
+    const input = document.createElement('input');
+    input.id = 'bs-policy-fatigue';
+    input.value = '80';
+    document.body.appendChild(input);
+    withBox(input);
+
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'set-early-policy' }, state());
+    const view = rails.refresh();
+    expect(view.stageIndex).toBe(2);
+    expect(view.hint).toContain('50');
+    expect(view.hint).toContain('69');
+    expect(view.hint).not.toContain('{min}');
+    expect(view.hint).not.toContain('{max}');
   });
 
   it('fills the target coordinates into the hint for an exact selection', () => {

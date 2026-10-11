@@ -102,6 +102,7 @@ export function scrollTargetIntoView(el: Element): void {
 export function resolveStageIndex(stages: TutorialStage[]): number {
   for (let i = stages.length - 1; i >= 0; i--) {
     const stage = stages[i]!;
+    if (stage.reachableWhen && !stage.reachableWhen()) continue;
     if (isReachable(stage.target)) return i;
     // `target` is gone — before falling back to an earlier stage, check
     // whether this stage's own action is what made it disappear (#903): a

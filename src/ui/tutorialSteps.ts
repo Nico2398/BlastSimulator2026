@@ -13,7 +13,7 @@ import {
   isBlastReportOutstanding,
   createEvacuateZoneStep,
   createSurveyOverlayToggleStep,
-  TOOLBAR_TARGET,
+  TOOLBAR_TARGET, isEventDialogOpen,
 } from './tutorialStepHelpers.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
 
@@ -366,7 +366,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const events = state.events;
       if (!events) return false;
       return (events.firedEventIds ?? []).includes(TUTORIAL_EVENT_ID)
-        && events.pendingEvent == null;
+        && events.pendingEvent == null && !isEventDialogOpen();
     },
   },
 
