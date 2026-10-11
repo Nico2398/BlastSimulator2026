@@ -428,14 +428,44 @@
         },
         {
           "type": "waitForTutorialStep",
+          "stepId": "buy-charging-truck",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "buy-charging-truck",
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "timeout": 90,
+      "description": "#1648: buy-charging-truck. Charging is done from a truck, so the tutorial guides the player to buy the tier-1 charging truck right after the rock digger. Fleet panel open, tier-1 charging_truck bought; the rail advances to 'box-cut' on the purchase alone. The scripted driller (Dale Drillson) and the blaster already hold the driving.truck licence the truck needs, so no further player input is required. Step-local: asserts vehicleCount rises by exactly one, not the file's running fleet total.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
           "stepId": "box-cut",
           "timeout": 60000
         }
       ],
       "expect": {
         "tutorialStep": "box-cut",
-        "increased": [
-          "vehicleCount"
+        "changedBy": {
+          "vehicleCount": 1
+        },
+        "decreased": [
+          "cash"
         ]
       }
     },

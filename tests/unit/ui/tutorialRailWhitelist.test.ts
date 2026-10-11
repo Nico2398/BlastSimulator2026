@@ -14,7 +14,7 @@ import { applyRails, allowedSelectors, resolveStageIndex, ALLOWED_CLASS } from '
 import { injectStyles } from '../../../src/ui/styles.js';
 import { BASE_PERMANENTLY_ALLOWED } from '../../../src/ui/tutorialRails.js';
 
-const ROLES = ['drill_rig', 'rock_digger', 'debris_hauler', 'rock_fragmenter', 'surveyor_truck'] as const;
+const ROLES = ['drill_rig', 'rock_digger', 'debris_hauler', 'rock_fragmenter', 'surveyor_truck', 'charging_truck'] as const;
 
 interface Probe {
   name: string;
@@ -46,6 +46,7 @@ function buildFixture(): Probe[] {
   // Tier 1 of a role the step is NOT about is off-script too.
   const legitTier1: Record<string, string> = {
     drill_rig: 'buy-drill-rig-assign', rock_digger: 'buy-rock-digger-assign', debris_hauler: 'vehicle-buy-assign',
+    charging_truck: 'buy-charging-truck',
   };
   for (const role of ROLES) {
     const legit = legitTier1[role];
@@ -135,6 +136,7 @@ describe('tutorial rails whitelist (#1595)', () => {
     it.each([
       ['buy-drill-rig-assign', 'drill_rig'],
       ['buy-rock-digger-assign', 'rock_digger'],
+      ['buy-charging-truck', 'charging_truck'],
       ['vehicle-buy-assign', 'debris_hauler'],
     ])('%s', (stepId, role) => {
       const stages = stagesFor(stepId);

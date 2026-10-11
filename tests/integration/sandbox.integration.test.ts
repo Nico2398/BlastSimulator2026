@@ -217,6 +217,24 @@ describe('sandbox mode', () => {
       assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
     });
 
+    it('staffed:true opens with a tier-1 charging truck and an employee holding blasting and driving.truck (#1648)', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
+      expect(result.success).toBe(true);
+      const st = ctx.state!;
+      expect(st.vehicles.vehicles.filter(v => v.type === 'charging_truck' && v.tier === 1)).toHaveLength(1);
+      expect(st.employees.employees.some(e => {
+        const cats = e.qualifications.map(q => q.category);
+        return cats.includes('blasting') && cats.includes('driving.truck');
+      })).toBe(true);
+    });
+
+    it('staffed:false has no charging truck and no crew (#1648)', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:false');
+      expect(result.success).toBe(true);
+      expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'charging_truck')).toBe(false);
+      expect(ctx.state!.employees.employees.length).toBe(0);
+    });
+
     it('staffed:true leaves starting cash unaffected — same as an unstaffed run with identical params', () => {
       const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
       expect(result.success).toBe(true);

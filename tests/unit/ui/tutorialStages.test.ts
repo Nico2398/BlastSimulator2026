@@ -289,7 +289,7 @@ describe('buy-drill-rig-assign / buy-rock-digger-assign / vehicle-buy-assign sta
   // ArrivalGate), so the third stage each of these used to carry — clicking
   // `.bs-vehicle-assign-btn` — is gone. Each list ends on the vehicle-buy
   // click itself.
-  const RETARGETED_IDS = ['buy-drill-rig-assign', 'buy-rock-digger-assign', 'vehicle-buy-assign'];
+  const RETARGETED_IDS = ['buy-drill-rig-assign', 'buy-rock-digger-assign', 'buy-charging-truck', 'vehicle-buy-assign'];
 
   for (const id of RETARGETED_IDS) {
     it(`"${id}" has exactly 2 stages, ending on the vehicle-buy click`, () => {
@@ -623,6 +623,7 @@ describe('tutorial stage allow-set pins the scripted choice (#1595)', () => {
   it.each([
     ['buy-drill-rig-assign', 'drill_rig'],
     ['buy-rock-digger-assign', 'rock_digger'],
+    ['buy-charging-truck', 'charging_truck'],
     ['vehicle-buy-assign', 'debris_hauler'],
   ])('%s matches only the tier-1 button of %s', (stepId, role) => {
     const stages = stagesFor(stepId);
@@ -1060,5 +1061,40 @@ describe('building pins publish the placed building footprint (#1646)', () => {
     expect(messages['tutorial.stage.build_site']).not.toMatch(/\btile\b/i);
     expect(messagesFr['tutorial.stage.build_site']).toMatch(/\bzone\b/i);
     expect(messagesFr['tutorial.stage.build_site']).not.toMatch(/\bcase\b/i);
+  });
+});
+
+describe('buy-charging-truck stages (#1648)', () => {
+  it('opens Fleet, then targets the tier-1 charging truck button', () => {
+    const stages = stagesFor('buy-charging-truck');
+    expect(stages).toHaveLength(2);
+    expect(stages[0]!.target).toBe(TOOLBAR_TARGET.vehicles);
+    expect(stages[0]!.hintKey).toBe('tutorial.stage.open_vehicles');
+    expect(stages[1]!.target).toBe('#bs-vehicle-panel button[data-vtype="charging_truck"][data-tier="1"]');
+    expect(stages[1]!.hintKey).toBe('tutorial.stage.vehicle_buy_charging_truck');
+  });
+
+  it('hint copy exists in both locales and differs between them', () => {
+    expect(messages['tutorial.stage.vehicle_buy_charging_truck']).toBeTruthy();
+    expect(messagesFr['tutorial.stage.vehicle_buy_charging_truck']).toBeTruthy();
+    expect(messages['tutorial.stage.vehicle_buy_charging_truck']).not.toBe(messagesFr['tutorial.stage.vehicle_buy_charging_truck']);
+  });
+
+  it('is ordered directly after buy-rock-digger-assign and before box-cut and charge', () => {
+    const ids = TUTORIAL_STEPS.map(s => s.id);
+    const i = ids.indexOf('buy-charging-truck');
+    expect(i).toBeGreaterThan(-1);
+    expect(ids[i - 1]).toBe('buy-rock-digger-assign');
+    expect(i).toBeLessThan(ids.indexOf('box-cut'));
+    expect(i).toBeLessThan(ids.indexOf('charge'));
+  });
+
+  it('step is built from a charging_truck vehicle count with the Fleet toolbar target', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'buy-charging-truck')!;
+    expect(step.titleKey).toBe('tutorial.step_buychargingtruck.title');
+    expect(step.textKey).toBe('tutorial.step_buychargingtruck');
+    expect(step.highlightTarget).toBe(TOOLBAR_TARGET.vehicles);
+    expect(step.commands).toContain('vehicle buy charging_truck');
+    expect(step.tickBudget).toBe(1);
   });
 });

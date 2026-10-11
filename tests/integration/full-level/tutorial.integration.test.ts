@@ -324,6 +324,25 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(ctx.state!.sitePolicy.shiftMode).toBe('shift_8h');
   });
 
+  it('the guided charging truck purchase succeeds and the scripted hires include a blasting + driving.truck holder (#1648)', () => {
+    ctx.state!.cash += 100_000;
+    expect(employeeCommand(ctx, ['hire'], { role: 'driller' }).success).toBe(true);
+    expect(employeeCommand(ctx, ['hire'], { role: 'blaster' }).success).toBe(true);
+    expect(employeeCommand(ctx, ['hire'], { role: 'driver' }).success).toBe(true);
+    const dual = ctx.state!.employees.employees.filter(e => {
+      const cats = e.qualifications.map(q => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    });
+    expect(dual.length).toBeGreaterThan(0);
+
+    const before = ctx.state!.vehicles.vehicles.filter(v => v.type === 'charging_truck').length;
+    const buy = vehicleCommand(ctx, ['buy', 'charging_truck'], {});
+    expect(buy.success, buy.output).toBe(true);
+    const trucks = ctx.state!.vehicles.vehicles.filter(v => v.type === 'charging_truck');
+    expect(trucks.length - before).toBe(1);
+    expect(trucks[0]!.tier).toBe(1);
+  });
+
   it('completes the tutorial level', () => {
     // Perform a blast first to have some activity, then force-complete the tutorial level
     const { blastOutput } = assertLevelCompletion(ctx, 3, 3);

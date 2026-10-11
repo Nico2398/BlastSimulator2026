@@ -13,8 +13,8 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 27 entries (#1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1344 removes the detonation-sequence step, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(27);
+  it('has exactly 28 entries (#1648 adds buy-charging-truck after buy-rock-digger-assign, #1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1344 removes the detonation-sequence step, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(28);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -114,6 +114,8 @@ describe('tutorialSteps', () => {
       'hire-driver',
       'buy-drill-rig-assign',
       'buy-rock-digger-assign',
+      // #1648: charging is done from a truck, so one is bought before box-cut.
+      'buy-charging-truck',
       'box-cut',
       // #1015: box-cut is immediately followed by drill-plan — the
       // speed-up-for-dig/speed-normal-after-dig pair #923 inserted here is
@@ -385,7 +387,7 @@ describe('tutorialSteps', () => {
     const stepsWithTarget = new Set([
       'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
       'build-driving-center', 'train-fragmenter', 'buy-drill-rig-assign',
-      'buy-rock-digger-assign',
+      'buy-rock-digger-assign', 'buy-charging-truck',
       'drill-plan', 'charge', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'sell-ore',
@@ -806,6 +808,7 @@ describe('tutorialSteps', () => {
     const PURCHASE_COMPLETING: Array<{ id: string; role: string }> = [
       { id: 'buy-drill-rig-assign', role: 'drill_rig' },
       { id: 'buy-rock-digger-assign', role: 'rock_digger' },
+      { id: 'buy-charging-truck', role: 'charging_truck' },
       { id: 'vehicle-buy-assign', role: 'debris_hauler' },
     ];
 

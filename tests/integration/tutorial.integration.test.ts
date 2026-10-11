@@ -872,6 +872,26 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     expect(commandsRun.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 300_000);
 
+  it('the guided phase buys a charging truck and leaves someone holding blasting and driving.truck (#1648)', () => {
+    const { run, state, commandsRun } = newTutorial();
+    playGuidedPhase(run, state);
+    expect(commandsRun).toContain('vehicle buy charging_truck');
+    const trucks = state.vehicles.vehicles.filter((v) => v.type === 'charging_truck');
+    expect(trucks).toHaveLength(1);
+    expect(trucks[0]!.tier).toBe(1);
+    const dual = state.employees.employees.filter((e) => {
+      const cats = e.qualifications.map((q) => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    });
+    expect(dual.length).toBeGreaterThan(0);
+  });
+
+  it('buy-charging-truck sits between buy-rock-digger-assign and box-cut in the played order (#1648)', () => {
+    const ids = TUTORIAL_STEPS.map((s) => s.id);
+    expect(ids.indexOf('buy-charging-truck')).toBe(ids.indexOf('buy-rock-digger-assign') + 1);
+    expect(ids.indexOf('buy-charging-truck')).toBeLessThan(ids.indexOf('box-cut'));
+  });
+
   it('the goal chip params match net profit and the win target right after the guided phase', () => {
     const { run, state } = newTutorial();
     playGuidedPhase(run, state);
@@ -938,6 +958,15 @@ describe('Tutorial determinism (#1600)', () => {
       expect(h.name).toBe(scripted.name);
       expect(h.unionized).toBe(scripted.unionized);
     }
+  });
+
+  it('the scripted driller holds blasting and driving.truck once hired (#1648)', () => {
+    const hired = hireAfterIdling(0);
+    const driller = hired.find((h) => h.role === 'driller')!;
+    const cats = driller.qualifications.map((q) => q.category);
+    expect(cats).toContain('blasting');
+    expect(cats).toContain('driving.truck');
+    expect(driller.qualifications.filter((q) => q.category === 'driving.truck')).toHaveLength(1);
   });
 
   it('the tutorial hiring pool offers one scripted candidate per role right after campaign start', () => {

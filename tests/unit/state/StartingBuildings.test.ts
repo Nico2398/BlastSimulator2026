@@ -213,3 +213,34 @@ describe('isStaffedComposition (#1574)', () => {
     expect(isStaffedComposition(STARTING_SITE_STAFFED_COMPOSITION)).toBe(true);
   });
 });
+
+describe('starting compositions carry a charging truck and a crew member who can drive it (#1648)', () => {
+  const dual = (slots: typeof STARTING_SITE_STAFFED_COMPOSITION.employees) =>
+    slots.some(e => {
+      const cats = e.qualifications.map(q => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    });
+
+  it('staffed composition has a tier-1 charging_truck and a blasting + driving.truck slot', () => {
+    expect(STARTING_SITE_STAFFED_COMPOSITION.vehicles).toContainEqual({ role: 'charging_truck', tier: 1 });
+    expect(dual(STARTING_SITE_STAFFED_COMPOSITION.employees)).toBe(true);
+  });
+
+  it('Dusty Hollow composition inherits the truck and the dual-qualified slot', async () => {
+    const { DUSTY_HOLLOW_STARTING_SITE } = await import('../../../src/core/config/balance.js');
+    expect(DUSTY_HOLLOW_STARTING_SITE.vehicles).toContainEqual({ role: 'charging_truck', tier: 1 });
+    expect(dual(DUSTY_HOLLOW_STARTING_SITE.employees)).toBe(true);
+  });
+
+  it('the dual-qualified slot is the blaster, at driving.truck level 1', async () => {
+    const blaster = STARTING_SITE_STAFFED_COMPOSITION.employees.find(e => e.role === 'blaster')!;
+    expect(blaster.qualifications).toContainEqual({ category: 'blasting', proficiencyLevel: 1 });
+    expect(blaster.qualifications).toContainEqual({ category: 'driving.truck', proficiencyLevel: 1 });
+  });
+
+  it('the tutorial site still opens bare: no crew, no fleet', async () => {
+    const { TUTORIAL_STARTING_SITE } = await import('../../../src/core/config/balance.js');
+    expect(TUTORIAL_STARTING_SITE.employees).toHaveLength(0);
+    expect(TUTORIAL_STARTING_SITE.vehicles).toHaveLength(0);
+  });
+});
