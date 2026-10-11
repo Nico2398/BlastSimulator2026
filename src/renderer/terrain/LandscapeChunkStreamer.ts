@@ -76,36 +76,43 @@ export interface LandscapeChunkStreamer {
   flush(): number;
 }
 
+function sameSteps(a: NeighbourSteps, b: NeighbourSteps): boolean {
+  return a.west === b.west && a.east === b.east && a.north === b.north && a.south === b.south;
+}
+
 /** `mesh` is the LandscapeMesh instance the streamer builds/disposes chunks against — one streamer per mesh. */
 export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChunkStreamer {
-  /** Chunks this streamer has asked `mesh` to build and not yet disposed. */
-  const built = new Map<string, LandscapeChunkId>();
+  /** Chunks this streamer has asked `mesh` to build and not yet disposed, with the neighbour steps each was last built with. */
+  const built = new Map<string, { id: LandscapeChunkId; steps: NeighbourSteps }>();
   // Cached from the last update() call so invalidateNear() (no handle/palette/cut
   // params of its own) can still rebuild — null before the first update().
   let lastHandle: LandscapeHandle | null = null;
   let lastPalette: CompositionPalette | null = null;
   let lastCut: PlayableCut | null = null;
-  /** Desired-but-not-resident chunks left after the last update()'s budgeted builds — see pendingChunkCount(). */
+  /** Chunks owed (missing or stale) after the last update()'s budgeted builds — see pendingChunkCount(). */
   let pending = 0;
   // Last camera position update() streamed against, so flush() can finish
   // that same residency set rather than needing its own camera argument.
   let lastCameraX = 0;
   let lastCameraZ = 0;
+  /** Desired set the last stream() converged on; null when the next stream() must scan for work. */
+  let convergedSignature: string | null = null;
 
   /**
-   * `footprint`'s four sides' real neighbour step, read geometrically against
-   * `footprints` (the desired or resident set to search) — a probe point just
-   * past each side finds whichever footprint covers it, and its ladder step
-   * is that side's answer. Falls back to this chunk's own step (no chord)
-   * when no neighbour is found there, or the neighbour found hasn't actually
-   * been built yet — never crashes on a sparse residency set.
+   * `footprint`'s four sides' neighbour step, read geometrically against
+   * `footprints` (the DESIRED set, so the answer does not depend on build
+   * order): a probe point just past each side finds whichever footprint
+   * covers it. Per side the step is the coarser of this chunk's own step and
+   * the neighbour's — a finer neighbour reads as "no chord", since the finer
+   * edge already has the vertices — and this chunk's own step when nothing
+   * lies past that edge.
    */
   const neighbourStepsFor = (footprint: ChunkFootprint, footprints: readonly ChunkFootprint[]): NeighbourSteps => {
     const ownStep = LADDER_STEPS[footprint.id.level]!;
     const probe = (dx: number, dz: number): number => {
       const neighbour = footprintContaining(footprints, footprint.originX + dx, footprint.originZ + dz);
-      if (!neighbour || !built.has(chunkKey(neighbour.id))) return ownStep;
-      return LADDER_STEPS[neighbour.id.level]!;
+      if (!neighbour) return ownStep;
+      return Math.max(ownStep, LADDER_STEPS[neighbour.id.level]!);
     };
     return {
       west: probe(-EDGE_PROBE_EPSILON, footprint.span / 2),
@@ -115,12 +122,28 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     };
   };
 
+  /** Build `id` with `steps` and record them, so staleChunks() can tell when the desired steps move on. */
+  const buildRecorded = (
+    id: LandscapeChunkId, steps: NeighbourSteps,
+    handle: LandscapeHandle, palette: CompositionPalette, cut: PlayableCut,
+  ): void => {
+    mesh.buildChunk(id, handle, palette, steps, cut);
+    built.set(chunkKey(id), { id, steps });
+  };
+
+  /** Resident, still-desired chunks whose recorded steps differ from what the desired set now implies. */
+  const staleChunks = (desiredFootprints: readonly ChunkFootprint[]): ChunkFootprint[] =>
+    desiredFootprints.filter(f => {
+      const record = built.get(chunkKey(f.id));
+      return record !== undefined && !sameSteps(record.steps, neighbourStepsFor(f, desiredFootprints));
+    });
+
   /**
    * Bring residency in line with (cameraX, cameraZ): dispose what is no
-   * longer wanted, then build at most `maxBuilds` of what is missing,
-   * nearest-first. Updates `pending` to what is still owed afterwards and
-   * returns how many chunks were built. Shared by the per-frame `update()`
-   * (budgeted) and `flush()` (unbounded).
+   * longer wanted, then build at most `maxBuilds` of what is missing or
+   * stale, nearest-first. Updates `pending` to what is still owed afterwards
+   * and returns how many chunks were built. Shared by the per-frame
+   * `update()` (budgeted) and `flush()` (unbounded).
    */
   const stream = (
     cameraX: number, cameraZ: number,
@@ -131,37 +154,34 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     const desiredKeys = new Set(desiredIds.map(chunkKey));
 
     // Dispose every resident chunk no longer desired — cheap, unbudgeted, every call.
-    for (const [key, id] of built) {
+    for (const [key, { id }] of built) {
       if (desiredKeys.has(key)) continue;
       mesh.disposeChunk(id);
       built.delete(key);
     }
 
-    const missingIds = desiredIds.filter(id => !built.has(chunkKey(id)));
-    pending = missingIds.length;
-    if (missingIds.length === 0) return 0;
+    const signature = Array.from(desiredKeys).sort().join('|');
+    if (signature === convergedSignature) return 0;
 
     const footprints = footprintsOf(desiredIds, handle.map.centerX, handle.map.centerZ);
-    const footprintById = new Map(footprints.map(f => [chunkKey(f.id), f]));
+    const stale = new Set(staleChunks(footprints).map(f => chunkKey(f.id)));
+    const work = footprints.filter(f => !built.has(chunkKey(f.id)) || stale.has(chunkKey(f.id)));
 
-    const distSqToCamera = (id: LandscapeChunkId): number => {
-      const f = footprintById.get(chunkKey(id))!;
+    const distSqToCamera = (f: ChunkFootprint): number => {
       const dx = f.originX + f.span / 2 - cameraX;
       const dz = f.originZ + f.span / 2 - cameraZ;
       return dx * dx + dz * dz;
     };
-    missingIds.sort((a, b) => distSqToCamera(a) - distSqToCamera(b));
+    work.sort((a, b) => distSqToCamera(a) - distSqToCamera(b));
 
-    const budget = Math.min(maxBuilds, missingIds.length);
-    for (let i = 0; i < budget; i++) {
-      const id = missingIds[i]!;
-      const footprint = footprintById.get(chunkKey(id))!;
-      const neighbourSteps = neighbourStepsFor(footprint, footprints);
-      mesh.buildChunk(id, handle, palette, neighbourSteps, cut);
-      built.set(chunkKey(id), id);
+    const spent = Math.min(maxBuilds, work.length);
+    for (let i = 0; i < spent; i++) {
+      const f = work[i]!;
+      buildRecorded(f.id, neighbourStepsFor(f, footprints), handle, palette, cut);
     }
-    pending = missingIds.length - budget;
-    return budget;
+    pending = work.length - spent;
+    convergedSignature = pending === 0 ? signature : null;
+    return spent;
   };
 
   return {
@@ -187,16 +207,18 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
       if (!lastHandle || !lastPalette || !lastCut) return;
       const handle = lastHandle, palette = lastPalette, cut = lastCut;
 
-      const residentIds = Array.from(built.values());
-      const footprints = footprintsOf(residentIds, handle.map.centerX, handle.map.centerZ);
+      const desired = footprintsOf(
+        selectLandscapeChunks(lastCameraX, lastCameraZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf),
+        handle.map.centerX, handle.map.centerZ,
+      );
+      const residentFootprints = footprintsOf(Array.from(built.values(), r => r.id), handle.map.centerX, handle.map.centerZ);
 
-      for (const f of footprints) {
+      for (const f of residentFootprints) {
         const intersects =
           f.originX < dirtyRect.maxX && f.originX + f.span > dirtyRect.minX &&
           f.originZ < dirtyRect.maxZ && f.originZ + f.span > dirtyRect.minZ;
         if (!intersects) continue;
-        const neighbourSteps = neighbourStepsFor(f, footprints);
-        mesh.buildChunk(f.id, handle, palette, neighbourSteps, cut);
+        buildRecorded(f.id, neighbourStepsFor(f, desired), handle, palette, cut);
       }
     },
 
@@ -206,6 +228,7 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
       lastHandle = null;
       lastPalette = null;
       lastCut = null;
+      convergedSignature = null;
       // Nothing is desired again until the next update() names a camera
       // position, so a reset streamer owes no chunks — reporting the old
       // level's backlog would make a capture wait for builds nobody asked
