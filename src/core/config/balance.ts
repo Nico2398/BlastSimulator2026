@@ -1288,7 +1288,11 @@ export interface StartingBuildingSlot {
   readonly tier: BuildingTier;
 }
 
-/** Driller, blaster and truck driver: the crew every starting site opens with. */
+/**
+ * Driller, blaster and truck driver: the crew every starting site opens with.
+ * The blaster also holds the charging truck's licence (`driving.truck`), so
+ * someone can both charge and drive the tier-1 charging truck (#1648).
+ */
 const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
   { role: 'driller', qualifications: [
     { category: 'blasting', proficiencyLevel: 1 },
@@ -1296,16 +1300,18 @@ const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
   ] },
   { role: 'blaster', qualifications: [
     { category: 'blasting', proficiencyLevel: 1 },
+    { category: 'driving.truck', proficiencyLevel: 1 },
   ] },
   { role: 'driver', qualifications: [
     { category: 'driving.truck', proficiencyLevel: 1 },
   ] },
 ];
 
-/** Drill rig and debris hauler: the fleet every starting site opens with. */
+/** Drill rig, debris hauler and charging truck: the fleet every blasting opening carries (#1648). */
 const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
   { role: 'drill_rig', tier: 1 },
   { role: 'debris_hauler', tier: 1 },
+  { role: 'charging_truck', tier: 1 },
 ];
 
 /** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
@@ -1905,7 +1911,8 @@ export interface ScriptedCandidate {
 
 /** Tutorial hiring pool: one fixed candidate per hiring role, ids 1..5 (#1600). */
 export const TUTORIAL_HIRING_SCRIPT: readonly ScriptedCandidate[] = [
-  { id: 1, role: 'driller', name: 'Dale Drillson', unionized: false, skillBonus: 0 },
+  { id: 1, role: 'driller', name: 'Dale Drillson', unionized: false, skillBonus: 0,
+    extraQualifications: [{ category: 'driving.truck', proficiencyLevel: 1 }] },
   { id: 2, role: 'blaster', name: 'Bea Boomer', unionized: false, skillBonus: 0 },
   { id: 3, role: 'driver', name: 'Dex Hauler', unionized: false, skillBonus: 0 },
   { id: 4, role: 'surveyor', name: 'Sue Seismic', unionized: false, skillBonus: 0 },

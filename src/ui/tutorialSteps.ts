@@ -182,6 +182,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { tickBudget: 1 },
   ),
 
+  // ── Step 3e: buy-charging-truck ── (#1648) same shape as buy-rock-digger-assign.
+  createComparisonStep(
+    'buy-charging-truck',
+    'tutorial.step_buychargingtruck.title',
+    'tutorial.step_buychargingtruck',
+    (s) => countVehiclesOfType(s, 'charging_truck'),
+    ['vehicle buy charging_truck'],
+    TOOLBAR_TARGET.vehicles,
+    { tickBudget: 1 },
+  ),
+
   // ── Step 4: box-cut ──
   // Real pits start the way this step does: an access ramp and a starter cut
   // are dug *before* the first shot, because blasted rock swells and has to
