@@ -12,3 +12,14 @@ export function shouldAutoStartTutorial(
 export function shouldKeepTutorialRunning(levelId: string | null | undefined): boolean {
   return levelId === TUTORIAL_LEVEL_ID;
 }
+
+/** True when retrying a level that ended without completion should restart the tutorial. */
+export function shouldRestartTutorialOnRetry(
+  levelId: string | null | undefined,
+  levelEndReason: string | null | undefined,
+): boolean {
+  void levelId;
+  void levelEndReason;
+  // TODO: implement
+  return false;
+}
