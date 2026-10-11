@@ -27,9 +27,9 @@ describe('campaign keep_playing (#1647)', () => {
     const s = ctx.state!;
     const snapshot = {
       cash: s.cash,
-      employees: s.employees.length,
-      vehicles: s.vehicles.length,
-      buildings: s.buildings.length,
+      employees: s.employees.employees.length,
+      vehicles: s.vehicles.vehicles.length,
+      buildings: s.buildings.buildings.length,
       levels: JSON.parse(JSON.stringify(s.campaign.levels)),
       grid: ctx.grid,
     };
@@ -41,9 +41,9 @@ describe('campaign keep_playing (#1647)', () => {
     expect(s.levelEndReason).toBeNull();
     expect(s.campaign.activeLevelId).toBeNull();
     expect(s.cash).toBe(snapshot.cash);
-    expect(s.employees.length).toBe(snapshot.employees);
-    expect(s.vehicles.length).toBe(snapshot.vehicles);
-    expect(s.buildings.length).toBe(snapshot.buildings);
+    expect(s.employees.employees.length).toBe(snapshot.employees);
+    expect(s.vehicles.vehicles.length).toBe(snapshot.vehicles);
+    expect(s.buildings.buildings.length).toBe(snapshot.buildings);
     expect(ctx.grid).toBe(snapshot.grid);
     expect(s.campaign.levels).toEqual(snapshot.levels);
     expect(s.campaign.levels['dusty_hollow']!.completed).toBe(true);

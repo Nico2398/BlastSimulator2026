@@ -20,7 +20,6 @@ import {
 } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { createGame } from '../../../src/core/state/GameState.js';
 import { DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../../../src/core/config/balance.js';
 
 const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
