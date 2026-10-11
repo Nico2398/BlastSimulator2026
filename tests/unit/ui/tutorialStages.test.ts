@@ -1008,7 +1008,7 @@ describe('building pins publish the placed building footprint (#1646)', () => {
   const BUILDING_PINS = [
     { pin: 'livingQuarters', type: 'living_quarters', stepId: 'build-living-quarters' },
     { pin: 'drivingCenter', type: 'driving_center', stepId: 'build-driving-center' },
-    { pin: 'warehouse', type: 'freight_warehouse', stepId: 'build-warehouse' },
+    { pin: 'warehouse', type: 'freight_warehouse', stepId: 'build-storage' },
   ] as const;
 
   /** Tier-1 footprint rectangle at the pin's min corner, sizes read from the definition. */
