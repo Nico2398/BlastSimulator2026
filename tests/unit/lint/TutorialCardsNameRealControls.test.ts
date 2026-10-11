@@ -47,6 +47,7 @@ const CARD_CONTROLS: Record<string, string[]> = {
   ],
   'stage.execute': ['ui.blast_workshop.footer.fire'],
   'stage.contract_deliver': ['ui.contracts.deliver'],
+  'stage.sell_ore': ['ui.contracts.accept'],
   'stage.build_warehouse': ['ui.build.place'],
   'stage.build_living_quarters': ['ui.build.place'],
   'stage.build_driving_center': ['ui.build.place'],
@@ -83,7 +84,7 @@ describe.each(Object.keys(LOCALES))('tutorial cards name real controls (%s)', (c
   });
 });
 
-// The cards must also quote the stepper values the scenario sets (#1338), so a
+// The cards must also quote the stepper values that are preset (#1338), so a
 // player following the card lands on the exact drill grid and charge the
 // tutorial expects.
 describe.each(Object.keys(LOCALES))('tutorial stepper values are named on the cards (%s)', (code) => {
@@ -100,4 +101,41 @@ describe.each(Object.keys(LOCALES))('tutorial stepper values are named on the ca
       expect(new RegExp(`(^|[^0-9.,])${v.replace('.', sep)}(?![0-9])`).test(card), `[${code}] ${cardKey} lacks "${v}": ${card}`).toBe(true);
     }
   });
+});
+
+// #1633: a hint may only ask for actions the player is allowed to take. The
+// stepper values are preset, so "set X" is an inert instruction; the rails do
+// not allow Hold on the sell_ore stage; event_choose has no "answers".
+describe.each(Object.keys(LOCALES))('hints do not ask for inert controls (#1633) (%s)', (code) => {
+  const locale = LOCALES[code] as Record<string, string>;
+  const setVerb = code === 'fr' ? /\bréglez\b/i : /\bset\b/i;
+
+  it.each(['tutorial.stage.drill_area', 'tutorial.stage.charge_all'])('%s does not say "set"', (cardKey) => {
+    const card = locale[cardKey] as string;
+    expect(setVerb.test(card), `[${code}] ${cardKey} asks for a preset value: ${card}`).toBe(false);
+  });
+
+  it('sell_ore does not name the Hold control', () => {
+    const card = locale['tutorial.stage.sell_ore'] as string;
+    const hold = locale['ui.contracts.hold'] as string;
+    expect(hold.length).toBeGreaterThan(0);
+    expect(card.includes(hold), `[${code}] sell_ore names disallowed "${hold}": ${card}`).toBe(false);
+  });
+
+  it('event_choose does not refer to "answers"', () => {
+    const card = locale['tutorial.stage.event_choose'] as string;
+    expect(/one of the answers|une des réponses/i.test(card), `[${code}] ${card}`).toBe(false);
+  });
+});
+
+it('sell_ore (en) fits two lines (<= 150 chars)', () => {
+  const card = LOCALES.en?.['tutorial.stage.sell_ore'] as string;
+  expect(card.length).toBeLessThanOrEqual(150);
+});
+
+it('step_earlypolicy (en) keeps Shift schedule and Continuous labels', () => {
+  const en = LOCALES.en as Record<string, string>;
+  const card = en['tutorial.step_earlypolicy'] as string;
+  expect(card).toContain(en['ui.policy.shift_mode'] as string);
+  expect(card).toContain(en['ui.policy.continuous'] as string);
 });
