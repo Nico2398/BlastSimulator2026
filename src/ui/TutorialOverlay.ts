@@ -62,6 +62,8 @@ export class TutorialOverlay {
   private _active = false;
   private _executingCommands = false;
   private stepIndex = 0;
+  private clearanceObserver: ResizeObserver | null = null;
+  private lastClearancePx = -1;
   private readonly rails = new TutorialRails();
   private gameState: GameState | null = null;
   private snapshots: Record<string, unknown> | null = null;
@@ -549,5 +551,17 @@ export class TutorialOverlay {
   private updateParamStripClearance(): void {
     const clearance = this.box.offsetHeight + 30;
     document.documentElement.style.setProperty('--bsx-tutorial-card-clearance', `${clearance}px`);
+  }
+
+  /** Re-measures param strip clearance whenever the coach card resizes (#1630). */
+  observeCardResize(): void {
+    // TODO: implement
+    void this.clearanceObserver;
+    void this.lastClearancePx;
+  }
+
+  /** Disconnects the card resize observer (#1630). */
+  stopObservingCardResize(): void {
+    // TODO: implement
   }
 }
