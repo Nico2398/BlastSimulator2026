@@ -74,15 +74,20 @@ export function isReachable(selector: string): boolean {
  * (overflowY auto/scroll/hidden) or by the viewport.
  */
 export function isClippedByScroller(el: Element): boolean {
-  void el;
-  // TODO: implement
+  const rect = el.getBoundingClientRect();
+  if (rect.top < 0 || rect.bottom > window.innerHeight) return true;
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if (overflowY !== 'auto' && overflowY !== 'scroll' && overflowY !== 'hidden') continue;
+    const box = node.getBoundingClientRect();
+    if (rect.top < box.top || rect.bottom > box.bottom) return true;
+  }
   return false;
 }
 
 /** Scrolls `el` into view (nearest block/inline) when the host supports it. */
 export function scrollTargetIntoView(el: Element): void {
-  void el;
-  // TODO: implement
+  el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
 }
 
 /**
