@@ -194,9 +194,7 @@ export function isPanelVisible(rootSelector: string): boolean {
 
 /** True when the event dialog (`#bs-event-dialog`) is displayed (#1632). */
 export function isEventDialogOpen(): boolean {
-  if (typeof document === 'undefined') return false;
-  const el = document.getElementById('bs-event-dialog');
-  return el !== null && el.style.display !== 'none';
+  return isPanelVisible('#bs-event-dialog');
 }
 
 /** Read the panel root's open-request count (0 when absent, invalid selector, or no document). */

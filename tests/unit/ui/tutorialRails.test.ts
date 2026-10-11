@@ -9,7 +9,7 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
-import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
+import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
