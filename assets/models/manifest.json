@@ -4231,6 +4231,326 @@
         }
       }
     },
+    "vehicle_charging_truck_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 6260,
+      "glbKb": 177,
+      "size": [
+        2.47,
+        1.54,
+        1.16
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Canvas",
+        "Chrome",
+        "Cream",
+        "Dark",
+        "DuctTape",
+        "Lamp",
+        "Plastic",
+        "Red",
+        "Rope",
+        "Rubber",
+        "Rust",
+        "RustDark",
+        "TintBody",
+        "White",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3444,
+          "parts": [
+            "Barrel",
+            "BarrelDent",
+            "BarrelStrap",
+            "BarrelTape",
+            "BarsBar",
+            "BarsBell",
+            "BarsGrip",
+            "BarsStem",
+            "ChairLeg",
+            "ChairPost",
+            "ChairSeat",
+            "ChairSlat",
+            "Cradle",
+            "FrameCross",
+            "FrameFloor",
+            "FrameRail",
+            "FunnelCone",
+            "FunnelStem",
+            "HoseCoil",
+            "HoseRose",
+            "HoseRun",
+            "HoseTap",
+            "TorchBody",
+            "TorchHead",
+            "TorchLens",
+            "TorchTape"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 704,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 704,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 704,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 704,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        }
+      }
+    },
+    "vehicle_charging_truck_t2": {
+      "builder": "vehicles.py",
+      "triangles": 8872,
+      "glbKb": 214,
+      "size": [
+        3.96,
+        2.34,
+        1.9
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Chrome",
+        "Dark",
+        "Glass",
+        "Hub",
+        "Lamp",
+        "Red",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "WheelFL": {
+          "triangles": 1148,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 1148,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 1148,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 1148,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        },
+        "Body": {
+          "triangles": 4280,
+          "parts": [
+            "BoomArm",
+            "BoomHose",
+            "BoomNozzle",
+            "BoomPost",
+            "Bumper",
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Chassis",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Fender",
+            "Grille",
+            "HeadLamp",
+            "HeadRim",
+            "Hood",
+            "Tank",
+            "TankBand",
+            "TankGauge",
+            "TankHatch",
+            "TankSaddle"
+          ]
+        }
+      }
+    },
+    "vehicle_charging_truck_t3": {
+      "builder": "vehicles_t3.py",
+      "triangles": 8744,
+      "glbKb": 235,
+      "size": [
+        4.8,
+        3.77,
+        2.19
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "GlowCyan",
+        "GlowFlame",
+        "GlowNeon",
+        "GlowRed",
+        "GlowWarn",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Black",
+        "Chrome",
+        "ChromeHub",
+        "Dark",
+        "Glass",
+        "GlowCyan",
+        "GlowFlame",
+        "GlowNeon",
+        "GlowRed",
+        "GlowWarn",
+        "Gold",
+        "Lamp",
+        "Rubber",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 5624,
+          "parts": [
+            "BoomArm",
+            "BoomHose",
+            "BoomNozzle",
+            "BoomPost",
+            "Bumper",
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Chassis",
+            "FountainSpray",
+            "FountainStem0",
+            "FountainStem1",
+            "FountainStem2",
+            "FountainTier0",
+            "FountainTier1",
+            "FountainTier2",
+            "Grille",
+            "GrilleBar",
+            "HeadLamp",
+            "HeadRim",
+            "Hood",
+            "HoodTrim",
+            "SignBack",
+            "SignN",
+            "SignPost",
+            "SignT",
+            "StackBase",
+            "StackCollar",
+            "StackFlame",
+            "StackFlame2",
+            "StackPipe",
+            "Tank",
+            "TankBand",
+            "TankSaddle",
+            "Underglow"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 780,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 780,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 780,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 780,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        }
+      }
+    },
     "vehicle_debris_hauler_t1": {
       "builder": "vehicles_t1.py",
       "triangles": 11428,

@@ -4,6 +4,8 @@ Chunky machines with rounded bodies, oversized wheels/tracks and a cab with
 real windows. `TintBody` is the Caterpillar-yellow paint the game recolours
 per instance. Nodes the runtime animates: Wheel* (spin on the Y axis while
 moving), plus role-specific ones (Bed, Boom, Mast, Blade…).
+
+charging_truck — bulk-emulsion tank truck: round tank behind a cab, swing boom with a hose and nozzle.
 """
 from __future__ import annotations
 
@@ -16,7 +18,7 @@ from common import (
     apply_transform, array, assign, bevel, box, capsule, cylinder, material, pivot, prism, rotate, sphere, torus,
 )
 
-ROLES = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter']
+ROLES = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck']
 
 
 def _materials() -> dict[str, bpy.types.Material]:
@@ -193,6 +195,15 @@ def rock_pile(name: str, center, spread, m, count: int = 9, seed: int = 3) -> li
 
 
 # ------------------------------------------------------------ vehicles ---
+
+def pole(name: str, a: Vector, b: Vector, radius: float, mat, segments: int = 12) -> bpy.types.Object:
+    """A straight round bar from `a` to `b` (hoses, booms, poles, pipes)."""
+    d = b - a
+    bar = cylinder(name, radius, d.length, loc=a + d / 2, segments=segments)
+    bar.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
+    assign(bar, mat)
+    return bar
+
 
 def build_debris_hauler(m) -> None:
     """Articulated dump truck: cab up front, a deep tipping bed behind, four fat wheels."""
@@ -594,6 +605,69 @@ def build_rock_fragmenter(m) -> None:
     pivot('Conveyor', cp, parts)
 
 
+def build_charging_truck(m) -> None:
+    """Bulk-emulsion tank truck: cab up front, a long round tank behind, a swing boom with a hose
+    and nozzle off the rear, four fat wheels. The tank is the part that reads."""
+    body = []
+    chassis = box('Chassis', (3.3, 1.0, 0.22), loc=(-0.25, 0, 0.52))
+    bevel(chassis, 0.04, 2)
+    assign(chassis, m['dark'])
+    body.append(chassis)
+    hood = box('Hood', (0.6, 1.2, 0.5), loc=(1.25, 0, 0.88))
+    bevel(hood, 0.09, 4)
+    assign(hood, m['body'])
+    body.append(hood)
+    grille = box('Grille', (0.04, 0.7, 0.3), loc=(1.56, 0, 0.88))
+    bevel(grille, 0.015, 2)
+    assign(grille, m['dark'])
+    body.append(grille)
+    body += headlights('Head', 1.55, (-0.45, 0.45), 0.98, m)
+    bumper = box('Bumper', (0.12, 1.3, 0.16), loc=(1.58, 0, 0.62))
+    bevel(bumper, 0.05, 3)
+    assign(bumper, m['steel'])
+    body.append(bumper)
+    body += cab('Cab', (0.8, 1.2, 0.85), (0.85, 0, 1.5), m)
+    body += exhaust('Exhaust', (0.25, 0.62, 1.2), 1.1, m)
+    for side in (-1, 1):
+        body.append(fender('Fender', 0.54, 0.46, (1.0, side * 0.72, 0.42), m))
+    # Horizontal tank on a saddle frame, hazard-orange band, filler hatch and gauge on top.
+    tank = capsule('Tank', 0.58, 1.0, loc=(-0.55, 0, 1.4), axis='X', segments=28, rings=14)
+    assign(tank, m['body'])
+    body.append(tank)
+    for x in (-1.35, -0.55, 0.25):
+        saddle = box('Tank.Saddle', (0.2, 1.0, 0.3), loc=(x, 0, 0.85))
+        bevel(saddle, 0.04, 2)
+        assign(saddle, m['dark'])
+        body.append(saddle)
+    band = cylinder('Tank.Band', 0.6, 0.18, loc=(-0.55, 0, 1.4), axis='X', segments=28)
+    assign(band, m['beacon'])
+    body.append(band)
+    hatch = cylinder('Tank.Hatch', 0.18, 0.1, loc=(-0.1, 0, 2.0), segments=16)
+    bevel(hatch, 0.03, 2, angle=60)
+    assign(hatch, m['steel'])
+    body.append(hatch)
+    gauge = cylinder('Tank.Gauge', 0.09, 0.06, loc=(0.0, 0.59, 1.5), axis='Y', segments=14)
+    assign(gauge, m['chrome'])
+    body.append(gauge)
+    # Swing boom: a post on the tail, an arm out and back, a hose drooping to a nozzle.
+    post = cylinder('Boom.Post', 0.07, 0.8, loc=(-1.75, 0, 1.0), segments=12)
+    assign(post, m['steel'])
+    body.append(post)
+    elbow = Vector((-1.75, 0, 1.45))
+    tip = Vector((-2.15, 0.45, 1.3))
+    body.append(pole('Boom.Arm', elbow, tip, 0.06, m['steel']))
+    body.append(pole('Boom.Hose', tip, Vector((-2.25, 0.55, 0.45)), 0.05, m['rubber']))
+    nozzle = cylinder('Boom.Nozzle', 0.07, 0.2, loc=(-2.25, 0.55, 0.38), segments=12, radius2=0.04)
+    assign(nozzle, m['red'])
+    body.append(nozzle)
+    # Wheels
+    wheel('WheelFL', 0.42, 0.36, (1.0, 0.72, 0.42), m)
+    wheel('WheelFR', 0.42, 0.36, (1.0, -0.72, 0.42), m)
+    wheel('WheelRL', 0.42, 0.36, (-0.9, 0.72, 0.42), m)
+    wheel('WheelRR', 0.42, 0.36, (-0.9, -0.72, 0.42), m)
+    pivot('Body', (0, 0, 0), body)
+
+
 def hydraulic(name: str, a: Vector, b: Vector, radius: float, m) -> list[bpy.types.Object]:
     """A hydraulic cylinder from `a` (barrel end) to `b` (rod end)."""
     d = b - a
@@ -617,6 +691,7 @@ BUILDERS = {
     'drill_rig': build_drill_rig,
     'building_destroyer': build_building_destroyer,
     'rock_fragmenter': build_rock_fragmenter,
+    'charging_truck': build_charging_truck,
 }
 
 

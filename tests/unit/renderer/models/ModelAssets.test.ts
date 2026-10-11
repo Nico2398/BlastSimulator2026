@@ -87,6 +87,14 @@ describe('public/models', () => {
     }
   });
 
+  it('charging_truck has a model with a Body node at every tier (#1645)', () => {
+    for (const tier of VEHICLE_TIERS) {
+      const inst = library.instantiate(vehicleModelId('charging_truck', tier), { size: [1, 1, 1] });
+      expect(inst.node('Body'), `charging_truck t${tier}`).not.toBeNull();
+      expect(inst.tints.has('TintBody'), `charging_truck t${tier}`).toBe(true);
+    }
+  });
+
   it('grass tufts carry the biome tint, flowers stand on a stem, and the twister is a single tall body', () => {
     for (let v = 0; v < GRASS_VARIANTS; v++) {
       const tuft = library.instantiate(grassModelId(v), { size: [1, 1, 1] });

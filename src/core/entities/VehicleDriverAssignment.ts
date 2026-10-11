@@ -15,6 +15,7 @@ import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
 /** Qualification category a driver needs for each vehicle role. */
 export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
   debris_hauler: 'driving.truck',
+  charging_truck: 'driving.truck',
   building_destroyer: 'driving.truck',
   rock_digger: 'driving.excavator',
   rock_fragmenter: 'driving.rock_fragmenter',

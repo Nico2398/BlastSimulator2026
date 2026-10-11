@@ -34,6 +34,7 @@ describe('driving.rock_fragmenter licence', () => {
     expect(ROLE_LICENCE_REQUIRED.drill_rig).toBe('driving.drill_rig');
     expect(ROLE_LICENCE_REQUIRED.debris_hauler).toBe('driving.truck');
     expect(ROLE_LICENCE_REQUIRED.building_destroyer).toBe('driving.truck');
+    expect(ROLE_LICENCE_REQUIRED.charging_truck).toBe('driving.truck');
   });
 
   it('a freshly hired driver (truck + excavator) cannot board a rock_fragmenter', () => {

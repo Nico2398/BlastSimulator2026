@@ -1,7 +1,7 @@
 ---
 name: gameplay-vehicle-fleet
 description: >
-  Vehicle fleet specification for BlastSimulator2026: 5 vehicle roles with 3 tiers each, driver
+  Vehicle fleet specification for BlastSimulator2026: 6 vehicle roles with 3 tiers each, driver
   licensing, and the mount/itinerary model that makes an employee the only mobile agent and a
   vehicle an inert tool they ride. Use when implementing or modifying vehicles, boarding, driving,
   movement planning, action cost estimation, traffic, hauling, drilling, digging, or demolition.
@@ -24,15 +24,22 @@ Two rules make the whole system tractable, and every invariant below follows fro
 
 ## Vehicle Roles & Tier Names
 
-Five roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
+Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
 | **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every demolition and tier upgrade (#1392): `build destroy` / `build upgrade` queue a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
+| **Charging Truck** (#1645) | "Pour-Bucket Pete" | "Boom-Juice Hauler 5000" | "Kaboom Cruiser Deluxe" | Bulk explosive delivery: pumps emulsion down a blast hole. **No action uses it yet** — `charge_hole` is still on-foot work (`requiredVehicleRole: null`); the follow-up issues put a truck in every blast opening and then make charging require it. Buyable (Fleet panel, `vehicle buy charging_truck`) and renders with its own model per tier |
 | **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to a Freight Warehouse (ore) or Spoil Heap (barren rock) |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
 | **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
+
+**Charging Truck decisions (#1645, defaulted).** Licence: the existing `driving.truck`, like the hauler and destroyer
+(no new `SkillCategory`, Driving Center course or starting qualification; Drivers already hold it). Base stats
+(`VEHICLE_BASE_STATS.charging_truck`): 28 000 $, workRate 6, capacity 500, speed 2, maxHp 115, upkeep 4, fuel 6 per tick
+(slower and a little dearer than the hauler, as a heavy tanker). Arrival task `loading` (`VEHICLE_ROLE_ARRIVAL_TASK`; the
+delivery task it will do later), one seat (`VEHICLE_SEAT_COUNT`). Reverse by changing those `balance.ts` entries.
 
 ## Tier Stat Multipliers
 
@@ -51,13 +58,13 @@ and fuel.
 
 Units the field names do not state: `capacity` is kg for a Debris Hauler, m³/tick for a Rock
 Digger, holes/tick for a Drill Rig. `nameKey` is an i18n key of the form `vehicle.<role>.tier<N>`.
-Only a Debris Hauler carries cargo: `Vehicle.cargo`, a list of `{ fragmentId, massKg }` (`vehicleCargoMassKg` sums it). Hauler capacity is 4000 kg at tier 1 (6400, 10000 at tiers 2, 3).
+Only a Debris Hauler carries cargo: `Vehicle.cargo`, a list of `{ fragmentId, massKg }` (`vehicleCargoMassKg` sums it). Charging Truck `capacity` is kg of explosive (500 kg at tier 1; no work-unit key, so the kg fallback tooltip applies). Hauler capacity is 4000 kg at tier 1 (6400, 10000 at tiers 2, 3).
 
 ## Driver Licensing
 
 | Role | Licence (`ROLE_LICENCE_REQUIRED`) |
 |------|-----------------------------------|
-| Debris Hauler, Building Destroyer | `driving.truck` |
+| Debris Hauler, Building Destroyer, Charging Truck | `driving.truck` |
 | Rock Digger | `driving.excavator` |
 | Rock Fragmenter | `driving.rock_fragmenter` |
 | Drill Rig | `driving.drill_rig` |

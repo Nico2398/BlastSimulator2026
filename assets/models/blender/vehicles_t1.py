@@ -5,6 +5,7 @@
 * rock_digger      — "The Scratch": a swivel stool under a beach umbrella, broom-handle boom, frying-pan bucket.
 * drill_rig        — "Pokey McPoke": a shopping cart carrying a ladder mast, egg-beater drill, pencil bit.
 * building_destroyer — "Wrecking Rascal": a ride-on mower with a plank-and-nails blade, bowling-ball crane, rake ripper.
+* charging_truck  — "Pour-Bucket Pete": a blue barrel on a rusty go-kart, kitchen funnel, garden-hose coil and rose nozzle.
 * rock_fragmenter  — "Cracky": a wheelbarrow-cart with a see-saw sledgehammer, crate hopper, pedal-crank flywheel.
 """
 from __future__ import annotations
@@ -20,7 +21,7 @@ from common import (
     _finish, apply_transform, array, assign, assign_by, bevel, box, capsule, cylinder, material, pivot,
     prism, rotate, sphere, torus,
 )
-from vehicles import _materials, rock_pile, wheel
+from vehicles import _materials, pole, rock_pile, wheel
 
 Vec = Vector
 
@@ -56,15 +57,6 @@ def tape_band(name: str, radius: float, loc, axis: str = 'Z', width: float = 0.0
     band = cylinder(name, radius * 1.18, width, loc=loc, axis=axis, segments=14, rot=rot)
     assign(band, m['tape'])
     return band
-
-
-def pole(name: str, a: Vector, b: Vector, radius: float, mat, segments: int = 12) -> bpy.types.Object:
-    """A straight rod from `a` to `b`."""
-    d = b - a
-    rod = cylinder(name, radius, d.length, loc=a + d / 2, segments=segments)
-    rod.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
-    assign(rod, mat)
-    return rod
 
 
 def helix(name: str, radius: float, tube: float, turns: float, height: float, loc, m,
@@ -1120,12 +1112,76 @@ def build_rock_fragmenter(m) -> None:
     pivot('Conveyor', cp, cparts)
 
 
+def build_charging_truck(m) -> None:
+    """Pour-Bucket Pete: a blue plastic barrel strapped to a rusty go-kart, a kitchen funnel in the bung,
+    a coiled garden hose with a watering-can-rose nozzle, kitchen chair and bicycle bars up front."""
+    body = []
+    rail_z = 0.36
+    track = 0.44
+    for side in (-1, 1):
+        rail = capsule('Frame.Rail', 0.04, 2.1, loc=(-0.05, side * 0.3, rail_z), axis='X', segments=10, rings=6)
+        assign(rail, m['rust'])
+        body.append(rail)
+    for x in (-1.1, -0.5, 0.1, 0.6, 0.95):
+        cross = cylinder('Frame.Cross', 0.035, 0.66, loc=(x, 0, rail_z), axis='Y', segments=10)
+        assign(cross, m['rust'])
+        body.append(cross)
+    floor = box('Frame.Floor', (2.0, 0.56, 0.03), loc=(-0.05, 0, rail_z + 0.03))
+    bevel(floor, 0.01, 2)
+    assign(floor, m['rust2'])
+    body.append(floor)
+    for x in (-0.6, 0.1):
+        cradle = box('Cradle', (0.14, 0.5, 0.1), loc=(x, 0, rail_z + 0.1))
+        bevel(cradle, 0.02, 2)
+        assign(cradle, m['wood'])
+        body.append(cradle)
+    body += kitchen_chair('Chair', (0.7, 0, 0.76), m)
+    body += handlebars('Bars', (1.0, 0, 1.02), m, width=0.6, stem=0.62)
+    body += flashlight('Torch', (1.04, 0, 0.62), m)
+    # The tank: a plastic barrel on its side, taped and strapped, with dents.
+    bz = rail_z + 0.15 + 0.34
+    barrel = cylinder('Barrel', 0.34, 1.0, loc=(-0.3, 0, bz), axis='X', segments=24)
+    bevel(barrel, 0.05, 3, angle=60)
+    assign(barrel, m['body'])
+    body.append(barrel)
+    for x in (-0.55, -0.05):
+        strap = cylinder('Barrel.Strap', 0.355, 0.05, loc=(x, 0, bz), axis='X', segments=24)
+        assign(strap, m['rope'])
+        body.append(strap)
+    body.append(tape_band('Barrel.Tape', 0.34, (-0.3, 0, bz), axis='X', width=0.08, m=m))
+    body.append(rust_patch('Barrel.Dent', (0.22, 0.012, 0.16), (-0.2, 0.345, bz + 0.02), m))
+    # Kitchen funnel stuck in the bung on top.
+    stem = cylinder('Funnel.Stem', 0.04, 0.16, loc=(-0.3, 0, bz + 0.4), segments=10)
+    assign(stem, m['white'])
+    cone = cylinder('Funnel.Cone', 0.04, 0.22, loc=(-0.3, 0, bz + 0.58), segments=16, radius2=0.2)
+    assign(cone, m['white'])
+    body += [stem, cone]
+    # Garden hose: a flat coil at the tail, a run from the tap down to a rose nozzle.
+    coil = torus('Hose.Coil', 0.17, 0.04, loc=(-0.98, 0, rail_z + 0.1), major_segments=20, minor_segments=6)
+    assign(coil, m['bag'])
+    coil2 = torus('Hose.Coil', 0.17, 0.04, loc=(-0.98, 0, rail_z + 0.18), major_segments=20, minor_segments=6)
+    assign(coil2, m['bag'])
+    tap = cylinder('Hose.Tap', 0.04, 0.1, loc=(-0.84, 0, bz - 0.2), axis='X', segments=10)
+    assign(tap, m['chrome'])
+    body += [coil, coil2, tap]
+    tip = Vec((-1.2, 0.26, 0.2))
+    body.append(pole('Hose.Run', Vec((-0.88, 0.05, bz - 0.2)), tip, 0.035, m['bag'], segments=8))
+    rose = cylinder('Hose.Rose', 0.07, 0.08, loc=tip - Vec((0, 0, 0.05)), segments=12, radius2=0.04)
+    assign(rose, m['red'])
+    body.append(rose)
+    pivot('Body', (0, 0, 0), body)
+    for name, x, y, r in (('WheelFL', 0.8, track, 0.3), ('WheelFR', 0.8, -track, 0.3),
+                          ('WheelRL', -0.65, track, 0.28), ('WheelRR', -0.65, -track, 0.28)):
+        fat_wheel(name, r, 0.24, (x, y, r), m)
+
+
 BUILDERS = {
     'debris_hauler': build_debris_hauler,
     'rock_digger': build_rock_digger,
     'drill_rig': build_drill_rig,
     'building_destroyer': build_building_destroyer,
     'rock_fragmenter': build_rock_fragmenter,
+    'charging_truck': build_charging_truck,
 }
 
 
@@ -1135,6 +1191,7 @@ BODY_PAINT = {
     'drill_rig': 0x8A8F96,           # shopping-cart zinc
     'building_destroyer': 0xB8452E,  # ride-on mower red
     'rock_fragmenter': 0xB07A3A,     # dull cart orange
+    'charging_truck': 0x3F6FB0,      # chemical-barrel blue
 }
 
 

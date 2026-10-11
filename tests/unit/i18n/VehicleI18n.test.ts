@@ -121,6 +121,12 @@ describe('vehicle tier names match spec-defined humorous names (en)', () => {
   it('rock_fragmenter tier 3 is "The Atomizer"', () => {
     expect(t('vehicle.rock_fragmenter.tier3')).toBe('The Atomizer');
   });
+
+  it('charging_truck tier names (#1645)', () => {
+    expect(t('vehicle.charging_truck.tier1')).toBe('Pour-Bucket Pete');
+    expect(t('vehicle.charging_truck.tier2')).toBe('Boom-Juice Hauler 5000');
+    expect(t('vehicle.charging_truck.tier3')).toBe('Kaboom Cruiser Deluxe');
+  });
 });
 
 // ── en/fr parity — translations differ between locales ───────────────────────
@@ -151,4 +157,26 @@ describe('vehicle tier names resolve differently in en vs fr', () => {
     const fr = t('vehicle.rock_fragmenter.tier3');
     expect(en).not.toBe(fr);
   });
+});
+
+describe('charging_truck strings differ between en and fr (#1645)', () => {
+  const keys = [
+    'vehicle.charging_truck.tier1',
+    'vehicle.charging_truck.tier2',
+    'vehicle.charging_truck.tier3',
+    'vehicle.charging_truck.desc',
+    'vehicle_type.charging_truck',
+  ];
+  for (const key of keys) {
+    it(`${key} is translated and en != fr`, () => {
+      setLocale('en');
+      const en = t(key);
+      setLocale('fr');
+      const fr = t(key);
+      setLocale('en');
+      expect(en).not.toBe(key);
+      expect(fr).not.toBe(key);
+      expect(en).not.toBe(fr);
+    });
+  }
 });

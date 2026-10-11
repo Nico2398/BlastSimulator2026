@@ -18,6 +18,7 @@ export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignmen
 
 export type VehicleRole =
   | 'building_destroyer'
+  | 'charging_truck'
   | 'debris_hauler'
   | 'drill_rig'
   | 'rock_digger'
@@ -98,6 +99,7 @@ const VEHICLE_DEFS: Record<VehicleRole, Record<VehicleTier, VehicleDef>> = {
   drill_rig:          makeTiers('drill_rig',           VEHICLE_BASE_STATS.drill_rig),
   building_destroyer: makeTiers('building_destroyer',  VEHICLE_BASE_STATS.building_destroyer),
   rock_fragmenter:    makeTiers('rock_fragmenter',     VEHICLE_BASE_STATS.rock_fragmenter),
+  charging_truck:     makeTiers('charging_truck',      VEHICLE_BASE_STATS.charging_truck),
 };
 
 /** Returns the def for the given role and tier. */

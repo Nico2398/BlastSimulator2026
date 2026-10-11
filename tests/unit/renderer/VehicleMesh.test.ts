@@ -71,18 +71,18 @@ describe('VehicleMesh', () => {
   it('all vehicle roles can be added', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter'];
+    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck'];
     const vehicles = types.map((t, i) => makeVehicle(i, t, i * 5, 0));
     const vs = makeVehicleState(vehicles);
     vehicles.forEach(v => vm.addVehicle(v, vs, []));
-    expect(vm.count).toBe(5);
+    expect(vm.count).toBe(6);
     vm.dispose();
   });
 
   it('vehicles have multiple children (composed shapes)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter'];
+    const types: Vehicle['type'][] = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck'];
     for (const type of types) {
       const v = makeVehicle(0, type);
       vm.addVehicle(v, makeVehicleState([v]), []);

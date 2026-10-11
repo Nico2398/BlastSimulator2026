@@ -22,7 +22,7 @@ import {
   findBestEvacuationDriver,
   type EvacuationDriverReachabilityCheck,
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
-import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
+import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_ROLE_ARRIVAL_TASK, VEHICLE_SEAT_COUNT } from '../../../src/core/config/balance.js';
 import { board, alight } from '../../../src/core/engine/Mount.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
@@ -39,9 +39,10 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── Role catalogue ────────────────────────────────────────────────────────────
 
 describe('VehicleRole catalogue', () => {
-  it('getAllVehicleRoles() returns all 5 defined roles', () => {
+  it('getAllVehicleRoles() returns all 6 defined roles', () => {
     const roles = getAllVehicleRoles();
-    expect(roles).toHaveLength(5);
+    expect(roles).toContain('charging_truck');
+    expect(roles).toHaveLength(6);
   });
 
   it('getAllVehicleRoles() contains debris_hauler', () => {
@@ -67,6 +68,10 @@ describe('VehicleRole catalogue', () => {
   it('getAllVehicleRoles() contains rock_fragmenter', () => {
     const roles = getAllVehicleRoles();
     expect(roles).toContain('rock_fragmenter' satisfies VehicleRole);
+  });
+
+  it('getAllVehicleRoles() has six roles (#1645)', () => {
+    expect(getAllVehicleRoles()).toHaveLength(6);
   });
 });
 
@@ -131,6 +136,14 @@ describe('purchaseVehicle', () => {
     const state = createVehicleState();
     const { vehicle } = purchaseVehicle(state, 'rock_fragmenter');
     expect(vehicle.type).toBe('rock_fragmenter' satisfies VehicleRole);
+  });
+
+  it('purchasing a charging_truck adds it with correct role and tier-1 cost (#1645)', () => {
+    const state = createVehicleState();
+    const { vehicle, cost } = purchaseVehicle(state, 'charging_truck');
+    expect(vehicle.type).toBe('charging_truck' satisfies VehicleRole);
+    expect(cost).toBe(getVehicleDefByTier('charging_truck', 1).purchaseCost);
+    expect(cost).toBeGreaterThan(0);
   });
 
   it('purchased vehicle starts at the given coordinates', () => {
@@ -528,6 +541,7 @@ const ALL_ROLES: VehicleRole[] = [
   'drill_rig',
   'rock_digger',
   'rock_fragmenter',
+  'charging_truck',
 ];
 const ALL_TIERS: VehicleTier[] = [1, 2, 3];
 
@@ -640,6 +654,23 @@ describe('getVehicleDefByTier — nameKey follows "vehicle.<role>.tier<N>" patte
 });
 
 // ── Tier 2 stat multipliers ───────────────────────────────────────────────────
+
+describe('charging_truck tiers (#1645)', () => {
+  it('arrival task is loading and it seats one employee', () => {
+    expect(VEHICLE_ROLE_ARRIVAL_TASK.charging_truck).toBe('loading');
+    expect(VEHICLE_SEAT_COUNT.charging_truck).toBe(1);
+  });
+
+  it.each([1, 2, 3] as const)('tier %i nameKey is vehicle.charging_truck.tier%i', (tier) => {
+    expect(getVehicleDefByTier('charging_truck', tier).nameKey).toBe(`vehicle.charging_truck.tier${tier}`);
+  });
+
+  it('tier 2 costs 2.0x and tier 3 costs 4.0x tier 1', () => {
+    const t1 = getVehicleDefByTier('charging_truck', 1);
+    expect(getVehicleDefByTier('charging_truck', 2).purchaseCost).toBeCloseTo(t1.purchaseCost * 2.0, 5);
+    expect(getVehicleDefByTier('charging_truck', 3).purchaseCost).toBeCloseTo(t1.purchaseCost * 4.0, 5);
+  });
+});
 
 describe('getVehicleDefByTier — tier 2 applies ×1.3 speed multiplier', () => {
   it('tier 2 speed is approximately tier 1 speed × 1.3 for every role', () => {

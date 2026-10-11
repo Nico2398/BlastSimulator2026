@@ -24,7 +24,7 @@ const ROLE_ICON: Record<string, IconName> = {
 };
 const VEHICLE_ICON: Record<string, IconName> = {
   debris_hauler: 'vehicle', rock_digger: 'vehicle', drill_rig: 'blast',
-  building_destroyer: 'vehicle', rock_fragmenter: 'vehicle',
+  building_destroyer: 'vehicle', rock_fragmenter: 'vehicle', charging_truck: 'vehicle',
 };
 
 /** Space reserved above the anchor for the tag before it flips to render below instead. */

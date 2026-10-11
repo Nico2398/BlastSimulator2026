@@ -1135,6 +1135,8 @@ export const VEHICLE_BASE_STATS = {
   building_destroyer: { workRate: 12, purchaseCost: 30_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 100, speed: 2, maxHp: 130 },
   /** 9 fragments/tick output; ~90 kg/tick fragmentation throughput. */
   rock_fragmenter:    { workRate: 9,  purchaseCost: 32_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 90,  speed: 2, maxHp: 125 },
+  /** capacity = kg of explosive carried per load; $28k sits between the hauler ($25k) and the fragmenter ($32k); slow, light chassis (115 hp). */
+  charging_truck:     { workRate: 6,  purchaseCost: 28_000, maintenanceCostPerTick: 4, fuelCostPerTick: 6, capacity: 500, speed: 2, maxHp: 115 },
 } as const;
 
 /**
@@ -1232,6 +1234,7 @@ export const FREIGHT_WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3, number> = { 1: 250
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',
   debris_hauler: 'transport',
+  charging_truck: 'loading',
   rock_digger: 'clearing',
   rock_fragmenter: 'clearing',
   building_destroyer: 'clearing',
@@ -1241,6 +1244,7 @@ export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
 export const VEHICLE_SEAT_COUNT: Record<VehicleRole, number> = {
   drill_rig: 1,
   debris_hauler: 1,
+  charging_truck: 1,
   rock_digger: 1,
   rock_fragmenter: 1,
   building_destroyer: 1,
