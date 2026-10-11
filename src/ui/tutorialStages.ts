@@ -94,6 +94,22 @@ export interface TutorialStage {
   orderIssuedWhen?: ((state: GameState) => boolean) | null;
   /** i18n key for the waiting line shown once `spentWhen` fires. Required whenever `spentWhen` is set. */
   waitingKey?: string;
+  /** Whether this stage can be reached at all; an unreachable stage is skipped (#1632). */
+  reachableWhen?: () => boolean;
+  /** Interpolation params for `hintKey` (#1632). */
+  hintParams?: Record<string, string | number>;
+}
+
+/** True when the continuous shift mode button is pressed (#1632). */
+export function isContinuousSelected(root: ParentNode): boolean {
+  void root;
+  return false; // TODO: implement
+}
+
+/** True when the policy fatigue input holds a value inside the tutorial range (#1632). */
+export function isPolicyFatigueInRange(root: ParentNode): boolean {
+  void root;
+  return false; // TODO: implement
 }
 
 // P3 retired the 2D picker: dragging/clicking now happens directly on the
