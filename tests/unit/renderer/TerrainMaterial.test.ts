@@ -206,6 +206,20 @@ describe('TerrainMaterial', () => {
         expect(shader.fragmentShader).toContain('mat3(viewMatrix) * g');
       });
 
+      it('bumps by the noise gradient\'s true magnitude, not a normalized tilt', () => {
+        const mat = makeMaterial();
+        const shader = makeFakeShader();
+        mat.onBeforeCompile(shader, undefined as unknown as THREE.WebGLRenderer);
+
+        // A normalized gradient tilts every pixel by the same full amount in a
+        // direction that swings wherever the noise flattens — on a steep cut
+        // face under grazing light that rendered as dark, smeared blotches.
+        const body = shader.fragmentShader.match(/vec3 vnoiseGrad\(vec3 p, float e\)\{([\s\S]*?)\n\}/)?.[1];
+        expect(body).toBeDefined();
+        expect(body).not.toContain('normalize');
+        expect(body).toContain('/ (4.0 * e)');
+      });
+
       it('modulates roughness so large lit areas do not turn into one sheen', () => {
         const mat = makeMaterial();
         const shader = makeFakeShader();
@@ -215,7 +229,7 @@ describe('TerrainMaterial', () => {
 
       it('bumps the program cache key so the old compiled shader is not reused', () => {
         const mat = makeMaterial();
-        expect(mat.customProgramCacheKey()).toBe('terrain-material-v5');
+        expect(mat.customProgramCacheKey()).toBe('terrain-material-v6');
       });
     });
 
