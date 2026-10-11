@@ -35,7 +35,10 @@ export abstract class PanelBase {
 
   setCloseHandler(cb: () => void): void { this.onCloseCb = cb; }
 
-  show(): void { this.el.style.display = 'flex'; }
+  show(): void {
+    this.el.style.display = 'flex';
+    this.el.dataset[PANEL_OPEN_COUNT_KEY] = String((Number(this.el.dataset[PANEL_OPEN_COUNT_KEY]) || 0) + 1);
+  }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
 
