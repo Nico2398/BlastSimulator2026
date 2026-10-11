@@ -844,6 +844,18 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
       expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'point', x: pin.x1, z: pin.z1 }));
     });
 
+    it.each(['livingQuarters', 'drivingCenter', 'warehouse'] as const)(
+      'hovering inside the live area of the multi-tile REGION.%s pin draws the ghost at its min corner (#1646)',
+      (name) => {
+        const pin = REGION[name];
+        const { kit, controller, overlay } = makeMockKit({ activeRegion: pin });
+        menu.update(makeMockState());
+        armCatalog(kit);
+        controller.simulateHover({ x: pin.x2, z: pin.z2 });
+        expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'point', x: pin.x1, z: pin.z1 }));
+      },
+    );
+
     it('hovering outside the exact region margin keeps the ghost under the cursor (#1594)', () => {
       const pin = REGION.warehouse;
       const far = { x: pin.x2 + EXACT_LIVE_MARGIN + 5, z: pin.z2 + EXACT_LIVE_MARGIN + 5 };

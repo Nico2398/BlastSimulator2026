@@ -228,6 +228,9 @@ export class GroundTintLayer {
     // no reason (nothing is drawn either way), so skip it in that case.
     if (positions.length > 0) this.geometry.computeBoundingSphere();
     else this.geometry.boundingSphere = new THREE.Sphere();
+    // Drop the cached box too: Box3.expandByObject reuses it, and it would
+    // otherwise keep describing the previous patch set (#1646).
+    this.geometry.boundingBox = null;
     this.geometry.setDrawRange(0, positions.length / 3);
   }
 

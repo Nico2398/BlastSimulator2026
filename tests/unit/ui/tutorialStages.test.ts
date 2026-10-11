@@ -17,6 +17,8 @@ import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { TOOLBAR_TARGET, SURVEY_OVERLAY_TOGGLE_TARGET, isEventDialogOpen } from '../../../src/ui/tutorialStepHelpers.js';
 import { resolveStageIndex, isReachable, resolveWaitStatus, allowedSelectors } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
+import type { BuildingType } from '../../../src/core/entities/Building.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
@@ -998,5 +1000,65 @@ describe('isEventDialogOpen (#1632)', () => {
   it('true when the dialog has no inline display set', () => {
     dialog();
     expect(isEventDialogOpen()).toBe(true);
+  });
+});
+
+// ── #1646: building pins are the footprint of the building their step places ──
+describe('building pins publish the placed building footprint (#1646)', () => {
+  const BUILDING_PINS = [
+    { pin: 'livingQuarters', type: 'living_quarters', stepId: 'build-living-quarters' },
+    { pin: 'drivingCenter', type: 'driving_center', stepId: 'build-driving-center' },
+    { pin: 'warehouse', type: 'freight_warehouse', stepId: 'build-storage' },
+  ] as const;
+
+  /** Tier-1 footprint rectangle at the pin's min corner, sizes read from the definition. */
+  function footprintAt(type: BuildingType, origin: { x1: number; z1: number }) {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, 1));
+    return { x1: origin.x1, z1: origin.z1, x2: origin.x1 + sizeX - 1, z2: origin.z1 + sizeZ - 1 };
+  }
+
+  it.each(BUILDING_PINS)('REGION.$pin covers the tier-1 $type footprint', ({ pin, type }) => {
+    const region = REGION[pin];
+    const expected = footprintAt(type, { x1: region.x1, z1: region.z1 });
+    expect({ x1: region.x1, z1: region.z1, x2: region.x2, z2: region.z2 }).toEqual(expected);
+  });
+
+  it.each(BUILDING_PINS)('REGION.$pin is exact and centred', ({ pin }) => {
+    const region = REGION[pin] as { exact?: boolean; centred?: boolean };
+    expect(region.exact).toBe(true);
+    expect(region.centred).toBe(true);
+  });
+
+  it('keeps the pin origins and the literal tier-1 footprints', () => {
+    expect(REGION.livingQuarters).toMatchObject({ x1: 8, z1: 15, x2: 10, z2: 17 });
+    expect(REGION.drivingCenter).toMatchObject({ x1: 6, z1: 15, x2: 7, z2: 16 });
+    expect(REGION.warehouse).toMatchObject({ x1: 2, z1: 12, x2: 5, z2: 15 });
+  });
+
+  it.each(BUILDING_PINS)('the $stepId picker stage draws the REGION.$pin footprint', ({ pin, stepId }) => {
+    const region = stagesFor(stepId).find(s => s.region)?.region;
+    expect(region).toMatchObject({ x1: REGION[pin].x1, z1: REGION[pin].z1, x2: REGION[pin].x2, z2: REGION[pin].z2, exact: true, centred: true });
+  });
+
+  it('survey stays one tile, drill spans 8 tiles each way, box-cut a line; none centred', () => {
+    expect(REGION.survey).toMatchObject({ x1: 23, z1: 23, x2: 23, z2: 23 });
+    expect(REGION.drill.x2 - REGION.drill.x1).toBe(8);
+    expect(REGION.drill.z2 - REGION.drill.z1).toBe(8);
+    expect(REGION.boxcut.x1).toBe(REGION.boxcut.x2);
+    expect(REGION.boxcut.z2).toBeGreaterThan(REGION.boxcut.z1);
+    for (const r of [REGION.survey, REGION.drill, REGION.boxcut]) {
+      expect((r as { centred?: boolean }).centred).toBeFalsy();
+    }
+  });
+
+  it('the build_site hint has no digits and describes an area, not a single tile', () => {
+    for (const [loc, table] of [['en', messages], ['fr', messagesFr]] as const) {
+      const text = table['tutorial.stage.build_site'] ?? '';
+      expect(/\d/.test(text), `${loc}: build_site prints a digit`).toBe(false);
+    }
+    expect(messages['tutorial.stage.build_site']).toMatch(/\barea\b/i);
+    expect(messages['tutorial.stage.build_site']).not.toMatch(/\btile\b/i);
+    expect(messagesFr['tutorial.stage.build_site']).toMatch(/\bzone\b/i);
+    expect(messagesFr['tutorial.stage.build_site']).not.toMatch(/\bcase\b/i);
   });
 });

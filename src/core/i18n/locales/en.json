@@ -3280,7 +3280,7 @@
   "tutorial.stage.build_driving_center": "Press \"Click terrain to place\" next to Driving Center.",
   "tutorial.stage.expand_driver": "Click the driver's card to open their details.",
   "tutorial.stage.train_fragmenter": "Press Train next to the Rock Fragmenter licence.",
-  "tutorial.stage.build_site": "Click the blue tile outlined in the scene to site the building.",
+  "tutorial.stage.build_site": "Click inside the blue outlined area in the scene to site the building.",
   "tutorial.stage.ramp_tool": "Press Build Ramp in the Terrain section.",
   "tutorial.stage.boxcut_area": "Drag along the blue strip outlined in the scene, from its top end to its bottom end. The ramp snaps to it.",
   "tutorial.stage.open_settings": "Open the Settings panel from the toolbar.",

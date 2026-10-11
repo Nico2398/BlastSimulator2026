@@ -658,12 +658,24 @@ describe('the region a step publishes is the region the picker enforces (#489)',
     expect(published).toEqual(stageRegion);
   });
 
-  it.each(['survey', 'drill-plan', 'box-cut', 'build-storage'])(
+  it.each(['survey', 'drill-plan', 'box-cut', 'build-storage', 'build-living-quarters', 'build-driving-center'])(
     '%s publishes exactly what its picker stage draws',
     (stepId) => {
       const rails = new TutorialRails();
       rails.beginStep({ id: stepId }, state());
       expect(getPickerRegion()).toEqual(stagesFor(stepId).find(s => s.region)!.region!);
+    },
+  );
+
+  it.each(['build-living-quarters', 'build-driving-center'])(
+    '%s publishes the centred multi-tile footprint (#1646)',
+    (stepId) => {
+      const rails = new TutorialRails();
+      rails.beginStep({ id: stepId }, state());
+      const region = getPickerRegion()!;
+      expect(region.centred).toBe(true);
+      expect(region.exact).toBe(true);
+      expect((region.x2 - region.x1 + 1) * (region.z2 - region.z1 + 1)).toBeGreaterThan(1);
     },
   );
 
