@@ -75,11 +75,17 @@ float fbm3(vec3 p){ return (vnoise(p) * 0.5 + vnoise(p * 2.03) * 0.3 + vnoise(p 
 
 // Tetrahedral gradient of vnoise — four taps instead of the six a central
 // difference needs. Used for surface bump, so the cost matters.
+// The true gradient, magnitude included: the four offsets k satisfy
+// sum(k * k^T) = 4I, so sum(k * vnoise(p + k*e)) is 4e times the gradient.
+// It used to be normalized, which tilted every pixel by the same full amount
+// in whatever direction the noise happened to slope — and that direction
+// swings fast wherever the field flattens out. Under a grazing light on a
+// steep cut face (a ramp wall) that read as dark, smeared blotches.
 vec3 vnoiseGrad(vec3 p, float e){
   vec2 k = vec2(1.0, -1.0);
-  return normalize(
+  return (
     k.xyy * vnoise(p + k.xyy * e) + k.yyx * vnoise(p + k.yyx * e) +
-    k.yxy * vnoise(p + k.yxy * e) + k.xxx * vnoise(p + k.xxx * e) + 1e-6);
+    k.yxy * vnoise(p + k.yxy * e) + k.xxx * vnoise(p + k.xxx * e)) / (4.0 * e);
 }
 
 /** 1 at the camera, 0 past DETAIL_FADE_DISTANCE. */
@@ -364,6 +370,14 @@ const ROUGHNESS_GLSL = `
 }
 `;
 
+// Gains on the two octaves' true gradients (see vnoiseGrad). The value
+// noise's gradient magnitude averages ~0.34 at the coarse step and ~0.50 at
+// the fine one, so these give a mean tilt of ~0.6 and ~0.25 — a real relief
+// that fades to nothing where the noise is flat, instead of the constant
+// full-strength tilt (1.0 and 0.5) the normalized gradient used to apply.
+const BUMP_COARSE_GAIN = 1.75;
+const BUMP_FINE_GAIN = 0.5;
+
 // A shallow bump derived from the same noise the albedo uses. This is what
 // actually breaks up the mesh triangulation — the regular grid's diagonal
 // split was legible straight through the old flat shading. The gradient is
@@ -380,9 +394,9 @@ const NORMAL_BUMP_GLSL = `
   float bumpLod = detailLod(vWorldPos);
   if (bumpLod > 0.01) {
     vec3 wn = normalize(vWorldNormal);
-    vec3 g = vnoiseGrad(vWorldPos * 1.6, 0.4);
+    vec3 g = vnoiseGrad(vWorldPos * 1.6, 0.4) * float(${BUMP_COARSE_GAIN});
     float fine = smoothstep(0.35, 0.7, bumpLod);
-    if (fine > 0.001) g += vnoiseGrad(vWorldPos * 5.3, 0.12) * 0.5 * fine;
+    if (fine > 0.001) g += vnoiseGrad(vWorldPos * 5.3, 0.12) * float(${BUMP_FINE_GAIN}) * fine;
     g -= wn * dot(g, wn);
     normal = normalize(normal - mat3(viewMatrix) * g * 0.45 * bumpLod * (0.55 + 0.5 * surfaceBump));
   }
@@ -500,7 +514,7 @@ export class TerrainMaterial extends THREE.MeshStandardMaterial {
         .replace('#include <roughnessmap_fragment>', ROUGHNESS_GLSL)
         .replace('#include <normal_fragment_begin>', NORMAL_BUMP_GLSL);
     };
-    this.customProgramCacheKey = () => 'terrain-material-v5';
+    this.customProgramCacheKey = () => 'terrain-material-v6';
   }
 
   /**
