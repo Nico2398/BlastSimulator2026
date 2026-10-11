@@ -28,7 +28,7 @@ import { dominantRockUnderHole } from '../mining/ExplosiveRockFit.js';
 import { getRock } from '../world/RockCatalog.js';
 import { buildTickEventContext } from './TickEventContext.js';
 import { tickInjuryRecovery } from './InjuryRecovery.js';
-import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
+import { releaseInjuredEmployeesQueues, releaseDeadHoldersActions } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags } from '../entities/Building.js';
@@ -331,6 +331,8 @@ export function runTick(
   // completion-pass loop in this file.
   // Injured employees are skipped by dispatch; hand their queued work back to the pool first (#1381).
   releaseInjuredEmployeesQueues(state);
+  // Claims held by the dead go back to the pool so OrderReachability re-stamps them (#1660).
+  releaseDeadHoldersActions(state, emitter);
   const dispatchResult = tickEmployees(state);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 

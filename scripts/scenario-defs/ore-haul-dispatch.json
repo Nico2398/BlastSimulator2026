@@ -235,7 +235,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "#553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st -- and the blast above destroyed the drill_rig (vehicle #1, sitting inside its own hole's blast radius), so vehicleCount goes 3 -> 4, not 0 -> 1.",
+      "description": "#553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st -- and the blast above destroyed the drill_rig (vehicle #1, sitting inside its own hole's blast radius), so vehicleCount goes 3 -> 4, not 0 -> 1. #1660: the charging truck no longer stalls, so charging finishes at tick ~274, before the holes go wet (the 9 holes fizzled as wet when charging only finished at tick ~307), and the full blast also destroys the charging truck (#5, parked beside the drill rig) -- the fleet is 3 after the blast, so this purchase makes vehicleCount 4, not 5.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -256,7 +256,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 5
+          "vehicleCount": 4
         }
       }
     },

@@ -30,10 +30,16 @@ function findOutstandingChargeAction(state: GameState, holeId: string): PendingA
   return state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
 }
 
-/** blockedReason of the outstanding (unfinished) charge order, null when none or not blocked (#1649). */
-export function outstandingChargeBlockedReason(state: GameState): string | null {
-  const action = state.pendingActions.find(a => a.type === 'charge_hole');
-  return action?.blockedReason ?? null;
+/**
+ * blockedReason of the first outstanding (unfinished) charge order that has one, null
+ * when none or none blocked (#1649). A claimed order carries no reason, so the first
+ * order in the queue is not the one to read (#1660).
+ */
+export function outstandingChargeBlockedReason(state: Pick<GameState, 'pendingActions'>): string | null {
+  for (const a of state.pendingActions) {
+    if (a.type === 'charge_hole' && a.blockedReason != null) return a.blockedReason;
+  }
+  return null;
 }
 
 /** Cancel the outstanding charge order of a hole, refunding its cost. No-op without one (#554). */

@@ -369,3 +369,8 @@ Remove a row when its issue lands.
 Dealership cards show a one-line purpose plus running cost in $/h and a tooltip of absolute stats (speed, capacity, work rate, licence level shown = tier, per #1524), built in `src/ui/catalogCardText.ts`.
 
 Event closures (#1568): a vehicle named by a live `out_of_service` modifier is never picked by `findFreeVehicleForRole`, and `findVehicleForClaim` releases an already-reserved closed vehicle's reservation and refuses the claim. A driver already mounted is not dismounted.
+
+Truck-worked charging stalls (#1660), decisions taken:
+- `outstandingChargeBlockedReason` returns the first outstanding `charge_hole` order that carries a reason; a claimed order has none, so the queue head is not the one to read.
+- `releaseDeadHoldersActions` (TickPipeline, before dispatch) returns any claim held by a dead employee to the pool, whatever killed them, so `OrderReachability` re-stamps it (`no_vehicle_in_fleet`, `no_dual_qualified_employee`). A destroyed vehicle already releases its driver's claim through the aborted drive leg.
+- A drive leg blocked by a parked, driverless vehicle crosses it (`handleAgentOccupancyBlock` step 2.5) instead of trying the avoid-all reroute first: plain drive pathing repaths every tick through the parked vehicle, so a reroute step was undone next tick and reset the stuck counters, never reaching `MOVE_STUCK_ABANDON_TICKS`. Parking the truck clear of the blast zone is out of scope.

@@ -6,7 +6,7 @@ import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   dispatchChargeAction, cancelOutstandingChargeAction,
   chargeFundsFailureAmount, isHoleChargeCovered, autoChargeHole, settleAwaitingFundsCharges,
-  chargePatternHoles,
+  chargePatternHoles, outstandingChargeBlockedReason,
 } from '../../../src/core/mining/ChargeOrder.js';
 
 const BOOMITE_5KG = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
@@ -271,5 +271,19 @@ describe('chargePatternHoles', () => {
     const state = makeState();
     state.patternCharge = { ...BOOMITE_5KG };
     expect(chargePatternHoles(state, [])).toEqual({ ordered: [], awaiting: [], invalid: [] });
+  });
+});
+
+describe('outstandingChargeBlockedReason (#1660)', () => {
+  const order = (type: string, blockedReason: string | null) => ({ type, blockedReason } as GameState['pendingActions'][number]);
+
+  it('reads the first charge order that has a reason, skipping claimed ones', () => {
+    const pendingActions = [order('drill_hole', 'x'), order('charge_hole', null), order('charge_hole', 'no_vehicle_in_fleet')];
+    expect(outstandingChargeBlockedReason({ pendingActions })).toBe('no_vehicle_in_fleet');
+  });
+
+  it('is null with no charge orders or none blocked', () => {
+    expect(outstandingChargeBlockedReason({ pendingActions: [] })).toBeNull();
+    expect(outstandingChargeBlockedReason({ pendingActions: [order('charge_hole', null)] })).toBeNull();
   });
 });

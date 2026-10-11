@@ -778,6 +778,13 @@ function applyReroutedAdvance(
   return 'moved';
 }
 
+/** The vehicle `occupant` is, when it is a genuinely parked, driverless one (#1660). */
+function idleParkedVehicleOf(state: GameState, occupant: Occupant | null | undefined): Vehicle | undefined {
+  if (occupant?.kind !== 'vehicle') return undefined;
+  const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
+  return vehicle !== undefined && isIdleParkedVehicle(vehicle, state.employees.employees) ? vehicle : undefined;
+}
+
 function handleAgentOccupancyBlock(
   state: GameState,
   emp: Employee,
@@ -901,8 +908,17 @@ function handleAgentOccupancyBlock(
     // vehicle's own cell by construction — always self-held — so this branch
     // is unreachable for a board leg in the first place. A latent coupling,
     // not a gap to fill.
-    const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
-    if (reroute.found) {
+    // #1660: a drive leg's plain route (advanceLeg, repathed every tick) ignores
+    // occupancy and passes straight through a parked vehicle, so an
+    // avoid-everything reroute away from it is undone the next tick and the
+    // mover oscillates forever, its stuck counters reset by every reroute step.
+    // Crossing the parked blocker (below) is the route plain pathing keeps taking.
+    const crossesParkedBlocker = isDrive
+      && idleParkedVehicleOf(state, occupancy.holderOf(blockedStep.x, blockedStep.z)) !== undefined;
+    const reroute = crossesParkedBlocker
+      ? undefined
+      : findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
+    if (reroute?.found) {
       return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, reroute, occupancy, result);
     }
 
@@ -988,9 +1004,7 @@ function handleAgentOccupancyBlock(
     // the ~90-150+ tick recovery cost the ladder would otherwise pay exceeded
     // rubble_disposal's own deadline (rng.nextInt(30, 100)) every time this
     // recurred.
-    const blockerVehicle = blocker?.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === blocker!.id) : undefined;
-    const blockerIsIdleParkedVehicle = blockerVehicle !== undefined
-      && isIdleParkedVehicle(blockerVehicle, state.employees.employees);
+    const blockerIsIdleParkedVehicle = idleParkedVehicleOf(state, blocker) !== undefined;
     const blockerIsStationaryBusyEmployee = blocker?.kind === 'employee'
       && blockerEmp !== undefined && isStationaryBusyEmployee(blockerEmp);
     if (blockerIsIdleParkedVehicle) {
@@ -1176,8 +1190,8 @@ function relocateIdleDestinationBlocker(
   }
 
   // occupant.kind === 'vehicle'
-  const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
-  if (!vehicle || !isIdleParkedVehicle(vehicle, state.employees.employees)) return false;
+  const vehicle = idleParkedVehicleOf(state, occupant);
+  if (!vehicle) return false;
 
   const freeCell = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
   if (!freeCell) return false;
