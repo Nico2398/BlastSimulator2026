@@ -18,8 +18,5 @@ export function shouldRestartTutorialOnRetry(
   levelId: string | null | undefined,
   levelEndReason: string | null | undefined,
 ): boolean {
-  void levelId;
-  void levelEndReason;
-  // TODO: implement
-  return false;
+  return levelId === TUTORIAL_LEVEL_ID && !!levelEndReason && levelEndReason !== 'completed';
 }

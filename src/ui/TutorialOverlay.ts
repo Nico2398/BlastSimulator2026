@@ -48,6 +48,11 @@ interface TutorialOverlayOptions {
  * other control is inert, and the clock is held once a step has spent its tick
  * allowance — so the world cannot move on while the player is still reading.
  */
+/** A level-end reason that is a defeat: set and not a win. */
+function isDefeatReason(reason: string | null | undefined): boolean {
+  return !!reason && reason !== 'completed';
+}
+
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
   private readonly box: HTMLElement;
@@ -257,8 +262,7 @@ export class TutorialOverlay {
    * advanceToNextStep() that already lands on this same last step normally.
    */
   private shortCircuitOnDefeat(): boolean {
-    const reason = this.gameState?.levelEndReason;
-    if (!reason || reason === 'completed') return false;
+    if (!isDefeatReason(this.gameState?.levelEndReason)) return false;
     if (this.stepIndex >= LAST_STEP_INDEX) return false;
 
     this.landOnStep(LAST_STEP_INDEX);
@@ -391,11 +395,17 @@ export class TutorialOverlay {
     this.end(true);
   }
 
-  /** Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again. */
+  /**
+   * Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again.
+   * A tutorial ending on a defeat (bankruptcy etc.) never counts as completed (#1631): the
+   * outcome is read before teardown drops the game state, so finish, exit and the
+   * defeat short-circuit all share the rule.
+   */
   private end(markDone: boolean): void {
     if (!this._active) return;
+    const endedInDefeat = isDefeatReason(this.gameState?.levelEndReason);
     this.teardown(true);
-    if (!markDone) return;
+    if (!markDone || endedInDefeat) return;
     try {
       localStorage.setItem('bs_tutorial_done', '1');
     } catch {
