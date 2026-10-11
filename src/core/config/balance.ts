@@ -1899,6 +1899,8 @@ export interface ScriptedCandidate {
   name: string;
   unionized: boolean;
   skillBonus: 0 | 1;
+  /** Extra qualifications granted on top of the role defaults (#1648). */
+  extraQualifications?: readonly { category: SkillCategory; proficiencyLevel: 1 | 2 | 3 | 4 | 5 }[];
 }
 
 /** Tutorial hiring pool: one fixed candidate per hiring role, ids 1..5 (#1600). */
