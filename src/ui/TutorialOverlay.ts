@@ -26,6 +26,12 @@ const GUIDE_INTERVAL_MS = 250;
 /** How long (ms) to show the congratulations step before auto-dismiss. */
 const CONGRATULATIONS_DISPLAY_MS = 4000;
 
+/** CSS var the placement param strip docks against; equals card height plus the gap below. */
+const CLEARANCE_VAR = '--bsx-tutorial-card-clearance';
+
+/** Gap (px) between the coach card's top edge and the param strip above it. */
+const PARAM_STRIP_CARD_GAP_PX = 30;
+
 /** Index of the final (congratulations) step. */
 const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
 
@@ -123,6 +129,7 @@ export class TutorialOverlay {
     this.overlay.style.display = '';
     document.body.classList.add(CARD_CLASS);
     this.applyGuidedClass();
+    this.observeCardResize();
   }
 
   get isActive(): boolean {
@@ -214,6 +221,9 @@ export class TutorialOverlay {
   private hideGuidedChrome(): void {
     document.body.classList.remove(GUIDED_CLASS, CARD_CLASS);
     this.goalChipEl.style.display = 'none';
+    this.stopObservingCardResize();
+    document.documentElement.style.removeProperty(CLEARANCE_VAR);
+    this.lastClearancePx = -1;
   }
 
   private step(): RailsStep {
@@ -494,6 +504,7 @@ export class TutorialOverlay {
     this.stageLine.classList.toggle('bs-tutorial-stage-line--waiting', view.waiting);
     this.waitingChipEl.style.display = view.waiting ? '' : 'none';
     this.renderGoalChip();
+    this.updateParamStripClearance();
   }
 
   private clearCongratulationsTimer(): void {
@@ -521,7 +532,6 @@ export class TutorialOverlay {
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
     this.progressEl.style.width = `${progress}%`;
 
-    this.updateParamStripClearance();
     this.refreshGuide();
 
     // The console equivalent stays off the card.
@@ -544,24 +554,33 @@ export class TutorialOverlay {
    * card's height varies with each step's own body text — a fixed offset
    * undershoots for a long step and the strip's CONFIRM button ends up
    * rendered underneath the card instead of above it (found via the
-   * box-cut step's four-line body, #482). Measured fresh on every render
-   * so any step's text — however long — gets real clearance, not a value
-   * tuned for whichever step happened to be longest at the time.
+   * box-cut step's four-line body, #482). The card also grows after render
+   * (live `textParamsFor` figures, stage hint, waiting/goal chips, locale),
+   * so this runs at the end of refreshGuide() and from the card's
+   * ResizeObserver (#1630). Skips while inactive and writes the CSS var only
+   * when the measured value changed.
    */
   private updateParamStripClearance(): void {
-    const clearance = this.box.offsetHeight + 30;
-    document.documentElement.style.setProperty('--bsx-tutorial-card-clearance', `${clearance}px`);
+    if (!this._active) return;
+    const clearance = this.box.offsetHeight + PARAM_STRIP_CARD_GAP_PX;
+    if (clearance === this.lastClearancePx) return;
+    this.lastClearancePx = clearance;
+    document.documentElement.style.setProperty(CLEARANCE_VAR, `${clearance}px`);
   }
 
   /** Re-measures param strip clearance whenever the coach card resizes (#1630). */
-  observeCardResize(): void {
-    // TODO: implement
-    void this.clearanceObserver;
-    void this.lastClearancePx;
+  private observeCardResize(): void {
+    this.stopObservingCardResize();
+    if (typeof ResizeObserver === 'undefined') return;
+    this.clearanceObserver = new ResizeObserver(() => {
+      if (this._active) this.updateParamStripClearance();
+    });
+    this.clearanceObserver.observe(this.box);
   }
 
   /** Disconnects the card resize observer (#1630). */
-  stopObservingCardResize(): void {
-    // TODO: implement
+  private stopObservingCardResize(): void {
+    this.clearanceObserver?.disconnect();
+    this.clearanceObserver = null;
   }
 }
