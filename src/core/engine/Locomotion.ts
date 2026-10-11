@@ -778,6 +778,14 @@ function applyReroutedAdvance(
   return 'moved';
 }
 
+/** The occupant of `cell` when it is a genuinely parked, driverless vehicle (#1660). */
+function parkedVehicleAt(state: GameState, occupancy: AgentOccupancy, cell: { x: number; z: number }): Occupant | undefined {
+  const holder = occupancy.holderOf(cell.x, cell.z);
+  if (holder?.kind !== 'vehicle') return undefined;
+  const vehicle = state.vehicles.vehicles.find(v => v.id === holder.id);
+  return vehicle !== undefined && isIdleParkedVehicle(vehicle, state.employees.employees) ? holder : undefined;
+}
+
 function handleAgentOccupancyBlock(
   state: GameState,
   emp: Employee,
@@ -901,7 +909,15 @@ function handleAgentOccupancyBlock(
     // vehicle's own cell by construction — always self-held — so this branch
     // is unreachable for a board leg in the first place. A latent coupling,
     // not a gap to fill.
-    const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
+    // #1660: a drive leg's plain route (advanceLeg, repathed every tick) ignores
+    // occupancy and passes straight through a parked vehicle, so an
+    // avoid-everything reroute away from it is undone the next tick and the
+    // mover oscillates forever, its stuck counters reset by every reroute step.
+    // Crossing the parked blocker (below) is the route plain pathing keeps taking.
+    const parkedBlocker = isDrive ? parkedVehicleAt(state, occupancy, blockedStep) : undefined;
+    const reroute = parkedBlocker !== undefined
+      ? { found: false as const, waypoints: [] }
+      : findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
     if (reroute.found) {
       return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, reroute, occupancy, result);
     }

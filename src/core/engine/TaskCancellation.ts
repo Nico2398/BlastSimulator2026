@@ -619,6 +619,28 @@ export function releaseInjuredEmployeeQueue(state: GameState, employeeId: number
 }
 
 /**
+ * Release every claimed action held by an employee who is no longer alive (#1660).
+ * Death paths that do not call releaseDeadEmployeeActions themselves (a mafia
+ * hit, a flying-rock casualty) would otherwise leave a charge order claimed by a
+ * corpse: never re-stamped by OrderReachability, so no blocked reason reads out.
+ * One pass over the pool; a no-op, allocating nothing, while no claim is held by the dead.
+ */
+export function releaseDeadHoldersActions(state: GameState, emitter?: EventEmitter): void {
+  let dead: Set<number> | null = null;
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) (dead ??= new Set()).add(emp.id);
+  }
+  if (dead === null) return;
+  const holders = new Set<number>();
+  for (const a of state.pendingActions) {
+    if ((a.status === 'assigned' || a.status === 'in_progress') && a.holderId !== null && dead.has(a.holderId)) {
+      holders.add(a.holderId);
+    }
+  }
+  for (const id of holders) releaseDeadEmployeeActions(state, id, emitter);
+}
+
+/**
  * Apply releaseInjuredEmployeeQueue to every alive, injured employee that still
  * has something to release: a queue entry that is stale or non-rest, or a queued
  * non-rest action targeted at them. A rest-only queue is skipped, so it costs
