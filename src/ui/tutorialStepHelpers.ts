@@ -191,6 +191,12 @@ export function isPanelVisible(rootSelector: string): boolean {
   }
 }
 
+/** Read the panel root's open-request count (0 when absent, invalid selector, or no document). */
+export function readPanelOpenCount(rootSelector: string): number {
+  void rootSelector;
+  return 0; // TODO: implement
+}
+
 /** Read the scores HUD inspectCount (0 when absent). */
 export function readScoresInspectCount(): number {
   if (typeof document === 'undefined') return 0;

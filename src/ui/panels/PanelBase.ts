@@ -18,6 +18,10 @@
 export const PANEL_CLOSE_ATTR = 'data-panel-close';
 export const PANEL_CLOSE_SELECTOR = `[${PANEL_CLOSE_ATTR}]`;
 
+/** dataset key on a panel root counting every show() call, including re-shows of an
+ *  already-visible panel, so tutorial polling can see a re-open (#1628). */
+export const PANEL_OPEN_COUNT_KEY = 'openCount';
+
 export abstract class PanelBase {
   /** The panel's root element — created by `panelRoot()`, hidden until `show()`. */
   protected readonly el: HTMLElement;
