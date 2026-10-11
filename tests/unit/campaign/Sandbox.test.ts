@@ -13,6 +13,7 @@ import {
   SANDBOX_LEVEL_ID,
   SANDBOX_SEED_MAX,
   clampSandboxConfig,
+  convertWinToFreePlay,
   randomSandboxSeed,
   sandboxLevelDef,
   type SandboxConfig,
@@ -20,6 +21,7 @@ import {
 } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
+import { createGame } from '../../../src/core/state/GameState.js';
 import { DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../../../src/core/config/balance.js';
 
 const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
@@ -252,5 +254,70 @@ describe('SANDBOX_FIELDS', () => {
     const field = SANDBOX_FIELDS.find(f => f.key === 'difficulty')!;
     const ids = (field.options?.() ?? []).map(o => o.id);
     expect(ids).toEqual(SANDBOX_DIFFICULTY_ORDER);
+  });
+});
+
+
+describe('convertWinToFreePlay (#1647)', () => {
+  function wonState(levelId: string | null = 'dusty_hollow') {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.campaign.activeLevelId = levelId;
+    s.levelEnded = true;
+    s.levelEndReason = 'completed';
+    return s;
+  }
+
+  it('clears the end state and detaches the active level after a win', () => {
+    const s = wonState();
+    const r = convertWinToFreePlay(s);
+    expect(r.success).toBe(true);
+    expect(s.levelEnded).toBe(false);
+    expect(s.levelEndReason).toBeNull();
+    expect(s.campaign.activeLevelId).toBeNull();
+  });
+
+  it('converts a tutorial win too', () => {
+    const s = wonState('tutorial_pit');
+    expect(convertWinToFreePlay(s).success).toBe(true);
+    expect(s.campaign.activeLevelId).toBeNull();
+    expect(s.levelEndReason).toBeNull();
+  });
+
+  it('leaves recorded campaign progress untouched', () => {
+    const s = wonState();
+    s.campaign.levels['dusty_hollow']!.completed = true;
+    s.campaign.levels['dusty_hollow']!.bestStars = 2;
+    const levelsBefore = JSON.parse(JSON.stringify(s.campaign.levels));
+    const completeBefore = s.campaign.campaignComplete;
+    convertWinToFreePlay(s);
+    expect(s.campaign.levels).toEqual(levelsBefore);
+    expect(s.campaign.campaignComplete).toBe(completeBefore);
+  });
+
+  it('refuses after each defeat reason and leaves the state unmodified', () => {
+    for (const reason of ['bankruptcy', 'arrest', 'ecological_shutdown', 'worker_revolt'] as const) {
+      const s = wonState();
+      s.levelEndReason = reason;
+      const r = convertWinToFreePlay(s);
+      expect(r.success).toBe(false);
+      expect(s.levelEnded).toBe(true);
+      expect(s.levelEndReason).toBe(reason);
+      expect(s.campaign.activeLevelId).toBe('dusty_hollow');
+    }
+  });
+
+  it('refuses when no level has ended', () => {
+    const s = wonState();
+    s.levelEnded = false;
+    s.levelEndReason = null;
+    const r = convertWinToFreePlay(s);
+    expect(r.success).toBe(false);
+    expect(s.campaign.activeLevelId).toBe('dusty_hollow');
+  });
+
+  it('refuses a second conversion (already free play)', () => {
+    const s = wonState();
+    expect(convertWinToFreePlay(s).success).toBe(true);
+    expect(convertWinToFreePlay(s).success).toBe(false);
   });
 });

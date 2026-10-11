@@ -1,0 +1,117 @@
+{
+  "name": "level-end-keep-playing",
+  "description": "Issue #1647: after winning a level, clicking Keep playing on the victory screen resumes the same mine as free play. Game time advances and the end screen does not return.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:true",
+      "description": "Open Dusty Hollow staffed.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "campaign complete level:dusty_hollow",
+      "description": "Debug force-win (console-only, #1431): level ends completed.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Gate: the victory screen must offer the keep-playing button.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-level-end-screen [data-action=\"keep-playing\"]",
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "observe",
+      "timeout": 60,
+      "expect": {
+        "usable": "#bs-level-end-screen [data-action=\"keep-playing\"]"
+      }
+    },
+    {
+      "command": "campaign keep_playing",
+      "description": "Player clicks Keep playing on the victory screen; the end screen goes away and the level is no longer ended. Command mode runs the paired console command.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-level-end-screen [data-action=\"keep-playing\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn",
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "player",
+      "timeout": 60,
+      "expect": {
+        "blocked": "#bs-level-end-screen [data-action=\"keep-playing\"]",
+        "usable": "#bs-saveload-btn",
+        "equals": {
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "description": "Game time advances again after keep playing.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ],
+        "equals": {
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "The end screen does not return after ticking.",
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-level-end-screen [data-action=\"keep-playing\"]",
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ]
+    }
+  ]
+}
