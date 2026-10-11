@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  createUiActionStep, isPanelVisible, readScoresInspectCount, createEvacuateZoneStep,
+  createUiActionStep, isPanelVisible, readPanelOpenCount, readScoresInspectCount, createEvacuateZoneStep,
 } from '../../../src/ui/tutorialStepHelpers.js';
 import type { TutorialUiAction } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -262,6 +262,105 @@ describe('createEvacuateZoneStep completes on the real fire, not on arming (#159
       panel.style.display = 'block';
       expect(b.isComplete(STATE, snapB)).toBe(false);
       expect(a.isComplete(STATE, snapA)).toBe(true);
+    });
+  });
+
+  describe('readPanelOpenCount (#1628)', () => {
+    beforeEach(() => { document.body.innerHTML = ''; });
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    it('is 0 when the panel root is absent', () => {
+      expect(readPanelOpenCount('#bs-finances-panel')).toBe(0);
+    });
+
+    it('is 0 for an invalid selector without throwing', () => {
+      expect(() => readPanelOpenCount('###')).not.toThrow();
+      expect(readPanelOpenCount('###')).toBe(0);
+    });
+
+    it('is 0 when the root has no openCount dataset entry', () => {
+      addPanel('bs-finances-panel', 'block');
+      expect(readPanelOpenCount('#bs-finances-panel')).toBe(0);
+    });
+
+    it('is 0 when the dataset entry is not numeric', () => {
+      addPanel('bs-finances-panel', 'block').dataset['openCount'] = 'abc';
+      expect(readPanelOpenCount('#bs-finances-panel')).toBe(0);
+    });
+
+    it('reads the numeric dataset.openCount', () => {
+      addPanel('bs-finances-panel', 'block').dataset['openCount'] = '3';
+      expect(readPanelOpenCount('#bs-finances-panel')).toBe(3);
+    });
+  });
+
+  describe('createUiActionStep: panel re-show while open (#1628)', () => {
+    beforeEach(() => { document.body.innerHTML = ''; });
+    afterEach(() => { document.body.innerHTML = ''; });
+    const make = (root: string) => createUiActionStep('p', 't', 'x', { kind: 'panel', rootSelector: root });
+    const bump = (el: HTMLElement) => { el.dataset['openCount'] = String(Number(el.dataset['openCount'] ?? 0) + 1); };
+
+    it('captures the panel open count in the snapshot', () => {
+      addPanel('bs-finances-panel', 'block').dataset['openCount'] = '2';
+      const snap = make('#bs-finances-panel').captureSnapshot!(STATE);
+      expect(snap['panelOpenCount']).toBe(2);
+    });
+
+    it('captures 0 when the panel is absent', () => {
+      expect(make('#bs-finances-panel').captureSnapshot!(STATE)['panelOpenCount']).toBe(0);
+    });
+
+    it('open at capture: repeated polls with an unchanged count never complete', () => {
+      const panel = addPanel('bs-finances-panel', 'block');
+      panel.dataset['openCount'] = '1';
+      const step = make('#bs-finances-panel');
+      const snap = step.captureSnapshot!(STATE);
+      for (let i = 0; i < 5; i++) expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('open at capture: completes after the count bumps while still visible', () => {
+      const panel = addPanel('bs-finances-panel', 'block');
+      panel.dataset['openCount'] = '1';
+      const step = make('#bs-finances-panel');
+      const snap = step.captureSnapshot!(STATE);
+      expect(step.isComplete(STATE, snap)).toBe(false);
+      bump(panel); // show() on an already-visible panel
+      expect(step.isComplete(STATE, snap)).toBe(true);
+    });
+
+    it('open at capture, count bumped but panel hidden: not complete', () => {
+      const panel = addPanel('bs-finances-panel', 'block');
+      const step = make('#bs-finances-panel');
+      const snap = step.captureSnapshot!(STATE);
+      bump(panel);
+      panel.style.display = 'none';
+      expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('hide then show still completes (count bumped too)', () => {
+      const panel = addPanel('bs-employee-panel', 'block');
+      const step = make('#bs-employee-panel');
+      const snap = step.captureSnapshot!(STATE);
+      panel.style.display = 'none';
+      expect(step.isComplete(STATE, snap)).toBe(false);
+      panel.style.display = 'block';
+      bump(panel);
+      expect(step.isComplete(STATE, snap)).toBe(true);
+    });
+
+    it('closed at capture then opened completes without needing a count', () => {
+      const panel = addPanel('bs-employee-panel', 'none');
+      const step = make('#bs-employee-panel');
+      const snap = step.captureSnapshot!(STATE);
+      panel.style.display = 'block';
+      expect(step.isComplete(STATE, snap)).toBe(true);
+    });
+
+    it('a snapshot lacking panelOpenCount with the panel open does not complete spuriously', () => {
+      const panel = addPanel('bs-finances-panel', 'block');
+      panel.dataset['openCount'] = '4';
+      const step = make('#bs-finances-panel');
+      expect(step.isComplete(STATE, { panelWasVisible: true })).toBe(false);
     });
   });
 });
