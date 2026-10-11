@@ -40,6 +40,28 @@ describe('dispatchChargeAction', () => {
     expect(state.cash).toBe(10_000 - COST_5KG);
   });
 
+  it('queues the order for a blasting-skilled charging truck crew (#1649)', () => {
+    const state = makeState();
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+
+    const action = chargeActions(state)[0]!;
+    expect(action.requiredSkill).toBe('blasting');
+    expect(action.requiredVehicleRole).toBe('charging_truck');
+  });
+
+  it('stays queued, not rejected, when the fleet has no charging truck (#1649)', () => {
+    const state = makeState();
+    expect(state.vehicles.vehicles).toHaveLength(0);
+
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+
+    const actions = chargeActions(state);
+    expect(actions).toHaveLength(1);
+    expect(actions[0]!.status).toBe('queued');
+    expect(state.plannedChargesByHole['H1']).toEqual(BOOMITE_5KG);
+    expect(state.cash).toBe(10_000 - COST_5KG);
+  });
+
   it('replaces an outstanding order rather than stacking, netting the refund', () => {
     const state = makeState();
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);

@@ -35,7 +35,7 @@ description: >
 
 ### Blast Plan Design
 **Drill Pattern:** Grid of holes with positions, depth, diameter, spacing, burden
-**Charge Loading:** Per hole: explosive type, amount (kg), stemming height, optional tubing
+**Charge Loading:** Per hole: explosive type, amount (kg), stemming height, optional tubing. Done from a Charging Truck driven by an employee with `blasting` + `driving.truck`, never on foot
 **Detonation:** All charges fire together; no per-hole order or delay. Vibration uses the total charge of every hole
 
 ### Blast Preview / Software Upgrades

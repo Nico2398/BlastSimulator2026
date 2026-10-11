@@ -3,9 +3,11 @@
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
+import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { t } from '../i18n/I18n.js';
+import type { VehicleTier } from '../entities/Vehicle.js';
 import {
-  MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
+  MIN_STEMMING_M, VEHICLE_TIER_MULTIPLIERS, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
   CHARGE_KG_PER_METRE, CHARGE_FIT_EPSILON,
 } from '../config/balance.js';
 
@@ -103,6 +105,22 @@ export function computeChargeHoleDurationTicks(amountKg: number): number {
   return Math.max(
     1,
     Math.round(CHARGE_HOLE_BASE_DURATION_TICKS * (amountKg / CHARGE_HOLE_REFERENCE_AMOUNT_KG)),
+  );
+}
+
+/**
+ * Ticks for a charging-truck crew member to load a charge: base ticks scaled by
+ * the truck tier's work rate, then by proficiency, need and LQ (#1649).
+ */
+export function computeChargeDurationTicks(
+  baseTicks: number,
+  tier: VehicleTier,
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
+  needMultiplier: number = 1,
+  lqMultiplier: number = 1,
+): number {
+  return computeTaskDuration(
+    baseTicks / VEHICLE_TIER_MULTIPLIERS[tier].workRate, proficiencyLevel, needMultiplier, lqMultiplier, 1,
   );
 }
 

@@ -42,6 +42,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   wetHoleCount: { type: 'number', description: 'Drill holes whose water level is past the wet threshold (wetHoles, #1350)' },
   orderedHoleCount: { type: 'number', description: 'Holes ordered but not yet drilled (state.plannedDrillHoles.length, #553)' },
   orderedChargeCount: { type: 'number', description: 'Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length, #554)' },
+  chargeOrderBlockedReason: { type: 'string', optional: true, description: 'blockedReason of the outstanding charge_hole action, null when none or not blocked (#1649)' },
   orderedRampSegmentCount: { type: 'number', description: 'Segments ordered but not yet dug across all in-flight ramps (state.plannedRamps, #555)' },
   builtRampCount: { type: 'number', description: 'Finished ramps (state.builtRamps.length, #1298)' },
   builtRampWidth: { type: 'number', description: 'Width in voxels of the first built ramp, 0 when none is built (#1298)' },

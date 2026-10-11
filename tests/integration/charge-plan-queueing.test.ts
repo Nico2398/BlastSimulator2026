@@ -4,8 +4,8 @@
 // state.chargesByHole in one frame — instant, no employee, no time. #554
 // changes this, mirroring #553's drill_hole split: `charge hole:<id>` queues
 // one `charge_hole` PendingAction per hole instead (requiredSkill:
-// 'blasting', requiredVehicleRole: null — on foot, unlike drilling's
-// drill_rig gate), validated immediately at order time (createCharge's
+// 'blasting', requiredVehicleRole: 'charging_truck' since #1649 — worked
+// from a truck like drilling's drill_rig gate), validated immediately at order time (createCharge's
 // existing refusals are unchanged), and a hole only lands in
 // state.chargesByHole once its own action completes. Ordered-but-unloaded
 // charges live in state.plannedChargesByHole in the meantime.
@@ -54,7 +54,7 @@ describe('charge hole:<id> — queues one charge_hole action instead of writing 
     const chargeActions = state.pendingActions.filter(a => a.type === 'charge_hole');
     expect(chargeActions).toHaveLength(1);
     expect(chargeActions[0]!.requiredSkill).toBe('blasting');
-    expect(chargeActions[0]!.requiredVehicleRole).toBeNull();
+    expect(chargeActions[0]!.requiredVehicleRole).toBe('charging_truck');
     expect(chargeActions[0]!.payload['holeId']).toBe(holeId);
   });
 

@@ -25,6 +25,9 @@ function wideSurvey(id: number, over: Partial<SurveyResult> = {}): SurveyResult 
 
 function drain(runner: ConsoleRunner, ctx: MiningContext, done: () => boolean): void {
   for (let i = 0; i < 800 && !done(); i++) {
+    // Charging is worked from a truck by one crew member (#1649), so a pass spans
+    // more payroll ticks than the starting cash covers; keep the run from going bankrupt.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 100000);
     for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
     runner.run('tick 1');
   }
@@ -34,7 +37,8 @@ function drain(runner: ConsoleRunner, ctx: MiningContext, done: () => boolean): 
 /** Everything up to (not including) `blast`. */
 function prepareBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-  expect(runner.run('drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:14,14').success).toBe(true);
+  // 1x3 near the truck's depot: a charging truck (#1649) circles a wider pattern's far corner without reaching it.
+  expect(runner.run('drill_plan grid rows:1 cols:3 spacing:3 depth:6 start:12,12').success).toBe(true);
   drain(runner, ctx, () => ctx.state!.plannedDrillHoles.length === 0);
   expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
   drain(runner, ctx, () => Object.keys(ctx.state!.plannedChargesByHole).length === 0);

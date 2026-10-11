@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-ecology",
-  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `blast` step ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values.",
+  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `blast` step ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values. #1649 (supersedes the pattern-1 figures above): charging is worked from the one staffed charging truck by the staffed blaster, about 20 ticks per hole, while payroll and fuel burn the $70k budget. Pattern 1 is therefore a 2x3 grid (6 holes, not 20), the fixed tick-20 pads are one wait_until, and the 7 hand-hires land right before the blast; 4 of 12 die, ecology falls 50 -> ~44.8 and nuisance to ~36. All pinned figures below were re-measured from the real run.",
   "steps": [
     {
       "command": "new_game seed:3666 staffed:true cash:70000",
@@ -256,7 +256,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 diameter:0.089 start:10,10",
+      "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -288,8 +288,8 @@
           "type": "dragTiles",
           "x1": 10,
           "z1": 10,
-          "x2": 19,
-          "z2": 22
+          "x2": 16,
+          "z2": 13
         },
         {
           "type": "screenshot"
@@ -307,753 +307,8 @@
           "deathCount": 0,
           "employeeCount": 5,
           "holeCount": 0,
-          "orderedHoleCount": 20,
+          "orderedHoleCount": 6,
           "chargedCount": 0,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 20,
-          "holeCount": 1,
-          "orderedHoleCount": 19,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ],
-        "note": "#553: sandbox-measured. A single driller (employee #1, the staffed:true composition's only driving.drill_rig licence) lands this 20-hole pattern in 13 tick(20)/event(choose 0) cycles -- 260 ticks -- interspersed with the fatigue-collapse rest cycles Employee.ts's needs system forces on a site with no living_quarters (a real driller collapses and rests in the dirt repeatedly, not just once). The 7 hand-hired employees below are NOT hired yet at this point -- deliberately: cash crosses BANKRUPTCY_THRESHOLD ($5,000, balance.ts) on its own well before this pattern finishes even with the scrap boost, and BANKRUPTCY_GRACE_TICKS is only 100 -- hiring 7 more salaries any earlier than this checkpoint burns the grace period before the first blast can even fire (sandbox-measured: hiring all 7 at tick 0 instead of here bankrupts the mine mid-pattern-1, around tick 220). Hiring here, once the single driller is already 16/20 holes in, is the latest point cash can still afford all seven ($20,138 vs. $8,300 total hiring cost) while leaving the rest of this pattern's drilling window inside the 100-tick grace once the new payroll starts compounding."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 20,
-          "holeCount": 1,
-          "orderedHoleCount": 19,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 40,
-          "holeCount": 4,
-          "orderedHoleCount": 16,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 40,
-          "holeCount": 4,
-          "orderedHoleCount": 16,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 60,
-          "holeCount": 6,
-          "orderedHoleCount": 14,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      },
-      "description": "#1151: re-baselined against a measured run -- holeCount 7 -> 8; orderedHoleCount 13 -> 12. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 7 -> 8; orderedHoleCount 13 -> 12. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 60,
-          "holeCount": 6,
-          "orderedHoleCount": 14,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "description": "#1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0, plus rest-priority claim ordering): holeCount 10 -> 9, orderedHoleCount 10 -> 11 at this checkpoint (and the next, following the same one-hole shift plus the drilling crew's own knock-on progress: holeCount 12 -> 13, orderedHoleCount 8 -> 7) -- the harder-to-reach collapse floor and the queued-rest-always-wins claim tie-break shift exactly when this file's own drillers are mid-hole versus mid-rest, delaying hole H5's own landing from this window into the next one (re-derived live: H5 lands at tick 71 into this window, one hole short of the old total; H10 lands early in the next window, one hole over the old total there). tickCount, deathCount, and employeeCount all reproduce unchanged.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 80,
-          "holeCount": 7,
-          "orderedHoleCount": 13,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 80,
-          "holeCount": 7,
-          "orderedHoleCount": 13,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 100,
-          "holeCount": 10,
-          "orderedHoleCount": 10,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      },
-      "description": "#1151: re-baselined against a measured run -- holeCount 11 -> 12; orderedHoleCount 9 -> 8. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 11 -> 12; orderedHoleCount 9 -> 8. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 100,
-          "holeCount": 10,
-          "orderedHoleCount": 10,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 120,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 120,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 130,
-          "holeCount": 12,
-          "orderedHoleCount": 8,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      },
-      "description": "#1151: re-baselined against a measured run -- holeCount 15 -> 16; orderedHoleCount 5 -> 4. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1379: re-baselined against a measured run -- the always-on site policy (neutralized to continuous/0 by the setup step) still routes collapse rests through the shift cycle, so the lone driller lands holes at a different pace and the Profit Sharing event now fires at tick 130 (halting this batch there), shifting every later checkpoint by -10 ticks; the 20-hole pattern now finishes at tick 190."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 15 -> 16; orderedHoleCount 5 -> 4. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 130,
-          "holeCount": 12,
-          "orderedHoleCount": 8,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -8000
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 150,
-          "holeCount": 14,
-          "orderedHoleCount": 6,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 150,
-          "holeCount": 14,
-          "orderedHoleCount": 6,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 170,
-          "holeCount": 15,
-          "orderedHoleCount": 5,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      },
-      "description": "#1151: re-baselined against a measured run -- holeCount 19 -> 20; orderedHoleCount 1 -> 0. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1151: re-baselined against a measured run -- holeCount 19 -> 20; orderedHoleCount 1 -> 0. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 170,
-          "holeCount": 15,
-          "orderedHoleCount": 5,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "description": "#553: this is the same 7-employee hand-hire this file has always done (driller x3, blaster x3, driver x1) -- only its position in the file moved, from immediately after `finances` to right here, mid-pattern-1. Renumbered #6-#12 now that staffed:true claims #1-#5. See the note on the tick(20) step 13 cycles up for why the timing had to move.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 6,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 7,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 8,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 9,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -1500
-        }
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -1500
-        }
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 11,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -1500
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": -800
-        }
-      }
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 190,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
-          "deathCount": 0,
-          "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1065,7 +320,7 @@
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
       "timeout": 125,
-      "description": "#1384: drilling is a fixed-duration action scaled by proficiency/fatigue/Living Quarters, so the last holes land later than the fixed tick pads above assumed. Wait for the queue to drain (the drill rig must be idle before it can be repositioned below) instead of padding.",
+      "description": "#1384: drilling is a fixed-duration action scaled by proficiency/fatigue/Living Quarters, so the last holes land later than the fixed tick pads above assumed. Wait for the queue to drain (the drill rig must be idle before it can be repositioned below) instead of padding. #1649: replaces the 10 fixed tick-20 pads (which kept the payroll running well past the last hole and, with truck-worked charging, bankrupted the $70k budget before the last charge landed).",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1079,7 +334,7 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 20,
+          "holeCount": 6,
           "deathCount": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1129,11 +384,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 220,
-          "holeCount": 20,
+          "tickCount": 54,
+          "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
-          "employeeCount": 12,
+          "employeeCount": 5,
           "vehicleCount": 2,
           "levelEnded": false,
           "levelEndReason": null
@@ -1158,11 +413,11 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 235,
-          "holeCount": 20,
+          "tickCount": 69,
+          "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
-          "employeeCount": 12,
+          "employeeCount": 5,
           "vehicleCount": 2,
           "levelEnded": false,
           "levelEndReason": null
@@ -1223,11 +478,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 235,
-          "holeCount": 20,
+          "tickCount": 69,
+          "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
-          "employeeCount": 12,
+          "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1264,7 +519,7 @@
       "expect": {
         "equals": {
           "orderedChargeCount": 0,
-          "chargedCount": 20,
+          "chargedCount": 6,
           "deathCount": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1272,8 +527,261 @@
       }
     },
     {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "description": "#553: this is the same 7-employee hand-hire this file has always done (driller x3, blaster x3, driver x1) -- only its position in the file moved, from immediately after `finances` to right here, mid-pattern-1. Renumbered #6-#12 now that staffed:true claims #1-#5. See the note on the tick(20) step 13 cycles up for why the timing had to move.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 6,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 8,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 9,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 11,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -800
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 193,
+          "holeCount": 6,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"4\"]"
@@ -1308,7 +816,7 @@
           "holeCount": 0,
           "orderedHoleCount": 0,
           "chargedCount": 0,
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "vehicleCount": 1,
           "levelEnded": false,
@@ -1331,7 +839,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1354,12 +862,12 @@
       "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest versus mid-task at this exact tick. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1090-followup (sandbox-measured): wellBeing 3.30 -> 2.86, safety 50.60 -> 50.55 -- one fewer death at the blast above (deathCount 11, not 12; see that step's own #1090-followup note) means computeAverageMorale averages in one more living-but-devastated employee's own near-zero morale, pulling this checkpoint's average down slightly rather than up, and the surviving rig (vehicleCount 1, not 0) shifts the safety decay accrued by this tick too. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration, sandbox-measured): wellBeing 2.9091666666666565 -> 2.9641666666666575 -- occupancy-aware pathing shifts exactly which of the single surviving driller's rest/work cycles land inside this tick, a small (~0.055) morale-average difference; deathCount/safety/ecology/nuisance/tickCount (314) all reproduce unchanged, confirming this is the same real-crew composition, not a different trajectory.",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 44.40916666666664,
+          "wellBeing": 54.98200000000021,
           "safety": 50,
-          "ecology": 29.204481995231976,
-          "nuisance": 0,
+          "ecology": 44.58863403876688,
+          "nuisance": 36.471585096917195,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1373,6 +881,10 @@
     {
       "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 diameter:0.089 start:25,10",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -1407,7 +919,7 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1433,7 +945,7 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1460,7 +972,7 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1484,7 +996,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1507,12 +1019,12 @@
       "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136, same recalibration as the earlier `scores` checkpoint above -- no change happened between the two checkpoints (both `changedBy.tickCount: 0`), so they still read identically. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration): wellBeing re-derived 2.9091666666666565 -> 2.9641666666666575, same mechanism and same value as the earlier `scores` checkpoint's own note -- still identical between the two checkpoints (`changedBy.tickCount: 0`).",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 44.40916666666664,
+          "wellBeing": 54.98200000000021,
           "safety": 50,
-          "ecology": 29.204481995231976,
-          "nuisance": 0,
+          "ecology": 44.58863403876688,
+          "nuisance": 36.471585096917195,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1535,10 +1047,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 316,
+          "tickCount": 213,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1561,15 +1073,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 316,
+          "tickCount": 213,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 11,
+          "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 25.40916666666661,
+          "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 28.326891971391863,
-          "nuisance": 0,
+          "ecology": 44.78180423260124,
+          "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1588,8 +1100,8 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 316,
-          "deathCount": 11,
+          "tickCount": 213,
+          "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1608,13 +1120,13 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 316,
-          "deathCount": 11,
+          "tickCount": 213,
+          "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 25.40916666666661,
+          "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 28.326891971391863,
-          "nuisance": 0,
+          "ecology": 44.78180423260124,
+          "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1632,13 +1144,13 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 316,
-          "deathCount": 11,
+          "tickCount": 213,
+          "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 25.40916666666661,
+          "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 28.326891971391863,
-          "nuisance": 0,
+          "ecology": 44.78180423260124,
+          "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false

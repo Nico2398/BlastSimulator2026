@@ -154,13 +154,12 @@ export function forceShiftRestIfNeeded(
  * own forceShiftRestIfNeededByPolicy for why that guard survives #1090
  * rather than being deleted alongside the dismount-on-completion mechanism.
  *
- * 'place_building' (#1039), 'charge_hole' and 'survey' (#1049) — all three
- * are requiredVehicleRole: null, timer-driven via taskTicksRemaining, with no
- * vehicle gate.
+ * 'place_building' (#1039) and 'survey' (#1049) — both are requiredVehicleRole:
+ * null, timer-driven via taskTicksRemaining, with no vehicle gate. 'charge_hole'
+ * is vehicle-gated since #1649 and protected via isMidVehicleGatedWork.
  */
 const PROTECTED_MID_EXECUTION_ACTION_TYPES: ReadonlySet<ActionType> = new Set([
   'place_building',
-  'charge_hole',
   'survey',
 ]);
 
@@ -183,8 +182,7 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  * fatigue cost exceeds what an in-place rest restores (it caps at
  * NEED_REST_NO_BUILDING_CAP). Interrupting then walks nowhere — the rest ends
  * at the same level, the walk restarts and crosses the threshold at the same
- * point of the same route, so the action is never reached (a far charge_hole
- * stranded in plannedChargesByHole forever, #1379). Callers pass a destination
+ * point of the same route, so the action is never reached (#1379). Callers pass a destination
  * with no living_quarters (a building is weighed by restRoundTripWorthwhile).
  */
 function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee): boolean {

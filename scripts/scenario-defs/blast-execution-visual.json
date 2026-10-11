@@ -142,7 +142,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "vehicleCount": 1
         }
       }
@@ -248,8 +248,55 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "description": "#1649: employee 1 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
@@ -629,7 +676,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "vehicleCount": 1
         }
       }
@@ -734,8 +781,55 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "description": "#1649: employee 2 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
@@ -851,7 +945,22 @@
           "command": "tick 60"
         }
       ],
+      "role": "setup"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#1649: charge orders wait on the charging-truck crew; wait on the queue draining rather than a hand-measured tick pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
       "role": "setup",
+      "timeout": 180,
       "expect": {
         "equals": {
           "chargedCount": 4,
@@ -1044,7 +1153,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "vehicleCount": 1
         }
       }
@@ -1175,9 +1284,56 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.truck level:1",
+      "description": "#1649: employee 4 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
       "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
@@ -1634,7 +1790,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "vehicleCount": 1
         }
       }
@@ -1698,8 +1854,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 2
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -1760,8 +1916,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 3
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -1864,8 +2020,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 4
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -1926,8 +2082,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 5
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -1988,8 +2144,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 6
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -2071,8 +2227,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 7
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -2133,8 +2289,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 8
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -2388,6 +2544,143 @@
       }
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 16 skill:driving.truck level:1",
+      "description": "#1649: employee 16 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 16 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 17 skill:driving.truck level:1",
+      "description": "#1649: employee 17 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 17 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 18 skill:driving.truck level:1",
+      "description": "#1649: employee 18 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 18 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
       "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
       "interaction": [
@@ -2439,6 +2732,27 @@
       ],
       "role": "setup",
       "description": "#1385: hiring pool holds 3 candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1649: charging now runs for the truck crew, so an event can cut the previous pad short; one more day so the hiring pool (refreshed daily) restocks."
     },
     {
       "command": "event choose 0",
@@ -3239,8 +3553,55 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 37 skill:driving.truck level:1",
+      "description": "#1649: employee 37 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 37 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"

@@ -30,6 +30,7 @@ import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../src/core/mining/BlastPlayback.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
+import { buyChargingTruck } from '../helpers/blastFixtures.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 
 /**
@@ -50,6 +51,12 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
     runner.run('tick 1');
   }
   expect(ctx.state!.plannedDrillHoles.length).toBe(0);
+
+  // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
+  const driller = ctx.state!.employees.employees.find(e => e.role === 'driller')!;
+  buyChargingTruck(cmd => runner.run(cmd), ctx.state!, driller.id);
+  ctx.state!.cash = 500_000; // the truck purchase must not leave the charge orders waiting for funds
+  ctx.state!.finances.cash = 500_000;
 
   expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
   for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {

@@ -10,6 +10,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
+import { VEHICLE_BASE_STATS } from '../../../src/core/config/balance.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
 /**
@@ -177,6 +178,35 @@ export function ensureDrillRigCrew(ctx: GameContext): void {
 }
 
 /**
+ * Give the site a charging truck and license its first driller to drive it, so
+ * `charge_hole` orders are worked (#1649: a charge needs a truck and a crew
+ * member holding 'blasting' plus the truck licence — never charged on foot).
+ * Call after the driller holds 'blasting'. A no-op for a truck already owned.
+ */
+export function ensureChargingTruckCrew(ctx: GameContext): void {
+  const state = ctx.state!;
+  if (!state.vehicles.vehicles.some(v => v.type === 'charging_truck')) {
+    vehicleCommand(ctx as any, ['buy', 'charging_truck'], {});
+  }
+  const driller = state.employees.employees.find(e => e.role === 'driller');
+  if (driller) {
+    employeeCommand(ctx as any, ['assign_skill', String(driller.id)], { skill: 'driving.truck', level: '1' });
+  }
+}
+
+/**
+ * Add the charging truck's purchase price to the site's cash, so buying it
+ * (#1649) leaves the level's calibrated budget as it was: the staffed opening
+ * hands the truck over free (#1648), a bare or hired-in site pays for it.
+ * Call before `performBlast`, which buys the truck through ensureChargingTruckCrew.
+ */
+export function fundChargingTruck(ctx: GameContext): void {
+  const state = ctx.state!;
+  state.cash += VEHICLE_BASE_STATS.charging_truck.purchaseCost;
+  state.finances.cash = state.cash;
+}
+
+/**
  * Perform a standard blast cycle: drill grid, charge all, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).
@@ -186,6 +216,7 @@ export function ensureDrillRigCrew(ctx: GameContext): void {
  */
 export function performBlast(ctx: GameContext, originX: number, originZ: number): string {
   ensureDrillRigCrew(ctx);
+  ensureChargingTruckCrew(ctx);
   drillPlanCommand(ctx as any, ['grid'], {
     origin: `${originX},${originZ}`,
     rows: '2',

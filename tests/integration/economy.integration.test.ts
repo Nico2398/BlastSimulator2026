@@ -126,6 +126,14 @@ function hireDrillerAndRig(ctx: GameContext): void {
   expect(buyRig.success).toBe(true);
 }
 
+/** Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649). */
+function addChargingTruckCrew(ctx: GameContext): void {
+  const drillerId = ctx.state!.employees.employees.find(e => e.role === 'driller')!.id;
+  employeeCommand(ctx, ['assign_skill', String(drillerId)], { skill: 'driving.truck', level: '1' });
+  employeeCommand(ctx, ['assign_skill', String(drillerId)], { skill: 'blasting', level: '1' });
+  expect(vehicleCommand(ctx, ['buy', 'charging_truck'], {}).success).toBe(true);
+}
+
 /**
  * Ticks until every hole ordered by the last drill_plan grid has landed in
  * state.drillHoles (#553). Tops up employee need gauges each tick — a solo
@@ -772,6 +780,7 @@ describe('Economy', () => {
     // would be asserting against a fixture the game cannot satisfy. (18,19) is
     // on the same flat bench as the vehicle spawn and the warehouse.
     hireDrillerAndRig(ctx);
+    addChargingTruckCrew(ctx);
 
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
       origin: '18,19',
@@ -1099,7 +1108,8 @@ describe('Economy', () => {
     });
     const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     expect(buyResult.success).toBe(true);
-    const vehicleId = 5;
+    // Not a fixed id: the charging truck bought for the blast cycle (#1649) precedes it.
+    const vehicleId = ctx.state!.vehicles.vehicles.find(v => v.type === 'debris_hauler')!.id;
     const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
     expect(assignResult.success).toBe(true);
 

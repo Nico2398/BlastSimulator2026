@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-win",
-  "description": "Level 3 (Treranium Depths) playthrough: 3 surveys, a fleet purchase, four far-flung living quarters and one real 24-hole blast (PERFECT rating, heavy casualties and fleet losses) plus a contract cycle on a funded ($1,500,000) mine that stays solvent and revolt-free, ending as a real win. #1431 (rebuilt after #1313 froze the mine at level end): the original $220,000 opening went bankrupt at tick 139 and the file played on over a lost game. `campaign start level:treranium_depths` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:treranium_depths`, which activates level 3 and ends it 'completed' with profit at the $800,000 threshold. Patterns 2-5 of the original $800k plan stay dropped.",
+  "description": "Level 3 (Treranium Depths) playthrough: 3 surveys, a fleet purchase, four far-flung living quarters and one real 24-hole blast (PERFECT rating, heavy casualties and fleet losses) plus a contract cycle on a funded ($1,500,000) mine that stays solvent and revolt-free, ending as a real win. #1431 (rebuilt after #1313 froze the mine at level end): the original $220,000 opening went bankrupt at tick 139 and the file played on over a lost game. `campaign start level:treranium_depths` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:treranium_depths`, which activates level 3 and ends it 'completed' with profit at the $800,000 threshold. Patterns 2-5 of the original $800k plan stay dropped. #1649: charging is truck-worked (staffed charging truck + dual-qualified blaster), so fewer crew stand in the blast zone and deathCount is 1 (re-measured; was 7).",
   "steps": [
     {
       "command": "new_game seed:3666 cash:1500000 staffed:true",
@@ -1911,7 +1911,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1936,7 +1936,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1958,7 +1958,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1980,7 +1980,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2006,7 +2006,7 @@
           "tickCount": 6
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2032,7 +2032,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2055,7 +2055,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2146,7 +2146,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2168,7 +2168,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2194,7 +2194,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2216,7 +2216,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2259,7 +2259,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 1,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,

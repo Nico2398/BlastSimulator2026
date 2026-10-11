@@ -521,6 +521,48 @@
       "role": "bootstrap"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      },
+      "description": "#1649: charge_hole is worked from a charging truck by an employee holding blasting + driving.truck; buy one so the charge orders can be carried out."
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "description": "#1649: the driller already holds blasting (role starting qualification); driving.truck lets them drive the charging truck. Training at a driving_center is the player path; skipped, this file is not about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553 follow-up: a single driller/drill_rig cannot finish this 9-hole grid before well-being's 120-tick worker-revolt countdown completes -- sandbox-measured directly (pure command-mode engine probe, no browser): one driller starting fresh at tick 0 with full needs still only reaches 5/9 holes by the tick the crew revolts, and a `build living_quarters` early makes it WORSE (the driller detours to rest there instead of progressing, landing 0/9 holes). A second driller/drill_rig running in parallel is the strategy that actually finishes in time -- sandbox-measured landing at tick ~297 vs. revolt's tick ~333, an 8-tick margin at the tick-block sizes below. Employee #3 -- #1 is the surveyor, #2 the first driller, both hired above.",
       "interaction": [
@@ -569,7 +611,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 2
+          "vehicleCount": 3
         }
       }
     },

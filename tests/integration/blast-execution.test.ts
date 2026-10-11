@@ -7,8 +7,15 @@ import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 import { t } from '../../src/core/i18n/I18n.js';
+import type { GameState } from '../../src/core/state/GameState.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
+import { tickUntilFresh } from '../helpers/blastFixtures.js';
+
+/** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
+function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
+  tickUntilFresh(run, state, () => { state.cash = Math.max(state.cash, 100000); return predicate(); }, maxTicks);
+}
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -224,7 +231,7 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
 
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    for (let i = 0; i < 800 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
+    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
     expect(Object.keys(state.chargesByHole).length).toBeGreaterThan(0);
 
@@ -270,30 +277,24 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
 // ── #1346: firing the blast cancels every still-ordered drill hole ───────────
 
 describe('Blast execution — #1346', () => {
-  /** Drill a 3x4 grid until >=3 holes have landed while others are still ordered, then charge only the landed ones. */
+  /**
+   * Drill and charge a 1x3 pattern completely, then order a second pattern that
+   * is still pending at fire time. Charging is worked from a truck by one crew
+   * member (#1649) and is slower than drilling, so the pending orders are placed
+   * after the charges landed rather than racing the drill crew.
+   */
   function setupPartiallyDrilled() {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(run('drill_plan grid rows:4 cols:6 spacing:3 depth:8 start:12,12').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:3 spacing:3 depth:8 start:12,12').success).toBe(true);
     const state = ctx.state!;
-    for (let i = 0; i < 2000 && state.drillHoles.length < 3; i++) run('tick 1');
+    tickFunded(run, state, () => state.plannedDrillHoles.length === 0, 2000);
     expect(state.drillHoles.length).toBeGreaterThanOrEqual(3);
+    expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+    for (const x of [12, 15, 18]) expect(run(`drill_plan add x:${x} z:20 depth:8`).success).toBe(true);
     expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
-    // Keep ordering charges for each newly landed hole until every landed hole
-    // is charged while others are still ordered (the drill crew keeps working).
-    const ordered = new Set<string>();
-    for (let i = 0; i < 3000; i++) {
-      for (const h of state.drillHoles) {
-        if (ordered.has(h.id)) continue;
-        state.cash = Math.max(state.cash, 100000); // slower scaled drilling accrues wages; keep charge orders affordable
-        expect(run(`charge hole:${h.id} explosive:boomite amount:8 stemming:2`).success).toBe(true);
-        ordered.add(h.id);
-      }
-      if (state.plannedDrillHoles.length === 0) break;
-      if (state.drillHoles.every(h => state.chargesByHole[h.id])) break;
-      run('tick 1');
-    }
     const ids = state.drillHoles.map(h => h.id);
     expect(ids.length).toBeGreaterThanOrEqual(3);
     expect(ids.every(id => state.chargesByHole[id])).toBe(true);
@@ -370,11 +371,11 @@ describe('Blast execution — #1346', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:14,14').success).toBe(true);
     const state = ctx.state!;
-    for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    tickFunded(run, state, () => state.plannedDrillHoles.length === 0, 2000);
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < 2000 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
+    tickFunded(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 2000);
 
     const result = run('blast');
 
@@ -398,10 +399,10 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(run('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
     const state = () => ctx.state!;
-    const topUp = () => { for (const e of state().employees.employees) e.fatigue = 100; };
+    const topUp = () => { state().cash = Math.max(state().cash, 100000); for (const e of state().employees.employees) e.fatigue = 100; };
     for (let i = 0; i < 600 && state().plannedDrillHoles.length > 0; i++) { topUp(); run('tick 1'); }
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < 600 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
+    for (let i = 0; i < 2000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
     expect(state().drillHoles.length).toBeGreaterThan(0);
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
     return { run, ctx, state, topUp, engine };

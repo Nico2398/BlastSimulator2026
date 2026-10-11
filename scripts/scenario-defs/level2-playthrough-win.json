@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four far-flung living quarters, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig.",
+  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four far-flung living quarters, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig. #1649: charging is worked from a charging truck by a blasting + driving.truck employee. Each blast destroys the truck and kills its blaster, so patterns 2-4 each buy a fresh charging truck and licence a blaster for it; death counts and ecology/nuisance figures were re-measured, and the closing profit reads 250000.00000000023 (float residue of the force-win top-up).",
   "steps": [
     {
       "command": "new_game seed:2277 cash:3000000 staffed:true",
@@ -1659,7 +1659,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1683,7 +1683,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1704,7 +1704,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1725,11 +1725,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.04083333333342,
+          "wellBeing": 99.95,
           "safety": 50,
           "ecology": 49.67524933152729,
           "nuisance": 49.18812332881822
@@ -1752,7 +1752,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1773,7 +1773,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1796,7 +1796,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1816,7 +1816,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1838,7 +1838,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1867,7 +1867,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1912,7 +1912,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1931,7 +1931,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1961,7 +1961,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2001,7 +2001,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2090,7 +2090,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 13,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2143,7 +2143,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2164,7 +2164,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2185,7 +2185,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2194,6 +2194,44 @@
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "employee assign_skill 10 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 10 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence, and the previous blast destroyed the old truck and its blaster. Grants the licence to a blaster for pattern 2 (player path: `employee train` at a driving_center)."
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      },
+      "description": "#1649: a fresh charging truck for pattern 2; the previous one was destroyed by the last blast."
     },
     {
       "command": "charge hole:* explosive:krackle amount:5 stemming:3",
@@ -2244,7 +2282,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 1,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2335,7 +2373,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2360,7 +2398,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2382,7 +2420,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2404,7 +2442,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2426,14 +2464,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
-          "safety": 13.850000000000072,
-          "ecology": 32.498181610747444,
-          "nuisance": 6.245454026868625
+          "safety": 0,
+          "ecology": 32.36818161074745,
+          "nuisance": 5.920454026868629
         },
         "changedBy": {
           "tickCount": 0
@@ -2452,7 +2490,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2475,7 +2513,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2498,7 +2536,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2519,7 +2557,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2542,7 +2580,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2572,7 +2610,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2613,7 +2651,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2635,7 +2673,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2727,11 +2765,11 @@
       "role": "player"
     },
     {
-      "command": "vehicle driver 8 14",
+      "command": "vehicle driver 9 14",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 8 14"
+          "command": "vehicle driver 9 14"
         }
       ],
       "role": "bootstrap"
@@ -2781,7 +2819,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2835,7 +2873,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2857,7 +2895,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2879,7 +2917,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2920,6 +2958,44 @@
           "wetHoleCount": 0
         }
       }
+    },
+    {
+      "command": "employee assign_skill 15 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 15 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence, and the previous blast destroyed the old truck and its blaster. Grants the licence to a blaster for pattern 3 (player path: `employee train` at a driving_center)."
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      },
+      "description": "#1649: a fresh charging truck for pattern 3; the previous one was destroyed by the last blast."
     },
     {
       "command": "charge hole:* explosive:boomite amount:6 stemming:3",
@@ -2970,11 +3046,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 5,
+          "holeCount": 4,
           "chargedCount": 0
         },
         "changedBy": {
@@ -3061,7 +3137,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3086,7 +3162,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3108,7 +3184,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3129,51 +3205,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 7,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ],
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3196,7 +3228,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3217,7 +3249,51 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3245,7 +3321,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3265,7 +3341,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3295,7 +3371,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3336,7 +3412,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3358,14 +3434,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.62250000000002,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 39.888338847163396,
-          "nuisance": 10.54237259825818
+          "ecology": 59.589696697780155,
+          "nuisance": 15.093544904265844
         },
         "changedBy": {
           "tickCount": 0
@@ -3384,7 +3460,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3406,7 +3482,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3498,11 +3574,11 @@
       "role": "player"
     },
     {
-      "command": "vehicle driver 9 16",
+      "command": "vehicle driver 11 16",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 9 16"
+          "command": "vehicle driver 11 16"
         }
       ],
       "role": "bootstrap"
@@ -3552,7 +3628,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3606,7 +3682,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3628,7 +3704,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3650,7 +3726,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3660,6 +3736,44 @@
         },
         "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
       }
+    },
+    {
+      "command": "employee assign_skill 17 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 17 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence, and the previous blast destroyed the old truck and its blaster. Grants the licence to a blaster for pattern 4 (player path: `employee train` at a driving_center)."
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      },
+      "description": "#1649: a fresh charging truck for pattern 4; the previous one was destroyed by the last blast."
     },
     {
       "command": "charge hole:* explosive:krackle amount:6 stemming:3",
@@ -3710,7 +3824,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3801,7 +3915,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3826,7 +3940,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3848,7 +3962,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3870,7 +3984,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3891,7 +4005,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3914,7 +4028,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3935,7 +4049,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3963,7 +4077,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3982,7 +4096,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4005,7 +4119,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4035,7 +4149,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4077,7 +4191,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4101,14 +4215,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 36.972252371826684,
-          "nuisance": 0
+          "ecology": 50,
+          "nuisance": 7.329085444122614
         },
         "changedBy": {
           "tickCount": 0
@@ -4127,14 +4241,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 6,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 36.972252371826684,
-          "nuisance": 0
+          "ecology": 50,
+          "nuisance": 7.329085444122614
         },
         "changedBy": {
           "tickCount": 0
@@ -4157,7 +4271,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000
+          "profit": 250000.00000000023
         },
         "increased": [
           "cash"
@@ -4180,7 +4294,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000
+          "profit": 250000.00000000023
         },
         "changedBy": {
           "cash": 0,

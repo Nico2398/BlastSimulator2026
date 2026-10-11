@@ -608,7 +608,8 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   }
 
   // #1103: a currently-mounted employee claiming any OTHER on-foot action
-  // (place_building, survey, charge_hole, etc.) must alight first. Without
+  // (place_building, survey, etc.) must alight first. (charge_hole is
+  // vehicle-gated since #1649 and returned above, before this alight.) Without
   // this, the itinerary walk below moves employee.x/z on its own every tick
   // while the vehicle they're still nominally "mounted" in never moves — an
   // immediate and then ever-widening I2 (mounted-position-mismatch)

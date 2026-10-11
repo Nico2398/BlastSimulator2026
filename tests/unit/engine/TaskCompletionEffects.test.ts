@@ -453,4 +453,21 @@ describe('applyTaskCompletion — charge_hole generates the rock it will blast (
     expect(report.chargeLoaded?.holeId).toBe('H1');
     expect(grid.allocatedCyRange(chunkIndexOf(20), chunkIndexOf(20))!.min).toBeLessThanOrEqual(zoneBottomCy);
   });
+
+  it('keeps the charger mounted on the charging truck once the charge lands (#1649)', () => {
+    const state = createGame({ seed: SEED });
+    const grid = generateTerrain({ sizeX: 48, datum: 40, sizeZ: 48, seed: 11, climateBias: [0, 0] });
+    const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    employee.locomotion = { kind: 'mounted', vehicleId: 7 };
+    state.drillHoles.push({ id: 'H1', x: 20, z: 20, depth: 12, diameter: 0.15 });
+    state.plannedChargesByHole['H1'] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } as typeof state.plannedChargesByHole[string];
+
+    const report = applyTaskCompletion(state, grid, employee, baseProgress({
+      actionType: 'charge_hole',
+      actionPayload: { holeId: 'H1' },
+    }), new EventEmitter());
+
+    expect(report.chargeLoaded?.holeId).toBe('H1');
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: 7 });
+  });
 });

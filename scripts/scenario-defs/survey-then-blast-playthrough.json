@@ -543,6 +543,48 @@
       "role": "bootstrap"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: charge_hole is worked from a charging truck by an employee holding blasting + driving.truck; buy one so the charge orders can be carried out.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "description": "#1649: the driller already holds blasting (role starting qualification); driving.truck lets them drive the charging truck. Training at a driving_center is the player path; skipped, this file is not about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553 follow-up: a single driller/drill_rig cannot finish this 9-hole grid before well-being's 120-tick worker-revolt countdown completes -- sandbox-measured directly (pure command-mode engine probe, no browser). A second tier-1 driller/drill_rig closes most of the gap but this file's earlier 3-employee roster (surveyor+driller+blaster, all on payroll since tick 0) means a THIRD employee's payroll and needs upkeep tips the mine into bankruptcy before drilling finishes instead (also sandbox-measured). Buying the second rig at tier:2 (see below) gets the same combined drilling throughput from only one extra employee, which the mine's cash can actually sustain. Employee #4 -- #1 surveyor, #2 the first driller, #3 the blaster.",
       "interaction": [
@@ -591,7 +633,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 2
+          "vehicleCount": 3
         }
       }
     },

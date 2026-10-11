@@ -817,13 +817,12 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
   // proactive shift-cycle/fatigue-threshold rest — unlike the general_work
   // case above (#945 follow-up), which stays interruptible.
   // isMidConstructionWork/PROTECTED_MID_EXECUTION_ACTION_TYPES scopes this
-  // guard to place_building, charge_hole and survey specifically, mirroring
+  // guard to place_building and survey (charge_hole left the set in #1649) specifically, mirroring
   // isMidVehicleGatedWork's own scoping for vehicle-gated work — each shares
   // the same fragmentation bug class (a single task fragmented into many
   // interrupted, restarted attempts).
   it.each<[ActionType, number]>([
     ['place_building', 1103],
-    ['charge_hole', 1106],
     ['survey', 1107],
   ])('#1039/#1049: no-op when mid-execution of a %s action (taskTicksRemaining set), even with fatigue very low', (actionType, id) => {
     const state = createGame({ seed: SEED });
@@ -842,6 +841,48 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.activeActionId).toBe(id);
     const held = state.pendingActions.find(a => a.id === id)!;
     expect(held.status).toBe('in_progress');
+  });
+
+  // #1649: charge_hole is vehicle-gated work (charging truck), so it is protected
+  // mid-execution through isMidVehicleGatedWork, not the on-foot protected set.
+  it('#1649: no-op when mid-execution of a charge_hole worked from a reserved charging truck', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1106, 'charge_hole');
+    prior.requiredSkill = 'blasting';
+    prior.requiredVehicleRole = 'charging_truck';
+    vehicle.occupantIds = [employee.id];
+    reserveVehicle(state.vehicles, vehicle.id, prior.id);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1106);
+    expect(state.pendingActions.find(a => a.id === 1106)!.status).toBe('in_progress');
+  });
+
+  it('#1649: charge_hole is no longer protected on its own — mid-execution without a reservation is interruptible', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1108, 'charge_hole');
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 1;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBe(1108);
   });
 
   // #1039: general_work is unaffected by the new place_building guard — see
@@ -879,18 +920,20 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
   });
 
   // #1379: with no living_quarters an in-place rest only restores to
-  // NEED_REST_NO_BUILDING_CAP, so a walk to a protected task (charge_hole)
+  // NEED_REST_NO_BUILDING_CAP, so a walk to a protected task (survey)
   // costing more fatigue than that gain is never reached if every threshold
-  // crossing interrupts it (entry stuck in plannedChargesByHole forever).
+  // crossing interrupts it (a far survey never reached). charge_hole itself was
+  // the original case but is vehicle-gated since #1649, so the protected-walk
+  // guard is pinned with survey, which is still on-foot and protected.
   it.each<[number, boolean]>([
     [20, false],
     [3, true],
-  ])('#1379: mid-walk to a charge_hole, no quarters, itinerary est %s ticks at fatigue 60 rests: %s', (estTotalTicks, rests) => {
+  ])('#1379: mid-walk to a survey, no quarters, itinerary est %s ticks at fatigue 60 rests: %s', (estTotalTicks, rests) => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const prior = pushHeldAction(state, employee.id, 1140, 'charge_hole');
+    const prior = pushHeldAction(state, employee.id, 1140, 'survey');
     prior.status = 'assigned';
     employee.activeActionId = prior.id;
     employee.fatigue = 60;

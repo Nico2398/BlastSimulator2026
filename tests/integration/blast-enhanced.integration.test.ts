@@ -25,7 +25,7 @@ import {
 import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 import { createRunner } from '../../src/console/createRunner.js';
-import { tickUntilFresh } from '../helpers/blastFixtures.js';
+import { tickUntilFresh, buyChargingTruck } from '../helpers/blastFixtures.js';
 import { recordProfit } from '../../src/core/campaign/Campaign.js';
 import { tickCommand } from '../../src/console/commands/tick.js';
 import { blastCommand, blastPreviewCommand } from '../../src/console/commands/mining.js';
@@ -382,6 +382,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     const driller = state.employees.employees.find(e => e.role === 'driller')!;
     expect(run('vehicle buy drill_rig').success).toBe(true);
     expect(run(`employee assign_skill ${driller.id} skill:driving.drill_rig level:1`).success).toBe(true);
+    buyChargingTruck(run, state, driller.id);
 
     expect(run('drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:18,10 diameter:0.089').success).toBe(true);
     tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 800);

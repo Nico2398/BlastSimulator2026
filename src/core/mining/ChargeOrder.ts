@@ -30,6 +30,12 @@ function findOutstandingChargeAction(state: GameState, holeId: string): PendingA
   return state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
 }
 
+/** blockedReason of the outstanding (unfinished) charge order, null when none or not blocked (#1649). */
+export function outstandingChargeBlockedReason(state: GameState): string | null {
+  const action = state.pendingActions.find(a => a.type === 'charge_hole');
+  return action?.blockedReason ?? null;
+}
+
 /** Cancel the outstanding charge order of a hole, refunding its cost. No-op without one (#554). */
 export function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
   const action = findOutstandingChargeAction(state, holeId);
@@ -58,13 +64,15 @@ export function dispatchChargeAction(
   const durationTicks = computeChargeHoleDurationTicks(amountKg);
   const orderCost = chargeOrderCost(explosiveId, amountKg) * explosivePriceFactor(state);
   const actionId = state.nextPendingActionId++;
-  // skipQualificationCheck (#554): a charge order must queue silently even
-  // when nobody on the roster holds 'blasting' yet.
+  // Worked from a charging truck by a crew member holding 'blasting' and the
+  // truck's licence (#1649). skipQualificationCheck (#554): the order must still
+  // queue silently with no truck, driver or blaster; OrderReachability then
+  // stamps why nobody can take it (blockedReason).
   dispatchPendingAction(state, {
     id: actionId,
     type: 'charge_hole',
     requiredSkill: 'blasting',
-    requiredVehicleRole: null,
+    requiredVehicleRole: 'charging_truck',
     targetX: hole.x,
     targetZ: hole.z,
     targetY: 0,

@@ -582,7 +582,7 @@ describe('Performance Benchmarks', () => {
 
   describe('Blast on level 4 (treranium_depths, 160×64×160) (#458 T6.2/D14)', () => {
     it('completes drill → charge → blast within the benchmark budget', async () => {
-      const { makeCampaignCtx, ensureDrillRigCrew, driveDrillPlanToCompletion, driveChargePlanToCompletion } = await import('../../integration/full-level/helpers.js');
+      const { makeCampaignCtx, ensureDrillRigCrew, ensureChargingTruckCrew, fundChargingTruck, driveDrillPlanToCompletion, driveChargePlanToCompletion } = await import('../../integration/full-level/helpers.js');
       const { employeeCommand } = await import('../../../src/console/commands/entities.js');
       const { drillPlanCommand, chargeCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
 
@@ -590,6 +590,9 @@ describe('Performance Benchmarks', () => {
       employeeCommand(ctx, ['hire'], { role: 'driller' });
       employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
       ensureDrillRigCrew(ctx);
+      // Charging is worked from a charging truck by a licensed blaster (#1649).
+      fundChargingTruck(ctx);
+      ensureChargingTruckCrew(ctx);
 
       // FIRE needs drilled, charged holes (#1345), so the crew works the plan between
       // commands. Only the commands are timed, as before; the crew ticks are not.

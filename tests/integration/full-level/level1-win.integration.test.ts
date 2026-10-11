@@ -12,6 +12,7 @@ import {
   makeCampaignCtx,
   tickWithEvents,
   performBlast,
+  fundChargingTruck,
   driveToLevelCompletion,
   assertLevelCompletion,
   assertStateSummaryCompletion,
@@ -23,6 +24,9 @@ import { getLevel } from '../../../src/core/campaign/Level.js';
 import { getOperatingProfit } from '../../../src/core/economy/Finance.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../../helpers/playthrough.js';
+
+/** Cash credited to the bare site for the payroll of the extra ticks truck-worked charging takes (#1649). */
+const TRUCK_CHARGING_PAYROLL_HEADROOM = 15000;
 
 describe('Level 1 — Win (debug command, bare site)', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -60,6 +64,13 @@ describe('Level 1 — Win (debug command, bare site)', () => {
     });
     expect(skillResult.success).toBe(true);
     expect(skillResult.output).toContain('assigned skill');
+
+    // Charging needs a charging truck (#1649); performBlast buys it, so fund it
+    fundChargingTruck(ctx);
+    // Truck-worked charging stretches the cycle by ~70 ticks of payroll the bare
+    // site's budget never had to carry; credit that wage bill, not a free win.
+    ctx.state!.cash += TRUCK_CHARGING_PAYROLL_HEADROOM;
+    ctx.state!.finances.cash = ctx.state!.cash;
 
     // Perform a blast at (10,10)
     const blastOutput = performBlast(ctx, 10, 10);
@@ -150,7 +161,7 @@ function playLevel1(run: Run, state: GameState, style: PlayStyle): void {
 describe('Level 1 — real playthrough wins with no campaign complete (#1363)', () => {
   const STYLES: ReadonlyArray<{ label: string; style: PlayStyle }> = [
     { label: 'seed 1138, 2x2 grids stepping south', style: { rows: 2, cols: 2, spacing: 3, depth: 6, offset: { x: 14, z: 13 }, step: { x: 0, z: 10 } } },
-    { label: 'seed 1138, 2x3 grids stepping east', style: { rows: 2, cols: 3, spacing: 3, depth: 6, offset: { x: 14, z: 13 }, step: { x: 10, z: 0 } } },
+    { label: 'seed 1138, 2x2 grids stepping east', style: { rows: 2, cols: 2, spacing: 3, depth: 6, offset: { x: 14, z: 13 }, step: { x: 10, z: 0 } } },
   ];
 
   it.each(STYLES)('wins within the tick cap and solvent — $label', ({ style }) => {

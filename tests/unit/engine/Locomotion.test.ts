@@ -2187,3 +2187,33 @@ describe('an on-foot work claim whose itinerary dies is released, not started in
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 });
+
+describe('a vehicle-gated charge_hole is driven to the hole, never walked (#1649)', () => {
+  it('a blaster seated in the reserved charging truck drives to the hole and stays mounted', () => {
+    const state = buildFlatNavGridState(30, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const action: PendingAction = {
+      id: 1, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: 'charging_truck',
+      targetX: 20, targetZ: 0, targetY: 0, payload: { holeId: 'h1' }, targetEmployeeId: null,
+      status: 'assigned', holderId: employee.id, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
+    employee.activeActionId = action.id;
+    employee.pendingTaskDuration = 10;
+    employee.itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { action });
+
+    expect(employee.itinerary!.legs.some(leg => leg.onArrive.kind === 'alight')).toBe(false);
+    for (let t = 0; t < 40 && employee.itinerary !== null; t++) tickLocomotion(state);
+
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(vehicleDriverId(vehicle)).toBe(employee.id);
+    expect(Math.hypot(vehicle.x - 20, vehicle.z - 0)).toBeLessThan(3);
+  });
+});

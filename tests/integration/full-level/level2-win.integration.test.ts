@@ -7,6 +7,7 @@ import {
   makeCampaignCtxWithUnlock,
   tickWithEvents,
   performBlast,
+  fundChargingTruck,
 } from './helpers.js';
 import { campaignCompleteCommand, campaignStatusCommand } from '../../../src/console/commands/campaign.js';
 import { employeeCommand } from '../../../src/console/commands/entities.js';
@@ -40,6 +41,9 @@ describe('Level 2 — Win', () => {
 
     // Assign blasting skill
     employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
+
+    // Charging needs a charging truck (#1649); performBlast buys it, so fund it
+    fundChargingTruck(ctx);
 
     // Perform a blast at (15,15) — offset from origin to avoid center
     const blastOutput = performBlast(ctx, 15, 15);

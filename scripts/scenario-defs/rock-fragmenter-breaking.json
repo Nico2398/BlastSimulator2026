@@ -174,9 +174,56 @@
       }
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "description": "#1649: employee 1 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
       "description": "#1090-followup root-cause fix: leading `setStepper` on the amount field added -- stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), but amount had no equivalent stepper adjustment, so the real Charge All click was silently charging at the panel's own DEFAULT_AMOUNT_KG=5 the whole time (same documented gotcha Charge.ts's own comment on `data-field=\"amount\"` names, and the exact fix blast-undercharge.json's own analogous step already applies). #1090's dispatch-timing change didn't create this divergence -- `compare-scenario-traces.ts` shows it was always there (chargesByHole amountKg 5 vs the declared 2) -- but it meant this file's blast in interaction mode was never actually the deliberately undercharged 2kg/5m-spacing shot the file's own description claims, just a heavier, better-fragmented one whose different RNG trajectory needed enough extra ticks to build both freight_warehouses that the file's cash cushion (last sized for a different divergence, #556) ran out into bankruptcy first. Charging at the intended 2kg fixes the actual blast outcome to match command mode's own trace.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
@@ -360,21 +407,21 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 1
+          "vehicleCount": 2
         },
         "changedBy": {
           "cash": -25000
         },
-        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts); vehicleCount is 1, not 2, because the blast above destroyed vehicle #1 (the drill_rig)"
+        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts); vehicleCount is 2 (charging truck + hauler), not 3, because the blast above destroyed vehicle #1 (the drill_rig)"
       }
     },
     {
-      "command": "vehicle driver 2 2",
+      "command": "vehicle driver 3 2",
       "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 2 2"
+          "command": "vehicle driver 3 2"
         }
       ],
       "role": "bootstrap"
@@ -389,6 +436,17 @@
         }
       ],
       "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#1649: charging by truck shifts the event clock; defensively resolve any event the tick above raised before the next tick (idempotent, no-op when none pending).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 1",
@@ -498,7 +556,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 2
+          "vehicleCount": 3
         },
         "decreased": [
           "cash"
@@ -507,12 +565,12 @@
       }
     },
     {
-      "command": "vehicle driver 3 3",
+      "command": "vehicle driver 4 3",
       "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 3 3"
+          "command": "vehicle driver 4 3"
         }
       ],
       "role": "bootstrap"
@@ -680,10 +738,7 @@
           "buildingCount": 2,
           "orderedBuildingCount": 0
         },
-        "note": "#1384: fixed-duration actions (place_building) now scale by proficiency/fatigue, so the warehouses stand at tick ~246 and the first delivery (0 -> 1575 kg) lands while this wait runs; the 'storedMassKg must have grown' proof sits here again. Earlier history: #953 had it here, #1091-followup moved it to the tick-40 step; the later tick-40 step now only adds cash drain, the second delivery (1575 -> 3937.5 kg) lands in the tick-30 step before it.",
-        "increased": [
-          "storedMassKg"
-        ]
+        "note": "#1649: charging now waits on the charging-truck crew, so the hauler's first delivery no longer lands during this wait; the 'storedMassKg must have grown' proof sits on the final tick-40 step below. Earlier history: #1384 had it here."
       }
     },
     {
@@ -739,7 +794,10 @@
         "decreased": [
           "cash"
         ],
-        "note": "#1384: cash drain only. The storedMassKg growth proof moved to the wait_until step above, since the deliveries now land before this step (no growth left in these 40 ticks)."
+        "note": "#1649: cash drain plus the storedMassKg growth proof (the hauler's deliveries land in this window now).",
+        "increased": [
+          "storedMassKg"
+        ]
       }
     },
     {

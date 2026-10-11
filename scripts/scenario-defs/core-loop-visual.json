@@ -220,6 +220,22 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Truck licence: with blasting, the hire is dual-qualified for the charging truck (#1649).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
       "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: shrunk from 4x4 (16 holes) to 2x2 (4 holes) -- this file demonstrates the core gameplay loop end to end, not blast density, and a single driller cannot land 16 holes without risking a worker_revolt (sandbox-measured elsewhere in this pass). Drag rectangle previously 'corrected' to (20,20)-(26,26), but that arithmetic was wrong: a 6x6 span at spacing 3 is round(6/3)+1 = round(2)+1 = 3, a 3x3=9 grid (reproduced: orderedHoleCount came back 9, not 4). Drill.ts's real formula is cols/rows = Math.max(1, Math.round((x2-x1)/spacing)+1) (blastSteps/Drill.ts:286-287,304-305) -- to land exactly 2 per axis needs round(size/3)=1, i.e. size in [1.5,4.5). Re-corrected to (20,20)-(23,23), a 3x3 span: round(3/3)+1 = 1+1 = 2, a true 2x2=4-hole grid.",
       "interaction": [
@@ -337,8 +353,39 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#1649: charging is worked from a charging truck; buy one so the charge order can land.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
@@ -363,93 +410,24 @@
       }
     },
     {
-      "command": "tick 20",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "description": "#554-followup (issue #586 CI, two independent agents confirmed a 900000ms single waitUntil still stalls): root cause is the event-freeze asymmetry already fixed elsewhere in this batch (blast-execution-visual.json, level1-lose-ecology.json, level3-playthrough-ecology.json) -- command mode's own waitUntil (command-runner.ts) auto-resolves any pending random event every tick it advances, interaction mode's waitUntil (interaction-executor.ts) never does, by design (its real, isPaused-gated clock halts exactly as it would for a real player). This file's own 2-employee crew, pinned at wellBeing 0 for long stretches (no living quarters anywhere in the file), is exactly the kind of scenario a spontaneous event fires into mid-wait. Chunked into the same tick-N/event-choose-0 pair pattern already used for this file's own drilling waits above (NOT a single step with a resolveEventIfPending tucked into its interaction array -- command-runner.ts only special-cases a step whose interaction array contains a literal `waitUntil` action; every other step, in command mode, just runs its own top-level `command` string once and ignores the rest of the interaction array, so a resolveEventIfPending sitting next to a `command` action inside one step never runs in command mode at all. A pending event left over from a prior chunk's tick then blocks every later tick from advancing, which is exactly what command mode sandbox-testing this fix surfaced: chargedCount stuck at 0 even after ~3000 ticks). #554-followup round 2 (issue #586 CI, real failure): the first pass of this fix used 10 rounds (200 ticks) as a flat safety margin, reasoning by analogy to this file's own ~150-tick drilling wait -- sandbox-measured, that was badly oversized: chargedCount actually reaches 4 by round 3 (tick 205), so 7 of the 10 rounds were dead padding, and with wellBeing pinned at 0 almost the entire time, that padding is exactly the dead-tick-padding-into-revolt pattern this file already hit once this session (this time pushing tickCount, not intentionally, into the same REVOLT_TICKS=120 danger zone the original padding-removal fix was written to avoid) -- real CI's own worker_revolt sometimes fires during those extra idle rounds, covering the panel before the sequence step below ever runs. Trimmed to 4 rounds (80 ticks, sandbox-confirmed complete by round 3 with one round of margin) instead."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "description": "#1586: one more chunk. Charge dispatch now picks the lowest real (path-resolved) cost, so the blaster visits the holes in a different order and the fourth charge lands inside this extra 20 ticks instead of the previous four chunks. The check that follows still proves all four charges loaded and none still ordered."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",

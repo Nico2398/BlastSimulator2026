@@ -105,6 +105,22 @@
       }
     },
     {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Truck licence: with blasting, the hire is dual-qualified for the charging truck (#1649).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:18,10 diameter:0.089",
       "interaction": [
         {
@@ -189,8 +205,39 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#1649: charging is worked from a charging truck; buy one so the charge order can land.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:3 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
@@ -416,11 +463,11 @@
       }
     },
     {
-      "command": "vehicle driver 2 2",
+      "command": "vehicle driver 3 2",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 2 2"
+          "command": "vehicle driver 3 2"
         }
       ],
       "description": "Crew the rock digger (vehicle 2) with driver 2.",
@@ -520,11 +567,11 @@
       }
     },
     {
-      "command": "vehicle driver 3 3",
+      "command": "vehicle driver 4 3",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 3 3"
+          "command": "vehicle driver 4 3"
         }
       ],
       "description": "Crew the hauler with the truck-licensed driver.",
