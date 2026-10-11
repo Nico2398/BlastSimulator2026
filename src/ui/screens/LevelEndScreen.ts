@@ -224,10 +224,14 @@ export class LevelEndScreen {
       this.defeatRoot.style.display = 'none';
       this.clearDefeatContent();
       this.victoryRoot.style.display = 'flex';
+      // Re-attach (idempotent) in case a prior defeat render detached it.
+      this.continueBtn.before(this.keepPlayingBtn);
       this.renderVictoryContent(state);
     } else if (reason !== null) {
       this.victoryRoot.style.display = 'none';
       this.clearVictoryContent();
+      // Victory-only control: the hidden victory root stays mounted, so detach it.
+      this.keepPlayingBtn.remove();
       this.defeatRoot.style.display = 'flex';
       this.renderDefeatContent(state, reason);
     }
