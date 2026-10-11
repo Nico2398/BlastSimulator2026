@@ -551,8 +551,9 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     expect(state.pendingActions.find(a => a.id === 1)!.holderId).toBeNull();
     expect(employee.activeActionId).toBeNull();
 
-    // Open the path — same action, now reachable.
-    grid.cells[5]![1] = { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false };
+    // Open the path — same action, now reachable. Through setCellAt, as every
+    // nav edit must (NavGrid.bumpRevision): reachability is cached per revision.
+    grid.setCellAt(1, 5, { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
 
     tickEmployees(state);
 

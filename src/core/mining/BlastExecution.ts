@@ -21,22 +21,23 @@ import {
 import {
   buildHoleSeeds,
   clampBoxToGrid,
-  createEnergyField,
-  seedEnergy,
+  createEnergyFieldSteps,
+  seedEnergySteps,
   type BlastBox,
   type EnergyField,
   type EnergySeed,
 } from './EnergyPropagation.js';
-import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
-import { generateFragments } from './FragmentGeneration.js';
+import { identifyFragmentedVoxelsSteps } from './VoxelFragmentation.js';
+import { generateFragmentsSteps } from './FragmentGeneration.js';
 import { computeFragmentVelocity, throwFractionForBlowout } from './FragmentVelocity.js';
 import { groupProjectiles } from './ProjectileGrouping.js';
-import { resolveFragmentLanding, type FragmentFlight } from './BlastResolve.js';
+import { resolveFragmentLandingSteps, type FragmentFlight } from './BlastResolve.js';
+import { drain, type Steps } from '../engine/Steps.js';
 import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { VoxelGrid, firstEmptyLayerAboveGround, captureColumnTopsForCarve, renormaliseCarvedColumns } from '../world/VoxelGrid.js';
-import type { EventEmitter } from '../state/EventEmitter.js';
+import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
 import type { AccidentRecord } from '../entities/Damage.js';
 import {
@@ -46,6 +47,9 @@ import {
   PROJECTION_SPEED_THRESHOLD,
   THROW_DISTANCE_BAD,
   THROW_DISTANCE_CATASTROPHIC,
+  BLAST_SLICE_CELLS,
+  BLAST_SLICE_ITEMS,
+  BLAST_SLICE_STRIP_COLUMNS,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -279,6 +283,25 @@ export function executeBlast(
   /** Hole ids currently holding water (stored hole water past the wet threshold — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): BlastResult | null {
+  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds));
+}
+
+/**
+ * `executeBlast`, yielding between bounded slices of work (#1603, Steps.ts) so
+ * a frame loop can spread a large blast over several frames. It mutates the
+ * grid, buildings and emits events as it goes, exactly as `executeBlast` does
+ * — a caller running it in slices must let nothing else touch the game until
+ * it returns.
+ */
+export function* executeBlastSteps(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  villages: readonly VillagePosition[],
+  groundFactor: number = DEFAULT_GROUND_FACTOR,
+  buildingState?: BuildingState,
+  emitter?: EventEmitter,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+): Steps<BlastResult | null> {
   // 1. Validate
   const errors = validateBlastPlan(plan);
   if (errors.length > 0) return null;
@@ -298,8 +321,8 @@ export function executeBlast(
   emitter?.emit('blast:started', { originX: blastCenter.x, originY, originZ: blastCenter.z });
 
   // 3. Propagate the charge energy through the rock, then read off what broke.
-  const field = buildBlastEnergyField(plan, grid, bbox, holeSurfaceYs, wetHoleIds);
-  const fragmentation = field ? identifyFragmentedVoxels(field, grid) : null;
+  const field = yield* buildBlastEnergyFieldSteps(plan, grid, bbox, holeSurfaceYs, wetHoleIds);
+  const fragmentation = field ? yield* identifyFragmentedVoxelsSteps(field, grid) : null;
 
   const fragments: FragmentData[] = [];
   let fragmentIdCounter = 0;
@@ -320,9 +343,11 @@ export function executeBlast(
 
   if (field && fragmentation) {
     const rng = new Random(fragmentSeedFor(plan));
-    const { fragments: generated } = generateFragments(fragmentation, field, grid, rng);
+    const { fragments: generated } = yield* generateFragmentsSteps(fragmentation, field, grid, rng);
 
-    for (const gen of generated) {
+    for (let g = 0; g < generated.length; g++) {
+      if ((g & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
+      const gen = generated[g]!;
       const throwFraction = throwFractionAt(gen.origin, plan);
       const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg, field, throwFraction);
 
@@ -347,7 +372,9 @@ export function executeBlast(
 
     // Ore value and rock volume come from the ground that was removed, not from
     // the fragments, so they stay right however the rock happened to break.
-    for (const { x, y, z } of fragmentation.fragmented) {
+    for (let v = 0; v < fragmentation.fragmented.length; v++) {
+      if ((v & (BLAST_SLICE_CELLS - 1)) === 0) yield;
+      const { x, y, z } = fragmentation.fragmented[v]!;
       const ores = grid.oresAt(x, y, z);
       if (ores) totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
       totalRockVolume += VoxelGrid.CELL_SIZE ** 3;
@@ -358,8 +385,15 @@ export function executeBlast(
 
   // 4b. Clear the rock before working out where the fragments land — they fall
   //     into the hole the blast just made, not onto the ground it removed.
+  yield;
   const carvedColumns = captureColumnTopsForCarve(grid, toClear);
-  for (const { x, y, z } of toClear) grid.clearVoxel(x, y, z);
+  for (let c = 0; c < toClear.length; c++) {
+    // A clear also records a terrain edit: several times a plain cell's cost.
+    if ((c & (BLAST_SLICE_CELLS / 4 - 1)) === 0) yield;
+    const { x, y, z } = toClear[c]!;
+    grid.clearVoxel(x, y, z);
+  }
+  yield;
 
   // 4b-cont. Clean up any leftover sub-threshold density the clear stranded
   //          above each carved column's new top, and re-grade that top into
@@ -375,11 +409,12 @@ export function executeBlast(
     const thrown = fragments.filter(f => f.isProjection);
     const projectiles = groupProjectiles(thrown);
     projectileCount = projectiles.length;
-    const resolved = resolveFragmentLanding(fragments, projectiles, grid);
+    const resolved = yield* resolveFragmentLandingSteps(fragments, projectiles, grid);
     flights = resolved.flights;
     maxThrowDistance = resolved.maxThrowDistance;
   }
 
+  yield;
   // 4b. Compute cleared region AABB from toClear for navmesh dirty-region
   //     update. One pass with running bounds — a reduce allocating an object
   //     per voxel showed up in the blast's frame budget.
@@ -407,12 +442,14 @@ export function executeBlast(
   //     callers already use clearedRegion directly) the exact voxel AABB that
   //     changed, covering both the fracture-pass clears and anything the
   //     crater pass added afterward.
-  if (toClear.length > 0) {
-    emitter?.emit('terrain:updated', {
-      region: { minX: regMinX, maxX: regMaxX, minY: regMinY, maxY: regMaxY, minZ: regMinZ, maxZ: regMaxZ },
+  yield;
+  if (toClear.length > 0 && emitter) {
+    yield* emitRegionInStrips(emitter, 'terrain:updated', {
+      minX: regMinX, maxX: regMaxX, minY: regMinY, maxY: regMaxY, minZ: regMinZ, maxZ: regMaxZ,
     });
   }
 
+  yield;
   // 5b. Check for building destruction: if any cleared voxel's (x, z) falls
   //     within a building's footprint, the building is destroyed.
   const destroyedBuildings: DestroyedBuildingInfo[] = [];
@@ -468,6 +505,7 @@ export function executeBlast(
     };
   });
 
+  yield;
   // 7. Compute stats and rating
   const projectionCount = fragments.filter(f => f.isProjection).length;
   const maxProjectionSpeed = fragments.reduce((max, f) => {
@@ -509,6 +547,25 @@ export function executeBlast(
 }
 
 // ── Helpers ──
+
+/**
+ * Announce a changed region as strips of `BLAST_SLICE_STRIP_COLUMNS` columns,
+ * yielding between them (#1603): the nav grid re-patches every region it is
+ * told about, and a large blast's in one go was a frame's budget on its own.
+ * Every listener accumulates what it is told region by region (the nav patch
+ * reads the final terrain, the renderer queues chunks), so the end state is
+ * the same as one announcement of the whole region.
+ */
+export function* emitRegionInStrips(
+  emitter: EventEmitter,
+  event: 'terrain:updated' | 'nav:occupancy_changed',
+  region: GameEventMap['terrain:updated']['region'],
+): Steps<void> {
+  for (let x = region.minX; x <= region.maxX; x += BLAST_SLICE_STRIP_COLUMNS) {
+    if (x > region.minX) yield;
+    emitter.emit(event, { region: { ...region, minX: x, maxX: Math.min(region.maxX, x + BLAST_SLICE_STRIP_COLUMNS - 1) } });
+  }
+}
 
 /**
  * Seed for a blast's fragment randomness, derived from the plan itself so the
@@ -569,6 +626,17 @@ export function buildBlastEnergyField(
   holeSurfaceYs: Record<string, number>,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): EnergyField | null {
+  return drain(buildBlastEnergyFieldSteps(plan, grid, bbox, holeSurfaceYs, wetHoleIds));
+}
+
+/** `buildBlastEnergyField`, yielding as the field fills and the energy spreads (#1603). */
+function* buildBlastEnergyFieldSteps(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  bbox: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
+  holeSurfaceYs: Record<string, number>,
+  wetHoleIds: ReadonlySet<string>,
+): Steps<EnergyField | null> {
   // calculateBlastZone reports an inclusive box; the field's is half-open.
   const requested: BlastBox = {
     minX: bbox.minX, minY: bbox.minY, minZ: bbox.minZ,
@@ -594,8 +662,9 @@ export function buildBlastEnergyField(
     ));
   }
 
-  const field = createEnergyField(grid, box, explosiveTierResolver(plan, box));
-  seedEnergy(field, seeds);
+  const tierAt = yield* explosiveTierResolver(plan, box);
+  const field = yield* createEnergyFieldSteps(grid, box, tierAt);
+  yield* seedEnergySteps(field, seeds);
   return field;
 }
 
@@ -607,10 +676,10 @@ export function buildBlastEnergyField(
  *
  * Cost: footprint columns x charged holes, once per field build.
  */
-function explosiveTierResolver(
+function* explosiveTierResolver(
   plan: BlastPlan,
   box: BlastBox,
-): ((x: number, z: number) => number) | undefined {
+): Steps<((x: number, z: number) => number) | undefined> {
   const gating: { hole: DrillHole; tier: number }[] = [];
   for (const hole of plan.holes) {
     const charge = plan.charges[hole.id];
@@ -623,12 +692,31 @@ function explosiveTierResolver(
   const holes = gating.map(g => g.hole);
   const tierByHole = new Map(gating.map(g => [g.hole.id, g.tier]));
   for (let z = box.minZ; z < box.maxZ; z++) {
+    if (((z - box.minZ) & 3) === 0) yield;
     for (let x = box.minX; x < box.maxX; x++) {
       const hole = findNearestHole(vec3(x, 0, z), holes);
       tiers[(z - box.minZ) * nx + (x - box.minX)] = tierByHole.get(hole.id)!;
     }
   }
   return (x, z) => tiers[(z - box.minZ) * nx + (x - box.minX)]!;
+}
+
+/**
+ * Generate now the terrain a blast of `holes` would read (#1603).
+ *
+ * Rock below the surface is generated lazily, slab by slab, the first time
+ * anything reads it — and a blast's zone reaches deeper than anything else
+ * usually does, so detonating used to pay for generating it: about a quarter of
+ * a large blast's frame. Calling this as each charge is loaded moves that work
+ * to the charging, a few slabs at a time. The blast reads the same values
+ * either way; only when the generation happens changes.
+ */
+export function prefetchBlastZone(grid: VoxelGrid, holes: readonly DrillHole[]): void {
+  if (holes.length === 0) return;
+  const holeSurfaceYs: Record<string, number> = {};
+  for (const hole of holes) holeSurfaceYs[hole.id] = firstEmptyLayerAboveGround(grid, hole.x, hole.z);
+  const zone = calculateBlastZone(holes, holeSurfaceYs);
+  grid.prefetchSlabs(zone.minX, zone.maxX, zone.minY, zone.maxY, zone.minZ, zone.maxZ);
 }
 
 function calculateBlastZone(

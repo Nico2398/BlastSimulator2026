@@ -1892,3 +1892,84 @@ describe('TerrainMesh.getSurveyOverlay', () => {
     expect(scene.children.length).toBe(0);
   });
 });
+
+// ── Deferred blast remesh (#1603) ───────────────────────────────────────────
+
+describe('TerrainMesh — deferred remesh (queueRegion)', () => {
+  /** A generated site with a pit carved across a chunk seam, and the region that covers it. */
+  function carvedSite(): { grid: VoxelGrid; region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } } {
+    const grid = generateTerrain({ sizeX: 64, datum: 40, sizeZ: 64, seed: 42, climateBias: [0, 0] });
+    const top = computeVoxelColumnSurfaceY(grid, 16, 16)!;
+    for (let x = 10; x < 22; x++) {
+      for (let z = 12; z < 20; z++) {
+        for (let y = top - 6; y <= top + 1; y++) grid.clearVoxel(x, y, z);
+      }
+    }
+    return { grid, region: { minX: 10, maxX: 21, minY: top - 6, maxY: top + 1, minZ: 12, maxZ: 19 } };
+  }
+
+  /** Every chunk's geometry, keyed by its position attribute bytes, for exact comparison. */
+  function meshPrint(scene: THREE.Scene): string[] {
+    return scene.children
+      .filter((c): c is THREE.Mesh => c instanceof THREE.Mesh)
+      .map(m => Object.keys(m.geometry.attributes).sort()
+        .map(name => `${name}:${Array.from((m.geometry.getAttribute(name) as THREE.BufferAttribute).array).join(',')}`)
+        .join('|'))
+      .sort();
+  }
+
+  /** A fresh TerrainMesh built over the pre-carve terrain, carved afterwards — as a blast would. */
+  function builtThenCarved(): { scene: THREE.Scene; tm: TerrainMesh; region: ReturnType<typeof carvedSite>['region'] } {
+    const { grid, region } = carvedSite();
+    const pristine = generateTerrain({ sizeX: 64, datum: 40, sizeZ: 64, seed: 42, climateBias: [0, 0] });
+    const scene = makeScene();
+    const tm = new TerrainMesh(scene, pristine);
+    tm.buildAll();
+    tm.setGrid(grid);
+    return { scene, tm, region };
+  }
+
+  it('keeps every old mesh on screen until the whole batch lands, then matches an immediate remesh exactly', () => {
+    const { scene: immediateScene, tm: immediate, region } = builtThenCarved();
+    immediate.remeshRegion(region);
+
+    const { scene, tm } = builtThenCarved();
+    const before = [...scene.children];
+    tm.queueRegion(region);
+    expect(tm.pendingRemeshCount).toBeGreaterThan(1);
+
+    let clock = 0;
+    let steps = 0;
+    // A tiny budget: one chunk per step, and nothing swapped in until the last.
+    while (!tm.stepPendingRemesh(0, () => (clock += 1))) {
+      steps++;
+      expect(scene.children).toEqual(before);
+    }
+    expect(steps).toBeGreaterThan(0);
+    expect(tm.pendingRemeshCount).toBe(0);
+    expect(meshPrint(scene)).toEqual(meshPrint(immediateScene));
+  });
+
+  it('an immediate remesh lands a pending batch first, so the newer edit wins', () => {
+    const { scene: immediateScene, tm: immediate, region } = builtThenCarved();
+    immediate.remeshRegion(region);
+
+    const { scene, tm } = builtThenCarved();
+    tm.queueRegion(region);
+    tm.stepPendingRemesh(0, () => 0); // part-way through
+    tm.remeshRegion({ minX: 30, maxX: 30, minY: region.minY, maxY: region.minY, minZ: 30, maxZ: 30 });
+    expect(tm.pendingRemeshCount).toBe(0);
+    expect(meshPrint(scene)).toEqual(meshPrint(immediateScene));
+  });
+
+  it('finishPendingRemesh lands the batch at once; buildAll drops it', () => {
+    const { tm, region } = builtThenCarved();
+    tm.queueRegion(region);
+    expect(tm.finishPendingRemesh()).toBe(true);
+    expect(tm.finishPendingRemesh()).toBe(false);
+
+    tm.queueRegion(region);
+    tm.buildAll();
+    expect(tm.pendingRemeshCount).toBe(0);
+  });
+});

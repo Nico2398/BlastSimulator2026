@@ -10,10 +10,13 @@ import {
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
-import { executeBlast, buildBlastReport, villagePositions, averageVibrationMod, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, executeBlastSteps, buildBlastReport, villagePositions, averageVibrationMod, prefetchBlastZone, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
+import { chunkIndexOf } from '../../../src/core/world/VoxelGrid.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { GRAVITY } from '../../../src/core/config/balance.js';
+import { advance } from '../../../src/core/engine/Steps.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -174,6 +177,54 @@ describe('executeBlast — crater', () => {
 // with, while the real wiring rewrites them to the canonical band — so
 // that test genuinely fails without this file's own call sites running.
 
+describe('executeBlastSteps — the same blast, a slice at a time (#1603)', () => {
+  function chargedSite() {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 8, 2);
+    return { grid, plan: assembleBlastPlan(holes, charges) };
+  }
+
+  it('lands the identical result and crater as executeBlast, over many slices', () => {
+    const once = chargedSite();
+    const expected = executeBlast(once.plan, once.grid, []);
+
+    holeCounter.nextHoleId = 1;
+    const sliced = chargedSite();
+    const steps = executeBlastSteps(sliced.plan, sliced.grid, []);
+    let slices = 0;
+    let next: IteratorResult<void, BlastResult | null>;
+    do { next = advance(steps, () => true); slices++; } while (next.done !== true);
+
+    expect(slices).toBeGreaterThan(10);
+    expect(JSON.stringify(next.value)).toBe(JSON.stringify(expected));
+    for (let z = 5; z <= 25; z++) {
+      for (let y = 0; y <= 10; y++) {
+        for (let x = 5; x <= 25; x++) expect(sliced.grid.densityAt(x, y, z)).toBe(once.grid.densityAt(x, y, z));
+      }
+    }
+  });
+
+  it('touches nothing before its first slice runs', () => {
+    const { grid, plan } = chargedSite();
+    const emitter = new EventEmitter();
+    let started = 0;
+    emitter.on('blast:started', () => { started++; });
+    executeBlastSteps(plan, grid, [], undefined, undefined, emitter);
+    expect(started).toBe(0);
+    expect(grid.densityAt(12, 10, 12)).toBeGreaterThan(0);
+  });
+
+  it('returns null for an uncharged hole without yielding', () => {
+    const { grid, plan } = chargedSite();
+    const steps = executeBlastSteps(assembleBlastPlan(plan.holes, {}), grid, []);
+    expect(steps.next()).toEqual({ done: true, value: null });
+  });
+});
+
 describe('executeBlast — fragment origin (#1355)', () => {
   function blast() {
     const grid = new VoxelGrid(40, 40);
@@ -276,12 +327,17 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
     const result = executeBlast(plan, grid, [], undefined, undefined, emitter);
     expect(result).not.toBeNull();
 
-    expect(handler).toHaveBeenCalledTimes(1);
-    const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
+    // Announced in column strips (#1603, emitRegionInStrips): together they
+    // tile the cleared region exactly, each with the region's full Y range.
+    const strips = handler.mock.calls.map(c => (c[0] as { region: { minX: number; maxX: number; maxY: number } }).region);
+    expect(strips.length).toBeGreaterThan(0);
+    for (let k = 1; k < strips.length; k++) expect(strips[k]!.minX).toBe(strips[k - 1]!.maxX + 1);
+    expect(strips[0]!.minX).toBe(result!.clearedRegion.minX);
+    expect(strips[strips.length - 1]!.maxX).toBe(result!.clearedRegion.maxX);
     // Renormalisation reaches y=11 (the residue) — one cell above the raw
-    // fragmented voxels' own top (y=10) — so the emitted event's region must
-    // widen to cover it, not stop at the raw fragmented voxels' own Y range.
-    expect(emitted.region.maxY).toBeGreaterThanOrEqual(11);
+    // fragmented voxels' own top (y=10) — so the emitted region must widen to
+    // cover it, not stop at the raw fragmented voxels' own Y range.
+    for (const strip of strips) expect(strip.maxY).toBeGreaterThanOrEqual(11);
   });
 
   /**
@@ -570,5 +626,47 @@ describe('averageVibrationMod', () => {
     const a = run('pop_rock');
     const b = run('big_bada_boom');
     expect(a.vib / a.mod).toBeCloseTo(b.vib / b.mod, 6);
+  });
+});
+
+describe('prefetchBlastZone (#1603)', () => {
+  const site = () => generateTerrain({ sizeX: 48, datum: 40, sizeZ: 48, seed: 11, climateBias: [0, 0] });
+  const planOn = () => {
+    const holes = createGridPlan({ nextHoleId: 1 }, { x: 18, z: 18 }, 2, 3, 4, 10, 0.15);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'boomite', 8, 2);
+    return { holes, plan: assembleBlastPlan(holes, charges) };
+  };
+
+  it('generates the slabs the blast zone reaches before any blast reads them', () => {
+    const grid = site();
+    const { holes } = planOn();
+    const deepest = Math.min(...holes.map(h => computeVoxelColumnSurfaceY(grid, h.x, h.z)! - h.depth)) - 5;
+    const before = grid.allocatedCyRange(chunkIndexOf(18), chunkIndexOf(18));
+    prefetchBlastZone(grid, holes);
+    const after = grid.allocatedCyRange(chunkIndexOf(18), chunkIndexOf(18))!;
+    expect(after.min).toBeLessThanOrEqual(chunkIndexOf(deepest));
+    expect(after).not.toEqual(before);
+  });
+
+  it('leaves the blast it precedes exactly as it would have been', () => {
+    const plain = site();
+    const prefetched = site();
+    const { holes, plan } = planOn();
+    prefetchBlastZone(prefetched, holes);
+    const a = executeBlast(plan, plain, [])!;
+    const b = executeBlast(plan, prefetched, [])!;
+    expect(b.fragmentCount).toBeGreaterThan(0);
+    expect(b.fragments).toEqual(a.fragments);
+    expect(b.flights).toEqual(a.flights);
+    expect(b.clearedColumns).toEqual(a.clearedColumns);
+  });
+
+  it('does nothing for an empty hole list', () => {
+    const grid = site();
+    const before = grid.allocatedCyRange(1, 1);
+    prefetchBlastZone(grid, []);
+    expect(grid.allocatedCyRange(1, 1)).toEqual(before);
   });
 });

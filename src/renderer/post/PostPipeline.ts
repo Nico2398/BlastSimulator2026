@@ -96,6 +96,11 @@ export class PostPipeline {
     this.composer.addPass(new SMAAPass(width * dpr, height * dpr));
   }
 
+  /** The render target the scene itself is drawn into: RenderPass draws into the composer's read buffer. */
+  get sceneTarget(): THREE.WebGLRenderTarget {
+    return this.composer.readBuffer;
+  }
+
   /**
    * `EffectComposer.setSize()` already iterates every pass (including GTAO
    * and SMAA) and re-derives device-pixel dimensions from `width * height *

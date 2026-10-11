@@ -10,6 +10,7 @@ import { footprintCenterCoord } from './MeshUtils.js';
 import { instantiateBuildingModel } from './BuildingMesh.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
+import { GhostInstanceBatch } from './GhostInstanceBatch.js';
 
 // ---------- Config ----------
 
@@ -129,19 +130,59 @@ interface GhostEntry {
   instance: ModelInstance | null;
   /** A `place_building` box drawn only until its model has loaded. */
   standIn: boolean;
+  /** Whether the box geometry is this entry's own (a footprint box) rather than the shared cube. */
+  ownsGeometry: boolean;
   preview: GhostPreview;
+  /** Ground height the ghost stands on: the preview's own targetY, or the surface sampled for it. */
+  targetY: number;
+  /** The `sync` pass that last saw its preview; an older one means the order is gone. */
+  seen?: number;
+}
+
+/** One auto-debris ghost, drawn as a slot of the batch for its material. */
+interface InstancedGhost {
+  batch: GhostInstanceBatch;
+  slot: number;
+  preview: GhostPreview;
+  targetY: number;
+  /** The look it was slotted with, to skip a preview whose flags did not change. */
+  claimed: boolean;
+  unreachable: boolean;
+  /** The `sync` pass that last saw its preview. */
+  seen: number;
+}
+
+/**
+ * Auto-debris orders (one per blast fragment, thousands after a large blast)
+ * draw as instanced cubes: never a building, never a footprint, never a site
+ * other UI anchors to.
+ */
+function isInstancedGhost(preview: GhostPreview): boolean {
+  return (preview.type === 'haul_debris' || preview.type === 'fragment_debris')
+    && preview.footprint === undefined && preview.building === undefined;
 }
 
 export class GhostMesh {
   private readonly scene: THREE.Scene;
   private readonly library: ModelLibrary;
   private readonly entries = new Map<number, GhostEntry>();
+  private readonly instanced = new Map<number, InstancedGhost>();
+  /** Instanced debris ghosts per material, created on first use. */
+  private readonly batches = new Map<THREE.Material, GhostInstanceBatch>();
+  /** Counts `sync` passes; a ghost its pass did not see is removed. */
+  private generation = 0;
   /** Material for unclaimed ghosts — brighter, faster pulse. */
   private readonly material: THREE.MeshPhongMaterial;
   /** Material for claimed ghosts (#547) — dimmer, slower pulse, still blue. */
   private readonly claimedMaterial: THREE.MeshPhongMaterial;
   /** Material for unclaimed ghosts no capable actor can reach (#1306) — red, same pulse as unclaimed. */
   private readonly unreachableMaterial: THREE.MeshPhongMaterial;
+  /**
+   * The one cube every footprint-less ghost shares: a blast queues a haul
+   * order per fragment, and building a geometry for each of thousands of
+   * ghosts in one frame was a ~100 ms hitch right after detonate (#1603).
+   */
+  private readonly cubeGeometry = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
   private time = 0;
 
   constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
@@ -164,24 +205,45 @@ export class GhostMesh {
    * whose `claimed`/`unreachable` flag flips in place (same id, existing mesh)
    * swaps that mesh's material rather than recreating it (#547, #1306).
    * Call after syncFromContext() whenever ghostPreviews may have changed.
+   *
+   * With `surfaceY`, a new ghost stands on the ground sampled there instead
+   * of its preview's targetY, and existing ghosts keep the height they were
+   * given until `resnap` says the terrain changed — a large blast's thousands
+   * of haul ghosts are re-synced on most ticks, and sampling the ground under
+   * each one every time was a frame's budget on its own (#1603).
    */
-  sync(previews: GhostPreview[]): void {
-    const activeIds = new Set(previews.map(p => p.id));
-
-    for (const [id, entry] of this.entries) {
-      if (!activeIds.has(id)) this.removeEntry(id, entry);
-    }
-
+  sync(
+    previews: readonly GhostPreview[],
+    surfaceY: ((x: number, z: number) => number) | null = null,
+    resnap = false,
+  ): void {
+    // Stamped, not collected into a Set: this runs on most ticks after a large
+    // blast, over thousands of previews (#1603).
+    const gen = ++this.generation;
     for (const preview of previews) {
+      if (isInstancedGhost(preview)) {
+        this.syncInstanced(preview, surfaceY, resnap, gen);
+        continue;
+      }
       const existing = this.entries.get(preview.id);
       if (existing) {
+        existing.seen = gen;
         existing.preview = preview;
+        if (surfaceY !== null && resnap) existing.targetY = surfaceY(preview.targetX, preview.targetZ);
         this.applyMaterial(existing);
         continue;
       }
-      const entry = this.createEntry(preview);
+      const entry = this.createEntry(preview, surfaceY?.(preview.targetX, preview.targetZ) ?? preview.targetY);
+      entry.seen = gen;
       this.entries.set(preview.id, entry);
       this.scene.add(entry.root);
+    }
+
+    for (const [id, entry] of this.entries) {
+      if (entry.seen !== gen) this.removeEntry(id, entry);
+    }
+    for (const [id, ghost] of this.instanced) {
+      if (ghost.seen !== gen) this.removeInstanced(id, ghost);
     }
   }
 
@@ -192,7 +254,7 @@ export class GhostMesh {
   refreshModels(): void {
     for (const [id, entry] of this.entries) {
       if (!entry.standIn) continue;
-      const fresh = this.createEntry(entry.preview);
+      const fresh = this.createEntry(entry.preview, entry.targetY);
       if (fresh.standIn) {
         this.disposeEntry(fresh);
         continue;
@@ -203,6 +265,57 @@ export class GhostMesh {
     }
   }
 
+  /** Add, restyle or re-place one instanced debris ghost. */
+  private syncInstanced(
+    preview: GhostPreview,
+    surfaceY: ((x: number, z: number) => number) | null,
+    resnap: boolean,
+    gen: number,
+  ): void {
+    const existing = this.instanced.get(preview.id);
+    const claimed = preview.claimed === true;
+    const unreachable = preview.unreachable === true;
+    const moved = surfaceY !== null && resnap;
+    if (existing !== undefined) {
+      existing.seen = gen;
+      existing.preview = preview;
+      if (!moved && existing.claimed === claimed && existing.unreachable === unreachable) return;
+      existing.claimed = claimed;
+      existing.unreachable = unreachable;
+    }
+    const batch = this.batchFor(this.materialFor(preview));
+    if (existing === undefined) {
+      const targetY = surfaceY?.(preview.targetX, preview.targetZ) ?? preview.targetY;
+      const slot = batch.add(preview.id, preview.targetX, targetY + GHOST_SIZE / 2, preview.targetZ);
+      this.instanced.set(preview.id, { batch, slot, preview, targetY, claimed, unreachable, seen: gen });
+      return;
+    }
+    if (moved) existing.targetY = surfaceY(preview.targetX, preview.targetZ);
+    if (existing.batch === batch && !moved) return;
+    // Claimed, unreachable, or the ground under it changed: re-slot it.
+    existing.batch.remove(existing.slot);
+    existing.batch = batch;
+    existing.slot = batch.add(preview.id, preview.targetX, existing.targetY + GHOST_SIZE / 2, preview.targetZ);
+  }
+
+  private batchFor(material: THREE.Material): GhostInstanceBatch {
+    let batch = this.batches.get(material);
+    if (batch === undefined) {
+      const created: GhostInstanceBatch = new GhostInstanceBatch(this.scene, this.cubeGeometry, material, GHOST_RENDER_ORDER, (id, slot) => {
+        const moved = this.instanced.get(id);
+        if (moved !== undefined && moved.batch === created) moved.slot = slot;
+      });
+      batch = created;
+      this.batches.set(material, batch);
+    }
+    return batch;
+  }
+
+  private removeInstanced(id: number, ghost: InstancedGhost): void {
+    ghost.batch.remove(ghost.slot);
+    this.instanced.delete(id);
+  }
+
   private applyMaterial(entry: GhostEntry): void {
     const material = this.materialFor(entry.preview);
     for (const mesh of entry.meshes) {
@@ -210,10 +323,12 @@ export class GhostMesh {
     }
   }
 
-  private createEntry(preview: GhostPreview): GhostEntry {
-    const entry = preview.building !== undefined
-      ? this.createBuildingEntry(preview, preview.building)
-      : this.createBoxEntry(preview);
+  private createEntry(preview: GhostPreview, targetY: number): GhostEntry {
+    const placed = targetY === preview.targetY ? preview : { ...preview, targetY };
+    const entry = placed.building !== undefined
+      ? this.createBuildingEntry(placed, placed.building)
+      : this.createBoxEntry(placed);
+    entry.preview = preview;
     this.applyMaterial(entry);
     return entry;
   }
@@ -225,7 +340,11 @@ export class GhostMesh {
     // BuildingMesh.ts centers a real building's box on its own footprint:
     // group position at footprintCenterCoord(x, sizeX)/footprintCenterCoord(z, sizeZ),
     // box sized sizeX x sizeZ (#1198).
-    const mesh = new THREE.Mesh();
+    // Built with its real geometry and material: a bare `new Mesh()` allocates
+    // a default geometry and material of its own, thousands of them in the
+    // frame after a large blast (#1603).
+    const ownsGeometry = preview.footprint !== undefined;
+    const mesh = new THREE.Mesh(this.cubeGeometry, this.materialFor(preview));
     if (preview.footprint) {
       const { sizeX, sizeZ } = getFootprintSize(preview.footprint);
       mesh.geometry = new THREE.BoxGeometry(sizeX, GHOST_SIZE, sizeZ);
@@ -236,12 +355,11 @@ export class GhostMesh {
         footprintCenterCoord(origin.z, sizeZ),
       );
     } else {
-      mesh.geometry = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
       mesh.position.set(preview.targetX, preview.targetY + GHOST_SIZE / 2, preview.targetZ);
     }
     mesh.renderOrder = GHOST_RENDER_ORDER;
     markSceneOverlay(mesh);
-    return { root: mesh, meshes: [mesh], instance: null, standIn, preview };
+    return { root: mesh, meshes: [mesh], instance: null, standIn, ownsGeometry, preview, targetY: preview.targetY };
   }
 
   /**
@@ -272,7 +390,7 @@ export class GhostMesh {
       meshes.push(obj);
     });
     markSceneOverlay(group);
-    return { root: group, meshes, instance, standIn: false, preview };
+    return { root: group, meshes, instance, standIn: false, ownsGeometry: false, preview, targetY: preview.targetY };
   }
 
   private removeEntry(id: number, entry: GhostEntry): void {
@@ -281,13 +399,13 @@ export class GhostMesh {
     this.entries.delete(id);
   }
 
-  /** Box geometry is the ghost's own; a model's geometry is shared with the library and stays. */
+  /** A footprint box's geometry is the ghost's own; the shared cube and a model's geometry stay. */
   private disposeEntry(entry: GhostEntry): void {
     if (entry.instance !== null) {
       entry.instance.dispose();
       return;
     }
-    for (const mesh of entry.meshes) mesh.geometry.dispose();
+    if (entry.ownsGeometry) for (const mesh of entry.meshes) mesh.geometry.dispose();
   }
 
   /**
@@ -295,7 +413,7 @@ export class GhostMesh {
    * Claimed and unclaimed ghosts pulse independently (#547).
    */
   update(dt: number): void {
-    if (this.entries.size === 0) return;
+    if (this.count === 0) return;
     this.time += dt;
     const t = (Math.sin(this.time * PULSE_SPEED) + 1) * 0.5; // 0..1
     this.material.opacity = OPACITY_MIN + t * (OPACITY_MAX - OPACITY_MIN);
@@ -308,16 +426,28 @@ export class GhostMesh {
   /** Remove all ghost meshes from the scene. */
   clearAll(): void {
     for (const [id, entry] of [...this.entries]) this.removeEntry(id, entry);
+    for (const [id, ghost] of [...this.instanced]) this.removeInstanced(id, ghost);
   }
 
-  /** Number of ghost meshes currently rendered. */
+  /** Every material a ghost can wear — for compiling at level load (ShaderWarmup.ts, #1603). */
+  get materials(): readonly THREE.Material[] {
+    return [this.material, this.claimedMaterial, this.unreachableMaterial];
+  }
+
+  /** Number of ghosts currently rendered, instanced ones included. */
   get count(): number {
-    return this.entries.size;
+    return this.entries.size + this.instanced.size;
+  }
+
+  /** The instanced batch drawing ghosts in `material`, or null before any does — for tests. */
+  batchOf(material: THREE.Material): THREE.InstancedMesh | null {
+    return this.batches.get(material)?.object ?? null;
   }
 
   /**
    * THREE.Object3D anchor for the ghost with pending-action id `id`, or
-   * null when none exists (site not yet synced this frame, or gone). Lets
+   * null when none exists (site not yet synced this frame, or gone, or an
+   * instanced debris ghost, which has no object of its own). Lets
    * other renderer modules parent world-space UI to a construction site
    * without duplicating GhostMesh's own footprint-centering math (#1012).
    */
@@ -327,6 +457,9 @@ export class GhostMesh {
 
   dispose(): void {
     this.clearAll();
+    for (const batch of this.batches.values()) batch.dispose();
+    this.batches.clear();
+    this.cubeGeometry.dispose();
     this.material.dispose();
     this.claimedMaterial.dispose();
     this.unreachableMaterial.dispose();

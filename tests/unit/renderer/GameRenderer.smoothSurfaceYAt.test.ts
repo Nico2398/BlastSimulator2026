@@ -22,8 +22,9 @@ function makeMockSceneManager() {
   const csm = { cascades: 3, maxFar: 1200, camera, getExtendedBreaks: () => {}, shaders: new Map() };
   const postPipeline = {
     aerial: { setHazeColor: () => {}, setHeightRef: () => {}, setGrade: () => {}, update: () => {} },
+    sceneTarget: null,
   };
-  return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: () => {} } as unknown };
+  return { scene, camera, sunLight, ambient, fill, csm, cameraController, postPipeline, renderer: { render: () => {}, compile: () => {}, getRenderTarget: () => null, setRenderTarget: () => {} } as unknown };
 }
 
 function makeCtx(seed = 42): MiningContext {

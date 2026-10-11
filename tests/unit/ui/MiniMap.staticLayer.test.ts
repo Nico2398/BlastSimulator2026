@@ -77,7 +77,10 @@ describe('MiniMap — static layer cache', () => {
     minimap.update(state);
 
     expect(layer.clearRect).toHaveBeenCalledTimes(2);
-    expect(layer.fillRect.mock.calls.length).toBe(paintedOnce * 2);
+    // Painted again in full: one more pass of row runs, give or take the run the edit split.
+    const repainted = layer.fillRect.mock.calls.length - paintedOnce;
+    expect(repainted).toBeGreaterThanOrEqual(paintedOnce - 2);
+    expect(repainted).toBeLessThanOrEqual(paintedOnce + 2);
     minimap.dispose();
   });
 
@@ -125,11 +128,13 @@ describe('MiniMap — static layer cache', () => {
     const state = makeGameContext({ seed: 42, size: 32 }).state!;
 
     minimap.update(state);
+    const map = created[0]!;
+    const onePaint = map.fillRect.mock.calls.length;
     minimap.update(state);
 
-    const map = created[0]!;
     expect(map.drawImage).not.toHaveBeenCalled();
-    expect(map.fillRect.mock.calls.length).toBeGreaterThanOrEqual(2 * 32 * 32);
+    expect(onePaint).toBeGreaterThan(32); // at least a run per row
+    expect(map.fillRect.mock.calls.length).toBe(2 * onePaint); // terrain painted again, every update
     minimap.dispose();
   });
 });

@@ -7,7 +7,6 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js';
-import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
@@ -18,7 +17,9 @@ import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ra
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
-import { createFragmentLookup, haulActionCarriesOre, type FragmentLookup } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, haulActionCarriesOre, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
+import { thinDebrisCandidates } from './DebrisCandidateBins.js';
+import { employeeClimbReach } from './OrderReachability.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
 // and cellsToTravelTicks from this module — a two-way cycle, safe because
@@ -452,9 +453,10 @@ export function selectBestActionForEmployee(
   employee: Employee,
   candidates: PendingAction[],
   isClaimable: (action: PendingAction) => boolean = () => true,
+  fragmentOf: FragmentLookup = createFragmentLookup(state),
 ): SelectedAction | null {
   if (candidates.length === 0) return null;
-  return withUnderRepairIndex(state, () => selectWithinIndex(state, employee, candidates, isClaimable));
+  return withUnderRepairIndex(state, () => selectWithinIndex(state, employee, candidates, isClaimable, fragmentOf));
 }
 
 function selectWithinIndex(
@@ -462,11 +464,17 @@ function selectWithinIndex(
   employee: Employee,
   candidates: PendingAction[],
   isClaimable: (action: PendingAction) => boolean,
+  fragmentOf: FragmentLookup,
 ): SelectedAction | null {
 
   // Event modifiers (#1414): a stoppage, drill ban or haul pause keeps the action unclaimed.
-  const claimable = candidates.filter(a =>
-    !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role) && isClaimable(a));
+  const allowed = (a: PendingAction): boolean =>
+    !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role) && isClaimable(a);
+  // A post-blast pool holds thousands of debris orders: gate and cost one per
+  // spatial bin, not every piece (#1603, DebrisCandidateBins.ts).
+  const claimable = thinDebrisCandidates(
+    state, employee, candidates, a => isAutoDebrisAction(a.type), a => haulActionCarriesOre(state, a, fragmentOf), allowed,
+  );
   if (claimable.length === 0) return null;
 
   // Each candidate's estimate is computed exactly once, up front, rather
@@ -475,7 +483,6 @@ function selectWithinIndex(
   // over a post-blast pool of thousands is the same per-tick blow-up
   // createFragmentLookup exists for (HaulDispatch.ts). Same order as
   // before — cost ascending, id ascending on a tie.
-  const fragmentOf = createFragmentLookup(state);
   const costed = claimable.map(action => ({ action, ...estimateWithBonus(state, employee, action, fragmentOf) }));
   costed.sort((a, b) => {
     const costDiff = a.cost - b.cost;
@@ -486,11 +493,9 @@ function selectWithinIndex(
   // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
   // interior) can never be reached by any real findExactPath, so it's skipped
   // below without spending one of the bounded real-pathfind attempts — frees
-  // the budget for a farther candidate that might actually resolve. One
-  // flood fill for the whole call, reused as an O(1) check per candidate.
-  const climbReachable = state.navGrid !== null
-    ? NavGrid.computeClimbReachableSet(state.navGrid, employee.x, employee.z)
-    : null;
+  // the budget for a farther candidate that might actually resolve. Answered
+  // from the climb labelling the order pools share, O(1) per candidate (#1603).
+  const climbReach = employeeClimbReach(state);
 
   let best: SelectedAction | null = null;
   let bestAdjusted = Infinity;
@@ -501,10 +506,10 @@ function selectWithinIndex(
     // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
     if (best !== null && estimate >= bestAdjusted) break;
 
-    if (climbReachable !== null && state.navGrid !== null) {
+    if (climbReach !== null && state.navGrid !== null) {
       const cx = state.navGrid.clampX(candidate.targetX);
       const cz = state.navGrid.clampZ(candidate.targetZ);
-      if (!climbReachable.has(cx, cz)) continue;
+      if (!climbReach.canReach(employee.x, employee.z, cx, cz)) continue;
     }
 
     attemptsSpent++;

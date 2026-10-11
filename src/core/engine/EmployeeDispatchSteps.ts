@@ -9,6 +9,7 @@
 // surface for tick-orchestration callers.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
+import type { VehicleRole } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
 import { holdsRequiredSkill, employeeQueueDepth } from '../entities/Employee.js';
 import {
@@ -19,7 +20,7 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole } from './VehicleReservation.js';
 import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
@@ -365,13 +366,24 @@ export function claimOnePoolCandidate(
   // `level1-lose-ecology` cost createFragmentLookup's doc comment records).
   const fragmentOf = createFragmentLookup(state);
   const fits = createStorageFit(state);
+  // Without a licence for an order's vehicle, the only way to claim it is a
+  // vehicle already reserved for it (findVehicleForClaim): leave the rest out
+  // here instead of gating each one. After a large blast that is thousands of
+  // haul orders an idle surveyor or driller otherwise weighed every tick (#1603).
+  const licensed = new Map<VehicleRole, boolean>();
+  const mayDrive = (a: PendingAction): boolean => {
+    const role = a.requiredVehicleRole;
+    if (role === null) return true;
+    let ok = licensed.get(role);
+    if (ok === undefined) { ok = isLicensedForRole(employee, role); licensed.set(role, ok); }
+    return ok || findVehicleReservedForAction(state.vehicles, a.id) !== null;
+  };
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
     (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
     holdsRequiredSkill(employee, a.requiredSkill) &&
-    // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-    isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits) &&
+    mayDrive(a) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
     // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
     // (called once per tick from tickEmployees) means this never permanently
@@ -383,11 +395,16 @@ export function claimOnePoolCandidate(
 
   const selection = selectBestActionForEmployee(
     state, employee, poolCandidates,
-    candidate => findVehicleForClaim(state, candidate, employee).ok
+    // #552: see claimActionsTargetedAtEmployee's own comment on the same
+    // check. Gated here rather than in the pre-filter above, so a post-blast
+    // pool's debris is storage-checked per bin, not per piece (#1603).
+    candidate => isHaulOrFragmentActionClaimable(state, candidate, fragmentOf, fits)
+      && findVehicleForClaim(state, candidate, employee).ok
       && isRampSegmentClaimable(state, candidate)
       && isChargeHoleClaimable(state, candidate)
       && (!deferVehicleGatedToIdleAlternative
         || !hasIdleLicensedAlternative(state, candidate, employee)),
+    fragmentOf,
   );
   if (selection === null) return null;
 
