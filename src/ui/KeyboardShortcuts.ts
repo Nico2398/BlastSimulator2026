@@ -3,7 +3,7 @@
 // Shortcuts panel shown in Settings/Help.
 
 import type { PanelName } from './UIManager.js';
-import { SURVEY_OVERLAY_TOGGLE_TARGET } from './tutorialStepHelpers.js';
+import { SURVEY_OVERLAY_TOGGLE_TARGET, PAUSE_TOGGLE_SELECTOR } from './tutorialStepHelpers.js';
 
 export type GameConsoleFn = (cmd: string) => string;
 
@@ -47,7 +47,7 @@ const SPEED_KEYS: Readonly<Record<string, number>> = {
 
 /** On-screen control each shortcut drives, so a rail on the control also holds the key. */
 const SHORTCUT_CONTROLS: Readonly<Record<string, string>> = {
-  Space: 'button[data-action="pause-toggle"]',
+  Space: PAUSE_TOGGLE_SELECTOR,
   KeyO: SURVEY_OVERLAY_TOGGLE_TARGET,
   ...Object.fromEntries(
     Object.entries(SPEED_KEYS).map(([code, speed]) => [code, `button[data-speed="${speed}"]`]),

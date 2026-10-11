@@ -1,6 +1,6 @@
 {
   "name": "tutorial-save-resume",
-  "description": "#1333: tutorial progress survives save/load. The player hires the surveyor (card moves to Survey Terrain), quick-saves with F5 (tutorial games write their own auto_tutorial slot), returns to the main menu, clicks Continue, and the tutorial card is back on the same step.",
+  "description": "#1333: tutorial progress survives save/load. The player hires the surveyor (card moves to Survey Terrain), quick-saves with F5 (tutorial games write their own auto_tutorial slot), returns to the main menu, clicks Continue, and the tutorial card is back on the same step. #1627: the save is taken with the survey order already placed (work in flight); after Continue the play/pause control is live (not rail-inert) and the clock runs again so the survey completes.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit",
@@ -65,6 +65,49 @@
         "increased": [
           "employeeCount"
         ]
+      }
+    },
+    {
+      "command": "survey seismic x:23 z:23",
+      "timeout": 90,
+      "description": "#1627: Player orders the seismic survey (picked at 23,23) so the saved step has its own work in flight.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 23,
+          "z": 23
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": ".bs-tutorial-box .bs-tutorial-stage",
+          "property": "textContent",
+          "expectedValue": "Order placed — waiting for the surveyor to report back.",
+          "timeoutMs": 30000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "survey"
       }
     },
     {
@@ -158,6 +201,42 @@
       ],
       "expect": {
         "tutorialStep": "survey"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "#1627: after Continue on a waits-on-work step with work in flight, the top-bar play/pause control is live (not rail-inert) so the player can always restart time; Space follows it.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "button[data-action=\"pause-toggle\"]"
+        }
+      ],
+      "expect": {
+        "usable": "button[data-action=\"pause-toggle\"]",
+        "tutorialStep": "survey"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 120,
+      "interactionOnly": true,
+      "description": "#1627: the resumed survey finishes and the clock advances (resumed game is not left frozen behind the order).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "toggle-survey-overlay",
+          "timeout": 90000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "toggle-survey-overlay",
+        "increased": [
+          "tickCount"
+        ]
       }
     }
   ]

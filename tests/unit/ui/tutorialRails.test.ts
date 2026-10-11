@@ -9,7 +9,7 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor, PICKER_CANCEL } from '../../../src/ui/tutorialStages.js';
-import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
+import { PAUSE_TOGGLE_SELECTOR, SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { GUIDED_CLASS } from '../../../src/ui/tutorialGuide.js';
@@ -1298,5 +1298,136 @@ describe('TutorialRails — unissued order holds the clock (#1626)', () => {
     rails.beginStep({ id: 'haul-debris', tickBudget: 30, waitsOnWork: true }, s);
     s.tickCount = 40;
     expect(rails.updateClock(s)).toBe(false);
+  });
+});
+
+describe('play/pause control stays allowed under the rails (#1627)', () => {
+  function pauseButton(): HTMLButtonElement {
+    const bar = document.createElement('div');
+    bar.id = 'bs-hud-top';
+    const btn = document.createElement('button');
+    btn.dataset['action'] = 'pause-toggle';
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+    return withBox(btn) as HTMLButtonElement;
+  }
+
+  it('marks the pause toggle allowed on a stage that does not target it', () => {
+    const btn = pauseButton();
+    expect(Array.from(document.querySelectorAll(PAUSE_TOGGLE_SELECTOR))).toEqual([btn]);
+    toolbarCrew();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('keeps it allowed on a later step and after clear() + beginStep()', () => {
+    const btn = pauseButton();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'drill-plan' }, state());
+    rails.refresh();
+    expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+    rails.clear();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(btn.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('never highlights it', () => {
+    const btn = pauseButton();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(btn.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+  });
+});
+
+describe('TutorialRails.settleClockAfterResume (#1627)', () => {
+  const inFlightTraining = (s: GameState): void => {
+    s.employees.employees = [
+      { activeActionId: null, pendingDriverVehicleId: null, destinationX: null, qualifications: [],
+        trainingState: { buildingId: 1, skill: 'driving.rock_fragmenter', ticksRemaining: 90, fee: 1 } } as never,
+    ];
+  };
+
+  it('unpauses a waits-on-work step whose order is already issued (training active)', () => {
+    const s = state();
+    s.isPaused = true;
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'train-fragmenter', tickBudget: 25, waitsOnWork: true }, s);
+    s.isPaused = true;
+    inFlightTraining(s);
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(false);
+  });
+
+  it('unpauses while a detonation is pending (no training in flight)', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'blast', waitsOnWork: true }, s);
+    s.isPaused = true;
+    s.pendingDetonation = {} as never;
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(false);
+  });
+
+  it('unpauses a waits-on-work step with no player order (self-dispatching haul)', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'haul-debris', tickBudget: 30, waitsOnWork: true }, s);
+    s.isPaused = true;
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(false);
+  });
+
+  it('stays paused when the step has no order in flight yet', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'train-fragmenter', tickBudget: 25, waitsOnWork: true }, s);
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(true);
+  });
+
+  it('pauses a non-waits-on-work step', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, s);
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(true);
+  });
+
+  it('the pause is the player\'s: updateClock does not release it', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor', tickBudget: 25 }, s);
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(true);
+    expect(rails.updateClock(s)).toBe(false);
+    expect(s.isPaused).toBe(true);
+    expect(rails.clockHeld).toBe(false);
+  });
+
+  it('the player\'s unpause sticks while the step has budget left', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor', tickBudget: 25 }, s);
+    rails.settleClockAfterResume(s);
+    s.isPaused = false;
+    rails.updateClock(s);
+    expect(s.isPaused).toBe(false);
+  });
+
+  it('under a rails hold the unpause is re-paused and the clock still reports held', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor', tickBudget: 25 }, s);
+    s.tickCount = 100;
+    rails.settleClockAfterResume(s);
+    expect(s.isPaused).toBe(true);
+    s.isPaused = false;
+    expect(rails.updateClock(s)).toBe(true);
+    expect(s.isPaused).toBe(true);
+    expect(rails.clockHeld).toBe(true);
   });
 });

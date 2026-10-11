@@ -12,7 +12,7 @@ import {
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
 import {
-  SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS,
+  SPEED_BUTTON_GROUP, PAUSE_TOGGLE_SELECTOR, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS,
 } from './tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
 import { installActivationGuard } from './tutorialActivationGuard.js';
@@ -21,6 +21,8 @@ import { installActivationGuard } from './tutorialActivationGuard.js';
  * Selectors permanently allowed from the tutorial's very first step onward,
  * independent of any step's own declarations:
  * - the speed bar is the player's from the moment the tutorial starts (#1015).
+ * - the play/pause toggle (and Space, which follows it) is always the player's, so a
+ *   resumed tutorial can never leave the clock frozen with no way to restart it (#1627).
  * - opening, closing, or switching between panels is navigation, never a
  *   game-state action, so it is always allowed too (#1041) — gating stays on
  *   the controls *inside* a panel (the active stage's own target/also set),
@@ -30,7 +32,7 @@ import { installActivationGuard } from './tutorialActivationGuard.js';
  *   manage the session (#1332). Replay Tutorial stays gated.
  */
 export const BASE_PERMANENTLY_ALLOWED: readonly string[] = [
-  SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, PANEL_CLOSE_SELECTOR,
+  SPEED_BUTTON_GROUP, PAUSE_TOGGLE_SELECTOR, PANEL_OPEN_SELECTOR, PANEL_CLOSE_SELECTOR,
   TUTORIAL_EXIT_SELECTOR, ...SETTINGS_SESSION_SELECTORS,
 ];
 
@@ -161,7 +163,7 @@ export class TutorialRails {
         trainingActive: this.lastProgressTrainingActive,
       },
       this.clockMustRun?.(state) === true,
-      resolveOrderIssued(this.stages, state) === false,
+      this.orderNotIssued(state),
     );
     this.lastProgressSignature = decision.progressSignature;
     this.lastProgressTick = decision.lastProgressTick;
@@ -178,10 +180,26 @@ export class TutorialRails {
     return this.held;
   }
 
+  /** The step has a player order and it is not issued yet (`null`: no player order). */
+  private orderNotIssued(state: GameState): boolean {
+    return resolveOrderIssued(this.stages, state) === false;
+  }
+
   /** Let the clock run again — the step moved on. */
   releaseClock(state: GameState | null): void {
     this.held = false;
     if (state) state.isPaused = false;
+  }
+
+  /**
+   * Reconcile the clock after the tutorial is resumed (#1627). A work-waiting
+   * step whose order is already issued runs (the work is under way); any other
+   * step starts paused. Never adopted as `held`, so a player unpause sticks.
+   */
+  settleClockAfterResume(state: GameState): void {
+    this.held = false;
+    const underway = this.waitsOnWork && !this.orderNotIssued(state);
+    state.isPaused = !underway;
   }
 
   get clockHeld(): boolean {

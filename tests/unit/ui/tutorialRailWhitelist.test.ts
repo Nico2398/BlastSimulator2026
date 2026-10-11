@@ -76,7 +76,6 @@ function buildFixture(): Probe[] {
   probe('demolish', [], add(sel, 'button', { 'data-action': 'demolish' }));
   probe('fire employee', [], add(sel, 'button', { 'data-action': 'fire-employee' }));
 
-  probe('pause toggle', [], add(document.body, 'button', { 'data-action': 'pause-toggle' }));
   return probes;
 }
 
@@ -104,6 +103,12 @@ describe('tutorial rails whitelist (#1595)', () => {
     for (const p of probes) {
       expect(p.el.classList.contains(ALLOWED_CLASS), `${p.name} is live while the order is spent`).toBe(false);
     }
+  });
+
+  it('the pause toggle is always live, even while the order is spent (#1627)', () => {
+    const pause = add(document.body, 'button', { 'data-action': 'pause-toggle' });
+    applyRails({ target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'k' }, document, BASE_PERMANENTLY_ALLOWED, true);
+    expect(pause.classList.contains(ALLOWED_CLASS)).toBe(true);
   });
 
   it('a spent stage still keeps the permanent base list allowed', () => {
