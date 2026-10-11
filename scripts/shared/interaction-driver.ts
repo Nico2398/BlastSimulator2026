@@ -191,25 +191,28 @@ function describeAvailable(actions: ProbedAction[]): string {
 }
 
 /** Ask the page directly about one selector, rather than matching probe output. */
-async function blockedReason(page: Page, selector: string): Promise<string | null> {
-  return page.evaluate((sel: string) => {
+async function blockedReason(page: Page, selector: string, scroll = true): Promise<string | null> {
+  return page.evaluate((sel: string, doScroll: boolean) => {
     // Scroll into view before probing, exactly as page.click will before
     // clicking (interaction-executor.ts's clickSelector does the same, #481):
     // a row below a panel's fold has its centre over the game canvas until
     // scrolled, and probing that without scrolling first reads as covered-forever.
-    document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    // `scroll` false (`awaitUsable` with `inPlace`, #1629) probes the layout
+    // exactly as the player sees it, so a control the product itself must
+    // bring into view is not masked by this harness doing it first.
+    if (doScroll) document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
     const probe = (window as unknown as {
       __probeSelector: (s: string) => string | null;
     }).__probeSelector;
     return probe(sel);
-  }, selector) as Promise<string | null>;
+  }, selector, scroll) as Promise<string | null>;
 }
 
-async function requireUsable(page: Page, selector: string, timeoutMs: number): Promise<void> {
+async function requireUsable(page: Page, selector: string, timeoutMs: number, scroll = true): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let reason: string | null = 'absent';
   for (;;) {
-    reason = await blockedReason(page, selector);
+    reason = await blockedReason(page, selector, scroll);
     if (reason === null) return;
     if (Date.now() > deadline) break;
     await new Promise(r => setTimeout(r, 150));
@@ -439,7 +442,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'awaitUsable': {
-      await requireUsable(page, action.selector, action.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      await requireUsable(page, action.selector, action.timeoutMs ?? DEFAULT_TIMEOUT_MS, action.inPlace !== true);
       break;
     }
     case 'awaitTutorialStep': {

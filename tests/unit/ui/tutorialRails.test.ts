@@ -1431,3 +1431,238 @@ describe('TutorialRails.settleClockAfterResume (#1627)', () => {
     expect(rails.clockHeld).toBe(true);
   });
 });
+
+// #1629: a stage's target can sit inside a panel's scrolling body, below the
+// fold. The rails scroll it into view once per stage activation — never again
+// while the player scrolls away, never on a re-rendered copy of the target.
+describe('TutorialRails — scrolls an off-screen target into view once per stage activation (#1629)', () => {
+  type Box = { top: number; bottom: number };
+  const SCROLLER_BOX: Box = { top: 0, bottom: 200 };
+  const VISIBLE: Box = { top: 50, bottom: 80 };
+  const BELOW_FOLD: Box = { top: 400, bottom: 430 };
+
+  function setBox(el: HTMLElement, box: Box): void {
+    el.getBoundingClientRect = () => ({
+      width: 40, height: box.bottom - box.top, top: box.top, bottom: box.bottom,
+      left: 0, right: 40, x: 0, y: box.top, toJSON: () => ({}),
+    }) as DOMRect;
+  }
+
+  /** A hire button inside a vertically scrolling body, as the Crew panel lays it out. */
+  function scrolledHireButton(box: Box, host?: HTMLElement): { btn: HTMLElement; scrollIntoView: ReturnType<typeof vi.fn> } {
+    const panel = host ?? document.createElement('div');
+    if (!host) {
+      panel.id = 'bs-employee-panel';
+      // The panel itself scrolls (overflow auto) and spans the viewport, so it never clips.
+      setBox(panel, { top: 0, bottom: 768 });
+      document.body.appendChild(panel);
+    }
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    setBox(scroller, SCROLLER_BOX);
+    const btn = document.createElement('button');
+    btn.dataset['role'] = 'surveyor';
+    btn.dataset['candidateId'] = String(TUTORIAL_HIRING_SCRIPT.find(c => c.role === 'surveyor')!.id);
+    setBox(btn, box);
+    const scrollIntoView = vi.fn();
+    (btn as unknown as { scrollIntoView: unknown }).scrollIntoView = scrollIntoView;
+    scroller.appendChild(btn);
+    panel.appendChild(scroller);
+    return { btn, scrollIntoView };
+  }
+
+  function railsForHire(): { rails: TutorialRails; s: GameState } {
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'hire-surveyor' }, s);
+    return { rails, s };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+  });
+
+  it('scrolls a target clipped by its scroller into view with nearest alignment', () => {
+    const { btn, scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(btn.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+  });
+
+  it('does not scroll again on later refreshes of the same stage', () => {
+    const { scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    const { rails } = railsForHire();
+    rails.refresh();
+    rails.refresh();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not scroll a re-rendered replacement of the target for the same stage', () => {
+    const first = scrolledHireButton(BELOW_FOLD);
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(first.scrollIntoView).toHaveBeenCalledTimes(1);
+
+    const panel = document.getElementById('bs-employee-panel')!;
+    panel.innerHTML = '';
+    const second = scrolledHireButton(BELOW_FOLD, panel);
+    rails.refresh();
+    expect(second.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('does not scroll a target that is already visible, and a later clip is left alone', () => {
+    const { btn, scrollIntoView } = scrolledHireButton(VISIBLE);
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    // The player scrolls it out of view: the activation is already consumed.
+    setBox(btn, BELOW_FOLD);
+    rails.refresh();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('scrolls a target that sits below the viewport even without a scrolling ancestor', () => {
+    const panel = document.createElement('div');
+    panel.id = 'bs-employee-panel';
+    document.body.appendChild(panel);
+    const btn = document.createElement('button');
+    btn.dataset['role'] = 'surveyor';
+    btn.dataset['candidateId'] = String(TUTORIAL_HIRING_SCRIPT.find(c => c.role === 'surveyor')!.id);
+    setBox(btn, { top: 900, bottom: 930 });
+    const scrollIntoView = vi.fn();
+    (btn as unknown as { scrollIntoView: unknown }).scrollIntoView = scrollIntoView;
+    panel.appendChild(btn);
+
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps retrying while the target is absent, then scrolls once when it appears', () => {
+    const { rails } = railsForHire();
+    expect(() => rails.refresh()).not.toThrow();
+    rails.refresh();
+
+    const { scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    rails.refresh();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps retrying while the target is unreachable (display none), then scrolls once when shown', () => {
+    const { btn, scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    btn.style.display = 'none';
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    btn.style.display = '';
+    rails.refresh();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stage advance gives the new stage its own single scroll, leaving the earlier target alone', () => {
+    const open = toolbarCrew();
+    setBox(open, { top: 700, bottom: 720 }); // inside the viewport, no scroller
+    const openScroll = vi.fn();
+    (open as unknown as { scrollIntoView: unknown }).scrollIntoView = openScroll;
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(rails.progress.index).toBe(0);
+    expect(openScroll).not.toHaveBeenCalled();
+
+    const { scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    rails.refresh();
+    expect(rails.progress.index).toBe(1);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(openScroll).not.toHaveBeenCalled();
+  });
+
+  it('beginStep resets the activation so the same stage scrolls again on a new step run', () => {
+    const { scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    const { rails, s } = railsForHire();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    rails.beginStep({ id: 'hire-surveyor' }, s);
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it('clear resets the activation', () => {
+    const { scrollIntoView } = scrolledHireButton(BELOW_FOLD);
+    const { rails, s } = railsForHire();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    rails.clear();
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1); // nothing staged after clear
+    rails.beginStep({ id: 'hire-surveyor' }, s);
+    rails.refresh();
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not scroll while the stage is waiting on the simulation, and scrolls once the wait ends', () => {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const open = document.createElement('button');
+    open.dataset['panel'] = 'build';
+    bar.appendChild(open);
+    document.body.appendChild(bar);
+    withBox(open);
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-build-panel';
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    setBox(scroller, SCROLLER_BOX);
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-build-type', 'living_quarters');
+    const buy = document.createElement('button');
+    buy.className = 'bs-build-buy-btn';
+    setBox(buy, BELOW_FOLD);
+    const scrollIntoView = vi.fn();
+    (buy as unknown as { scrollIntoView: unknown }).scrollIntoView = scrollIntoView;
+    wrap.appendChild(buy);
+    scroller.appendChild(wrap);
+    panel.appendChild(scroller);
+    document.body.appendChild(panel);
+
+    const rails = new TutorialRails();
+    const s = state();
+    rails.beginStep({ id: 'build-living-quarters' }, s);
+    s.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 } as never,
+    ];
+    expect(rails.refresh(s).waiting).toBe(true);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    s.plannedBuildings = [];
+    expect(rails.refresh(s).waiting).toBe(false);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('never clicks the target on the player\'s behalf', () => {
+    const { btn } = scrolledHireButton(BELOW_FOLD);
+    const click = vi.fn();
+    btn.addEventListener('click', click);
+    const { rails } = railsForHire();
+    rails.refresh();
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('tolerates a host without scrollIntoView', () => {
+    const { btn } = scrolledHireButton(BELOW_FOLD);
+    delete (btn as unknown as { scrollIntoView?: unknown }).scrollIntoView;
+    const { rails } = railsForHire();
+    expect(() => rails.refresh()).not.toThrow();
+  });
+});

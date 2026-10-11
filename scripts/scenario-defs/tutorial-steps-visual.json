@@ -965,10 +965,10 @@
       }
     },
     {
-      "command": "employee train 3 skill:driving.rock_fragmenter",
+      "command": "state",
       "timeout": 90,
       "role": "player",
-      "description": "#1339: train-fragmenter, click half -- the hired Driver (found by role in the crew panel) is booked on the Rock Fragmenter licence at the driving_center.",
+      "description": "#1629: train-fragmenter, reach half -- open the crew panel and expand the Driver's detail; the Train button for the Rock Fragmenter licence sits in the panel's scrolling body. The in-place usable probe (awaitUsable inPlace, which does not scroll the control into view the way the harness's own probes do) asserts the tutorial rails themselves brought it into reach, not clipped or covered, the moment the step is active.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -982,6 +982,22 @@
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-employee-role=\"driver\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
         },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]",
+          "inPlace": true
+        }
+      ],
+      "expect": {
+        "tutorialStep": "train-fragmenter"
+      }
+    },
+    {
+      "command": "employee train 3 skill:driving.rock_fragmenter",
+      "timeout": 90,
+      "role": "player",
+      "description": "#1339: train-fragmenter, click half -- the hired Driver (found by role in the crew panel) is booked on the Rock Fragmenter licence at the driving_center.",
+      "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-employee-role=\"driver\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
@@ -1346,7 +1362,7 @@
     {
       "command": "contract accept type:ore_sale material:rustite fillable:true",
       "timeout": 120,
-      "description": "#959, the issue's own missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blasts produced and its own haulers carried in. #1042 CI-fix: scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to `material:dirtite` -- which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins this step to a pool composition that any upstream re-timing (like #1042's own evacuate-zone fix) re-rolls, same failure #1048 already fixed this same way in tutorial-steps-visual.json. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. A `waitForSelector` ahead of the click gives the refresh cycle time to surface the right card rather than assuming it's there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 22` in command mode), so the same wait_until above lands command mode on a different offer pool, where the console can refuse this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all. #1574: interaction click pinned to dirtite. The starting spoil heap re-times the run so the first fillable offer was a 410 kg rustite sale ($353,895), one sale past the +$5,000 profit target: the level was won on the spot and the tutorial jumped past free-play to the closing card before the next beat could prove the rails lifting. Dirtite is the pit's bulk ore (1,000+ kg stored) at a fraction of rustite's price, so the first sale lands the tutorial in free-play and the profit target still takes several sales. The preceding wait_until polls `fillableDirtiteSaleOffered`, so a fillable dirtite card is on the board by now. #1587: the drill pattern moved to the climbable west plateau, whose haul loads are mostly dirtite ($240/kg), so a generic fillable match can land on a dirtite offer worth less than the operating deficit the running payroll has piled up, and the level does not end on the first sale. The sale pins rustite (the pit's one valuable ore, ~$960/kg): the wait is on a fillable rustite offer and accept/deliver name it, as a player picks the best-paying card on the board.",
+      "description": "#959, the issue's own missing half, first beat: Accept clicked on an ore_sale offer this pit can actually fill -- rock its own blasts produced and its own haulers carried in. #1042 CI-fix: scoped to `[data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"]` rather than to `material:dirtite` -- which ore the board asks for is random per refresh (Contract.ts's generateContracts), so naming one pins this step to a pool composition that any upstream re-timing (like #1042's own evacuate-zone fix) re-rolls, same failure #1048 already fixed this same way in tutorial-steps-visual.json. `data-contract-fillable` is the card's own `stored >= quantityKg`, the same figure its \"have\" bar already colors green, and the DOM counterpart of the `fillableOreSaleOffered` the preceding step waits on. A `waitForSelector` ahead of the click gives the refresh cycle time to surface the right card rather than assuming it's there instantly. `commandOutcome: 'either'` is command-mode only: the two modes' tick trajectories diverge well upstream of here (this file's haul-debris step waits on the tutorial rail in interaction mode and on a fixed `tick 22` in command mode), so the same wait_until above lands command mode on a different offer pool, where the console can refuse this accept outright. The sell beat is proven by the click path, in interaction mode, which is the mode that models a player at all. #1574: interaction click pinned to dirtite. The starting spoil heap re-times the run so the first fillable offer was a 410 kg rustite sale ($353,895), one sale past the +$5,000 profit target: the level was won on the spot and the tutorial jumped past free-play to the closing card before the next beat could prove the rails lifting. Dirtite is the pit's bulk ore (1,000+ kg stored) at a fraction of rustite's price, so the first sale lands the tutorial in free-play and the profit target still takes several sales. The preceding wait_until polls `fillableDirtiteSaleOffered`, so a fillable dirtite card is on the board by now. #1587: the drill pattern moved to the climbable west plateau, whose haul loads are mostly dirtite ($240/kg), so a generic fillable match can land on a dirtite offer worth less than the operating deficit the running payroll has piled up, and the level does not end on the first sale. The sale pins rustite (the pit's one valuable ore, ~$960/kg): the wait is on a fillable rustite offer and accept/deliver name it, as a player picks the best-paying card on the board. #1629: the awaitUsable before the click is inPlace -- it probes the Accept button without the harness scrolling it into view, so the tutorial rails (not the harness) must have put it in reach.",
       "role": "player",
       "interaction": [
         {
@@ -1357,6 +1373,11 @@
           "type": "waitForSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 30000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "inPlace": true
         },
         {
           "type": "screenshot"

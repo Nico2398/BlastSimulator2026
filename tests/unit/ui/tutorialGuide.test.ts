@@ -4,7 +4,7 @@
 // The rails are what make the tutorial impossible to lose: one control live at
 // a time, resolved by reachability, and a clock that cannot outrun the step.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   isReachable,
   resolveStageIndex,
@@ -19,6 +19,8 @@ import {
   DEFAULT_TICK_BUDGET,
   WORK_GRACE_TICKS,
   MODAL_DISMISS_SELECTOR,
+  isClippedByScroller,
+  scrollTargetIntoView,
 } from '../../../src/ui/tutorialGuide.js';
 import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
@@ -1778,5 +1780,92 @@ describe('hasBookedTraining (#1626)', () => {
     const s = fresh();
     s.employees.employees = [];
     expect(hasBookedTraining(s, 'driving.rock_fragmenter')).toBe(false);
+  });
+});
+
+// #1629: a stage target clipped out of view by a scrolling body gets scrolled in.
+describe('isClippedByScroller / scrollTargetIntoView (#1629)', () => {
+  function boxed(el: HTMLElement, top: number, bottom: number): HTMLElement {
+    el.getBoundingClientRect = () => ({
+      width: 40, height: bottom - top, top, bottom, left: 0, right: 40, x: 0, y: top, toJSON: () => ({}),
+    }) as DOMRect;
+    return el;
+  }
+
+  function inScroller(overflowY: string, scrollerBox: [number, number], elBox: [number, number]): HTMLElement {
+    const scroller = boxed(document.createElement('div'), scrollerBox[0], scrollerBox[1]);
+    scroller.style.overflowY = overflowY;
+    const el = boxed(document.createElement('button'), elBox[0], elBox[1]);
+    scroller.appendChild(el);
+    document.body.appendChild(scroller);
+    return el;
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+  });
+
+  it('is false for an element fully inside its scroller', () => {
+    expect(isClippedByScroller(inScroller('auto', [0, 200], [50, 80]))).toBe(false);
+  });
+
+  it('is true for an element below its scroller (auto)', () => {
+    expect(isClippedByScroller(inScroller('auto', [0, 200], [400, 430]))).toBe(true);
+  });
+
+  it('is true for an element above its scroller (scroll)', () => {
+    expect(isClippedByScroller(inScroller('scroll', [100, 300], [20, 50]))).toBe(true);
+  });
+
+  it('is true for an element straddling the scroller edge (hidden)', () => {
+    expect(isClippedByScroller(inScroller('hidden', [0, 200], [180, 230]))).toBe(true);
+  });
+
+  it('is false for an element exactly filling the scroller (boundary)', () => {
+    expect(isClippedByScroller(inScroller('auto', [0, 200], [0, 200]))).toBe(false);
+  });
+
+  it('ignores ancestors that do not clip (overflowY visible)', () => {
+    expect(isClippedByScroller(inScroller('visible', [0, 200], [400, 430]))).toBe(false);
+  });
+
+  it('is true for an element below the viewport with no scrolling ancestor', () => {
+    const el = boxed(document.createElement('button'), 900, 930);
+    document.body.appendChild(el);
+    expect(isClippedByScroller(el)).toBe(true);
+  });
+
+  it('is false for an element inside the viewport with no scrolling ancestor', () => {
+    const el = boxed(document.createElement('button'), 100, 130);
+    document.body.appendChild(el);
+    expect(isClippedByScroller(el)).toBe(false);
+  });
+
+  it('checks every clipping ancestor, not only the nearest', () => {
+    const outer = boxed(document.createElement('div'), 0, 100);
+    outer.style.overflowY = 'auto';
+    const inner = boxed(document.createElement('div'), 0, 500);
+    inner.style.overflowY = 'auto';
+    const el = boxed(document.createElement('button'), 200, 230); // inside inner, outside outer
+    inner.appendChild(el);
+    outer.appendChild(inner);
+    document.body.appendChild(outer);
+    expect(isClippedByScroller(el)).toBe(true);
+  });
+
+  it('scrollTargetIntoView calls scrollIntoView with nearest block and inline', () => {
+    const el = document.createElement('button');
+    const spy = vi.fn();
+    (el as unknown as { scrollIntoView: unknown }).scrollIntoView = spy;
+    scrollTargetIntoView(el);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+  });
+
+  it('scrollTargetIntoView does not throw when the host has no scrollIntoView', () => {
+    const el = document.createElement('button');
+    delete (el as unknown as { scrollIntoView?: unknown }).scrollIntoView;
+    expect(() => scrollTargetIntoView(el)).not.toThrow();
   });
 });

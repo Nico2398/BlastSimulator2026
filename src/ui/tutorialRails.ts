@@ -8,7 +8,7 @@ import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import { stagesFor, PICKER_CANVAS, type TutorialStage } from './tutorialStages.js';
 import {
-  applyRails, clearRails, resolveStageIndex, resolveWaitStatus, resolveOrderIssued, decideClock, DEFAULT_TICK_BUDGET,
+  applyRails, clearRails, isReachable, isClippedByScroller, scrollTargetIntoView, resolveStageIndex, resolveWaitStatus, resolveOrderIssued, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
 import {
@@ -69,6 +69,9 @@ export class TutorialRails {
   private waitsOnWork = false;
   private clockMustRun: ((state: GameState) => boolean) | undefined;
   private held = false;
+  private stepId = '';
+  /** `${stepId}:${stageIndex}` already brought into view; one scroll per stage activation. */
+  private scrolledKey: string | null = null;
   /** True once the step lifted the rails: the clock is never held (#1328). */
   private unguided = false;
   private lastProgressSignature: string | null = null;
@@ -82,6 +85,8 @@ export class TutorialRails {
     this.unguided = step.guided === false;
     this.disposeActivationGuard ??= installActivationGuard(document);
     this.stages = this.unguided ? [] : stagesFor(step.id, step.highlightTarget);
+    this.stepId = step.id;
+    this.scrolledKey = null;
     this.stageIndex = 0;
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
     this.waitsOnWork = step.waitsOnWork === true;
@@ -116,6 +121,7 @@ export class TutorialRails {
     const stage = this.stages[this.stageIndex];
     const waitStatus = resolveWaitStatus(this.stages, state);
     applyRails(stage, document, BASE_PERMANENTLY_ALLOWED, waitStatus.waiting);
+    if (stage && !waitStatus.waiting) this.scrollStageIntoViewOnce(stage);
 
     const counter = this.stages.length > 1
       ? `  (${this.stageIndex + 1}/${this.stages.length})`
@@ -214,6 +220,16 @@ export class TutorialRails {
     };
   }
 
+  /** Brings the stage's target into view once per activation; a missing target retries next refresh. */
+  private scrollStageIntoViewOnce(stage: TutorialStage): void {
+    const key = `${this.stepId}:${this.stageIndex}`;
+    if (this.scrolledKey === key) return;
+    const el = document.querySelector(stage.target);
+    if (!el || !isReachable(stage.target)) return;
+    if (isClippedByScroller(el)) scrollTargetIntoView(el);
+    this.scrolledKey = key;
+  }
+
   /** Take every mark off the DOM — used when the tutorial ends or restarts. */
   clear(): void {
     this.disposeActivationGuard?.();
@@ -222,6 +238,7 @@ export class TutorialRails {
     setPickerRegion(null);
     this.stages = [];
     this.stageIndex = 0;
+    this.scrolledKey = null;
     this.held = false;
     this.unguided = false;
   }

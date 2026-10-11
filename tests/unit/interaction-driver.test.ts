@@ -147,3 +147,30 @@ describe('runAction — focusTile wires __cameraOrbit alongside __cameraFocus', 
     expect(cameraOrbit).toHaveBeenCalledWith(15, 60);
   });
 });
+
+// `awaitUsable` (#1629): every probe scrolls the control to centre first, which
+// masks a product that never scrolls a guided target into view. `inPlace`
+// probes the layout as the player sees it.
+describe('runAction — awaitUsable scrolls before probing unless inPlace', () => {
+  async function scrollCalls(action: PlayerAction): Promise<number> {
+    const scrollIntoView = vi.fn();
+    vi.stubGlobal('document', { querySelector: () => ({ scrollIntoView }) });
+    vi.stubGlobal('window', { __probeSelector: () => null });
+    try {
+      const evaluate = vi.fn(async (fn: (...a: unknown[]) => unknown, ...args: unknown[]) =>
+        String(fn).includes('__probeSelector') ? fn(...args) : undefined);
+      await runAction({ evaluate } as unknown as Page, action);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    return scrollIntoView.mock.calls.length;
+  }
+
+  it('default: scrolls the control into view before probing', async () => {
+    expect(await scrollCalls({ do: 'awaitUsable', selector: '#x' })).toBe(1);
+  });
+
+  it('inPlace: probes without scrolling', async () => {
+    expect(await scrollCalls({ do: 'awaitUsable', selector: '#x', inPlace: true })).toBe(0);
+  });
+});
