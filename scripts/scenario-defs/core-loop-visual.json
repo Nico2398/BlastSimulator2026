@@ -1,6 +1,6 @@
 {
   "name": "core-loop-visual",
-  "description": "Visual verification of the full core gameplay loop: survey \u2192 drill plan \u2192 charge \u2192 blast \u2192 fragments \u2192 contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
+  "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:false cash:200000",
@@ -327,7 +327,7 @@
     },
     {
       "command": "tick 50",
-      "description": "Third and final chunk \u2014 all 4 holes should have landed by now. Two further chunks (150->250 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 4 holes already landed by tick 155 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding, on a 2-employee crew with no living quarters ever built in this file, was enough for wellBeing (already pinned at 0 by ~tick135) to accumulate REVOLT_TICKS=120 consecutive ticks at zero and end the level via worker_revolt (WorkerRevolt.ts) before charging ever got a chance to run as real, clickable UI -- the interaction-mode wait_until step below needs the speed-8x control to still be usable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/blast to run as genuine player interaction instead of falling back to the guard-step pattern.",
+      "description": "Third and final chunk — all 4 holes should have landed by now. Two further chunks (150->250 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 4 holes already landed by tick 155 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding, on a 2-employee crew with no living quarters ever built in this file, was enough for wellBeing (already pinned at 0 by ~tick135) to accumulate REVOLT_TICKS=120 consecutive ticks at zero and end the level via worker_revolt (WorkerRevolt.ts) before charging ever got a chance to run as real, clickable UI -- the interaction-mode wait_until step below needs the speed-8x control to still be usable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/blast to run as genuine player interaction instead of falling back to the guard-step pattern.",
       "interaction": [
         {
           "type": "command",
@@ -382,6 +382,10 @@
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",

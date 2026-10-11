@@ -865,6 +865,10 @@
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         },
         {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
         },

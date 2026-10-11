@@ -294,6 +294,10 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
@@ -823,6 +827,10 @@
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
@@ -1322,6 +1330,10 @@
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
       "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
@@ -2567,6 +2579,10 @@
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         },
         {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
         },
@@ -2592,6 +2608,10 @@
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -3578,6 +3598,10 @@
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"

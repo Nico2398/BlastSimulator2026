@@ -530,6 +530,10 @@
       "description": "#1362: FIRE then DETONATE once: DETONATE sounds the horn itself. A driverless drill rig cannot drive out, so the waiting state names it and keeps Fire anyway / Cancel on offer instead of auto-firing.",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
           "type": "ensureStep",
           "step": 4
         },
