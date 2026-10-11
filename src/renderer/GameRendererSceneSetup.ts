@@ -47,6 +47,7 @@ import { createLandscapeChunkStreamer, type LandscapeChunkStreamer } from './ter
 import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
+import { warmupShaders } from './ShaderWarmup.js';
 import { RampArrowLayer } from './RampArrow.js';
 import { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
 
@@ -213,6 +214,14 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
 
   // Traffic jam markers (#1208), one per active jam
   deps.trafficJamMarkers = new TrafficJamMarkerLayer(scene, deps.getSmoothTerrainSurfaceY);
+
+  // Ghosts first appear mid-game — haul orders the moment a blast lands —
+  // so compile their materials now, with every light in place, rather than
+  // on that frame (#1603). Nothing after this adds a light.
+  warmupShaders(
+    deps.sm.renderer, deps.sm.camera, scene, deps.ghosts.materials, deps.sm.postPipeline.sceneTarget,
+    deps.ghosts.materials, // debris ghosts draw instanced (GhostInstanceBatch.ts)
+  );
 }
 
 /**

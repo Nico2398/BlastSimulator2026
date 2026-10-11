@@ -13,6 +13,7 @@
 // See the gameplay-blast-system skill, "Step 4 — Throw, Flight and the Muck Pile" (landing and the muck pile).
 
 import { vec3, type Vec3 } from '../math/Vec3.js';
+import { drain, type Steps } from '../engine/Steps.js';
 import { firstEmptyLayerAboveGround, type VoxelGrid } from '../world/VoxelGrid.js';
 import {
   GRAVITY,
@@ -26,6 +27,7 @@ import {
   MIN_PILE_RISE,
   PILE_SPILL_STEPS,
   PILE_REPOSE_STEP,
+  BLAST_SLICE_ITEMS,
 } from '../config/balance.js';
 import type { Projectile } from './ProjectileGrouping.js';
 
@@ -311,6 +313,15 @@ export function resolveFragmentLanding(
   projectiles: readonly Projectile[],
   grid: VoxelGrid,
 ): ResolveResult {
+  return drain(resolveFragmentLandingSteps(fragments, projectiles, grid));
+}
+
+/** `resolveFragmentLanding`, yielding every `BLAST_SLICE_ITEMS` projectiles or fragments (#1603). */
+export function* resolveFragmentLandingSteps(
+  fragments: readonly LandableFragment[],
+  projectiles: readonly Projectile[],
+  grid: VoxelGrid,
+): Steps<ResolveResult> {
   const byId = new Map<number, LandableFragment>();
   for (const f of fragments) byId.set(f.id, f);
 
@@ -325,13 +336,18 @@ export function resolveFragmentLanding(
   if (!Number.isFinite(floorY)) floorY = 0;
 
   // ── Thrown rock: follow the arc, then scatter the members where it lands ──
-  const thrown = projectiles
-    .map(p => ({ projectile: p, arc: traceArc(p.origin, p.velocity, piles, grid) }))
-    .sort((a, b) => a.arc.timeS - b.arc.timeS || a.projectile.id - b.projectile.id);
+  const traced: Array<{ projectile: Projectile; arc: ReturnType<typeof traceArc> }> = [];
+  for (const p of projectiles) {
+    if ((traced.length & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
+    traced.push({ projectile: p, arc: traceArc(p.origin, p.velocity, piles, grid) });
+  }
+  const thrown = traced.sort((a, b) => a.arc.timeS - b.arc.timeS || a.projectile.id - b.projectile.id);
 
   const inFlight = new Set<number>();
 
-  for (const { projectile, arc } of thrown) {
+  for (let t = 0; t < thrown.length; t++) {
+    if ((t & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
+    const { projectile, arc } = thrown[t]!;
     const members = projectile.memberIds
       .map(id => byId.get(id))
       .filter((f): f is LandableFragment => f !== undefined);
@@ -372,7 +388,9 @@ export function resolveFragmentLanding(
     .filter(f => !inFlight.has(f.id))
     .sort((a, b) => a.position.y - b.position.y || a.id - b.id);
 
-  for (const fragment of collapsing) {
+  for (let c = 0; c < collapsing.length; c++) {
+    if ((c & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
+    const fragment = collapsing[c]!;
     const from = fragment.position;
     const rest = piles.place(from.x, from.z, fragment.volume);
     const to = vec3(rest.x, rest.y, rest.z);

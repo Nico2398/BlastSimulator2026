@@ -7,7 +7,7 @@ import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 import { t } from '../../src/core/i18n/I18n.js';
-import { createRunner } from '../../src/console/createRunner.js';
+import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -392,7 +392,8 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
 
   /** Staffed game with a drilled and fully charged 3x3 pattern, nobody yet moved. */
   function setupCharged() {
-    const { runner, ctx } = createRunner();
+    const engine = createRunner();
+    const { runner, ctx } = engine;
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
@@ -403,7 +404,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     for (let i = 0; i < 600 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
     expect(state().drillHoles.length).toBeGreaterThan(0);
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
-    return { run, ctx, state, topUp };
+    return { run, ctx, state, topUp, engine };
   }
 
   type Setup = ReturnType<typeof setupCharged>;
@@ -459,6 +460,71 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(s.state().tickCount - startTick).toBeLessThan(300);
     s.run('tick 20');
     expect(s.state().damage.blastCount).toBe(1);
+  });
+
+  // ── Sliced detonation (#1603): the browser resolves a blast over frames ──
+
+  /** Tick until the armed shot fires (sync) or starts resolving (sliced). */
+  function tickUntilFired(s: Setup, cap = 400): void {
+    for (let n = 0; n < cap && s.state().damage.blastCount === 0 && !s.ctx.blastJob; n++) { s.topUp(); s.run('tick 1'); }
+  }
+
+  /** Everything a blast decides, for comparing two runs of the same shot. */
+  const blastOutcome = (s: Setup) => JSON.stringify({
+    tick: s.state().tickCount,
+    report: s.state().lastBlastReport,
+    fragments: s.state().logistics.fragments.map(f => [f.fragment.id, f.fragment.position, f.fragment.mass]),
+    flights: s.ctx.lastBlastFlights,
+    holes: s.state().drillHoles.length,
+    alive: s.state().employees.employees.filter(e => e.alive).length,
+  });
+
+  it('a sliced auto-fire holds the game, then lands exactly what the synchronous fire does', () => {
+    const sync = setupCharged();
+    crewAt(sync, 16, 16);
+    sync.run('blast detonate');
+    tickUntilFired(sync);
+    expect(sync.state().damage.blastCount).toBe(1);
+
+    const sliced = setupCharged();
+    sliced.ctx.sliceBlasts = true;
+    crewAt(sliced, 16, 16);
+    sliced.run('blast detonate');
+    tickUntilFired(sliced);
+    const job = sliced.ctx.blastJob!;
+    expect(job).toBeTruthy();
+    // Started, not landed: the rock is still standing and the holes still loaded.
+    expect(sliced.state().damage.blastCount).toBe(0);
+    expect(sliced.state().drillHoles.length).toBeGreaterThan(0);
+
+    let steps = 0;
+    let next = job.next();
+    while (next.done !== true) { steps++; next = job.next(); }
+    expect(steps).toBeGreaterThan(10); // genuinely spread out, not one slice
+    expect(next.value.success, next.value.output).toBe(true);
+    expect(next.value.output).toContain('BLAST REPORT');
+    sliced.ctx.blastJob = null;
+
+    expect(blastOutcome(sliced)).toBe(blastOutcome(sync));
+  });
+
+  it('a command arriving while a sliced blast resolves lands the blast first', () => {
+    const s = setupCharged();
+    s.ctx.sliceBlasts = true;
+    crewClear(s);
+
+    const res = s.run('blast detonate'); // already clear: starts resolving at once
+    expect(res.success, res.output).toBe(true);
+    expect(s.ctx.blastJob).toBeTruthy();
+    expect(s.state().damage.blastCount).toBe(0);
+    const tick = s.state().tickCount;
+
+    expect(runCommand(s.engine, 'tick 1').success).toBe(true);
+
+    expect(s.ctx.blastJob).toBeNull();
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().lastBlastReport?.tick).toBe(tick);
+    expect(s.state().tickCount).toBe(tick + 1);
   });
 
   it('already-clear zone: detonate fires immediately in that call', () => {

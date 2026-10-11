@@ -17,6 +17,7 @@ import {
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
 import { hasBlockedQueuedActionForVehicleRole } from './VehicleReservation.js';
 import { classifyQueuedOrders } from './OrderReachability.js';
+import { DEBRIS_CLASSIFY_PER_TICK } from '../config/balance.js';
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { alightIfMounted } from './Mount.js';
@@ -81,7 +82,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // holder is merely unavailable (#1380). Each option of that event resolves the
   // block (UnqualifiedTaskEffects.ts), and the event is raised once per blocked
   // action (detectUnqualifiedTask), not every tick.
-  const { unqualifiedIds } = classifyQueuedOrders(state);
+  const { unqualifiedIds } = classifyQueuedOrders(state, DEBRIS_CLASSIFY_PER_TICK);
   for (const id of unqualifiedIds) result.unqualified.push(id);
 
   const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);

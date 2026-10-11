@@ -1964,3 +1964,33 @@ describe('VoxelGrid.generatorSurfaceHeightAt memo', () => {
     expect(grid.generatorSurfaceHeightAt(4.5, 6)).toBe(-3.75); // non-integer: sampled directly
   });
 });
+
+describe('VoxelGrid.prefetchSlabs — generate a region now instead of on first read (#1603)', () => {
+  const config: TerrainConfig = { sizeX: 32, datum: 40, sizeZ: 32, seed: 7, climateBias: [0, 0] };
+
+  it('makes every band in the box resident, reading exactly what an untouched grid generates', () => {
+    const prefetched = generateTerrain(config);
+    const untouched = generateTerrain(config);
+    const before = prefetched.allocatedCyRange(0, 0);
+
+    prefetched.prefetchSlabs(2, 12, 0, 30, 2, 12);
+
+    const after = prefetched.allocatedCyRange(0, 0)!;
+    expect(after.min).toBeLessThanOrEqual(0);
+    expect(after.max).toBeGreaterThanOrEqual(1);
+    expect(after).not.toEqual(before);
+    for (let y = 0; y <= 30; y += 3) {
+      for (let x = 2; x <= 12; x += 5) {
+        expect(prefetched.densityAt(x, y, 7)).toBe(untouched.densityAt(x, y, 7));
+        expect(prefetched.compositionAt(x, y, 7)).toEqual(untouched.compositionAt(x, y, 7));
+        expect(prefetched.oresAt(x, y, 7)).toEqual(untouched.oresAt(x, y, 7));
+      }
+    }
+  });
+
+  it('is a no-op on a grid with no generator behind it', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.prefetchSlabs(0, 15, 0, 40, 0, 15);
+    expect(grid.allocatedCyRange(0, 0)).toBeNull();
+  });
+});

@@ -48,7 +48,8 @@ function makeMockSceneManager() {
     fill,
     csm,
     cameraController,
-    renderer: { render: vi.fn() } as unknown,
+    postPipeline: { sceneTarget: null },
+    renderer: { render: vi.fn(), compile: vi.fn(), getRenderTarget: vi.fn(() => null), setRenderTarget: vi.fn() } as unknown,
   };
 }
 

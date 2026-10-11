@@ -887,6 +887,25 @@ export class VoxelGrid {
    * allocated, independent of whether it is reachable from the topmost
    * surface (#1188).
    */
+  /**
+   * Materialize now every slab under the owned columns of `[minX, maxX] ×
+   * [minZ, maxZ]` between `minY` and `maxY` (all inclusive), so a later read
+   * there does not pay for generating it (#1603). Reads see exactly the same
+   * values either way — a slab is generated the same whenever it is first
+   * touched — so this only moves that cost to a moment that has room for it.
+   * A no-op without a generator source, or for slabs already resident.
+   */
+  prefetchSlabs(minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number): void {
+    if (!this.chunkSource) return;
+    for (let cz = chunkIndexOf(minZ); cz <= chunkIndexOf(maxZ); cz++) {
+      for (let cx = chunkIndexOf(minX); cx <= chunkIndexOf(maxX); cx++) {
+        const chunk = this.chunks.get(chunkKey(cx, cz));
+        if (!chunk) continue;
+        for (let cy = chunkIndexOf(minY); cy <= chunkIndexOf(maxY); cy++) this.ensureSlab(chunk, cy * CHUNK_SIZE);
+      }
+    }
+  }
+
   allocatedCyRange(cx: number, cz: number): { min: number; max: number } | null {
     const chunk = this.chunks.get(chunkKey(cx, cz));
     if (!chunk || chunk.slabs.size === 0) return null;

@@ -72,15 +72,26 @@ export function rebuildTerrain(deps: TerrainDeps): void {
   deps.terrainMeshRevision++;
 }
 
+/** Time each frame may spend marching a queued blast's terrain chunks (#1603). */
+const TERRAIN_REMESH_FRAME_BUDGET_MS = 4;
+
 /**
  * Re-mesh only the chunks a terrain:updated region touches (#458 T3.1).
  * The main.ts subscription calls this for every mutation (blast, drill,
  * ramp) instead of rebuildTerrain() — a single-voxel drill dig no longer
  * pays for re-marching chunks its region never touched.
+ *
+ * `defer` (a blast's region, #1603) queues the chunks instead: they are
+ * marched across the following frames by `stepTerrainRemesh` and swapped in
+ * together, so the detonate frame pays for none of them.
  */
-export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, region: DirtyRegion): void {
-  deps.terrain?.remeshRegion(region);
-  deps.terrainMeshRevision++;
+export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, region: DirtyRegion, defer = false): void {
+  if (defer) {
+    deps.terrain?.queueRegion(region);
+  } else {
+    deps.terrain?.remeshRegion(region);
+    deps.terrainMeshRevision++;
+  }
   if (!siteBoundsChanged(deps, ctx.grid)) return;
 
   // A claim moves the site's bounding box: the camera leash has to let the
@@ -100,6 +111,16 @@ export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, regio
   const claimRect: Rect = { minX: ctx.grid.minX, minZ: ctx.grid.minZ, maxX: ctx.grid.maxX, maxZ: ctx.grid.maxZ };
   deps.landscapeStreamer?.invalidateNear(claimRect);
   rebuildBorderWall(deps, ctx);
+}
+
+/** Spend one frame's budget on a queued blast remesh; the revision moves when its batch lands. */
+export function stepTerrainRemesh(deps: TerrainDeps, budgetMs: number = TERRAIN_REMESH_FRAME_BUDGET_MS): void {
+  if (deps.terrain?.stepPendingRemesh(budgetMs)) deps.terrainMeshRevision++;
+}
+
+/** Land a queued blast remesh now — for a caller that needs the settled terrain this frame. */
+export function finishTerrainRemesh(deps: TerrainDeps): void {
+  if (deps.terrain?.finishPendingRemesh()) deps.terrainMeshRevision++;
 }
 
 /** True when the site's bounding box differs from the one the landscape and wall were built against. */

@@ -920,6 +920,54 @@ export const MAX_EMPLOYEE_TASK_QUEUE_DEPTH = 3;
 export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 
 /**
+ * Debris orders past this many in one candidate pool are ranked by spatial bin
+ * rather than one by one (#1603, DebrisCandidateBins.ts): a large blast queues
+ * thousands, and costing each per idle employee per tick froze the frame.
+ * Smaller pools — every ordinary blast's — rank exactly as before.
+ */
+export const DEBRIS_SELECTION_BINNING_MIN = 128;
+/** Side, in cells, of the ground square debris orders are binned by. */
+export const DEBRIS_SELECTION_BIN_CELLS = 4;
+/** Members of a debris bin tried, nearest first, before giving the bin up for this pass. */
+export const DEBRIS_SELECTION_BIN_PROBES = 3;
+/** Debris bins, nearest first, whose representative is costed in one search. */
+export const DEBRIS_SELECTION_MAX_BINS = 16;
+/**
+ * Debris bins of one kind (order type × ore or barren) tried in one search
+ * before the rest of that kind are left for a later one: bounds a search when
+ * the nearest rock can't be taken (no storage room, no free vehicle), so it
+ * costs the same however big the pile. Per kind, so ore the warehouse has no
+ * room for never hides barren rock the spoil heap would take.
+ */
+export const DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND = 16;
+/**
+ * Auto-debris orders re-judged per tick for reachability and warnings, rotating
+ * through them (#1603, OrderReachability.ts `sliceDebris`); every other order
+ * is judged every tick.
+ */
+export const DEBRIS_CLASSIFY_PER_TICK = 128;
+
+/**
+ * Auto-debris orders queued per tick (#1603, HaulDispatch.ts `syncHaulDispatch`).
+ * A large blast lands thousands of fragments at once; queueing an order (and
+ * its ghost) for every one in the first tick after it froze that tick, so the
+ * pile is queued this many fragments a tick, in the order the blast left them.
+ * Haulers take one load at a time, so they never wait on it.
+ */
+export const DEBRIS_DISPATCH_PER_TICK = 512;
+
+/**
+ * Work between two yields of the resumable blast pipeline (#1603, Steps.ts),
+ * each a power of two: grid cells for the per-cell passes, fragments or
+ * broken voxels for the per-item ones. Each slice is a fraction of a millisecond, so the browser
+ * can stop within its frame budget; the console runs every slice at once.
+ */
+export const BLAST_SLICE_CELLS = 2048;
+export const BLAST_SLICE_ITEMS = 32;
+/** Columns of ground per terrain/nav update a blast announces at a time (`emitRegionInStrips`). */
+export const BLAST_SLICE_STRIP_COLUMNS = 8;
+
+/**
  * Upper bound on how many ranked, qualified candidates
  * `findBestEvacuationDriver` (VehicleDriverAssignment.ts) will spend a real
  * `findPath`-backed `canReach` call resolving before giving up on finding a
@@ -1826,9 +1874,6 @@ export const ENV_CAUSE_ECOLOGY_MAX = 45;
 
 /** Neighbour-relations (nuisance) score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
 export const ENV_CAUSE_NUISANCE_MAX = 45;
-
-/** Max cached reachability fills in OrderReachability (#1427). One grid-sized Uint8Array per key, so memory is bounded by this cap. */
-export const ORDER_REACH_CACHE_MAX_KEYS = 64;
 
 /**
  * Contract price multiplier for the tutorial level (#959, #1328, #1363). The

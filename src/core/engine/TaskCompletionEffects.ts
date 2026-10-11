@@ -18,6 +18,7 @@ import { completeVehicleGatedAction } from './VehicleReservation.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../mining/SurveyCalc.js';
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
+import { prefetchBlastZone } from '../mining/BlastExecution.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { recordBuiltRamp } from '../mining/RampWidening.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
@@ -200,6 +201,10 @@ export function applyTaskCompletion(
         const loaded = landLoadedCharge(planned);
         state.chargesByHole[holeId] = loaded;
         report.chargeLoaded = { holeId, explosiveId: loaded.explosiveId, amountKg: loaded.amountKg };
+        // Generate the rock this hole will blast now, while charging, rather
+        // than inside the detonate frame (#1603).
+        const hole = state.drillHoles.find(h => h.id === holeId);
+        if (hole && grid) prefetchBlastZone(grid, [hole]);
       }
     }
 

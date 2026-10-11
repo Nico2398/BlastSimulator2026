@@ -677,16 +677,6 @@ function reachSourceCellZ(navGrid: NavGrid, z: number): number {
 }
 
 /**
- * Row-major index of the cell `computeClimbReachableSetFromSources` floods from
- * for a source at (x, z): same clamp and rounding, so two sources with the same
- * index seed identical fills.
- */
-export function reachSourceCellIndex(navGrid: NavGrid, x: number, z: number): number {
-  return (reachSourceCellZ(navGrid, z) - navGrid.originZ) * navGrid.width
-    + (reachSourceCellX(navGrid, x) - navGrid.originX);
-}
-
-/**
  * Hypothetical edits to the fill (#1391): `block` cells (min-inclusive,
  * max-exclusive) count as impassable, `free` cells as passable.
  */
@@ -726,6 +716,13 @@ export interface ClimbComponents {
    * its own cell plus the components of the legal neighbours it can step onto.
    */
   canReach(sx: number, sz: number, tx: number, tz: number): boolean;
+  /**
+   * Every cell climb-reachable from any of `sources` — exactly what
+   * `computeClimbReachableSetFromSources(navGrid, sources, clearance).has`
+   * answers (#1603): the union of each source's components, plus a stranded
+   * source's own cell. O(sources) to build, O(1) per query, no fill.
+   */
+  reachableFrom(sources: ReadonlyArray<{ x: number; z: number }>): Pick<ReachableSet, 'has'>;
 }
 
 /**
@@ -772,28 +769,58 @@ export function computeClimbComponents(
     }
   }
 
+  const cellIndex = (x: number, z: number): number => (z - originZ) * width + (x - originX);
   const labelAt = (x: number, z: number): number =>
-    navGrid.containsCell(x, z) ? label[(z - originZ) * width + (x - originX)]! : 0;
+    navGrid.containsCell(x, z) ? label[cellIndex(x, z)]! : 0;
+
+  /**
+   * Visit the labels a source at (sx, sz) reaches: its own, or — stranded on a
+   * cell with no label — those of the legal neighbours it can step onto. Returns
+   * the source's cell, or null when it lies outside the grid and reaches nothing.
+   */
+  const forEachSourceLabel = (sx: number, sz: number, visit: (label: number) => void): { x: number; z: number } | null => {
+    const fromX = Math.round(navGrid.clampX(sx));
+    const fromZ = Math.round(navGrid.clampZ(sz));
+    if (!navGrid.containsCell(fromX, fromZ)) return null;
+    const own = labelAt(fromX, fromZ);
+    if (own !== 0) {
+      visit(own);
+      return { x: fromX, z: fromZ };
+    }
+    const from = navGrid.cellAt(fromX, fromZ);
+    for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+      const nx = fromX + dx;
+      const nz = fromZ + dz;
+      const neighbour = labelAt(nx, nz);
+      if (neighbour === 0) continue;
+      const to = navGrid.cellAt(nx, nz);
+      if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, from, nx, nz, to, true, requiredClearance)) visit(neighbour);
+    }
+    return { x: fromX, z: fromZ };
+  };
 
   return {
     canReach(sx, sz, tx, tz): boolean {
-      const fromX = Math.round(navGrid.clampX(sx));
-      const fromZ = Math.round(navGrid.clampZ(sz));
-      if (!navGrid.containsCell(fromX, fromZ)) return false;
-      if (fromX === tx && fromZ === tz) return true;
       const targetLabel = labelAt(tx, tz);
-      if (targetLabel === 0) return false;
-      const sourceLabel = labelAt(fromX, fromZ);
-      if (sourceLabel !== 0) return sourceLabel === targetLabel;
-      const from = navGrid.cellAt(fromX, fromZ);
-      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
-        const nx = fromX + dx;
-        const nz = fromZ + dz;
-        if (labelAt(nx, nz) !== targetLabel) continue;
-        const to = navGrid.cellAt(nx, nz);
-        if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, from, nx, nz, to, true, requiredClearance)) return true;
+      let reached = false;
+      const from = forEachSourceLabel(sx, sz, l => { if (l === targetLabel) reached = true; });
+      if (from === null) return false;
+      return (from.x === tx && from.z === tz) || (targetLabel !== 0 && reached);
+    },
+    reachableFrom(sources) {
+      const labels = new Set<number>();
+      const sourceCells = new Set<number>();
+      for (const source of sources) {
+        const from = forEachSourceLabel(source.x, source.z, l => { labels.add(l); });
+        if (from !== null) sourceCells.add(cellIndex(from.x, from.z));
       }
-      return false;
+      return {
+        has(x: number, z: number): boolean {
+          if (!navGrid.containsCell(x, z)) return false;
+          const at = label[cellIndex(x, z)]!;
+          return (at !== 0 && labels.has(at)) || sourceCells.has(cellIndex(x, z));
+        },
+      };
     },
   };
 }

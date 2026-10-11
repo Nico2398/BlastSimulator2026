@@ -138,10 +138,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   if (deps.ghosts) {
     const ghostsDirty = state.ghostPreviewsRevision !== lastGhostRevision;
     if (ghostsDirty || terrainDirty) {
-      const previews = deps.lastGrid
-        ? state.ghostPreviews.map(p => ({ ...p, targetY: deps.getTerrainSurfaceY(p.targetX, p.targetZ) }))
-        : state.ghostPreviews;
-      deps.ghosts.sync(previews);
+      deps.ghosts.sync(state.ghostPreviews, deps.lastGrid ? deps.getTerrainSurfaceY : null, terrainDirty);
       lastGhostRevision = state.ghostPreviewsRevision;
     }
   }

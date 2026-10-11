@@ -39,7 +39,6 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
-import { ORDER_REACH_CACHE_MAX_KEYS } from '../../../src/core/config/balance.js';
 import {
   orderActorKey,
   buildOrderReachability,
@@ -451,48 +450,49 @@ describe('cost does not grow with the number of actors (#1306)', () => {
     return state;
   }
 
-  it('performs the same number of flood fills with 2 actors as with 40', () => {
+  // The whole cost is one labelling per clearance a changed grid needs (#1603):
+  // no flood fill at all, however many actors or orders there are.
+  it('labels as often with 2 actors as with 40, and never fills', () => {
     const small = stage(2);
     const large = stage(40);
+    fills.labels = 0; fills.count = 0;
 
-    small.navGrid!.bumpRevision(); // cold cache: count the fills a changed grid costs
-    fills.count = 0;
+    small.navGrid!.bumpRevision(); // cold cache: count what a changed grid costs
     judgeQueuedOrders(small);
-    const smallFills = fills.count;
+    const smallLabels = fills.labels;
 
-    large.navGrid!.bumpRevision(); // cold cache: count the fills a changed grid costs
-    fills.count = 0;
+    fills.labels = 0;
+    large.navGrid!.bumpRevision();
     judgeQueuedOrders(large);
-    const largeFills = fills.count;
 
-    expect(smallFills).toBeGreaterThan(0);
-    expect(largeFills).toBe(smallFills);
+    expect(smallLabels).toBe(2); // employee and vehicle clearance
+    expect(fills.labels).toBe(smallLabels);
+    expect(fills.count).toBe(0);
   });
 
-  it('refreshOrderReachability stays flat in fills as actors grow', () => {
+  it('refreshOrderReachability stays flat in labellings as actors grow', () => {
     const small = stage(2);
     const large = stage(40);
-    small.navGrid!.bumpRevision(); // cold cache: count the fills a changed grid costs
-    fills.count = 0;
+    fills.labels = 0; fills.count = 0;
+    small.navGrid!.bumpRevision();
     refreshOrderReachability(small);
-    const smallFills = fills.count;
-    large.navGrid!.bumpRevision(); // cold cache: count the fills a changed grid costs
-    fills.count = 0;
+    const smallLabels = fills.labels;
+    fills.labels = 0;
+    large.navGrid!.bumpRevision();
     refreshOrderReachability(large);
-    expect(fills.count).toBe(smallFills);
+    expect(fills.labels).toBe(smallLabels);
+    expect(fills.count).toBe(0);
   });
 
-  it('adding a queued action that shares an actor pool adds no flood fill', () => {
+  it('adding queued actions on a known grid costs no labelling', () => {
     const state = stage(10);
-    state.navGrid!.bumpRevision(); // cold cache: count the fills a changed grid costs
-    fills.count = 0;
     judgeQueuedOrders(state);
-    const before = fills.count;
+    fills.labels = 0;
     queue(state, 'general_work', IN_A_TARGET); // same pool as the on-foot surveys
     queue(state, 'survey', { x: 2, z: 2 });
-    fills.count = 0;
     judgeQueuedOrders(state);
-    expect(fills.count).toBeLessThanOrEqual(before);
+    expect(fills.labels).toBe(0);
+    expect(fills.count).toBe(0);
   });
 });
 
@@ -675,7 +675,6 @@ describe('reachability cache (#1427)', () => {
     const { state } = stage();
     queue(state, 'rest', IN_A_TARGET, { targetEmployeeId: state.employees.employees[0]!.id });
     judgeQueuedOrders(state);
-    expect(fills.count).toBeGreaterThan(0);
     expect(fills.labels).toBeGreaterThan(0);
     fills.count = 0; fills.labels = 0;
     judgeQueuedOrders(state);
@@ -685,33 +684,40 @@ describe('reachability cache (#1427)', () => {
     expect(fills.labels).toBe(0);
   });
 
-  it('buildOrderReachability reuses cached fills across calls', () => {
+  it('buildOrderReachability reuses the labelling across calls', () => {
     const { state } = stage();
     const actions = state.pendingActions.filter(a => a.status === 'queued');
     buildOrderReachability(state, actions);
-    fills.count = 0;
+    fills.labels = 0;
     buildOrderReachability(state, actions);
-    expect(fills.count).toBe(0);
+    expect(fills.labels).toBe(0);
   });
 
-  it('ticks of unrelated state (ghost churn, new orders on known keys) do not refill', () => {
+  it('ticks of unrelated state (ghost churn, new orders on known keys) do not relabel', () => {
     const { state } = stage();
     judgeQueuedOrders(state);
-    fills.count = 0;
+    fills.labels = 0;
     queue(state, 'survey', IN_B_TARGET);
     judgeQueuedOrders(state);
-    expect(fills.count).toBe(0);
+    expect(fills.labels).toBe(0);
   });
 
-  it('moving one actor to a new cell refills only the keys it belongs to', () => {
-    const { state, plain, free, gated } = stage();
+  it('moving actors costs no fill and no labelling, and the verdicts follow them', () => {
+    const { state, plain, geo, free, gated } = stage();
+    const far = queue(state, 'survey', IN_B_TARGET);
     judgeQueuedOrders(state);
-    fills.count = 0;
+    fills.labels = 0;
     plain.x = IN_B.x; plain.z = IN_B.z; // holds no skill: only the skill-free pool contains it
-    const v = verdicts(state);
-    expect(fills.count).toBe(1);
+    let v = verdicts(state);
     expect(v[free]).toBe('reachable'); // geology holder is still in A, so A stays covered
     expect(v[gated]).toBe('reachable');
+    expect(v[far]).toBe('reachable');
+    geo.x = IN_B.x; geo.z = IN_B.z;
+    v = verdicts(state);
+    expect(v[free]).toBe('unreachable');
+    expect(v[gated]).toBe('unreachable');
+    expect(fills.labels).toBe(0);
+    expect(fills.count).toBe(0);
   });
 
   it('a verdict follows a lone actor that moves across the wall', () => {
@@ -725,46 +731,14 @@ describe('reachability cache (#1427)', () => {
     expect(verdicts(state)[id]).toBe('reachable');
   });
 
-  it('moving a skill holder refills its skill pool and the skill-free pool', () => {
-    const { state, geo } = stage();
-    judgeQueuedOrders(state);
-    fills.count = 0;
-    geo.x = IN_B.x; geo.z = IN_B.z;
-    judgeQueuedOrders(state);
-    expect(fills.count).toBe(2);
-  });
-
-  it('moving within the same rounded cell does not refill', () => {
-    const { state, plain, geo } = stage();
-    judgeQueuedOrders(state);
-    fills.count = 0;
-    plain.x += 0.3; plain.z -= 0.2;
-    geo.x -= 0.4; geo.z += 0.4;
-    judgeQueuedOrders(state);
-    expect(fills.count).toBe(0);
-  });
-
-  it('the order in which employees sit on the roster does not defeat the cache', () => {
+  it('hiring a new candidate is seen on the next call, and so is firing it', () => {
     const { state } = stage();
-    judgeQueuedOrders(state);
-    fills.count = 0;
-    state.employees.employees.reverse();
-    judgeQueuedOrders(state);
-    expect(fills.count).toBe(0);
-  });
-
-  it('hiring a new candidate refills its pools and firing it refills again', () => {
-    const { state } = stage();
-    judgeQueuedOrders(state);
-    fills.count = 0;
+    const far = queue(state, 'survey', IN_B_TARGET);
+    expect(verdicts(state)[far]).toBe('unreachable');
     const extra = hire(state, IN_B);
-    const v = verdicts(state);
-    expect(fills.count).toBeGreaterThan(0);
-    expect(v).toBeDefined();
-    fills.count = 0;
+    expect(verdicts(state)[far]).toBe('reachable');
     expect(fireEmployee(state.employees, extra.id).success).toBe(true);
-    judgeQueuedOrders(state);
-    expect(fills.count).toBeGreaterThan(0);
+    expect(verdicts(state)[far]).toBe('unreachable');
   });
 
   it('killing the only candidate of a key is seen on the next call', () => {
@@ -777,15 +751,16 @@ describe('reachability cache (#1427)', () => {
     )).toBe(false);
   });
 
-  it('a nav-grid cell edit invalidates the cached fills', () => {
+  it('a nav-grid cell edit invalidates the cached labelling', () => {
     const { state, free } = stage();
-    queue(state, 'survey', IN_B_TARGET);
-    judgeQueuedOrders(state);
-    fills.count = 0;
+    const far = queue(state, 'survey', IN_B_TARGET);
+    expect(verdicts(state)[far]).toBe('unreachable');
+    fills.labels = 0;
     state.navGrid!.setCellAt(WALL_X, 5, { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
     const v = verdicts(state);
-    expect(fills.count).toBeGreaterThanOrEqual(2);
+    expect(fills.labels).toBe(1);
     expect(v[free]).toBe('reachable');
+    expect(v[far]).toBe('reachable');
   });
 
   it('a nav edit opening a doorway flips an unreachable verdict', () => {
@@ -823,10 +798,10 @@ describe('reachability cache (#1427)', () => {
   it('replacing the nav grid with an identical-looking one invalidates', () => {
     const { state } = stage();
     judgeQueuedOrders(state);
-    fills.count = 0;
+    fills.labels = 0;
     state.navGrid = makeGrid(true);
     judgeQueuedOrders(state);
-    expect(fills.count).toBeGreaterThanOrEqual(2);
+    expect(fills.labels).toBe(1);
   });
 
   it('replacing the nav grid changes verdicts to match the new grid', () => {
@@ -921,43 +896,36 @@ describe('reachability cache (#1427)', () => {
       return { state, driver, vehicle, id };
     }
 
-    it('is reused when neither driver, vehicle nor grid changed', () => {
+    it('labels the vehicle clearance once and reuses it while the grid stands', () => {
       const { state } = stageVehicle();
       judgeQueuedOrders(state);
-      fills.count = 0;
+      expect(fills.labels).toBe(2); // employee and vehicle clearance
+      fills.labels = 0;
       judgeQueuedOrders(state);
+      expect(fills.labels).toBe(0);
       expect(fills.count).toBe(0);
     });
 
-    it('moving the vehicle to another cell refills and updates the verdict', () => {
+    it('moving the vehicle to another cell updates the verdict without relabelling', () => {
       const { state, vehicle, id } = stageVehicle();
       expect(verdicts(state)[id]).toBe('reachable');
-      fills.count = 0;
+      fills.labels = 0;
       vehicle.x = IN_B.x; vehicle.z = IN_B.z; // parked across the wall, nobody driving it
       expect(verdicts(state)[id]).toBe('unreachable');
-      expect(fills.count).toBeGreaterThan(0);
+      expect(fills.labels).toBe(0);
     });
 
-    it('moving the vehicle within its rounded cell does not refill', () => {
-      const { state, vehicle } = stageVehicle();
-      judgeQueuedOrders(state);
-      fills.count = 0;
-      vehicle.x += 0.25;
-      judgeQueuedOrders(state);
-      expect(fills.count).toBe(0);
-    });
-
-    it('a driver change on the vehicle refills', () => {
+    it('a driver change on the vehicle is seen on the next call', () => {
       const { state, driver, vehicle, id } = stageVehicle();
       vehicle.x = IN_B.x; vehicle.z = IN_B.z;
       expect(verdicts(state)[id]).toBe('unreachable');
-      fills.count = 0;
       // Driver boards: the vehicle is usable wherever it is, and sits in B.
       vehicle.occupantIds = [driver.id];
       driver.x = IN_B.x; driver.z = IN_B.z;
-      const v = verdicts(state);
-      expect(fills.count).toBeGreaterThan(0);
-      expect(v[id]).toBe('unreachable'); // target is in A, vehicle and driver are in B
+      expect(verdicts(state)[id]).toBe('unreachable'); // target is in A, vehicle and driver are in B
+      vehicle.x = IN_A.x + 1; vehicle.z = IN_A.z;
+      driver.x = IN_A.x + 1; driver.z = IN_A.z;
+      expect(verdicts(state)[id]).toBe('reachable');
     });
 
     it('purchasing a further vehicle is seen without a stale cache', () => {
@@ -969,42 +937,6 @@ describe('reachability cache (#1427)', () => {
     });
   });
 
-  describe('LRU cap', () => {
-    /** One fill-backed key per employee: vehicle-gated and aimed at that employee. */
-    function stageKeys(count: number): GameState {
-      const state = makeState(false);
-      for (let i = 0; i < count; i++) {
-        const emp = hire(state, { x: i % WIDTH, z: (i * 5) % HEIGHT }, [ROLE_LICENCE_REQUIRED.rock_digger]);
-        purchaseVehicle(state.vehicles, 'rock_digger', emp.x, emp.z);
-        queue(state, 'level_ground', IN_A_TARGET, { requiredVehicleRole: 'rock_digger', targetEmployeeId: emp.id });
-      }
-      return state;
-    }
-
-    it('keeps every key cached while under the cap', () => {
-      const state = stageKeys(10);
-      judgeQueuedOrders(state);
-      fills.count = 0;
-      judgeQueuedOrders(state);
-      expect(fills.count).toBe(0);
-    });
-
-    it('does not retain more than the cap: a pass over cap+2 distinct keys refills again', () => {
-      const state = stageKeys(ORDER_REACH_CACHE_MAX_KEYS + 2);
-      judgeQueuedOrders(state);
-      fills.count = 0;
-      judgeQueuedOrders(state);
-      expect(fills.count).toBeGreaterThan(0);
-    });
-
-    it('a pass over exactly the cap is fully cached', () => {
-      const state = stageKeys(ORDER_REACH_CACHE_MAX_KEYS);
-      judgeQueuedOrders(state);
-      fills.count = 0;
-      judgeQueuedOrders(state);
-      expect(fills.count).toBe(0);
-    });
-  });
 });
 
 describe('cached verdicts equal fresh verdicts over random mutation sequences (#1427)', () => {

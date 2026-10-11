@@ -160,20 +160,45 @@ export function drawTerrain(
   const cellW = Math.max(1, Math.ceil(scaleX));
   const cellH = Math.max(1, Math.ceil(scaleZ));
   const maxBench = Math.max(1, nav.maxSurfaceY);
+  const styles = new Map<number, string>();
+  const styleOf = (benchLevel: number): string => {
+    let style = styles.get(benchLevel);
+    if (style === undefined) {
+      const t01 = Math.max(0, Math.min(1, benchLevel / maxBench));
+      style = shadeRgb(ROCK_RGB, SHADE_MIN + (SHADE_MAX - SHADE_MIN) * t01);
+      styles.set(benchLevel, style);
+    }
+    return style;
+  };
 
+  // One rect per run of same-coloured cells in a row, not one per cell: a
+  // repaint after a blast or a dig was ten thousand fillRects in one frame
+  // (#1603). The run covers exactly the pixels its cells did, painted in the
+  // same order, so the picture is unchanged.
   for (let z = nav.originZ; z < nav.maxZ; z++) {
+    const py = Math.floor(projectZ(proj, z));
+    let runStyle: string | null = null;
+    let runStart = 0;
+    let runEnd = 0;
+    const flush = (): void => {
+      if (runStyle === null) return;
+      ctx.fillStyle = runStyle;
+      const px = Math.floor(projectX(proj, runStart));
+      ctx.fillRect(px, py, Math.floor(projectX(proj, runEnd)) + cellW - px, cellH);
+      runStyle = null;
+    };
     for (let x = nav.originX; x < nav.maxX; x++) {
       const cell = nav.cellAt(x, z);
-      if (!cell) continue;
-      if (cell.type === 'void') {
-        ctx.fillStyle = '#0a0e12';
-      } else {
-        const t01 = Math.max(0, Math.min(1, cell.benchLevel / maxBench));
-        const shade = SHADE_MIN + (SHADE_MAX - SHADE_MIN) * t01;
-        ctx.fillStyle = shadeRgb(ROCK_RGB, shade);
+      if (!cell) { flush(); continue; }
+      const style = cell.type === 'void' ? '#0a0e12' : styleOf(cell.benchLevel);
+      if (style !== runStyle) {
+        flush();
+        runStyle = style;
+        runStart = x;
       }
-      ctx.fillRect(Math.floor(projectX(proj, x)), Math.floor(projectZ(proj, z)), cellW, cellH);
+      runEnd = x;
     }
+    flush();
   }
 }
 

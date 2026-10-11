@@ -3,16 +3,17 @@
 // A queued action is "unreachable" (its ghost reads red) when none of the actors
 // able to perform THAT action can reach its target, or no such actor exists.
 // Actors are worked out per action from its own requirements (skill, vehicle
-// role) and grouped by that key, so the cost is one employee fill plus (for
-// vehicle-gated keys) one vehicle fill per distinct key. An order aimed at one
-// named employee on foot (a rest order) is answered from a single shared
-// labelling of the grid instead of a fill of its own, so N such orders cost one
-// pass, not N — bounded by the grid and the distinct keys, never by actors.
+// role) and grouped by that key. Every pool is answered from a labelling of
+// the grid into climb components — one per clearance, kept until the grid
+// changes — so a pool costs the union of its actors' components, not a flood
+// fill: actors walking about every tick re-cost nothing (#1603). An order aimed
+// at one named employee is answered straight from that employee's component.
 // Temporary unavailability (injured, resting, training, busy) does not remove
 // an actor: alive and on the roster is enough.
 
 import type { NavGrid } from '../nav/NavGrid.js';
-import type { GameState, PendingAction, BlockedOrderReason } from '../state/GameState.js';
+import type { GameState, PendingAction, BlockedOrderReason, GhostPreview } from '../state/GameState.js';
+import { findById } from '../state/IdIndex.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -21,13 +22,11 @@ import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignmen
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
 import {
-  computeClimbReachableSetFromSources,
   computeClimbComponents,
-  reachSourceCellIndex,
   type ClimbComponents,
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, ORDER_REACH_CACHE_MAX_KEYS } from '../config/balance.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
 type OrderActorKey = string;
@@ -68,14 +67,13 @@ function candidateEmployees(state: GameState, req: ActorRequirements): Employee[
 
 /**
  * Derived reachability per game state, never serialized. Valid for one nav grid
- * at one `revision`: fills ignore occupancy, so only a cell write invalidates.
- * `fills` is in least-recently-used order (oldest first).
+ * at one `revision`: labellings ignore occupancy, so only a cell write
+ * invalidates. One labelling per clearance, built the first time a pool needs it.
  */
 interface ReachCache {
   navGrid: NavGrid;
   revision: number;
-  components: ClimbComponents | null;
-  fills: Map<OrderActorKey, { signature: string; pool: ActorPool }>;
+  components: Map<number, ClimbComponents>;
 }
 
 const reachCaches = new WeakMap<GameState, ReachCache>();
@@ -88,44 +86,28 @@ function cacheFor(state: GameState): ReachCache | null {
   }
   let cache = reachCaches.get(state);
   if (cache === undefined || cache.navGrid !== navGrid || cache.revision !== navGrid.revision) {
-    cache = { navGrid, revision: navGrid.revision, components: null, fills: new Map() };
+    cache = { navGrid, revision: navGrid.revision, components: new Map() };
     reachCaches.set(state, cache);
   }
   return cache;
 }
 
-function sortedUniqueCells(navGrid: NavGrid, sources: ReadonlyArray<{ x: number; z: number }>): number[] {
-  const cells = new Set<number>();
-  for (const s of sources) cells.add(reachSourceCellIndex(navGrid, s.x, s.z));
-  return [...cells].sort((a, b) => a - b);
-}
-
-/**
- * Everything a fill-backed pool's reachable set depends on besides the grid.
- * Vehicles key on their rounded position, not the clamped fill cell: `fillPool`
- * tests the unclamped rounded cell against the on-foot set, so an out-of-grid
- * vehicle must not share a signature with the in-grid one it clamps onto.
- */
-function poolSignature(state: GameState, navGrid: NavGrid, req: ActorRequirements, employees: ReadonlyArray<Employee>): string {
-  const cells = sortedUniqueCells(navGrid, employees).join(',');
-  const role = req.requiredVehicleRole;
-  if (role === null) return cells;
-  const ids = employees.map(e => e.id).sort().join(',');
-  const vehicles = state.vehicles.vehicles
-    .filter(v => v.type === role)
-    .map(v => `${v.id}:${Math.round(v.x)},${Math.round(v.z)}:${vehicleDriverId(v) ?? '-'}`)
-    .sort()
-    .join(',');
-  return `${cells}|${ids}|${vehicles}`;
+function componentsOf(cache: ReachCache, clearance: number): ClimbComponents {
+  let components = cache.components.get(clearance);
+  if (components === undefined) {
+    components = computeClimbComponents(cache.navGrid, clearance);
+    cache.components.set(clearance, components);
+  }
+  return components;
 }
 
 function fillPool(
   state: GameState,
-  navGrid: NavGrid,
+  cache: ReachCache,
   req: ActorRequirements,
   employees: ReadonlyArray<Employee>,
 ): ActorPool {
-  const onFoot = computeClimbReachableSetFromSources(navGrid, employees, NAV_CLEARANCE_EMPLOYEE_CELLS);
+  const onFoot = componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS).reachableFrom(employees);
   const role = req.requiredVehicleRole;
   if (role === null) return { hasActor: true, reachable: onFoot };
 
@@ -141,42 +123,46 @@ function fillPool(
   });
   return {
     hasActor: true,
-    reachable: computeClimbReachableSetFromSources(navGrid, usable, NAV_CLEARANCE_VEHICLE_CELLS),
+    reachable: componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS).reachableFrom(usable),
   };
 }
 
 function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCache | null): ActorPool {
   if (cache === null) return NO_ACTORS;
-  const navGrid = cache.navGrid;
   const employees = candidateEmployees(state, req);
   if (employees.length === 0) return NO_ACTORS;
 
   const [only] = employees;
   if (req.targetEmployeeId !== null && req.requiredVehicleRole === null && only !== undefined) {
-    const components = cache.components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_EMPLOYEE_CELLS);
+    const components = componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
     return { hasActor: true, reachable: { has: (x, z) => components.canReach(only.x, only.z, x, z) } };
   }
 
-  const key = orderActorKey(req);
-  const signature = poolSignature(state, navGrid, req, employees);
-  const hit = cache.fills.get(key);
-  cache.fills.delete(key); // re-inserted below as most recently used
-  if (hit !== undefined && hit.signature === signature) {
-    cache.fills.set(key, hit);
-    return hit.pool;
-  }
-  const pool = fillPool(state, navGrid, req, employees);
-  cache.fills.set(key, { signature, pool });
-  return pool;
+  return fillPool(state, cache, req, employees);
 }
 
-function evictOverflow(cache: ReachCache | null): void {
+/**
+ * Climb reachability for one employee on foot, from the labelling the order
+ * pools already share (#1603): `canReach(x, z, tx, tz)` answers exactly what
+ * `computeClimbReachableSet(navGrid, x, z).has(tx, tz)` does, without a flood
+ * fill per question. Null with no nav grid.
+ */
+export function employeeClimbReach(state: GameState): ClimbComponents | null {
+  const cache = cacheFor(state);
+  return cache === null ? null : componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
+}
+
+/**
+ * Label the current nav grid for every clearance the order pools use, ahead
+ * of the tick that would otherwise pay for it (#1603): a blast reshapes the
+ * grid, and its first tick after classifying thousands of new haul orders
+ * was the one that also relabelled it. Pure cache warm-up — no verdict changes.
+ */
+export function warmOrderReachability(state: GameState): void {
+  const cache = cacheFor(state);
   if (cache === null) return;
-  while (cache.fills.size > ORDER_REACH_CACHE_MAX_KEYS) {
-    const oldest = cache.fills.keys().next();
-    if (oldest.done === true) break;
-    cache.fills.delete(oldest.value);
-  }
+  componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
+  componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS);
 }
 
 export function buildOrderReachability(
@@ -189,7 +175,6 @@ export function buildOrderReachability(
     const key = orderActorKey(action);
     if (!pools.has(key)) pools.set(key, buildActorPool(state, action, cache));
   }
-  evictOverflow(cache);
   return {
     canReach: (key, x, z) => pools.get(key)?.reachable?.has(x, z) ?? false,
     hasActor: key => pools.get(key)?.hasActor ?? false,
@@ -211,7 +196,6 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
   const verdicts = new Map<number, Judgement>();
   if (state.navGrid === null || targets.length === 0) return verdicts;
 
-  const byId = new Map(state.pendingActions.map(a => [a.id, a]));
   const rampLeadOf = new Map<number, number>();
   for (const ramp of state.plannedRamps) {
     const next = ramp.segments.find(s => !s.done);
@@ -221,7 +205,7 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
 
   const leadActionOf = (target: PendingAction): PendingAction | undefined => {
     const leadId = rampLeadOf.get(target.id);
-    return leadId === undefined ? target : byId.get(leadId);
+    return leadId === undefined ? target : findById(state.pendingActions, actionIdOf, leadId);
   };
   const judged: PendingAction[] = [];
   for (const target of targets) {
@@ -286,6 +270,9 @@ function availabilityReason(
   return holdsSkill(eligible) ? null : 'no_qualified_employee';
 }
 
+const actionIdOf = (action: PendingAction): number => action.id;
+const ghostIdOf = (ghost: GhostPreview): number => ghost.id;
+
 /** Stamp blockedReason and the ghost's red flag for `targets`; returns ids needing the unqualified modal. */
 function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<number> {
   const unqualifiedIds = new Set<number>();
@@ -298,13 +285,12 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   const judgements = judgeActions(state, targets);
   const fragmentOf = createFragmentLookup(state);
   const fits = createStorageFit(state);
-  const ghostById = new Map(state.ghostPreviews.map(g => [g.id, g]));
   let flipped = false;
 
   for (const action of targets) {
     const judgement = judgements.get(action.id);
     const red = judgement?.verdict === 'unreachable';
-    const ghost = ghostById.get(action.id);
+    const ghost = findById(state.ghostPreviews, ghostIdOf, action.id);
     if (ghost !== undefined && judgement !== undefined) {
       // Always stamp, so a blue ghost carries an explicit `false`; only a real
       // red/blue flip needs the renderer to re-sync.
@@ -340,13 +326,38 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   return unqualifiedIds;
 }
 
+/** Where each game's rotating debris slice resumes (#1603) — derived, never serialized, like `reachCaches`. */
+const debrisCursors = new WeakMap<GameState, number>();
+
+/**
+ * `queued` with its auto-debris orders cut to `perCall` of them, rotating so
+ * successive calls cover every one (#1603). A large blast queues thousands of
+ * debris orders, and re-judging all of them every tick cost a frame's whole
+ * budget on its own; their verdicts only colour ghosts and feed warnings — a
+ * debris order is vehicle-gated, so it never reaches the unqualified modal —
+ * so a verdict a few ticks old is fine. Every other order is judged every call.
+ */
+function sliceDebris(state: GameState, queued: PendingAction[], perCall: number): PendingAction[] {
+  if (!Number.isFinite(perCall)) return queued;
+  const debris: PendingAction[] = [];
+  const out: PendingAction[] = [];
+  for (const action of queued) (isAutoDebrisAction(action.type) ? debris : out).push(action);
+  if (debris.length <= perCall) return queued;
+  const start = (debrisCursors.get(state) ?? 0) % debris.length;
+  for (let k = 0; k < perCall; k++) out.push(debris[(start + k) % debris.length]!);
+  debrisCursors.set(state, start + perCall);
+  return out;
+}
+
 /**
  * Classify every queued, unclaimed action: stamp `blockedReason`, flip each
  * ghost's `unreachable` flag (bumping `ghostPreviewsRevision` only on a flip),
  * and report the actions no eligible employee could ever perform.
- * A claimed ghost is never red.
+ * A claimed ghost is never red. `debrisPerCall` (the tick's pass) judges only
+ * that many auto-debris orders per call, rotating through them — see
+ * `sliceDebris`.
  */
-export function classifyQueuedOrders(state: GameState): { unqualifiedIds: Set<number> } {
+export function classifyQueuedOrders(state: GameState, debrisPerCall = Infinity): { unqualifiedIds: Set<number> } {
   let flipped = false;
   for (const ghost of state.ghostPreviews) {
     if (ghost.claimed && ghost.unreachable === true) {
@@ -355,7 +366,7 @@ export function classifyQueuedOrders(state: GameState): { unqualifiedIds: Set<nu
     }
   }
   if (flipped) state.ghostPreviewsRevision++;
-  return { unqualifiedIds: classify(state, queuedActions(state)) };
+  return { unqualifiedIds: classify(state, sliceDebris(state, queuedActions(state), debrisPerCall)) };
 }
 
 /** Classify one freshly dispatched action so its ghost is coloured before any tick. */

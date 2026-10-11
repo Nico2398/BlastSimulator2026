@@ -64,7 +64,8 @@ describe('GameRenderer — onBlast()', () => {
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
 
-    const spawnSpy = vi.spyOn(FragmentMesh.prototype, 'spawnFragments');
+    // onBlast spawns through the resumable path (#1603), run to completion here.
+    const spawnSpy = vi.spyOn(FragmentMesh.prototype, 'spawnFragmentsSteps');
     ctx.lastBlastFragmentData = [{
       id: 0,
       position: { x: 10, y: 5, z: 10 },
@@ -83,6 +84,34 @@ describe('GameRenderer — onBlast()', () => {
 
     expect(spawnSpy).toHaveBeenCalledWith(ctx.lastBlastFragmentData);
     spawnSpy.mockRestore();
+  });
+
+  it('onBlastSteps spawns the same fragments over several slices, drawn only once all are written (#1603)', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    ctx.lastBlastFragmentData = Array.from({ length: 1500 }, (_, i) => ({
+      id: i,
+      position: { x: 10 + (i % 30), y: 5, z: 10 + Math.floor(i / 30) },
+      volume: 0.1, mass: 200, rockId: 'sandite', oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.2, y: 0.2, z: 0.2 }, shapeSeed: i, origin: { x: 10, y: 5, z: 10 },
+    }));
+    const drawn = (): number => {
+      let n = 0;
+      (renderer as any).fragments.instancedMeshes.forEach((im: THREE.InstancedMesh) => { n += im.count; });
+      return n;
+    };
+
+    const steps = renderer.onBlastSteps(ctx);
+    let slices = 0;
+    let next = steps.next();
+    while (next.done !== true) {
+      if (slices++ === 1) expect(drawn()).toBe(0); // mid-spawn: nothing half-drawn
+      next = steps.next();
+    }
+    expect(slices).toBeGreaterThan(2);
+    expect(drawn()).toBeGreaterThan(0);
   });
 
   it('does nothing before a game has been loaded', () => {
@@ -1197,5 +1226,46 @@ describe('GameRenderer — blast playback clock (#1590)', () => {
 
     renderer.seekFragmentPlayback(duration);
     expect(renderer.blastPlayback.isPlaying).toBe(false);
+  });
+});
+
+describe('GameRenderer — deferred blast remesh (#1603)', () => {
+  /** A synced renderer whose site has a small pit carved at (20, 20), and the region it dirtied. */
+  function carved() {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const grid = ctx.grid!;
+    let top = 0;
+    for (let y = 120; y > -40; y--) if (grid.densityAt(20, y, 20) >= 0.5) { top = y; break; }
+    for (let x = 18; x <= 22; x++) for (let z = 18; z <= 22; z++) for (let y = top - 3; y <= top; y++) grid.clearVoxel(x, y, z);
+    const region = { minX: 18, maxX: 22, minY: top - 3, maxY: top, minZ: 18, maxZ: 22 };
+    return { renderer, ctx, region };
+  }
+
+  it('a deferred region moves the terrain revision only when its batch lands, frames later', () => {
+    const { renderer, ctx, region } = carved();
+    const revision = renderer.terrainMeshRevisionCount;
+
+    renderer.remeshTerrainRegion(ctx, region, { defer: true });
+    expect(renderer.terrain!.pendingRemeshCount).toBeGreaterThan(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision);
+
+    for (let i = 0; i < 100 && renderer.terrain!.pendingRemeshCount > 0; i++) renderer.update(1 / 60);
+    expect(renderer.terrain!.pendingRemeshCount).toBe(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision + 1);
+  });
+
+  it('finishTerrainRemesh lands a deferred batch at once; an immediate remesh never defers', () => {
+    const { renderer, ctx, region } = carved();
+    const revision = renderer.terrainMeshRevisionCount;
+    renderer.remeshTerrainRegion(ctx, region, { defer: true });
+    renderer.finishTerrainRemesh();
+    expect(renderer.terrain!.pendingRemeshCount).toBe(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision + 1);
+
+    renderer.remeshTerrainRegion(ctx, region);
+    expect(renderer.terrain!.pendingRemeshCount).toBe(0);
+    expect(renderer.terrainMeshRevisionCount).toBe(revision + 2);
   });
 });

@@ -16,6 +16,8 @@ import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
+import { DEBRIS_DISPATCH_PER_TICK } from '../config/balance.js';
+import { findById } from '../state/IdIndex.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -26,7 +28,9 @@ export interface HaulActionPayload {
  * Create one haul_debris/fragment_debris PendingAction per on-ground fragment
  * with no existing action (any status: queued/assigned/in_progress) already
  * covering its id. Idempotent — safe to call every tick. Oversized fragments
- * get fragment_debris instead of haul_debris.
+ * get fragment_debris instead of haul_debris. At most
+ * `DEBRIS_DISPATCH_PER_TICK` are queued per call; a large blast's pile is
+ * queued over the next few ticks (#1603).
  *
  * requiredSkill is deliberately left null on both action types — the actual
  * qualification a haul/break vehicle needs (the truck/excavator licence
@@ -39,6 +43,13 @@ export interface HaulActionPayload {
  * queued silently instead.
  */
 export function syncHaulDispatch(state: GameState): void {
+  // Nothing to queue unless an order or an on-ground fragment came or went
+  // since the last pass: after a large blast both lists run to thousands, and
+  // rebuilding the covered set every tick to find nothing was a frame's
+  // millisecond of its own (#1603).
+  const signature = haulDispatchSignature(state);
+  if (lastHaulDispatch.get(state) === signature) return;
+
   const coveredFragmentIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (!isAutoDebrisAction(action.type)) continue;
@@ -46,9 +57,12 @@ export function syncHaulDispatch(state: GameState): void {
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
+  let queued = 0;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
+    // The rest wait for the next tick's pass (DEBRIS_DISPATCH_PER_TICK).
+    if (queued++ === DEBRIS_DISPATCH_PER_TICK) return;
 
     const oversized = isOversized(tracked.fragment.volume);
     const actionId = state.nextPendingActionId++;
@@ -61,6 +75,8 @@ export function syncHaulDispatch(state: GameState): void {
     // skipQualificationCheck: true because these must be able to sit queued
     // silently with no hauler/driver/depot available yet and pick up later
     // once the situation changes, never rejected outright.
+    // deferClassification: a blast lands thousands of fragments at once; the
+    // tick's own classifyQueuedOrders colours them a slice at a time (#1603).
     dispatchPendingAction(state, {
       id: actionId,
       type: oversized ? 'fragment_debris' : 'haul_debris',
@@ -71,10 +87,30 @@ export function syncHaulDispatch(state: GameState): void {
       targetY: 0,
       payload: { fragmentId: tracked.fragment.id } satisfies HaulActionPayload,
       targetEmployeeId: null,
-    }, { skipQualificationCheck: true });
+    }, { skipQualificationCheck: true, deferClassification: true });
 
     coveredFragmentIds.add(tracked.fragment.id);
   }
+  lastHaulDispatch.set(state, haulDispatchSignature(state));
+}
+
+/** Signature of the last `syncHaulDispatch` pass per game — derived, never serialized. */
+const lastHaulDispatch = new WeakMap<GameState, string>();
+
+/**
+ * Everything a dispatch pass's outcome depends on: the order list's length and
+ * id counter (an order added or removed), and the on-ground fragments' count
+ * and id sum (one landing, picked up, returned to the ground, or split).
+ */
+function haulDispatchSignature(state: GameState): string {
+  let onGround = 0;
+  let idSum = 0;
+  for (const tracked of state.logistics.fragments) {
+    if (tracked.state !== 'on_ground') continue;
+    onGround++;
+    idSum += tracked.fragment.id;
+  }
+  return `${state.pendingActions.length}|${state.nextPendingActionId}|${state.logistics.fragments.length}|${onGround}|${idSum}`;
 }
 
 /**
@@ -84,35 +120,27 @@ export function syncHaulDispatch(state: GameState): void {
 export type FragmentLookup = (fragmentId: number) => TrackedFragment | undefined;
 
 /**
- * Build a lazy id → TrackedFragment index over `state.logistics.fragments`
- * for one dispatch pass.
+ * An id → TrackedFragment resolver over `state.logistics.fragments`.
  *
  * `logistics.fragments` is a plain array, so resolving an action's fragment
  * is a linear `find`. The claim-time gate calls it once per pool action, for
  * every idle employee, every tick — after a large blast that is
  * O(employees × actions × fragments) per tick, with actions ≈ fragments in
  * the thousands: `level1-lose-ecology.json` spent 126 of its 137 s in that
- * one `find`. Every caller that walks the pool builds this once and hands
- * it to the gate, so the pass is O(actions + fragments).
+ * one `find`. Every caller that walks the pool resolves through this instead.
  *
- * The index is built on first use and is never kept past the pass that
- * created it — nothing here can go stale, because nothing that adds or
- * removes a fragment (`addBlastFragments`, `sellFragment`, a boulder split)
- * runs inside a claim pass, and a fragment's own `state` transitions mutate
- * the object the index holds. First occurrence wins, exactly like `find`.
+ * The index behind it (`findById`, IdIndex.ts) outlives the pass, since
+ * rebuilding it for every search was itself a per-tick cost after a large
+ * blast (#1603); fragments are only ever appended (`addBlastFragments`, a
+ * boulder split) or spliced out (`sellFragment`, delivery), which is what it
+ * relies on. A fragment's own `state` transitions mutate the object the array
+ * holds. First occurrence wins, exactly like `find`.
  */
 export function createFragmentLookup(state: GameState): FragmentLookup {
-  let byId: Map<number, TrackedFragment> | null = null;
-  return (fragmentId) => {
-    if (byId === null) {
-      byId = new Map();
-      for (const tracked of state.logistics.fragments) {
-        if (!byId.has(tracked.fragment.id)) byId.set(tracked.fragment.id, tracked);
-      }
-    }
-    return byId.get(fragmentId);
-  };
+  return fragmentId => findById(state.logistics.fragments, fragmentIdOf, fragmentId);
 }
+
+const fragmentIdOf = (tracked: TrackedFragment): number => tracked.fragment.id;
 
 /**
  * Resolve the TrackedFragment a haul_debris/fragment_debris action's

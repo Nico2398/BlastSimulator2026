@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import type { FragmentData } from '../core/mining/BlastExecution.js';
+import { drain, type Steps } from '../core/engine/Steps.js';
 import { rockIndexOf } from '../core/world/RockCatalog.js';
 import { oreIndexOf } from '../core/world/OreCatalog.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../core/config/balance.js';
@@ -75,6 +76,9 @@ function dominantOre(oreDensities: Record<string, number>): { id: string; amt: n
 }
 
 // ---------- Main class ----------
+
+/** Fragments written between two yields of a resumable spawn (a power of two). */
+const SPAWN_SLICE = 512;
 
 export class FragmentMesh {
   private readonly scene: THREE.Scene;
@@ -153,12 +157,23 @@ export class FragmentMesh {
    * Call after executeBlast() returns a BlastResult.
    */
   spawnFragments(fragments: FragmentData[]): void {
+    drain(this.spawnFragmentsSteps(fragments));
+  }
+
+  /**
+   * `spawnFragments`, yielding every few hundred fragments (#1603): a large
+   * blast's thousands of instances took a frame's budget to write. The new
+   * instances are drawn only once all are written.
+   */
+  *spawnFragmentsSteps(fragments: FragmentData[]): Steps<void> {
     // Sample evenly across the whole fragment array rather than taking the
     // first N. Fragments come out ordered by where in the blast they were
     // carved, so taking a prefix only ever shows one corner of a large blast.
     const toRender = sampleEvenly(fragments, MAX_RENDERED_FRAGMENTS);
 
-    for (const frag of toRender) {
+    for (let k = 0; k < toRender.length; k++) {
+      if ((k & (SPAWN_SLICE - 1)) === 0) yield;
+      const frag = toRender[k]!;
       // Keyed on the shape seed, not the id — ids run consecutively so
       // `id % SHAPE_VARIANTS` marched through variants in lockstep, giving a
       // visible repeating pattern. Falling through to any bucket with room

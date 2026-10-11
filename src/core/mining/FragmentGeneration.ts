@@ -16,6 +16,7 @@
 // See the gameplay-blast-system skill, "Step 3 — Carving Fragments".
 
 import type { Random } from '../math/Random.js';
+import { drain, type Steps } from '../engine/Steps.js';
 import { vec3, type Vec3 } from '../math/Vec3.js';
 import type { VoxelGrid, VoxelRockComposition } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';
@@ -28,6 +29,8 @@ import {
   MAX_ORPHAN_COMPONENT_SUBCELLS,
   MAX_FRAGMENTS_PER_BLAST,
   FRAGMENTATION_MULTIPLIER,
+  BLAST_SLICE_ITEMS,
+  BLAST_SLICE_CELLS,
 } from '../config/balance.js';
 import { type EnergyField, intensityAt } from './EnergyPropagation.js';
 import type { FragmentationResult, VoxelCoord } from './VoxelFragmentation.js';
@@ -87,16 +90,27 @@ export function generateFragments(
   grid: VoxelGrid,
   rng: Random,
 ): FragmentGenerationResult {
+  return drain(generateFragmentsSteps(fragmentation, field, grid, rng));
+}
+
+/** `generateFragments`, yielding every `BLAST_SLICE_ITEMS` voxels or fragments (#1603). */
+export function* generateFragmentsSteps(
+  fragmentation: FragmentationResult,
+  field: EnergyField,
+  grid: VoxelGrid,
+  rng: Random,
+): Steps<FragmentGenerationResult> {
   const voxels = fragmentation.fragmented;
   if (voxels.length === 0) return { fragments: [], throttled: false };
 
   // Index the broken voxels so sub-cell work can look them up by coordinate.
   const voxelIndex = new Map<number, number>();
   for (let i = 0; i < voxels.length; i++) {
+    if ((i & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     voxelIndex.set(voxelKey(voxels[i]!), i);
   }
 
-  const { seeds, seedsByVoxel, throttled } = scatterSeeds(voxels, field, rng);
+  const { seeds, seedsByVoxel, throttled } = yield* scatterSeeds(voxels, field, rng);
 
   // Assign every sub-cell of every broken voxel to its nearest seed.
   const subCellsPerVoxel = SUB ** 3;
@@ -121,6 +135,7 @@ export function generateFragments(
   const shellSeeds: (number[] | null)[] = new Array(SEED_SEARCH_RADIUS + 1);
 
   for (let vi = 0; vi < voxels.length; vi++) {
+    if ((vi & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
     const voxel = voxels[vi]!;
     shellSeeds.fill(null);
     const ensureShell = (r: number): number[] => {
@@ -149,21 +164,34 @@ export function generateFragments(
     }
   }
 
-  // Cluster by seed, then sweep up whatever no seed claimed.
-  const clusters = new Map<number, number[]>();
+  // Cluster by seed, then sweep up whatever no seed claimed. A counting sort
+  // over seed indices (#1603) rather than a Map of growing arrays: every one of
+  // a large blast's ~10⁵ sub-cells passed through Map.get/push. Stable, so each
+  // cluster lists its sub-cells in the same ascending order as before.
+  yield;
+  const clusterSize = new Int32Array(seeds.length);
   const orphans: number[] = [];
   for (let k = 0; k < owner.length; k++) {
     const seedIdx = owner[k]!;
-    if (seedIdx < 0) { orphans.push(k); continue; }
-    const bucket = clusters.get(seedIdx);
-    if (bucket) bucket.push(k);
-    else clusters.set(seedIdx, [k]);
+    if (seedIdx < 0) orphans.push(k);
+    else clusterSize[seedIdx]!++;
+  }
+  const clusterStart = new Int32Array(seeds.length + 1);
+  for (let si = 0; si < seeds.length; si++) clusterStart[si + 1] = clusterStart[si]! + clusterSize[si]!;
+  const clustered = new Int32Array(clusterStart[seeds.length]!);
+  const fill = clusterStart.slice(0, seeds.length);
+  for (let k = 0; k < owner.length; k++) {
+    const seedIdx = owner[k]!;
+    if (seedIdx >= 0) clustered[fill[seedIdx]!++] = k;
   }
 
+  yield;
   const fragments: GeneratedFragment[] = [];
-  // Sorted so fragment order depends on the seeds, not on Map insertion order.
-  for (const seedIdx of [...clusters.keys()].sort((a, b) => a - b)) {
-    const fragment = buildFragment(clusters.get(seedIdx)!, voxels, grid, rng);
+  // In seed order, so fragment order depends on the seeds alone.
+  for (let si = 0; si < seeds.length; si++) {
+    if ((si & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
+    if (clusterSize[si] === 0) continue;
+    const fragment = buildFragment(clustered.subarray(clusterStart[si]!, clusterStart[si + 1]!), voxels, grid, rng);
     if (fragment) fragments.push(fragment);
   }
   for (const component of splitOrphanComponents(orphans, voxels, voxelIndex)) {
@@ -183,12 +211,14 @@ interface SeedScatter {
   throttled: boolean;
 }
 
-function scatterSeeds(voxels: readonly VoxelCoord[], field: EnergyField, rng: Random): SeedScatter {
+function* scatterSeeds(voxels: readonly VoxelCoord[], field: EnergyField, rng: Random): Steps<SeedScatter> {
   const seeds: Vec3[] = [];
   const seedsByVoxel = new Map<number, number[]>();
   let throttled = false;
 
-  for (const voxel of voxels) {
+  for (let v = 0; v < voxels.length; v++) {
+    if ((v & (BLAST_SLICE_CELLS - 1)) === 0) yield;
+    const voxel = voxels[v]!;
     // The guard exists for pathological input, never as a balance dial: once it
     // trips, stop adding seeds rather than dropping rock, so the volume still
     // comes out whole — as fewer, larger fragments.
@@ -354,7 +384,7 @@ function subCellNeighbours(
 // ── Building a fragment ──────────────────────────────────────────────────────
 
 function buildFragment(
-  slots: readonly number[],
+  slots: ArrayLike<number> & Iterable<number>,
   voxels: readonly VoxelCoord[],
   grid: VoxelGrid,
   rng: Random,
@@ -365,7 +395,13 @@ function buildFragment(
   let sumX = 0, sumY = 0, sumZ = 0;
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-  const subCellsPerSource = new Map<number, number>();
+  // Sub-cells per source voxel, run-length counted (#1603): a seed's cluster
+  // lists its sub-cells in ascending order, so its voxels arrive sorted and
+  // each one's count is a single run. An orphan lump, gathered breadth-first,
+  // can revisit a voxel out of order — that case falls back to sorting.
+  const sourceVi: number[] = [];
+  const sourceCount: number[] = [];
+  let sortedRuns = true;
 
   const half = SUB_CELL_SIZE / 2;
   for (const slot of slots) {
@@ -384,13 +420,19 @@ function buildFragment(
     if (cy + half > maxY) maxY = cy + half;
     if (cz + half > maxZ) maxZ = cz + half;
 
-    subCellsPerSource.set(vi, (subCellsPerSource.get(vi) ?? 0) + 1);
+    const last = sourceVi.length - 1;
+    if (last >= 0 && sourceVi[last] === vi) {
+      sourceCount[last]!++;
+    } else {
+      if (last >= 0 && vi < sourceVi[last]!) sortedRuns = false;
+      sourceVi.push(vi);
+      sourceCount.push(1);
+    }
   }
 
   const n = slots.length;
-  const sources: VoxelContribution[] = [...subCellsPerSource.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([vi, count]) => ({ ...voxels[vi]!, weight: count * SUB_CELL_VOLUME }));
+  const counts = sortedRuns ? sourceVi.map((vi, k) => [vi, sourceCount[k]!] as const) : mergeRuns(sourceVi, sourceCount);
+  const sources: VoxelContribution[] = counts.map(([vi, count]) => ({ ...voxels[vi]!, weight: count * SUB_CELL_VOLUME }));
 
   const composition = computeAverageRockComposition(sources, grid);
   const oreDensities = computeAverageOreDensities(sources, grid);
@@ -417,6 +459,13 @@ function buildFragment(
 }
 
 // ── Small helpers ────────────────────────────────────────────────────────────
+
+/** Total count per voxel index across unsorted runs, ascending by index. */
+function mergeRuns(vis: readonly number[], counts: readonly number[]): Array<readonly [number, number]> {
+  const totals = new Map<number, number>();
+  for (let k = 0; k < vis.length; k++) totals.set(vis[k]!, (totals.get(vis[k]!) ?? 0) + counts[k]!);
+  return [...totals.entries()].sort((a, b) => a[0] - b[0]);
+}
 
 /** Centre of sub-cell `s` (0 … SUB³-1) inside a voxel, in world coordinates. */
 /**

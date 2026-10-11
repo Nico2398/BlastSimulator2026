@@ -19,6 +19,7 @@ import type { FragmentMesh } from './FragmentMesh.js';
 import type { FragmentAnimator } from './FragmentAnimator.js';
 import type { BlastEffects } from './BlastEffects.js';
 import type { BirdFlocks } from './ambient/BirdFlocks.js';
+import { drain, type Steps } from '../core/engine/Steps.js';
 
 /** Mutable GameRenderer fields these blast-visual helpers read/write, passed in place of `this` (#767). */
 export interface BlastVisualsDeps {
@@ -34,6 +35,11 @@ export interface BlastVisualsDeps {
 
 /** Trigger blast visual effects. Call from main.ts immediately after a successful blast command. */
 export function onBlast(deps: BlastVisualsDeps, ctx: MiningContext): void {
+  drain(onBlastSteps(deps, ctx));
+}
+
+/** `onBlast`, yielding while the fragments are spawned (#1603). */
+export function* onBlastSteps(deps: BlastVisualsDeps, ctx: MiningContext): Steps<void> {
   console.log(`[GameRenderer] onBlast: lastGrid=${deps.lastGrid?.id} fragments=${ctx.lastBlastFragments?.length ?? 0}`);
   if (!deps.terrain || !deps.lastGrid) {
     // Still clear the animator so a stale earlier duration is not read.
@@ -61,7 +67,8 @@ export function onBlast(deps: BlastVisualsDeps, ctx: MiningContext): void {
 
   if (deps.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
     deps.fragments.clearAll();
-    deps.fragments.spawnFragments(ctx.lastBlastFragmentData);
+    yield* deps.fragments.spawnFragmentsSteps(ctx.lastBlastFragmentData);
+    yield;
   }
 
   if (!deps.blastEffects || !ctx.state) return;

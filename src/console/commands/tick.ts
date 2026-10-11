@@ -6,7 +6,8 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { MiningContext } from './mining/types.js';
-import { fireBlast } from './mining/blast.js';
+import { fireBlastSteps } from './mining/blast.js';
+import { drain, type Steps } from '../../core/engine/Steps.js';
 import { tickDetonation } from '../../core/engine/DetonationSequence.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
@@ -23,6 +24,13 @@ import { formatGameOver } from './tickGameOver.js';
 /** Kilograms for a console line: whole numbers stay whole, fractions get one decimal. */
 function formatKg(kg: number): string {
   return Number.isInteger(kg) ? String(kg) : kg.toFixed(1);
+}
+
+/** Fire the armed detonation, adding the auto-fire line to the blast's own output. */
+function* autoFireSteps(ctx: MiningContext, tick: number): Steps<CommandResult> {
+  const fired = yield* fireBlastSteps(ctx);
+  if (!fired.success) return fired;
+  return { ...fired, output: `${fired.output}\n[tick ${tick}] ${t('mining.blast.detonation_auto_fired')}` };
 }
 
 export function tickCommand(
@@ -143,10 +151,11 @@ export function tickCommand(
     }
 
     // Armed detonation (#1362): fire once the zone is clear, once, and stop the batch.
+    // Sliced over the next frames when the caller asks (#1603); its lines come with it.
     if (state.pendingDetonation !== null && tickDetonation(state).kind === 'ready') {
-      const fired = fireBlast(ctx);
-      lines.push(fired.output);
-      if (fired.success) lines.push(`[tick ${state.tickCount}] ${t('mining.blast.detonation_auto_fired')}`);
+      const fire = autoFireSteps(ctx, state.tickCount);
+      if (ctx.sliceBlasts === true) ctx.blastJob = fire;
+      else lines.push(drain(fire).output);
       break;
     }
 
