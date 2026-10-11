@@ -7,6 +7,7 @@ import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress, createCampaignState, isCampaignDone, isCampaignLevel } from '../../core/campaign/Campaign.js';
 import { addIncome, getOperatingProfit } from '../../core/economy/Finance.js';
 import { createGameForLevel, settleLevelResult } from '../../core/campaign/LevelTransition.js';
+import { convertWinToFreePlay } from '../../core/campaign/Sandbox.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
@@ -281,10 +282,16 @@ export function statsCommand(
 // ── campaign keep_playing ──
 
 export function campaignKeepPlayingCommand(
-  _ctx: GameContext,
+  ctx: GameContext,
   _args: string[],
   _named: Record<string, string>,
 ): CommandResult {
-  // TODO: implement
-  return { success: false, output: 'not implemented' };
+  if (!ctx.state) {
+    return { success: false, output: t('console.no_game_loaded') };
+  }
+  const result = convertWinToFreePlay(ctx.state);
+  if (!result.success) {
+    return { success: false, output: t('campaign.keep_playing_refused') };
+  }
+  return { success: true, output: t('campaign.keep_playing_success') };
 }

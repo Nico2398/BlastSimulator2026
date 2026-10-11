@@ -155,7 +155,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
 }
 
 /** Outcome of converting a won level into free play. */
-export type KeepPlayingResult = { success: true; data: undefined } | { success: false; error: string };
+type KeepPlayingResult = { success: true; data: undefined } | { success: false; error: string };
 
 /**
  * Convert a completed (won) level into open-ended free play: clears the
@@ -163,8 +163,11 @@ export type KeepPlayingResult = { success: true; data: undefined } | { success: 
  * Refuses unless `levelEndReason === 'completed'`.
  */
 export function convertWinToFreePlay(
-  _state: Pick<GameState, 'levelEnded' | 'levelEndReason' | 'campaign'>,
+  state: Pick<GameState, 'levelEnded' | 'levelEndReason' | 'campaign'>,
 ): KeepPlayingResult {
-  // TODO: implement
-  return { success: false, error: 'not implemented' };
+  if (state.levelEndReason !== 'completed') return { success: false, error: 'level_not_completed' };
+  state.levelEnded = false;
+  state.levelEndReason = null;
+  state.campaign.activeLevelId = null;
+  return { success: true, data: undefined };
 }
