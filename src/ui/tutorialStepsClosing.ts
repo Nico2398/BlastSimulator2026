@@ -11,13 +11,7 @@ import type { TutorialStep } from './tutorialSteps.js';
 import { getOperatingProfit } from '../core/economy/Finance.js';
 import { formatDollars } from '../core/economy/formatMoney.js';
 import { getLevel } from '../core/campaign/Level.js';
-import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
-import type { DefeatReason } from './screens/LevelEndScreen.js';
-
-/** True for any terminal `levelEndReason` other than a genuine win — reuses the same union `LevelEndScreen` already carries rather than redefining it (#959). */
-function isDefeatReason(reason: GameState['levelEndReason']): reason is DefeatReason {
-  return reason !== null && reason !== 'completed';
-}
+import { TUTORIAL_LEVEL_ID, isDefeatReason } from './tutorialTrigger.js';
 
 /** Profit earned so far against the level's profit target, and what is still missing. */
 export function victoryProgress(

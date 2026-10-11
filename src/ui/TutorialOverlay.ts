@@ -8,7 +8,7 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { goalChipParams } from './tutorialStepsClosing.js';
-import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
+import { TUTORIAL_LEVEL_ID, isDefeatReason } from './tutorialTrigger.js';
 import { CARD_CLASS, GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
@@ -257,8 +257,7 @@ export class TutorialOverlay {
    * advanceToNextStep() that already lands on this same last step normally.
    */
   private shortCircuitOnDefeat(): boolean {
-    const reason = this.gameState?.levelEndReason;
-    if (!reason || reason === 'completed') return false;
+    if (!isDefeatReason(this.gameState?.levelEndReason)) return false;
     if (this.stepIndex >= LAST_STEP_INDEX) return false;
 
     this.landOnStep(LAST_STEP_INDEX);
@@ -391,11 +390,17 @@ export class TutorialOverlay {
     this.end(true);
   }
 
-  /** Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again. */
+  /**
+   * Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again.
+   * A tutorial ending on a defeat (bankruptcy etc.) never counts as completed (#1631): the
+   * outcome is read before teardown drops the game state, so finish, exit and the
+   * defeat short-circuit all share the rule.
+   */
   private end(markDone: boolean): void {
     if (!this._active) return;
+    const endedInDefeat = isDefeatReason(this.gameState?.levelEndReason);
     this.teardown(true);
-    if (!markDone) return;
+    if (!markDone || endedInDefeat) return;
     try {
       localStorage.setItem('bs_tutorial_done', '1');
     } catch {

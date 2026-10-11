@@ -12,7 +12,7 @@ import { wireResearchNotifications } from './ui/notify/researchNotifications.js'
 import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
-import { shouldAutoStartTutorial, shouldKeepTutorialRunning, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
+import { shouldAutoStartTutorial, shouldKeepTutorialRunning, shouldRestartTutorialOnRetry, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
 import { probeTutorialState } from './ui/tutorialStateProbe.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { isControlLive } from './ui/tutorialActivationGuard.js';
@@ -294,7 +294,9 @@ worldMap.setOnStartLevel((levelId) => {
 // --- Level End Screen (redesign P8) ---
 const levelEndScreen = new LevelEndScreen(uiContainer);
 levelEndScreen.setOnReplay((levelId) => {
+  const restartTutorial = shouldRestartTutorialOnRetry(levelId, ctx.state?.levelEndReason);
   levelEndScreen.hide();
+  if (restartTutorial) { startTutorial(); return; }
   const level = getLevel(levelId);
   void enterLevel([`campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined);
 });

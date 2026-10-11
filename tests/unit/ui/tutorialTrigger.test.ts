@@ -3,6 +3,7 @@ import {
   TUTORIAL_LEVEL_ID,
   shouldAutoStartTutorial,
   shouldKeepTutorialRunning,
+  shouldRestartTutorialOnRetry,
 } from '../../../src/ui/tutorialTrigger';
 import { getAllLevels } from '../../../src/core/campaign/Level';
 
@@ -62,5 +63,31 @@ describe('tutorialTrigger (#1319)', () => {
     it.each(NOT_A_LEVEL)('is false for non-level id %j', (id) => {
       expect(shouldKeepTutorialRunning(id)).toBe(false);
     });
+  });
+});
+
+describe('shouldRestartTutorialOnRetry (#1631)', () => {
+  it('is true for a tutorial_pit bankruptcy', () => {
+    expect(shouldRestartTutorialOnRetry('tutorial_pit', 'bankruptcy')).toBe(true);
+  });
+
+  it.each(['arrest', 'worker_revolt'])('is true for a tutorial_pit %s defeat', (reason) => {
+    expect(shouldRestartTutorialOnRetry('tutorial_pit', reason)).toBe(true);
+  });
+
+  it.each([['completed'], [null], [undefined]] as const)(
+    'is false for tutorial_pit when levelEndReason is %s',
+    (reason) => {
+      expect(shouldRestartTutorialOnRetry('tutorial_pit', reason)).toBe(false);
+    },
+  );
+
+  it('is false for another level even on defeat', () => {
+    expect(shouldRestartTutorialOnRetry('dusty_hollow', 'bankruptcy')).toBe(false);
+  });
+
+  it('is false with no level id', () => {
+    expect(shouldRestartTutorialOnRetry(null, 'bankruptcy')).toBe(false);
+    expect(shouldRestartTutorialOnRetry(undefined, 'bankruptcy')).toBe(false);
   });
 });
