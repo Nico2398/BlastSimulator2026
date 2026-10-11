@@ -283,7 +283,10 @@ export function chebyshevRectDistance(a: TileRegion, b: TileRegion): number {
 }
 
 /**
- * The tile rectangle a building of `type`/`tier` occupies when pinned at `region`'s origin corner.
+ * The exact, centred pin for a building of `type`/`tier` placed at `region`'s
+ * origin corner: its footprint rect (`origin + size - 1`) with the footprint
+ * at the origin, flagged `exact` and `centred` so the overlay and picker use
+ * the footprint-preview convention rather than a bare tile rect.
  *
  * The `origin + size - 1` arithmetic here matches `makeFootprintRegion`
  * (`src/console/commands/buildingHelpers.ts`) and the inline sizing in

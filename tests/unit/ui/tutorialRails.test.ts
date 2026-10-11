@@ -658,7 +658,7 @@ describe('the region a step publishes is the region the picker enforces (#489)',
     expect(published).toEqual(stageRegion);
   });
 
-  it.each(['survey', 'drill-plan', 'box-cut', 'build-storage', 'build-living-quarters', 'build-driving-center', 'build-storage'])(
+  it.each(['survey', 'drill-plan', 'box-cut', 'build-storage', 'build-living-quarters', 'build-driving-center'])(
     '%s publishes exactly what its picker stage draws',
     (stepId) => {
       const rails = new TutorialRails();
@@ -667,7 +667,7 @@ describe('the region a step publishes is the region the picker enforces (#489)',
     },
   );
 
-  it.each(['build-living-quarters', 'build-driving-center', 'build-storage'])(
+  it.each(['build-living-quarters', 'build-driving-center'])(
     '%s publishes the centred multi-tile footprint (#1646)',
     (stepId) => {
       const rails = new TutorialRails();

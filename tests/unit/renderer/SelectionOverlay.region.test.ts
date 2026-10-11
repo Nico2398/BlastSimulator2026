@@ -238,11 +238,26 @@ describe('a centred region is drawn on the footprint convention (#1646)', () => 
     expect(region.maxZ).toBeCloseTo(preview.maxZ);
   });
 
+  /** The beacon is the only scaffold child that is a vertical mast: zero x/z extent, non-zero height. */
+  const beaconXZ = () => {
+    for (const child of regionGroup().children) {
+      const box = new THREE.Box3().expandByObject(child);
+      if (box.max.x === box.min.x && box.max.z === box.min.z && box.max.y > box.min.y) {
+        return { x: box.min.x, z: box.min.z };
+      }
+    }
+    throw new Error('no beacon in the region group');
+  };
+
   it('shifts border, corners and beacon by -0.5 as well', () => {
     overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22 });
     const plain = scaffoldBounds();
+    const plainBeacon = beaconXZ();
     overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22, centred: true });
     const centred = scaffoldBounds();
+    const centredBeacon = beaconXZ();
+    expect(centredBeacon.x).toBeCloseTo(plainBeacon.x - 0.5);
+    expect(centredBeacon.z).toBeCloseTo(plainBeacon.z - 0.5);
     expect(centred.minX).toBeCloseTo(plain.minX - 0.5);
     expect(centred.maxX).toBeCloseTo(plain.maxX - 0.5);
     expect(centred.minZ).toBeCloseTo(plain.minZ - 0.5);

@@ -1040,7 +1040,7 @@ describe('building pins publish the placed building footprint (#1646)', () => {
     expect(region).toMatchObject({ x1: REGION[pin].x1, z1: REGION[pin].z1, x2: REGION[pin].x2, z2: REGION[pin].z2, exact: true, centred: true });
   });
 
-  it('survey stays one tile, drill 8x8, box-cut a line; none centred', () => {
+  it('survey stays one tile, drill spans 8 tiles each way, box-cut a line; none centred', () => {
     expect(REGION.survey).toMatchObject({ x1: 23, z1: 23, x2: 23, z2: 23 });
     expect(REGION.drill.x2 - REGION.drill.x1).toBe(8);
     expect(REGION.drill.z2 - REGION.drill.z1).toBe(8);
