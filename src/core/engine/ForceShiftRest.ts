@@ -182,9 +182,7 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
  * fatigue cost exceeds what an in-place rest restores (it caps at
  * NEED_REST_NO_BUILDING_CAP). Interrupting then walks nowhere — the rest ends
  * at the same level, the walk restarts and crosses the threshold at the same
- * point of the same route, so the action is never reached (a far survey
- * never reached; a far charge_hole stranded in plannedChargesByHole forever,
- * #1379, before it became vehicle-gated). Callers pass a destination
+ * point of the same route, so the action is never reached (#1379). Callers pass a destination
  * with no living_quarters (a building is weighed by restRoundTripWorthwhile).
  */
 function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee): boolean {

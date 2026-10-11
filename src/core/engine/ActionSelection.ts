@@ -79,9 +79,10 @@ function resolveEmployeeProductivityInputs(
  * Single source of truth for both the cost estimate/resolution below and the
  * claim-time seeding of pendingTaskDuration/pendingRestDuration in EmployeeDispatchSteps.ts.
  *
- * An action carrying a base `payload.durationTicks` (drill_hole, charge_hole,
- * survey, place_building) replaces BASE_TASK_DURATION_TICKS as the base but is
- * still scaled by proficiency, need and Living Quarters multipliers. A numeric
+ * An action carrying a base `payload.durationTicks` (drill_hole, survey,
+ * place_building) replaces BASE_TASK_DURATION_TICKS as the base but is
+ * still scaled by proficiency, need and Living Quarters multipliers.
+ * charge_hole is tier-scaled via its own branch, not by this generic path. A numeric
  * `payload.resumeTicks` (written by interruptActiveAction) is already-resolved
  * remaining work and is returned unscaled. `dig_ramp_segment` and
  * `level_ground` bypass resumeTicks: their live grid count (cells/columns
