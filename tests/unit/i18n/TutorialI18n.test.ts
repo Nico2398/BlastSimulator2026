@@ -174,3 +174,41 @@ describe('#1335: sell-ore copy tells the player to accept an offer for ore alrea
     expect(fr['tutorial.step_sellore']!.toLowerCase()).toMatch(/gris|grisé/);
   });
 });
+
+// ── #1632: stage-line fixes ─────────────────────────────────────────────────
+
+describe('#1632: new stage and waiting keys', () => {
+  const NEW_KEYS = [
+    'tutorial.stage.blast_report_close',
+    'tutorial.stage.overlay_toggle',
+    'tutorial.stage.policy_apply',
+    'tutorial.stage.policy_fatigue_range',
+    'tutorial.waiting.training',
+  ];
+  const en = enLocale as Record<string, string>;
+  const fr = frLocale as Record<string, string>;
+
+  for (const key of NEW_KEYS) {
+    it(`${key} exists, non-empty, in en and fr, and differs between them`, () => {
+      expect(en[key], `en ${key}`).toBeTruthy();
+      expect(fr[key], `fr ${key}`).toBeTruthy();
+      expect(en[key]).not.toBe(fr[key]);
+    });
+  }
+
+  it('policy_fatigue_range interpolates {min} and {max} in both locales', () => {
+    for (const table of [en, fr]) {
+      expect(table['tutorial.stage.policy_fatigue_range']).toContain('{min}');
+      expect(table['tutorial.stage.policy_fatigue_range']).toContain('{max}');
+    }
+    setLocale('en');
+    const text = t('tutorial.stage.policy_fatigue_range', { min: 50, max: 69 });
+    expect(text).toContain('50');
+    expect(text).toContain('69');
+  });
+
+  it('tutorial.stage.blast_confirm is removed from both locales', () => {
+    expect('tutorial.stage.blast_confirm' in en).toBe(false);
+    expect('tutorial.stage.blast_confirm' in fr).toBe(false);
+  });
+});

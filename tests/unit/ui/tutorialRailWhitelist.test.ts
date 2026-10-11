@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { stagesFor, type TutorialStage } from '../../../src/ui/tutorialStages.js';
-import { applyRails, allowedSelectors, ALLOWED_CLASS } from '../../../src/ui/tutorialGuide.js';
+import { applyRails, allowedSelectors, resolveStageIndex, ALLOWED_CLASS } from '../../../src/ui/tutorialGuide.js';
 import { injectStyles } from '../../../src/ui/styles.js';
 import { BASE_PERMANENTLY_ALLOWED } from '../../../src/ui/tutorialRails.js';
 
@@ -67,7 +67,7 @@ function buildFixture(): Probe[] {
   probe('policy shift_12h', [], add(shift, 'button', { 'data-shift-mode': 'shift_12h' }));
   probe('policy continuous', ['set-early-policy'], add(shift, 'button', { 'data-shift-mode': 'continuous' }));
   // Default fixture: no pressed shift, default fatigue -> Apply is not legitimate yet.
-  probe('policy apply (shift not Continuous)', [], add(ops, 'button', { id: 'bs-policy-apply' }));
+  probe('policy apply (shift not Continuous)', ['set-early-policy'], add(ops, 'button', { id: 'bs-policy-apply' }));
 
   const blast = add(document.body, 'div', { id: 'bs-blast-panel' });
   probe('grid tool', ['drill-plan'], add(blast, 'button', { 'data-action': 'grid-tool' }));
@@ -164,9 +164,8 @@ describe('tutorial rails whitelist (#1595)', () => {
   });
 
   describe('set-early-policy: Apply needs Continuous and an in-range fatigue threshold', () => {
-    const applyStage = (): TutorialStage =>
-      stagesFor('set-early-policy', undefined).find(s => (s.alsoWhen ?? []).some(a => a.selector === '#bs-policy-apply'))!;
-
+    const stages = (): TutorialStage[] => stagesFor('set-early-policy', undefined);
+    /** Boxes make every fixture control reachable, so resolveStageIndex follows reachableWhen alone. */
     function setPolicy(pressed: string | null, fatigue: string): void {
       const cont = document.querySelector('#bs-policy-shift button[data-shift-mode="continuous"]')!;
       for (const b of Array.from(document.querySelectorAll('#bs-policy-shift button'))) b.removeAttribute('aria-pressed');
@@ -174,39 +173,42 @@ describe('tutorial rails whitelist (#1595)', () => {
       let input = document.querySelector('#bs-policy-fatigue') as HTMLInputElement | null;
       if (!input) input = add(document.body, 'input', { id: 'bs-policy-fatigue' }) as HTMLInputElement;
       input.value = fatigue;
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>('#bs-operations-panel *, #bs-policy-fatigue'))) {
+        el.getBoundingClientRect = () => ({ width: 40, height: 20, top: 0, left: 0, right: 40, bottom: 20, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+      }
     }
     const apply = () => document.querySelector('#bs-policy-apply')!;
+    const activeStage = (): TutorialStage => stages()[resolveStageIndex(stages())]!;
 
-    it('declares Apply conditionally, never unconditionally', () => {
-      expect(applyStage()).toBeDefined();
-      for (const s of stagesFor('set-early-policy')) {
-        expect(s.also ?? []).not.toContain('#bs-policy-apply');
-      }
+    it('declares Apply as a gated stage target, never through `also`', () => {
+      for (const s of stages()) expect(s.also ?? []).not.toContain('#bs-policy-apply');
+      const applyStage = stages().find(s => s.target === '#bs-policy-apply');
+      expect(applyStage?.reachableWhen).toBeTypeOf('function');
     });
 
     it('Apply stays inert when Continuous is not pressed', () => {
       setPolicy(null, '60');
-      applyRails(applyStage(), document, BASE_PERMANENTLY_ALLOWED, false);
+      applyRails(activeStage(), document, BASE_PERMANENTLY_ALLOWED, false);
       expect(apply().classList.contains(ALLOWED_CLASS)).toBe(false);
-      expect(allowedSelectors(applyStage(), document)).not.toContain('#bs-policy-apply');
+      expect(allowedSelectors(activeStage(), document)).not.toContain('#bs-policy-apply');
     });
 
     it.each(['40', '49', '70', '100', '', 'abc'])('Apply stays inert at fatigue %s', (v) => {
       setPolicy('true', v);
-      applyRails(applyStage(), document, BASE_PERMANENTLY_ALLOWED, false);
+      applyRails(activeStage(), document, BASE_PERMANENTLY_ALLOWED, false);
       expect(apply().classList.contains(ALLOWED_CLASS)).toBe(false);
     });
 
     it.each(['50', '60', '69'])('Apply goes live with Continuous pressed and fatigue %s', (v) => {
       setPolicy('true', v);
-      applyRails(applyStage(), document, BASE_PERMANENTLY_ALLOWED, false);
+      applyRails(activeStage(), document, BASE_PERMANENTLY_ALLOWED, false);
       expect(apply().classList.contains(ALLOWED_CLASS)).toBe(true);
-      expect(allowedSelectors(applyStage(), document)).toContain('#bs-policy-apply');
+      expect(allowedSelectors(activeStage(), document)).toContain('#bs-policy-apply');
     });
 
     it('Apply goes inert again once the order is spent', () => {
       setPolicy('true', '60');
-      applyRails(applyStage(), document, BASE_PERMANENTLY_ALLOWED, true);
+      applyRails(activeStage(), document, BASE_PERMANENTLY_ALLOWED, true);
       expect(apply().classList.contains(ALLOWED_CLASS)).toBe(false);
     });
   });

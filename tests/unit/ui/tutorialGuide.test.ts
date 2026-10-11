@@ -147,6 +147,60 @@ describe('resolveStageIndex', () => {
   });
 });
 
+describe('resolveStageIndex — reachableWhen (#1632)', () => {
+  it('skips a later stage whose control exists but reachableWhen is false', () => {
+    button('open');
+    button('later');
+    const stages: TutorialStage[] = [
+      { target: '#open', hintKey: 'a' },
+      { target: '#later', hintKey: 'b', reachableWhen: () => false },
+    ];
+    expect(resolveStageIndex(stages)).toBe(0);
+  });
+
+  it('takes a later stage once reachableWhen is true and its control is reachable', () => {
+    button('open');
+    button('later');
+    const stages: TutorialStage[] = [
+      { target: '#open', hintKey: 'a' },
+      { target: '#later', hintKey: 'b', reachableWhen: () => true },
+    ];
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+
+  it('reachableWhen true does not make an absent control reachable', () => {
+    button('open');
+    const stages: TutorialStage[] = [
+      { target: '#open', hintKey: 'a' },
+      { target: '#later', hintKey: 'b', reachableWhen: () => true },
+    ];
+    expect(resolveStageIndex(stages)).toBe(0);
+  });
+
+  it('reads reachableWhen live on every call', () => {
+    button('open');
+    button('later');
+    let ok = false;
+    const stages: TutorialStage[] = [
+      { target: '#open', hintKey: 'a' },
+      { target: '#later', hintKey: 'b', reachableWhen: () => ok },
+    ];
+    expect(resolveStageIndex(stages)).toBe(0);
+    ok = true;
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+
+  it('falls through a gated stage to an earlier ungated one in a three-stage list', () => {
+    button('a'); button('b'); button('c');
+    const stages: TutorialStage[] = [
+      { target: '#a', hintKey: 'a' },
+      { target: '#b', hintKey: 'b' },
+      { target: '#c', hintKey: 'c', reachableWhen: () => false },
+    ];
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+});
+
 describe('resolveStageIndex — doneTarget fallback (#903)', () => {
   // Shaped like train-driller's final stage: `target` is the `.bs-train-btn`
   // row, which the crew panel replaces with an "in training" status view

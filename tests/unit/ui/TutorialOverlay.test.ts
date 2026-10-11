@@ -1037,6 +1037,56 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
+  describe('stage-line row hides when there is no stage text (#1632)', () => {
+    const row = (): HTMLElement => document.querySelector('.bs-tutorial-stage-line') as HTMLElement;
+    function advanceTo(tut: any, id: string): void {
+      for (let i = 0; i < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tut.stepIndex]!.id !== id; i++) tut.advanceToNextStep();
+      expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe(id);
+    }
+
+    it('is visible on a guided step that has a hint', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      tut.refreshGuide();
+      const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
+      expect(stageEl.textContent).not.toBe('');
+      expect(row().style.display).not.toBe('none');
+    });
+
+    it('is hidden on free-play (no hint, not waiting)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      advanceTo(tut, 'free-play');
+      tut.refreshGuide();
+      expect((container.querySelector('.bs-tutorial-stage') as HTMLElement).textContent).toBe('');
+      expect(row().style.display).toBe('none');
+    });
+
+    it('is hidden on the congratulations card', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      advanceTo(tut, 'congratulations');
+      tut.refreshGuide();
+      expect(row().style.display).toBe('none');
+    });
+
+    it('comes back when a guided step follows (restart at step 0)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      advanceTo(tut, 'free-play');
+      tut.refreshGuide();
+      expect(row().style.display).toBe('none');
+      tut.stepIndex = 0;
+      tut.render();
+      tut.refreshGuide();
+      expect(row().style.display).not.toBe('none');
+    });
+  });
+
   describe('free play lifts the rails and shows the goal chip (#1328)', () => {
     const chip = (): HTMLElement | null => document.querySelector('.bs-tutorial-goal');
     const chipShown = (): boolean => !!chip() && chip()!.style.display !== 'none';
