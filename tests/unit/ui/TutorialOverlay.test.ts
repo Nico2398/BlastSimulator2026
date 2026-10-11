@@ -1135,6 +1135,193 @@ describe('TutorialOverlay (12.4)', () => {
   });
 });
 
+describe('param strip clearance tracks card height (#1630)', () => {
+  const VAR = '--bsx-tutorial-card-clearance';
+  let container: HTMLDivElement;
+  let tut: any;
+  let box: HTMLElement;
+  let height: () => number;
+
+  const clearanceVar = () => document.documentElement.style.getPropertyValue(VAR);
+
+  class FakeResizeObserver {
+    static instances: FakeResizeObserver[] = [];
+    observed: Element[] = [];
+    disconnected = 0;
+    constructor(public callback: ResizeObserverCallback) { FakeResizeObserver.instances.push(this); }
+    observe(el: Element): void { this.observed.push(el); }
+    unobserve(): void { /* unused */ }
+    disconnect(): void { this.disconnected++; }
+    fire(): void { this.callback([], this as unknown as ResizeObserver); }
+  }
+
+  /** jsdom has no layout: give the box a controllable offsetHeight. */
+  function build(): void {
+    tut = new TutorialOverlay(container);
+    box = container.querySelector('.bs-tutorial-box') as HTMLElement;
+    Object.defineProperty(box, 'offsetHeight', { configurable: true, get: () => height() });
+  }
+
+  function advanceToStep(id: string): void {
+    while (TUTORIAL_STEPS[tut.stepIndex]!.id !== id) tut.advanceToNextStep();
+  }
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    try { localStorage.removeItem('bs_tutorial_done'); } catch { /* ignore */ }
+    document.documentElement.style.removeProperty(VAR);
+    FakeResizeObserver.instances = [];
+    height = () => 200;
+    build();
+  });
+
+  afterEach(() => {
+    tut.dispose();
+    container.remove();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    setLocale('en');
+    document.documentElement.style.removeProperty(VAR);
+  });
+
+  it('sets the var to card height + 30px after start', () => {
+    tut.start(createMockState());
+    expect(clearanceVar()).toBe('230px');
+  });
+
+  it('re-measures on refreshGuide when only the height changed', () => {
+    tut.start(createMockState());
+    height = () => 260;
+    tut.refreshGuide();
+    expect(clearanceVar()).toBe('290px');
+  });
+
+  it('updates the var when a stage-line change grows the card', () => {
+    const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
+    height = () => 100 + stageEl.textContent!.length;
+    const state = createMockState();
+    tut.start(state);
+    advanceToStep('build-living-quarters');
+    tut.refreshGuide();
+    const before = clearanceVar();
+    expect(before).toBe(`${100 + stageEl.textContent!.length + 30}px`);
+
+    state.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 },
+    ];
+    tut.refreshGuide();
+    expect(stageEl.textContent).toBe(t('tutorial.waiting.building'));
+    expect(clearanceVar()).toBe(`${100 + t('tutorial.waiting.building').length + 30}px`);
+    expect(clearanceVar()).not.toBe(before);
+  });
+
+  it('re-measures when the waiting chip toggles', () => {
+    const chip = container.querySelector('.bs-tutorial-waiting') as HTMLElement;
+    height = () => (chip.style.display === 'none' ? 200 : 240);
+    const state = createMockState();
+    tut.start(state);
+    advanceToStep('build-living-quarters');
+    tut.refreshGuide();
+    expect(clearanceVar()).toBe('230px');
+
+    state.plannedBuildings = [
+      { id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 29, z: 12, actionId: 1, cost: 100 },
+    ];
+    tut.refreshGuide();
+    expect(clearanceVar()).toBe('270px');
+
+    state.plannedBuildings = [];
+    tut.refreshGuide();
+    expect(clearanceVar()).toBe('230px');
+  });
+
+  it('re-measures after a locale switch to fr', () => {
+    height = () => 100 + box.textContent!.length;
+    tut.start(createMockState());
+    const enVar = clearanceVar();
+    setLocale('fr');
+    tut.refreshLocale();
+    expect(clearanceVar()).toBe(`${100 + box.textContent!.length + 30}px`);
+    expect(clearanceVar()).not.toBe(enVar);
+  });
+
+  it('re-measures on each guide tick (250ms)', () => {
+    vi.useFakeTimers();
+    tut.start(createMockState());
+    height = () => 320;
+    vi.advanceTimersByTime(250);
+    expect(clearanceVar()).toBe('350px');
+  });
+
+  describe('ResizeObserver', () => {
+    beforeEach(() => { vi.stubGlobal('ResizeObserver', FakeResizeObserver); });
+
+    it('observes the card box from start and re-measures when the callback fires', () => {
+      tut.start(createMockState());
+      expect(FakeResizeObserver.instances.length).toBeGreaterThan(0);
+      const obs = FakeResizeObserver.instances[FakeResizeObserver.instances.length - 1]!;
+      expect(obs.observed).toContain(box);
+
+      height = () => 333;
+      obs.fire();
+      expect(clearanceVar()).toBe('363px');
+    });
+
+    it('disconnects the observer on dispose', () => {
+      tut.start(createMockState());
+      const obs = FakeResizeObserver.instances[FakeResizeObserver.instances.length - 1]!;
+      tut.dispose();
+      expect(obs.disconnected).toBeGreaterThan(0);
+    });
+
+    it('disconnects the observer on exit', () => {
+      tut.start(createMockState());
+      const obs = FakeResizeObserver.instances[FakeResizeObserver.instances.length - 1]!;
+      tut.exit();
+      expect(obs.disconnected).toBeGreaterThan(0);
+    });
+  });
+
+  it('start and dispose do not throw when ResizeObserver is undefined', () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    expect(() => tut.start(createMockState())).not.toThrow();
+    expect(clearanceVar()).toBe('230px');
+    expect(() => tut.dispose()).not.toThrow();
+  });
+
+  it('does not call setProperty again while the height is unchanged', () => {
+    tut.start(createMockState());
+    const spy = vi.spyOn(document.documentElement.style, 'setProperty');
+    tut.refreshGuide();
+    tut.refreshGuide();
+    tut.refreshGuide();
+    const calls = spy.mock.calls.filter(c => c[0] === VAR);
+    expect(calls).toHaveLength(0);
+
+    height = () => 250;
+    tut.refreshGuide();
+    expect(spy.mock.calls.filter(c => c[0] === VAR)).toHaveLength(1);
+    tut.refreshGuide();
+    expect(spy.mock.calls.filter(c => c[0] === VAR)).toHaveLength(1);
+  });
+
+  it('removes the var after dispose', () => {
+    tut.start(createMockState());
+    expect(clearanceVar()).not.toBe('');
+    tut.dispose();
+    expect(clearanceVar()).toBe('');
+  });
+
+  it('removes the var after exit', () => {
+    tut.start(createMockState());
+    expect(clearanceVar()).not.toBe('');
+    tut.exit();
+    expect(clearanceVar()).toBe('');
+  });
+});
+
 describe('TutorialOverlay exit (#1332)', () => {
   let container: HTMLDivElement;
   let tut: TutorialOverlay;
