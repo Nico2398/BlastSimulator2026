@@ -34,6 +34,8 @@ const HOLE_RING_SEGMENTS = 16;
 const HOLE_RING_RADIUS = 0.28;
 const CORNER_LEN = 0.9; // tiles, per design doc geometry tokens
 const CONFIRM_FLASH_MS = 220;
+/** Tiles: building footprints are centred per cell on [x-0.5, x+0.5] (footprintCenterCoord, #1198), not [x, x+1]. */
+const CENTRED_FOOTPRINT_SHIFT = -0.5;
 const BEACON_HEIGHT = 14; // world units above the region's centre
 
 export type OverlayShape = 'rect' | 'line' | 'point';
@@ -75,7 +77,7 @@ export interface OverlayPointUpdate {
 
 export type OverlayUpdate = OverlayCellsUpdate | OverlayLineUpdate | OverlayPointUpdate;
 
-/** Inclusive tile rectangle a guided step pins the placement to. */
+/** Inclusive tile rectangle a guided step pins the placement to. `centred` shifts the drawing onto the centred footprint convention (a building's footprint). */
 export interface OverlayRegion { x1: number; z1: number; x2: number; z2: number; centred?: boolean }
 
 export class SelectionOverlay {
@@ -159,14 +161,15 @@ export class SelectionOverlay {
     const patches: GroundTintPatch[] = [];
     const r = this.region;
     if (r) {
+      const shift = r.centred ? CENTRED_FOOTPRINT_SHIFT : 0;
       for (let z = r.z1; z <= r.z2; z++) {
         for (let x = r.x1; x <= r.x2; x++) {
-          patches.push(cellPatch(`region:${x}:${z}`, x, z, COLOR_PINNED, REGION_FILL_OPACITY));
+          patches.push(cellPatch(`region:${x}:${z}`, x + shift, z + shift, COLOR_PINNED, REGION_FILL_OPACITY));
         }
       }
-      this.regionGroup.add(this.makeBorder(r.x1, r.z1, r.x2, r.z2, COLOR_PINNED));
-      this.regionGroup.add(...this.makeCorners(r.x1, r.z1, r.x2, r.z2, COLOR_PINNED));
-      this.regionGroup.add(this.makeBeacon(r));
+      this.regionGroup.add(this.makeBorder(r.x1 + shift, r.z1 + shift, r.x2 + shift, r.z2 + shift, COLOR_PINNED));
+      this.regionGroup.add(...this.makeCorners(r.x1 + shift, r.z1 + shift, r.x2 + shift, r.z2 + shift, COLOR_PINNED));
+      this.regionGroup.add(this.makeBeacon(r, shift));
     }
     if (this.blockedTile) {
       patches.push(cellPatch('blocked', this.blockedTile.x, this.blockedTile.z, COLOR_BLOCKED, 0.4));
@@ -260,7 +263,7 @@ export class SelectionOverlay {
     // unshifted. A future second caller of the footprintCells path with a
     // different addressing intent (e.g. corner-based) would silently inherit
     // this shift — keep it scoped to building-footprint previews only.
-    const shift = u.footprintCells !== undefined ? -0.5 : 0;
+    const shift = u.footprintCells !== undefined ? CENTRED_FOOTPRINT_SHIFT : 0;
     const patches: GroundTintPatch[] = cells.map(
       ([dx, dz]): GroundTintPatch =>
         cellPatch(`${u.x + dx}:${u.z + dz}`, u.x + dx + shift, u.z + dz + shift, color, opacity),
@@ -312,15 +315,15 @@ export class SelectionOverlay {
   /**
    * A vertical mast over the region's centre.
    *
-   * A one-tile target — which is what the survey and warehouse steps pin —
+   * A one-tile target — which is what the survey step pins —
    * covers a handful of pixels from the game's low, shallow camera, and a flat
    * tint on the ground is easy to read as terrain. The mast is the part the
    * player's eye finds; the outline underneath is what tells them how big the
    * target is.
    */
-  private makeBeacon(r: OverlayRegion): THREE.Object3D {
-    const cx = (r.x1 + r.x2) / 2 + 0.5;
-    const cz = (r.z1 + r.z2) / 2 + 0.5;
+  private makeBeacon(r: OverlayRegion, shift: number): THREE.Object3D {
+    const cx = (r.x1 + r.x2) / 2 + 0.5 + shift;
+    const cz = (r.z1 + r.z2) / 2 + 0.5 + shift;
     const base = this.surfaceYAt(Math.round(cx), Math.round(cz)) + Y_OFFSET;
     const geometry = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(cx, base, cz),

@@ -171,7 +171,9 @@ function pickerStages(
  * miss.
  *
  * The three tutorial building pins (warehouse, drivingCenter, livingQuarters)
- * are derived, not picked ad hoc: flat for the building's full footprint
+ * are the tier-1 footprint rects of their building defs, anchored at the
+ * origin (x1, z1) the building is placed at (`tutorialSiteFootprintRect`),
+ * and are derived, not picked ad hoc: flat for the building's full footprint
  * (`BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD`), clear of every tutorial hazard by
  * `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES` (`tutorialHazards`,
  * `isTutorialSiteHazardClear`), mutually within
@@ -218,7 +220,7 @@ export const REGION = {
   // #1008-followup) this superseded. #1170: moved west of the box-cut
   // corridor, alongside livingQuarters (8,15) and drivingCenter (6,15) — see
   // this file's own REGION doc comment above for the full trace.
-  warehouse: { x1: 2, z1: 12, x2: 2, z2: 12, exact: true },
+  warehouse: tutorialSiteFootprintRect('freight_warehouse', 1, { x1: 2, z1: 12, x2: 2, z2: 12 }),
   // The starter cut runs down the west side of where the drill pattern will
   // go, on ground that is still intact — the point of the step is that it is
   // dug *before* anything is blasted, so the first shot has a face to break
@@ -230,7 +232,7 @@ export const REGION = {
   // #1008-followup) this superseded. #1170: moved west of the box-cut
   // corridor, alongside livingQuarters (8,15) and warehouse (2,12) — see this
   // file's own REGION doc comment above for the full trace.
-  drivingCenter: { x1: 6, z1: 15, x2: 6, z2: 15, exact: true },
+  drivingCenter: tutorialSiteFootprintRect('driving_center', 1, { x1: 6, z1: 15, x2: 6, z2: 15 }),
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
@@ -242,8 +244,8 @@ export const REGION = {
   // placed in the same order the tutorial rail orders them (living_quarters,
   // then driving_center, then freight_warehouse) with each one checked
   // against the prior pins already placed.
-  livingQuarters: { x1: 8, z1: 15, x2: 8, z2: 15, exact: true },
-} as const satisfies Record<string, TileRegion>;
+  livingQuarters: tutorialSiteFootprintRect('living_quarters', 1, { x1: 8, z1: 15, x2: 8, z2: 15 }),
+} satisfies Record<string, TileRegion>;
 
 /** World edge (tiles) after the seismic survey grows the world from 32 to 48. */
 export const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
@@ -295,7 +297,7 @@ export function chebyshevRectDistance(a: TileRegion, b: TileRegion): number {
  */
 export function tutorialSiteFootprintRect(type: BuildingType, tier: BuildingTier, region: TileRegion): TileRegion {
   const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
-  return { x1: region.x1, z1: region.z1, x2: region.x1 + sizeX - 1, z2: region.z1 + sizeZ - 1, exact: false };
+  return { x1: region.x1, z1: region.z1, x2: region.x1 + sizeX - 1, z2: region.z1 + sizeZ - 1, exact: true, centred: true };
 }
 
 /** Whether `rect` clears every `tutorialHazards()` entry by `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`. */

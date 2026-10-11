@@ -3280,7 +3280,7 @@
   "tutorial.stage.build_driving_center": "Appuyez sur « Cliquez sur le terrain pour placer » à côté de Centre de conduite.",
   "tutorial.stage.expand_driver": "Cliquez sur la fiche du chauffeur pour ouvrir ses détails.",
   "tutorial.stage.train_fragmenter": "Appuyez sur Former à côté de la licence Brise-roche.",
-  "tutorial.stage.build_site": "Cliquez sur la case bleue entourée dans la scène pour implanter le bâtiment.",
+  "tutorial.stage.build_site": "Cliquez dans la zone bleue entourée dans la scène pour implanter le bâtiment.",
   "tutorial.stage.ramp_tool": "Appuyez sur Creuser une rampe dans la section Terrain.",
   "tutorial.stage.boxcut_area": "Faites glisser le long de la bande bleue entourée dans la scène, de son extrémité haute vers son extrémité basse. La rampe s'y aligne.",
   "tutorial.stage.open_settings": "Ouvrez le panneau Paramètres depuis la barre d'outils.",
