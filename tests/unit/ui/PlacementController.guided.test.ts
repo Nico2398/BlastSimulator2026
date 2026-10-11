@@ -744,4 +744,33 @@ describe('exact region: preview and checks sit at the pin (#1594)', () => {
       expect(controller.footprintInvalid).toBe(true);
     });
   });
+
+describe('a centred multi-tile building pin still snaps to the min corner (#1646)', () => {
+  it.each(['livingQuarters', 'drivingCenter', 'warehouse'] as const)(
+    'a point click in the live area of REGION.%s selects the origin (x1, z1)',
+    (pin) => {
+      const r = REGION[pin];
+      setPickerRegion({ ...r });
+      controller.arm({ shape: 'point' });
+
+      press(r.x2 + EXACT_LIVE_MARGIN, r.z2 + EXACT_LIVE_MARGIN);
+
+      expect(controller.selection).toEqual({ x1: r.x1, z1: r.z1, x2: r.x2, z2: r.z2 });
+      expect(controller.canConfirm).toBe(true);
+
+      hover(r.x2 + EXACT_LIVE_MARGIN, r.z2 + EXACT_LIVE_MARGIN);
+      expect(controller.previewOrigin).toEqual({ x: r.x1, z: r.z1 });
+    },
+  );
+
+  it('a click beyond the live margin of a multi-tile pin is refused', () => {
+    const r = REGION.warehouse;
+    setPickerRegion({ ...r });
+    controller.arm({ shape: 'point' });
+
+    press(r.x2 + EXACT_LIVE_MARGIN + 1, r.z2 + EXACT_LIVE_MARGIN + 1);
+
+    expect(controller.selection).toBeNull();
+  });
+});
 });

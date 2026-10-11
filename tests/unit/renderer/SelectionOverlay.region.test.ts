@@ -192,3 +192,78 @@ describe('dispose', () => {
     expect(sceneMeshes()).toHaveLength(0);
   });
 });
+
+// ── #1646: centred regions line up with the footprint preview convention ──
+describe('a centred region is drawn on the footprint convention (#1646)', () => {
+  /** Bounding box in x/z of every vertex in the given objects. */
+  function bounds(objs: THREE.Object3D[]): { minX: number; maxX: number; minZ: number; maxZ: number } {
+    const box = new THREE.Box3();
+    for (const o of objs) box.expandByObject(o);
+    return { minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z };
+  }
+  const tintBounds = () => bounds(meshesWithGeometry());
+  const scaffoldBounds = () => bounds([...regionGroup().children]);
+
+  it('shifts the tint by -0.5 in x and z relative to the corner convention', () => {
+    overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22 });
+    const plain = tintBounds();
+    overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22, centred: true });
+    const centred = tintBounds();
+    expect(centred.minX).toBeCloseTo(plain.minX - 0.5);
+    expect(centred.maxX).toBeCloseTo(plain.maxX - 0.5);
+    expect(centred.minZ).toBeCloseTo(plain.minZ - 0.5);
+    expect(centred.maxZ).toBeCloseTo(plain.maxZ - 0.5);
+  });
+
+  it('a size-3 centred region at origin spans [x-0.5, x+size-0.5], like the footprint preview', () => {
+    overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22, centred: true });
+    const b = tintBounds();
+    expect(b.minX).toBeCloseTo(19.5);
+    expect(b.maxX).toBeCloseTo(22.5);
+    expect(b.minZ).toBeCloseTo(19.5);
+    expect(b.maxZ).toBeCloseTo(22.5);
+  });
+
+  it('matches the cells the footprint preview tints for the same origin and size', () => {
+    overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22, centred: true });
+    const region = tintBounds();
+    overlay.setRegion(null);
+    const cells: Array<readonly [number, number]> = [];
+    for (let dz = 0; dz < 3; dz++) for (let dx = 0; dx < 3; dx++) cells.push([dx, dz]);
+    overlay.update({ shape: 'point', x: 20, z: 20, footprintCells: cells } as never);
+    const preview = tintBounds();
+    expect(region.minX).toBeCloseTo(preview.minX);
+    expect(region.maxX).toBeCloseTo(preview.maxX);
+    expect(region.minZ).toBeCloseTo(preview.minZ);
+    expect(region.maxZ).toBeCloseTo(preview.maxZ);
+  });
+
+  it('shifts border, corners and beacon by -0.5 as well', () => {
+    overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22 });
+    const plain = scaffoldBounds();
+    overlay.setRegion({ x1: 20, z1: 20, x2: 22, z2: 22, centred: true });
+    const centred = scaffoldBounds();
+    expect(centred.minX).toBeCloseTo(plain.minX - 0.5);
+    expect(centred.maxX).toBeCloseTo(plain.maxX - 0.5);
+    expect(centred.minZ).toBeCloseTo(plain.minZ - 0.5);
+    expect(centred.maxZ).toBeCloseTo(plain.maxZ - 0.5);
+  });
+
+  it('a non-centred one-tile region stays unshifted on [x, x+1]', () => {
+    overlay.setRegion({ x1: 23, z1: 23, x2: 23, z2: 23 });
+    const b = tintBounds();
+    expect(b.minX).toBeCloseTo(23);
+    expect(b.maxX).toBeCloseTo(24);
+    expect(b.minZ).toBeCloseTo(23);
+    expect(b.maxZ).toBeCloseTo(24);
+  });
+
+  it('leaves the blocked-tile patch unshifted on a centred region', () => {
+    overlay.setRegion({ x1: 20, z1: 20, x2: 20, z2: 20, centred: true });
+    overlay.setBlockedTile({ x: 2, z: 2 });
+    const b = tintBounds();
+    expect(b.minX).toBeCloseTo(2);
+    expect(b.minZ).toBeCloseTo(2);
+    expect(b.maxX).toBeCloseTo(20.5);
+  });
+});
