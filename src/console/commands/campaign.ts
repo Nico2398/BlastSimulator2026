@@ -277,3 +277,14 @@ export function statsCommand(
 
   return { success: true, output: lines.join('\n') };
 }
+
+// ── campaign keep_playing ──
+
+export function campaignKeepPlayingCommand(
+  _ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  // TODO: implement
+  return { success: false, output: 'not implemented' };
+}

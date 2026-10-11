@@ -66,6 +66,7 @@ export class LevelEndScreen {
   private onBackToPortfolio?: () => void;
   private onRetrySandbox?: () => void;
   private onBackToSandbox?: () => void;
+  protected onKeepPlaying?: () => void; // TODO: wire to the keep-playing button
 
   /** True once rendered for the current terminal-reason transition — reset the instant levelEndReason clears. */
   private rendered = false;
@@ -181,6 +182,7 @@ export class LevelEndScreen {
   setOnBackToPortfolio(cb: () => void): void { this.onBackToPortfolio = cb; }
   setOnRetrySandbox(cb: () => void): void { this.onRetrySandbox = cb; }
   setOnBackToSandbox(cb: () => void): void { this.onBackToSandbox = cb; }
+  setOnKeepPlaying(cb: () => void): void { this.onKeepPlaying = cb; }
 
   refreshLocale(): void {
     this.locale.refresh();

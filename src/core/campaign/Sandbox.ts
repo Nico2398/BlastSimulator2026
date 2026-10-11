@@ -14,6 +14,7 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { SCORE_DECAY_RATE, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
 import type { LevelDef } from './Level.js';
+import type { GameState } from '../state/GameState.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
@@ -151,4 +152,19 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     // Tier 0 keeps it off the campaign world map, which lists tier > 0 only.
     difficultyTier: 0,
   };
+}
+
+/** Outcome of converting a won level into free play. */
+export type KeepPlayingResult = { success: true; data: undefined } | { success: false; error: string };
+
+/**
+ * Convert a completed (won) level into open-ended free play: clears the
+ * level-ended flag and reason and detaches the campaign's active level.
+ * Refuses unless `levelEndReason === 'completed'`.
+ */
+export function convertWinToFreePlay(
+  _state: Pick<GameState, 'levelEnded' | 'levelEndReason' | 'campaign'>,
+): KeepPlayingResult {
+  // TODO: implement
+  return { success: false, error: 'not implemented' };
 }
