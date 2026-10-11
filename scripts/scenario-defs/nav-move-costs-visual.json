@@ -175,7 +175,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 5
+          "vehicleCount": 6
         },
         "changedBy": {
           "cash": -25000

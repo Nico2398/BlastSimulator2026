@@ -15,7 +15,7 @@
       "expect": {
         "equals": {
           "cash": 50000,
-          "vehicleCount": 4,
+          "vehicleCount": 5,
           "employeeCount": 5
         }
       }

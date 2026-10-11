@@ -331,7 +331,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 4
+          "vehicleCount": 5
         }
       }
     },
@@ -380,12 +380,12 @@
       "role": "bootstrap"
     },
     {
-      "command": "vehicle driver 5 6",
+      "command": "vehicle driver 6 6",
       "description": "#553: vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. #921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one. `vehicle driver` survives as a scenario/console-only primitive, so this step now runs as a bootstrap command rather than a UI click.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 5 6"
+          "command": "vehicle driver 6 6"
         }
       ],
       "role": "bootstrap",
@@ -542,7 +542,7 @@
       "expect": {
         "equals": {
           "employeeCount": 6,
-          "vehicleCount": 4,
+          "vehicleCount": 5,
           "buildingCount": 2
         },
         "note": "#553: staffed:true's roster/fleet (5 employees, 4 vehicles minus the drill_rig the blast destroyed, plus this file's own driver/debris_hauler); #1530: warehouse plus spoil heap."

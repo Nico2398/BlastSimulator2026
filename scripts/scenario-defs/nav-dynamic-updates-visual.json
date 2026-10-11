@@ -248,7 +248,7 @@
           "cash": -25000
         },
         "equals": {
-          "vehicleCount": 4
+          "vehicleCount": 5
         }
       }
     },
@@ -314,7 +314,7 @@
           "cash": 0
         },
         "equals": {
-          "vehicleCount": 4
+          "vehicleCount": 5
         }
       }
     },

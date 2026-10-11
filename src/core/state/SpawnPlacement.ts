@@ -4,7 +4,7 @@
 // GameState it is handed.
 
 import { NavGrid, isStepClimbable, type NavCell } from '../nav/NavGrid.js';
-import { findNearestNavigableCell, countLegalStepNeighbours } from '../nav/NavGridReachability.js';
+import { findNearestNavigableCell, countLegalStepNeighbours, computeClimbComponents } from '../nav/NavGridReachability.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
@@ -354,6 +354,9 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
   if (!navGrid) return false;
   const { employees, vehicles } = { employees: state.employees.employees, vehicles: state.vehicles.vehicles };
   const open = (c: Cell): number => countLegalStepNeighbours(navGrid, c.x, c.z, NAV_CLEARANCE_VEHICLE_CELLS);
+  // The new cell must stay on the vehicle's own climb component: a roomier
+  // cell in a cut-off pocket would strand the vehicle from every order.
+  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
   const occupied = new Set<string>([
     ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
     ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
@@ -370,6 +373,7 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
         !occupied.has(key(c))
         && isSpawnable(navGrid.cellAt(c.x, c.z))
         && open(c) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS
+        && components.canReach(from.x, from.z, c.x, c.z)
         && others.every(o => chebyshev(o, c) >= CREW_SPAWN_VEHICLE_SEPARATION),
       ) ?? null;
     }

@@ -15,7 +15,7 @@
         "equals": {
           "cash": 50000,
           "holeCount": 0,
-          "vehicleCount": 4,
+          "vehicleCount": 5,
           "employeeCount": 5
         },
         "note": "staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants the roster/fleet for free at game-open, including the two driving.excavator drivers and the rock_digger this scenario needs to actually carve the ramp below — a plain new_game has neither, so ordering a ramp would only ever queue dig_ramp_segment work, never carve it."
