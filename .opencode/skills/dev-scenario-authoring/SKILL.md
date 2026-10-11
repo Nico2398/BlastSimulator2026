@@ -91,7 +91,7 @@ Exactly one entry lands in the step's report/state-dump/screenshot regardless of
 | `awaitTutorialStep` | Wait (default 6 s, `timeoutMs`) for the tutorial to reach a step id, with the page's rAF tick loop running for the wait. Combine with the scenario-level `realTutorialClock: true` so the guide clock holds/releases as for a real player; then a clock held 3 s with no progress fails the wait naming the step, stage and live control. Without the opt-in the guide does not follow the clock (scenario mode) and the wait only drives the tick loop. |
 | `set` | Set a form control's value the way typing or picking would. |
 | `clickLabel` | Click the first usable control whose label matches, case-insensitively. |
-| `awaitUsable` | Wait for a selector to exist and be genuinely usable, not merely present. |
+| `awaitUsable` | Wait for a selector to exist and be genuinely usable, not merely present. Every probe scrolls the control to the viewport centre first (as the click will); add `"inPlace": true` to probe without scrolling, asserting the product itself brought a guided target into reach (#1629). |
 | `zoomOut` | Scroll the wheel out N ticks to bring an off-screen tile into view. |
 | `focusTile` | Re-aim the camera at a world tile before clicking it. |
 | `clickEntity` | Click a live scene entity by kind + id rather than a baked coordinate. |
