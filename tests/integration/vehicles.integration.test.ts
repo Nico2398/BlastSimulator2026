@@ -508,7 +508,7 @@ describe('Vehicle fleet', () => {
 
   // ── getAllVehicleRoles ──
 
-  it('getAllVehicleRoles returns all five roles', () => {
+  it('getAllVehicleRoles returns all six roles', () => {
     const roles = getAllVehicleRoles();
 
     expect(roles).toContain('debris_hauler');
@@ -516,7 +516,15 @@ describe('Vehicle fleet', () => {
     expect(roles).toContain('drill_rig');
     expect(roles).toContain('building_destroyer');
     expect(roles).toContain('rock_fragmenter');
-    expect(roles).toHaveLength(5);
+    expect(roles).toContain('charging_truck');
+    expect(roles).toHaveLength(6);
+  });
+
+  it('buy charging_truck succeeds and lists it (#1645)', () => {
+    const result = vehicleCommand(ctx, ['buy', 'charging_truck'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('charging_truck');
+    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'charging_truck')).toBe(true);
   });
 
   // ── Buy all types ──

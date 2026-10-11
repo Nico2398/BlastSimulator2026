@@ -113,6 +113,15 @@ describe('vehicleCardTooltip', () => {
     }
   });
 
+  it('charging truck tooltip falls back to the kg payload capacity (#1645)', () => {
+    for (const tier of TIERS) {
+      const tip = vehicleCardTooltip(getVehicleDefByTier('charging_truck', tier));
+      expect(tip).toMatch(/Capacity: [\d,.]+ kg(?!\/h)/);
+      expect(tip).not.toMatch(/kg\/h/);
+      expect(tip).not.toMatch(/ui\.fleet\.tip/);
+    }
+  });
+
   it('drill rig capacity is not stated in kg', () => {
     for (const tier of TIERS) {
       expect(vehicleCardTooltip(getVehicleDefByTier('drill_rig', tier))).not.toMatch(/kg/i);

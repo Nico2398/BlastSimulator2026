@@ -369,9 +369,10 @@ describe('FleetPanel', () => {
     const { panel } = makePanel();
     panel.update(makeState([]));
     const buttons = panel.root.querySelectorAll('.bs-fleet-tier-btn');
-    expect(buttons.length).toBe(5 * 3);
+    expect(buttons.length).toBe(6 * 3);
     expect(panel.root.textContent).toContain('DEALERSHIP');
     expect(panel.root.textContent).toContain('Dumpster on Wheels');
+    expect(panel.root.textContent).toContain('Pour-Bucket Pete');
     expect(panel.root.textContent).toContain('$25,000');
   });
 
@@ -397,7 +398,7 @@ describe('FleetPanel', () => {
     state.cash = 5_000_000;
     panel.update(state);
     const buttons = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')];
-    expect(buttons.length).toBe(15);
+    expect(buttons.length).toBe(18);
     for (const btn of buttons) {
       const def = getVehicleDefByTier(btn.dataset['role'] as VehicleRole, Number(btn.dataset['tier']) as VehicleTier);
       const desc = btn.querySelector('.bs-fleet-tier-desc');
@@ -800,8 +801,8 @@ describe('FleetPanel — scroll-bounded vehicle list section (#958)', () => {
 
     const vehicleWrapper = children[0]!;
     expect(vehicleWrapper.contains(children[dealershipIdx]!)).toBe(false);
-    // 5 roles × 3 tiers of dealership buttons still resolve, unwrapped.
-    expect(bodyEl.querySelectorAll('.bs-fleet-tier-btn').length).toBe(5 * 3);
+    // 6 roles × 3 tiers of dealership buttons still resolve, unwrapped.
+    expect(bodyEl.querySelectorAll('.bs-fleet-tier-btn').length).toBe(6 * 3);
   });
 
   it('keeps bodyEl itself scrollable (overflow-y:auto unchanged) regardless of fleet size', () => {
