@@ -1,5 +1,10 @@
 export const TUTORIAL_LEVEL_ID = 'tutorial_pit';
 
+/** True for any terminal `levelEndReason` other than a genuine win: set and not 'completed'. */
+export function isDefeatReason(reason: string | null | undefined): boolean {
+  return !!reason && reason !== 'completed';
+}
+
 /** Auto-start after a level entry: only the tutorial map, only for first-timers. */
 export function shouldAutoStartTutorial(
   levelId: string | null | undefined,
@@ -18,5 +23,5 @@ export function shouldRestartTutorialOnRetry(
   levelId: string | null | undefined,
   levelEndReason: string | null | undefined,
 ): boolean {
-  return levelId === TUTORIAL_LEVEL_ID && !!levelEndReason && levelEndReason !== 'completed';
+  return levelId === TUTORIAL_LEVEL_ID && isDefeatReason(levelEndReason);
 }

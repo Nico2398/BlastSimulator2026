@@ -23,7 +23,7 @@ import { TICKS_PER_DAY, REVOLT_TICKS } from '../../core/config/balance.js';
 import { revoltCause } from '../../core/scores/RevoltCause.js';
 import type { GameState } from '../../core/state/GameState.js';
 
-export type DefeatReason = Exclude<NonNullable<GameState['levelEndReason']>, 'completed'>;
+type DefeatReason = Exclude<NonNullable<GameState['levelEndReason']>, 'completed'>;
 
 /**
  * Every defeat cause shares the same critical-red identity (design: uniform

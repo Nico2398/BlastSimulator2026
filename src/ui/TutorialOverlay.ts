@@ -8,7 +8,7 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { goalChipParams } from './tutorialStepsClosing.js';
-import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
+import { TUTORIAL_LEVEL_ID, isDefeatReason } from './tutorialTrigger.js';
 import { CARD_CLASS, GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
@@ -48,11 +48,6 @@ interface TutorialOverlayOptions {
  * other control is inert, and the clock is held once a step has spent its tick
  * allowance — so the world cannot move on while the player is still reading.
  */
-/** A level-end reason that is a defeat: set and not a win. */
-function isDefeatReason(reason: string | null | undefined): boolean {
-  return !!reason && reason !== 'completed';
-}
-
 export class TutorialOverlay {
   private readonly overlay: HTMLElement;
   private readonly box: HTMLElement;
