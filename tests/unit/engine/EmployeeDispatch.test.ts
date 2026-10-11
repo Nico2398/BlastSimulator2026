@@ -29,6 +29,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../../src/core/mining/ChargePlan.js';
+import { dispatchChargeAction } from '../../../src/core/mining/ChargeOrder.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import {
@@ -2092,8 +2093,8 @@ describe('charge_hole actions — dispatch and landing (#554)', () => {
    * runFullTickAndLandDrilledHoles above but landing charge_hole completions
    * instead: moves the completed hole's PlannedCharge out of
    * plannedChargesByHole and into chargesByHole via landLoadedCharge.
-   * charge_hole carries requiredVehicleRole: null, so no vehicle-continuity
-   * promotion step applies here. Returns the ids of holes that landed this
+   * These fixtures keep requiredVehicleRole: null (on-foot dispatch mechanics);
+   * the vehicle-gated charge is covered in the #1649 describe below. Returns the ids of holes that landed this
    * tick, in completion order.
    */
   function runFullTickAndLandLoadedCharges(state: GameState): string[] {
@@ -2556,5 +2557,55 @@ describe('employeeWorkState (#680, #928)', () => {
     employee.destinationZ = 34;
 
     expect(employeeWorkState(employee)).toBe('traveling');
+  });
+});
+
+
+describe('charge_hole is vehicle-gated work: a mounted blaster is not alighted before claim (#1649)', () => {
+  const SEED = 42;
+
+  function setup(withTruck = true) {
+    const state = createGame({ seed: SEED });
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < 5; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < 40; x++) row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      cells.push(row);
+    }
+    state.navGrid = new NavGrid(40, 5, cells);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
+    const vehicle = withTruck ? purchaseVehicle(state.vehicles, 'charging_truck', 0, 0).vehicle : null;
+    if (vehicle) expect(board(state, vehicle.id, employee.id).success).toBe(true);
+    const hole: DrillHole = { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 };
+    state.drillHoles.push(hole);
+    dispatchChargeAction(state, hole, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    return { state, employee, vehicle };
+  }
+
+  it('claims the charge order with the blaster still seated in the truck', () => {
+    const { state, employee, vehicle } = setup();
+    const action = state.pendingActions.find(a => a.type === 'charge_hole')!;
+    expect(action.requiredVehicleRole).toBe('charging_truck');
+    if (!vehicle) throw new Error('fixture has a truck');
+
+    tickEmployees(state);
+
+    expect(action.holderId).toBe(employee.id);
+    expect(vehicle.occupantIds).toContain(employee.id);
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(action.id);
+  });
+
+  it('with no charging truck in the fleet the order stays queued and nobody is claimed', () => {
+    const { state, employee } = setup(false);
+    const action = state.pendingActions.find(a => a.type === 'charge_hole')!;
+
+    tickEmployees(state);
+
+    expect(action.status).toBe('queued');
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.itinerary).toBeNull();
   });
 });

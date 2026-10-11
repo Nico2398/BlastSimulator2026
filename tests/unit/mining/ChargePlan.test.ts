@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks, chargeOrderCost,
+  createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks, computeChargeDurationTicks, chargeOrderCost,
   chargeColumnM, maxChargeKgForHole, weakHoleSummary,
 } from '../../../src/core/mining/ChargePlan.js';
 import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
-import { MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
+import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
+import { VEHICLE_TIER_MULTIPLIERS, MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
 
 describe('ChargePlan', () => {
   it('charging a hole stores explosive type and amount', () => {
@@ -339,5 +340,32 @@ describe('weakHoleSummary (#1358)', () => {
     const summary = weakHoleSummary('no_such_explosive', [col('obstiite', 4)]);
     expect(summary.weakCount).toBe(0);
     expect(summary.rockId).toBeNull();
+  });
+});
+
+describe('computeChargeDurationTicks (#1649)', () => {
+  it('tier 1 with defaults equals the unscaled task duration', () => {
+    expect(computeChargeDurationTicks(60, 1)).toBe(computeTaskDuration(60, 1, 1, 1, 1));
+  });
+
+  it.each([1, 2, 3] as const)('tier %s divides base ticks by the tier work rate before proficiency scaling', (tier) => {
+    expect(computeChargeDurationTicks(120, tier, 3, 0.9, 0.85))
+      .toBe(computeTaskDuration(120 / VEHICLE_TIER_MULTIPLIERS[tier].workRate, 3, 0.9, 0.85, 1));
+  });
+
+  it('a tier 3 truck takes fewer ticks than tier 1, tier 2 in between', () => {
+    const t1 = computeChargeDurationTicks(120, 1);
+    const t2 = computeChargeDurationTicks(120, 2);
+    const t3 = computeChargeDurationTicks(120, 3);
+    expect(t3).toBeLessThan(t2);
+    expect(t2).toBeLessThan(t1);
+  });
+
+  it('never drops below one tick for a tiny base', () => {
+    expect(computeChargeDurationTicks(0.01, 3)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a higher proficiency level shortens the duration', () => {
+    expect(computeChargeDurationTicks(120, 2, 5)).toBeLessThan(computeChargeDurationTicks(120, 2, 1));
   });
 });

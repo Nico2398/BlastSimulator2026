@@ -37,6 +37,7 @@ import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATIO
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
+import { computeChargeDurationTicks } from '../../../src/core/mining/ChargePlan.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
 import { computeLevelVolume } from '../../../src/core/mining/LevelGround.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
@@ -1868,5 +1869,68 @@ describe('canReleaseStrandedOnFootAction (#1025)', () => {
     // `false` below, not a side effect of the reachability check.
     expect(resolveActionCost(state, holder, action)).not.toBeNull();
     expect(canReleaseStrandedOnFootAction(state, holder, action)).toBe(false);
+  });
+});
+
+describe('computeActionWorkTicks — charge_hole scales with the reserved charging truck tier (#1649)', () => {
+  const BASE = 90;
+
+  function chargeAction(id: number, payload: Record<string, unknown> = { durationTicks: BASE }): PendingAction {
+    return makeWorkAction({ id, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: 'charging_truck', payload });
+  }
+
+  function inputs(state: GameState, employee: Employee) {
+    return {
+      needMult: getNeedMultiplier(employee),
+      lqMult: getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length),
+    };
+  }
+
+  it('tier 1 reservation: unchanged from the plain proficiency/need/LQ scaling', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = chargeAction(1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 1);
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
+    const { needMult, lqMult } = inputs(state, employee);
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(computeTaskDuration(BASE, 1, needMult, lqMult, 1));
+    expect(ticks).toBe(computeChargeDurationTicks(BASE, 1, 1, needMult, lqMult));
+  });
+
+  it('tier 3 reservation: charges in fewer ticks than tier 1, matching computeChargeDurationTicks', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 2);
+    const a1 = chargeAction(1);
+    const a3 = chargeAction(2);
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 1).vehicle.id, a1.id);
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 3).vehicle.id, a3.id);
+    const { needMult, lqMult } = inputs(state, employee);
+
+    const t1 = computeActionWorkTicks(state, employee, a1);
+    const t3 = computeActionWorkTicks(state, employee, a3);
+
+    expect(t3).toBeLessThan(t1);
+    expect(t3).toBe(computeChargeDurationTicks(BASE, 3, 2, needMult, lqMult));
+  });
+
+  it('no reserved vehicle: falls back to tier 1', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const { needMult, lqMult } = inputs(state, employee);
+
+    expect(computeActionWorkTicks(state, employee, chargeAction(7)))
+      .toBe(computeChargeDurationTicks(BASE, 1, 1, needMult, lqMult));
+  });
+
+  it('a resumeTicks payload is returned raw, before any tier scaling', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = chargeAction(3, { durationTicks: BASE, resumeTicks: 11 });
+    reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 3).vehicle.id, action.id);
+
+    expect(computeActionWorkTicks(state, employee, action)).toBe(11);
   });
 });

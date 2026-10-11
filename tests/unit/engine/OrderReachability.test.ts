@@ -38,6 +38,7 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { dispatchChargeAction } from '../../../src/core/mining/ChargeOrder.js';
 import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import {
   orderActorKey,
@@ -329,6 +330,67 @@ describe('classifyQueuedOrders (#1306)', () => {
       const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
       classifyQueuedOrders(state);
       expect(reasonOf(state, id) ?? null).toBeNull();
+    });
+  });
+
+  describe('availability reasons for a charge_hole order (#1649)', () => {
+    const licence = ROLE_LICENCE_REQUIRED.charging_truck;
+    const reasonOf = (state: GameState) => state.pendingActions.find(a => a.type === 'charge_hole')!.blockedReason;
+    const order = (state: GameState) => dispatchChargeAction(
+      state, { id: 'H1', x: IN_A_TARGET.x, z: IN_A_TARGET.z },
+      { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
+    );
+
+    it('requires the charging truck role', () => {
+      const state = makeState();
+      order(state);
+      expect(state.pendingActions.find(a => a.type === 'charge_hole')!.requiredVehicleRole).toBe('charging_truck');
+    });
+
+    it('stamps no_vehicle_in_fleet when no charging truck is owned, even with a dual-qualified employee', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting', licence]);
+      order(state);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state)).toBe('no_vehicle_in_fleet');
+    });
+
+    it('stamps no_licensed_driver when a blaster exists but nobody holds the truck licence', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting']);
+      purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
+      order(state);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state)).toBe('no_licensed_driver');
+    });
+
+    it('stamps no_dual_qualified_employee when blasting and licence sit on different employees', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting']);
+      hire(state, IN_A, [licence]);
+      purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
+      order(state);
+      const { unqualifiedIds } = classifyQueuedOrders(state);
+      expect(reasonOf(state)).toBe('no_dual_qualified_employee');
+      expect(unqualifiedIds.size).toBe(0);
+    });
+
+    it('stamps licence_level_too_low when only a tier-2 truck exists and the licence holder is level 1', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting', licence]);
+      purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 2);
+      order(state);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state)).toBe('licence_level_too_low');
+    });
+
+    it('leaves the order unblocked when one employee holds both and a truck exists', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting', licence]);
+      purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
+      order(state);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state) ?? null).toBeNull();
     });
   });
 
