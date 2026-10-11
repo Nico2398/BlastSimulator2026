@@ -30,6 +30,7 @@ import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../src/core/mining/BlastPlayback.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
+import type { GameState } from '../../src/core/state/GameState.js';
 
 /**
  * Fires one real blast through the console command layer — drill, charge,
@@ -63,12 +64,14 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   expect(ctx.state!.lastBlastReport).not.toBeNull();
 }
 
-function finished(elapsedS: number): BlastPlaybackSnapshot {
-  return { elapsedS, durationS: 0, isPlaying: false };
+/** The renderer's snapshot once it plays the blast whose report `state` holds, collapse at rest. */
+function finished(state: GameState, elapsedS: number): BlastPlaybackSnapshot {
+  return { report: state.lastBlastReport, elapsedS, durationS: 0, isPlaying: false };
 }
 
-function playing(elapsedS: number): BlastPlaybackSnapshot {
-  return { elapsedS, durationS: 100, isPlaying: true };
+/** The renderer's snapshot once it plays the blast whose report `state` holds, debris still moving. */
+function playing(state: GameState, elapsedS: number): BlastPlaybackSnapshot {
+  return { report: state.lastBlastReport, elapsedS, durationS: 100, isPlaying: true };
 }
 
 /**
@@ -104,7 +107,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     // Arm + open the report the same way main.ts's per-frame uiManager.update(ctx.state) does.
     uiManager.update(ctx.state!);
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S));
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     // Player dismisses before saving.
@@ -124,8 +127,8 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     // Advance real time well past the open delay across several frames, the
     // way the render loop's per-frame update() calls do.
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 2));
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S * 2));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -141,7 +144,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     fireBlast(runner, ctx);
 
     uiManager.update(ctx.state!);
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S));
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
     expect(runner.run('save').success).toBe(true);
@@ -163,11 +166,11 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     };
     ctx.state!.lastBlastReport = newReport;
 
-    uiManager.update(ctx.state!, playing(0)); // arms the new report (collapse just began)
+    uiManager.update(ctx.state!, playing(ctx.state!, 0)); // arms the new report (collapse just began)
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(true);
 
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S));
 
     expect(uiManager.blastReportModalVisible).toBe(true);
   });
@@ -184,7 +187,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
 
     simulateEnteredNewLevel(uiManager, ctx);
     uiManager.update(ctx.state!);
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -200,7 +203,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     fireBlast(runner, ctx);
 
     uiManager.update(ctx.state!);
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S));
     expect(uiManager.blastReportModalVisible).toBe(true); // never dismissed
 
     expect(runner.run('save').success).toBe(true);
@@ -210,7 +213,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalVisible).toBe(false);
     expect(uiManager.blastReportModalPending).toBe(false);
 
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -232,10 +235,10 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     const { runner, ctx } = createRunner();
     fireBlast(runner, ctx);
 
-    uiManager.update(ctx.state!, playing(BLAST_REPORT_MIN_PLAYBACK_S + 1));
+    uiManager.update(ctx.state!, playing(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S + 1));
     expect(uiManager.blastReportModalVisible).toBe(false); // past the floor but still mid-collapse
 
-    uiManager.update(ctx.state!, finished(5));
+    uiManager.update(ctx.state!, finished(ctx.state!, 5));
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
@@ -250,8 +253,8 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     simulateEnteredNewLevel(uiManager, ctx);
 
     // Fresh playback clock after reload (0) and a stale-looking finished one.
-    uiManager.update(ctx.state!, finished(0));
-    uiManager.update(ctx.state!, finished(50));
+    uiManager.update(ctx.state!, finished(ctx.state!, 0));
+    uiManager.update(ctx.state!, finished(ctx.state!, 50));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -266,8 +269,8 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     const { runner, ctx } = createRunner();
     fireBlast(runner, ctx);
 
-    uiManager.update(ctx.state!, playing(0));
-    uiManager.update(ctx.state!, playing(BLAST_REPORT_MIN_PLAYBACK_S + 1));
+    uiManager.update(ctx.state!, playing(ctx.state!, 0));
+    uiManager.update(ctx.state!, playing(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S + 1));
     expect(uiManager.blastReportModalPending).toBe(true);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
@@ -278,7 +281,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -304,7 +307,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
-    uiManager.update(ctx.state!, finished(BLAST_REPORT_MIN_PLAYBACK_S * 10));
+    uiManager.update(ctx.state!, finished(ctx.state!, BLAST_REPORT_MIN_PLAYBACK_S * 10));
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);

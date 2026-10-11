@@ -5,9 +5,14 @@
 // report whose identity differs from the last one shown means a new blast
 // just happened, right after PreflightModal's DETONATE dispatches `blast`
 // and closes itself. Rather than opening on that very next update() tick,
-// the modal arms and waits for the renderer's collapse playback to finish
-// (and reach BLAST_REPORT_MIN_PLAYBACK_S of rendered time) before actually
-// showing itself (#545, #1590), so the fragment-collapse animation plays first.
+// the modal arms and waits for the renderer to play that blast's collapse
+// until every fragment is at rest (and BLAST_REPORT_MIN_PLAYBACK_S of rendered
+// time has passed), or for BLAST_REPORT_MAX_PLAYBACK_S if debris is still
+// moving, so the player watches the blast before the report covers it
+// (#545, #1590). The playback must be the report's own: a sliced blast writes
+// its report frames before the renderer starts playing it (#1603), and the
+// previous blast's long-finished playback read as "done" opened the report
+// over the detonation.
 //
 // Deviation from the design mock: its second footer button, "SEND HAULERS",
 // has no real backing command — only per-vehicle `vehicle haul <id>` exists,
@@ -23,8 +28,8 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
-import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
-import { IDLE_BLAST_PLAYBACK, isBlastPlaybackComplete, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
+import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../core/config/balance.js';
+import { IDLE_BLAST_PLAYBACK, isBlastReportDue, type BlastPlaybackSnapshot } from '../../core/mining/BlastPlayback.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 
 const RATING_COLOR: Record<BlastRating, string> = {
@@ -56,8 +61,8 @@ export class BlastReportModal {
   private readonly locale = new LocaleTextRegistry();
 
   // Deferred-open state (#545). pendingReport holds a report that has
-  // arrived but not yet been shown; it opens once the rendered collapse
-  // playback snapshot passed to update() reports completion (#1590).
+  // arrived but not yet been shown; it opens once the rendered playback
+  // snapshot passed to update() is its own blast's and is due (#1590).
   private pendingReport: BlastReport | null = null;
 
   constructor(container: HTMLElement) {
@@ -187,7 +192,8 @@ export class BlastReportModal {
       this.pendingReport = report;
     }
 
-    if (this.pendingReport !== null && isBlastPlaybackComplete(playback, BLAST_REPORT_MIN_PLAYBACK_S)) {
+    if (this.pendingReport !== null
+      && isBlastReportDue(playback, this.pendingReport, BLAST_REPORT_MIN_PLAYBACK_S, BLAST_REPORT_MAX_PLAYBACK_S)) {
       const toShow = this.pendingReport;
       this.lastShownReport = toShow;
       this.pendingReport = null;

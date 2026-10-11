@@ -84,7 +84,7 @@ Concrete measures below; the general rule for how cost must scale as the game gr
 - Marching cubes recalculation localized — only recompute chunks near blast
 - Fragment count capped per blast (max 2000) to avoid physics overload
 - Event system timers use delta-time accumulation, not setTimeout
-- A UI element that must delay by real wall-clock time (not simulation ticks — e.g. letting an animation play before a modal opens) gates on rendered time the renderer already measures (a capped-dt playback clock passed in as a snapshot), never on wall-clock timers: wall time and rendered time diverge without a GPU. Tests pass a snapshot instead of waiting. See `BlastReportModal` and `isBlastPlaybackComplete` (#1590).
+- A UI element that must delay by real wall-clock time (not simulation ticks — e.g. letting an animation play before a modal opens) gates on rendered time the renderer already measures (a capped-dt playback clock passed in as a snapshot), never on wall-clock timers: wall time and rendered time diverge without a GPU. The snapshot names what it is timing, and the consumer checks it is its own before trusting the clock — the state can run frames ahead of the renderer, and an earlier, long-finished playback otherwise reads as done. Tests pass a snapshot instead of waiting. See `BlastReportModal` and `isBlastReportDue` (#1590).
 - Voxel grid operations use spatial indexing where beneficial
 
 ## Centralized Configuration

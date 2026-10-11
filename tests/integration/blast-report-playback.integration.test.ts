@@ -7,13 +7,18 @@
 // and the animator advance by the SAME dt. Wall clocks are mocked to run far
 // ahead to prove they play no part.
 //
-// Invariant under every dt sequence:  modal.visible  =>  !animator.isPlaying
-//                                                        && elapsed >= floor
+// Invariant under every dt sequence:  modal.visible  =>  the playback is the
+//   shown report's own  &&  ((!animator.isPlaying && elapsed >= floor) || elapsed >= cap)
+//
+// A sliced blast (#1603) writes its report to the state frames before the
+// renderer starts playing it, with the UI updated every frame in between:
+// `reportLands` / `rendererStarts` replay that order, which `blast` (both at
+// once) never exercised.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { FragmentAnimator } from '../../src/renderer/FragmentAnimator.js';
 import { BlastReportModal } from '../../src/ui/panels/BlastReportModal.js';
-import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../src/core/config/balance.js';
+import { BLAST_REPORT_MAX_PLAYBACK_S, BLAST_REPORT_MIN_PLAYBACK_S } from '../../src/core/config/balance.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { Random } from '../../src/core/math/Random.js';
 import type { GameState } from '../../src/core/state/GameState.js';
@@ -54,7 +59,12 @@ interface Rig {
   modal: BlastReportModal;
   state: GameState;
   elapsed: () => number;
+  /** The report lands and the renderer starts its playback in the same frame (unsliced blast). */
   blast: (fl: FragmentFlight[], report: BlastReport) => void;
+  /** The simulation writes the report to the state; the renderer has not started on it yet. */
+  reportLands: (report: BlastReport) => void;
+  /** The renderer starts playing the blast whose report the state holds (GameRenderer.onBlastSteps). */
+  rendererStarts: (fl: FragmentFlight[]) => void;
   frame: (dt: number) => void;
   snapshot: () => BlastPlaybackSnapshot;
 }
@@ -67,15 +77,24 @@ function makeRig(): Rig {
   const modal = new BlastReportModal(container);
   const state = createGame({ seed: 42, mineType: 'desert' });
   let elapsed = 0;
+  let playingReport: BlastReport | null = null;
   const snapshot = (): BlastPlaybackSnapshot => ({
-    elapsedS: elapsed, durationS: animator.durationS, isPlaying: animator.isPlaying,
+    report: playingReport, elapsedS: elapsed, durationS: animator.durationS, isPlaying: animator.isPlaying,
   });
+  const rendererStarts = (fl: FragmentFlight[]): void => {
+    elapsed = 0;
+    playingReport = state.lastBlastReport;
+    animator.begin(fl);
+  };
   return {
-    animator, modal, state, snapshot,
+    animator, modal, state, snapshot, rendererStarts,
     elapsed: () => elapsed,
     blast(fl, report) {
-      elapsed = 0;
-      animator.begin(fl);
+      state.lastBlastReport = report;
+      rendererStarts(fl);
+      modal.update(state, snapshot());
+    },
+    reportLands(report) {
       state.lastBlastReport = report;
       modal.update(state, snapshot());
     },
@@ -89,8 +108,11 @@ function makeRig(): Rig {
 
 function expectInvariant(rig: Rig): void {
   if (rig.modal.visible) {
-    expect(rig.animator.isPlaying).toBe(false);
-    expect(rig.elapsed()).toBeGreaterThanOrEqual(BLAST_REPORT_MIN_PLAYBACK_S);
+    expect(rig.snapshot().report).toBe(rig.state.lastBlastReport);
+    if (rig.elapsed() < BLAST_REPORT_MAX_PLAYBACK_S) {
+      expect(rig.animator.isPlaying).toBe(false);
+      expect(rig.elapsed()).toBeGreaterThanOrEqual(BLAST_REPORT_MIN_PLAYBACK_S);
+    }
   }
 }
 
@@ -200,15 +222,80 @@ describe('blast report vs real playback (#1590)', () => {
     expect(rig.elapsed()).toBeGreaterThanOrEqual(rig.animator.durationS);
   });
 
-  it('a seek that holds the collapse mid-flight keeps the report closed however long it is held', () => {
+  it('a seek that holds the collapse mid-flight keeps the report closed until the cap', () => {
     const rig = makeRig();
     rig.blast(flights(6), makeReport());
     rig.animator.seek(rig.animator.durationS / 2);
-    for (let i = 0; i < 300; i++) {
+    while (rig.elapsed() + MAX_FRAME_DT < BLAST_REPORT_MAX_PLAYBACK_S) {
       rig.frame(MAX_FRAME_DT); // the loop keeps ticking the clock; the animator is held
       expect(rig.modal.visible).toBe(false);
     }
+    for (let i = 0; i < 3 && !rig.modal.visible; i++) rig.frame(MAX_FRAME_DT);
+    expect(rig.modal.visible).toBe(true);
     expect(rig.animator.isPlaying).toBe(true);
+  });
+
+  it('a collapse longer than the cap opens the report at the cap, debris still moving', () => {
+    const rig = makeRig();
+    rig.blast(flights(20), makeReport());
+    expect(rig.animator.durationS).toBeGreaterThan(BLAST_REPORT_MAX_PLAYBACK_S);
+    let openedAt = -1;
+    for (let i = 0; i < 2000 && openedAt < 0; i++) {
+      rig.frame(1 / 60);
+      expectInvariant(rig);
+      if (rig.modal.visible) openedAt = rig.elapsed();
+    }
+    expect(openedAt).toBeGreaterThanOrEqual(BLAST_REPORT_MAX_PLAYBACK_S);
+    expect(openedAt).toBeLessThan(BLAST_REPORT_MAX_PLAYBACK_S + 1 / 30);
+    expect(rig.animator.isPlaying).toBe(true);
+  });
+
+  it('a sliced blast\'s report, landing frames before its playback starts, waits for that playback — first blast of the session', () => {
+    const rig = makeRig();
+    // The page has been up a while: the clock is far past every threshold, nothing playing.
+    for (let i = 0; i < 200; i++) rig.frame(MAX_FRAME_DT);
+    expect(rig.elapsed()).toBeGreaterThan(BLAST_REPORT_MAX_PLAYBACK_S);
+
+    rig.reportLands(makeReport());
+    for (let i = 0; i < 10; i++) {
+      rig.frame(1 / 60); // the blast job and its landing still resolving
+      expect(rig.modal.visible).toBe(false);
+    }
+
+    rig.rendererStarts(flights(4));
+    let openedAt = -1;
+    for (let i = 0; i < 2000 && openedAt < 0; i++) {
+      rig.frame(1 / 60);
+      expectInvariant(rig);
+      if (rig.modal.visible) openedAt = rig.elapsed();
+    }
+    expect(openedAt).toBeGreaterThanOrEqual(rig.animator.durationS);
+  });
+
+  it('a sliced blast\'s report waits for its own playback, not the previous blast\'s finished one', () => {
+    const rig = makeRig();
+    rig.blast(flights(1, 1), makeReport(1));
+    for (let i = 0; i < 2000 && !rig.modal.visible; i++) rig.frame(1 / 60);
+    expect(rig.modal.visible).toBe(true);
+    rig.modal.hide();
+    for (let i = 0; i < 100; i++) rig.frame(MAX_FRAME_DT); // first collapse long settled
+
+    const second = makeReport(2);
+    second.fragmentCount = 777;
+    rig.reportLands(second);
+    for (let i = 0; i < 10; i++) {
+      rig.frame(1 / 60);
+      expect(rig.modal.visible).toBe(false);
+    }
+
+    rig.rendererStarts(flights(4));
+    for (let i = 0; i < 2000 && !rig.modal.visible; i++) {
+      rig.frame(1 / 60);
+      expectInvariant(rig);
+    }
+    expect(rig.modal.visible).toBe(true);
+    expect(rig.modal.root.textContent).toContain('777');
+    expect(rig.elapsed()).toBeGreaterThanOrEqual(rig.animator.durationS);
   });
 
   it('finish() (harness skip) completes playback; the report then opens once the floor of rendered time has passed', () => {

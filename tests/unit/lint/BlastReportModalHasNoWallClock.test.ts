@@ -30,8 +30,9 @@ describe('BlastReportModal has no wall clock (#1590)', () => {
     expect(CODE).not.toMatch(/\bnow\s*:\s*\(\)\s*=>\s*number/);
   });
 
-  it('gates on the playback helper and the seconds constant', () => {
-    expect(CODE).toMatch(/isBlastPlaybackComplete/);
+  it('gates on the playback helper and the seconds constants', () => {
+    expect(CODE).toMatch(/isBlastReportDue/);
     expect(CODE).toMatch(/BLAST_REPORT_MIN_PLAYBACK_S/);
+    expect(CODE).toMatch(/BLAST_REPORT_MAX_PLAYBACK_S/);
   });
 });
