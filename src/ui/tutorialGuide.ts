@@ -70,6 +70,22 @@ export function isReachable(selector: string): boolean {
 }
 
 /**
+ * True when `el`'s box is clipped out of view by a scrollable ancestor
+ * (overflowY auto/scroll/hidden) or by the viewport.
+ */
+export function isClippedByScroller(el: Element): boolean {
+  void el;
+  // TODO: implement
+  return false;
+}
+
+/** Scrolls `el` into view (nearest block/inline) when the host supports it. */
+export function scrollTargetIntoView(el: Element): void {
+  void el;
+  // TODO: implement
+}
+
+/**
  * Which stage the player is on.
  *
  * The last reachable stage wins. Later stages live behind earlier ones — a
