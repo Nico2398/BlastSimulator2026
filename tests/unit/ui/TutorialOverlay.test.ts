@@ -1080,8 +1080,7 @@ describe('TutorialOverlay (12.4)', () => {
       advanceTo(tut, 'free-play');
       tut.refreshGuide();
       expect(row().style.display).toBe('none');
-      tut.stepIndex = 0;
-      tut.render();
+      tut.landOnStep(0); // restart path: sets index, renders, tells the rails the new step
       tut.refreshGuide();
       expect(row().style.display).not.toBe('none');
     });

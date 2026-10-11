@@ -3221,7 +3221,7 @@
   "tutorial.waiting_chip": "EN COURS",
   "tutorial.waiting_tooltip": "L'ordre est lancé — l'équipe s'en occupe déjà.",
   "tutorial.waiting.building": "Ordre lancé — en attente que l'équipe finisse la construction.",
-  "tutorial.waiting.training": "Formation réservée — en attente que le conducteur rejoigne le cours.",
+  "tutorial.waiting.training": "Formation réservée — en attente que le chauffeur rejoigne le cours.",
   "tutorial.waiting.drilling": "Ordre lancé — en attente que l'équipe finisse le forage.",
   "tutorial.waiting.charging": "Ordre lancé — en attente que l'équipe finisse de charger les trous.",
   "tutorial.waiting.surveying": "Ordre lancé — en attente du rapport du prospecteur.",
