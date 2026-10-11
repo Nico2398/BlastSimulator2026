@@ -26,7 +26,7 @@ import bpy
 from mathutils import Vector
 
 from common import (
-    apply_transform, array, assign, bevel, box, cylinder, icosphere, material, pivot, prism, rotate, sphere, torus,
+    apply_transform, array, assign, bevel, box, capsule, cylinder, icosphere, material, pivot, prism, rotate, sphere, torus,
 )
 from vehicles import _materials, cab, fender, headlights, hydraulic, pole, rock_pile, track
 
@@ -1103,8 +1103,8 @@ def build_rock_fragmenter(m) -> None:
     pivot('Conveyor', cp, parts)
 
 
-def _neon_letters(name: str, text: str, center, height: float, m, stroke: float = 0.07) -> list[bpy.types.Object]:
-    """Block capitals T and N in glowing red, standing in the XZ plane (readable from the side)."""
+def _neon_letters(name: str, text: str, center, height: float, m, stroke: float = 0.07, mirror: bool = False) -> list[bpy.types.Object]:
+    """Block capitals T and N in glowing red in the XZ plane; `mirror` flips the N diagonal for the far face."""
     cx, cy, cz = center
     w = height * 0.7
     gap = w * 0.4
@@ -1116,7 +1116,7 @@ def _neon_letters(name: str, text: str, center, height: float, m, stroke: float 
             strokes = [((w, stroke, stroke), (x, cy, cz + height / 2 - stroke / 2), 0),
                        ((stroke, stroke, height), (x, cy, cz), 0)]
         else:  # 'N'
-            diag = math.degrees(math.atan2(w, height))
+            diag = math.degrees(math.atan2(w, height)) * (-1 if mirror else 1)
             strokes = [((stroke, stroke, height), (x - w / 2 + stroke / 2, cy, cz), 0),
                        ((stroke, stroke, height), (x + w / 2 - stroke / 2, cy, cz), 0),
                        ((stroke, stroke, math.hypot(w, height)), (x, cy, cz), -diag)]
@@ -1181,7 +1181,7 @@ def build_charging_truck(m) -> None:
     assign(backing, m['black'])
     body.append(backing)
     for side in (-1, 1):
-        body += _neon_letters('Sign', 'TNT', (-0.6, side * 0.05, 3.25), 0.5, m)
+        body += _neon_letters('Sign', 'TNT', (-0.6, side * 0.05, 3.25), 0.5, m, mirror=side == 1)
     # Chrome swan-neck boom off the tail, gold hose and nozzle.
     post = cylinder('Boom.Post', 0.08, 0.7, loc=(-1.9, 0, 1.3), segments=12)
     assign(post, m['chrome'])
