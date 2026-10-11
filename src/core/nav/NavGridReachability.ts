@@ -622,8 +622,8 @@ export function countLegalStepNeighbours(
   for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
     const nx = x + dx;
     const nz = z + dz;
-    const to = navGrid.cellAt(nx, nz);
-    if (!to || to.type === 'blocked' || to.type === 'void') continue;
+    if (!isTraversableCell(navGrid, nx, nz)) continue;
+    const to = navGrid.cellAt(nx, nz)!;
     if (isLegalStep(navGrid, x, z, from, nx, nz, to, true, requiredClearance)) count++;
   }
   return count;

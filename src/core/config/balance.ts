@@ -274,6 +274,13 @@ export const SPAWN_TILE_SPACING = 3;
 export const CREW_SPAWN_VEHICLE_SEPARATION = 3;
 
 /**
+ * Cell-count headroom for the crew-relocation search: the search visits this
+ * many times the cells the spaced vehicle picks alone would need
+ * (agents x SEPARATION^2), leaving room for employees to fill in around them.
+ */
+export const CREW_SPAWN_SEARCH_LIMIT_FACTOR = 2;
+
+/**
  * Fewest legal-step neighbours (of 8, at vehicle clearance) a starting
  * vehicle's cell may have (#1648). A cell with only one or two is a thin
  * ridge or trench that one building corner can seal, leaving the vehicle
@@ -1278,12 +1285,14 @@ export const TRANSPORT_ALIGHT_FINISH_WALK_CELLS = 1;
 
 // ─── Starting Site (staffed new_game / sandbox) ────────────────────────────────
 
+export interface StartingSiteQualification {
+  readonly category: SkillCategory;
+  readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
+}
+
 export interface StartingSiteEmployeeSlot {
   readonly role: EmployeeRole;
-  readonly qualifications: ReadonlyArray<{
-    readonly category: SkillCategory;
-    readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
-  }>;
+  readonly qualifications: readonly StartingSiteQualification[];
 }
 
 export interface StartingSiteVehicleSlot {
@@ -1316,10 +1325,14 @@ const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
 ];
 
 /** Drill rig, debris hauler and charging truck: the fleet every blasting opening carries (#1648). */
-const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+const BASE_STARTING_VEHICLES_BEFORE_CHARGING: readonly StartingSiteVehicleSlot[] = [
   { role: 'drill_rig', tier: 1 },
   { role: 'debris_hauler', tier: 1 },
-  { role: 'charging_truck', tier: 1 },
+];
+const STARTING_CHARGING_TRUCK: StartingSiteVehicleSlot = { role: 'charging_truck', tier: 1 };
+const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+  ...BASE_STARTING_VEHICLES_BEFORE_CHARGING,
+  STARTING_CHARGING_TRUCK,
 ];
 
 /** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
@@ -1355,10 +1368,10 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
   // the older fleet's positions (and every seed-pinned playthrough on them)
   // were tuned against, so a newcomer extends the row rather than shifting it.
   vehicles: [
-    ...BASE_STARTING_VEHICLES.filter(v => v.role !== 'charging_truck'),
+    ...BASE_STARTING_VEHICLES_BEFORE_CHARGING,
     { role: 'rock_digger', tier: 1 },
     { role: 'rock_fragmenter', tier: 1 },
-    ...BASE_STARTING_VEHICLES.filter(v => v.role === 'charging_truck'),
+    STARTING_CHARGING_TRUCK,
   ],
 } as const;
 
@@ -1926,7 +1939,7 @@ export interface ScriptedCandidate {
   unionized: boolean;
   skillBonus: 0 | 1;
   /** Extra qualifications granted on top of the role defaults (#1648). */
-  extraQualifications?: readonly { category: SkillCategory; proficiencyLevel: 1 | 2 | 3 | 4 | 5 }[];
+  extraQualifications?: readonly StartingSiteQualification[];
 }
 
 /** Tutorial hiring pool: one fixed candidate per hiring role, ids 1..5 (#1600). */

@@ -8,6 +8,7 @@ import { findNearestNavigableCell, countLegalStepNeighbours, computeClimbCompone
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
+  CREW_SPAWN_SEARCH_LIMIT_FACTOR,
   CREW_SPAWN_AGENT_SEPARATION,
   CREW_SPAWN_MAX_ROUTE_INFLATION,
   CREW_SPAWN_SEARCH_RADIUS,
@@ -352,11 +353,12 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
 export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
   const navGrid = state.navGrid;
   if (!navGrid) return false;
-  const { employees, vehicles } = { employees: state.employees.employees, vehicles: state.vehicles.vehicles };
+  const employees = state.employees.employees;
+  const vehicles = state.vehicles.vehicles;
   const open = (c: Cell): number => countLegalStepNeighbours(navGrid, c.x, c.z, NAV_CLEARANCE_VEHICLE_CELLS);
   // The new cell must stay on the vehicle's own climb component: a roomier
   // cell in a cut-off pocket would strand the vehicle from every order.
-  const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+  let components: ReturnType<typeof computeClimbComponents> | null = null; // built on the first narrow vehicle
   const occupied = new Set<string>([
     ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
     ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
@@ -373,7 +375,7 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
         !occupied.has(key(c))
         && isSpawnable(navGrid.cellAt(c.x, c.z))
         && open(c) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS
-        && components.canReach(from.x, from.z, c.x, c.z)
+        && (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS)).canReach(from.x, from.z, c.x, c.z)
         && others.every(o => chebyshev(o, c) >= CREW_SPAWN_VEHICLE_SEPARATION),
       ) ?? null;
     }
@@ -440,7 +442,7 @@ export function placeStartingCrew(state: GameState): boolean {
   // Vehicle separation is what makes the cluster wider than one cell per
   // agent: leave room for the spaced picks plus the employees filling in
   // around them.
-  const searchLimit = 2 * agents.length * CREW_SPAWN_VEHICLE_SEPARATION * CREW_SPAWN_VEHICLE_SEPARATION;
+  const searchLimit = CREW_SPAWN_SEARCH_LIMIT_FACTOR * agents.length * CREW_SPAWN_VEHICLE_SEPARATION * CREW_SPAWN_VEHICLE_SEPARATION;
 
   // One trigger, and a deliberately narrow one: how far the crew would
   // actually have to walk to reach the middle of its own site. A level's

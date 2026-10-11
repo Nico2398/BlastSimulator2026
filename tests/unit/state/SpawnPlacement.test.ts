@@ -6,7 +6,7 @@ import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js'
 import { CREW_SPAWN_VEHICLE_SEPARATION, CREW_SPAWN_AGENT_SEPARATION, CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 import { isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
-import { countLegalStepNeighbours } from '../../../src/core/nav/NavGridReachability.js';
+import { countLegalStepNeighbours, computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
 
 function solidVoxel(): VoxelData {
   return {
@@ -385,6 +385,19 @@ function makeTrenchGrid(size: number): VoxelGrid {
   return grid;
 }
 
+/** A trench (z=5, x<10) sealed on every side by walls too steep to climb: a cut-off pocket. */
+function makeSealedTrenchGrid(size: number): VoxelGrid {
+  const grid = new VoxelGrid(size, size);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const isWall = ((z === 4 || z === 6) && x <= 10) || (z === 5 && x === 10);
+      const top = isWall ? 12 : 1;
+      for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
 describe('relocateVehiclesOffNarrowGround (#1648)', () => {
   it('leaves a vehicle on open ground exactly where it stands', () => {
     const state = createGame({ seed: 42, staffed: true });
@@ -405,7 +418,27 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     expect(countLegalStepNeighbours(navGrid, 4, 5, NAV_CLEARANCE_VEHICLE_CELLS)).toBeLessThan(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
 
     expect(relocateVehiclesOffNarrowGround(state)).toBe(true);
+    expect([hauler.x, hauler.z]).not.toEqual([4, 5]);
     expect(countLegalStepNeighbours(navGrid, hauler.x, hauler.z, NAV_CLEARANCE_VEHICLE_CELLS)).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+    // The new cell is on the origin's own climb component: the vehicle can still reach where it started.
+    const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+    expect(components.canReach(4, 5, hauler.x, hauler.z)).toBe(true);
+  });
+
+  it('leaves a vehicle sealed in a pocket where the only roomier cells lie outside its climb component', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    buildGameNavGrid(state, makeSealedTrenchGrid(32), [], []);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 4; hauler.z = 5;
+    state.vehicles.vehicles.filter(v => v !== hauler).forEach((v, i) => { v.x = 20 + i * CREW_SPAWN_VEHICLE_SEPARATION; v.z = 20; });
+    state.employees.employees.forEach((e, i) => { e.x = 20 + i * CREW_SPAWN_AGENT_SEPARATION; e.z = 26; });
+    const navGrid = state.navGrid!;
+    expect(countLegalStepNeighbours(navGrid, 4, 5, NAV_CLEARANCE_VEHICLE_CELLS)).toBeLessThan(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+    expect(countLegalStepNeighbours(navGrid, 4, 2, NAV_CLEARANCE_VEHICLE_CELLS)).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+    expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS).canReach(4, 5, 4, 2)).toBe(false);
+
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
+    expect([hauler.x, hauler.z]).toEqual([4, 5]);
   });
 
   it('keeps the vehicle separation from every other vehicle when it moves one', () => {

@@ -1,8 +1,8 @@
 // BlastSimulator2026 — Zone clearing and evacuation
 // Players define safety zones before blasting and evacuate entities.
 
-import type { VehicleState } from './Vehicle.js';
-import type { EmployeeState } from './Employee.js';
+import type { Vehicle, VehicleState } from './Vehicle.js';
+import type { Employee, EmployeeState } from './Employee.js';
 import type { GameState } from '../state/GameState.js';
 import { vehicleDriverId } from './Vehicle.js';
 import { moveTo, alightOnArrival } from '../engine/MoveTo.js';
@@ -110,6 +110,13 @@ export function clearZone(
     strandedEmployeeIds: [],
   };
 
+  // Only consulted when nobody inside can drive `v` out (#1648).
+  const reachableRescuer = (v: Vehicle): Employee | null => {
+    if (rescuerIds.length === 0) return null;
+    const rescuer = findAvailableDriverForReposition(v, vehicles, employees, rescuerIds);
+    return rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
+  };
+
   // Employees picked to board a vehicle this call — tracked so a later
   // vehicle in the same zone doesn't also pick them, and so the foot-
   // evacuation loop below skips them.
@@ -179,9 +186,8 @@ export function clearZone(
       )
       .map(e => e.id);
 
-    const rescuer = rescuerIds.length > 0 ? findAvailableDriverForReposition(v, vehicles, employees, rescuerIds) : null;
     const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle)
-      ?? (rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null);
+      ?? reachableRescuer(v);
     if (!driver) {
       result.strandedVehicleIds.push(v.id);
       continue;
