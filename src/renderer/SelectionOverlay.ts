@@ -76,7 +76,7 @@ export interface OverlayPointUpdate {
 export type OverlayUpdate = OverlayCellsUpdate | OverlayLineUpdate | OverlayPointUpdate;
 
 /** Inclusive tile rectangle a guided step pins the placement to. */
-export interface OverlayRegion { x1: number; z1: number; x2: number; z2: number }
+export interface OverlayRegion { x1: number; z1: number; x2: number; z2: number; centred?: boolean }
 
 export class SelectionOverlay {
   private readonly scene: THREE.Scene;

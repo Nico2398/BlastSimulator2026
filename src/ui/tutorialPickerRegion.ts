@@ -23,6 +23,11 @@ export interface TileRegion {
    * too much freedom in the tutorial").
    */
   exact?: boolean;
+  /**
+   * Drawing metadata: the cells are on the centred footprint convention
+   * (matching footprintCenterCoord). Logic ignores it.
+   */
+  centred?: boolean;
 }
 
 /**
