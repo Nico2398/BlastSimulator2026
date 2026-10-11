@@ -49,6 +49,26 @@ export function settleLevelResult(
   return stars;
 }
 
+// ── Keep playing ──
+
+/** Outcome of converting a won level into free play. */
+type KeepPlayingResult = { success: true; data: undefined } | { success: false; error: string };
+
+/**
+ * Convert a completed (won) level into open-ended free play: clears the
+ * level-ended flag and reason and detaches the campaign's active level.
+ * Refuses unless `levelEndReason === 'completed'`.
+ */
+export function convertWinToFreePlay(
+  state: Pick<GameState, 'levelEnded' | 'levelEndReason' | 'campaign'>,
+): KeepPlayingResult {
+  if (state.levelEndReason !== 'completed') return { success: false, error: 'level_not_completed' };
+  state.levelEnded = false;
+  state.levelEndReason = null;
+  state.campaign.activeLevelId = null;
+  return { success: true, data: undefined };
+}
+
 // ── Threshold check ──
 
 /**

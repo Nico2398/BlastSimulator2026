@@ -7,6 +7,7 @@ import { createRunner, runCommand } from '../../../src/console/createRunner.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../../src/core/campaign/Bankruptcy.js';
+import { addIncome, getOperatingProfit } from '../../../src/core/economy/Finance.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import en from '../../../src/core/i18n/locales/en.json';
@@ -67,11 +68,14 @@ describe('campaign keep_playing (#1647)', () => {
     expect(ctx.state!.levelEndReason).toBeNull();
   });
 
-  it('does not re-trigger the win with profit above the threshold', () => {
+  it('does not re-trigger the win with operating profit above the threshold', () => {
     const ctx = wonCtx();
     campaignKeepPlayingCommand(ctx, [], {});
     const s = ctx.state!;
-    s.cash += getLevel('dusty_hollow')!.unlockThreshold * 3;
+    const threshold = getLevel('dusty_hollow')!.unlockThreshold;
+    addIncome(s.finances, threshold * 3, 'contracts', 'windfall', s.tickCount);
+    // Control: the win trigger would fire were the level still active.
+    expect(getOperatingProfit(s.finances)).toBeGreaterThanOrEqual(threshold);
     tickCommand(ctx, ['10'], {});
     expect(s.levelEnded).toBe(false);
     expect(s.levelEndReason).toBeNull();
