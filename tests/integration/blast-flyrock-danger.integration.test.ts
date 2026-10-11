@@ -69,11 +69,11 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
  * Ticks until every charge ordered by the last `charge hole:*` has landed in
  * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
  *
- * Charging is on-foot work (no vehicle gate, unlike drilling) — either the
- * driller (id 1, relocated clear by driveDrillPlanToCompletion above once
- * drilling finished) or the staffed blaster (id 2, also 'blasting'-qualified,
- * STARTING_SITE_STAFFED_COMPOSITION) can walk back into the pattern to claim
- * a charge_hole action, undoing that relocation. Same reasoning as the drill
+ * Charging is worked from the staffed charging truck (#1649) by the staffed
+ * blaster (id 2, 'blasting' + driving.truck, STARTING_SITE_STAFFED_COMPOSITION),
+ * one hole at a time, so a 3x3 pattern needs far more ticks than drilling —
+ * the cap is raised accordingly. The blaster drives into the pattern to claim
+ * a charge_hole action, undoing the relocation of the driller above. Same reasoning as the drill
  * helper's own relocation: these tests are about flyrock reaching the crew
  * crewBesideTheBlast (or a test's own explicitly hired/positioned employee)
  * places deliberately, not about whichever staffed employee happened to do
@@ -85,7 +85,7 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
  * qualified too (ROLE_STARTING_QUALIFICATIONS) but must stay exactly where
  * each test put them.
  */
-function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 1500): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
@@ -273,6 +273,8 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const farAway = hireEmployee(ctx.state!.employees, 'driver', rng, safeX, safeZ).employee;
     const farVehicle = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', safeX, safeZ + 1).vehicle;
 
+    // Truck-worked charging spans many payroll ticks (#1649); fund it like blastAt does.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     driveChargePlanToCompletion(ctx);
     const result = blastCommand(ctx, [], {});

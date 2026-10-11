@@ -104,6 +104,24 @@ describe('hire_contractor with nothing completable', () => {
   });
 });
 
+describe('hire_contractor on a charge order (#1649)', () => {
+  it('loads the charge without a truck or crew: the contractor is not bound by the vehicle role', () => {
+    const s = setupUnqualified();
+    const action = s.state.pendingActions.find(a => a.id === s.actionId)!;
+    action.type = 'charge_hole';
+    action.requiredSkill = 'blasting';
+    action.requiredVehicleRole = 'charging_truck';
+    action.payload = { holeId: 'h1' };
+    s.state.drillHoles.push({ id: 'h1', x: 12, z: 12, depth: 5, diameter: 0.2 } as never);
+    s.state.plannedChargesByHole['h1'] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } as never;
+    const outcome = UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId], s.world, TICK);
+    expect(outcome.resultKeySuffix).toBe('');
+    expect(s.state.plannedChargesByHole['h1']).toBeUndefined();
+    expect(s.state.chargesByHole['h1']?.amountKg).toBe(5);
+    expect(s.state.pendingActions.some(a => a.id === s.actionId)).toBe(false);
+  });
+});
+
 describe('hire_contractor on a drill order', () => {
   it('lands the planned hole and removes the action', () => {
     const s = setupUnqualified();

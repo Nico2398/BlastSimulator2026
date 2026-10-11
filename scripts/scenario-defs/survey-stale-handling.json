@@ -359,6 +359,44 @@
       "role": "bootstrap"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      },
+      "description": "#1649: charge_hole is worked from a charging truck by an employee holding blasting + driving.truck; buy one so the charge orders can be carried out."
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "description": "#1649: the driller already holds blasting (role starting qualification); driving.truck lets them drive the charging truck. Training at a driving_center is the player path; skipped, this file is not about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
       "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper click precedes the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis, matching the declared 2x2. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
@@ -494,6 +532,39 @@
       ],
       "role": "player",
       "commandOutcome": "either"
+    },
+    {
+      "command": "employee dispatch 1 x:70 z:70",
+      "description": "#1649: the driller now stands at the holes in the charging truck and the blast zone is no longer empty of crew; the surveyor, needed for the later core_sample, walks clear of the blast zone first (employee dispatch has no UI button).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:70 z:70"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 60",
+      "description": "Let the surveyor walk clear of the danger zone before the blast; no state field exposes employee positions, so a fixed tick pad is the only wait available.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee cancel 16",
+      "description": "The dispatched walk is open-ended general work; cancel it so the surveyor is free for the later core_sample (same pattern as vibration-budget).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee cancel 16"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "blast",

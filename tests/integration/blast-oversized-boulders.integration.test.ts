@@ -42,7 +42,7 @@ function makeCtx(): GameContext {
 
 /**
  * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATIONS)
- * and buys one drill_rig vehicle, so drill_plan grid's queued drill_hole
+ * and buys one drill_rig and one charging_truck (#1649), so drill_plan grid's queued drill_hole
  * actions (#553) can actually land — deliberately NOT `staffed:true`
  * (STARTING_SITE_STAFFED_COMPOSITION also pre-crews a debris_hauler and
  * rock_fragmenter, which would race this test's own step-by-step manual
@@ -55,6 +55,10 @@ function hireDrillerAndRig(ctx: GameContext): void {
   employeeCommand(ctx, ['assign_skill', String(drillerId)], { skill: 'driving.drill_rig', level: '5' });
   const buyRig = vehicleCommand(ctx, ['buy', 'drill_rig'], {});
   expect(buyRig.success).toBe(true);
+  // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
+  employeeCommand(ctx, ['assign_skill', String(drillerId)], { skill: 'driving.truck', level: '1' });
+  const buyTruck = vehicleCommand(ctx, ['buy', 'charging_truck'], {});
+  expect(buyTruck.success).toBe(true);
 }
 
 /**

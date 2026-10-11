@@ -817,7 +817,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
   // proactive shift-cycle/fatigue-threshold rest — unlike the general_work
   // case above (#945 follow-up), which stays interruptible.
   // isMidConstructionWork/PROTECTED_MID_EXECUTION_ACTION_TYPES scopes this
-  // guard to place_building, charge_hole and survey specifically, mirroring
+  // guard to place_building and survey (charge_hole left the set in #1649) specifically, mirroring
   // isMidVehicleGatedWork's own scoping for vehicle-gated work — each shares
   // the same fragmentation bug class (a single task fragmented into many
   // interrupted, restarted attempts).
@@ -920,18 +920,20 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
   });
 
   // #1379: with no living_quarters an in-place rest only restores to
-  // NEED_REST_NO_BUILDING_CAP, so a walk to a protected task (charge_hole)
+  // NEED_REST_NO_BUILDING_CAP, so a walk to a protected task (survey)
   // costing more fatigue than that gain is never reached if every threshold
-  // crossing interrupts it (entry stuck in plannedChargesByHole forever).
+  // crossing interrupts it (a far survey never reached). charge_hole itself was
+  // the original case but is vehicle-gated since #1649, so the protected-walk
+  // guard is pinned with survey, which is still on-foot and protected.
   it.each<[number, boolean]>([
     [20, false],
     [3, true],
-  ])('#1379: mid-walk to a charge_hole, no quarters, itinerary est %s ticks at fatigue 60 rests: %s', (estTotalTicks, rests) => {
+  ])('#1379: mid-walk to a survey, no quarters, itinerary est %s ticks at fatigue 60 rests: %s', (estTotalTicks, rests) => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const prior = pushHeldAction(state, employee.id, 1140, 'charge_hole');
+    const prior = pushHeldAction(state, employee.id, 1140, 'survey');
     prior.status = 'assigned';
     employee.activeActionId = prior.id;
     employee.fatigue = 60;

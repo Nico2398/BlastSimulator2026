@@ -196,6 +196,22 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Truck licence: with blasting, the hire is dual-qualified for the charging truck (#1649).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
@@ -313,6 +329,33 @@
         "equals": {
           "orderedHoleCount": 0,
           "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#1649: charging is worked from a charging truck; buy one so the charge order can land.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -639,11 +682,11 @@
       }
     },
     {
-      "command": "vehicle driver 2 4",
+      "command": "vehicle driver 3 4",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 2 4"
+          "command": "vehicle driver 3 4"
         }
       ],
       "description": "#921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
@@ -861,11 +904,11 @@
       }
     },
     {
-      "command": "vehicle driver 3 5",
+      "command": "vehicle driver 4 5",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 3 5"
+          "command": "vehicle driver 4 5"
         }
       ],
       "description": "#555: the freshly-hired employee #5 (licensed above, issue #585) is assigned to the rock_digger -- #1 and #2, this section's original licence target, are both dead by this point. Without a driver the digger is a mesh and the queued dig_ramp_segment actions never start. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
@@ -1122,11 +1165,43 @@
       }
     },
     {
-      "command": "vehicle driver 4 6",
+      "command": "employee assign_skill 6 skill:driving.truck level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 4 6"
+          "command": "employee assign_skill 6 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Truck licence: with blasting, the hire is dual-qualified for the charging truck (#1649).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 6 skill:blasting level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 6 skill:blasting level:3"
+        }
+      ],
+      "description": "#553: the drill_rig licence for the replacement driller, same reason and same unmarked-role justification as the assign_skill for employee #2 above. Renumbered 5 -> 6 (issue #585): the excavator-course hire above (#1 and #2's original licence target both died in the pattern-1 blast) now claims id #5, pushing this file's own next hire to #6.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 5 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 5 6"
         }
       ],
       "description": "#553: the replacement driller (employee #6, issue #585: renumbered up from #5 -- see the excavator-hire step's own note) takes the replacement rig (vehicle #4, #555: renumbered up from #3 -- the rock_digger bought above is now #3). #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
@@ -1206,6 +1281,33 @@
       }
     },
     {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#1649: blast 1 destroyed the parked charging truck, so buy a fresh one for the second charge order.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:4 stemming:2",
       "interaction": [
         {
@@ -1247,7 +1349,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -1324,7 +1426,7 @@
           "chargedCount": 0,
           "deathCount": 5
         },
-        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on — see the campaign-status step's own note.",
+        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on \u2014 see the campaign-status step's own note.",
         "decreased": [
           "vehicleCount"
         ]
@@ -1406,7 +1508,7 @@
           "employeeCount": 6,
           "holeCount": 0
         },
-        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note. #1151/#1166: \"vehicleCount: 0\" became \"atMost 1\". Under the 30-degree slope gate the crew's routes are long enough that command mode and interaction mode no longer park the three vehicles on the same cells at blast time: command mode still loses all three, interaction mode loses two and the third sits outside blast 2's danger-zone box. Neither is wrong — an absolute that only one trajectory arrives at is, which is what scripts/shared/interaction-goal-scope.ts's own doc warns against pinning. The blast step above now carries the step-local `decreased: ['vehicleCount']` that proves the shot really does destroy fleet in both channels, and this ceiling still refuses a run where the blast leaves the fleet intact.",
+        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note. #1151/#1166: \"vehicleCount: 0\" became \"atMost 1\". Under the 30-degree slope gate the crew's routes are long enough that command mode and interaction mode no longer park the three vehicles on the same cells at blast time: command mode still loses all three, interaction mode loses two and the third sits outside blast 2's danger-zone box. Neither is wrong \u2014 an absolute that only one trajectory arrives at is, which is what scripts/shared/interaction-goal-scope.ts's own doc warns against pinning. The blast step above now carries the step-local `decreased: ['vehicleCount']` that proves the shot really does destroy fleet in both channels, and this ceiling still refuses a run where the blast leaves the fleet intact.",
         "atMost": {
           "vehicleCount": 1
         }

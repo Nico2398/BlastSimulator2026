@@ -436,6 +436,49 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "description": "#1649: a charge order is worked from a charging truck; without one it waits. Buy the tier-1 truck.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "description": "#1649: employee 1 needs driving.truck (alongside blasting) to crew the charging truck.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.truck level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
@@ -538,11 +581,14 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 20",
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
@@ -553,7 +599,9 @@
           "nuisance"
         ],
         "note": "#1362: the armed detonation auto-fires inside this tick batch once the zone is clear (tickCommand), so the blast's vibration dip in ecology/nuisance lands here."
-      }
+      },
+      "timeout": 180,
+      "description": "#1649: with the charge now worked by the charging-truck crew the evacuation clears later than a fixed 20-tick pad assumed; wait on the armed detonation actually firing (holeCount 0) instead."
     },
     {
       "command": "event choose 0",

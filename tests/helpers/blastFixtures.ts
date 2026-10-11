@@ -34,6 +34,14 @@ export function isPocketCell(x: number, z: number): boolean {
   return POCKET_CELLS.has(`${x},${z}`);
 }
 
+/** Buys a charging truck and makes `employeeId` a blasting + driving.truck charger (#1649). */
+export function buyChargingTruck(run: (cmd: string) => unknown, state: GameState, employeeId: number): void {
+  expect(run('vehicle buy charging_truck')).toMatchObject({ success: true });
+  expect(run(`employee assign_skill ${employeeId} skill:driving.truck level:1`)).toMatchObject({ success: true });
+  expect(run(`employee assign_skill ${employeeId} skill:blasting level:1`)).toMatchObject({ success: true });
+  expect(state.vehicles.vehicles.some(v => v.type === 'charging_truck')).toBe(true);
+}
+
 /**
  * Hires a driller, licenses them for the drill_rig, drills+charges
  * a single hole at (startX, startZ) with the given charge amount (spacing:3
@@ -53,6 +61,8 @@ export function drillChargeAndBlast(startX: number, startZ: number, amount: numb
 
   expect(run('vehicle buy drill_rig')).toMatchObject({ success: true });
   expect(run(`employee assign_skill ${driller.id} skill:driving.drill_rig level:1`)).toMatchObject({ success: true });
+  // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
+  buyChargingTruck(run, state, driller.id);
 
   expect(run(`drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:${startX},${startZ} diameter:0.089`)).toMatchObject({ success: true });
   tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 400);

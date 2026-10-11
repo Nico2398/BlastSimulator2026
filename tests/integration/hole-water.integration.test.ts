@@ -22,6 +22,7 @@ import { createGame } from '../../src/core/state/GameState.js';
 import { runTick } from '../../src/core/engine/TickPipeline.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { Random } from '../../src/core/math/Random.js';
+import { buyChargingTruck } from '../helpers/blastFixtures.js';
 import { TUBING_COST } from '../../src/core/mining/Tubing.js';
 
 const GRID = 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12';
@@ -335,6 +336,11 @@ describe('hole water lifecycle (#1350)', () => {
 describe('hole water in the blast (#1350)', () => {
   function chargedGame(explosive: string) {
     const game = drilledGame();
+    // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
+    const driller = game.ctx.state!.employees.employees.find(e => e.role === 'driller')!;
+    buyChargingTruck(game.runner.run.bind(game.runner), game.ctx.state!, driller.id);
+    game.ctx.state!.cash = 500_000; // the truck purchase must not leave the charge orders waiting for funds
+    game.ctx.state!.finances.cash = 500_000;
     game.runner.run(`charge hole:* explosive:${explosive} amount:8 stemming:2`);
     drive(game.runner, game.ctx, () => Object.keys(game.ctx.state!.plannedChargesByHole).length === 0);
     // Weather drifts while the crew charges: start the blast from dry holes.

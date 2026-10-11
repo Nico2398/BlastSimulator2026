@@ -12,6 +12,7 @@ import {
   driveDrillPlanToCompletion,
   driveChargePlanToCompletion,
   driveConstructionToCompletion,
+  ensureChargingTruckCrew,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
@@ -90,6 +91,8 @@ describe('Tutorial Level — Contract Delivery', () => {
     });
     const buyRig = vehicleCommand(ctx, ['buy', 'drill_rig'], {});
     expect(buyRig.success).toBe(true);
+    // Charging is worked from a charging truck by a blasting + driving.truck holder (#1649).
+    ensureChargingTruckCrew(ctx);
 
     // 4. Drill 2×2 grid at (10,10), 4m spacing, 8m depth
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {

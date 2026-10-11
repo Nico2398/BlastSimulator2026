@@ -237,6 +237,22 @@
       }
     },
     {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Truck licence: with blasting, the hire is dual-qualified for the charging truck (#1649).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:14,6 diameter:0.089",
       "interaction": [
         {
@@ -321,6 +337,33 @@
       "commandOutcome": "either"
     },
     {
+      "command": "vehicle buy charging_truck",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"charging_truck\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#1649: charging is worked from a charging truck; buy one so the charge order can land.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:3 stemming:2",
       "interaction": [
         {
@@ -362,7 +405,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -673,11 +716,11 @@
       }
     },
     {
-      "command": "vehicle driver 2 4",
+      "command": "vehicle driver 3 4",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 2 4"
+          "command": "vehicle driver 3 4"
         }
       ],
       "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
@@ -728,11 +771,11 @@
       }
     },
     {
-      "command": "vehicle driver 3 3",
+      "command": "vehicle driver 4 3",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 3 3"
+          "command": "vehicle driver 4 3"
         }
       ],
       "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
@@ -906,7 +949,7 @@
     },
     {
       "command": "wait_until field:buildingCount equals:2 max_ticks:400",
-      "description": "Assert the warehouse ordered above actually landed (#556). The crew builds it across the tick blocks the file already runs, so this costs no ticks of its own — which is what keeps the haul below, and the contract accepted around it, on the trajectory this file measured.",
+      "description": "Assert the warehouse ordered above actually landed (#556). The crew builds it across the tick blocks the file already runs, so this costs no ticks of its own \u2014 which is what keeps the haul below, and the contract accepted around it, on the trajectory this file measured.",
       "timeout": 130,
       "interaction": [
         {

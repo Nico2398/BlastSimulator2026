@@ -23,7 +23,7 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 | Category | Required for | Training building |
 |----------|-------------|-------------------|
 | `driving.<vehicle_role>` | Operating vehicles of that role | Driving Center |
-| `blasting` | Charging holes, setting sequences, monitoring blasts | Blasting Academy |
+| `blasting` | Charging holes (from a charging truck, needs `driving.truck` too), setting sequences, monitoring blasts | Blasting Academy |
 | `management` | Contract negotiation (requires an eligible manager; best level raises odds by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1). Hiring/firing/policy setting are not gated on it yet | Management Office |
 | `geology` | Seismic, core-sample, and aerial surveys | Geology Lab |
 | `repair` | Repairing damaged idle vehicles in place (`repair_vehicle`, #1393); parts cost per restored hp | Driving Center |
@@ -61,6 +61,8 @@ An action's XP award is a list, not a single slot — `computeTaskXpAwards` (`sr
 ```
 ticksRequired = baseDuration / (proficiency_multiplier * wellbeing_multiplier * event_multipliers)
 ```
+
+`charge_hole` is vehicle work (`requiredVehicleRole: 'charging_truck'`): duration = `computeChargeDurationTicks`, base / truck tier `workRate`, then the multipliers below; blockers `no_dual_qualified_employee` etc. See `gameplay-vehicle-fleet`.
 
 Fixed-duration actions (`drill_hole`, `charge_hole`, `survey`, `place_building`) carry a base `payload.durationTicks` that replaces the generic baseDuration but is scaled by the same proficiency (the action's required skill; none = level 1), need and Living Quarters multipliers (`computeActionWorkTicks`). An interrupted action stores its remaining work in `payload.resumeTicks` — already resolved, so it overrides the formula unscaled and `durationTicks` stays the base.
 

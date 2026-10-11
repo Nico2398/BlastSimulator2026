@@ -17,6 +17,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { tickUntil } from './helpers.js';
+import { buyChargingTruck } from '../helpers/blastFixtures.js';
 import { refreshHiringPool } from '../../src/core/entities/HiringPool.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
@@ -322,6 +323,12 @@ function setupSavedPlan() {
   expect(run('drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
   tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
   expect(state.drillHoles).toHaveLength(4);
+  // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
+  state.cash = 500_000; // the truck purchase must not leave the charge orders waiting for funds
+  state.finances.cash = 500_000;
+  buyChargingTruck(run, state, state.employees.employees.find(e => e.role === 'driller')!.id);
+  state.cash = 500_000;
+  state.finances.cash = 500_000;
   expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
   tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
   expect(Object.keys(state.chargesByHole)).toHaveLength(4);
