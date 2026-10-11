@@ -97,7 +97,7 @@ const SERIALIZED_FIELDS = [
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'rubbleDisposalOffered', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
-  'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel',
+  'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel', 'chargeOrderBlockedReason',
 ] as const;
 
 describe('console-api', () => {
@@ -503,6 +503,10 @@ describe('console-api', () => {
       // version.
       runner.runner.run(`employee assign_skill ${empId} skill:driving.drill_rig level:1`);
       runner.runner.run('vehicle buy drill_rig');
+      // Charging is worked from a charging truck by a crew member holding
+      // 'blasting' and the truck licence (#1649).
+      runner.runner.run(`employee assign_skill ${empId} skill:driving.truck level:1`);
+      runner.runner.run('vehicle buy charging_truck');
       runner.runner.run('drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:15,15');
       for (let i = 0; i < 600 && runner.ctx.state!.plannedDrillHoles.length > 0; i++) {
         // Tops up needs each tick — this solo multi-hole drive would otherwise

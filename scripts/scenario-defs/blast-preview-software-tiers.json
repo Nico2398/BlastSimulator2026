@@ -3,19 +3,19 @@
   "description": "Visual verification of blast preview overlays at each software tier: energy heatmap, fragment distribution, projection arcs, vibration waves",
   "steps": [
     {
-      "command": "new_game seed:42 cash:80000 staffed:true",
+      "command": "new_game seed:42 cash:150000 staffed:true",
       "timeout": 20,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:80000 staffed:true"
+          "command": "new_game seed:42 cash:150000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000,
+          "cash": 150000,
           "holeCount": 0
         }
       }

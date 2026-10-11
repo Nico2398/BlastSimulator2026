@@ -310,7 +310,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "#553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st -- and the blast above destroyed the drill_rig (vehicle #1, sitting inside its own hole's blast radius), so vehicleCount goes 3 -> 4, not 0 -> 1.",
+      "description": "#553: staffed:true's fleet (drill_rig, debris_hauler, rock_digger, rock_fragmenter and, since #1648, a charging truck) is 5 vehicles -- and the unevacuated blast above destroyed two of them (the drill_rig and the charging truck, both parked inside their own holes' blast radius, #1649), so vehicleCount goes 5 -> 3 -> 4 with this purchase.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -331,7 +331,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 5
+          "vehicleCount": 4
         }
       }
     },
@@ -434,7 +434,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: this blast leaves only barren rock, so the delivery shows up as spoil on the heap (storedSpoilKg), not in the warehouse (storedMassKg).",
+      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: this blast leaves only barren rock, so the delivery shows up as spoil on the heap (storedSpoilKg), not in the warehouse (storedMassKg). #1649: the new hauler's driver now starts hauling later in the run (the charging crew and truck died in the blast), so the first delivery lands in the 60-tick block below, not this one.",
       "interaction": [
         {
           "type": "command",
@@ -445,9 +445,6 @@
       "expect": {
         "decreased": [
           "cash"
-        ],
-        "increased": [
-          "storedSpoilKg"
         ]
       }
     },
@@ -464,7 +461,7 @@
     },
     {
       "command": "tick 60",
-      "description": "Automatic hauling keeps running; only cash's continuing upkeep drain is checkable on every seed/timing here.",
+      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable on every seed/timing here, and the first delivery of spoil to the heap lands inside this block (#1649: moved here from the 20-tick block above).",
       "interaction": [
         {
           "type": "command",
@@ -475,6 +472,9 @@
       "expect": {
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "storedSpoilKg"
         ]
       }
     },
@@ -542,10 +542,10 @@
       "expect": {
         "equals": {
           "employeeCount": 6,
-          "vehicleCount": 5,
+          "vehicleCount": 4,
           "buildingCount": 2
         },
-        "note": "#553: staffed:true's roster/fleet (5 employees, 4 vehicles minus the drill_rig the blast destroyed, plus this file's own driver/debris_hauler); #1530: warehouse plus spoil heap."
+        "note": "#553/#1649: staffed:true's roster/fleet (5 employees, 5 vehicles incl. the charging truck) minus the drill_rig and charging truck the unevacuated blast destroyed, plus this file's own driver/debris_hauler; #1530: warehouse plus spoil heap."
       }
     }
   ]

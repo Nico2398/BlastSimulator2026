@@ -3,18 +3,18 @@
   "description": "Chapter 5: 3-deck charge configuration with varying depths for deep fracture and no surface projection",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 staffed:true cash:250000",
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Every hole in this pattern must actually land before charging: each of the 4 holes gets a distinct amount/stemming below, so a partially-drilled plan would corrupt the deck-depth physics this file exists to prove.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 staffed:true cash:250000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 250000,
           "holeCount": 0
         }
       }

@@ -3,18 +3,18 @@
   "description": "Chapter 5: Presplit row plus production drill holes for zero back-break wall control",
   "steps": [
     {
-      "command": "new_game seed:42 cash:100000 staffed:true",
+      "command": "new_game seed:42 cash:300000 staffed:true",
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. #553 also shrunk this file's plan: the original 9-hole production grid + 5-hole presplit row (14 holes total, depth 10-12m) is a full shift's work for a single driller/drill_rig now that drilling takes real time -- sandbox-measured, that full pattern pushes the crew into a genuine worker_revolt (WorkerRevolt.ts: wellBeing pinned at 0 for REVOLT_TICKS=120) around tick 400, regardless of cash on hand or a nearby living_quarters, since one employee cannot both drill nonstop and rest enough. Shrunk to a 2x2 production grid (4 holes) plus a 3-hole presplit row (7 holes total) -- still proves the same pattern (a presplit row alongside production holes, charged with a different product), just at a workload one driller can actually finish. Cash bumped to $100,000 (from $50,000) for headroom through the ~245-tick wait (no income anywhere in this file).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:100000 staffed:true"
+          "command": "new_game seed:42 cash:300000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000,
+          "cash": 300000,
           "holeCount": 0
         }
       }

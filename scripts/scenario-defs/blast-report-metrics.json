@@ -3,19 +3,19 @@
   "description": "Visual verification of post-blast report: crater visibility, report metrics, rating display",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 staffed:true cash:150000",
       "timeout": 30,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 staffed:true cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 150000,
           "holeCount": 0
         }
       }

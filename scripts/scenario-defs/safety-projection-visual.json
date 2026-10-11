@@ -3,18 +3,18 @@
   "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face, buildings/vehicles in projection path, and post-blast damage assessment.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:250000 staffed:true",
+      "command": "new_game seed:42 cash:600000 staffed:true",
       "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill site to matter, and campaign start has no staffed:true equivalent anyway. staffed:true (a driller with blasting + drill_rig licence, plus an unmanned drill_rig, hired/purchased for free) is what #553's automatic drill dispatch needs to ever land an ordered hole. Cash bumped to $250,000 for headroom through the drilling wait (no income anywhere in this file) on top of the freight_warehouse/software-tier spend already here.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:250000 staffed:true"
+          "command": "new_game seed:42 cash:600000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 250000
+          "cash": 600000
         }
       }
     },
