@@ -1125,7 +1125,6 @@ export const VEHICLE_TIER_MULTIPLIERS = {
 
 /** Tier-1 (base) stats for each vehicle role. Units: $, kg, m³, grid cells/tick. */
 export const VEHICLE_BASE_STATS = {
-  charging_truck:     { workRate: 6, purchaseCost: 28_000, maintenanceCostPerTick: 4, fuelCostPerTick: 6, capacity: 500, speed: 2, maxHp: 115 },
   /** 4000 kg cargo (T2 6400, T3 10000), several fragments per trip (#1370); cost scaled from real $1–5M dump trucks; diesel ~$150/hr scaled. */
   debris_hauler:      { workRate: 10, purchaseCost: 25_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 4000, speed: 3, maxHp: 100 },
   /** ~8 m³/tick excavation; most expensive vehicle — the key production bottleneck. */
@@ -1136,6 +1135,8 @@ export const VEHICLE_BASE_STATS = {
   building_destroyer: { workRate: 12, purchaseCost: 30_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 100, speed: 2, maxHp: 130 },
   /** 9 fragments/tick output; ~90 kg/tick fragmentation throughput. */
   rock_fragmenter:    { workRate: 9,  purchaseCost: 32_000, maintenanceCostPerTick: 4, fuelCostPerTick: 7, capacity: 90,  speed: 2, maxHp: 125 },
+  /** capacity = kg of explosive carried per load; $28k sits between the hauler ($25k) and the fragmenter ($32k); slow, light chassis (115 hp). */
+  charging_truck:     { workRate: 6,  purchaseCost: 28_000, maintenanceCostPerTick: 4, fuelCostPerTick: 6, capacity: 500, speed: 2, maxHp: 115 },
 } as const;
 
 /**

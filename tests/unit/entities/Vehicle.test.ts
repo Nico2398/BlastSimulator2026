@@ -22,7 +22,7 @@ import {
   findBestEvacuationDriver,
   type EvacuationDriverReachabilityCheck,
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
-import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
+import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_ROLE_ARRIVAL_TASK, VEHICLE_SEAT_COUNT } from '../../../src/core/config/balance.js';
 import { board, alight } from '../../../src/core/engine/Mount.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
@@ -70,10 +70,8 @@ describe('VehicleRole catalogue', () => {
     expect(roles).toContain('rock_fragmenter' satisfies VehicleRole);
   });
 
-  it('getAllVehicleRoles() has six roles with charging_truck last (#1645)', () => {
-    const roles = getAllVehicleRoles();
-    expect(roles).toHaveLength(6);
-    expect(roles[roles.length - 1]).toBe('charging_truck' satisfies VehicleRole);
+  it('getAllVehicleRoles() has six roles (#1645)', () => {
+    expect(getAllVehicleRoles()).toHaveLength(6);
   });
 });
 
@@ -658,6 +656,11 @@ describe('getVehicleDefByTier — nameKey follows "vehicle.<role>.tier<N>" patte
 // ── Tier 2 stat multipliers ───────────────────────────────────────────────────
 
 describe('charging_truck tiers (#1645)', () => {
+  it('arrival task is loading and it seats one employee', () => {
+    expect(VEHICLE_ROLE_ARRIVAL_TASK.charging_truck).toBe('loading');
+    expect(VEHICLE_SEAT_COUNT.charging_truck).toBe(1);
+  });
+
   it.each([1, 2, 3] as const)('tier %i nameKey is vehicle.charging_truck.tier%i', (tier) => {
     expect(getVehicleDefByTier('charging_truck', tier).nameKey).toBe(`vehicle.charging_truck.tier${tier}`);
   });

@@ -1105,6 +1105,9 @@ def build_rock_fragmenter(m) -> None:
 
 def _neon_letters(name: str, text: str, center, height: float, m, stroke: float = 0.07, mirror: bool = False) -> list[bpy.types.Object]:
     """Block capitals T and N in glowing red in the XZ plane; `mirror` flips the N diagonal for the far face."""
+    unsupported = sorted(set(text) - {'T', 'N'})
+    if unsupported:
+        raise ValueError(f"_neon_letters only supports 'T' and 'N', got {unsupported}")
     cx, cy, cz = center
     w = height * 0.7
     gap = w * 0.4
