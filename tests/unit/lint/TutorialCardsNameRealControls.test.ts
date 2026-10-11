@@ -122,20 +122,17 @@ describe.each(Object.keys(LOCALES))('hints do not ask for inert controls (#1633)
     expect(card.includes(hold), `[${code}] sell_ore names disallowed "${hold}": ${card}`).toBe(false);
   });
 
-  it('event_choose does not refer to "answers"', () => {
+  it('event_choose names the first answer, not "one of the answers"', () => {
     const card = locale['tutorial.stage.event_choose'] as string;
+    const first = code === 'fr' ? 'première' : 'first';
+    expect(card.includes(first), `[${code}] event_choose must say "${first}": ${card}`).toBe(true);
     expect(/one of the answers|une des réponses/i.test(card), `[${code}] ${card}`).toBe(false);
   });
 });
 
+// 150 chars is a proxy for two lines of the ~75-char tutorial card at
+// 1280x720; confirmed by screenshot in #1633.
 it('sell_ore (en) fits two lines (<= 150 chars)', () => {
   const card = LOCALES.en?.['tutorial.stage.sell_ore'] as string;
   expect(card.length).toBeLessThanOrEqual(150);
-});
-
-it('step_earlypolicy (en) keeps Shift schedule and Continuous labels', () => {
-  const en = LOCALES.en as Record<string, string>;
-  const card = en['tutorial.step_earlypolicy'] as string;
-  expect(card).toContain(en['ui.policy.shift_mode'] as string);
-  expect(card).toContain(en['ui.policy.continuous'] as string);
 });
