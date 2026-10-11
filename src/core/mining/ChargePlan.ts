@@ -3,10 +3,11 @@
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
+import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { t } from '../i18n/I18n.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import {
-  MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
+  MIN_STEMMING_M, VEHICLE_TIER_MULTIPLIERS, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
   CHARGE_KG_PER_METRE, CHARGE_FIT_EPSILON,
 } from '../config/balance.js';
 
@@ -113,13 +114,14 @@ export function computeChargeHoleDurationTicks(amountKg: number): number {
  */
 export function computeChargeDurationTicks(
   baseTicks: number,
-  _tier: VehicleTier,
-  _proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
-  _needMultiplier: number = 1,
-  _lqMultiplier: number = 1,
+  tier: VehicleTier,
+  proficiencyLevel: 1 | 2 | 3 | 4 | 5 = 1,
+  needMultiplier: number = 1,
+  lqMultiplier: number = 1,
 ): number {
-  // TODO: implement
-  return baseTicks;
+  return computeTaskDuration(
+    baseTicks / VEHICLE_TIER_MULTIPLIERS[tier].workRate, proficiencyLevel, needMultiplier, lqMultiplier, 1,
+  );
 }
 
 /**

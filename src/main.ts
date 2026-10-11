@@ -65,6 +65,7 @@ import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
 import { dominantRockUnderHole } from './core/mining/ExplosiveRockFit.js';
+import { outstandingChargeBlockedReason } from './core/mining/ChargeOrder.js';
 import { wetHoles } from './core/mining/WetHoles.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
@@ -735,6 +736,7 @@ window.__gameState = () => {
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount above (#554).
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    chargeOrderBlockedReason: outstandingChargeBlockedReason(s),
     wetHoleCount: wetHoles(s).length,
     // Remaining not-yet-`done` segments across every in-flight
     // state.plannedRamps entry -- mirrors serializeGameState's own field
