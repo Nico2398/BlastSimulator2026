@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { tickCommand } from '../../../src/console/commands/tick.js';
+import { campaignCompleteCommand, campaignKeepPlayingCommand } from '../../../src/console/commands/campaign.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
@@ -44,5 +45,36 @@ describe('tick after the level ended (#1313)', () => {
     expect(typeof enMap['tick.level_ended']).toBe('string');
     expect(typeof frMap['tick.level_ended']).toBe('string');
     expect(enMap['tick.level_ended']).not.toBe(frMap['tick.level_ended']);
+  });
+});
+
+describe('tick across keep-playing conversion (#1647)', () => {
+  it('is refused after a win and accepted again after campaign keep_playing', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
+    const state = ctx.state!;
+    expect(campaignCompleteCommand(ctx, [], { level: 'dusty_hollow' }).success).toBe(true);
+    expect(state.levelEndReason).toBe('completed');
+
+    const frozen = state.tickCount;
+    const refused = tickCommand(ctx, ['5'], {});
+    expect(refused.output).toBe(t('tick.level_ended'));
+    expect(state.tickCount).toBe(frozen);
+
+    expect(campaignKeepPlayingCommand(ctx, [], {}).success).toBe(true);
+    tickCommand(ctx, ['5'], {});
+    expect(state.tickCount).toBe(frozen + 5);
+    expect(state.levelEndReason).toBeNull();
+    expect(state.levelEnded).toBe(false);
+  });
+
+  it('stays frozen after a defeat because keep_playing is refused', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
+    const state = ctx.state!;
+    state.levelEnded = true;
+    state.levelEndReason = 'bankruptcy';
+    expect(campaignKeepPlayingCommand(ctx, [], {}).success).toBe(false);
+    const before = state.tickCount;
+    expect(tickCommand(ctx, ['5'], {}).output).toBe(t('tick.level_ended'));
+    expect(state.tickCount).toBe(before);
   });
 });

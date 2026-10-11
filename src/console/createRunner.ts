@@ -57,6 +57,7 @@ import {
   campaignCompleteCommand,
   campaignStartCommand,
   campaignResetCommand,
+  campaignKeepPlayingCommand,
   recordLevelResultInProfile,
   statsCommand,
   tutorialStartCommand,
@@ -293,14 +294,15 @@ export function createRunner(): RunnerWithContext {
   );
 
   // --- Campaign commands (Phase 7) ---
-  runner.register('campaign', 'Campaign (status|start level:<id>|complete [level:<id>]|reset)', (args, named): CommandResult => {
+  runner.register('campaign', 'Campaign (status|start level:<id>|complete [level:<id>]|reset|keep_playing)', (args, named): CommandResult => {
     const sub = args[0] ?? named['sub'] ?? 'status';
     const rest = args.slice(1);
     if (sub === 'status') return campaignStatusCommand(ctx, rest, named);
     if (sub === 'start') return campaignStartCommand(ctx, rest, named);
     if (sub === 'complete') return campaignCompleteCommand(ctx, rest, named);
     if (sub === 'reset') return campaignResetCommand(ctx, rest, named);
-    return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete | reset` };
+    if (sub === 'keep_playing') return campaignKeepPlayingCommand(ctx, rest, named);
+    return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete | reset | keep_playing` };
   });
   runner.register('sandbox', 'Sandbox mode (start biome:<id> seed:<n|random> size:<n> ...)', (args, named) =>
     sandboxCommand(ctx, args, named),
