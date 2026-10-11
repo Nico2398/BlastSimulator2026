@@ -11,6 +11,8 @@
                    a spiked wrecking ball on a crane, a green laser turret and corporate flags.
 * rock_fragmenter — The Atomizer: sci-fi crusher with a glowing reactor dome, particle-accelerator
                    ring flywheel, funnel hopper, warning lights and twin conveyors.
+* charging_truck — Kaboom Cruiser Deluxe: gold-banded chrome tanker, neon TNT sign on posts, glowing
+                   under-glow, a swan-neck boom and a three-tier champagne fountain on the cab roof.
 
 Same conventions as vehicles.py: +X forward, +Y left, ground at z = 0, `TintBody` is
 the per-instance paint, emissive materials stay on their own meshes.
@@ -26,9 +28,9 @@ from mathutils import Vector
 from common import (
     apply_transform, array, assign, bevel, box, cylinder, icosphere, material, pivot, prism, rotate, sphere, torus,
 )
-from vehicles import _materials, cab, fender, headlights, hydraulic, rock_pile, track
+from vehicles import _materials, cab, fender, headlights, hydraulic, pole, rock_pile, track
 
-ROLES = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter']
+ROLES = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck']
 
 
 def _materials_t3(body_color: int = 0x1E1E24) -> dict[str, bpy.types.Material]:
@@ -1101,12 +1103,121 @@ def build_rock_fragmenter(m) -> None:
     pivot('Conveyor', cp, parts)
 
 
+def _neon_letters(name: str, text: str, center, height: float, m, stroke: float = 0.07) -> list[bpy.types.Object]:
+    """Block capitals T and N in glowing red, standing in the XZ plane (readable from the side)."""
+    cx, cy, cz = center
+    w = height * 0.7
+    gap = w * 0.4
+    x0 = cx - (len(text) * w + (len(text) - 1) * gap) / 2 + w / 2
+    out = []
+    for i, ch in enumerate(text):
+        x = x0 + i * (w + gap)
+        if ch == 'T':
+            strokes = [((w, stroke, stroke), (x, cy, cz + height / 2 - stroke / 2), 0),
+                       ((stroke, stroke, height), (x, cy, cz), 0)]
+        else:  # 'N'
+            diag = math.degrees(math.atan2(w, height))
+            strokes = [((stroke, stroke, height), (x - w / 2 + stroke / 2, cy, cz), 0),
+                       ((stroke, stroke, height), (x + w / 2 - stroke / 2, cy, cz), 0),
+                       ((stroke, stroke, math.hypot(w, height)), (x, cy, cz), -diag)]
+        for size, loc, ang in strokes:
+            bar = box(f'{name}.{ch}', size, loc=loc)
+            rotate(bar, y=ang)
+            assign(bar, m['glow_red'])
+            out.append(bar)
+    return out
+
+
+def build_charging_truck(m) -> None:
+    """Kaboom Cruiser Deluxe: a gold-banded chrome tanker with a glowing TNT sign on a gantry, neon
+    under-glow, a chrome swan-neck boom, and — nothing to do with the job — a three-tier gold
+    champagne fountain bubbling on the cab roof."""
+    body = []
+    chassis = box('Chassis', (3.9, 1.4, 0.3), loc=(0, 0, 0.78))
+    bevel(chassis, 0.05, 3)
+    assign(chassis, m['dark'])
+    body.append(chassis)
+    glow = box('Underglow', (3.5, 1.55, 0.05), loc=(0, 0, 0.6))
+    assign(glow, m['glow_neon'])
+    body.append(glow)
+    hood = box('Hood', (1.1, 1.8, 0.85), loc=(1.35, 0, 1.38))
+    bevel(hood, 0.13, 4)
+    assign(hood, m['body'])
+    body.append(hood)
+    for side in (-1, 1):
+        body.append(_gold_line('Hood.Trim', (0.95, 0.035, 0.07), (1.35, side * 0.9, 1.45), m))
+    grille = box('Grille', (0.1, 1.3, 0.6), loc=(1.93, 0, 1.35))
+    bevel(grille, 0.035, 3)
+    assign(grille, m['chrome'])
+    body.append(grille)
+    body.append(_gold_line('Grille.Bar', (0.12, 1.3, 0.06), (1.95, 0, 1.35), m))
+    bumper = box('Bumper', (0.22, 2.0, 0.3), loc=(1.95, 0, 0.9))
+    bevel(bumper, 0.09, 3)
+    assign(bumper, m['chrome'])
+    body.append(bumper)
+    body += headlights('Head', 1.95, (-0.7, 0.7), 1.1, m, radius=0.13)
+    body += cab('Cab', (0.85, 1.4, 0.9), (1.0, 0, 2.2), m)
+    body += _stack('Stack', (0.45, 0.78, 1.8), 1.2, 0.07, m)
+    # Chrome tank, gold bands, gold end caps.
+    tank = capsule('Tank', 0.72, 1.0, loc=(-0.6, 0, 1.75), axis='X', segments=32, rings=16)
+    assign(tank, m['chrome'])
+    body.append(tank)
+    for x in (-1.05, -0.6, -0.15):
+        band = cylinder('Tank.Band', 0.74, 0.1, loc=(x, 0, 1.75), axis='X', segments=32)
+        assign(band, m['gold'])
+        body.append(band)
+    for x in (-1.3, -0.3):
+        saddle = box('Tank.Saddle', (0.22, 1.2, 0.3), loc=(x, 0, 1.05))
+        bevel(saddle, 0.04, 2)
+        assign(saddle, m['dark'])
+        body.append(saddle)
+    # Neon TNT sign on two gold posts above the tank.
+    for y in (-0.5, 0.5):
+        post = cylinder('Sign.Post', 0.05, 0.6, loc=(-0.6, y, 2.7), segments=10)
+        assign(post, m['gold'])
+        body.append(post)
+    backing = box('Sign.Back', (1.9, 0.06, 0.78), loc=(-0.6, 0, 3.25))
+    bevel(backing, 0.03, 2)
+    assign(backing, m['black'])
+    body.append(backing)
+    for side in (-1, 1):
+        body += _neon_letters('Sign', 'TNT', (-0.6, side * 0.05, 3.25), 0.5, m)
+    # Chrome swan-neck boom off the tail, gold hose and nozzle.
+    post = cylinder('Boom.Post', 0.08, 0.7, loc=(-1.9, 0, 1.3), segments=12)
+    assign(post, m['chrome'])
+    body.append(post)
+    elbow = Vector((-1.9, 0, 1.7))
+    tip = Vector((-2.55, -0.5, 1.5))
+    body.append(pole('Boom.Arm', elbow, tip, 0.07, m['chrome']))
+    body.append(pole('Boom.Hose', tip, Vector((-2.65, -0.6, 0.5)), 0.06, m['gold']))
+    nozzle = cylinder('Boom.Nozzle', 0.09, 0.22, loc=(-2.65, -0.6, 0.42), segments=12, radius2=0.05)
+    assign(nozzle, m['glow_warn'])
+    body.append(nozzle)
+    # The absurd add-on: a champagne fountain bubbling on the cab roof.
+    fx, fz, fy = 1.0, 2.65, 0.0
+    for i, r in enumerate((0.34, 0.24, 0.15)):
+        bowl = cylinder(f'Fountain.Tier{i}', r, 0.09, loc=(fx, fy, fz + 0.15 + i * 0.3), segments=16)
+        bevel(bowl, 0.02, 2, angle=60)
+        assign(bowl, m['gold'])
+        body.append(bowl)
+        stem = cylinder(f'Fountain.Stem{i}', 0.04, 0.22, loc=(fx, fy, fz + 0.04 + i * 0.3), segments=10)
+        assign(stem, m['gold'])
+        body.append(stem)
+    spray = cylinder('Fountain.Spray', 0.1, 0.35, loc=(fx, fy, fz + 0.95), segments=10, radius2=0.01)
+    assign(spray, m['glow_cyan'])
+    body.append(spray)
+    pivot('Body', (0, 0, 0), body)
+    for name, x, y in (('WheelFL', 1.2, 0.85), ('WheelFR', 1.2, -0.85), ('WheelRL', -1.2, 0.85), ('WheelRR', -1.2, -0.85)):
+        _wheel_t3(name, 0.48, 0.42, (x, y, 0.48), m)
+
+
 BODY_COLORS = {
     'debris_hauler': 0x1E1E24,
     'rock_digger': 0x141416,
     'drill_rig': 0xB01818,
     'building_destroyer': 0x2A2A30,
     'rock_fragmenter': 0xEEF0F4,
+    'charging_truck': 0xE8B923,
 }
 
 BUILDERS = {
@@ -1115,6 +1226,7 @@ BUILDERS = {
     'drill_rig': build_drill_rig,
     'building_destroyer': build_building_destroyer,
     'rock_fragmenter': build_rock_fragmenter,
+    'charging_truck': build_charging_truck,
 }
 
 

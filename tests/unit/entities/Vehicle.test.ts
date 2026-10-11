@@ -41,6 +41,7 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 describe('VehicleRole catalogue', () => {
   it('getAllVehicleRoles() returns all 6 defined roles', () => {
     const roles = getAllVehicleRoles();
+    expect(roles).toContain('charging_truck');
     expect(roles).toHaveLength(6);
   });
 

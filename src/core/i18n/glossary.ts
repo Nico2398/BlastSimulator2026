@@ -175,7 +175,7 @@ export const ORPHAN_KEYS: readonly OrphanKeyEntry[] = [
   {
     keys: ['vehicle.excavator.name', 'vehicle.bulldozer.name', 'vehicle.truck.name', 'vehicle.drill_rig.name'],
     reason:
-      "Legacy per-vehicle name keys. The live vehicle catalog (src/core/entities/Vehicle.ts) only ever builds nameKeys of the form `vehicle.${role}.tier${n}` for the 5 VehicleRole values (building_destroyer, debris_hauler, drill_rig, rock_digger, rock_fragmenter) and reads type labels via `vehicle_type.${role}`; none of these four `.name` keys is referenced anywhere in src/. vehicle.excavator.name's fr value 'Pelleteuse' collides with the live vehicle_type.rock_digger fr value, also 'Pelleteuse' — the same French word naming two different vehicle roles.",
+      "Legacy per-vehicle name keys. The live vehicle catalog (src/core/entities/Vehicle.ts) only ever builds nameKeys of the form `vehicle.${role}.tier${n}` for the 6 VehicleRole values (building_destroyer, charging_truck, debris_hauler, drill_rig, rock_digger, rock_fragmenter) and reads type labels via `vehicle_type.${role}`; none of these four `.name` keys is referenced anywhere in src/. vehicle.excavator.name's fr value 'Pelleteuse' collides with the live vehicle_type.rock_digger fr value, also 'Pelleteuse' — the same French word naming two different vehicle roles.",
   },
   {
     keys: [

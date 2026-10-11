@@ -149,7 +149,7 @@ Legend — where the feature is reachable today:
 | Feature | Today | Notes |
 |---|---|---|
 | Fleet list, status, HP | [UI] | task string is raw (`idle/moving/hauling…`) |
-| Buy 5 roles × 3 tiers | [UI] | stats (speed/capacity/workRate/maintenance) in defs, not shown |
+| Buy 6 roles × 3 tiers | [UI] | stats (speed/capacity/workRate/maintenance) in defs, not shown |
 | Assign driver (licence-filtered) | [UI] | boarding is walk-then-board (arrival-gated); walking state invisible |
 | Unassign driver | nothing | [missing] |
 | Haul best reachable fragment | [UI] contextual button | manual fragment choice [missing]; phase (to fragment/to depot) invisible |
