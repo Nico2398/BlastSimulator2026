@@ -48,7 +48,7 @@
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-level-end-screen [data-action=\"retry\"]" },
         { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
-        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+        { "type": "awaitTutorialStep", "stepId": "hire-surveyor" }
       ],
       "expect": { "tutorialStep": "hire-surveyor", "blocked": "#bs-level-end-screen [data-action=\"retry\"]" }
     }
