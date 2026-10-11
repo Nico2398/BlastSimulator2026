@@ -28,6 +28,7 @@ import { TerrainMesh } from '../../../../src/renderer/TerrainMesh.js';
 import { buildChunkMesh, uniformNeighbourSteps, type PlayableCut, type NeighbourSteps } from '../../../../src/renderer/terrain/LandscapeMesh.js';
 import { playableCut } from '../../../../src/renderer/GameRendererTerrain.js';
 import { measureSeam } from '../../../helpers/landscapeSeam.js';
+import { heightField, makeLadderChunk } from '../../../helpers/ladderField.js';
 
 const SITE = 32;
 
@@ -35,18 +36,6 @@ const SITE = 32;
  *  Float32 vertex attributes are only good to ~0.02 degrees, and a step this
  *  small is ~0.0005 of a lambert term — invisible. A crease is degrees. */
 const NORMAL_AGREEMENT_DEG = 0.05;
-
-/**
- * Ridged and curved at 3-6 m wavelengths — shorter than a 4m coarse step, so
- * no chord through it is exact and any node that takes one is measurably off.
- */
-function heightField(x: number, z: number): number {
-  return 11
-    + 1.8 * Math.sin(x * 0.9)
-    + 1.4 * Math.cos(z * 1.1)
-    + 0.7 * Math.sin((x + z) * 1.7)
-    + 0.06 * x - 0.04 * z;
-}
 
 /** A site generated from `heightField` exactly the way TerrainGen fills a real one. */
 function buildGrid(): VoxelGrid {
@@ -207,17 +196,6 @@ describe('Playable/landscape seam — one continuous ground (#907, pinned to lev
 
 describe('buildChunkMesh — ladder rung joins meet exactly when neighbourSteps reflect the neighbour (#1153)', () => {
   const NO_CLAIM: PlayableCut = { rect: { minX: 0, minZ: 0, maxX: 0, maxZ: 0 }, ownsColumn: () => false };
-
-  function makeLadderChunk(id: LandscapeChunkId, originX: number, originZ: number, step: number, compId: number): LandscapeChunk {
-    const n = NODES_PER_CHUNK;
-    const heights = new Float32Array(n * n);
-    const biomeIds = new Uint8Array(n * n);
-    const surfCompIds = new Uint16Array(n * n).fill(compId);
-    for (let row = 0; row < n; row++) {
-      for (let col = 0; col < n; col++) heights[row * n + col] = heightField(originX + col * step, originZ + row * step);
-    }
-    return { id, step, originX, originZ, heights, biomeIds, surfCompIds };
-  }
 
   function sampleColumnFor(compId: number) {
     return (x: number, z: number) => ({ height: heightField(x, z), biomeId: 0, surfCompId: compId });
