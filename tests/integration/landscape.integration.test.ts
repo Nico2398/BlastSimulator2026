@@ -193,7 +193,10 @@ describe('Landscape/playable seam on a real level (#907)', () => {
     for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
     expect(state.drillHoles.length, 'no hole was ever drilled').toBeGreaterThan(0);
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < 2000 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
+    // Wait for every hole to finish loading, not just for the order queue to
+    // empty: a claimed charge leaves the queue while it is still being loaded.
+    const unloaded = (): boolean => state.drillHoles.some(h => state.chargesByHole[h.id] === undefined);
+    for (let i = 0; i < 2000 && (Object.keys(state.plannedChargesByHole).length > 0 || unloaded()); i++) run('tick 1');
     expect(run('blast').success).toBe(true);
 
     assertSeamClosed(engine, 'after a blast at the site edge');

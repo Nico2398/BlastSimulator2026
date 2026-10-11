@@ -349,9 +349,9 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
     expect(getLevel('dusty_hollow')!.startingSite).toBe(DUSTY_HOLLOW_STARTING_SITE);
   });
 
-  it('the starting site is a driller, a blaster, a driver, a drill rig, a debris hauler, a T1 freight warehouse and a T1 spoil heap', () => {
+  it('the starting site is a driller, a blaster, a driver, a drill rig, a debris hauler, a charging truck, a T1 freight warehouse and a T1 spoil heap', () => {
     expect(DUSTY_HOLLOW_STARTING_SITE.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
-    expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.map(v => v.role).sort()).toEqual(['debris_hauler', 'drill_rig']);
+    expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.map(v => v.role).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig']);
     expect(DUSTY_HOLLOW_STARTING_SITE.buildings).toEqual([
       { type: 'freight_warehouse', tier: 1 },
       { type: 'spoil_heap', tier: 1 },
@@ -381,12 +381,13 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
 
   // The multiplier is a tuning lever: it must be raised above the old 1.2
   // placeholder (the level could not be won at 1.2) yet stay far below the
-  // tutorial's 52x, so Level 1 stays a real market. The upper bound of 10 is a
+  // tutorial's 52x, so Level 1 stays a real market. The upper bound of 12 (10 until
+  // #1648's re-bisect, see the constant's doc comment) is a
   // deliberate sanity cap, not a target: a win bought with a runaway multiplier
   // proves nothing about the economy.
-  it('DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER sits in the sensible mid-window (1.2, 10]', () => {
+  it('DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER sits in the sensible mid-window (1.2, 12]', () => {
     expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeGreaterThan(1.2);
-    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThanOrEqual(10);
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThanOrEqual(12);
     expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThan(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
   });
 

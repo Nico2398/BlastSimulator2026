@@ -274,6 +274,21 @@ export const SPAWN_TILE_SPACING = 3;
 export const CREW_SPAWN_VEHICLE_SEPARATION = 3;
 
 /**
+ * Cell-count headroom for the crew-relocation search: the search visits this
+ * many times the cells the spaced vehicle picks alone would need
+ * (agents x SEPARATION^2), leaving room for employees to fill in around them.
+ */
+export const CREW_SPAWN_SEARCH_LIMIT_FACTOR = 2;
+
+/**
+ * Fewest legal-step neighbours (of 8, at vehicle clearance) a starting
+ * vehicle's cell may have (#1648). A cell with only one or two is a thin
+ * ridge or trench that one building corner can seal, leaving the vehicle
+ * unable to drive out — every order needing its role then reads out of reach.
+ */
+export const CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS = 3;
+
+/**
  * Cells between any two agents — employee or vehicle — when
  * `placeStartingCrew` fills employee cells in around the already-spaced
  * vehicle picks (#1263). Below this, `climbConnectedCells`' own nearest-first
@@ -1270,12 +1285,14 @@ export const TRANSPORT_ALIGHT_FINISH_WALK_CELLS = 1;
 
 // ─── Starting Site (staffed new_game / sandbox) ────────────────────────────────
 
+export interface StartingSiteQualification {
+  readonly category: SkillCategory;
+  readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
+}
+
 export interface StartingSiteEmployeeSlot {
   readonly role: EmployeeRole;
-  readonly qualifications: ReadonlyArray<{
-    readonly category: SkillCategory;
-    readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
-  }>;
+  readonly qualifications: readonly StartingSiteQualification[];
 }
 
 export interface StartingSiteVehicleSlot {
@@ -1288,7 +1305,11 @@ export interface StartingBuildingSlot {
   readonly tier: BuildingTier;
 }
 
-/** Driller, blaster and truck driver: the crew every starting site opens with. */
+/**
+ * Driller, blaster and truck driver: the crew every starting site opens with.
+ * The blaster also holds the charging truck's licence (`driving.truck`), so
+ * someone can both charge and drive the tier-1 charging truck (#1648).
+ */
 const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
   { role: 'driller', qualifications: [
     { category: 'blasting', proficiencyLevel: 1 },
@@ -1296,16 +1317,22 @@ const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
   ] },
   { role: 'blaster', qualifications: [
     { category: 'blasting', proficiencyLevel: 1 },
+    { category: 'driving.truck', proficiencyLevel: 1 },
   ] },
   { role: 'driver', qualifications: [
     { category: 'driving.truck', proficiencyLevel: 1 },
   ] },
 ];
 
-/** Drill rig and debris hauler: the fleet every starting site opens with. */
-const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+/** Drill rig, debris hauler and charging truck: the fleet every blasting opening carries (#1648). */
+const BASE_STARTING_VEHICLES_BEFORE_CHARGING: readonly StartingSiteVehicleSlot[] = [
   { role: 'drill_rig', tier: 1 },
   { role: 'debris_hauler', tier: 1 },
+];
+const STARTING_CHARGING_TRUCK: StartingSiteVehicleSlot = { role: 'charging_truck', tier: 1 };
+const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+  ...BASE_STARTING_VEHICLES_BEFORE_CHARGING,
+  STARTING_CHARGING_TRUCK,
 ];
 
 /** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
@@ -1337,10 +1364,14 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
       { category: 'driving.rock_fragmenter', proficiencyLevel: 1 },
     ] },
   ],
+  // The charging truck sits in the last spawn slot: the authored row is what
+  // the older fleet's positions (and every seed-pinned playthrough on them)
+  // were tuned against, so a newcomer extends the row rather than shifting it.
   vehicles: [
-    ...BASE_STARTING_VEHICLES,
+    ...BASE_STARTING_VEHICLES_BEFORE_CHARGING,
     { role: 'rock_digger', tier: 1 },
     { role: 'rock_fragmenter', tier: 1 },
+    STARTING_CHARGING_TRUCK,
   ],
 } as const;
 
@@ -1394,8 +1425,16 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
  * tier-1 warehouse and delays sales. 9.5 then ends the seed-1138 2x2 style in
  * a revolt (tick 435, $49k profit); 9.75 wins with a thin margin ($83k),
  * 10 wins both styles by ~$7k/$55k (tick 281/301).
+ *
+ * Re-bisected to 12 for the opening charging truck and the blaster's truck
+ * licence (#1648): the licence lifts the blaster's salary and the truck adds
+ * upkeep, so payroll-plus-upkeep rises and the seed-1138 2x3-east style ended
+ * in a revolt (tick 410, $46k profit) at 10, 10.5 and 11. Same styles and
+ * play: 11.5 wins with a $1k margin on the 2x3 (tick 341, $81k), 11.75
+ * $4k, 12 wins both by ~$8k/$75k (tick 341/301, $88k/$155k), 12.5 trims the
+ * 2x2 to ~$5k (tick 281). 12 keeps the thinnest margin at about the old ~$7k.
  */
-export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 10;
+export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 12;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
@@ -1899,11 +1938,14 @@ export interface ScriptedCandidate {
   name: string;
   unionized: boolean;
   skillBonus: 0 | 1;
+  /** Extra qualifications granted on top of the role defaults (#1648). */
+  extraQualifications?: readonly StartingSiteQualification[];
 }
 
 /** Tutorial hiring pool: one fixed candidate per hiring role, ids 1..5 (#1600). */
 export const TUTORIAL_HIRING_SCRIPT: readonly ScriptedCandidate[] = [
-  { id: 1, role: 'driller', name: 'Dale Drillson', unionized: false, skillBonus: 0 },
+  { id: 1, role: 'driller', name: 'Dale Drillson', unionized: false, skillBonus: 0,
+    extraQualifications: [{ category: 'driving.truck', proficiencyLevel: 1 }] },
   { id: 2, role: 'blaster', name: 'Bea Boomer', unionized: false, skillBonus: 0 },
   { id: 3, role: 'driver', name: 'Dex Hauler', unionized: false, skillBonus: 0 },
   { id: 4, role: 'surveyor', name: 'Sue Seismic', unionized: false, skillBonus: 0 },

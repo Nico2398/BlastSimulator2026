@@ -27,7 +27,18 @@ describe('campaign start level:dusty_hollow (default) opens staffed (#1363)', ()
 
   it('has a drill rig and a debris hauler', () => {
     const { state } = startLevel('dusty_hollow');
-    expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['debris_hauler', 'drill_rig']);
+    expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig']);
+  });
+
+  it('has a tier-1 charging truck and an employee holding both blasting and driving.truck (#1648)', () => {
+    const { state } = startLevel('dusty_hollow');
+    const trucks = state.vehicles.vehicles.filter((v) => v.type === 'charging_truck');
+    expect(trucks).toHaveLength(1);
+    expect(trucks[0]!.tier).toBe(1);
+    expect(state.employees.employees.some((e) => {
+      const cats = e.qualifications.map((q) => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    })).toBe(true);
   });
 
   it('has one active freight warehouse with its tier-1 storage capacity', () => {
@@ -83,6 +94,21 @@ describe('campaign start level:dusty_hollow staffed flag (#1363)', () => {
     expect(state.employees.employees).toHaveLength(STARTING_SITE_STAFFED_COMPOSITION.employees.length);
     expect(state.vehicles.vehicles).toHaveLength(STARTING_SITE_STAFFED_COMPOSITION.vehicles.length);
     expect(state.buildings.buildings).toHaveLength(0);
+  });
+
+  it('staffed:true also has a charging truck and a blasting + driving.truck employee (#1648)', () => {
+    const { state } = startLevel('dusty_hollow', 'staffed:true');
+    expect(state.vehicles.vehicles.filter((v) => v.type === 'charging_truck' && v.tier === 1)).toHaveLength(1);
+    expect(state.employees.employees.some((e) => {
+      const cats = e.qualifications.map((q) => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    })).toBe(true);
+  });
+
+  it('staffed:false has neither crew nor a charging truck (#1648)', () => {
+    const { state } = startLevel('dusty_hollow', 'staffed:false');
+    expect(state.vehicles.vehicles.some((v) => v.type === 'charging_truck')).toBe(false);
+    expect(state.employees.employees).toHaveLength(0);
   });
 });
 

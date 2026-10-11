@@ -78,7 +78,7 @@ describe('campaign start level:dusty_hollow opens with warehouse and heap (#1574
   it('keeps the #1363 crew and fleet', () => {
     const { state } = startLevel('dusty_hollow');
     expect(state.employees.employees.map((e) => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
-    expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['debris_hauler', 'drill_rig']);
+    expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig']);
   });
 
   it('start message still says Staffed', () => {

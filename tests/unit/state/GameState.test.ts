@@ -554,17 +554,18 @@ describe('buildGameNavGrid (task 6.10)', () => {
 // spawn-placement convention.
 
 describe('createGame — applyStaffedComposition vehicle spawn placement (issue #591)', () => {
-  it('spaces the 4 staffed vehicles 3 cells apart on one row instead of stacking every 2 cells', () => {
+  it('spaces the 5 staffed vehicles 3 cells apart on one row instead of stacking every 2 cells', () => {
     const state = createGame({ seed: 42, staffed: true });
 
     const positions = state.vehicles.vehicles.map(v => [v.x, v.z]);
-    // Order matches STARTING_SITE_STAFFED_COMPOSITION.vehicles: drill_rig,
-    // debris_hauler, rock_digger, rock_fragmenter.
+    // Order matches STARTING_SITE_STAFFED_COMPOSITION.vehicles (5 vehicles
+    // since the #1648 charging_truck).
     expect(positions).toEqual([
       [0, 2],
       [3, 2],
       [6, 2],
       [9, 2],
+      [12, 2],
     ]);
   });
 
@@ -643,9 +644,9 @@ describe('snapAgentsToNavigableGround', () => {
 
   it('leaves every agent on ordinary flat terrain exactly where it spawned', () => {
     const state = createGame({ seed: 42, staffed: true });
-    const flat = new VoxelGrid(12, 12);
-    for (let z = 0; z < 12; z++) {
-      for (let x = 0; x < 12; x++) {
+    const flat = new VoxelGrid(16, 16);
+    for (let z = 0; z < 16; z++) {
+      for (let x = 0; x < 16; x++) {
         for (let y = 0; y <= 1; y++) flat.setVoxel(x, y, z, solidVoxel());
       }
     }

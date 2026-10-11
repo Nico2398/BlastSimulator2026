@@ -1181,11 +1181,11 @@
       "description": "#553: this file's 24-hole pattern 1 is bigger than any single driller can land inside a reasonable tick budget (sandbox-measured: a lone driller does not finish it) -- a 2nd concurrent driller/drill_rig pair is added, matching level2-playthrough-win.json's and level3-playthrough-ecology.json's own crew-sizing judgment call for comparable hole totals. Frank Dusty (employee #8, the first of this file's own 3 hand-hired drillers) gets the drill_rig licence hiring alone doesn't grant -- the player-facing path is `employee train`."
     },
     {
-      "command": "vehicle driver 7 8",
+      "command": "vehicle driver 8 8",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 7 8"
+          "command": "vehicle driver 8 8"
         }
       ],
       "role": "bootstrap",
@@ -1722,7 +1722,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 756162,
+          "cash": 752118,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1911,7 +1911,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1936,7 +1936,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1958,7 +1958,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1980,7 +1980,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2006,7 +2006,7 @@
           "tickCount": 6
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2032,7 +2032,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2055,7 +2055,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2146,7 +2146,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2168,7 +2168,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2194,7 +2194,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2216,7 +2216,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2259,7 +2259,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,

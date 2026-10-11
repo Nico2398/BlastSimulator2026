@@ -1134,7 +1134,7 @@
           "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
-          "vehicleCount": 1,
+          "vehicleCount": 2,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1163,7 +1163,7 @@
           "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
-          "vehicleCount": 1,
+          "vehicleCount": 2,
           "levelEnded": false,
           "levelEndReason": null
         },

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
-import { placeStartingCrew, isVehicleRouteAcceptable } from '../../../src/core/state/SpawnPlacement.js';
+import { placeStartingCrew, isVehicleRouteAcceptable, relocateVehiclesOffNarrowGround } from '../../../src/core/state/SpawnPlacement.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
-import { CREW_SPAWN_VEHICLE_SEPARATION, CREW_SPAWN_AGENT_SEPARATION } from '../../../src/core/config/balance.js';
+import { CREW_SPAWN_VEHICLE_SEPARATION, CREW_SPAWN_AGENT_SEPARATION, CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 import { isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { countLegalStepNeighbours, computeClimbComponents } from '../../../src/core/nav/NavGridReachability.js';
 
 function solidVoxel(): VoxelData {
   return {
@@ -108,11 +109,10 @@ function debrisHaulerRidgeSite(size = 32): ReturnType<typeof createGame> {
   buildGameNavGrid(state, makeAxisRidgeGrid(size, 10, size - 1, 'z'), [], []);
 
   const [driller, blaster, truckDriver, excavator1, excavator2] = state.employees.employees;
-  const [drillRig, debrisHauler, rockDigger, rockFragmenter] = state.vehicles.vehicles;
+  const [drillRig, debrisHauler, chargingTruck, rockDigger, rockFragmenter] = state.vehicles.vehicles;
 
   // South of the ridge (z > 10), clustered near the grid centre.
   driller!.x = 10; driller!.z = 16;
-  blaster!.x = 11; blaster!.z = 16;
   excavator1!.x = 12; excavator1!.z = 16;
   excavator2!.x = 13; excavator2!.z = 16;
   drillRig!.x = 10; drillRig!.z = 18;
@@ -124,6 +124,10 @@ function debrisHaulerRidgeSite(size = 32): ReturnType<typeof createGame> {
   // straight-line distance 10 from the hauler but with no legal route short
   // of looping all the way round to the gap at x=31.
   truckDriver!.x = 16; truckDriver!.z = 5;
+  // The blaster holds driving.truck since #1648, so it must be stranded north
+  // of the ridge too or it would be a second, reachable licensed driver.
+  blaster!.x = 19; blaster!.z = 5;
+  chargingTruck!.x = 13; chargingTruck!.z = 5;
 
   return state;
 }
@@ -138,7 +142,7 @@ function drillRigRidgeSite(size = 32): ReturnType<typeof createGame> {
   buildGameNavGrid(state, makeAxisRidgeGrid(size, 10, size - 1, 'x'), [], []);
 
   const [driller, blaster, truckDriver, excavator1, excavator2] = state.employees.employees;
-  const [drillRig, debrisHauler, rockDigger, rockFragmenter] = state.vehicles.vehicles;
+  const [drillRig, debrisHauler, chargingTruck, rockDigger, rockFragmenter] = state.vehicles.vehicles;
 
   // East of the ridge (x > 10), clustered near the grid centre.
   blaster!.x = 16; blaster!.z = 11;
@@ -149,6 +153,7 @@ function drillRigRidgeSite(size = 32): ReturnType<typeof createGame> {
   debrisHauler!.x = 18; debrisHauler!.z = 11;
   rockDigger!.x = 18; rockDigger!.z = 13;
   rockFragmenter!.x = 18; rockFragmenter!.z = 14;
+  chargingTruck!.x = 18; chargingTruck!.z = 12;
 
   // West of the ridge — the drill_rig's only licensed driller, straight-line
   // distance 2 from the rig but with no legal route short of looping round
@@ -362,5 +367,98 @@ describe('placeStartingCrew — vehicle reachability (#1179)', () => {
     expect(result).toBe(false);
     expect(debrisHauler.x).toBe(before.x);
     expect(debrisHauler.z).toBe(before.z);
+  });
+});
+
+// ── vehicles off thin ridges and trenches (#1648) ──
+
+/** Flat site with a one-cell-wide trench (z=5, x<10) between two walls too steep to climb. */
+function makeTrenchGrid(size: number): VoxelGrid {
+  const grid = new VoxelGrid(size, size);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const isWall = (z === 4 || z === 6) && x < 10;
+      const top = isWall ? 12 : 1;
+      for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
+/** A trench (z=5, x<10) sealed on every side by walls too steep to climb: a cut-off pocket. */
+function makeSealedTrenchGrid(size: number): VoxelGrid {
+  const grid = new VoxelGrid(size, size);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const isWall = ((z === 4 || z === 6) && x <= 10) || (z === 5 && x === 10);
+      const top = isWall ? 12 : 1;
+      for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
+describe('relocateVehiclesOffNarrowGround (#1648)', () => {
+  it('leaves a vehicle on open ground exactly where it stands', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    buildGameNavGrid(state, makeFlatGrid(32), [], []);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 16; hauler.z = 16;
+
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
+    expect([hauler.x, hauler.z]).toEqual([16, 16]);
+  });
+
+  it('moves a vehicle standing in a one-cell trench onto roomier ground', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    buildGameNavGrid(state, makeTrenchGrid(32), [], []);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 4; hauler.z = 5;
+    const navGrid = state.navGrid!;
+    expect(countLegalStepNeighbours(navGrid, 4, 5, NAV_CLEARANCE_VEHICLE_CELLS)).toBeLessThan(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(true);
+    expect([hauler.x, hauler.z]).not.toEqual([4, 5]);
+    expect(countLegalStepNeighbours(navGrid, hauler.x, hauler.z, NAV_CLEARANCE_VEHICLE_CELLS)).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+    // The new cell is on the origin's own climb component: the vehicle can still reach where it started.
+    const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+    expect(components.canReach(4, 5, hauler.x, hauler.z)).toBe(true);
+  });
+
+  it('leaves a vehicle sealed in a pocket where the only roomier cells lie outside its climb component', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    buildGameNavGrid(state, makeSealedTrenchGrid(32), [], []);
+    const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 4; hauler.z = 5;
+    state.vehicles.vehicles.filter(v => v !== hauler).forEach((v, i) => { v.x = 20 + i * CREW_SPAWN_VEHICLE_SEPARATION; v.z = 20; });
+    state.employees.employees.forEach((e, i) => { e.x = 20 + i * CREW_SPAWN_AGENT_SEPARATION; e.z = 26; });
+    const navGrid = state.navGrid!;
+    expect(countLegalStepNeighbours(navGrid, 4, 5, NAV_CLEARANCE_VEHICLE_CELLS)).toBeLessThan(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+    expect(countLegalStepNeighbours(navGrid, 4, 2, NAV_CLEARANCE_VEHICLE_CELLS)).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
+    expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS).canReach(4, 5, 4, 2)).toBe(false);
+
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
+    expect([hauler.x, hauler.z]).toEqual([4, 5]);
+  });
+
+  it('keeps the vehicle separation from every other vehicle when it moves one', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    buildGameNavGrid(state, makeTrenchGrid(32), [], []);
+    const vehicles = state.vehicles.vehicles;
+    const hauler = vehicles.find(v => v.type === 'debris_hauler')!;
+    hauler.x = 4; hauler.z = 5;
+    vehicles.filter(v => v !== hauler).forEach((v, i) => { v.x = 14 + i * CREW_SPAWN_VEHICLE_SEPARATION; v.z = 16; });
+
+    relocateVehiclesOffNarrowGround(state);
+
+    for (const other of vehicles.filter(v => v !== hauler)) {
+      expect(Math.max(Math.abs(other.x - hauler.x), Math.abs(other.z - hauler.z))).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_SEPARATION);
+    }
+  });
+
+  it('is a no-op without a nav grid', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    state.navGrid = null;
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
   });
 });

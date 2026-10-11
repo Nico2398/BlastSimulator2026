@@ -490,7 +490,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1632: +5 keys (waiting.training, blast_report_close, overlay_toggle, policy_apply, policy_fatigue_range), -1 (stage.blast_confirm), net +4: 3965.
     // #1645: +5 keys (charging_truck tier1..3, desc, vehicle_type), both locales.
     // #1647: +3 keys (ui.level_end.keep_playing, campaign.keep_playing_success, campaign.keep_playing_refused): 3973.
-    expect(Object.keys(en).length).toBe(3973);
+    // #1648: +3 keys (tutorial buy-charging-truck step): 3976.
+    expect(Object.keys(en).length).toBe(3976);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

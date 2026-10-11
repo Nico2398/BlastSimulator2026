@@ -256,7 +256,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 4
+          "vehicleCount": 5
         }
       }
     },

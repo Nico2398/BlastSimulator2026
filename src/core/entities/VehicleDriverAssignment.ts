@@ -170,9 +170,11 @@ export function findAvailableDriverForReposition(
   vehicle: Vehicle,
   vehicleState: VehicleState,
   employeeState: EmployeeState,
+  /** When given, only these employees are considered (#1648: evacuation's own rescuers). */
+  onlyAmong?: readonly number[],
 ): Employee | null {
   const candidateIds = employeeState.employees
-    .filter(e => isIdleForReposition(e, vehicle))
+    .filter(e => (onlyAmong === undefined || onlyAmong.includes(e.id)) && isIdleForReposition(e, vehicle))
     .map(e => e.id);
 
   return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, candidateIds)[0] ?? null;

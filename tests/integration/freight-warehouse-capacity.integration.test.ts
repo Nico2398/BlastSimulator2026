@@ -2,7 +2,7 @@
 // ore a good Dusty Hollow blast actually produces (#1531).
 //
 // Reference shot: `campaign start level:dusty_hollow seed:1138`, a 1x2 grid
-// (spacing 3, depth 6) at rig+(14,13), boomite 5 kg, stemming 2, auto
+// (spacing 3, depth 6) at rig+(14,13), boomite 2 kg (see REFERENCE_CHARGE_KG), stemming 2, auto
 // sequence, holes dry. Barren rock goes to a spoil heap (#1530), so only the
 // ORE-BEARING mass has to fit a warehouse. Measured on that shot: ~30,662 kg
 // ore-bearing, largest ore fragment ~4,400 kg.
@@ -52,6 +52,15 @@ interface Shot {
   oreIds: number[];
 }
 
+/**
+ * Boomite per hole (kg) of the reference shot. A truly dry 1x2 pattern at 5 kg
+ * clears ~115 voxels (~240 t of ore-bearing rock, #1648 measurement) — the
+ * ~30 t the depots were sized on was a wet-hole fizzle. 2 kg dry keeps the
+ * shot a good one (24 voxels cracked loose) at the order of magnitude a
+ * tier-1/2 depot is meant to take.
+ */
+const REFERENCE_CHARGE_KG = 2;
+
 /** Ticks of hauling the verification slice runs (enough for several trips). */
 const HAUL_SLICE_TICKS = 400;
 
@@ -85,12 +94,13 @@ beforeAll(() => {
   const z = Math.round(rig.z) + 13;
   expect(run(`drill_plan grid rows:1 cols:2 spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
   tickUntil(run, state, 600, () => state.plannedDrillHoles.length === 0);
-  // A dry day: the shot must not depend on which weather window the rig reached the holes in.
-  for (const hw of Object.values(state.holeWater)) hw.level = 0;
-  run('charge hole:* explosive:boomite amount:5 stemming:2');
+  run(`charge hole:* explosive:boomite amount:${REFERENCE_CHARGE_KG} stemming:2`);
   tickUntil(run, state, 600, () => Object.keys(state.plannedChargesByHole).length === 0);
   run('sequence auto');
   clearBlastZone(run, state);
+  // A dry day: the shot must not depend on which weather window the rig reached the holes in.
+  // Dried last, right before firing: water drained earlier is back by the time the zone clears.
+  for (const hw of Object.values(state.holeWater)) hw.level = 0;
   expect(run('blast').success).toBe(true);
 
   const ore = state.logistics.fragments.filter((t) => !isBarrenFragment(t.fragment.oreDensities));

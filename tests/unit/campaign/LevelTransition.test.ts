@@ -396,7 +396,7 @@ describe('createGameForLevel staffed is tri-state (#1363)', () => {
   it('undefined on dusty_hollow opens with the level starting site roster and fleet', () => {
     const state = createGameForLevel(unlocked(), 'dusty_hollow')!;
     expect(state.employees.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
-    expect(state.vehicles.vehicles.map(v => v.type).sort()).toEqual(['debris_hauler', 'drill_rig']);
+    expect(state.vehicles.vehicles.map(v => v.type).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig']);
   });
 
   it('undefined deducts no cash for the free crew and fleet', () => {

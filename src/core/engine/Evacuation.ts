@@ -200,7 +200,7 @@ export function findSafeEvacuationCell(
  * loop below releases that reservation explicitly so clearZone's own
  * driverless-rescue branch finds it genuinely free.
  */
-export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResult {
+export function evacuateZone(state: GameState, zone: ZoneBounds, rescuerIds: readonly number[] = []): EvacuationResult {
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
     if (!isInZone(emp.x, emp.z, zone)) continue;
@@ -280,6 +280,7 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     state.employees,
     (fromX, fromZ, z) => findSafeEvacuationCell(state, fromX, fromZ, z),
     (employee, vehicle) => canEmployeeReachVehicleForEvacuation(state, employee, vehicle),
+    rescuerIds,
   );
 }
 

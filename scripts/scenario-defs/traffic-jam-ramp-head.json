@@ -147,15 +147,15 @@
       "commandOutcome": "either"
     },
     {
-      "command": "employee dispatch 2 x:15 z:16",
+      "command": "employee dispatch 3 x:15 z:16",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 2 x:15 z:16"
+          "command": "employee dispatch 3 x:15 z:16"
         }
       ],
       "role": "bootstrap",
-      "description": "Stage blaster #2, the one crew member on foot, at the ramp head beside the vehicles, so it reaches the convergence tile ahead of them."
+      "description": "Stage driver #3, the one crew member on foot (#1648: the blaster #2 now holds the truck licence, so the hauler reposition would draft it as its driver and no walker would hold the tile -- driver #3 is the walker instead and the blaster crews the hauler), at the ramp head beside the vehicles, so it reaches the convergence tile ahead of them."
     },
     {
       "command": "vehicle reposition 1 14 17",
@@ -221,11 +221,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "employee dispatch 2 x:15 z:24",
+      "command": "employee dispatch 3 x:15 z:24",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 2 x:15 z:24"
+          "command": "employee dispatch 3 x:15 z:24"
         }
       ],
       "role": "bootstrap",

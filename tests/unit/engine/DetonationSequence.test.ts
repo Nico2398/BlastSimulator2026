@@ -7,7 +7,7 @@ import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../src/core/mining/ChargePlan.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { isInZone, computeDangerZone } from '../../../src/core/entities/Zone.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -240,6 +240,40 @@ describe('tickDetonation', () => {
     state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
     tickDetonation(state);
     expect(emp.destinationX).not.toBeNull();
+  });
+
+  it('records the employees found inside the zone when arming', () => {
+    const state = chargedState();
+    const inside = addWorker(state, 22, 22);
+    const outside = addWorker(state, 70, 70);
+    const res = armDetonation(state);
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.evacuatedEmployeeIds).toContain(inside.id);
+      expect(res.data.evacuatedEmployeeIds).not.toContain(outside.id);
+    }
+  });
+
+  it('re-evacuation sends an already-evacuated licensed employee back in for a driverless vehicle', () => {
+    const state = chargedState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 30, 30);
+    vehicle.occupantIds = [];
+    const rescuer = addWorker(state, 22, 22); // unlicensed while the horn sounds
+    const bystander = addWorker(state, 70, 70); // licensed and idle, but never in the zone
+    assignSkill(state.employees, bystander.id, 'driving.excavator', 1);
+    armDetonation(state);
+    expect(state.pendingDetonation!.evacuatedEmployeeIds).toEqual([rescuer.id]);
+
+    // The rescuer walked out, finished its order, and has since earned the licence.
+    rescuer.x = 60; rescuer.z = 60;
+    rescuer.destinationX = null; rescuer.destinationZ = null; rescuer.itinerary = null;
+    assignSkill(state.employees, rescuer.id, 'driving.excavator', 1);
+    state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
+    tickDetonation(state);
+
+    expect(rescuer.itinerary).not.toBeNull();
+    expect(bystander.itinerary).toBeNull();
+    expect(state.pendingDetonation!.evacuatedEmployeeIds).toContain(rescuer.id);
   });
 
   it('stays stranded (never ready) while the stranded occupant is still inside', () => {

@@ -15,7 +15,7 @@
         "equals": {
           "cash": 100000,
           "employeeCount": 5,
-          "vehicleCount": 4,
+          "vehicleCount": 5,
           "deathCount": 0
         }
       }
@@ -61,7 +61,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 4,
+          "vehicleCount": 5,
           "deathCount": 0
         }
       }

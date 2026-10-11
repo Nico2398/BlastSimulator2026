@@ -40,4 +40,9 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel button[data-vtype="rock_digger"][data-tier="1"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
   ],
+
+  'buy-charging-truck': [
+    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
+    { target: '#bs-vehicle-panel button[data-vtype="charging_truck"][data-tier="1"]', hintKey: 'tutorial.stage.vehicle_buy_charging_truck' },
+  ],
 };

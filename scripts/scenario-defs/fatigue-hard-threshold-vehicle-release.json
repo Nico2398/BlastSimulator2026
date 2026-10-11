@@ -16,7 +16,7 @@
         "equals": {
           "cash": 200000,
           "employeeCount": 5,
-          "vehicleCount": 4,
+          "vehicleCount": 5,
           "collapsedCount": 0
         }
       }

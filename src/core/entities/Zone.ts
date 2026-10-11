@@ -1,14 +1,14 @@
 // BlastSimulator2026 — Zone clearing and evacuation
 // Players define safety zones before blasting and evacuate entities.
 
-import type { VehicleState } from './Vehicle.js';
-import type { EmployeeState } from './Employee.js';
+import type { Vehicle, VehicleState } from './Vehicle.js';
+import type { Employee, EmployeeState } from './Employee.js';
 import type { GameState } from '../state/GameState.js';
 import { vehicleDriverId } from './Vehicle.js';
 import { moveTo, alightOnArrival } from '../engine/MoveTo.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
-import { findBestEvacuationDriver } from './VehicleDriverAssignment.js';
+import { findBestEvacuationDriver, findAvailableDriverForReposition } from './VehicleDriverAssignment.js';
 
 // ── Zone bounds ──
 
@@ -95,12 +95,26 @@ export function clearZone(
   employees: EmployeeState,
   findSafeDestination: SafeDestinationFinder,
   canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
+  /**
+   * Employees this evacuation already moved out of the zone: when nobody inside
+   * can drive a driverless vehicle out, an idle, licensed one of these is sent
+   * back in for it (#1648). Employees never evacuated are left alone, so a
+   * vehicle nobody was ever near stays stranded.
+   */
+  rescuerIds: readonly number[] = [],
 ): EvacuationResult {
   const result: EvacuationResult = {
     orderedVehicleIds: [],
     orderedEmployeeIds: [],
     strandedVehicleIds: [],
     strandedEmployeeIds: [],
+  };
+
+  // Only consulted when nobody inside can drive `v` out (#1648).
+  const reachableRescuer = (v: Vehicle): Employee | null => {
+    if (rescuerIds.length === 0) return null;
+    const rescuer = findAvailableDriverForReposition(v, vehicles, employees, rescuerIds);
+    return rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
   };
 
   // Employees picked to board a vehicle this call — tracked so a later
@@ -172,7 +186,8 @@ export function clearZone(
       )
       .map(e => e.id);
 
-    const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle);
+    const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle)
+      ?? reachableRescuer(v);
     if (!driver) {
       result.strandedVehicleIds.push(v.id);
       continue;

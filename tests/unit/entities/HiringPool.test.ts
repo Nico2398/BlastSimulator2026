@@ -283,7 +283,11 @@ describe('scripted hiring pool (#1600)', () => {
     expect(pool.candidates).toHaveLength(TUTORIAL_HIRING_SCRIPT.length);
     for (const c of pool.candidates) {
       const cats = c.qualifications.map(q => q.category);
-      expect(cats).toEqual(ROLE_STARTING_QUALIFICATIONS[c.role].map(q => q.category));
+      const extra = (TUTORIAL_HIRING_SCRIPT.find(x => x.id === c.id)!.extraQualifications ?? []).map(q => q.category);
+      const expected = ROLE_STARTING_QUALIFICATIONS[c.role].map(q => q.category);
+      // extraQualifications (#1648) are merged in by category on top of the role defaults.
+      expect([...cats].sort()).toEqual([...new Set([...expected, ...extra])].sort());
+      expect(cats.slice(0, expected.length)).toEqual(expected);
       expect(c.salary).toBe(calculateSalary({ role: c.role, qualifications: c.qualifications, raises: 0 }));
     }
   });
@@ -369,5 +373,67 @@ describe('unscripted hiring pool is unchanged (#1600)', () => {
 
   it('explicit undefined script behaves like no script', () => {
     expect(createHiringPool(42, 0, undefined)).toEqual(createHiringPool(42, 0));
+  });
+});
+
+describe('scripted extraQualifications (#1648)', () => {
+  const one = (extra: ScriptedCandidate['extraQualifications'], role: ScriptedCandidate['role'] = 'blaster', skillBonus: 0 | 1 = 0) =>
+    createHiringPool(1, 0, [{ id: 1, role, name: 'Ex Tra', unionized: false, skillBonus, ...(extra !== undefined ? { extraQualifications: extra } : {}) }]).candidates[0]!;
+
+  it('appends a new category after the role defaults', () => {
+    const c = one([{ category: 'driving.truck', proficiencyLevel: 1 }]);
+    const cats = c.qualifications.map(q => q.category);
+    expect(cats).toEqual([...ROLE_STARTING_QUALIFICATIONS.blaster.map(q => q.category), 'driving.truck']);
+    expect(c.qualifications.find(q => q.category === 'driving.truck')!.proficiencyLevel).toBe(1);
+  });
+
+  it('keeps the higher level when the category already exists (extra lower)', () => {
+    const base = ROLE_STARTING_QUALIFICATIONS.blaster[0]!;
+    const c = one([{ category: base.category, proficiencyLevel: 1 }], 'blaster', 1);
+    const q = c.qualifications.filter(x => x.category === base.category);
+    expect(q).toHaveLength(1);
+    expect(q[0]!.proficiencyLevel).toBe(base.proficiencyLevel + 1);
+  });
+
+  it('raises an existing category when the extra level is higher, without duplicating it', () => {
+    const base = ROLE_STARTING_QUALIFICATIONS.blaster[0]!;
+    const c = one([{ category: base.category, proficiencyLevel: 4 }]);
+    const q = c.qualifications.filter(x => x.category === base.category);
+    expect(q).toHaveLength(1);
+    expect(q[0]!.proficiencyLevel).toBe(4);
+  });
+
+  it('salary matches calculateSalary over the merged qualifications', () => {
+    const c = one([{ category: 'driving.truck', proficiencyLevel: 2 }]);
+    expect(c.salary).toBe(calculateSalary({ role: 'blaster', qualifications: c.qualifications, raises: 0 }));
+  });
+
+  it('absent or empty extraQualifications leave the role defaults untouched', () => {
+    const defaults = ROLE_STARTING_QUALIFICATIONS.blaster.map(q => q.category);
+    expect(one(undefined).qualifications.map(q => q.category)).toEqual(defaults);
+    expect(one([]).qualifications.map(q => q.category)).toEqual(defaults);
+  });
+
+  it('TUTORIAL_HIRING_SCRIPT driller (Dale Drillson) carries driving.truck level 1', () => {
+    const dale = TUTORIAL_HIRING_SCRIPT.find(c => c.name === 'Dale Drillson')!;
+    expect(dale.extraQualifications).toEqual([{ category: 'driving.truck', proficiencyLevel: 1 }]);
+    const hired = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT).candidates.find(c => c.id === dale.id)!;
+    const cats = hired.qualifications.map(q => q.category);
+    expect(cats).toContain('blasting');
+    expect(cats).toContain('driving.truck');
+  });
+
+  it('refreshHiringPool keeps the merged qualifications on scripted candidates', () => {
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT);
+    refreshHiringPool(pool, 42, 24, TUTORIAL_HIRING_SCRIPT);
+    const dale = pool.candidates.find(c => c.name === 'Dale Drillson')!;
+    expect(dale.qualifications.map(q => q.category)).toContain('driving.truck');
+  });
+
+  it('unscripted pools never carry extra qualifications beyond the role defaults', () => {
+    const pool = createHiringPool(42, 0);
+    for (const c of pool.candidates) {
+      expect(c.qualifications.map(q => q.category)).toEqual(ROLE_STARTING_QUALIFICATIONS[c.role].map(q => q.category));
+    }
   });
 });

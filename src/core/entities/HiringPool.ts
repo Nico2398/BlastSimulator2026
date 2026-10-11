@@ -90,7 +90,18 @@ export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: num
 
 /** Build the fixed candidate a script entry describes (#1600). */
 function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
-  return buildCandidate(s.id, s.role, s.name, s.unionized, s.skillBonus);
+  const candidate = buildCandidate(s.id, s.role, s.name, s.unionized, s.skillBonus);
+  for (const extra of s.extraQualifications ?? []) {
+    const idx = candidate.qualifications.findIndex(q => q.category === extra.category);
+    const existing = candidate.qualifications[idx];
+    if (!existing) candidate.qualifications.push(qualificationAtLevel(extra.category, extra.proficiencyLevel));
+    else if (existing.proficiencyLevel < extra.proficiencyLevel) {
+      candidate.qualifications[idx] = qualificationAtLevel(extra.category, extra.proficiencyLevel);
+    }
+  }
+  // The role-default salary no longer covers the merged qualifications.
+  candidate.salary = calculateSalary({ role: candidate.role, qualifications: candidate.qualifications, raises: 0 });
+  return candidate;
 }
 
 /** Pool holds exactly the scripted candidates; ids are fixed so a refresh restores hired ones. */

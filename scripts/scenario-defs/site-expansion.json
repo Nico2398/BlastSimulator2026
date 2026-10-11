@@ -451,12 +451,13 @@
     },
     {
       "command": "blast",
-      "description": "A blast spanning both the original site and ground claimed during play. #1362: the stranded rig blocks the automatic fire, so the player presses Fire anyway in the waiting state.",
+      "description": "A blast spanning both the original site and ground claimed during play. #1648: the evacuation now sends its own walkout crew back in to drive the stranded rig out, so the zone clears and the detonation fires by itself during the ticks above (command mode: this `blast` is then refused, nothing left charged -- commandOutcome either). Should the zone still be waiting, the player presses Fire anyway.",
       "timeout": 150,
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "[data-action=\"preflight-fire-anyway\"]"
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
         },
         {
           "type": "clickSelector",
@@ -465,6 +466,7 @@
         }
       ],
       "role": "player",
+      "commandOutcome": "either",
       "expect": {
         "equals": {
           "holeCount": 0,

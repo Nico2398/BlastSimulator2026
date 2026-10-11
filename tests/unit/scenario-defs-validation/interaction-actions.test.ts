@@ -531,10 +531,11 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     12: 'employee hire role:driver', // #1339: moved before box-cut
     13: 'vehicle buy drill_rig',
     14: 'vehicle buy rock_digger',
-    15: `build_ramp start:${REGION.boxcut.x1},${REGION.boxcut.z1} end:${REGION.boxcut.x2},${REGION.boxcut.z2} depth:6`, // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
-    16: `drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${REGION.drill.x1},${REGION.drill.z1} diameter:0.089`, // #949
-    25: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
-    29: 'blast detonate', // #1362: replaces the Sound the Horn step (zone clear)
+    15: 'vehicle buy charging_truck', // #1648: buy-charging-truck follows the rock digger
+    16: `build_ramp start:${REGION.boxcut.x1},${REGION.boxcut.z1} end:${REGION.boxcut.x2},${REGION.boxcut.z2} depth:6`, // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
+    17: `drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${REGION.drill.x1},${REGION.drill.z1} diameter:0.089`, // #949
+    26: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
+    30: 'blast detonate', // #1362: replaces the Sound the Horn step (zone clear)
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

@@ -170,8 +170,8 @@
         ],
         "equals": {
           "employeeCount": 2,
-          "qualificationCount": 3,
-          "proficiencyTotal": 7
+          "qualificationCount": 4,
+          "proficiencyTotal": 8
         }
       }
     },
@@ -186,10 +186,8 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "proficiencyTotal": 11
+          "cash": 0,
+          "proficiencyTotal": 4
         }
       },
       "role": "bootstrap"
@@ -233,10 +231,8 @@
       "role": "bootstrap",
       "expect": {
         "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "proficiencyTotal": 11
+          "cash": 0,
+          "proficiencyTotal": 0
         }
       }
     },

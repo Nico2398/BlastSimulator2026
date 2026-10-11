@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { refreshOrderReachability } from '../../core/engine/OrderReachability.js';
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
-import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
+import { placeStartingCrew, relocateVehiclesOffNarrowGround } from '../../core/state/SpawnPlacement.js';
 import { placeStartingBuildings, startingBuildingAnchor } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
@@ -273,6 +273,9 @@ export function regenerateGrid(
     }
   }
   snapAgentsToNavigableGround(ctx.state);
+  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state)) {
+    buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
+  }
   refreshOrderReachability(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }

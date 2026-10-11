@@ -15,6 +15,12 @@ export interface PendingDetonation {
   strandedEmployeeIds: number[];
   strandedVehicleIds: number[];
   lastEvacuationTick: number;
+  /**
+   * Employees standing in the zone when an evacuation of this sequence was
+   * ordered (#1648): the only ones later sent back in to drive out a vehicle
+   * nobody else could. Absent on a save made before the field existed.
+   */
+  evacuatedEmployeeIds?: number[];
 }
 
 export type DetonationPhase =
@@ -26,12 +32,18 @@ export type DetonationPhase =
 type DetonationResult<T> = { success: true; data: T } | { success: false; error: string };
 
 /** Order the zone evacuated; returns the ids that could not be moved. */
-function orderEvacuation(state: GameState): { employees: number[]; vehicles: number[] } | null {
+function orderEvacuation(
+  state: GameState,
+  rescuerIds: readonly number[] = [],
+): { employees: number[]; vehicles: number[]; inZoneEmployeeIds: number[] } | null {
   const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
   if (zone === null) return null;
   defineZone(state.zone, zone);
-  const result = evacuateZone(state, state.zone.activeZone!);
-  return { employees: result.strandedEmployeeIds, vehicles: result.strandedVehicleIds };
+  const inZoneEmployeeIds = state.employees.employees
+    .filter(e => e.alive && isInZone(e.x, e.z, zone))
+    .map(e => e.id);
+  const result = evacuateZone(state, state.zone.activeZone!, rescuerIds);
+  return { employees: result.strandedEmployeeIds, vehicles: result.strandedVehicleIds, inZoneEmployeeIds };
 }
 
 /** True when any drilled hole has a charge loaded or still loading. */
@@ -56,6 +68,7 @@ export function armDetonation(state: GameState): DetonationResult<PendingDetonat
     strandedEmployeeIds: stranded.employees,
     strandedVehicleIds: stranded.vehicles,
     lastEvacuationTick: state.tickCount,
+    evacuatedEmployeeIds: stranded.inZoneEmployeeIds,
   };
   state.pendingDetonation = pending;
   return { success: true, data: pending };
@@ -104,9 +117,10 @@ export function tickDetonation(state: GameState): DetonationPhase {
   }
   if (state.tickCount - pending.lastEvacuationTick >= DETONATION_REEVACUATE_INTERVAL_TICKS
     && !isDangerZoneClear(state.drillHoles, state.vehicles, state.employees)) {
-    const stranded = orderEvacuation(state);
+    const stranded = orderEvacuation(state, pending.evacuatedEmployeeIds ?? []);
     if (stranded !== null) {
       pending.lastEvacuationTick = state.tickCount;
+      pending.evacuatedEmployeeIds = [...new Set([...(pending.evacuatedEmployeeIds ?? []), ...stranded.inZoneEmployeeIds])];
       pending.strandedEmployeeIds = [...new Set([...pending.strandedEmployeeIds, ...stranded.employees])];
       pending.strandedVehicleIds = [...new Set([...pending.strandedVehicleIds, ...stranded.vehicles])];
     }

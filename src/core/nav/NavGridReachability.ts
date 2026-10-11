@@ -605,6 +605,30 @@ function isLegalStep(
   return hasClearance(to, requiredClearance);
 }
 
+/**
+ * How many of the 8 neighbours of (x, z) an agent of `requiredClearance` could
+ * legally step onto (climb-aware, corner-cut refused). A cell with only one or
+ * two is a thin ridge or trench: it can be sealed by a single building corner
+ * or fragment, stranding whatever stands on it (#1648).
+ */
+export function countLegalStepNeighbours(
+  navGrid: NavGrid,
+  x: number,
+  z: number,
+  requiredClearance: number,
+): number {
+  const from = navGrid.cellAt(x, z);
+  let count = 0;
+  for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+    const nx = x + dx;
+    const nz = z + dz;
+    if (!isTraversableCell(navGrid, nx, nz)) continue;
+    const to = navGrid.cellAt(nx, nz)!;
+    if (isLegalStep(navGrid, x, z, from, nx, nz, to, true, requiredClearance)) count++;
+  }
+  return count;
+}
+
 /** True when (x, z) lies inside `r` (max edges exclusive); false for an undefined rect. */
 export function inRect(r: Rect | undefined, x: number, z: number): boolean {
   return !!r && x >= r.minX && x < r.maxX && z >= r.minZ && z < r.maxZ;
