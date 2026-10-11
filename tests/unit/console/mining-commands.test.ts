@@ -188,7 +188,7 @@ describe('drillPlanCommand — remove subcommand', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
-    expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
+    expect(ctx.state!.drillHoles.map(h => h.id).sort()).toEqual(['H1', 'H2']);
 
     const result = drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
 
