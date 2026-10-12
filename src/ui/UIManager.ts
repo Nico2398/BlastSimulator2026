@@ -34,6 +34,7 @@ import type { PlacementKit } from './scene/PlacementKit.js';
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { AudioManager } from '../audio/AudioManager.js';
+import type { UiCues } from '../audio/ui/UiCues.js';
 import type { SaveBackend } from '../core/state/SaveBackend.js';
 
 import type { GameConsoleFn } from './gameConsole.js';
@@ -65,6 +66,7 @@ export class UIManager {
   private readonly leftColumn: LeftColumn;
 
   private activePanel: PanelName | null = null;
+  private cues: Pick<UiCues, 'panelShown'> | null = null;
   private onLanguageChange?: (lang: string) => void;
   /** One-shot guard for the "A new contact" toast — fires once, the moment the rail icon itself reveals. */
   private shadyRevealed = false;
@@ -303,6 +305,17 @@ export class UIManager {
     this.settingsPanel.setAudioManager(mgr);
   }
 
+  /**
+   * Wire the interface cues to the three places no DOM delegation can hear: panels sliding in and out
+   * (the one chokepoint is showPanel/hideAllPanels), toasts, and the confirm modal; plus Settings' slider feedback.
+   */
+  setUiCues(cues: Pick<UiCues, 'panelShown' | 'notification' | 'modalShown' | 'volumeAdjusted'> | null): void {
+    this.cues = cues;
+    this.notificationCenter.setCues(cues);
+    this.confirmModal.setCues(cues);
+    this.settingsPanel.setCues(cues);
+  }
+
   /** Wire Settings' autosave-age-aware return-to-menu confirm (persistence lives in main.ts, not here). */
   setBackend(backend: SaveBackend): void {
     this.settingsPanel.setBackend(backend);
@@ -488,7 +501,9 @@ export class UIManager {
   }
 
   showPanel(name: PanelName): void {
-    this.hideAllPanels();
+    // One cue per change of panel: A to B is a single open, not a close then an open.
+    const changed = this.activePanel !== name;
+    this.closeAllPanels();
     this.activePanel = name;
     switch (name) {
       case 'blast': this.blastUI.show(); break;
@@ -503,6 +518,7 @@ export class UIManager {
       case 'settings': this.settingsPanel.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
+    if (changed) this.cues?.panelShown(true);
   }
 
   /** Open the Crew panel with a specific employee's card expanded — the DETAIL/TRAIN actions of the scene selection bar (src/ui/shell/SelectionBar.ts). */
@@ -555,7 +571,14 @@ export class UIManager {
     this.miniMap.dispose();
   }
 
+  /** Close whichever panel is open, with the close cue (only when one was). */
   private hideAllPanels(): void {
+    const wasOpen = this.activePanel !== null;
+    this.closeAllPanels();
+    if (wasOpen) this.cues?.panelShown(false);
+  }
+
+  private closeAllPanels(): void {
     this.activePanel = null;
     this.blastUI.hide();
     this.contractsPanel.hide();

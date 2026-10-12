@@ -422,3 +422,52 @@ describe('storm lightning flash', () => {
     });
   });
 });
+
+describe('storm lightning flash — onFlash callback', () => {
+  const DT = 1 / 60;
+
+  function makeStorm(onFlash?: () => void) {
+    const scene = new THREE.Scene();
+    const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+    const fill = new THREE.DirectionalLight(0xd0e8ff, 0.3);
+    const sw = new SkyboxWeather(scene, sun, ambient, fill, onFlash ? { random: () => 0.5, onFlash } : { random: () => 0.5 });
+    sw.setWeather('storm');
+    return sw;
+  }
+
+  function step(sw: SkyboxWeather, seconds: number): void {
+    for (let i = 0; i < Math.round(seconds / DT); i++) sw.update(DT);
+  }
+
+  it('fires once as each flash starts, not on every frame of it', () => {
+    let flashes = 0;
+    const sw = makeStorm(() => { flashes++; });
+    step(sw, STORM_FLASH_FIRST_DELAY - 0.5);
+    expect(flashes).toBe(0);
+    step(sw, 1); // crosses the first flash start; the flash itself lasts STORM_FLASH_DURATION
+    expect(flashes).toBe(1);
+    step(sw, STORM_FLASH_DURATION); // the rest of that flash, still the same one
+    expect(flashes).toBe(1);
+  });
+
+  it('fires again for the next flash', () => {
+    let flashes = 0;
+    const sw = makeStorm(() => { flashes++; });
+    step(sw, STORM_FLASH_FIRST_DELAY + STORM_FLASH_DURATION + STORM_FLASH_INTERVAL_MAX + 1);
+    expect(flashes).toBe(2);
+  });
+
+  it('stays silent outside a storm', () => {
+    let flashes = 0;
+    const sw = makeStorm(() => { flashes++; });
+    sw.setWeather('sunny');
+    step(sw, 60);
+    expect(flashes).toBe(0);
+  });
+
+  it('works without a callback', () => {
+    const sw = makeStorm();
+    expect(() => step(sw, STORM_FLASH_FIRST_DELAY + 1)).not.toThrow();
+  });
+});

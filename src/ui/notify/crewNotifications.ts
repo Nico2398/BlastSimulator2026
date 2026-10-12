@@ -20,6 +20,12 @@ const CREW_SEVERITY: Record<CrewKind, Severity> = {
   trained: 'info',
 };
 
+/**
+ * Kinds whose event the audio director already voices (`level_up` for levelup, `worker_collapse` for
+ * collapsed): their toast stays quiet so one event is not heard twice.
+ */
+const VOICED_KINDS: ReadonlySet<CrewKind> = new Set<CrewKind>(['levelup', 'collapsed']);
+
 /** Kinds that can repeat every tick while the cause persists, throttled per employee. */
 const COOLDOWN_KINDS: ReadonlySet<CrewKind> = new Set<CrewKind>(['stuck', 'action_abandoned']);
 
@@ -54,6 +60,7 @@ export function wireCrewNotifications(
       severity: CREW_SEVERITY[kind],
       title: t('notification.title.crew'),
       body: t(`notification.crew.${kind}`, { name: nameOf(employeeId), ...params }),
+      ...(VOICED_KINDS.has(kind) ? { silent: true } : {}),
     });
   };
 

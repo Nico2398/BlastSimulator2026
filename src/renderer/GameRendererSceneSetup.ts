@@ -119,6 +119,8 @@ export interface SceneSetupDeps {
   siteBoundsChanged: (grid: VoxelGrid | null) => boolean;
   /** Ground height rain splashes land on, read every frame — null where there is no ground to splash (#1601). */
   getRainGroundY: GroundSampler;
+  /** Called each time the storm sky flashes. */
+  onLightning: () => void;
 }
 
 /** Whole-scene rebuild on a new game/level (#474: runs all three load stages, then frames the camera). */
@@ -184,7 +186,7 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
 
   // Weather sky
   const flashRng = new Random(state.seed);
-  deps.skybox = new SkyboxWeather(scene, sunLight, ambient, fill, { random: () => flashRng.next() });
+  deps.skybox = new SkyboxWeather(scene, sunLight, ambient, fill, { random: () => flashRng.next(), onFlash: deps.onLightning });
 
   // Wind + clouds (#458 T7.1/D12): one WindState per level, seeded so every
   // ambient module (clouds now, birds/smoke/water/sway in T7.2) leans the

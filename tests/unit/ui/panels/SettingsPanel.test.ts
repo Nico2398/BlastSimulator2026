@@ -234,6 +234,47 @@ describe('SettingsPanel', () => {
       expect(mgr.getVolume('ambient')).toBeCloseTo(0.1);
       panel.dispose();
     });
+
+    it('every slider opts out of the generic slider tick: its row plays its own feedback', () => {
+      const { container, panel } = mount();
+      const sliders = Array.from(container.querySelectorAll('input[type="range"]')) as HTMLInputElement[];
+      expect(sliders).toHaveLength(4);
+      for (const slider of sliders) expect(slider.dataset['sfx']).toBe('none');
+      panel.dispose();
+    });
+
+    it('dragging a slider plays the volume cue for that channel, after the volume is set', () => {
+      const { container, panel } = mount();
+      const mgr = fakeAudioManager();
+      const heard: Array<[string, number]> = [];
+      panel.setAudioManager(mgr);
+      panel.setCues({ volumeAdjusted: channel => heard.push([channel, mgr.getVolume(channel)]) });
+      panel.show();
+
+      const sliders = Array.from(container.querySelectorAll('input[type="range"]')) as HTMLInputElement[];
+      const channels = ['master', 'effects', 'ambient', 'ui'];
+      sliders.forEach((slider, i) => {
+        slider.value = String(10 + i * 20);
+        slider.dispatchEvent(new Event('input'));
+      });
+
+      expect(heard.map(h => h[0])).toEqual(channels);
+      // The cue fires after setVolume, so it is heard at the level just set.
+      heard.forEach(([, volume], i) => expect(volume).toBeCloseTo((10 + i * 20) / 100));
+      panel.dispose();
+    });
+
+    it('a slider moves without cues, and the cues can be removed again', () => {
+      const { container, panel } = mount();
+      const volumeAdjusted = vi.fn();
+      const slider = container.querySelector('input[type="range"]') as HTMLInputElement;
+      expect(() => slider.dispatchEvent(new Event('input'))).not.toThrow();
+      panel.setCues({ volumeAdjusted });
+      panel.setCues(null);
+      slider.dispatchEvent(new Event('input'));
+      expect(volumeAdjusted).not.toHaveBeenCalled();
+      panel.dispose();
+    });
   });
 
   describe('session actions', () => {

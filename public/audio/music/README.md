@@ -1,0 +1,31 @@
+# Music tracks
+
+The game streams music from this folder. None ships yet: `MUSIC_TRACKS` in `src/audio/music/MusicCatalog.ts` is empty, and while it is, the music system does nothing and costs nothing.
+
+## Adding a track
+
+1. Put the file here as `<name>.mp3` (stereo, 44.1 or 48 kHz, 128 to 192 kbps VBR is plenty).
+2. Add one entry to `MUSIC_TRACKS`:
+
+   ```ts
+   { id: 'menu', file: 'menu_theme', scope: { kind: 'menu' } },
+   { id: 'desert', file: 'desert_dust', scope: { kind: 'biome', biomeId: 'desert_badlands' }, gainDb: -2 },
+   ```
+
+   - `file` is the basename without `.mp3`.
+   - `scope` decides when it plays: `menu` (main menu, world map, sandbox setup), `biome` (a biome id from `src/core/world/BiomeCatalog.ts`), `level` (a campaign level id from `src/core/campaign/Level.ts`), `game` (any game with no more specific track).
+   - In a game the most specific track wins: level, then biome, then `game`. The biome is the level's declared mine type, not the biome terrain generation happens to land on.
+   - `gainDb` trims the track (default 0); `loop: false` plays it once and then stays silent (default loops).
+3. Run `npx vitest run tests/unit/audio/music`. It fails on a duplicate id, an unknown biome or level, or a missing file.
+
+Tracks crossfade (2.5 s, equal power) when the screen or biome changes. The loading and level-end screens keep the current music.
+
+## Licensing
+
+Only music we may ship: CC0 / public domain, or a licence that allows redistribution in a game, with the author, title, source URL and licence recorded in `public/audio/CREDITS.md` for every file added here. No "free for personal use", no non-commercial-only licences, no tracks without a verifiable licence page.
+
+## Mastering
+
+- Loudness: -16 LUFS integrated, true peak below -1 dBTP. Sound effects are mastered well below this; the music bus sits under them through its own volume slider.
+- Loops: the last sample must continue into the first with no click and no silence. Trim to a musical boundary (a whole number of bars), check the seam in an editor, and avoid a reverb tail that is cut off at the end. Menu and biome tracks are meant to loop for many minutes.
+- Length: 1.5 to 4 minutes keeps the download small (about 3 to 5 MB each).

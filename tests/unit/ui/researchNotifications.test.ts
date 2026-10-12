@@ -89,3 +89,17 @@ describe('wireResearchNotifications', () => {
     expect(notes).toHaveLength(2);
   });
 });
+
+describe('research toasts the audio director already voices', () => {
+  it('completion is silent (the director plays the unlock sting); cancellation is not', () => {
+    const emitter = makeEmitter();
+    const notes: NotifyInput[] = [];
+    wireResearchNotifications(emitter, n => notes.push(n));
+
+    emitter.fire('research:completed', { targetType: 'site_office', targetTier: 2 });
+    emitter.fire('research:cancelled', { targetType: 'site_office', targetTier: 2, refund: 500 });
+
+    expect(notes.map(n => n.silent)).toEqual([true, undefined]);
+  });
+});
+

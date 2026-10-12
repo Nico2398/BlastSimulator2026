@@ -78,6 +78,8 @@ type FlashRandom = () => number;
 interface SkyboxWeatherOptions {
   /** Injectable for deterministic tests; defaults to the renderer's own source. */
   random?: FlashRandom;
+  /** Called once each time a storm flash starts (the audio layer follows it with thunder). */
+  onFlash?: () => void;
 }
 
 /** Flash brightness level (0..1) `t` seconds into a flash, interpolated from STORM_FLASH_ENVELOPE. */
@@ -147,6 +149,7 @@ export class SkyboxWeather {
   private flashElapsed: number | null = null;
   private flashCountdown = STORM_FLASH_FIRST_DELAY;
   private readonly flashRandom: FlashRandom;
+  private readonly onFlash: (() => void) | undefined;
 
   constructor(
     scene: THREE.Scene,
@@ -157,6 +160,7 @@ export class SkyboxWeather {
   ) {
     const defaultRandom = new Random(DEFAULT_FLASH_SEED);
     this.flashRandom = options.random ?? (() => defaultRandom.next());
+    this.onFlash = options.onFlash;
     this.sunBaseline = sun.intensity;
     this.scene = scene;
     this.sun = sun;
@@ -271,7 +275,10 @@ export class SkyboxWeather {
       }
     } else {
       this.flashCountdown -= dt;
-      if (this.flashCountdown <= 0) this.flashElapsed = 0;
+      if (this.flashCountdown <= 0) {
+        this.flashElapsed = 0;
+        this.onFlash?.();
+      }
     }
   }
 }

@@ -81,6 +81,7 @@ export class PlacementController {
   private onChangeHandler: PlacementChangeHandler | null = null;
   /** Set once by main.ts and never replaced, unlike onChangeHandler — the region/blocked-tile drawing must not depend on which panel armed the tool. */
   private onFeedbackHandler: PlacementChangeHandler | null = null;
+  private onRefusedHandler: (() => void) | null = null;
   /** Set once by main.ts, never overwritten by a panel arming its own tool — unlike onChangeHandler, which each panel replaces with its own strip refresh. Fires on every arm()/disarm() so ScenePicking can step aside while a placement tool owns the canvas. */
   private onArmedStateHandler: ((armed: boolean) => void) | null = null;
 
@@ -112,6 +113,11 @@ export class PlacementController {
   setArmedStateHandler(cb: (armed: boolean) => void): void { this.onArmedStateHandler = cb; }
   /** Fires alongside every change, for the scene-level feedback main.ts owns (region outline, refused tile). */
   setFeedbackHandler(cb: PlacementChangeHandler): void { this.onFeedbackHandler = cb; }
+  /**
+   * Told when a placement click is turned down (outside the region, or a site claim refused), and only then:
+   * the feedback handler also fires on every hover over a refused tile, which is not an answer to the player.
+   */
+  setRefusedHandler(cb: (() => void) | null): void { this.onRefusedHandler = cb; }
   /**
    * Register the predicate the controller asks whether the live selection
    * would be refused a site claim (#558) — separate from the tutorial's
@@ -274,6 +280,7 @@ export class PlacementController {
       this.blockedTile = { x: x1, z: z1 };
       this.footprintCheckFailed = footprintCheckFailed;
       this.notify();
+      this.onRefusedHandler?.();
       return;
     }
     this.claimRefusalReason = null;
@@ -376,6 +383,7 @@ export class PlacementController {
       this.claimRefusalReason = claimReason;
       this.blockedTile = tile;
       this.notify();
+      this.onRefusedHandler?.();
       return;
     }
     this.claimRefusalReason = null;

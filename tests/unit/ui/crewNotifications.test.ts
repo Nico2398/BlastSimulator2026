@@ -192,3 +192,24 @@ describe('wireCrewNotifications', () => {
     });
   });
 });
+
+describe('crew toasts the audio director already voices', () => {
+  it('level up and collapse are silent (their sounds are the director\'s), every other kind is not', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 0, 0);
+    const emitter = makeEmitter();
+    const notes: NotifyInput[] = [];
+    wireCrewNotifications(emitter, () => state, n => notes.push(n));
+
+    emitter.fire('employee:levelup', { employeeId: employee.id, category: 'driving', oldLevel: 1, newLevel: 2 });
+    emitter.fire('employee:collapsed', { employeeId: employee.id, needKey: 'fatigue' });
+    expect(notes.map(n => n.silent)).toEqual([true, true]);
+
+    notes.length = 0;
+    emitter.fire('employee:need_warning', { employeeId: employee.id, needKey: 'fatigue' });
+    emitter.fire('employee:trained', { employeeId: employee.id, skill: 'driving', level: 1, isNew: true });
+    emitter.fire('agent:stuck', { employeeId: employee.id });
+    expect(notes.map(n => n.silent)).toEqual([undefined, undefined, undefined]);
+  });
+});
+

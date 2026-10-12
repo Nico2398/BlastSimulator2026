@@ -19,6 +19,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { syncLangPills } from '../langPills.js';
 import { saveLocale, saveVolume } from '../userSettings.js';
 import type { AudioManager, AudioCategory } from '../../audio/AudioManager.js';
+import type { UiCues } from '../../audio/ui/UiCues.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
 import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from '../settingsHooks.js';
@@ -57,6 +58,7 @@ export class SettingsPanel extends PanelBase {
   private onOpenSavesCb?: () => void;
   private onReturnToMenuCb?: () => void;
   private audioManager?: AudioManager;
+  private cues: Pick<UiCues, 'volumeAdjusted'> | null = null;
   private backend: SaveBackend | null = null;
   private getState?: GetStateCallback;
   private readonly locale = new LocaleTextRegistry();
@@ -192,6 +194,9 @@ export class SettingsPanel extends PanelBase {
   setBackend(backend: SaveBackend): void { this.backend = backend; }
   setGetState(fn: GetStateCallback): void { this.getState = fn; }
 
+  /** Slider feedback: lets the player hear the level they are setting. */
+  setCues(cues: Pick<UiCues, 'volumeAdjusted'> | null): void { this.cues = cues; }
+
   setAudioManager(mgr: AudioManager): void {
     this.audioManager = mgr;
     for (const { channel } of AUDIO_CHANNELS) {
@@ -220,6 +225,8 @@ export class SettingsPanel extends PanelBase {
 
     const input = el('input', { attrs: {
       type: 'range', min: '0', max: '100', value: '100',
+      // This row ticks on the bus it controls (volumeAdjusted below); the generic slider tick stays out.
+      'data-sfx': 'none',
       style: 'flex:1;accent-color:var(--bsx-amber)',
     } }) as HTMLInputElement;
     const readout = el('span', {
@@ -230,6 +237,7 @@ export class SettingsPanel extends PanelBase {
       readout.textContent = input.value;
       this.audioManager?.setVolume(channel, Number(input.value) / 100);
       saveVolume(channel, Number(input.value) / 100);
+      this.cues?.volumeAdjusted(channel);
     });
     this.volumeEls[channel] = { input, readout };
 

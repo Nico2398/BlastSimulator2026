@@ -1836,19 +1836,17 @@ export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;
 /** Maximum vertical gap (metres) between two fragments' AABB extents for stacking. */
 export const FRAGMENT_SUPPORT_VERTICAL_GAP = 0.1;
 
-/** Delay (ms) between the blast boom and the post-blast rumble sound. */
-export const BLAST_RUMBLE_OFFSET_MS = 800;
-
 /**
  * Default volume (0–1) per audio channel, before any stored player setting applies.
  * Keys must match the audio layer's `VolumeChannel` exactly: userSettings.ts derives
  * its list of persistable channels from them.
  */
-export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'ui', number> = {
+export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'ui' | 'music', number> = {
   master: 1,
   effects: 1,
-  ambient: 0.4,
-  ui: 0.6,
+  ambient: 0.7,
+  ui: 0.7,
+  music: 0.6,
 };
 
 /**

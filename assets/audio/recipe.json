@@ -1,0 +1,1097 @@
+{
+ "spec": {
+  "sample_rate": 44100,
+  "trim_threshold_db": -55,
+  "lead_ms": 2,
+  "tail_ms": 8,
+  "fade_in_ms": 2,
+  "target_rms_db": -18,
+  "gate_db": -50,
+  "peak_ceiling_db": -1,
+  "limiter_knee_db": -6,
+  "max_overshoot_db": 6,
+  "mp3": {
+   "vbr_quality": 2
+  }
+ },
+ "kinds": {
+  "ui": {
+   "max_s": 1.0,
+   "fade_out_ms": 15
+  },
+  "work": {
+   "max_s": 1.6,
+   "fade_out_ms": 25
+  },
+  "sting": {
+   "max_s": 3.5,
+   "fade_out_ms": 40
+  },
+  "blast": {
+   "max_s": 3.0,
+   "fade_out_ms": 40
+  }
+ },
+ "packs": {
+  "uisfx": {
+   "title": "uisfx 0.4.0 (npm), 'mechanical' personality",
+   "author": "Romain Simon",
+   "dir": "npm/uisfx-0.4.0/package/sounds",
+   "url": "https://github.com/romainsimon/uisfx",
+   "via": "npm package uisfx@0.4.0 (LICENSE-AUDIO, manifest.json license.audio = CC0-1.0)",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-impact": {
+   "title": "Kenney Impact Sounds",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/open-game-sfx-index/audio/impact-sounds",
+   "url": "https://kenney.nl/assets/impact-sounds",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-scifi": {
+   "title": "Kenney Sci-Fi Sounds",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/open-game-sfx-index/audio/sci-fi-sounds",
+   "url": "https://kenney.nl/assets/sci-fi-sounds",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-rpg": {
+   "title": "Kenney RPG Audio",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/open-game-sfx-index/audio/rpg-audio",
+   "url": "https://kenney.nl/assets/rpg-audio",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-jingles": {
+   "title": "Kenney Music Jingles",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/open-game-sfx-index/audio/music-jingles",
+   "url": "https://kenney.nl/assets/music-jingles",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-digital": {
+   "title": "Kenney Digital Audio",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/open-game-sfx-index/audio/digital-audio",
+   "url": "https://kenney.nl/assets/digital-audio",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-interface": {
+   "title": "Kenney Interface Sounds",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/open-game-sfx-index/audio/interface-sounds",
+   "url": "https://kenney.nl/assets/interface-sounds",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "oga-wobbleboxx": {
+   "title": "Level Up, Power Up, Coin Get (13 sounds)",
+   "author": "wobbleboxx (OpenGameArt.org)",
+   "dir": "github/open-game-sfx-index/audio/oga-levelup-powerup",
+   "url": "https://opengameart.org/content/level-up-power-up-coin-get-13-sounds",
+   "via": "open-game-sfx-index mirror",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-kit-citybuilder": {
+   "title": "Kenney Starter Kit City Builder",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/Starter-Kit-City-Builder/sounds",
+   "url": "https://github.com/KenneyNL/Starter-Kit-City-Builder",
+   "via": "first-party repository (code MIT; assets incl. sound effects CC0 per README)",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-kit-platformer": {
+   "title": "Kenney Starter Kit 3D Platformer",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/Starter-Kit-3D-Platformer/sounds",
+   "url": "https://github.com/KenneyNL/Starter-Kit-3D-Platformer",
+   "via": "first-party repository (code MIT; sound effects CC0 per README)",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kenney-kit-fps": {
+   "title": "Kenney Starter Kit FPS",
+   "author": "Kenney (kenney.nl)",
+   "dir": "github/Starter-Kit-FPS/sounds",
+   "url": "https://github.com/KenneyNL/Starter-Kit-FPS",
+   "via": "first-party repository (code MIT; assets incl. sound effects CC0 per README)",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "godot-audio-effects": {
+   "title": "Godot demo projects, audio/audio_effects/sfx",
+   "author": "see per-file credit (Freesound.org uploaders)",
+   "dir": "github/godot-demo-projects/audio/audio_effects/sfx",
+   "url": "https://github.com/godotengine/godot-demo-projects/tree/master/audio/audio_effects",
+   "via": "godot-demo-projects README: all sound effects from Freesound under CC0",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "files": {
+    "Whistle.wav": {
+     "credit": "\"Whistle\" by OwlStorm, Freesound 320150",
+     "url": "https://freesound.org/people/OwlStorm/sounds/320150/"
+    },
+    "sad_trombone.wav": {
+     "credit": "\"Sad Trombone\" by kirbydx, Freesound 175409",
+     "url": "https://freesound.org/people/kirbydx/sounds/175409/"
+    }
+   }
+  },
+  "meta-piano": {
+   "title": "Meta Open Sound, meta-piano",
+   "author": "Meta Creative Audio team",
+   "dir": "github/Meta-open-sound/systems/instruments/meta-piano/ogg",
+   "url": "https://github.com/facebookincubator/Meta-open-sound",
+   "via": "repository README: recorded by Meta's Creative Audio team, all CC0 1.0",
+   "license": "CC0-1.0",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "opensfx": {
+   "title": "OpenSFX (OpenTTD base sounds)",
+   "author": "see per-file psfo line",
+   "dir": "github/OpenSFX/src/wav",
+   "url": "https://github.com/OpenTTD/OpenSFX",
+   "via": "github.com/OpenTTD/OpenSFX, src/opensfx.psfo; each sound is used under its own file licence, not the pack-wide CC-BY-SA-3.0",
+   "license": "per file",
+   "license_url": "",
+   "files": {
+    "osfx_17.wav": {
+     "psfo": "\"Crash\". Original \"crash.wav\" by \"sagetyrtle\". Edited by Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://freesound.org/people/sagetyrtle/sounds/40158/"
+    },
+    "osfx_19.wav": {
+     "psfo": "\"Big crash\". Original \"crash.wav\" by \"sagetyrtle\". Edited by Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://freesound.org/people/sagetyrtle/sounds/40158/"
+    },
+    "osfx_20.wav": {
+     "psfo": "\"Cash till\". By Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://github.com/OpenTTD/OpenSFX"
+    },
+    "osfx_25.wav": {
+     "psfo": "\"Truck/old bus start, pull away\". Original \"file0375.mp3\" by \"saphix\". Edited by \"Wuzzy\". License: Creative Commons Zero 1.0.",
+     "license": "CC0-1.0",
+     "url": "https://freesound.org/people/saphix/sounds/36794/"
+    },
+    "osfx_33.wav": {
+     "psfo": "\"Jackhammer\". Original \"air hammer half close.wav\" by \"Bluesy1905\". Cut and edited by \"Wuzzy\". License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://freesound.org/people/Bluesy1905/sounds/344934/"
+    },
+    "osfx_35.wav": {
+     "psfo": "\"Modern car horn\". Original \"claxon.wav\" by \"han1\". Edited by Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://freesound.org/people/han1/sounds/19026/"
+    },
+    "osfx_39.wav": {
+     "psfo": "\"Building bridge\". Original \"in the smithy 2.wav\" by \"l0calh05t\". Edited by \"Wuzzy\". License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://freesound.org/people/l0calh05t/sounds/19027/"
+    },
+    "osfx_16.wav": {
+     "psfo": "\"Train/ship breakdown\". Original \"Dumpster_Diving.wav\" by \"1sticky8\". Edited by \"Wuzzy\". License: Creative Commons Zero 1.0.",
+     "license": "CC0-1.0",
+     "url": "https://freesound.org/people/1sticky8/sounds/78484/"
+    }
+   }
+  }
+ },
+ "sounds": {
+  "bell": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactBell_heavy_000.ogg"
+    }
+   ],
+   "max_s": 1.5,
+   "fade_out_ms": 200
+  },
+  "blast_boom_1": {
+   "kind": "blast",
+   "layers": [
+    {
+     "pack": "kenney-scifi",
+     "file": "lowFrequency_explosion_000.ogg"
+    },
+    {
+     "pack": "kenney-scifi",
+     "file": "explosionCrunch_002.ogg",
+     "gain_db": -7,
+     "af": "lowpass=f=1000,lowpass=f=1000,lowpass=f=1000"
+    }
+   ],
+   "fade_out_ms": 300
+  },
+  "blast_boom_2": {
+   "kind": "blast",
+   "layers": [
+    {
+     "pack": "kenney-scifi",
+     "file": "lowFrequency_explosion_001.ogg"
+    },
+    {
+     "pack": "kenney-scifi",
+     "file": "explosionCrunch_004.ogg",
+     "gain_db": -8,
+     "af": "lowpass=f=800,lowpass=f=800,lowpass=f=800"
+    }
+   ],
+   "max_s": 2.4,
+   "fade_out_ms": 300
+  },
+  "blast_crack_1": {
+   "kind": "blast",
+   "layers": [
+    {
+     "pack": "kenney-scifi",
+     "file": "explosionCrunch_000.ogg"
+    }
+   ],
+   "max_s": 1.0,
+   "fade_out_ms": 120
+  },
+  "blast_crack_2": {
+   "kind": "blast",
+   "layers": [
+    {
+     "pack": "kenney-scifi",
+     "file": "explosionCrunch_001.ogg"
+    }
+   ],
+   "max_s": 1.2,
+   "fade_out_ms": 120
+  },
+  "blast_crack_3": {
+   "kind": "blast",
+   "layers": [
+    {
+     "pack": "kenney-scifi",
+     "file": "explosionCrunch_003.ogg"
+    }
+   ],
+   "max_s": 1.3,
+   "fade_out_ms": 120
+  },
+  "blast_dud": {
+   "kind": "blast",
+   "layers": [
+    {
+     "pack": "kenney-kit-fps",
+     "file": "enemy_destroy.ogg"
+    }
+   ],
+   "max_s": 1.0
+  },
+  "boulder_break": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-platformer",
+     "file": "break.ogg"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_002.ogg",
+     "at": 0.015,
+     "gain_db": -6
+    }
+   ]
+  },
+  "cash_till": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_20.wav"
+    }
+   ],
+   "max_s": 1.2,
+   "fade_out_ms": 150
+  },
+  "charge_click": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-rpg",
+     "file": "metalLatch.ogg"
+    }
+   ]
+  },
+  "coins_big": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-rpg",
+     "file": "handleCoins.ogg"
+    }
+   ]
+  },
+  "coins_small": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-rpg",
+     "file": "handleCoins2.ogg"
+    }
+   ]
+  },
+  "crash_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_17.wav",
+     "dur": 1.6
+    }
+   ],
+   "fade_out_ms": 150
+  },
+  "crash_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_19.wav",
+     "dur": 1.6
+    }
+   ],
+   "fade_out_ms": 150
+  },
+  "dig_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "removal-a.ogg"
+    }
+   ]
+  },
+  "dig_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "removal-b.ogg"
+    }
+   ]
+  },
+  "dig_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "removal-d.ogg"
+    }
+   ]
+  },
+  "drill_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_33.wav",
+     "start": 0.0,
+     "dur": 1.2,
+     "fade_in_ms": 4,
+     "fade_out_ms": 30
+    }
+   ]
+  },
+  "drill_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_33.wav",
+     "start": 1.25,
+     "dur": 1.2,
+     "fade_in_ms": 4,
+     "fade_out_ms": 30
+    }
+   ]
+  },
+  "dump_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_16.wav",
+     "start": 0.0,
+     "dur": 0.75,
+     "fade_in_ms": 4,
+     "fade_out_ms": 40
+    }
+   ]
+  },
+  "dump_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_16.wav",
+     "start": 0.5,
+     "dur": 0.77,
+     "fade_in_ms": 4,
+     "fade_out_ms": 40
+    }
+   ]
+  },
+  "event_lawsuit": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "kenney-rpg",
+     "file": "bookClose.ogg",
+     "at": 0.0,
+     "gain_db": 0,
+     "align_db": -22
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactWood_heavy_001.ogg",
+     "at": 0.0,
+     "gain_db": -8,
+     "dur": 0.3,
+     "af": "highpass=f=60"
+    },
+    {
+     "pack": "kenney-rpg",
+     "file": "bookPlace1.ogg",
+     "at": 0.34,
+     "gain_db": 3,
+     "align_db": -22
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactWood_heavy_003.ogg",
+     "at": 0.34,
+     "gain_db": -5,
+     "dur": 0.3,
+     "af": "highpass=f=60"
+    }
+   ],
+   "max_s": 1.2,
+   "fade_out_ms": 120
+  },
+  "event_mafia": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "meta-piano",
+     "file": "INSPiano_Vel04_C2_01.ogg",
+     "dur": 3.0
+    },
+    {
+     "pack": "meta-piano",
+     "file": "INSPiano_Vel04_Cs2_01.ogg",
+     "dur": 3.0,
+     "at": 0.035,
+     "gain_db": -1
+    },
+    {
+     "pack": "meta-piano",
+     "file": "INSPiano_Vel04_C1_01.ogg",
+     "dur": 3.0,
+     "gain_db": -4
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactSoft_heavy_001.ogg",
+     "gain_db": -2
+    }
+   ],
+   "max_s": 2.6,
+   "fade_out_ms": 500
+  },
+  "event_politics": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "kenney-jingles",
+     "file": "jingles_SAX03.ogg"
+    }
+   ]
+  },
+  "event_union": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "godot-audio-effects",
+     "file": "Whistle.wav",
+     "align_db": -40
+    }
+   ],
+   "max_s": 1.4
+  },
+  "fire": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/remove-from-cart.ogg"
+    }
+   ]
+  },
+  "hammer_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_39.wav",
+     "start": 0.3,
+     "dur": 0.55,
+     "fade_in_ms": 3
+    }
+   ]
+  },
+  "hammer_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_39.wav",
+     "start": 1.5,
+     "dur": 0.62,
+     "fade_in_ms": 3
+    }
+   ]
+  },
+  "hire": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/add-to-cart.ogg"
+    }
+   ]
+  },
+  "horn": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_35.wav"
+    }
+   ]
+  },
+  "impact_metal_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactMetal_heavy_001.ogg"
+    }
+   ]
+  },
+  "impact_metal_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactMetal_heavy_003.ogg"
+    }
+   ]
+  },
+  "impact_plate_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactPlate_heavy_000.ogg"
+    }
+   ]
+  },
+  "impact_plate_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactPlate_heavy_004.ogg"
+    }
+   ]
+  },
+  "impact_rock_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_000.ogg"
+    }
+   ],
+   "max_s": 0.6,
+   "fade_out_ms": 60
+  },
+  "impact_rock_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_001.ogg"
+    }
+   ],
+   "max_s": 0.6,
+   "fade_out_ms": 60
+  },
+  "impact_rock_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_002.ogg"
+    }
+   ],
+   "max_s": 0.6,
+   "fade_out_ms": 60
+  },
+  "impact_rock_4": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_003.ogg"
+    }
+   ],
+   "max_s": 0.6,
+   "fade_out_ms": 60
+  },
+  "impact_small_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_000.ogg"
+    }
+   ]
+  },
+  "impact_small_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_001.ogg"
+    }
+   ]
+  },
+  "impact_small_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_002.ogg"
+    }
+   ]
+  },
+  "impact_small_4": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_003.ogg"
+    }
+   ]
+  },
+  "impact_small_5": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_004.ogg"
+    }
+   ]
+  },
+  "impact_soft_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactSoft_heavy_000.ogg",
+     "af": "highpass=f=45"
+    },
+    {
+     "pack": "kenney-rpg",
+     "file": "dropLeather.ogg",
+     "gain_db": -3,
+     "align_db": -30
+    }
+   ]
+  },
+  "impact_soft_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactSoft_heavy_002.ogg",
+     "af": "highpass=f=45"
+    },
+    {
+     "pack": "kenney-rpg",
+     "file": "footstep02.ogg",
+     "gain_db": -3,
+     "align_db": -30
+    }
+   ]
+  },
+  "impact_soft_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-impact",
+     "file": "impactSoft_heavy_004.ogg",
+     "af": "highpass=f=45"
+    },
+    {
+     "pack": "kenney-rpg",
+     "file": "footstep06.ogg",
+     "gain_db": -3,
+     "align_db": -30
+    }
+   ]
+  },
+  "level_lose": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "godot-audio-effects",
+     "file": "sad_trombone.wav",
+     "af": "atempo=1.18"
+    }
+   ],
+   "max_s": 3.2,
+   "fade_out_ms": 250
+  },
+  "level_up": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/level-up.ogg"
+    }
+   ]
+  },
+  "level_win": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "oga-wobbleboxx",
+     "file": "Upper01.wav"
+    }
+   ],
+   "max_s": 3.4,
+   "fade_out_ms": 300
+  },
+  "notify_alert": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/mention.ogg"
+    }
+   ]
+  },
+  "notify_bad": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/disconnect.ogg"
+    }
+   ]
+  },
+  "notify_good": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/reward.ogg"
+    }
+   ]
+  },
+  "notify_info": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/info.ogg"
+    }
+   ]
+  },
+  "notify_warn": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/warning.ogg"
+    }
+   ]
+  },
+  "order_done": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/complete.ogg"
+    }
+   ]
+  },
+  "order_queued": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/queued.ogg"
+    }
+   ]
+  },
+  "place_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "placement-a.ogg"
+    }
+   ]
+  },
+  "place_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "placement-b.ogg"
+    }
+   ]
+  },
+  "place_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "placement-c.ogg"
+    }
+   ]
+  },
+  "place_4": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-kit-citybuilder",
+     "file": "placement-d.ogg"
+    }
+   ]
+  },
+  "purchase": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/purchase.ogg"
+    }
+   ]
+  },
+  "survey_ping": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "kenney-interface",
+     "file": "pluck_002.ogg"
+    },
+    {
+     "pack": "kenney-interface",
+     "file": "pluck_002.ogg",
+     "at": 0.2,
+     "gain_db": -10,
+     "af": "lowpass=f=3500"
+    },
+    {
+     "pack": "kenney-interface",
+     "file": "pluck_002.ogg",
+     "at": 0.4,
+     "gain_db": -18,
+     "af": "lowpass=f=2500"
+    }
+   ]
+  },
+  "truck_start": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "opensfx",
+     "file": "osfx_25.wav",
+     "dur": 2.3
+    }
+   ],
+   "max_s": 2.2,
+   "fade_out_ms": 200
+  },
+  "ui_back": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/back.ogg"
+    }
+   ]
+  },
+  "ui_click_1": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/press.ogg"
+    }
+   ]
+  },
+  "ui_click_2": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/snap.ogg"
+    }
+   ]
+  },
+  "ui_close": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/close.ogg"
+    }
+   ]
+  },
+  "ui_confirm": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/success.ogg"
+    }
+   ]
+  },
+  "ui_denied": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/blocked.ogg"
+    }
+   ]
+  },
+  "ui_error": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/error.ogg"
+    }
+   ]
+  },
+  "ui_hover": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/hover.ogg"
+    }
+   ]
+  },
+  "ui_invalid": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/invalid-drop.ogg"
+    }
+   ]
+  },
+  "ui_modal": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/focus.ogg"
+    }
+   ]
+  },
+  "ui_open": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/open.ogg"
+    }
+   ]
+  },
+  "ui_select": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/select.ogg"
+    }
+   ]
+  },
+  "ui_slider": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/volume-change.ogg"
+    }
+   ]
+  },
+  "ui_tab": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/swipe.ogg"
+    }
+   ]
+  },
+  "ui_toggle_off": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/toggle-off.ogg"
+    }
+   ]
+  },
+  "ui_toggle_on": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/toggle-on.ogg"
+    }
+   ]
+  },
+  "unlock": {
+   "kind": "ui",
+   "layers": [
+    {
+     "pack": "uisfx",
+     "file": "mechanical/unlock.ogg"
+    }
+   ]
+  }
+ }
+}

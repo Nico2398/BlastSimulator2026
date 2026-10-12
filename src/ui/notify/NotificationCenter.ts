@@ -24,6 +24,7 @@ import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
+import type { UiCues } from '../../audio/ui/UiCues.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -49,6 +50,8 @@ export interface NotifyInput {
   /** Optional call-to-action label + handler, shown on the toast only. */
   cta?: string;
   onCta?: () => void;
+  /** True when the event behind this toast already has its own sound, so the toast cue stays quiet. */
+  silent?: boolean;
 }
 
 export interface LogEntry {
@@ -98,6 +101,11 @@ export class NotificationCenter {
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
 
+  /** Interface cue sink; unset in headless runs and tests. */
+  private cues: Pick<UiCues, 'notification'> | null = null;
+
+  setCues(cues: Pick<UiCues, 'notification'> | null): void { this.cues = cues; }
+
   /** Push a notification: it appears as a toast now and stays in the log. */
   notify(input: NotifyInput): void {
     const entry: LogEntry = {
@@ -119,6 +127,7 @@ export class NotificationCenter {
     if (this.toasts.length > MAX_TOASTS) this.toasts.shift();
     // Auto-dismiss only the toast surface; the log entry is permanent.
     setTimeout(() => this.dismissToast(entry.id), TOAST_LIFETIME_MS);
+    if (input.silent !== true) this.cues?.notification(input.severity);
   }
 
   dismissToast(id: number): void {
