@@ -12,7 +12,7 @@ import { CooldownGate } from '../../../../src/audio/director/rateLimit.js';
 import { Subscriptions } from '../../../../src/audio/director/Subscriptions.js';
 import { EVENT_CUES, FLAG_CUES } from '../../../../src/core/config/audio/game.js';
 import { EventEmitter } from '../../../../src/core/state/EventEmitter.js';
-import { addEmployee, addVehicle, listenerAt, makeHarness, makeState } from '../director/helpers.js';
+import { addEmployee, addVehicle, fallingTo, listenerAt, makeHarness, makeState } from '../director/helpers.js';
 
 function feedFixture() {
   const state = makeState();
@@ -91,7 +91,7 @@ describe('BlastAudio.hush', () => {
   const info: BlastInfo = {
     origin: { x: 5, z: 5 },
     holeCount: 20,
-    flights: Array.from({ length: 300 }, (_, i) => ({ delayS: 0, durationS: 0.5 + i * 0.03, impactSpeed: 30, to: { x: 5 + (i % 7), z: 5 + (i % 5) } })),
+    flights: Array.from({ length: 300 }, (_, i) => fallingTo({ x: 5 + (i % 7), z: 5 + (i % 5) }, { delayS: 0, durationS: 0.5 + i * 0.03, impactSpeed: 30 })),
     report: null,
   };
 
@@ -99,13 +99,17 @@ describe('BlastAudio.hush', () => {
     const h = makeHarness({ seed: 4 });
     const blast = new BlastAudio(h.env, () => undefined);
     blast.play(info, 100);
+    const rain = () => h.player.plays.filter(p => p.id.startsWith('debris')).length;
     const bookedAtShot = h.player.plays.length;
+    const rainAtShot = rain();
     blast.hush();
     for (let frame = 0; frame < 60 * 12; frame++) {
       h.advance(1 / 60);
       blast.update(1 / 60);
     }
     expect(bookedAtShot).toBeGreaterThanOrEqual(4);
-    expect(h.player.plays).toHaveLength(bookedAtShot);
+    expect(rain()).toBe(rainAtShot);
+    // The tail is not rain: it may still be booked after the hush.
+    expect(h.player.of('blast_tail')).toHaveLength(1);
   });
 });

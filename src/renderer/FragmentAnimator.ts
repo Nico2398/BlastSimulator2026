@@ -10,7 +10,7 @@
 // playback would have arrived at.
 
 import type { FragmentFlight } from '../core/mining/BlastResolve.js';
-import { flightPositionAt, totalFlightDuration } from '../core/mining/BlastResolve.js';
+import { flightPositionAt, isAnimatedFlight, totalFlightDuration } from '../core/mining/BlastResolve.js';
 import type { FragmentMesh, FragmentInstanceTransform } from './FragmentMesh.js';
 import type { PlainVec3 } from './FragmentTransformMath.js';
 import {
@@ -109,7 +109,7 @@ export class FragmentAnimator {
    * animated, so a blast whose rock barely shifted costs nothing.
    */
   begin(flights: readonly FragmentFlight[]): void {
-    this.source = flights.filter(f => f.durationS > 0 && !samePlace(f));
+    this.source = flights.filter(isAnimatedFlight);
     this.flights = this.source.slice();
     this.elapsedS = 0;
     // Playback holds through the landing squash-and-bounce, not just to
@@ -190,12 +190,4 @@ export class FragmentAnimator {
     }
     this.fragments.updateTransforms(this.transforms);
   }
-}
-
-/** True when a fragment settled where it started and has nothing to animate. */
-function samePlace(flight: FragmentFlight): boolean {
-  const dx = flight.to.x - flight.from.x;
-  const dy = flight.to.y - flight.from.y;
-  const dz = flight.to.z - flight.from.z;
-  return dx * dx + dy * dy + dz * dz < 1e-6;
 }

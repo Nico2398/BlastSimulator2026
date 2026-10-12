@@ -6,7 +6,8 @@ import { isMixScenarioName, MIX_SCENARIO_NAMES, type MixScenarioName } from './m
 interface CheckOptions {
   /** Scenarios to render; all of them when none were named. */
   readonly scenarios: readonly MixScenarioName[];
-  readonly outDir: string;
+  /** Where to write the mixes; undefined means "a fresh private temp directory" (the caller creates it). */
+  readonly outDir: string | undefined;
   readonly port: number;
   /** Give up waiting for the page after this long (s). */
   readonly timeoutS: number;
@@ -20,7 +21,7 @@ type ParsedCheckArgs =
 export const CHECK_USAGE = [
   'Usage: npm run sounds:check -- [--scenario <name>[,<name>]] [--out <dir>] [--port <n>] [--timeout <s>]',
   `  scenarios: ${MIX_SCENARIO_NAMES.join(', ')} (default: all)`,
-  '  --out      directory for the rendered WAV files and report.json (default: a temp directory)',
+  '  --out      directory for the rendered WAV files and report.json (default: a new private temp directory, printed)',
   '  --port     dev server port (default 5173)',
   '  --timeout  seconds to wait for the page (default 900)',
 ].join('\n');
@@ -33,9 +34,9 @@ function positiveNumber(flag: string, value: string | undefined): number | strin
   return value !== undefined && Number.isFinite(parsed) && parsed > 0 ? parsed : `${flag} needs a positive number`;
 }
 
-export function parseCheckArgs(argv: readonly string[], defaultOutDir: string): ParsedCheckArgs {
+export function parseCheckArgs(argv: readonly string[]): ParsedCheckArgs {
   const scenarios: MixScenarioName[] = [];
-  let outDir = defaultOutDir;
+  let outDir: string | undefined;
   let port = DEFAULT_PORT;
   let timeoutS = DEFAULT_TIMEOUT_S;
   for (let i = 0; i < argv.length; i++) {

@@ -98,12 +98,56 @@ describe('Ambience beds', () => {
 
   it('cross-fades rain over a few seconds when the weather turns', () => {
     const f = fixture();
-    f.run(1, { weather: 'light_rain' });
+    f.run(cfg.minDwellS + STEP, { weather: 'light_rain' });
     f.run(1, { weather: 'heavy_rain' });
     const light = f.h.player.bed('amb_rain_light').calls;
     const heavy = f.h.player.bed('amb_rain_heavy').calls;
     expect(light.at(-1)).toEqual({ level: 0, rampS: cfg.rampS });
     expect(heavy.at(-1)).toEqual({ level: cfg.weather.heavy_rain.rainHeavy, rampS: cfg.rampS });
+  });
+
+  it('takes a weather change at once after a calm spell, and holds the next one for the dwell', () => {
+    const f = fixture();
+    f.run(cfg.minDwellS + STEP, { weather: 'sunny' });
+    f.run(STEP, { weather: 'heavy_rain' });
+    expect(f.level('amb_rain_heavy')).toBe(cfg.weather.heavy_rain.rainHeavy);
+    f.run(cfg.minDwellS / 2, { weather: 'cloudy' });
+    expect(f.level('amb_rain_heavy')).toBe(cfg.weather.heavy_rain.rainHeavy);
+    f.run(cfg.minDwellS + STEP, { weather: 'cloudy' });
+    expect(f.level('amb_rain_heavy')).toBe(0);
+  });
+
+  it('follows the weather that holds when the dwell ends, not one that came and went inside it', () => {
+    const f = fixture();
+    f.run(cfg.minDwellS + STEP, { weather: 'sunny' });
+    f.run(STEP, { weather: 'light_rain' });
+    f.run(1, { weather: 'storm' });
+    f.run(1, { weather: 'light_rain' });
+    f.run(cfg.minDwellS + STEP, { weather: 'light_rain' });
+    expect(f.level('amb_rain_heavy')).toBe(0);
+    expect(f.level('amb_rain_light')).toBe(cfg.weather.light_rain.rainLight);
+  });
+
+  it('does not flutter the beds when the weather flips every few real seconds (8x)', () => {
+    const f = fixture();
+    const flips: WeatherState[] = ['sunny', 'storm', 'cloudy', 'heavy_rain', 'light_rain', 'sunny'];
+    for (let i = 0; i < 60; i++) f.run(1, { weather: flips[i % flips.length] ?? 'sunny' });
+    const sends = ['amb_wind', 'amb_rain_light', 'amb_rain_heavy'].reduce((sum, bed) => sum + f.h.player.bed(bed as 'amb_wind').calls.length, 0);
+    // Without a dwell every flip retargets the three beds (60 flips, ~150 sends); with one, a change per dwell at most.
+    expect(sends).toBeLessThanOrEqual(3 * (Math.floor(60 / cfg.minDwellS) + 1));
+  });
+
+  it('still fades out at once for a menu or the end of the game, whatever the dwell', () => {
+    const f = fixture();
+    f.run(cfg.minDwellS, { weather: 'storm' });
+    f.run(STEP, { weather: 'storm', menuUp: true });
+    expect(f.level('amb_rain_heavy')).toBe(0);
+    expect(f.h.player.bed('amb_rain_heavy').calls.at(-1)?.rampS).toBe(cfg.menuRampS);
+    const g = fixture();
+    g.run(STEP, { weather: 'heavy_rain' });
+    g.run(STEP, { weather: null });
+    expect(g.level('amb_rain_heavy')).toBe(0);
+    expect(g.level('amb_wind')).toBe(0);
   });
 
   it('sends a level once per change, not once per frame', () => {
@@ -178,22 +222,34 @@ describe('Ambience thunder', () => {
 });
 
 describe('Ambience storm rumbles', () => {
-  it('rumbles at long random intervals in a storm only', () => {
+  const rumbles = (f: Fixture) => f.h.player.of('thunder').filter(p => p.opts.key === 'thunder:rumble');
+
+  it('rumbles at long random intervals in a storm only, the first one soon after it begins', () => {
     const f = fixture();
     f.run(600, { weather: 'storm' });
-    const rumbles = f.h.player.of('thunder');
-    expect(rumbles.length).toBeGreaterThanOrEqual(600 / cfg.thunder.rumbleMaxIntervalS - 1);
-    expect(rumbles.length).toBeLessThanOrEqual(600 / cfg.thunder.rumbleMinIntervalS);
-    for (const rumble of rumbles) {
+    const all = rumbles(f);
+    expect(all[0]?.atS).toBeGreaterThanOrEqual(cfg.thunder.rumbleFirstMinS - STEP);
+    expect(all[0]?.atS).toBeLessThanOrEqual(cfg.thunder.rumbleFirstMaxS + STEP);
+    expect(all.length).toBeGreaterThanOrEqual((600 - cfg.thunder.rumbleFirstMaxS) / cfg.thunder.rumbleMaxIntervalS);
+    expect(all.length).toBeLessThanOrEqual(600 / cfg.thunder.rumbleMinIntervalS + 1);
+    for (const rumble of all) {
       expect(rumble.opts.delayS).toBeUndefined();
       expect(rumble.opts.gainDb).toBeGreaterThanOrEqual(cfg.thunder.rumbleMinDb);
       expect(rumble.opts.gainDb).toBeLessThanOrEqual(cfg.thunder.rumbleMaxDb);
     }
-    const gaps = rumbles.slice(1).map((r, i) => r.atS - (rumbles[i]?.atS ?? 0));
+    const gaps = all.slice(1).map((r, i) => r.atS - (all[i]?.atS ?? 0));
+    expect(gaps.length).toBeGreaterThan(10);
     for (const gap of gaps) {
       expect(gap).toBeGreaterThanOrEqual(cfg.thunder.rumbleMinIntervalS - STEP);
       expect(gap).toBeLessThanOrEqual(cfg.thunder.rumbleMaxIntervalS + STEP);
     }
+  });
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])('rumbles within the first-rumble window of a storm (seed %d)', seed => {
+    const f = fixture(seed);
+    f.run(cfg.thunder.rumbleFirstMaxS + 2 * STEP, { weather: 'storm' });
+    expect(rumbles(f)).toHaveLength(1);
+    expect(rumbles(f)[0]?.atS).toBeGreaterThanOrEqual(cfg.thunder.rumbleFirstMinS - STEP);
   });
 
   it.each(['sunny', 'cloudy', 'light_rain', 'heavy_rain', 'heat_wave', 'cold_snap'] as const)('never rumbles in %s weather', weather => {
@@ -202,12 +258,32 @@ describe('Ambience storm rumbles', () => {
     expect(f.h.player.of('thunder')).toHaveLength(0);
   });
 
-  it('is silent while paused or behind a menu, and starts a fresh interval after', () => {
+  it('keeps its clock through a short calm between two storms', () => {
+    const f = fixture();
+    f.run(1.5, { weather: 'storm' });
+    f.run(cfg.thunder.rumbleResetCalmS / 2, { weather: 'cloudy' });
+    expect(rumbles(f)).toHaveLength(0);
+    f.run(cfg.thunder.rumbleFirstMaxS - 1.5 + 2 * STEP, { weather: 'storm' });
+    expect(rumbles(f)).toHaveLength(1);
+  });
+
+  it('starts afresh after a calm long enough for the storm to be over', () => {
+    const f = fixture();
+    f.run(cfg.thunder.rumbleFirstMaxS + 2 * STEP, { weather: 'storm' });
+    expect(rumbles(f)).toHaveLength(1);
+    f.run(cfg.thunder.rumbleResetCalmS + 1, { weather: 'cloudy' });
+    f.run(cfg.thunder.rumbleFirstMaxS + 2 * STEP, { weather: 'storm' });
+    expect(rumbles(f)).toHaveLength(2);
+  });
+
+  it('waits while paused or behind a menu, then rumbles within the first-rumble window of the storm it comes back to', () => {
     const f = fixture();
     f.run(300, { weather: 'storm', paused: true });
     f.run(300, { weather: 'storm', menuUp: true });
     expect(f.h.player.of('thunder')).toHaveLength(0);
-    f.run(cfg.thunder.rumbleMinIntervalS - 1, { weather: 'storm' });
+    f.run(cfg.thunder.rumbleFirstMinS - 2 * STEP, { weather: 'storm' });
     expect(f.h.player.of('thunder')).toHaveLength(0);
+    f.run(cfg.thunder.rumbleFirstMaxS, { weather: 'storm' });
+    expect(f.h.player.of('thunder')).toHaveLength(1);
   });
 });

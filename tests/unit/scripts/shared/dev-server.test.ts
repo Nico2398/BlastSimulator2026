@@ -3,7 +3,9 @@
 
 import { describe, it, expect, vi, type Mock } from 'vitest';
 import { createServer } from 'node:net';
-import { ensureDevServer, findFreePort, originOf, type DevServerDeps } from '../../../../scripts/shared/dev-server.js';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { ensureDevServer, findFreePort, originOf, REPO_ROOT, type DevServerDeps } from '../../../../scripts/shared/dev-server.js';
 
 function deps(up: boolean, startImpl?: DevServerDeps['start']): { deps: DevServerDeps; probe: Mock<[string], Promise<boolean>>; start: Mock<[number], Promise<() => Promise<void>>> } {
   const close = vi.fn(() => Promise.resolve());
@@ -11,6 +13,14 @@ function deps(up: boolean, startImpl?: DevServerDeps['start']): { deps: DevServe
   const start = vi.fn(startImpl ?? ((_port: number) => Promise.resolve(close)));
   return { deps: { probe, start }, probe, start };
 }
+
+describe('REPO_ROOT', () => {
+  it('is the repository root whatever the working directory, found from the module location', () => {
+    expect(resolve(REPO_ROOT)).toBe(resolve(import.meta.dirname, '../../../..'));
+    expect(existsSync(join(REPO_ROOT, 'package.json'))).toBe(true);
+    expect(existsSync(join(REPO_ROOT, 'sound-lab.html'))).toBe(true);
+  });
+});
 
 describe('originOf', () => {
   it('names localhost with the port and no trailing slash', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Listener } from '../../../../src/audio/AudioPlayer.js';
-import { computeSpatial } from '../../../../src/audio/engine/spatial.js';
+import { computeSpatial, cullDistance, referenceDistance } from '../../../../src/audio/engine/spatial.js';
 import { SPATIAL_CONFIG } from '../../../../src/core/config/audio/engine.js';
 
 /** Looking along +z with right = +x, at the given camera distance. */
@@ -115,5 +115,22 @@ describe('computeSpatial zoom', () => {
     const cfg = { ...SPATIAL_CONFIG, cullDistanceFactor: 1.5 };
     expect(computeSpatial(listener(), { x: 0, z: REF * 2 }, cfg).audible).toBe(false);
     expect(computeSpatial(listener(), { x: 0, z: REF * 2 }).audible).toBe(true);
+  });
+});
+
+describe('referenceDistance and cullDistance', () => {
+  it('scale with the camera distance inside the configured clamp', () => {
+    expect(referenceDistance(30)).toBeCloseTo(REF, 12);
+    expect(referenceDistance(0)).toBe(SPATIAL_CONFIG.minReferenceM);
+    expect(referenceDistance(1e6)).toBe(SPATIAL_CONFIG.maxReferenceM);
+    expect(cullDistance(30)).toBeCloseTo(CULL, 12);
+  });
+
+  it('are the distances computeSpatial itself culls at', () => {
+    for (const view of [5, 30, 80, 400]) {
+      const cull = cullDistance(view);
+      expect(computeSpatial(listener(view), { x: 0, z: cull }).audible).toBe(false);
+      expect(computeSpatial(listener(view), { x: 0, z: referenceDistance(view) }).gain).toBeGreaterThanOrEqual(SPATIAL_CONFIG.zoomTrimMin);
+    }
   });
 });

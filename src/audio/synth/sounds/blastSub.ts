@@ -3,16 +3,14 @@
 // tanh saturation, under a short lowpassed noise crack.
 
 import { BLAST_SUB_CONFIG } from '../../../core/config/audio/synth.js';
-import { attackDecay } from '../envelopes.js';
+import { attackDecay, decayTo } from '../envelopes.js';
 import { finishRender } from '../finish.js';
 import { filterBuffer } from '../filters.js';
 import { saturate } from '../mix.js';
 import { unitRms, whiteNoise } from '../noise.js';
-import { accumulatePhase } from '../oscillators.js';
+import { accumulatePhase, TWO_PI } from '../oscillators.js';
 import { rngFor, variantAt, variantIndex } from '../seed.js';
 import type { SynthRecipe } from '../types.js';
-
-const TWO_PI = 2 * Math.PI;
 
 export const BLAST_SUB: SynthRecipe = {
   variants: BLAST_SUB_CONFIG.variants.length,
@@ -26,7 +24,7 @@ export const BLAST_SUB: SynthRecipe = {
     const rng = rngFor('blast_sub', variant);
 
     const pitch = new Float64Array(n);
-    for (let i = 0; i < n; i++) pitch[i] = c.endHz + (v.startHz - c.endHz) * Math.exp(-i / sr / v.pitchTauSec);
+    for (let i = 0; i < n; i++) pitch[i] = decayTo(v.startHz, c.endHz, i / sr, v.pitchTauSec);
     const phase = accumulatePhase(pitch, sr);
 
     const rumble = unitRms(filterBuffer(whiteNoise(rng, n), 'lowpass', sr, c.rumbleLowpassHz));

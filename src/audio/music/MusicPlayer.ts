@@ -8,7 +8,7 @@
 import { MUSIC_CONFIG, type MusicConfig } from '../../core/config/audio/music.js';
 import { jumpTo } from '../engine/audioParams.js';
 import { dbToGain } from '../engine/units.js';
-import { fadeLevelAt, scheduleFade, type Fade } from './fadeCurve.js';
+import { assignLevel, fadeLevelAt, scheduleFade, type Fade } from './fadeCurve.js';
 import type { MusicTrack } from './MusicCatalog.js';
 
 /** The part of the audio manager the player needs; `AudioManager` satisfies it. */
@@ -133,7 +133,11 @@ export class MusicPlayer implements MusicPlayback {
     if (durationS <= 0) {
       voice.fade = null;
       voice.held = to;
-      jumpTo(voice.gain.gain, to, startS);
+      try {
+        jumpTo(voice.gain.gain, to, startS);
+      } catch {
+        assignLevel(voice.gain.gain, to);
+      }
       return;
     }
     voice.fade = { from, to, startS, durationS };

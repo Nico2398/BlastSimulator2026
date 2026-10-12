@@ -28,6 +28,7 @@ import {
   PILE_SPILL_STEPS,
   PILE_REPOSE_STEP,
   BLAST_SLICE_ITEMS,
+  MIN_ANIMATED_DISPLACEMENT_SQ_M2,
 } from '../config/balance.js';
 import type { Projectile } from './ProjectileGrouping.js';
 
@@ -91,6 +92,19 @@ export function flightPositionAt(flight: FragmentFlight, t: number): Vec3 {
     flight.from.y + vy * local + 0.5 * GRAVITY * local * local,
     flight.from.z + (flight.to.z - flight.from.z) * progress,
   );
+}
+
+/**
+ * True when a fragment visibly moves: it spends time in the air and settles somewhere other than where it
+ * started. The rest (rock that merely stays put) has nothing to play back, show or sound. The renderer and the
+ * blast's audio both ask this one question so they agree on which rock moved.
+ */
+export function isAnimatedFlight(flight: Pick<FragmentFlight, 'durationS' | 'from' | 'to'>): boolean {
+  if (flight.durationS <= 0) return false;
+  const dx = flight.to.x - flight.from.x;
+  const dy = flight.to.y - flight.from.y;
+  const dz = flight.to.z - flight.from.z;
+  return dx * dx + dy * dy + dz * dz >= MIN_ANIMATED_DISPLACEMENT_SQ_M2;
 }
 
 /** How long a blast takes to finish settling, in seconds. */

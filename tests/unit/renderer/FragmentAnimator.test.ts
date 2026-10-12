@@ -105,6 +105,16 @@ describe('FragmentAnimator', () => {
     expect(animator.isPlaying).toBe(false);
   });
 
+  it('ignores fragments with no time in the air, wherever they end', () => {
+    const { mesh, spy } = recorder();
+    const animator = new FragmentAnimator(mesh);
+
+    animator.begin([flight({ durationS: 0, from: { x: 1, y: 9, z: 3 }, to: { x: 4, y: 0, z: 3 } })]);
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(animator.isPlaying).toBe(false);
+  });
+
   it('holds a delayed fragment still until its turn comes', () => {
     const { mesh, frames } = recorder();
     const animator = new FragmentAnimator(mesh);

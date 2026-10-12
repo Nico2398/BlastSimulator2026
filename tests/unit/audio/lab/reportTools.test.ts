@@ -2,17 +2,20 @@
 
 import { describe, expect, it } from 'vitest';
 import { CHECK_USAGE, parseCheckArgs } from '../../../../src/audio/lab/checkArgs.js';
-import { evaluateReport } from '../../../../src/audio/lab/checks.js';
+import { evaluateReport, expectedAssetCount, savableMixes } from '../../../../src/audio/lab/checks.js';
 import { formatEnvelope, formatMixTable } from '../../../../src/audio/lab/formatReport.js';
 import { emptyReport, type MixReport, type SoundLabReport } from '../../../../src/audio/lab/labReport.js';
 import type { PcmStats } from '../../../../src/audio/lab/pcmStats.js';
+import { LAB_CHECK_LIMITS } from '../../../../src/core/config/audio/lab.js';
 import { probeVoices } from '../../../../src/audio/lab/voiceProbe.js';
 
 const goodStats: PcmStats = {
-  sampleRate: 48000, channels: 2, durationS: 30, nonFiniteCount: 0, peakDbfs: -3, clipCount: 0, dcOffset: 0,
+  sampleRate: 48000, channels: 2, durationS: 30, nonFiniteCount: 0, peakDbfs: -3, clipCount: 0, clipperDrive: 0, dcOffset: 0,
   rmsDbfs: -30, gatedRmsDbfs: -24, crestFactorDb: 21, integratedLufs: -26, shortTermMaxLufs: -22, monoLossDb: 0.5,
   envelopeDbfs: [-40, -30, -20, -10, -60],
 };
+
+const LOADED = { name: 'ui_click_1', kind: 'sample', durationS: 0.1, peakDbfs: -1 } as const;
 
 function mix(overrides: Partial<MixReport> = {}, stats: Partial<PcmStats> = {}): MixReport {
   return {
@@ -24,7 +27,7 @@ function mix(overrides: Partial<MixReport> = {}, stats: Partial<PcmStats> = {}):
 function healthy(mixes: MixReport[] = [mix()]): SoundLabReport {
   return {
     ...emptyReport(), done: true, contextState: 'running', contextClockAdvanced: true, sampleRate: 48000, ready: true, livePlayOk: true,
-    expected: { samples: 80, recipes: 10 }, loaded: [{ name: 'ui_click_1', kind: 'sample', durationS: 0.1, peakDbfs: -1 }], mixes,
+    expected: { samples: 1, recipes: 0 }, loaded: [LOADED, LOADED], mixes,
   };
 }
 
@@ -36,6 +39,13 @@ describe('evaluateReport', () => {
   it('fails on any asset that failed to load', () => {
     const verdict = evaluateReport({ ...healthy(), failed: ['sample:x (HTTP 404)', 'recipe:thunder (boom)'] });
     expect(verdict.problems).toEqual(['asset failed: sample:x (HTTP 404)', 'asset failed: recipe:thunder (boom)']);
+  });
+
+  it('fails when fewer assets loaded than the preload plan expects, without a failure being reported', () => {
+    const report = { ...healthy(), expected: { samples: 80, recipes: 11 } };
+    expect(expectedAssetCount(report)).toBe(92);
+    expect(evaluateReport(report).problems).toEqual(['only 2 of 92 assets loaded (an asset neither loaded nor reported as failed)']);
+    expect(evaluateReport({ ...report, loaded: Array.from({ length: 92 }, () => LOADED) }).problems).toEqual([]);
   });
 
   it('fails when nothing loaded, the engine is not ready or a live play returned no voice', () => {
@@ -54,6 +64,25 @@ describe('evaluateReport', () => {
     expect(evaluateReport(healthy([mix({}, { nonFiniteCount: 3 })])).problems[0]).toContain('3 NaN');
     expect(evaluateReport(healthy([mix({}, { peakDbfs: -0.05 })])).problems[0]).toContain('peak -0.05 dBFS');
     expect(evaluateReport(healthy([mix({}, { gatedRmsDbfs: -70 })])).problems[0]).toContain('silent');
+  });
+
+  it('fails a mix that drives the safety clipper too hard, warns earlier, and accepts the exact bounds', () => {
+    const { warnClipperDrive, maxClipperDrive } = LAB_CHECK_LIMITS;
+    const hard = evaluateReport(healthy([mix({}, { clipperDrive: maxClipperDrive * 1.5 })]));
+    expect(hard.problems).toHaveLength(1);
+    expect(hard.problems[0]).toContain('above the safety clipper');
+    expect(hard.warnings).toEqual([]);
+    const warm = evaluateReport(healthy([mix({}, { clipperDrive: (warnClipperDrive + maxClipperDrive) / 2 })]));
+    expect(warm.problems).toEqual([]);
+    expect(warm.warnings).toHaveLength(1);
+    expect(evaluateReport(healthy([mix({}, { clipperDrive: warnClipperDrive })]))).toEqual({ problems: [], warnings: [] });
+    expect(evaluateReport(healthy([mix({}, { clipperDrive: maxClipperDrive })])).problems).toEqual([]);
+  });
+
+  it('keeps the drive bounds ordered and above what the three lab mixes measured when they were set', () => {
+    // measured 2026-10 (maxBoostDb 3): ui-tour 0.00002, blast 0.00085, busy-mine 0.000002
+    expect(LAB_CHECK_LIMITS.warnClipperDrive).toBeGreaterThan(0.00085);
+    expect(LAB_CHECK_LIMITS.maxClipperDrive).toBeGreaterThan(LAB_CHECK_LIMITS.warnClipperDrive);
   });
 
   it('accepts a peak exactly at the limit and an RMS exactly at the floor', () => {
@@ -79,6 +108,20 @@ describe('evaluateReport', () => {
   });
 });
 
+describe('savableMixes', () => {
+  const report = (...names: string[]): SoundLabReport => healthy(names.map(name => mix({ name: name as MixReport['name'] })));
+
+  it('keeps known scenario names that were asked for', () => {
+    expect(savableMixes(report('blast', 'ui-tour'), ['blast', 'ui-tour']).map(m => m.name)).toEqual(['blast', 'ui-tour']);
+    expect(savableMixes(report('blast', 'ui-tour'), ['blast']).map(m => m.name)).toEqual(['blast']);
+  });
+
+  it('drops names that could escape the output directory or that are not scenarios', () => {
+    const hostile = report('../../etc/cron.d/x', 'blast/../../x', '/abs', '', 'busy-mine');
+    expect(savableMixes(hostile, ['blast', 'ui-tour', 'busy-mine']).map(m => m.name)).toEqual(['busy-mine']);
+  });
+});
+
 describe('formatMixTable', () => {
   it('prints a header, a rule and one aligned row per mix', () => {
     const lines = formatMixTable([mix(), mix({ name: 'ui-tour', dropped: 2 }, { peakDbfs: -12.5 })]).split('\n');
@@ -86,6 +129,7 @@ describe('formatMixTable', () => {
     expect(lines[0]).toMatch(/^mix\s+length\s+peak dBFS/);
     expect(lines[1]).toMatch(/^-+ +-+/);
     expect(lines[2]).toMatch(/^blast\s+30\.0 s\s+-3\.0/);
+    expect(lines[0]).toContain('drive %');
     expect(lines[3]).toContain('2/50');
     expect(new Set(lines.map(l => l.length)).size).toBe(1);
   });
@@ -105,10 +149,10 @@ describe('formatEnvelope', () => {
 });
 
 describe('parseCheckArgs', () => {
-  const parse = (...args: string[]) => parseCheckArgs(args, '/tmp/out');
+  const parse = (...args: string[]) => parseCheckArgs(args);
 
-  it('defaults to every scenario, the default directory, port 5173 and a long timeout', () => {
-    expect(parse()).toEqual({ kind: 'options', options: { scenarios: ['ui-tour', 'blast', 'busy-mine'], outDir: '/tmp/out', port: 5173, timeoutS: 900 } });
+  it('defaults to every scenario, no fixed directory (the caller makes a fresh one), port 5173 and a long timeout', () => {
+    expect(parse()).toEqual({ kind: 'options', options: { scenarios: ['ui-tour', 'blast', 'busy-mine'], outDir: undefined, port: 5173, timeoutS: 900 } });
   });
 
   it('reads scenarios (repeated or comma separated), directory, port and timeout', () => {

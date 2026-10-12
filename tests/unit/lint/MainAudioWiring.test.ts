@@ -102,14 +102,11 @@ describe('src/main.ts — the audio block', () => {
     expect(source).toContain('const music = scenarioMode ? null : createMusicDirector(audioMgr);');
   });
 
-  it('unlocks audio on the first pointerdown or keydown, once, without awaiting the resume', () => {
-    expect(source).toContain("document.addEventListener('pointerdown', unlockAudio, true);");
-    expect(source).toContain("document.addEventListener('keydown', unlockAudio, true);");
-    expect(source).toContain("document.removeEventListener('pointerdown', unlockAudio, true);");
-    expect(source).toContain("document.removeEventListener('keydown', unlockAudio, true);");
-    expect(source).toContain('void audioMgr.resume();');
+  it('unlocks audio on every gesture until the context runs, through the tested installer, with the music director', () => {
+    expect(source).toContain('installAudioUnlock(document, audioMgr, music);');
+    expect(occurrences('installAudioUnlock(')).toBe(1);
     expect(source).not.toMatch(/await [^\n]*\.resume\(/);
-    expect(source).toContain('music?.unlock();');
+    expect(source).not.toContain('removeEventListener');
   });
 
   it('installs the interface sounds muting tutorial-inert controls', () => {
@@ -144,7 +141,7 @@ describe('src/main.ts — the per-frame update', () => {
     expect(frame).toContain('dtS: dt,');
     expect(frame).toContain('menuUp: fullScreenMenuUp(),');
     expect(frame).toContain('scene.cameraController.viewTarget');
-    expect(frame).toContain('cameraGroundRight(scene.camera.matrixWorld.elements)');
+    expect(frame).toContain('scene.cameraController.groundRight()');
     expect(frame).not.toContain('scene.camera.position');
   });
 

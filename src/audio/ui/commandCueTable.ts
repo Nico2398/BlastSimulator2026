@@ -10,8 +10,6 @@ import { UI_COMMAND_CONFIG } from '../../core/config/audio/ui.js';
 export interface CueSpec {
   /** Cue on success. Absent: the command is audible only when it fails (its success sound belongs to someone else). */
   readonly cue?: OneShotId;
-  /** Play the cue at the world point named by the `at:x,z` argument. */
-  readonly atNamedPoint?: true;
   /** A second cue after a short delay, for cause-and-effect pairs. */
   readonly then?: { readonly cue: OneShotId; readonly delayS: number };
 }
@@ -68,7 +66,7 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   // ── Money, buildings, vehicles, staff ──
   build: {
     subs: { list: null, types: null, destroy: ORDER, upgrade: { cue: 'purchase' }, move: ORDER },
-    otherwise: { cue: 'build_placed', atNamedPoint: true },
+    otherwise: { cue: 'build_placed' },
   },
   vehicle: {
     subs: {

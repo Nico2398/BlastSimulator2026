@@ -9,6 +9,7 @@ import type { SynthRecipeId } from '../SoundCatalog.js';
 import type { ByteSource, Decoder } from '../engine/SampleBank.js';
 import type { RenderedAudio, SynthRecipe } from '../synth/types.js';
 import { LAB_STATS_CONFIG } from '../../core/config/audio/lab.js';
+import { samplePeak } from '../synth/loudness.js';
 import { amplitudeToDb, roundDb } from './levels.js';
 import type { AssetReport, LoadedAsset } from './labReport.js';
 
@@ -26,21 +27,10 @@ function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-interface PeakAndFinite {
-  readonly peak: number;
-  readonly finite: boolean;
-}
-
-function scan(channels: readonly ArrayLike<number>[]): PeakAndFinite {
-  let peak = 0;
-  for (const channel of channels) {
-    for (let i = 0; i < channel.length; i++) {
-      const v = channel[i] ?? 0;
-      if (!Number.isFinite(v)) return { peak, finite: false };
-      peak = Math.max(peak, Math.abs(v));
-    }
-  }
-  return { peak, finite: true };
+/** Peak of the planar channels (linear) and whether every sample was a finite number. */
+function scan(channels: readonly ArrayLike<number>[]): { readonly peak: number; readonly finite: boolean } {
+  const peak = samplePeak(channels);
+  return { peak, finite: Number.isFinite(peak) };
 }
 
 /** Planar channels of a decoded buffer. */

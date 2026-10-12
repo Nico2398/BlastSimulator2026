@@ -6,6 +6,8 @@
 
 import type { GameState } from '../../core/state/GameState.js';
 import { DIFF_CONFIG } from '../../core/config/audio/game.js';
+import { blastLosses, type BlastLossReport } from './blastLosses.js';
+import type { BlastLosses } from './blastPlan.js';
 import { playCue } from './playCue.js';
 import type { DirectorEnv } from './types.js';
 import { diffWorld, type WorldDiff } from './worldDiff.js';
@@ -36,6 +38,14 @@ export class StateDiffFeed {
     return kg;
   }
 
+  /**
+   * Buildings and vehicles the blast destroyed that its report does not list, where they stood. Asked at the
+   * instant the flash starts, before the next look at the world: the last snapshot still has them.
+   */
+  lossesOf(report: BlastLossReport | null): BlastLosses {
+    return blastLosses(report, this.snapshot);
+  }
+
   /** Forget everything: the next look is a baseline. */
   forget(): void {
     this.snapshot = null;
@@ -49,7 +59,7 @@ export class StateDiffFeed {
     this.snapshot = next;
     if (prev === null) {
       this.firedChargeKg = next.chargeKg;
-      return { cues: [], blastLanded: false, levelEnd: null, eventAlert: false };
+      return { cues: [], blastLanded: false, levelEnd: null, levelReopened: false, eventAlert: false };
     }
     const diff = diffWorld(prev, state, this.categoryOf);
     if (next.chargeKg > 0) this.firedChargeKg = next.chargeKg;

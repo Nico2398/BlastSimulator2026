@@ -20,19 +20,14 @@
  * Exit codes: 0 all clear, 1 a check failed, 2 the smoke test could not run (no Chromium, server, bad arguments).
  */
 
-import puppeteer from 'puppeteer';
 import type { Browser, Page } from 'puppeteer';
 import { countCues, formatCueTable, isInterfaceCue, missingCues, repeatedCues } from '../src/audio/debug/logAnalysis.js';
 import type { PlayRecord } from '../src/audio/debug/playLog.js';
 import type { AudioStatus } from '../src/audio/debug/audioDebug.js';
-import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
+import { chromeOrFail, EXIT_COULD_NOT_RUN, EXIT_FAILED, errorText, fail, launchAudioBrowser, sleep } from './shared/audio-check.js';
 import { clickWithTransientRetry } from './shared/click-retry.js';
 import { ensureDevServer, findFreePort, type DevServerHandle } from './shared/dev-server.js';
 
-const EXIT_FAILED = 1;
-const EXIT_COULD_NOT_RUN = 2;
-/** Autoplay without a gesture, so the context starts and the engine really decodes in a headless run. */
-const AUTOPLAY_FLAG = '--autoplay-policy=no-user-gesture-required';
 /**
  * Small on purpose: the sandbox has no GPU, so software rasterisation costs seconds per frame. Wide and tall enough
  * for the whole main menu column to be on screen, so real clicks reach every control.
@@ -53,7 +48,6 @@ interface Options {
   readonly timeoutS: number;
 }
 
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 const failures: string[] = [];
 
 function parseArgs(argv: readonly string[]): Options | 'help' | string {
@@ -225,6 +219,8 @@ interface GameStep {
   readonly until?: { readonly field: string; readonly value: number; readonly maxTicks: number; readonly expect: readonly string[] };
   /** A refused command is the point of the step. */
   readonly refused?: true;
+  /** Wait up to this many seconds for the expected keys: the director retargets weather beds only after a real-time dwell. */
+  readonly settleS?: number;
 }
 
 const GAME_STEPS: readonly GameStep[] = [
@@ -246,14 +242,17 @@ const GAME_STEPS: readonly GameStep[] = [
     expect: ['play:order_queued'],
     until: { field: 'orderedChargeCount', value: 0, maxTicks: 3000, expect: ['play:charge_loaded'] },
   },
-  { label: 'heavy rain starts the rain bed', command: 'weather set heavy_rain', expect: ['level:amb_rain_heavy'] },
+  // The director holds a new weather for a real-time dwell before the beds follow, and each page frame advances it by at most 0.1 s.
+  { label: 'heavy rain starts the rain bed (after the weather dwell)', command: 'weather set heavy_rain', expect: ['level:amb_rain_heavy'], settleS: 120 },
   { label: 'pause', command: 'time pause', expect: ['play:ui_toggle_off'] },
   { label: 'resume', command: 'time resume', expect: ['play:ui_toggle_on'] },
 ];
 
 /** Cues the whole run must have produced by its end, from steps that finish while others tick. */
 const LATE_CUES = ['play:building_built'];
-const BLAST_CUES = ['play:blast_snap', 'play:blast_crack', 'play:blast_boom', 'play:blast_sub', 'play:blast_tail', 'play:debris_hit', 'play:debris_pebble', 'duck:ambient'];
+const BLAST_CUES = ['play:blast_snap', 'play:blast_crack', 'play:blast_boom', 'play:blast_sub', 'play:blast_tail', 'duck:ambient'];
+/** The debris rain is built from the rock that actually flies; which sizes fly depends on the blast, so any one proves it. */
+const DEBRIS_CUES = ['play:debris_hit', 'play:debris_pebble'];
 /** Ticks run after the first boom so the debris rain and the tail are handed to the player. */
 const AFTER_BOOM_TICKS = 30;
 const BLAST_MAX_TICKS = 400;
@@ -300,7 +299,14 @@ async function tickUntilPlay(page: Page, id: string, maxTicks: number, extra: nu
 async function runGameStep(page: Page, step: GameStep): Promise<void> {
   const from = await logLength(page);
   const result = await gameCommand(page, step.command);
-  const own = await logSince(page, from);
+  let own = await logSince(page, from);
+  if (step.settleS !== undefined) {
+    const deadline = Date.now() + step.settleS * 1000;
+    while (missingCues(own, step.expect ?? []).length > 0 && Date.now() < deadline) {
+      await sleep(POLL_MS);
+      own = await logSince(page, from);
+    }
+  }
   const problems = missingCues(own, step.expect ?? []).map(key => `${key} missing after "${step.command}"`);
   if (result.success === (step.refused === true)) problems.push(`"${step.command}" ${result.success ? 'succeeded' : 'failed'}: ${result.output}`);
   if (step.until !== undefined) {
@@ -321,7 +327,9 @@ async function blastSteps(page: Page): Promise<void> {
 
   const ticks = await tickUntilPlay(page, 'blast_boom', BLAST_MAX_TICKS, AFTER_BOOM_TICKS);
   const fired = await logSince(page, from);
-  check(missingCues(fired, BLAST_CUES).length === 0, `the blast fires (after ${ticks} ticks): snap, crack, boom, sub, tail, debris, ambient duck`, missingCues(fired, BLAST_CUES).join(', '));
+  const noDebris = DEBRIS_CUES.every(key => missingCues(fired, [key]).length > 0);
+  const missingBlast = [...missingCues(fired, BLAST_CUES), ...(noDebris ? ['a debris cue (hit or pebble)'] : [])];
+  check(missingBlast.length === 0, `the blast fires (after ${ticks} ticks): snap, crack, boom, sub, tail, debris, ambient duck`, missingBlast.join(', '));
 
   const skipped = await page.evaluate(() => {
     try {
@@ -365,11 +373,6 @@ async function intendedCuesPhase(browser: Browser, origin: string, options: Opti
 
 // ── main ────────────────────────────────────────────────────────────────────────────────────────────
 
-function fail(message: string, code: number): never {
-  console.error(message);
-  process.exit(code);
-}
-
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if (parsed === 'help') {
@@ -379,21 +382,16 @@ async function main(): Promise<void> {
   if (typeof parsed === 'string') fail(`${parsed}\n\n${USAGE}`, EXIT_COULD_NOT_RUN);
   const options = parsed;
 
-  let executablePath: string;
-  try {
-    executablePath = resolveChromePathOrThrow();
-  } catch (error) {
-    return fail(String(error instanceof Error ? error.message : error), EXIT_COULD_NOT_RUN);
-  }
+  const executablePath = chromeOrFail();
   let server: DevServerHandle;
   try {
     server = await ensureDevServer(await findFreePort());
   } catch (error) {
-    return fail(`Could not start a dev server: ${String(error instanceof Error ? error.message : error)}`, EXIT_COULD_NOT_RUN);
+    return fail(`Could not start a dev server: ${errorText(error)}`, EXIT_COULD_NOT_RUN);
   }
   console.log(`Serving the game at ${server.origin} (stopped when the run ends)`);
 
-  const browser = await puppeteer.launch({ headless: true, args: [...LAUNCH_ARGS, AUTOPLAY_FLAG], executablePath });
+  const browser = await launchAudioBrowser(executablePath);
   const tables: Array<readonly [string, PlayRecord[]]> = [];
   try {
     if (options.phases.includes('real')) tables.push(['real engine', await realEnginePhase(browser, server.origin, options)]);

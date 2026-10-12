@@ -14,7 +14,9 @@
 // same reason; their trims here include the measured shortfall.
 //
 // The blast layers (snap, crack, boom, sub) are trimmed together: they stack within
-// 30 ms, so the sum, not each one, has to clear the master safety clipper's knee.
+// 30 ms, so the sum, not each one, has to clear the master safety clipper's knee
+// (effectively about 0.66 at the limiter input, because the compressor adds
+// makeup gain: see MASTER_LIMITER_CONFIG).
 // Re-measure with `npm run sounds:check` after changing any of them.
 
 /** Buses a sound can play on: the user-facing volume sliders other than master/music. */
@@ -82,7 +84,6 @@ export const SOUND_CATALOG = {
   ui_toggle_off: { bus: 'ui', source: sample('ui_toggle_off'), gainDb: -6, cooldownMs: 40, maxVoices: 2, priority: 2 },
   ui_slider: { bus: 'ui', source: sample('ui_slider'), gainDb: -7, pitchJitterCents: 40, cooldownMs: 55, maxVoices: 2, priority: 1 },
   ui_denied: { bus: 'ui', source: sample('ui_denied'), gainDb: -3, cooldownMs: 120, maxVoices: 2, priority: 3 },
-  ui_error: { bus: 'ui', source: sample('ui_error'), gainDb: -3, cooldownMs: 150, maxVoices: 2, priority: 3 },
   ui_confirm: { bus: 'ui', source: sample('ui_confirm'), gainDb: -4, cooldownMs: 60, maxVoices: 2, priority: 2 },
   ui_back: { bus: 'ui', source: sample('ui_back'), gainDb: -7, cooldownMs: 60, maxVoices: 2, priority: 2 },
   ui_select: { bus: 'ui', source: sample('ui_select'), gainDb: -6, pitchJitterCents: 50, cooldownMs: 50, maxVoices: 2, priority: 2 },
@@ -132,8 +133,9 @@ export const SOUND_CATALOG = {
   haul_load: { bus: 'effects', source: sample('impact_soft_1', 'impact_soft_2', 'impact_soft_3'), gainDb: -5, pitchJitterCents: 200, gainJitterDb: 2, cooldownMs: 150, maxVoices: 3, priority: 1, spatial: true },
   haul_dump: { bus: 'effects', source: sample('dump_1', 'dump_2'), gainDb: -4, pitchJitterCents: 150, gainJitterDb: 2, cooldownMs: 200, maxVoices: 2, priority: 1, spatial: true, reverbSend: 0.15 },
   boulder_break: { bus: 'effects', source: sample('boulder_break'), gainDb: -2, pitchJitterCents: 200, cooldownMs: 250, maxVoices: 2, priority: 2, spatial: true, reverbSend: 0.25 },
-  debris_hit: { bus: 'effects', source: sample('impact_rock_1', 'impact_rock_2', 'impact_rock_3', 'impact_rock_4', 'impact_soft_1', 'impact_soft_2'), gainDb: -6, pitchJitterCents: 450, gainJitterDb: 4, cooldownMs: 18, maxVoices: 10, priority: 1, spatial: true, reverbSend: 0.3 },
-  debris_pebble: { bus: 'effects', source: sample('impact_small_1', 'impact_small_2', 'impact_small_3', 'impact_small_4', 'impact_small_5'), gainDb: -9, pitchJitterCents: 500, gainJitterDb: 4, cooldownMs: 12, maxVoices: 8, priority: 1, spatial: true, reverbSend: 0.25 },
+  // No cooldownMs on the debris or the dud: each cue is keyed per impact (blastPlan), so a cooldown would never apply.
+  debris_hit: { bus: 'effects', source: sample('impact_rock_1', 'impact_rock_2', 'impact_rock_3', 'impact_rock_4', 'impact_soft_1', 'impact_soft_2'), gainDb: -6, pitchJitterCents: 450, gainJitterDb: 4, maxVoices: 10, priority: 1, spatial: true, reverbSend: 0.3 },
+  debris_pebble: { bus: 'effects', source: sample('impact_small_1', 'impact_small_2', 'impact_small_3', 'impact_small_4', 'impact_small_5'), gainDb: -9, pitchJitterCents: 500, gainJitterDb: 4, maxVoices: 8, priority: 1, spatial: true, reverbSend: 0.25 },
 
   // ── Blasting ──
   blast_beep: { bus: 'effects', source: synth('blast_beep'), gainDb: -4, cooldownMs: 150, maxVoices: 2, priority: 4 },
@@ -144,18 +146,21 @@ export const SOUND_CATALOG = {
   blast_snap: { bus: 'effects', source: synth('blast_snap'), gainDb: -2, maxVoices: 3, priority: 4, spatial: true, reverbSend: 0.25 },
   blast_sub: { bus: 'effects', source: synth('blast_sub'), gainDb: -2, maxVoices: 2, priority: 4, reverbSend: 0.2 },
   blast_tail: { bus: 'effects', source: synth('blast_tail'), gainDb: 0, maxVoices: 2, priority: 4, reverbSend: 0.65 },
-  blast_dud: { bus: 'effects', source: sample('blast_dud'), gainDb: -3, pitchJitterCents: 150, cooldownMs: 150, maxVoices: 3, priority: 3, spatial: true, reverbSend: 0.3 },
+  // Keyed per dud (blastPlan), like the debris: no cooldownMs.
+  blast_dud: { bus: 'effects', source: sample('blast_dud'), gainDb: -3, pitchJitterCents: 150, maxVoices: 3, priority: 3, spatial: true, reverbSend: 0.3 },
 
   // ── Level end stings ──
   level_win: { bus: 'effects', source: sample('level_win'), gainDb: 0, maxVoices: 1, priority: 4 },
   level_lose: { bus: 'effects', source: sample('level_lose'), gainDb: -2, maxVoices: 1, priority: 4 },
 
   // ── Ambient ──
+  // Looped beds run at priority 3 (the siren at 4): only priority-4 sounds (blast synths, level stings) may take a bed's slot at the voice cap,
+  // and the player restarts a bed that lost it (SoundPlayer.setListener), so weather never silently vanishes.
   thunder: { bus: 'ambient', source: synth('thunder'), gainDb: 0, cooldownMs: 2500, maxVoices: 2, priority: 2, reverbSend: 0.3 },
-  amb_wind: { bus: 'ambient', source: synth('wind_bed'), gainDb: 0, priority: 1, loop: true },
-  amb_rain_light: { bus: 'ambient', source: synth('rain_light_bed'), gainDb: 0, priority: 1, loop: true },
-  amb_rain_heavy: { bus: 'ambient', source: synth('rain_heavy_bed'), gainDb: 0, priority: 1, loop: true },
-  amb_machinery: { bus: 'ambient', source: synth('machinery_bed'), gainDb: 0, priority: 1, loop: true },
+  amb_wind: { bus: 'ambient', source: synth('wind_bed'), gainDb: 0, priority: 3, loop: true },
+  amb_rain_light: { bus: 'ambient', source: synth('rain_light_bed'), gainDb: 0, priority: 3, loop: true },
+  amb_rain_heavy: { bus: 'ambient', source: synth('rain_heavy_bed'), gainDb: 0, priority: 3, loop: true },
+  amb_machinery: { bus: 'ambient', source: synth('machinery_bed'), gainDb: 0, priority: 3, loop: true },
 } as const satisfies Record<string, SoundDefinition>;
 
 type SoundId = keyof typeof SOUND_CATALOG;

@@ -14,8 +14,6 @@ export const DIRECTOR_CONFIG = {
   maxFrameStepS: 0.25,
   /** Ticks one state diff may span (an 8x batch is 8). A larger jump is a load or a console skip and plays nothing. */
   maxCoalescedTicks: 8,
-  /** Cooldown entries beyond this count are swept when expired. */
-  cooldownSweepThreshold: 256,
   /** Entities remembered per burst between two flushes; the rest of a bigger burst is ignored. */
   maxPendingEntities: 512,
   /** A world cue from an event or a work site is only worth a voice within this multiple of the listener's reference distance (the engine culls at a larger one). */
@@ -72,8 +70,6 @@ export const DIFF_CONFIG = {
     drillDone: 3,
     chargeLoaded: 3,
     surveyDone: 1,
-    collapse: 2,
-    notifyBad: 3,
     eventAlert: 1,
   },
   /** Action types that finish without a world cue of their own, so they get the quiet `order_done` chime. */
@@ -81,7 +77,7 @@ export const DIFF_CONFIG = {
   /** Action types that are bookkeeping noise (a blast queues hundreds of hauls): never tracked. */
   noiseActions: ['rest', 'haul_debris', 'fragment_debris', 'repair_vehicle'],
   /** Income categories worth a coin sound; upkeep, refunds and smuggling stay silent. */
-  incomeCategories: ['sales', 'contracts', 'bonus'],
+  incomeCategories: ['contracts', 'bonus'],
   income: {
     /** Income in one diff below this plays nothing. */
     minAmount: 100,
@@ -131,8 +127,10 @@ export const BLAST_AUDIO_CONFIG = {
   fullScaleChargeKg: 600,
   /**
    * Loudness added on top of the catalog trim at full scale; never above. Kept small on purpose: the snap, sub and
-   * crack stack within 30 ms, and the master compressor lets that first transient through, so a bigger boost lands
-   * in the safety clipper (measured by `npm run sounds:check`: +4 dB put the blast mix at +0.3 dBFS).
+   * crack stack within 30 ms and the master compressor lets that first transient through. The mix is now bounded by
+   * the safety clipper (ceiling 0.97, so its peak never reads above -0.27 dBFS): the final-peak check of
+   * `npm run sounds:check` cannot show an over-boost any more, and this number is the design bound that keeps the
+   * clipper from doing the work. Before the clipper existed, +4 dB put the blast mix at +0.3 dBFS.
    */
   maxBoostDb: 3,
   /** The sampled crack trails the synthesized snap (which fires with the sub-bass at t = 0) by this long, so the snap's onset stays clean (s). */
@@ -145,8 +143,12 @@ export const BLAST_AUDIO_CONFIG = {
   tailMaxDelayS: 0.4,
   /** Share of the boost the tail follows. */
   tailBoostShare: 0.5,
-  /** The ambience dips as the blast is armed to fire (siren stops, air holds its breath). */
-  preRollDuck: { amountDb: -8, holdS: 1.2, releaseS: 0.8 },
+  /**
+   * The ambience dips as the blast is armed to fire (siren stops, air holds its breath). The dip is held until the
+   * flash fires (the blast is resolved over several frames and takes as long as it takes), renewed every
+   * `refreshS` real seconds, and given up after `maxHoldS` if the flash never comes.
+   */
+  preRollDuck: { amountDb: -8, holdS: 1.2, releaseS: 0.8, maxHoldS: 10, refreshS: 0.5 },
   /** The ambience is pushed down hard under the blast. */
   duck: { amountDb: -16, holdS: 2.5, releaseS: 1.8 },
   /** Work and haul bursts stay quiet this long after a blast (s). */
@@ -198,6 +200,8 @@ export const BLAST_AUDIO_CONFIG = {
     maxGainDb: 1,
   },
   demolish: { maxCount: 3, firstDelayS: 0.35, spacingS: 0.5, gainDb: -2 },
+  /** Vehicles flyrock or a secondary blast destroyed: a metal crunch just after the boom. */
+  scrap: { maxCount: 2, firstDelayS: 0.45, spacingS: 0.4, gainDb: -3 },
   /** One muted alert for casualties, after the blast has had its say. */
   casualty: { delayS: 1, gainDb: -4 },
   dud: { maxCount: 3, firstDelayS: 0.3, spacingS: 0.35, scatterM: 6, gainDb: -3 },
@@ -234,6 +238,12 @@ export const AMBIENCE_CONFIG = {
   pausedFactor: 0.55,
   /** Level changes smaller than this are not sent to the player. */
   epsilon: 0.02,
+  /**
+   * The beds change weather at most once per this many REAL seconds. Weather lasts game ticks, one real second
+   * each at 1x and an eighth of one at 8x, so without a dwell the beds would retarget (and cross-fade over `rampS`)
+   * several times per fade at 8x.
+   */
+  minDwellS: 6,
   /** Wind swells a little as the camera pulls back: camera distances (m) mapped to +/- swing. */
   windViewNearM: 20,
   windViewFarM: 120,
@@ -253,9 +263,16 @@ export const AMBIENCE_CONFIG = {
     maxDelayS: 2.5,
     /** The farthest strike is this much quieter than the nearest (dB). */
     farthestDb: -5,
-    /** Distant rumbles between flashes during a storm. */
-    rumbleMinIntervalS: 12,
-    rumbleMaxIntervalS: 30,
+    /**
+     * Distant rumbles between flashes during a storm, counted in storm time. A storm lasts 2 to 6 ticks (real seconds
+     * at 1x), so the first rumble comes soon after the storm begins; later ones are spaced further apart.
+     */
+    rumbleFirstMinS: 2,
+    rumbleFirstMaxS: 6,
+    rumbleMinIntervalS: 8,
+    rumbleMaxIntervalS: 20,
+    /** A calm this long (real s) means the storm is over: the next one starts the rumble clock afresh. Shorter gaps do not reset it. */
+    rumbleResetCalmS: 20,
     rumbleMinDb: -12,
     rumbleMaxDb: -8,
   },

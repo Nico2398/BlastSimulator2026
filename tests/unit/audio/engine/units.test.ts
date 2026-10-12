@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { centsToRate, clamp, dbToGain } from '../../../../src/audio/engine/units.js';
+import { centsToRate, clamp, dbToGain, finiteOr } from '../../../../src/audio/engine/units.js';
 
 describe('audio units', () => {
   it('clamp holds a value inside the range', () => {
@@ -19,5 +19,13 @@ describe('audio units', () => {
     expect(centsToRate(0)).toBe(1);
     expect(centsToRate(1200)).toBeCloseTo(2, 10);
     expect(centsToRate(-1200)).toBeCloseTo(0.5, 10);
+  });
+
+  it('finiteOr keeps finite numbers and replaces NaN and infinities', () => {
+    expect(finiteOr(0.5, 9)).toBe(0.5);
+    expect(finiteOr(0, 9)).toBe(0);
+    expect(finiteOr(Number.NaN, 9)).toBe(9);
+    expect(finiteOr(Infinity, 9)).toBe(9);
+    expect(finiteOr(-Infinity, 9)).toBe(9);
   });
 });

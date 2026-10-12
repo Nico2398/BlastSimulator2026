@@ -5,6 +5,7 @@
 
 import type { VoiceTicket } from './VoiceBudget.js';
 import { rampTo } from './audioParams.js';
+import { finiteOr } from './units.js';
 
 interface VoiceParts {
   readonly source: AudioBufferSourceNode;
@@ -34,15 +35,16 @@ export class Voice {
   /** True until stop() or the end of the source. */
   get active(): boolean { return !this.stopped && !this.finished; }
 
-  /** Fade out over `fadeS` and stop the source; the budget slot is free immediately. */
+  /** Fade out over `fadeS` (a non-finite or negative one counts as 0) and stop the source; the budget slot is free immediately. */
   stop(fadeS: number): void {
     if (!this.active) return;
     this.stopped = true;
     this.parts.ticket.release();
     const now = this.clock.currentTime;
-    rampTo(this.parts.gain.gain, 0, now, fadeS);
+    const fade = Math.max(finiteOr(fadeS, 0), 0);
+    rampTo(this.parts.gain.gain, 0, now, fade);
     try {
-      this.parts.source.stop(now + fadeS + this.stopMarginS);
+      this.parts.source.stop(now + fade + this.stopMarginS);
     } catch {
       // never started or already stopped: nothing left to silence
     }

@@ -5,12 +5,11 @@
 import { BLAST_CANCEL_CONFIG } from '../../../core/config/audio/synth.js';
 import { attackDecay } from '../envelopes.js';
 import { finishRender } from '../finish.js';
+import { clamp } from '../../engine/units.js';
 import { filterBuffer } from '../filters.js';
 import { mixInto } from '../mix.js';
-import { accumulatePhase } from '../oscillators.js';
+import { accumulatePhase, TWO_PI } from '../oscillators.js';
 import type { SynthRecipe } from '../types.js';
-
-const TWO_PI = 2 * Math.PI;
 
 export const BLAST_CANCEL: SynthRecipe = {
   variants: 1,
@@ -22,7 +21,7 @@ export const BLAST_CANCEL: SynthRecipe = {
     const pitch = new Float64Array(n);
     const detuned = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      const glide = Math.min(1, Math.max(0, (i / sr - c.firstSec) / c.glideSec));
+      const glide = clamp((i / sr - c.firstSec) / c.glideSec, 0, 1);
       const f = c.firstHz + (c.secondHz - c.firstHz) * (0.5 - 0.5 * Math.cos(Math.PI * glide));
       pitch[i] = f;
       detuned[i] = f * c.detuneRatio;

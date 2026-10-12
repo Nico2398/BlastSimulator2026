@@ -14,10 +14,12 @@ export function syntheticBlast(random: Random): BlastInfo {
     const radius = Math.sqrt(random.next()) * shape.scatterRadiusM;
     const angle = random.nextFloat(0, Math.PI * 2);
     return {
+      // Thrown from the blast's origin to a resting place around it: every one of them moves.
+      from: { x: shape.origin.x, y: 0, z: shape.origin.z },
       delayS: random.nextFloat(0, shape.maxLaunchDelayS),
       durationS: random.nextFloat(shape.minFlightS, shape.maxFlightS),
       impactSpeed: random.nextFloat(shape.minImpactSpeed, shape.maxImpactSpeed),
-      to: { x: shape.origin.x + Math.cos(angle) * radius, z: shape.origin.z + Math.sin(angle) * radius },
+      to: { x: shape.origin.x + Math.cos(angle) * radius, y: 0, z: shape.origin.z + Math.sin(angle) * radius },
     };
   });
   return {

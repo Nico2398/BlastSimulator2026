@@ -21,8 +21,3 @@ export function mixIntoCircular(target: Float32Array, source: ArrayLike<number>,
     target[at] = (target[at] as number) + gain * (source[i] as number);
   }
 }
-
-/** Linear gain for a level in dB. */
-export function dbToGain(db: number): number {
-  return Math.pow(10, db / 20);
-}

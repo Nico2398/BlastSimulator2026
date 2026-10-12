@@ -1,7 +1,7 @@
 // BlastSimulator2026 — fadeCurve unit tests
 
 import { describe, it, expect } from 'vitest';
-import { buildFadeCurve, fadeLevelAt, scheduleFade, type Fade } from '../../../../src/audio/music/fadeCurve.js';
+import { assignLevel, buildFadeCurve, fadeLevelAt, scheduleFade, type Fade } from '../../../../src/audio/music/fadeCurve.js';
 import { FakeGainParam } from './fakes.js';
 
 const rise: Fade = { from: 0, to: 1, startS: 10, durationS: 2 };
@@ -66,5 +66,32 @@ describe('scheduleFade', () => {
     param.throwOnCurve = true;
     scheduleFade(param as unknown as AudioParam, fall, 8);
     expect(param.ramps).toEqual([{ value: 0, time: 12 }]);
+  });
+
+  it('assigns the end level when pinning the start inside a running curve is refused', () => {
+    const param = new FakeGainParam();
+    param.throwOnSet = true;
+    expect(() => scheduleFade(param as unknown as AudioParam, fall, 8)).not.toThrow();
+    expect(param.value).toBe(0);
+    expect(param.cancels).toEqual([10, 0]);
+    expect(param.curves).toHaveLength(0);
+  });
+
+  it('never throws, even for a param that refuses every call', () => {
+    const param = new FakeGainParam();
+    param.throwOnSet = true;
+    param.throwOnAssign = true;
+    param.cancelScheduledValues = () => { throw new Error('InvalidStateError'); };
+    expect(() => scheduleFade(param as unknown as AudioParam, rise, 8)).not.toThrow();
+    expect(() => assignLevel(param as unknown as AudioParam, 0.5)).not.toThrow();
+  });
+});
+
+describe('assignLevel', () => {
+  it('drops what is queued and sets the value', () => {
+    const param = new FakeGainParam();
+    assignLevel(param as unknown as AudioParam, 0.25);
+    expect(param.cancels).toEqual([0]);
+    expect(param.value).toBe(0.25);
   });
 });

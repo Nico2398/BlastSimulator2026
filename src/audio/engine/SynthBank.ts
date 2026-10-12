@@ -1,8 +1,10 @@
 // BlastSimulator2026 — Synth bank
 // Renders the generative sounds once at startup into AudioBuffers. Rendering is
-// pure CPU work on the main thread, so it is sliced: after each variant, once
-// the slice budget is spent, control goes back to the event loop. A recipe that
-// throws or renders nothing is recorded and skipped, never fatal.
+// pure CPU work on the main thread. It is sliced only between variants: once the
+// slice budget is spent after a variant, control goes back to the event loop. A
+// variant itself renders atomically, so the heavy ones stall the page for
+// 70-105 ms each (measured; nine at startup). A recipe that throws or renders
+// nothing is recorded and skipped, never fatal.
 
 import type { SynthRecipeId } from '../SoundCatalog.js';
 import type { RenderedAudio, SynthRecipe } from '../synth/types.js';

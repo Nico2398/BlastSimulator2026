@@ -1,10 +1,11 @@
 // BlastSimulator2026 — The densest real blasts, and the hauling after them
-// ore-haul-dispatch blasts nine holes and drops 643 fragments within 0.4 s (a collapse, not a throw), the densest
-// debris rain the scenarios produce. blast-debris-stranded-ramp then has trucks load, dump and break boulders.
+// ore-haul-dispatch blasts nine holes and drops 643 fragments within 0.4 s (a collapse, not a throw); only 17 of them
+// move, and only the rock that moves rains. blast-debris-stranded-ramp then has trucks load, dump and break boulders.
 // Both at 8x, where the trucks make the most trips per real second.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { isBlastSound, summarize } from '../../../helpers/audioCrowdingStats.js';
+import { isAnimatedFlight } from '../../../../src/core/mining/BlastResolve.js';
 import { scenarioRun } from './runs.js';
 import { expectWorldWithinBudget } from './worldBudget.js';
 
@@ -27,21 +28,37 @@ describe(`${COLLAPSE}: a 643-fragment collapse at 8x`, () => {
     for (const layer of ['blast_snap', 'blast_sub', 'blast_crack', 'blast_boom', 'blast_tail'] as const) {
       expect(plays.filter(p => p.id === layer && p.accepted), layer).toHaveLength(1);
     }
-    // Measured: 36 rain requests, 18 admitted (10 impacts and 8 pebbles: the engine's caps); nothing else is refused.
+    // Measured: 10 rain requests, 9 admitted (the engine's caps of 10 impacts and 8 pebbles at once); nothing else is refused.
     const refused = plays.filter(p => !p.accepted);
+    expect(refused.length).toBeLessThanOrEqual(2);
     expect(refused.every(p => p.id === 'debris_hit' || p.id === 'debris_pebble')).toBe(true);
   });
 
-  it('spends the shot second on at most 26 sounds and 26 voices', () => {
-    // Measured 24 sounds in the second after the shot and 23 voices; the engine caps at 32.
-    const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(26);
-    expect(stats.maxVoices).toBeLessThanOrEqual(26);
+  it('rains for the rock that moves only: no more impacts than moving fragments, none before the first one lands', () => {
+    // 643 flights, 17 of them animated by the renderer. Measured: 10 requests, the first 0.08 s after the shot, when the
+    // first moving fragment lands; counting the 626 that stay put gave 36 requests and an impact at the moment of the boom.
+    const flights = sim().engine.ctx.lastBlastFlights ?? [];
+    const moving = flights.filter(isAnimatedFlight);
+    expect(flights.length).toBeGreaterThan(600);
+    expect(moving.length).toBeGreaterThan(0);
+    const shot = sim().recorder.plays.find(p => p.id === 'blast_snap')!;
+    const rain = sim().recorder.plays.filter(p => p.id === 'debris_hit' || p.id === 'debris_pebble');
+    expect(rain.length).toBeGreaterThan(0);
+    expect(rain.length).toBeLessThanOrEqual(moving.length);
+    const firstLanding = Math.min(...moving.map(f => f.delayS + f.durationS));
+    for (const impact of rain) expect(impact.startS - shot.startS).toBeGreaterThanOrEqual(firstLanding - 0.02);
   });
 
-  it('keeps the world to 3 sounds a second, 10 in ten seconds, 20 in thirty', () => {
-    // Measured 2, 7 and 15.
-    expectWorldWithinBudget(sim(), { per1s: 3, per10s: 10, per30s: 20 });
+  it('spends the shot second on at most 22 sounds and 16 voices', () => {
+    // Measured 17 sounds in the second after the shot and 12 voices; the engine caps at 32.
+    const stats = summarize(sim().recorder.plays, sim().realS);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(22);
+    expect(stats.maxVoices).toBeLessThanOrEqual(16);
+  });
+
+  it('keeps the world to 3 sounds a second, 9 in ten seconds, 22 in thirty', () => {
+    // Measured 3, 7 and 17.
+    expectWorldWithinBudget(sim(), { per1s: 3, per10s: 9, per30s: 22 });
   });
 });
 
@@ -55,14 +72,14 @@ describe(`${HAULING}: trucks hauling after a blast at 8x`, () => {
   });
 
   it('keeps the world to 4 sounds a second, 12 in ten seconds, 26 in thirty', () => {
-    // Measured 3, 7 and 18.
-    expectWorldWithinBudget(sim(), { per1s: 4, per10s: 12, per30s: 26 });
+    // Measured 4, 9 and 20.
+    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 12, per30s: 26 });
   });
 
-  it('spends the shot second on at most 26 sounds and 26 voices', () => {
-    // Measured 21 sounds in a second and 20 voices at once.
+  it('spends the shot second on at most 17 sounds and 13 voices', () => {
+    // Measured 13 sounds in a second and 10 voices at once.
     const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(26);
-    expect(stats.maxVoices).toBeLessThanOrEqual(26);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(17);
+    expect(stats.maxVoices).toBeLessThanOrEqual(13);
   });
 });

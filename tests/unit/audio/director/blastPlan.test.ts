@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { planBlast, type BlastInfo, type PlannedCue } from '../../../../src/audio/director/blastPlan.js';
+import { planBlast, type BlastInfo, type BlastLosses, type PlannedCue } from '../../../../src/audio/director/blastPlan.js';
 import { BLAST_AUDIO_CONFIG } from '../../../../src/core/config/audio/game.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { fallingTo } from './helpers.js';
 
 const ORIGIN = { x: 100, z: 50 };
 const cfg = BLAST_AUDIO_CONFIG;
@@ -10,20 +11,18 @@ function blast(overrides: Partial<BlastInfo> = {}): BlastInfo {
   return { origin: ORIGIN, holeCount: 10, flights: [], report: null, ...overrides };
 }
 
-function plan(info: BlastInfo, chargeKg = 0, seed = 1): PlannedCue[] {
-  return planBlast(info, chargeKg, new Random(seed));
+function plan(info: BlastInfo, chargeKg = 0, seed = 1, losses?: BlastLosses): PlannedCue[] {
+  return planBlast(info, chargeKg, new Random(seed), losses);
 }
 
 const of = (cues: PlannedCue[], sound: PlannedCue['sound']): PlannedCue[] => cues.filter(c => c.sound === sound);
 
 /** Flights landing evenly between two times, falling at a given speed near a point. */
 function flights(count: number, from: number, to: number, speed = 30, at = { x: 120, z: 60 }): BlastInfo['flights'] {
-  return Array.from({ length: count }, (_, i) => ({
-    delayS: 0.1,
-    durationS: from - 0.1 + ((to - from) * i) / Math.max(count - 1, 1),
-    impactSpeed: speed,
-    to: { x: at.x + (i % 7), z: at.z + (i % 5) },
-  }));
+  return Array.from({ length: count }, (_, i) => fallingTo(
+    { x: at.x + (i % 7), z: at.z + (i % 5) },
+    { delayS: 0.1, durationS: from - 0.1 + ((to - from) * i) / Math.max(count - 1, 1), impactSpeed: speed },
+  ));
 }
 
 describe('planBlast main report', () => {
@@ -65,7 +64,7 @@ describe('planBlast main report', () => {
     }
   });
 
-  it('scales the loudness from nothing to +4 dB and never above', () => {
+  it('scales the loudness from nothing to the configured maximum boost and never above', () => {
     const boost = (info: BlastInfo, kg = 0): number => of(plan(info, kg), 'blast_crack')[0]?.options.gainDb ?? NaN;
     expect(boost(blast({ holeCount: 0 }))).toBe(0);
     const levels = [1, 4, 10, 30, 60, 500].map(holeCount => boost(blast({ holeCount })));
@@ -138,9 +137,29 @@ describe('planBlast debris rain', () => {
     expect(rain.every(c => c.options.gainDb === cfg.rain.baseDb)).toBe(true);
   });
 
-  it('gives every impact its own cooldown key', () => {
+  // The catalog cooldownMs of debris_hit and debris_pebble never applies to these cues: the player keys a cooldown on
+  // `options.key`, and each impact has a key of its own by design, so only the voice caps shape the rain.
+  it('gives every impact its own key, so no impact shares a cooldown with another', () => {
     const rain = plan(blast({ flights: flights(2000, 0.8, 9) })).filter(c => c.sound.startsWith('debris'));
+    expect(rain.length).toBeGreaterThan(1);
     expect(new Set(rain.map(c => c.options.key)).size).toBe(rain.length);
+  });
+
+  it('rains only for rock that moves: a flight that stays put or has no air time makes no impact', () => {
+    const still = { delayS: 0, durationS: 2, impactSpeed: 0, from: { x: 5, y: 3, z: 5 }, to: { x: 5, y: 3, z: 5 } };
+    const instant = { delayS: 0, durationS: 0, impactSpeed: 0, from: { x: 5, y: 3, z: 5 }, to: { x: 9, y: 0, z: 5 } };
+    expect(plan(blast({ flights: [...Array.from({ length: 300 }, () => still), ...Array.from({ length: 300 }, () => instant)] })).filter(c => c.sound.startsWith('debris'))).toEqual([]);
+    const moving = flights(4, 1, 4);
+    const withStill = plan(blast({ flights: [...moving, ...Array.from({ length: 500 }, () => still)] })).filter(c => c.sound.startsWith('debris'));
+    const movingOnly = plan(blast({ flights: moving })).filter(c => c.sound.startsWith('debris'));
+    expect(withStill).toEqual(movingOnly);
+  });
+
+  it('sizes the rain by the rock that moves, not by the rock that stays', () => {
+    const still = { delayS: 0, durationS: 2, impactSpeed: 0, from: { x: 5, y: 3, z: 5 }, to: { x: 5, y: 3, z: 5 } };
+    const rain = plan(blast({ flights: [...flights(4, 1, 4), ...Array.from({ length: 2000 }, () => still)] })).filter(c => c.sound.startsWith('debris'));
+    expect(rain.length).toBeLessThanOrEqual(4);
+    expect(rain.every(c => c.options.gainDb === cfg.rain.baseDb)).toBe(true);
   });
 
   it('sends light bins as pebbles and heavy fast ones as deeper hits', () => {
@@ -159,8 +178,8 @@ describe('planBlast debris rain', () => {
 
   it('places each impact at the centre of the fragments it stands for', () => {
     const fall = [
-      { delayS: 0, durationS: 2, impactSpeed: 40, to: { x: 10, z: 0 } },
-      { delayS: 0, durationS: 2, impactSpeed: 40, to: { x: 30, z: 20 } },
+      fallingTo({ x: 10, z: 0 }, { delayS: 0, durationS: 2, impactSpeed: 40 }),
+      fallingTo({ x: 30, z: 20 }, { delayS: 0, durationS: 2, impactSpeed: 40 }),
     ];
     const hit = plan(blast({ flights: fall })).find(c => c.sound.startsWith('debris'));
     expect(hit?.options.at).toEqual({ x: 20, z: 10 });
@@ -225,6 +244,43 @@ describe('planBlast consequences', () => {
     expect(crashes.map(c => c.options.at)).toEqual(destroyedBuildings.slice(0, 3));
     expect(crashes[0]?.atS).toBe(cfg.demolish.firstDelayS);
     expect(crashes[1]?.atS).toBe(cfg.demolish.firstDelayS + cfg.demolish.spacingS);
+  });
+
+  it('crashes the buildings and scraps the vehicles the blast destroyed beyond its own list, after the boom', () => {
+    const losses = { buildings: [{ x: 7, z: 8 }], vehicles: [{ x: 20, z: 21 }, { x: 22, z: 23 }, { x: 24, z: 25 }] };
+    const cues = plan(blast({ report: { destroyedBuildings: [{ x: 1, z: 2 }] } }), 0, 1, losses);
+    const crashes = of(cues, 'building_demolished');
+    expect(crashes.map(c => c.options.at)).toEqual([{ x: 1, z: 2 }, { x: 7, z: 8 }]);
+    const scraps = of(cues, 'vehicle_scrap');
+    expect(scraps).toHaveLength(cfg.scrap.maxCount);
+    expect(scraps.map(c => c.options.at)).toEqual(losses.vehicles.slice(0, cfg.scrap.maxCount));
+    expect(scraps[0]?.atS).toBe(cfg.scrap.firstDelayS);
+    expect(scraps[0]?.options.gainDb).toBe(cfg.scrap.gainDb);
+    const boom = of(cues, 'blast_boom')[0];
+    for (const cue of [...crashes, ...scraps]) expect(cue.atS).toBeGreaterThan(boom?.atS ?? Infinity);
+  });
+
+  it('keeps every crash under the shared cap, the report\'s buildings first, and gives each its own key', () => {
+    const destroyedBuildings = [0, 1].map(i => ({ x: i, z: 0 }));
+    const losses = { buildings: [2, 3, 4].map(i => ({ x: i, z: 0 })), vehicles: [] };
+    const crashes = of(plan(blast({ report: { destroyedBuildings } }), 0, 1, losses), 'building_demolished');
+    expect(crashes).toHaveLength(cfg.demolish.maxCount);
+    expect(crashes.map(c => c.options.at?.x)).toEqual([0, 1, 2]);
+    expect(new Set(crashes.map(c => c.options.key)).size).toBe(crashes.length);
+  });
+
+  it('says nothing of losses without a report', () => {
+    const cues = plan(blast(), 0, 1, { buildings: [{ x: 1, z: 1 }], vehicles: [{ x: 2, z: 2 }] });
+    expect(of(cues, 'building_demolished')).toEqual([]);
+    expect(of(cues, 'vehicle_scrap')).toEqual([]);
+  });
+
+  it('marks only the rain as forgettable', () => {
+    const cues = plan(blast({ flights: flights(50, 1, 4), report: { destroyedBuildings: [{ x: 1, z: 1 }], secondaryBlasts: [{ x: 3, z: 3, explosivesKg: 50 }] } }));
+    const rain = cues.filter(c => c.rain === true);
+    expect(rain.length).toBeGreaterThan(0);
+    expect(rain.every(c => c.sound === 'debris_hit' || c.sound === 'debris_pebble')).toBe(true);
+    expect(cues.filter(c => c.sound.startsWith('debris')).every(c => c.rain === true)).toBe(true);
   });
 
   it('pops a dud for each fizzled hole near the blast, capped', () => {

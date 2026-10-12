@@ -3,6 +3,7 @@
 // in, a toast, a pick on the 3D canvas). Each maps onto one catalog sound; none knows about audio nodes.
 
 import type { AudioPlayer } from '../AudioPlayer.js';
+import type { VolumeChannel } from '../AudioManager.js';
 import type { OneShotId } from '../SoundCatalog.js';
 import type { CommandClaim } from './CommandClaim.js';
 import { UI_SELECTION_PITCH_CENTS } from '../../core/config/audio/ui.js';
@@ -13,9 +14,6 @@ export type NotificationSeverity = 'info' | 'positive' | 'warn' | 'critical';
 
 /** Things a click on the 3D scene can select. */
 export type SelectionKind = keyof typeof UI_SELECTION_PITCH_CENTS;
-
-/** The volume sliders of the settings panel. */
-export type VolumeChannel = 'master' | 'effects' | 'ambient' | 'ui' | 'music';
 
 /** Least to most severe; also the id each severity plays. */
 const NOTIFICATION_CUES: Readonly<Record<NotificationSeverity, { readonly rank: number; readonly id: OneShotId }>> = {
@@ -32,8 +30,8 @@ interface UiCuesOptions {
    */
   readonly defer?: (task: () => void) => void;
   /**
-   * Shared with installUiSounds. A cue that is the direct consequence of an activation (a panel, a modal, a
-   * confirmation) marks it, so the generic click of the control that caused it stays silent. Toasts do not.
+   * Shared with installUiSounds. A cue that is the direct consequence of an activation (a panel, a modal) marks
+   * it, so the generic click of the control that caused it stays silent. Toasts do not.
    */
   readonly claim?: CommandClaim;
 }
@@ -79,12 +77,6 @@ export class UiCues {
   modalShown(): void {
     this.claim?.mark();
     safePlay(this.player, 'ui_modal');
-  }
-
-  /** The player accepted a confirmation dialog. */
-  confirmAccepted(): void {
-    this.claim?.mark();
-    safePlay(this.player, 'ui_confirm');
   }
 
   /**

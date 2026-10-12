@@ -3,7 +3,7 @@ import { BlastAudio } from '../../../../src/audio/director/BlastAudio.js';
 import { planBlast, type BlastInfo } from '../../../../src/audio/director/blastPlan.js';
 import { BLAST_AUDIO_CONFIG } from '../../../../src/core/config/audio/game.js';
 import { Random } from '../../../../src/core/math/Random.js';
-import { makeHarness, type Harness } from './helpers.js';
+import { fallingTo, makeHarness, type Harness } from './helpers.js';
 
 const cfg = BLAST_AUDIO_CONFIG;
 const FRAME = 1 / 60;
@@ -13,12 +13,10 @@ function bigBlast(seed = 3): BlastInfo {
   return {
     origin: { x: 100, z: 50 },
     holeCount: 40,
-    flights: Array.from({ length: 2000 }, () => ({
-      delayS: random.nextFloat(0, 1),
-      durationS: random.nextFloat(0.5, 7),
-      impactSpeed: random.nextFloat(5, 70),
-      to: { x: 100 + random.nextFloat(-40, 40), z: 50 + random.nextFloat(-40, 40) },
-    })),
+    flights: Array.from({ length: 2000 }, () => fallingTo(
+      { x: 100 + random.nextFloat(-40, 40), z: 50 + random.nextFloat(-40, 40) },
+      { delayS: random.nextFloat(0, 1), durationS: random.nextFloat(0.5, 7), impactSpeed: random.nextFloat(5, 70) },
+    )),
     report: { destroyedBuildings: [{ x: 90, z: 40 }], accidents: [{ type: 'injury' }] },
   };
 }
@@ -105,9 +103,54 @@ describe('BlastAudio timeline', () => {
   it('holds its breath before the boom when the blast job starts', () => {
     const f = fixture();
     f.blast.preRoll();
-    expect(f.h.player.ducks).toEqual([{ bus: 'ambient', ...cfg.preRollDuck }]);
+    const { amountDb, holdS, releaseS } = cfg.preRollDuck;
+    expect(f.h.player.ducks).toEqual([{ bus: 'ambient', amountDb, holdS, releaseS }]);
     expect(f.suppressed).toEqual([cfg.preRollDuck.holdS]);
     expect(f.h.player.plays).toHaveLength(0);
+  });
+
+  it('keeps holding its breath for as long as the blast job takes, renewing the hold before it runs out', () => {
+    const f = fixture();
+    f.blast.preRoll();
+    f.run(8);
+    expect(f.h.player.ducks.length).toBeGreaterThanOrEqual(Math.floor(8 / cfg.preRollDuck.refreshS));
+    expect(f.suppressed.length).toBe(f.h.player.ducks.length);
+    expect(f.suppressed.every(s => s === cfg.preRollDuck.holdS)).toBe(true);
+    expect(f.h.player.plays).toHaveLength(0);
+  });
+
+  it('lets go of the hold when the flash fires, leaving the blast\'s own duck in charge', () => {
+    const f = fixture();
+    f.blast.preRoll();
+    f.run(3);
+    f.blast.play(bigBlast(), 0);
+    const ducksAtFlash = f.h.player.ducks.length;
+    expect(f.h.player.ducks.at(-1)?.amountDb).toBe(cfg.duck.amountDb);
+    f.run(5);
+    expect(f.h.player.ducks).toHaveLength(ducksAtFlash);
+    expect(f.suppressed.at(-1)).toBe(cfg.workSuppressS);
+  });
+
+  it('gives the hold up after the safety limit when the flash never comes', () => {
+    const f = fixture();
+    f.blast.preRoll();
+    f.run(cfg.preRollDuck.maxHoldS + 1);
+    const ducks = f.h.player.ducks.length;
+    expect(ducks).toBeLessThanOrEqual(Math.ceil(cfg.preRollDuck.maxHoldS / cfg.preRollDuck.refreshS) + 1);
+    f.run(10);
+    expect(f.h.player.ducks).toHaveLength(ducks);
+  });
+
+  it('lets go of the hold when the blast is cancelled or a menu hushes it', () => {
+    for (const release of ['cancel', 'hush'] as const) {
+      const f = fixture();
+      f.blast.preRoll();
+      f.run(1);
+      f.blast[release]();
+      const ducks = f.h.player.ducks.length;
+      f.run(5);
+      expect(f.h.player.ducks, release).toHaveLength(ducks);
+    }
   });
 
   it('uses the charge mass it is told about when the renderer does not give one', () => {
@@ -150,6 +193,39 @@ describe('BlastAudio timeline', () => {
   });
 });
 
+describe('BlastAudio hush', () => {
+  const withConsequences = (): BlastInfo => ({
+    ...bigBlast(),
+    report: { destroyedBuildings: [{ x: 90, z: 40 }], accidents: [{ type: 'injury' }], secondaryBlasts: [{ x: 300, z: 20, explosivesKg: 100 }] },
+  });
+
+  it('forgets only the rain still waiting: the shot, its tail, the secondary blast and the consequences ring out', () => {
+    const f = fixture();
+    const info = withConsequences();
+    const planned = planBlast(info, 0, new Random(42));
+    f.blast.play(info, 0);
+    f.blast.hush();
+    f.run(10);
+    const isRain = (id: string): boolean => id.startsWith('debris');
+    expect(planned.filter(c => c.rain).length).toBeGreaterThan(10);
+    expect(f.h.player.plays.filter(p => isRain(p.id))).toEqual([]);
+    expect(f.h.player.plays.map(p => p.id).sort()).toEqual(planned.filter(c => !c.rain).map(c => c.sound).sort());
+    expect(f.h.player.of('blast_tail')).toHaveLength(1);
+  });
+
+  it('books no rain after the rain began, but keeps the cues that come later', () => {
+    const f = fixture();
+    f.blast.play(withConsequences(), 0);
+    f.run(1);
+    const rainSoFar = f.h.player.plays.filter(p => p.id.startsWith('debris')).length;
+    expect(rainSoFar).toBeGreaterThan(0);
+    f.blast.hush();
+    f.run(10);
+    expect(f.h.player.plays.filter(p => p.id.startsWith('debris'))).toHaveLength(rainSoFar);
+    expect(f.h.player.of('blast_boom')).toHaveLength(2);
+  });
+});
+
 describe('BlastAudio cancel', () => {
   it('fades out what is playing and forgets what has not been booked', () => {
     const f = fixture();
@@ -176,7 +252,7 @@ describe('BlastAudio cancel', () => {
     const f = fixture();
     f.blast.play(bigBlast(), 0);
     f.blast.cancel();
-    f.h.player.clearPlays();
+    f.h.player.clear();
     f.blast.play(bigBlast(), 0);
     expect(f.h.player.of('blast_boom')).toHaveLength(1);
     expect(f.h.player.plays.some(p => p.handle.stopped)).toBe(false);

@@ -2,9 +2,9 @@
 // One set of capture-phase listeners on the document gives every button, dropdown and slider its
 // sound, so no panel declares one. Tone comes from the element (see uiTone.ts).
 //
-// Install order: after installActivationGuard. That guard swallows clicks on tutorial-inert controls with
-// stopImmediatePropagation, which only silences listeners registered after it on the same target. A
-// swallowed click is also defaultPrevented, which is checked here as a second line of defence.
+// Tutorial-inert controls. Install order does not matter: installActivationGuard starts lazily with the tutorial,
+// long after this runs, so silence for a railed control comes from the `isInert` option (the caller passes the same
+// test the guard uses). A click the guard swallows is also defaultPrevented, checked here only as a backstop.
 //
 // Disabled controls. A native disabled button never receives `click` in a browser, so a refusal is
 // voiced from `pointerdown` (Pointer Events are not suppressed on disabled controls in Chromium; engines
@@ -25,7 +25,7 @@
 import type { AudioPlayer } from '../AudioPlayer.js';
 import type { CommandClaim } from './CommandClaim.js';
 import { UI_SOUND_CONFIG } from '../../core/config/audio/ui.js';
-import { safePlay } from './safePlay.js';
+import { createFaultReporter, safePlay } from './safePlay.js';
 import {
   DENIED_TONE, SFX_NONE, isDisabledControl, readOverride, resolveClickTone, sliderTone, type UiTone,
 } from './uiTone.js';
@@ -48,6 +48,8 @@ const deferToMacrotask: DeferFn = task => {
   const timer = setTimeout(task, UI_SOUND_CONFIG.claimDeferMs);
   return () => clearTimeout(timer);
 };
+
+const reportListenerFault = createFaultReporter('installUiSounds');
 
 const CONTROL_SELECTOR = 'button, [role="button"], select';
 const SLIDER_SELECTOR = 'input[type="range"]';
@@ -178,8 +180,9 @@ export function installUiSounds(doc: Document, player: AudioPlayer, options: UiS
     const listener = (e: Event): void => {
       try {
         handler(e);
-      } catch {
-        // A sound fault must never break the click that triggered it.
+      } catch (error) {
+        // A sound fault must never break the click that triggered it, but it is logged once.
+        reportListenerFault(error);
       }
     };
     return [type, listener] as const;

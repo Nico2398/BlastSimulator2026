@@ -672,6 +672,9 @@ export const TUMBLE_MAX_RATE_RAD_S = Math.PI * 2;
  *  thrown and dropped fragments. */
 export const TUMBLE_DROP_FACTOR = 0.12;
 
+/** A fragment that settles closer than this (squared, m^2) to where it started did not move: nothing to animate or sound. */
+export const MIN_ANIMATED_DISPLACEMENT_SQ_M2 = 1e-6;
+
 /** How long the squash-and-bounce settle plays after a fragment lands (s). */
 export const SETTLE_DURATION_S = 0.35;
 

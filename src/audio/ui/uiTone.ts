@@ -5,6 +5,7 @@
 import type { PlayOptions } from '../AudioPlayer.js';
 import type { OneShotId } from '../SoundCatalog.js';
 import { UI_SOUND_CONFIG } from '../../core/config/audio/ui.js';
+import { clamp } from '../engine/units.js';
 
 /** A cue and its per-play adjustments. */
 export interface UiTone {
@@ -23,11 +24,14 @@ const OVERRIDABLE_CUES: readonly OneShotId[] = [
 ];
 
 /**
- * Controls whose own sound comes from elsewhere, so the generic click stays out of the way:
- * panel buttons (UIManager's open/close cue), and the pause/speed controls (their `time` command cue).
+ * Controls whose own sound comes from elsewhere, so the generic click stays out of the way: the tool rail's
+ * panel buttons and the panels' close buttons (UIManager plays an open or close cue on every press of them),
+ * and the pause/speed controls (their `time` command cue). The top bar's balance and objective chips also carry
+ * `data-panel`, but they only ever open: pressing one while its panel is already open plays no panel cue, so
+ * they keep the generic click (when they do open it, the open cue claims the click).
  */
 const SELF_VOICED_SELECTOR =
-  '[data-panel], [data-panel-close], [data-speed], [data-action="pause-toggle"]';
+  '#bs-toolbar [data-panel], [data-panel-close], [data-speed], [data-action="pause-toggle"]';
 
 /** A refused control: locked, disabled or otherwise unavailable. */
 export const DENIED_TONE: UiTone = { id: 'ui_denied' };
@@ -75,6 +79,6 @@ export function sliderTone(input: HTMLInputElement): UiTone {
   const max = input.max === '' ? 100 : Number(input.max);
   const span = max - min;
   const fraction = span > 0 && Number.isFinite(span) ? (Number(input.value) - min) / span : 0.5;
-  const clamped = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0.5;
+  const clamped = Number.isFinite(fraction) ? clamp(fraction, 0, 1) : 0.5;
   return { id: 'ui_slider', opts: { pitchCents: (clamped - 0.5) * UI_SOUND_CONFIG.sliderPitchSpanCents } };
 }

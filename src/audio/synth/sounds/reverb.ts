@@ -4,6 +4,8 @@
 // normalised to unit energy.
 
 import { REVERB_CONFIG } from '../../../core/config/audio/synth.js';
+import { decayTo } from '../envelopes.js';
+import { clamp } from '../../engine/units.js';
 import { Biquad } from '../filters.js';
 import { whiteNoise } from '../noise.js';
 import { rngFor } from '../seed.js';
@@ -23,8 +25,8 @@ export function renderOutdoorIr(): RenderedAudio {
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const t = i / sr;
-      const rise = Math.min(1, Math.max(0, (t - c.lateStartSec) / c.lateRiseSec));
-      const cutoff = c.endCutoffHz + (c.startCutoffHz - c.endCutoffHz) * Math.exp(-t / c.cutoffTauSec);
+      const rise = clamp((t - c.lateStartSec) / c.lateRiseSec, 0, 1);
+      const cutoff = decayTo(c.startCutoffHz, c.endCutoffHz, t, c.cutoffTauSec);
       out[i] = filter.tick(noise[i] as number, cutoff) * rise * Math.exp(-t * decayPerSec);
     }
     for (let k = 0; k < c.reflectionCount; k++) {

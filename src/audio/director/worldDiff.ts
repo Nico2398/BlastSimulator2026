@@ -3,9 +3,10 @@
 // the cues a player should hear. Pure: it reads a snapshot and a GameState and
 // returns data; nothing here touches a player or a clock.
 //
-// A diff may span up to DIRECTOR_CONFIG.maxCoalescedTicks ticks (the 8x
-// auto-tick runs eight in one command), so it never counts elements: each
-// category yields at most one cue per diff.
+// Casualties are not here: they only happen inside a blast, and the blast
+// timeline voices them. A diff may span up to DIRECTOR_CONFIG.maxCoalescedTicks
+// ticks (the 8x auto-tick runs eight in one command), so it never counts
+// elements: each category yields at most one cue per diff.
 
 import type { OneShotId } from '../SoundCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -19,11 +20,13 @@ export interface WorldDiff {
   /** A blast report appeared: the blast timeline owns every consequence of it. */
   readonly blastLanded: boolean;
   readonly levelEnd: 'win' | 'lose' | null;
+  /** A finished level is running again ("keep playing" after a win): it may end, and sting, once more. */
+  readonly levelReopened: boolean;
   /** An event now awaits a decision: the ambience should step aside. */
   readonly eventAlert: boolean;
 }
 
-const SILENT: WorldDiff = { cues: [], blastLanded: false, levelEnd: null, eventAlert: false };
+const SILENT: WorldDiff = { cues: [], blastLanded: false, levelEnd: null, levelReopened: false, eventAlert: false };
 
 const CD = DIFF_CONFIG.cooldownsS;
 
@@ -91,7 +94,7 @@ function surveyCue(prev: WorldSnapshot, state: GameState, out: Cue[]): void {
   if (survey) out.push({ sound: 'survey_done', site: { point: { x: survey.centerX, z: survey.centerZ } }, key: 'survey_done', cooldownS: CD.surveyDone });
 }
 
-/** Coins for sales, contracts and bonuses, scaled by how much came in; upkeep and refunds are silent. */
+/** Coins for contracts and bonuses, scaled by how much came in; upkeep and refunds are silent. */
 function incomeCue(prev: WorldSnapshot, state: GameState, out: Cue[]): void {
   const transactions = state.finances.transactions;
   if (transactions.length <= prev.transactionCount) return;
@@ -105,17 +108,6 @@ function incomeCue(prev: WorldSnapshot, state: GameState, out: Cue[]): void {
   if (total >= income.tillAmount) out.push({ sound: 'cash_till', key: 'cash_till', cooldownS: income.bigCooldownS });
   else if (total >= income.bigAmount) out.push({ sound: 'coins_big', key: 'coins_big', cooldownS: income.bigCooldownS });
   else out.push({ sound: 'coins_small', key: 'coins_small', cooldownS: income.smallCooldownS });
-}
-
-function accidentCues(prev: WorldSnapshot, state: GameState, out: Cue[]): void {
-  const fresh = state.damage.accidents.slice(prev.accidentCount);
-  const hurt = fresh.find(a => a.type === 'injury' || a.type === 'death');
-  if (!hurt) return;
-  const worker = state.employees.employees.find(e => e.id === hurt.entityId);
-  if (worker) {
-    out.push({ sound: 'worker_collapse', site: { entity: { kind: 'employee', id: worker.id }, point: { x: worker.x, z: worker.z } }, key: 'worker_collapse', cooldownS: CD.collapse });
-  }
-  if (fresh.some(a => a.type === 'death')) out.push({ sound: 'notify_bad', key: 'notify_bad', cooldownS: CD.notifyBad });
 }
 
 function eventCues(prev: WorldSnapshot, state: GameState, categoryOf: (eventId: string) => string | undefined, out: Cue[]): boolean {
@@ -154,7 +146,6 @@ export function diffWorld(prev: WorldSnapshot, state: GameState, categoryOf: (ev
   holeCues(prev, state, cues);
   surveyCue(prev, state, cues);
   incomeCue(prev, state, cues);
-  if (!blastLanded) accidentCues(prev, state, cues);
   const eventAlert = eventCues(prev, state, categoryOf, cues);
-  return { cues, blastLanded, levelEnd: levelEndOf(prev, state), eventAlert };
+  return { cues, blastLanded, levelEnd: levelEndOf(prev, state), levelReopened: prev.levelEndReason !== null && state.levelEndReason === null, eventAlert };
 }

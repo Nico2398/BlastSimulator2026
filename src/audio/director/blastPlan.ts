@@ -1,25 +1,27 @@
 // BlastSimulator2026 — Blast timeline plan
 // Everything a blast sounds like, as data: the synthesized snap and sub-bass at
 // t=0, the sampled crack and boom a few milliseconds behind, the tail a moment
-// after, a rain of debris binned from the fragment flights, secondary
-// explosions, collapsing buildings, duds and one muted alert for casualties. Pure: it needs the blast's description and a random source, and
-// returns cues with their start times; nothing here plays anything.
+// after, a rain of debris binned from the fragments that visibly move,
+// secondary explosions, collapsing buildings, scrapped vehicles, duds and one
+// muted alert for casualties. Pure: it needs the blast's description and a
+// random source, and returns cues with their start times; nothing here plays
+// anything.
 
 import type { OneShotId } from '../SoundCatalog.js';
 import type { PlayOptions, WorldPoint } from '../AudioPlayer.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
-import type { FragmentFlight } from '../../core/mining/BlastResolve.js';
+import { isAnimatedFlight, type FragmentFlight } from '../../core/mining/BlastResolve.js';
 import type { Random } from '../../core/math/Random.js';
 import { BLAST_AUDIO_CONFIG } from '../../core/config/audio/game.js';
 import { clamp } from '../engine/units.js';
 
-/** What the plan needs of one fragment's flight. */
-type BlastFlight = Pick<FragmentFlight, 'delayS' | 'durationS' | 'impactSpeed'> & { readonly to: WorldPoint };
+/** What the plan needs of one fragment's flight: its timing, and its two ends to tell rock that moved from rock that stayed. */
+type BlastFlight = Pick<FragmentFlight, 'delayS' | 'durationS' | 'impactSpeed' | 'from' | 'to'>;
 
 /** What the plan needs of the blast report. Every part is optional: a blast without casualties has none. */
 interface BlastReportView {
-  readonly destroyedBuildings?: readonly WorldPoint[];
-  readonly accidents?: readonly Pick<AccidentRecord, 'type'>[];
+  readonly destroyedBuildings?: readonly (WorldPoint & { readonly buildingId?: number })[];
+  readonly accidents?: readonly (Pick<AccidentRecord, 'type'> & { readonly entityId?: number })[];
   readonly fizzledHoleIds?: readonly string[];
   readonly secondaryBlasts?: readonly (WorldPoint & { readonly explosivesKg: number })[];
 }
@@ -34,14 +36,26 @@ export interface BlastInfo {
   readonly report: BlastReportView | null;
 }
 
+/** Where buildings and vehicles stood that the blast destroyed without its report listing them (flyrock, secondary blasts). */
+export interface BlastLosses {
+  readonly buildings: readonly WorldPoint[];
+  readonly vehicles: readonly WorldPoint[];
+}
+
 export interface PlannedCue {
   /** Seconds after the blast. */
   readonly atS: number;
+  /** A debris impact: the one part of the timeline a menu coming up forgets. */
+  readonly rain?: true;
   readonly sound: OneShotId;
   readonly options: Omit<PlayOptions, 'delayS'>;
 }
 
 const CFG = BLAST_AUDIO_CONFIG;
+// Every cue of the timeline that can repeat carries a key of its own (`blast:rain:3`, `blast:dud:1`, ...). The player
+// keys a cooldown on `options.key`, so the catalog `cooldownMs` of debris_hit, debris_pebble and blast_dud never
+// throttles these cues: only their `maxVoices` and the bins and caps below shape the rain.
+const NO_LOSSES: BlastLosses = { buildings: [], vehicles: [] };
 
 /** 0..1: how big the blast is, from hole count and (when known) charge mass on a log scale. */
 function blastIntensity(holeCount: number, chargeKg: number): number {
@@ -70,7 +84,7 @@ interface Bin {
   sumZ: number;
 }
 
-/** Group flights into a few dozen bins by landing time, so thousands of impacts become a rain of tens of sounds. */
+/** Group the flights into a few dozen bins by landing time, so thousands of impacts become a rain of tens of sounds. */
 function binFlights(flights: readonly BlastFlight[]): Bin[] {
   const landings = flights.map(f => f.delayS + f.durationS);
   const first = landings.reduce((a, b) => Math.min(a, b), Infinity);
@@ -95,9 +109,12 @@ function binFlights(flights: readonly BlastFlight[]): Bin[] {
  * One weighted impact per bin: loud where many fragments land together, so the
  * rain swells and thins with the real landing density; lower and heavier with
  * faster fragments. The loudest bin is as loud as the fragments-per-bin count
- * allows (a lone fragment is plain quiet), the others sit below it.
+ * allows (a lone fragment is plain quiet), the others sit below it. Only rock
+ * that visibly moves lands with a sound: the rest never leaves its place, and a
+ * crash for it would play before anything falls.
  */
-function debrisRain(flights: readonly BlastFlight[]): PlannedCue[] {
+function debrisRain(allFlights: readonly BlastFlight[]): PlannedCue[] {
+  const flights = allFlights.filter(isAnimatedFlight);
   if (flights.length === 0) return [];
   const rain = CFG.rain;
   const bins = binFlights(flights);
@@ -110,6 +127,7 @@ function debrisRain(flights: readonly BlastFlight[]): PlannedCue[] {
     const drop = light ? 0 : clamp(meanSpeed / rain.impactSpeedRef, 0, 1) * rain.maxPitchDropCents + (bin.count >= rain.heavyCount ? rain.heavyExtraDropCents : 0);
     return {
       atS: Math.max(0, bin.sumLandingS / bin.count),
+      rain: true,
       sound: light ? 'debris_pebble' : 'debris_hit',
       options: { at: { x: bin.sumX / bin.count, z: bin.sumZ / bin.count }, gainDb, pitchCents: -drop, key: `blast:rain:${i}` },
     };
@@ -131,13 +149,21 @@ function secondaryCues(report: BlastReportView, random: Random): PlannedCue[] {
   });
 }
 
-function consequenceCues(report: BlastReportView, origin: WorldPoint, random: Random): PlannedCue[] {
+function consequenceCues(report: BlastReportView, losses: BlastLosses, origin: WorldPoint, random: Random): PlannedCue[] {
   const cues: PlannedCue[] = [];
-  (report.destroyedBuildings ?? []).slice(0, CFG.demolish.maxCount).forEach((building, i) => {
+  const collapsed = [...(report.destroyedBuildings ?? []), ...losses.buildings];
+  collapsed.slice(0, CFG.demolish.maxCount).forEach((building, i) => {
     cues.push({
       atS: CFG.demolish.firstDelayS + i * CFG.demolish.spacingS,
       sound: 'building_demolished',
       options: { at: { x: building.x, z: building.z }, gainDb: CFG.demolish.gainDb, key: `blast:demolish:${i}` },
+    });
+  });
+  losses.vehicles.slice(0, CFG.scrap.maxCount).forEach((vehicle, i) => {
+    cues.push({
+      atS: CFG.scrap.firstDelayS + i * CFG.scrap.spacingS,
+      sound: 'vehicle_scrap',
+      options: { at: { x: vehicle.x, z: vehicle.z }, gainDb: CFG.scrap.gainDb, key: `blast:scrap:${i}` },
     });
   });
   const dudCount = Math.min((report.fizzledHoleIds ?? []).length, CFG.dud.maxCount);
@@ -152,12 +178,12 @@ function consequenceCues(report: BlastReportView, origin: WorldPoint, random: Ra
 }
 
 /** The whole timeline of one blast, earliest first. */
-export function planBlast(info: BlastInfo, chargeKg: number, random: Random): PlannedCue[] {
+export function planBlast(info: BlastInfo, chargeKg: number, random: Random, losses: BlastLosses = NO_LOSSES): PlannedCue[] {
   const intensity = blastIntensity(info.holeCount, info.chargeKg ?? chargeKg);
   const cues = [
     ...mainBlastCues(info, intensity, random),
     ...debrisRain(info.flights),
-    ...(info.report ? [...secondaryCues(info.report, random), ...consequenceCues(info.report, info.origin, random)] : []),
+    ...(info.report ? [...secondaryCues(info.report, random), ...consequenceCues(info.report, losses, info.origin, random)] : []),
   ];
   return cues.sort((a, b) => a.atS - b.atS);
 }

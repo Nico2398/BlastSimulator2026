@@ -10,11 +10,11 @@
  */
 
 import { createServer as createNetServer } from 'node:net';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
 /** The repository root, which is the Vite root. */
-const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), '..', '..');
+export const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PROBE_TIMEOUT_MS = 3000;
 
 export interface DevServerHandle {

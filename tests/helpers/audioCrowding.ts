@@ -25,17 +25,13 @@ import {
   SIREN_CONFIG as SIREN_SYNTH_CONFIG, THUNDER_CONFIG,
 } from '../../src/core/config/audio/synth.js';
 import { Random } from '../../src/core/math/Random.js';
+import { parseMp3 } from './mp3Info.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 
 /** Frames per real second of the simulated render loop. */
 const FRAMES_PER_S = 60;
 const FRAME_S = 1 / FRAMES_PER_S;
 const SFX_DIR = join(import.meta.dirname, '../../public/audio/sfx');
-/** MPEG-1 Layer III frame length in samples; every shipped file is 44.1 kHz with a Xing header. */
-const MP3_SAMPLES_PER_FRAME = 1152;
-const MP3_SAMPLE_RATE = 44100;
-/** Where a Xing/Info header may start inside the first frame of a mono file. */
-const XING_SEARCH_BYTES = 64;
 
 export type GameSpeed = 1 | 2 | 4 | 8;
 /** Which code path asked for the sound: the player's command cue, or the world director. */
@@ -73,12 +69,9 @@ interface DuckRecord {
 
 /** Length in seconds of a shipped sample, read from its Xing header. */
 function sampleDurationS(name: string): number {
-  const buf = readFileSync(join(SFX_DIR, `${name}.mp3`));
-  for (let at = 0; at < XING_SEARCH_BYTES; at++) {
-    const tag = buf.toString('latin1', at, at + 4);
-    if (tag === 'Xing' || tag === 'Info') return (buf.readUInt32BE(at + 8) * MP3_SAMPLES_PER_FRAME) / MP3_SAMPLE_RATE;
-  }
-  throw new Error(`${name}.mp3 has no Xing header`);
+  const info = parseMp3(readFileSync(join(SFX_DIR, `${name}.mp3`)));
+  if (!info?.hasXing) throw new Error(`${name}.mp3 has no Xing header`);
+  return info.durationS;
 }
 
 const SYNTH_DURATION_S: Readonly<Record<string, number>> = {
@@ -362,7 +355,7 @@ export class CrowdSim {
       commandCue(this.recorder, parsed, result.success, { claim: this.claim });
       this.recorder.source = 'director';
     }
-    this.director.onCommand({ command: cmd, success: result.success, prevState, state });
+    this.director.onCommand({ parsed, success: result.success, prevState, state });
     if (state !== prevState && state) {
       // A new level starts at the speed the player already chose, and looks from over its own pit.
       state.timeScale = this.options.speed;

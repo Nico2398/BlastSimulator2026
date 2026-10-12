@@ -22,7 +22,6 @@ export interface WorldSnapshot {
   readonly chargedHoleIds: ReadonlySet<string>;
   readonly surveyCount: number;
   readonly transactionCount: number;
-  readonly accidentCount: number;
   /** "eventId@firedAtTick" of the event awaiting a decision. */
   readonly pendingEventKey: string | null;
   /** Identity of the last blast report: a new object is a blast that has landed. */
@@ -51,7 +50,6 @@ export function takeSnapshot(state: GameState): WorldSnapshot {
     chargedHoleIds: new Set(Object.keys(state.chargesByHole)),
     surveyCount: state.surveyResults.length,
     transactionCount: state.finances.transactions.length,
-    accidentCount: state.damage.accidents.length,
     pendingEventKey: pending ? `${pending.eventId}@${pending.firedAtTick}` : null,
     blastReport: state.lastBlastReport,
     levelEndReason: state.levelEndReason,

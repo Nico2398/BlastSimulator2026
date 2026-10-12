@@ -2858,6 +2858,7 @@
   "ui.settings.audio.effects": "Effets",
   "ui.settings.audio.ambient": "Ambiance",
   "ui.settings.audio.ui": "Interface",
+  "ui.settings.audio.credits": "Crédits audio",
   "ui.settings.keyboard": "Clavier",
   "ui.settings.session": "Session",
   "ui.settings.replay_tutorial": "Rejouer le tutoriel",

@@ -6,7 +6,7 @@ import { SYNTH_LEVELS } from '../../../../src/core/config/audio/synth.js';
 import { Biquad, filterBuffer } from '../../../../src/audio/synth/filters.js';
 import { finishRender } from '../../../../src/audio/synth/finish.js';
 import { settleLoop } from '../../../../src/audio/synth/loop.js';
-import { dcOffset, gatedRmsDb, samplePeakDb, truePeakDb } from '../../../../src/audio/synth/loudness.js';
+import { dcOffset, gatedRmsDb, samplePeak, samplePeakDb, truePeakDb } from '../../../../src/audio/synth/loudness.js';
 import { whiteNoise } from '../../../../src/audio/synth/noise.js';
 import { sortedSteps } from './helpers.js';
 
@@ -43,6 +43,13 @@ describe('loudness', () => {
     expect(gatedRmsDb([new Float32Array(0)], SR)).toBe(-200);
     expect(gatedRmsDb([], SR)).toBe(-200);
     expect(gatedRmsDb([new Float32Array(100)], SR)).toBe(-200);
+  });
+
+  it('samplePeak is the largest magnitude over every channel, and non-finite when any sample is', () => {
+    expect(samplePeak([Float32Array.from([0.1, -0.5]), Float32Array.from([0.3, 0.2])])).toBeCloseTo(0.5, 6);
+    expect(samplePeak([])).toBe(0);
+    expect(Number.isFinite(samplePeak([Float32Array.from([0.1, Number.NaN, 0.2])]))).toBe(false);
+    expect(Number.isFinite(samplePeak([Float32Array.from([0.1]), Float32Array.from([Number.NEGATIVE_INFINITY])]))).toBe(false);
   });
 
   it('samplePeakDb and dcOffset read the obvious values', () => {

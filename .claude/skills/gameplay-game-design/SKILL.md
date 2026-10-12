@@ -249,7 +249,7 @@ Real-time with adjustable speed: 1x, 2x, 4x, 8x. Pause available. Some actions a
 
 ## Audio System
 
-Sound is feedback and atmosphere: alive, never crowded. Sampled sounds from licensed free banks are layered with generative ones (blast, siren, weather). Volume channels: master, effects, ambient, interface (music reserved).
+Sound is feedback and atmosphere: alive, never crowded. Sampled sounds from licensed free banks are layered with generative ones (blast, siren, weather). Volume channels: master, effects, ambient, interface (music reserved). The Settings panel's "Audio credits" button opens the sound banks' licences and required attribution in a new tab.
 
 - **Interface:** every control has a click/hover/toggle sound inferred from what it is; panels open and close, toasts sound by severity, a refused action buzzes. Orders, hires, firings and purchases confirm with their own cue. Nothing sounds on the per-second tick.
 - **World:** work bursts at the nearest sites, hauling and dumping, vehicles starting, buildings finishing, drilled holes, loaded charges, finished surveys, workers collapsing, coins for income, a shift bell, research and level-up flourishes, event alerts by category (union, lawsuit, mafia, politics), level win and lose stings.

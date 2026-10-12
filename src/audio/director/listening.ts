@@ -4,22 +4,17 @@
 // neighbourhood, a pulled-back one a wide area.
 
 import type { WorldPoint } from '../AudioPlayer.js';
-import { SPATIAL_CONFIG } from '../../core/config/audio/engine.js';
-import { clamp } from '../engine/units.js';
 
 export function distanceM(a: WorldPoint, b: WorldPoint): number {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
-/** Distance (m) inside which a source is at full level for a camera this far from its target. */
-export function referenceM(viewDistance: number): number {
-  return clamp(viewDistance * SPATIAL_CONFIG.referencePerViewMetre, SPATIAL_CONFIG.minReferenceM, SPATIAL_CONFIG.maxReferenceM);
-}
-
-/** Distance (m) beyond which the engine culls a positional sound. */
-export function cullM(viewDistance: number): number {
-  return referenceM(viewDistance) * SPATIAL_CONFIG.cullDistanceFactor;
-}
+/**
+ * Distance (m) inside which a source is at full level, and beyond which the engine
+ * culls one, for a camera this far from its target. The engine's own functions, so
+ * the director and `computeSpatial` cannot disagree.
+ */
+export { referenceDistance as referenceM, cullDistance as cullM } from '../engine/spatial.js';
 
 /** The point `distance` metres from `origin` along `bearingRad`. */
 export function offsetPoint(origin: WorldPoint, bearingRad: number, distance: number): WorldPoint {

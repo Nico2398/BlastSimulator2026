@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { SAMPLE_BANK_CONFIG } from '../../../../src/core/config/audio/engine.js';
 import { SampleBank } from '../../../../src/audio/engine/SampleBank.js';
 import { fakeBuffer } from '../../../helpers/audioFakes.js';
 
-function harness(options: { failFetch?: string[]; failDecode?: string[]; concurrency?: number } = {}) {
+function harness(options: { failFetch?: string[]; failDecode?: string[]; concurrency?: number; retries?: number; failFirst?: number } = {}) {
   const fetched: string[] = [];
+  const attempts = new Map<string, number>();
   let running = 0;
   let peak = 0;
   const releases: Array<() => void> = [];
@@ -13,7 +15,8 @@ function harness(options: { failFetch?: string[]; failDecode?: string[]; concurr
     peak = Math.max(peak, running);
     await new Promise<void>(resolve => releases.push(resolve));
     running--;
-    if (options.failFetch?.some(n => url.includes(n))) throw new Error('404');
+    attempts.set(url, (attempts.get(url) ?? 0) + 1);
+    if (options.failFetch?.some(n => url.includes(n)) && attempts.get(url)! <= (options.failFirst ?? Infinity)) throw new Error('404');
     return new ArrayBuffer(8);
   };
   const decoded: ArrayBuffer[] = [];
@@ -22,7 +25,13 @@ function harness(options: { failFetch?: string[]; failDecode?: string[]; concurr
     if (options.failDecode && decoded.length === 1) throw new Error('bad data');
     return fakeBuffer(0.1);
   };
-  const bank = new SampleBank(fetchBytes, decode, { base: '/sfx/', concurrency: options.concurrency ?? 4 });
+  const sleeps: number[] = [];
+  const bank = new SampleBank(fetchBytes, decode, {
+    base: '/sfx/',
+    concurrency: options.concurrency ?? 4,
+    retries: options.retries ?? 0,
+    delay: async (ms) => { sleeps.push(ms); },
+  });
   /** Let every pending fetch complete, repeatedly, until none remain. */
   const flush = async (): Promise<void> => {
     for (let i = 0; i < 200; i++) {
@@ -30,7 +39,7 @@ function harness(options: { failFetch?: string[]; failDecode?: string[]; concurr
       while (releases.length > 0) releases.shift()!();
     }
   };
-  return { bank, fetched, flush, peak: () => peak, decoded };
+  return { bank, fetched, flush, peak: () => peak, decoded, sleeps };
 }
 
 describe('SampleBank', () => {
@@ -92,5 +101,45 @@ describe('SampleBank', () => {
     await flush();
     await done;
     expect(fetched).toEqual(['/sfx/a.mp3']);
+  });
+
+  it('retries a failed fetch after a growing backoff and keeps the file when a retry succeeds', async () => {
+    const { bank, flush, fetched, sleeps } = harness({ failFetch: ['flaky'], failFirst: 2, retries: 2 });
+    const done = bank.load(['flaky']);
+    await flush();
+    await done;
+    expect(fetched).toHaveLength(3);
+    expect(sleeps).toEqual([SAMPLE_BANK_CONFIG.retryBackoffMs, SAMPLE_BANK_CONFIG.retryBackoffMs * 2]);
+    expect(bank.get('flaky')).toBeDefined();
+    expect(bank.failed).toEqual([]);
+  });
+
+  it('records the failure only after every retry failed, then never refetches it', async () => {
+    const { bank, flush, fetched } = harness({ failFetch: ['gone'], retries: 1 });
+    const done = bank.load(['gone']);
+    await flush();
+    await done;
+    expect(fetched).toHaveLength(2);
+    expect(bank.failed).toEqual(['gone']);
+    const again = bank.load(['gone']);
+    await flush();
+    await again;
+    expect(fetched).toHaveLength(2);
+  });
+
+  it('does not hold its decode slot while it waits to retry', async () => {
+    let openDelay!: () => void;
+    const gate = new Promise<void>((resolve) => { openDelay = resolve; });
+    const bank = new SampleBank(
+      async (url) => { if (url.includes('bad')) throw new Error('404'); return new ArrayBuffer(1); },
+      async () => fakeBuffer(0.1),
+      { base: '/sfx/', concurrency: 1, retries: 1, delay: () => gate },
+    );
+    const bad = bank.load(['bad']);
+    await bank.load(['good']);
+    expect(bank.get('good')).toBeDefined();
+    openDelay();
+    await bad;
+    expect(bank.failed).toEqual(['bad']);
   });
 });

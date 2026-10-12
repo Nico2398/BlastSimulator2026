@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { CooldownGate, TokenBucket } from '../../../../src/audio/director/rateLimit.js';
-import { DIRECTOR_CONFIG } from '../../../../src/core/config/audio/game.js';
 
 describe('CooldownGate', () => {
   it('passes a key once per cooldown, on the injected clock', () => {
@@ -29,9 +28,10 @@ describe('CooldownGate', () => {
 
   it('sweeps expired entries once the table grows past the threshold, keeping live ones', () => {
     let now = 0;
-    const gate = new CooldownGate(() => now);
+    const sweepThreshold = 8;
+    const gate = new CooldownGate(() => now, sweepThreshold);
     gate.tryPass('live', 1000);
-    for (let i = 0; i < DIRECTOR_CONFIG.cooldownSweepThreshold; i++) gate.tryPass(`short:${i}`, 1);
+    for (let i = 0; i < sweepThreshold; i++) gate.tryPass(`short:${i}`, 1);
     now = 10;
     gate.tryPass('trigger', 1);
     expect(gate.tryPass('live', 1000)).toBe(false);

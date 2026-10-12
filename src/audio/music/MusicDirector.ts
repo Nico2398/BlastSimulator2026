@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Music director
 // Picks the track that fits the screen and hands it to the player. Called every
 // frame, so an update that changes nothing is three comparisons. With an empty
-// catalog it does nothing at all.
+// catalog it does nothing at all. Music is garnish: whatever the player or the
+// audio graph throws stays in here, never in the render loop or the blast handler.
 
 import { MUSIC_CONFIG, type MusicConfig } from '../../core/config/audio/music.js';
 import { MUSIC_TRACKS, type MusicTrack } from './MusicCatalog.js';
@@ -28,6 +29,14 @@ export class MusicDirector {
   /** Follow the screen; per frame. Only a change of screen, biome or level touches the player. */
   update(context: MusicContext): void {
     if (this.deps.tracks.length === 0) return;
+    try {
+      this.follow(context);
+    } catch {
+      // a failing player must not break the frame
+    }
+  }
+
+  private follow(context: MusicContext): void {
     if (!this.applied || context.screen !== this.screen || context.biomeId !== this.biomeId || context.levelId !== this.levelId) {
       this.applied = true;
       this.screen = context.screen;
@@ -54,7 +63,11 @@ export class MusicDirector {
     releaseS: number = this.deps.config.duck.releaseS,
   ): void {
     if (this.deps.tracks.length === 0) return;
-    this.deps.output.duck('music', amountDb, holdS, releaseS);
+    try {
+      this.deps.output.duck('music', amountDb, holdS, releaseS);
+    } catch {
+      // a failing duck must not break the blast that asked for it
+    }
   }
 
   dispose(): void {

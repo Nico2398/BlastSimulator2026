@@ -24,11 +24,11 @@ describe(`${SCENARIO} at 8x`, () => {
     expectWorldWithinBudget(scenarioRun(SCENARIO, 8, OPENING_S), { per1s: 3, per10s: 12, per30s: 30 });
   });
 
-  it('plays under 60 sounds a minute and 8 voices at once, commands included', () => {
+  it('plays under 49 sounds a minute and 4 voices at once, commands included', () => {
     // Measured 37.3 a minute over the 138 s opening (the scripted player issues its orders back to back) and 3 voices.
     const stats = summarize(scenarioRun(SCENARIO, 8, OPENING_S).recorder.plays, scenarioRun(SCENARIO, 8, OPENING_S).realS);
-    expect(stats.totalPerMinute).toBeLessThan(60);
-    expect(stats.maxVoices).toBeLessThanOrEqual(8);
+    expect(stats.totalPerMinute).toBeLessThan(49);
+    expect(stats.maxVoices).toBeLessThanOrEqual(4);
   });
 
   it('keeps the world audible: a long game is not silent', () => {

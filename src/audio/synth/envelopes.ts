@@ -9,6 +9,11 @@ export function attackDecay(t: number, attackSec: number, tauSec: number): numbe
   return rise * Math.exp(-t / tauSec);
 }
 
+/** Exponential approach from `start` at t = 0 toward `end`, with time constant `tauSec`. */
+export function decayTo(start: number, end: number, t: number, tauSec: number): number {
+  return end + (start - end) * Math.exp(-t / tauSec);
+}
+
 /** Raised-cosine fade in and out applied in place. */
 export function fadeEdges(samples: Float32Array, sampleRate: number, fadeInSec: number, fadeOutSec: number): void {
   const inLen = Math.min(samples.length, Math.round(fadeInSec * sampleRate));

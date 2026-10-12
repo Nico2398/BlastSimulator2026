@@ -107,7 +107,7 @@ describe('WorkSounds bursts', () => {
     f.run(10);
     near.taskTicksRemaining = null;
     f.work.refresh(f.state);
-    f.h.player.clearPlays();
+    f.h.player.clear();
     f.run(20);
     expect(new Set(f.h.player.plays.map(p => p.opts.at?.x))).toEqual(new Set([20, 30]));
   });
@@ -139,7 +139,7 @@ describe('WorkSounds bursts', () => {
     expect(f.h.player.plays.length).toBeGreaterThan(0);
     driller.taskTicksRemaining = null;
     f.work.refresh(f.state);
-    f.h.player.clearPlays();
+    f.h.player.clear();
     f.run(30);
     expect(f.h.player.plays).toHaveLength(0);
   });
@@ -265,7 +265,7 @@ describe('WorkSounds machinery bed', () => {
     f.run(20);
     f.work.clear();
     expect(f.h.player.bed('amb_machinery').level).toBe(0);
-    f.h.player.clearPlays();
+    f.h.player.clear();
     f.run(20);
     expect(f.h.player.plays).toHaveLength(0);
   });

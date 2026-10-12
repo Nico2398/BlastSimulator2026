@@ -1,6 +1,8 @@
 // BlastSimulator2026 — An idle mine is quiet, and a menu is silent
-// Five real minutes of a campaign level nobody touches (no orders, no clicks, an event dialog left unanswered),
-// at 1x and at 8x, then a game hidden behind a full-screen menu while the world keeps raising events.
+// Five real minutes of a campaign level nobody touches (no orders, no clicks), at 1x and at 8x, then a game
+// hidden behind a full-screen menu while the world keeps raising events. The harness drives the game director
+// and the command cues only: sounds of clicks, hover, selection and toasts (the interface layer) are not part of
+// what is counted here, so "interface" below means what the director and the command cues put on the interface bus.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { CrowdSim } from '../../../helpers/audioCrowding.js';
@@ -22,17 +24,17 @@ beforeAll(() => {
 }, RUN_TIMEOUT_MS);
 
 describe('an idle mine at 1x', () => {
-  it('makes no interface sound once the player stopped clicking', () => {
+  it('makes no director or command interface sound once the player stopped issuing commands', () => {
     // Measured: the interface bus plays 2 sounds, both in the first two seconds (the player's own speed choice and resume).
     const late = idle1x.recorder.heard.filter(p => p.bus === 'ui' && p.tS > SETUP_S);
     expect(late.map(p => p.id)).toEqual([]);
   });
 
-  it('plays under 6 sounds a minute: bells and far-off life, nothing like a work site', () => {
+  it('plays under 4.5 sounds a minute: bells and far-off life, nothing like a work site', () => {
     // Measured 16 sounds in 302 s (3.2 a minute): 7 shift bells, 7 distant-life sounds, the player's two commands.
     const stats = summarize(idle1x.recorder.plays, idle1x.realS);
-    expect(stats.totalPerMinute).toBeLessThan(6);
-    expect(stats.maxVoices).toBeLessThanOrEqual(2);
+    expect(stats.totalPerMinute).toBeLessThan(4.5);
+    expect(stats.maxVoices).toBeLessThanOrEqual(1);
   });
 
   it('plays at most two sounds in any ten seconds once the opening commands are done', () => {
@@ -44,6 +46,7 @@ describe('an idle mine at 1x', () => {
   it('plays its distant life on the ambient bus, quietly and rarely', () => {
     // LIFE_CONFIG spaces them 25 to 70 s apart: at most 12 in five minutes, measured 7.
     const life = idle1x.recorder.heard.filter(p => p.bus === 'ambient');
+    expect(life.length).toBeGreaterThan(0);
     expect(life.length).toBeLessThanOrEqual(12);
     expect(life.every(p => p.positional)).toBe(true);
   });
@@ -56,11 +59,11 @@ describe('an idle mine at 1x', () => {
 });
 
 describe('an idle mine at 8x', () => {
-  it('plays under 3 sounds a minute and ends on a single level sting', () => {
-    // Measured: 7 sounds in 302 s. Left alone the mine goes bankrupt at tick 319, 40 real seconds in, and the
+  it('plays under 1.6 sounds a minute and ends on a single level sting', () => {
+    // Measured: 6 heard sounds in 302 s (1.2 a minute). Left alone the mine goes bankrupt at tick 319, 40 real seconds in, and the
     // lose sting is heard once; the game is then over and silent.
     const stats = summarize(idle8x.recorder.plays, idle8x.realS);
-    expect(stats.totalPerMinute).toBeLessThan(3);
+    expect(stats.totalPerMinute).toBeLessThan(1.6);
     expect(idle8x.recorder.heard.filter(p => p.id === 'level_lose')).toHaveLength(1);
     expect(idle8x.recorder.heard.filter(p => p.bus === 'ui' && p.tS > SETUP_S)).toEqual([]);
   });

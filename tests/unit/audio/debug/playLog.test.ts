@@ -2,26 +2,13 @@
 // The recording decorator: ordering, the cap, passthrough of results, JSON shape, and the NULL player case.
 
 import { describe, it, expect, vi } from 'vitest';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 import { createPlayLog, recordAudioPlayer } from '../../../../src/audio/debug/playLog.js';
-import { NULL_AUDIO_PLAYER, type AudioPlayer, type LoopHandle, type SoundHandle } from '../../../../src/audio/AudioPlayer.js';
+import { NULL_AUDIO_PLAYER } from '../../../../src/audio/AudioPlayer.js';
 
 function clock(): { now: () => number; advance: (ms: number) => void } {
   let t = 1000;
   return { now: () => t, advance: ms => { t += ms; } };
-}
-
-function fakePlayer(): { player: AudioPlayer; handle: SoundHandle; bed: LoopHandle; calls: string[] } {
-  const calls: string[] = [];
-  const handle: SoundHandle = { stop: vi.fn() };
-  const bed: LoopHandle = { stop: vi.fn(), setLevel: vi.fn() };
-  const player: AudioPlayer = {
-    ready: true,
-    play: id => { calls.push(`play ${id}`); return handle; },
-    loop: id => { calls.push(`loop ${id}`); return bed; },
-    duck: bus => { calls.push(`duck ${bus}`); },
-    setListener: () => { calls.push('listener'); },
-  };
-  return { player, handle, bed, calls };
 }
 
 describe('createPlayLog', () => {
@@ -45,9 +32,9 @@ describe('recordAudioPlayer', () => {
   it('records plays in call order with their options and returns the wrapped handle', () => {
     const c = clock();
     const log = createPlayLog(50, c.now);
-    const { player, handle } = fakePlayer();
+    const player = new RecordingPlayer();
     const rec = recordAudioPlayer(player, log);
-    expect(rec.play('ui_click')).toBe(handle);
+    expect(rec.play('ui_click')).toBe(player.plays[0]!.handle);
     c.advance(40);
     rec.play('blast_boom', { at: { x: 3, z: 4 }, gainDb: -2, delayS: 0.5, key: 'k', bus: 'effects' });
     expect(log.records).toEqual([
@@ -58,27 +45,31 @@ describe('recordAudioPlayer', () => {
 
   it('leaves undefined options out of the record so it round-trips through JSON unchanged', () => {
     const log = createPlayLog(10, () => 0);
-    recordAudioPlayer(fakePlayer().player, log).play('ui_click', {});
+    recordAudioPlayer(new RecordingPlayer(), log).play('ui_click', {});
     expect(Object.keys(log.records[0]!)).toEqual(['atMs', 'kind', 'id']);
     expect(JSON.parse(JSON.stringify(log.records))).toEqual(log.records);
   });
 
   it('marks a refused play as dropped and still returns null', () => {
     const log = createPlayLog(10, () => 0);
-    const refusing: AudioPlayer = { ...fakePlayer().player, play: () => null };
+    const refusing = new RecordingPlayer();
+    refusing.refuse.add('ui_hover');
     expect(recordAudioPlayer(refusing, log).play('ui_hover')).toBeNull();
     expect(log.records[0]).toEqual({ atMs: 0, kind: 'play', id: 'ui_hover', dropped: true });
   });
 
   it('records loop requests and level changes, and passes every call through', () => {
     const log = createPlayLog(10, () => 0);
-    const { player, bed } = fakePlayer();
+    const player = new RecordingPlayer();
     const rec = recordAudioPlayer(player, log);
     const handle = rec.loop('amb_wind', { level: 0.2, rampS: 1 });
     handle.setLevel(0.5, 2);
     handle.stop(0.3);
-    expect(bed.setLevel).toHaveBeenCalledWith(0.5, 2);
-    expect(bed.stop).toHaveBeenCalledWith(0.3);
+    expect(player.bed('amb_wind').calls).toEqual([
+      { level: 0.2, rampS: 1 },
+      { level: 0.5, rampS: 2 },
+      { level: 0, rampS: 0.3 },
+    ]);
     expect(log.records).toEqual([
       { atMs: 0, kind: 'loop', id: 'amb_wind', level: 0.2 },
       { atMs: 0, kind: 'level', id: 'amb_wind', level: 0.5 },
@@ -87,7 +78,7 @@ describe('recordAudioPlayer', () => {
 
   it('logs a bed level once when a director restates it every frame', () => {
     const log = createPlayLog(10, () => 0);
-    const handle = recordAudioPlayer(fakePlayer().player, log).loop('amb_wind');
+    const handle = recordAudioPlayer(new RecordingPlayer(), log).loop('amb_wind');
     handle.setLevel(0.4);
     handle.setLevel(0.4);
     handle.setLevel(0);
@@ -97,23 +88,23 @@ describe('recordAudioPlayer', () => {
 
   it('records a duck by its bus and depth', () => {
     const log = createPlayLog(10, () => 0);
-    const { player, calls } = fakePlayer();
+    const player = new RecordingPlayer();
     recordAudioPlayer(player, log).duck('ambient', -9, 1, 2);
-    expect(calls).toEqual(['duck ambient']);
+    expect(player.ducks).toEqual([{ bus: 'ambient', amountDb: -9, holdS: 1, releaseS: 2 }]);
     expect(log.records).toEqual([{ atMs: 0, kind: 'duck', id: 'ambient', bus: 'ambient', gainDb: -9 }]);
   });
 
   it('delegates the listener without logging it, and mirrors `ready`', () => {
     const log = createPlayLog(10, () => 0);
-    const state = { ready: false };
-    const inner: AudioPlayer = { ...fakePlayer().player, get ready() { return state.ready; } };
+    const inner = new RecordingPlayer();
+    inner.ready = false;
     const rec = recordAudioPlayer(inner, log);
     const setListener = vi.spyOn(inner, 'setListener');
     rec.setListener({ x: 1, z: 2, rightX: 1, rightZ: 0, viewDistance: 30 });
     expect(setListener).toHaveBeenCalledOnce();
     expect(log.records).toHaveLength(0);
     expect(rec.ready).toBe(false);
-    state.ready = true;
+    inner.ready = true;
     expect(rec.ready).toBe(true);
   });
 

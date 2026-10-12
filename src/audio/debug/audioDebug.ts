@@ -13,7 +13,10 @@ export interface AudioStatus {
   readonly ready: boolean;
   /** Every sample and synth recipe has been tried (loaded or failed). */
   readonly preloaded: boolean;
-  /** The Web Audio context state, or `none` when the browser has no context (scenario runs create none). */
+  /**
+   * The Web Audio context state, or `none` when the browser has no Web Audio. A scenario run still builds the
+   * manager (and so a context, suspended for want of a gesture) but no engine, so `ready` stays false there.
+   */
   readonly contextState: string;
   /** Sample files and synth recipes that could not be loaded. */
   readonly failedAssets: readonly string[];

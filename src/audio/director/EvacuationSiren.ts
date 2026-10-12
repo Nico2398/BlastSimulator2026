@@ -6,11 +6,11 @@
 // (silence, the boom follows) or a cancel (a falling blip); the blast announces
 // itself a moment after the state clears, so a short grace period decides.
 
-import type { LoopHandle } from '../AudioPlayer.js';
 import { detonationPhase } from '../../core/engine/DetonationSequence.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { SIREN_CONFIG } from '../../core/config/audio/game.js';
 import { clamp } from '../engine/units.js';
+import { BedFeed } from './BedFeed.js';
 import { lerp } from './scalar.js';
 import type { DirectorEnv } from './types.js';
 
@@ -18,7 +18,7 @@ interface SirenInput {
   readonly armed: boolean;
   /** People and vehicles still in the danger zone; null when unknown. */
   readonly remaining: number | null;
-  /** A menu or the level end hides the game: stay silent without forgetting the state. */
+  /** A menu, a pause or the level end hides or freezes the game: stay silent without forgetting the state. */
   readonly muted: boolean;
 }
 
@@ -34,16 +34,18 @@ export function evacuationRemaining(state: GameState): number | null {
 }
 
 export class EvacuationSiren {
-  private handle: LoopHandle | null = null;
+  /** Created with the first level sent: a mine that never arms a detonation never opens the siren loop. */
+  private readonly bed: BedFeed;
   private armed = false;
-  private sentLevel = 0;
   private startRemaining = 1;
   private beepTimerS = 0;
   private fired = false;
   private cancelRequested = false;
   private graceS: number | null = null;
 
-  constructor(private readonly env: DirectorEnv) {}
+  constructor(private readonly env: DirectorEnv) {
+    this.bed = new BedFeed(() => env.player.loop('blast_siren'), 0);
+  }
 
   /** The blast is under way: the armed state clearing now is a detonation, not a cancel. */
   notifyDetonation(): void {
@@ -116,9 +118,6 @@ export class EvacuationSiren {
   }
 
   private setLevel(level: number, rampS: number = SIREN_CONFIG.rampInS): void {
-    if (level === this.sentLevel) return;
-    this.sentLevel = level;
-    this.handle ??= this.env.player.loop('blast_siren');
-    this.handle.setLevel(level, rampS);
+    this.bed.set(level, rampS);
   }
 }

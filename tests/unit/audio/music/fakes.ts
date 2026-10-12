@@ -9,16 +9,28 @@ export interface CurveEvent {
 }
 
 export class FakeGainParam {
-  value = 1;
   readonly sets: Array<{ value: number; time: number }> = [];
   readonly curves: CurveEvent[] = [];
   readonly ramps: Array<{ value: number; time: number }> = [];
   cancels: number[] = [];
   throwOnCurve = false;
+  /** setValueAtTime throws, as Firefox/Safari may when the time lies inside a running curve. */
+  throwOnSet = false;
+  /** Assigning `value` throws too: a param that refuses everything. */
+  throwOnAssign = false;
+  private current = 1;
+
+  get value(): number { return this.current; }
+
+  set value(v: number) {
+    if (this.throwOnAssign) throw new Error('InvalidStateError');
+    this.current = v;
+  }
 
   setValueAtTime(value: number, time: number): void {
+    if (this.throwOnSet) throw new Error('NotSupportedError');
     this.sets.push({ value, time });
-    this.value = value;
+    this.current = value;
   }
 
   setValueCurveAtTime(values: Float32Array, start: number, duration: number): void {

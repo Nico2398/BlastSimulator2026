@@ -4,7 +4,7 @@
 // the two channels use independent noise.
 
 import { THUNDER_CONFIG } from '../../../core/config/audio/synth.js';
-import { attackDecay, controlTrack } from '../envelopes.js';
+import { attackDecay, controlTrack, decayTo } from '../envelopes.js';
 import { finishRender } from '../finish.js';
 import { Biquad } from '../filters.js';
 import { brownNoise, whiteNoise } from '../noise.js';
@@ -44,7 +44,7 @@ export const THUNDER: SynthRecipe = {
         for (const lobe of v.lobes) lobes += lobe.gain * attackDecay(t - lobe.atSec, lobe.riseSec, lobe.tauSec);
         return c.rumbleGain * lobes * Math.exp(-t / c.overallTauSec);
       });
-      const cutoff = controlTrack(n, (i) => c.endCutoffHz + (v.startCutoffHz - c.endCutoffHz) * Math.exp(-i / sr / v.cutoffTauSec));
+      const cutoff = controlTrack(n, (i) => decayTo(v.startCutoffHz, c.endCutoffHz, i / sr, v.cutoffTauSec));
       const out = new Float32Array(n);
       for (let i = 0; i < n; i++) {
         out[i] = crackLevel(i) * crackFilter.tick(crackNoise[i] as number) + rumbleLevel(i) * rumbleFilter.tick(rumbleNoise[i] as number, cutoff(i));

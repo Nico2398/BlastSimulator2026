@@ -415,8 +415,12 @@ export class CameraController {
     return new THREE.Vector3(-Math.sin(this.spherical.theta), 0, -Math.cos(this.spherical.theta));
   }
 
-  /** Ground-plane unit vector pointing to the camera's right. */
-  private groundRight(): THREE.Vector3 {
+  /**
+   * Ground-plane unit vector pointing to the camera's right. Derived from the orbit yaw, never from the
+   * camera's position or matrix, so a blast shake cannot wobble it: the pan axis here and the audio
+   * listener's pan axis (main.ts) are the same vector.
+   */
+  groundRight(): THREE.Vector3 {
     return new THREE.Vector3(Math.cos(this.spherical.theta), 0, -Math.sin(this.spherical.theta));
   }
 

@@ -491,7 +491,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1645: +5 keys (charging_truck tier1..3, desc, vehicle_type), both locales.
     // #1647: +3 keys (ui.level_end.keep_playing, campaign.keep_playing_success, campaign.keep_playing_refused): 3973.
     // #1648: +3 keys (tutorial buy-charging-truck step): 3976.
-    expect(Object.keys(en).length).toBe(3976);
+    // #NNNN: +1 key (ui.settings.audio.credits): 3977.
+    expect(Object.keys(en).length).toBe(3977);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

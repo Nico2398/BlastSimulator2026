@@ -17,8 +17,8 @@ export const worldPlays = (sim: CrowdSim): PlayRecord[] => sim.recorder.heard.fi
  * (EVENT_CUES.spacingS, FLAG_CUES, DIFF_CONFIG), so these ceilings hold at any game speed.
  */
 const CEILING_PER_30S: Readonly<Record<string, number>> = {
-  work_drill: 12,
-  work_hammer: 18,
+  work_drill: 10,
+  work_hammer: 17,
   vehicle_start: 7,
   drill_done: 8,
   charge_loaded: 8,

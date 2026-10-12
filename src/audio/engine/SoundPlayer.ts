@@ -69,6 +69,8 @@ export class SoundPlayer implements AudioPlayer {
   private readonly beds = new Map<LoopId, LoopBed>();
   private readonly lastPicked = new Map<string, string>();
   private listener: Listener | null = null;
+  /** Real-time stamp (ms) before which beds are not re-armed again. */
+  private nextRearmAt = 0;
 
   constructor(private readonly o: SoundPlayerOptions) {
     this.budget = new VoiceBudget(VOICE_CONFIG.globalVoiceCap, o.now, VOICE_CONFIG.cooldownSweepThreshold);
@@ -76,7 +78,11 @@ export class SoundPlayer implements AudioPlayer {
 
   get ready(): boolean { return this.o.isReady(); }
 
-  setListener(listener: Listener): void { this.listener = listener; }
+  /** Called every frame while a level runs, so it also paces the bed re-arm (cheap: one clock read between re-arms). */
+  setListener(listener: Listener): void {
+    this.listener = listener;
+    this.rearmBeds();
+  }
 
   duck(bus: SoundBus, amountDb: number, holdS: number, releaseS: number): void {
     this.o.mixer.duck(bus, amountDb, holdS, releaseS);
@@ -126,9 +132,17 @@ export class SoundPlayer implements AudioPlayer {
     return bed;
   }
 
-  /** Retry beds that wanted to play before their buffers existed. */
+  /** Retry beds that wanted to play but have no voice: their buffers did not exist yet, or the voice was stolen. */
   refreshLoops(): void {
     for (const bed of this.beds.values()) bed.refresh();
+  }
+
+  /** Re-arm beds that want to play but lost their voice (stolen at the voice cap), at most once per re-arm interval. */
+  private rearmBeds(): void {
+    const now = this.o.now();
+    if (now < this.nextRearmAt) return;
+    this.nextRearmAt = now + VOICE_CONFIG.loopRearmIntervalMs;
+    this.refreshLoops();
   }
 
   /** Silence everything that is playing. */

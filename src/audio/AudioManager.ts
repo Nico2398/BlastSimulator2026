@@ -8,14 +8,15 @@
 // Every bus has a dry lane and a wet lane so a volume slider or a duck affects
 // a sound's reverb tail exactly as it affects the sound itself. Without Web
 // Audio (no AudioContext, or its constructor throws) the manager still keeps the
-// volumes and the mute flag, so the settings panel works; `context` is null.
+// volumes, so the settings panel works; `context` is null. The context follows
+// page visibility: suspended while the tab is hidden, resumed when it shows again.
 
 import { AUDIO_DEFAULT_VOLUMES } from '../core/config/balance.js';
 import { DUCK_CONFIG, MASTER_LIMITER_CONFIG, MIXER_CONFIG } from '../core/config/audio/engine.js';
-import { jumpTo, smoothTo } from './engine/audioParams.js';
+import { smoothTo } from './engine/audioParams.js';
 import { buildSoftClipCurve } from './engine/softClip.js';
 import { duckLevelAt, mergeDuck, NO_DUCK, scheduleDuck, type DuckState } from './engine/ducking.js';
-import { clamp, dbToGain } from './engine/units.js';
+import { clamp, dbToGain, finiteOr } from './engine/units.js';
 
 export type AudioCategory = 'effects' | 'ambient' | 'ui' | 'music';
 
@@ -65,7 +66,6 @@ export class AudioManager {
   private readonly page: VisibilitySource | null;
   private readonly volumes: Record<VolumeChannel, number> = { ...AUDIO_DEFAULT_VOLUMES };
   private readonly ducks: Record<AudioCategory, DuckState> = { effects: NO_DUCK, ambient: NO_DUCK, ui: NO_DUCK, music: NO_DUCK };
-  private muted = false;
   /** The context was running when the page was hidden, so it should run again when shown. */
   private resumeWhenVisible = false;
   private readonly onVisibility = (): void => this.handleVisibility();
@@ -78,8 +78,6 @@ export class AudioManager {
 
   /** The Web Audio context, or null when the browser has none. */
   get context(): AudioContext | null { return this.graph?.ctx ?? null; }
-
-  get isMuted(): boolean { return this.muted; }
 
   /** Where a voice of `bus` connects. Only valid while `context` is non-null. */
   busInput(bus: AudioCategory): AudioNode { return this.requireGraph().dry[bus].user; }
@@ -97,7 +95,11 @@ export class AudioManager {
     }
   }
 
-  /** Pull `bus` down by `amountDb` (negative), hold, then release exponentially. The deeper of overlapping ducks wins. */
+  /**
+   * Pull `bus` down by `amountDb` (negative), hold, then release exponentially. The deeper of overlapping ducks
+   * wins. A non-finite amount ducks nothing and a non-finite hold or release counts as 0, so a bad value can
+   * neither throw out of the audio clock nor poison the bus's duck state.
+   */
   duck(bus: AudioCategory, amountDb: number, holdS: number, releaseS: number): void {
     const g = this.graph;
     if (!g) return;
@@ -105,9 +107,9 @@ export class AudioManager {
     const timeConstants = DUCK_CONFIG.releaseTimeConstants;
     const previous = this.ducks[bus];
     const previousLevel = duckLevelAt(previous, now, timeConstants);
-    const target = dbToGain(clamp(amountDb, DUCK_CONFIG.maxDepthDb, 0));
+    const target = dbToGain(clamp(finiteOr(amountDb, 0), DUCK_CONFIG.maxDepthDb, 0));
     if (target >= 1 && previousLevel >= 1) return;
-    const next = mergeDuck(previous, now, target, Math.max(holdS, 0), Math.max(releaseS, 0), DUCK_CONFIG.attackS, timeConstants);
+    const next = mergeDuck(previous, now, target, Math.max(finiteOr(holdS, 0), 0), Math.max(finiteOr(releaseS, 0), 0), DUCK_CONFIG.attackS, timeConstants);
     this.ducks[bus] = next;
     for (const lane of [g.dry[bus], g.wet[bus]]) {
       scheduleDuck(lane.duck.gain, previousLevel, next, now, DUCK_CONFIG.attackS, timeConstants);
@@ -125,15 +127,7 @@ export class AudioManager {
     return g.ctx.state === 'running' ? Promise.resolve() : g.ctx.resume().catch(() => undefined);
   }
 
-  /** Pause the audio clock; scheduled sounds wait. */
-  suspend(): void {
-    const g = this.graph;
-    if (!g) return;
-    this.resumeWhenVisible = false;
-    if (g.ctx.state === 'running') void g.ctx.suspend().catch(() => undefined);
-  }
-
-  /** Set volume for a channel (0–1, clamped). Applied smoothly; the master is held at zero while muted. */
+  /** Set volume for a channel (0–1, clamped). Applied smoothly. */
   setVolume(channel: VolumeChannel, value: number): void {
     if (Number.isNaN(value)) return;
     const clamped = clamp(value, 0, 1);
@@ -142,7 +136,7 @@ export class AudioManager {
     if (!g) return;
     const now = g.ctx.currentTime;
     if (channel === 'master') {
-      if (!this.muted) smoothTo(g.master.gain, clamped, now, MIXER_CONFIG.volumeSmoothS);
+      smoothTo(g.master.gain, clamped, now, MIXER_CONFIG.volumeSmoothS);
       return;
     }
     smoothTo(g.dry[channel].user.gain, clamped, now, MIXER_CONFIG.volumeSmoothS);
@@ -158,16 +152,6 @@ export class AudioManager {
   }
 
   getVolume(channel: VolumeChannel): number { return this.volumes[channel]; }
-
-  /** Mute silences the output at once; unmuting returns to the master volume smoothly. */
-  setMuted(muted: boolean): void {
-    this.muted = muted;
-    const g = this.graph;
-    if (!g) return;
-    const now = g.ctx.currentTime;
-    if (muted) jumpTo(g.master.gain, 0, now);
-    else smoothTo(g.master.gain, this.volumes.master, now, MIXER_CONFIG.volumeSmoothS);
-  }
 
   /** Close the context for good. */
   dispose(): void {

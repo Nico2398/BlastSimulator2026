@@ -10,11 +10,11 @@ import { Biquad } from '../filters.js';
 import { settleLoop } from '../loop.js';
 import { mixIntoCircular } from '../mix.js';
 import { whiteNoise } from '../noise.js';
+import { TWO_PI } from '../oscillators.js';
 import { rngFor } from '../seed.js';
 import type { SynthRecipe } from '../types.js';
 import type { Random } from '../../../core/math/Random.js';
 
-const TWO_PI = 2 * Math.PI;
 type Layer = (typeof MACHINERY_CONFIG.layers)[number];
 
 /** Sample positions of each firing: rate follows 1 + depth * sin(drift) and integrates to `firings` over the loop. */

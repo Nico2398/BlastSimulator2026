@@ -4,9 +4,9 @@
 // limiter before a final true-peak guard.
 
 import { SYNTH_LEVELS } from '../../core/config/audio/synth.js';
+import { dbToGain } from '../engine/units.js';
 import { fadeEdges } from './envelopes.js';
 import { gainForGatedRms, gatedRmsDb, samplePeakDb, truePeakDb } from './loudness.js';
-import { dbToGain } from './mix.js';
 import type { RenderedAudio } from './types.js';
 
 type SoundKind = 'oneShot' | 'loop';

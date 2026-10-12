@@ -13,12 +13,12 @@ import type { LabControls } from '../../../../src/audio/lab/panel/labControls.js
 import { mountLabPanel } from '../../../../src/audio/lab/panel/labPanel.js';
 import { formatStatus, type LabStatus } from '../../../../src/audio/lab/panel/labStatus.js';
 import { LAB_PANEL_CONFIG, LAB_RENDER_CONFIG } from '../../../../src/core/config/audio/lab.js';
-import { LabRecorder } from './recorder.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
 const STATUS: LabStatus = { contextState: 'running', ready: true, voices: 2, peakVoices: 5, loaded: 90, expected: 90, failed: [] };
 
 interface Rig {
-  readonly recorder: LabRecorder;
+  readonly recorder: RecordingPlayer;
   readonly controls: LabControls;
   readonly root: HTMLElement;
   readonly calls: { blast: Mock<[], void>; busy: Mock<[], boolean>; stop: Mock<[], void>; volumes: Array<[string, number]> };
@@ -29,7 +29,7 @@ interface Rig {
 }
 
 function rig(): Rig {
-  const recorder = new LabRecorder();
+  const recorder = new RecordingPlayer();
   const calls = { blast: vi.fn<[], void>(), busy: vi.fn<[], boolean>(() => true), stop: vi.fn<[], void>(), volumes: [] as Array<[string, number]> };
   const state = { status: STATUS, assets: { loaded: [], failed: [] } as AssetReport, mix: Promise.resolve({} as MixReport) };
   const controls: LabControls = {
@@ -103,7 +103,7 @@ describe('the catalog on the page', () => {
 describe('one-shot rows', () => {
   it('plays a plain sound with no options', () => {
     click(row(t.root, 'ui_click').querySelector('[data-action=play]'));
-    expect(t.recorder.plays).toEqual([{ id: 'ui_click', opts: undefined }]);
+    expect(t.recorder.calls).toEqual([{ id: 'ui_click', opts: undefined }]);
     expect(row(t.root, 'ui_click').querySelector('[data-role=result]')?.textContent).toBe('played');
   });
 
@@ -147,7 +147,7 @@ describe('bed rows', () => {
     const toggle = wind.querySelector('[data-action=toggle]')!;
     expect(toggle.textContent).toBe('Off');
     click(toggle);
-    expect(t.recorder.levels.get('amb_wind')).toEqual([{ level: LAB_PANEL_CONFIG.loopLevel.default, rampS: LAB_PANEL_CONFIG.loopLevel.rampS }]);
+    expect(t.recorder.bed('amb_wind').calls).toEqual([{ level: LAB_PANEL_CONFIG.loopLevel.default, rampS: LAB_PANEL_CONFIG.loopLevel.rampS }]);
     expect(toggle.textContent).toBe('On');
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
     click(toggle);
@@ -159,7 +159,7 @@ describe('bed rows', () => {
     const wind = row(t.root, 'amb_wind');
     const level = wind.querySelector<HTMLInputElement>('[data-role=level]')!;
     setSlider(level, 0.9);
-    expect(t.recorder.levels.get('amb_wind')).toBeUndefined();
+    expect(t.recorder.loops.has('amb_wind')).toBe(false);
     click(wind.querySelector('[data-action=toggle]'));
     expect(t.recorder.lastLevel('amb_wind')).toBe(0.9);
     setSlider(level, 0.2);

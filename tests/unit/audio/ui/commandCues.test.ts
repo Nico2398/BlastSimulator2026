@@ -11,7 +11,7 @@ import { UI_COMMAND_CONFIG } from '../../../../src/core/config/audio/ui.js';
 import { createRunner } from '../../../../src/console/createRunner.js';
 import { parseCommand } from '../../../../src/console/ConsoleRunner.js';
 import { getAllBuildingTypes } from '../../../../src/core/entities/Building.js';
-import { RecordingPlayer } from './recordingPlayer.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
 let player: RecordingPlayer;
 
@@ -135,13 +135,8 @@ describe('success cues', () => {
     expect(player.ids).toEqual(['ui_denied']);
   });
 
-  it('places a building at its world point', () => {
-    cue('build site_office at:20,-4.5');
-    expect(player.calls).toEqual([{ id: 'build_placed', opts: { at: { x: 20, z: -4.5 } } }]);
-  });
-
-  it.each(['build site_office', 'build site_office at:x,3', 'build site_office at:5'])(
-    'places a building without a point when the coordinates are unusable (%s)',
+  it.each(['build site_office', 'build site_office at:20,-4.5'])(
+    'confirms a placement "%s" as interface feedback, never at a world point',
     line => {
       cue(line);
       expect(player.calls).toEqual([{ id: 'build_placed', opts: undefined }]);
@@ -252,7 +247,7 @@ describe('with the real runner', () => {
     expect(accepted('vehicle buy debris_hauler tier:1')).toBe(true);
     expect(accepted('drill_plan grid x:10 z:10 rows:2 cols:2 spacing:3')).toBe(true);
     expect(accepted(`build ${building} at:30,30`)).toBe(true);
-    expect(player.calls[0]).toEqual({ id: 'build_placed', opts: { at: { x: 30, z: 30 } } });
+    expect(player.calls[0]).toEqual({ id: 'build_placed', opts: undefined });
     expect(player.ids).toEqual([
       'build_placed',
       'ui_toggle_off', 'ui_tab', 'ui_toggle_on',

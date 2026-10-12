@@ -1,11 +1,12 @@
 // BlastSimulator2026 — Game audio director
 // The one object the game talks to for the world's sound: feeds, work sites, the
 // blast timeline, the evacuation siren, ambience and distant life, composed.
-// It depends only on the AudioPlayer, the core event emitter and plain game
-// state, so a recording fake player and hand-built states test it end to end.
+// It depends only on the AudioPlayer, the core event emitter, plain game state
+// and the event pool's category lookup (getEventById), so a recording fake player
+// and hand-built states test it end to end.
 //
 // Integration (src/main.ts and the renderer call these; nothing here knows them):
-//   afterGameCommand   director.onCommand({ command, success, prevState, state })
+//   afterGameCommand   director.onCommand({ parsed, success, prevState, state })
 //   every frame        director.update({ dtS, state, menuUp, listener })      real seconds
 //   blast effects sync director.onBlast({ origin, holeCount, flights, report })
 //   playback skipped   director.cancelBlast()
@@ -18,9 +19,9 @@ import type { EventEmitter } from '../../core/state/EventEmitter.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
-import { parseCommand } from '../../console/ConsoleRunner.js';
 import { DIRECTOR_CONFIG } from '../../core/config/audio/game.js';
 import { clamp } from '../engine/units.js';
+import type { ParsedCommandLike } from '../ui/commandCues.js';
 import { Ambience } from './Ambience.js';
 import { BlastAudio } from './BlastAudio.js';
 import type { BlastInfo } from './blastPlan.js';
@@ -47,8 +48,8 @@ interface GameAudioDirectorOptions {
 }
 
 export interface CommandReport {
-  /** The raw command line that just ran. */
-  readonly command: string;
+  /** The command that just ran, as the caller already parsed it. */
+  readonly parsed: ParsedCommandLike;
   readonly success: boolean;
   /** The game state before the command; a different object from `state` means a new level or a load. */
   readonly prevState: GameState | null;
@@ -120,8 +121,8 @@ export class GameAudioDirector {
         return;
       }
       this.observe(state);
-      const parsed = parseCommand(report.command);
-      if (report.success && parsed.command === 'blast' && parsed.args[0] === 'cancel') this.siren.notifyCancelled();
+      const { command, args } = report.parsed;
+      if (report.success && command === 'blast' && args[0] === 'cancel') this.siren.notifyCancelled();
     });
   }
 
@@ -149,7 +150,7 @@ export class GameAudioDirector {
       this.siren.update(dtS, {
         armed: state !== null && state.pendingDetonation !== null,
         remaining: this.evacuationLeft,
-        muted: !playing || state.levelEnded,
+        muted: !playing || frozen,
       });
       this.ambience.update(dtS, {
         weather: state?.weather.current ?? null,
@@ -166,7 +167,7 @@ export class GameAudioDirector {
     this.guard(() => {
       if (this.state === null || this.menuUp) return;
       this.siren.notifyDetonation();
-      this.blast.play(info, this.diff.takeBlastChargeKg());
+      this.blast.play(info, this.diff.takeBlastChargeKg(), this.diff.lossesOf(info.report));
     });
   }
 
@@ -220,6 +221,7 @@ export class GameAudioDirector {
   /** Look at the world after a command or a tick: cues, flags, work sites. */
   private observe(state: GameState): void {
     const worldDiff = this.diff.observe(state, this.menuUp);
+    if (worldDiff.levelReopened) this.stings.reset();
     if (worldDiff.levelEnd !== null && !this.menuUp) this.stings.play(worldDiff.levelEnd);
     if (worldDiff.blastLanded) this.siren.notifyDetonation();
     this.work.refresh(state);

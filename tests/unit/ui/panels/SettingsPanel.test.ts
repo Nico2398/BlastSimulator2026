@@ -10,13 +10,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { UIManager } from '../../../../src/ui/UIManager.js';
-import { SettingsPanel } from '../../../../src/ui/panels/SettingsPanel.js';
+import { SettingsPanel, AUDIO_CREDITS_ACTION } from '../../../../src/ui/panels/SettingsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t, setLocale, getLocale } from '../../../../src/core/i18n/I18n.js';
 import type { AudioManager, AudioCategory } from '../../../../src/audio/AudioManager.js';
 import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 import type { SaveBackend, SaveMeta } from '../../../../src/core/state/SaveBackend.js';
 import { PANEL_CLOSE_ATTR, PANEL_CLOSE_SELECTOR } from '../../../../src/ui/panels/PanelBase.js';
+import { AUDIO_CREDITS_URL } from '../../../../src/core/config/audio/ui.js';
 
 /** Finds a button anywhere under `root` whose text matches `label` exactly. */
 function findButtonByText(root: ParentNode, label: string): HTMLButtonElement {
@@ -273,6 +274,41 @@ describe('SettingsPanel', () => {
       panel.setCues(null);
       slider.dispatchEvent(new Event('input'));
       expect(volumeAdjusted).not.toHaveBeenCalled();
+      panel.dispose();
+    });
+
+    it('shows an Audio credits button right under the volume rows, in both languages', () => {
+      const { container, panel } = mount();
+      const btn = container.querySelector<HTMLButtonElement>(`[data-action="${AUDIO_CREDITS_ACTION}"]`);
+      expect(btn).not.toBeNull();
+      expect(btn!.textContent).toBe('Audio credits');
+      const lastSliderRow = Array.from(container.querySelectorAll('input[type="range"]')).at(-1)!.parentElement!;
+      expect(lastSliderRow.nextElementSibling).toBe(btn);
+      setLocale('fr');
+      panel.refreshLocale();
+      expect(btn!.textContent).toBe('Crédits audio');
+      panel.dispose();
+    });
+
+    it('the credits button opens the credits page through the opener, and is not hidden with the session controls', () => {
+      const { container, panel } = mount();
+      const opened: string[] = [];
+      panel.setUrlOpener(url => opened.push(url));
+      const btn = container.querySelector<HTMLButtonElement>(`[data-action="${AUDIO_CREDITS_ACTION}"]`)!;
+      panel.show();
+      expect(isHiddenByAncestor(btn)).toBe(false); // no game state was ever given: the session section is hidden, this is not
+      btn.click();
+      expect(opened).toEqual([AUDIO_CREDITS_URL]);
+      expect(AUDIO_CREDITS_URL).toBe('/audio/credits.html');
+      panel.dispose();
+    });
+
+    it('by default the credits open in a new tab that cannot reach back to the game', () => {
+      const open = vi.spyOn(window, 'open').mockReturnValue(null);
+      const { container, panel } = mount();
+      container.querySelector<HTMLButtonElement>(`[data-action="${AUDIO_CREDITS_ACTION}"]`)!.click();
+      expect(open).toHaveBeenCalledWith(AUDIO_CREDITS_URL, '_blank', 'noopener');
+      open.mockRestore();
       panel.dispose();
     });
   });

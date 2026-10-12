@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// BlastSimulator2026 — A panel, modal or confirmation supersedes the click that opened it
+// BlastSimulator2026 — A panel or modal supersedes the click that opened it
 // UiCues marks the shared CommandClaim for every response that is the direct consequence of an activation, so the
 // delegated click (deferred by one macrotask) stays out of it. Toasts are not a click's consequence and do not mark.
 
@@ -8,7 +8,7 @@ import { CommandClaim } from '../../../../src/audio/ui/CommandClaim.js';
 import { installUiSounds, type DeferFn } from '../../../../src/audio/ui/installUiSounds.js';
 import { UiCues } from '../../../../src/audio/ui/UiCues.js';
 import { button } from '../../../../src/ui/dom.js';
-import { RecordingPlayer } from './recordingPlayer.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
 let player: RecordingPlayer;
 let claim: CommandClaim;
@@ -66,7 +66,6 @@ describe('responses that are the consequence of an activation mark the claim', (
     ['a panel opening', () => cues.panelShown(true), 'ui_open'],
     ['a panel closing', () => cues.panelShown(false), 'ui_close'],
     ['a modal appearing', () => cues.modalShown(), 'ui_modal'],
-    ['a confirmation accepted', () => cues.confirmAccepted(), 'ui_confirm'],
   ] as const)('%s: the click that caused it stays silent', (_label, respond, id) => {
     clickButton(respond);
     expect(claim.marks).toBe(1);
@@ -112,8 +111,7 @@ describe('without a claim', () => {
     bare.panelShown(true);
     bare.panelShown(false);
     bare.modalShown();
-    bare.confirmAccepted();
-    expect(player.ids).toEqual(['ui_open', 'ui_close', 'ui_modal', 'ui_confirm']);
+    expect(player.ids).toEqual(['ui_open', 'ui_close', 'ui_modal']);
     expect(claim.marks).toBe(0);
   });
 });

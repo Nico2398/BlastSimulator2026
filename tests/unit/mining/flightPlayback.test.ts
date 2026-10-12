@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flightPositionAt, totalFlightDuration, type FragmentFlight } from '../../../src/core/mining/BlastResolve.js';
+import { flightPositionAt, isAnimatedFlight, totalFlightDuration, type FragmentFlight } from '../../../src/core/mining/BlastResolve.js';
 
 function flight(overrides: Partial<FragmentFlight> = {}): FragmentFlight {
   return {
@@ -88,5 +88,27 @@ describe('totalFlightDuration', () => {
 
   it('is zero for a blast that moved nothing', () => {
     expect(totalFlightDuration([])).toBe(0);
+  });
+});
+
+describe('isAnimatedFlight', () => {
+  it('is true for rock that spends time in the air and settles somewhere else', () => {
+    expect(isAnimatedFlight(flight())).toBe(true);
+    expect(isAnimatedFlight(flight({ from: { x: 0, y: 0, z: 0 }, to: { x: 4, y: 0, z: 0 }, thrown: true }))).toBe(true);
+  });
+
+  it('is false for rock that settles where it started, however long it is given', () => {
+    const spot = { x: 3, y: 5, z: -2 };
+    expect(isAnimatedFlight(flight({ from: spot, to: { ...spot }, durationS: 3 }))).toBe(false);
+    expect(isAnimatedFlight(flight({ from: spot, to: { x: spot.x + 1e-4, y: spot.y, z: spot.z } }))).toBe(false);
+  });
+
+  it('is false for rock with no time in the air, wherever it ends', () => {
+    expect(isAnimatedFlight(flight({ durationS: 0 }))).toBe(false);
+    expect(isAnimatedFlight(flight({ durationS: -1 }))).toBe(false);
+  });
+
+  it('counts a straight drop as movement', () => {
+    expect(isAnimatedFlight(flight({ from: { x: 1, y: 9, z: 1 }, to: { x: 1, y: 8, z: 1 } }))).toBe(true);
   });
 });

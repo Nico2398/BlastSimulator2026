@@ -10,7 +10,7 @@ import { installUiSounds, type DeferFn } from '../../../../src/audio/ui/installU
 import { parseCommand } from '../../../../src/console/ConsoleRunner.js';
 import { UI_SOUND_CONFIG } from '../../../../src/core/config/audio/ui.js';
 import { button } from '../../../../src/ui/dom.js';
-import { RecordingPlayer } from './recordingPlayer.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
 /** Stands in for setTimeout(0): tasks wait until run() and can be cancelled. */
 class ManualScheduler {

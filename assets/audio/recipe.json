@@ -53,10 +53,17 @@
   "window_db": 35,
   "rel_db": -6
  },
+ "mirrors": {
+  "open-game-sfx-index": {
+   "url": "https://github.com/Mcamento8/open-game-sfx-index",
+   "commit": "34bbe8b525b5ceff3804915ea745532af11f6055",
+   "record": "SOURCES.md and ATTRIBUTION.md of that commit (official zip URLs, 'License: Creative Commons CC0' on each pack page, checked by the mirror's author 2026-09-21)"
+  }
+ },
  "packs": {
   "uisfx": {
    "title": "uisfx 0.4.0 (npm), 'mechanical' personality",
-   "author": "Romain Simon",
+   "author": "Yuki Capital (uisfx, github.com/romainsimon/uisfx)",
    "dir": "npm/uisfx-0.4.0/package/sounds",
    "url": "https://github.com/romainsimon/uisfx",
    "via": "npm package uisfx@0.4.0 (LICENSE-AUDIO, manifest.json license.audio = CC0-1.0)",
@@ -69,6 +76,8 @@
    "dir": "github/open-game-sfx-index/audio/impact-sounds",
    "url": "https://kenney.nl/assets/impact-sounds",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -78,6 +87,8 @@
    "dir": "github/open-game-sfx-index/audio/sci-fi-sounds",
    "url": "https://kenney.nl/assets/sci-fi-sounds",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://kenney.nl/media/pages/assets/sci-fi-sounds/6b296f9ecf-1677589334/kenney_sci-fi-sounds.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -87,6 +98,8 @@
    "dir": "github/open-game-sfx-index/audio/rpg-audio",
    "url": "https://kenney.nl/assets/rpg-audio",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -96,6 +109,8 @@
    "dir": "github/open-game-sfx-index/audio/music-jingles",
    "url": "https://kenney.nl/assets/music-jingles",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -105,6 +120,8 @@
    "dir": "github/open-game-sfx-index/audio/digital-audio",
    "url": "https://kenney.nl/assets/digital-audio",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://kenney.nl/media/pages/assets/digital-audio/216eac4753-1677590265/kenney_digital-audio.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -114,6 +131,8 @@
    "dir": "github/open-game-sfx-index/audio/interface-sounds",
    "url": "https://kenney.nl/assets/interface-sounds",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -123,6 +142,8 @@
    "dir": "github/open-game-sfx-index/audio/oga-levelup-powerup",
    "url": "https://opengameart.org/content/level-up-power-up-coin-get-13-sounds",
    "via": "open-game-sfx-index mirror",
+   "mirror": "open-game-sfx-index",
+   "official_zip": "https://opengameart.org/sites/default/files/SoundPack01.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -230,7 +251,8 @@
      "license": "CC0-1.0",
      "url": "https://freesound.org/people/1sticky8/sounds/78484/"
     }
-   }
+   },
+   "commit": "d0bf8d4deda22d5a7f8d01953433cb2644663e9f"
   }
  },
  "sounds": {
@@ -1012,15 +1034,6 @@
     {
      "pack": "uisfx",
      "file": "mechanical/blocked.ogg"
-    }
-   ]
-  },
-  "ui_error": {
-   "kind": "ui",
-   "layers": [
-    {
-     "pack": "uisfx",
-     "file": "mechanical/error.ogg"
     }
    ]
   },

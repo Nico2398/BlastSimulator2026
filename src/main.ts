@@ -35,13 +35,13 @@ import { NULL_AUDIO_PLAYER, type AudioPlayer } from './audio/AudioPlayer.js';
 import { installAudioDebug } from './audio/debug/audioDebug.js';
 import { UiCues } from './audio/ui/UiCues.js';
 import { CommandClaim } from './audio/ui/CommandClaim.js';
+import { installAudioUnlock } from './audio/ui/audioUnlock.js';
 import { installUiSounds } from './audio/ui/installUiSounds.js';
 import { commandCue } from './audio/ui/commandCues.js';
 import { GameAudioDirector } from './audio/director/GameAudioDirector.js';
 import { createMusicDirector } from './audio/music/MusicDirector.js';
 import { deriveMusicContext } from './audio/music/musicContext.js';
 import { Random } from './core/math/Random.js';
-import { cameraGroundRight } from './renderer/cameraGroundRight.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
 import { loadCampaignProfile, saveCampaignProfile } from './persistence/CampaignProfileStore.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
@@ -137,15 +137,8 @@ uiManager.setUiCues(uiCues);
 installUiSounds(document, audioPlayer, { isInert: target => isRailedControl(target), claim: commandClaim });
 // No streaming in scenario runs; with an empty track catalogue the director does nothing either way.
 const music = scenarioMode ? null : createMusicDirector(audioMgr);
-// Browsers hold audio back until the first gesture: resume the context and start any waiting music on it.
-const unlockAudio = (): void => {
-  document.removeEventListener('pointerdown', unlockAudio, true);
-  document.removeEventListener('keydown', unlockAudio, true);
-  void audioMgr.resume();
-  music?.unlock();
-};
-document.addEventListener('pointerdown', unlockAudio, true);
-document.addEventListener('keydown', unlockAudio, true);
+// Browsers hold audio back until a gesture they accept: every gesture retries until the context is running.
+installAudioUnlock(document, audioMgr, music);
 
 // --- Scene picking: hover tags, click-to-select, selection bar (redesign P2) ---
 // Declared here (with the other core objects) but wired further down, once
@@ -630,7 +623,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean; scripted?:
   // order, hire or refusal (a player's act); the director voices what the world did (built, scrapped, paid, blown).
   // `scripted` marks commands the tutorial runs for the player, which must not click like the player's own.
   commandCue(audioPlayer, parsed, result.success, { scripted: opts?.scripted === true, claim: commandClaim });
-  gameAudio.onCommand({ command: cmd, success: result.success, prevState, state: ctx.state });
+  gameAudio.onCommand({ parsed, success: result.success, prevState, state: ctx.state });
   return result;
 }
 
@@ -1453,7 +1446,7 @@ scene.start((dt) => {
   // Sound follows the camera's ground target (stable under blast shake, unlike camera.position) and its right
   // vector, with real seconds: the sim's speed never changes how long a sound lasts.
   const viewTarget = scene.cameraController.viewTarget;
-  const right = cameraGroundRight(scene.camera.matrixWorld.elements);
+  const right = scene.cameraController.groundRight();
   const viewDistance = scene.cameraController.distance;
   gameAudio.update({
     dtS: dt,

@@ -159,40 +159,6 @@ describe('volumes', () => {
   });
 });
 
-describe('mute', () => {
-  function masterOf(ctx: FakeAudioContext): FakeGain {
-    const limiter = ctx.all<FakeCompressor>('compressor')[0]!;
-    return ctx.all<FakeGain>('gain').find(g => g.outputs.includes(limiter))!;
-  }
-
-  it('silences the master immediately, with no ramp', () => {
-    const { ctx, manager } = make();
-    manager.setMuted(true);
-    expect(manager.isMuted).toBe(true);
-    const master = masterOf(ctx);
-    expect(master.gain.value).toBe(0);
-    expect(master.gain.events.map(e => e.type)).toEqual(['cancel', 'set']);
-  });
-
-  it('keeps master volume changes while muted but does not play them', () => {
-    const { ctx, manager } = make();
-    manager.setMuted(true);
-    manager.setVolume('master', 0.9);
-    expect(manager.getVolume('master')).toBe(0.9);
-    expect(masterOf(ctx).gain.value).toBe(0);
-    expect(masterOf(ctx).gain.events.some(e => e.type === 'target')).toBe(false);
-  });
-
-  it('unmuting returns to the stored master volume smoothly', () => {
-    const { ctx, manager } = make();
-    manager.setVolume('master', 0.6);
-    manager.setMuted(true);
-    manager.setMuted(false);
-    expect(manager.isMuted).toBe(false);
-    expect(masterOf(ctx).gain.events.at(-1)).toMatchObject({ type: 'target', value: 0.6 });
-  });
-});
-
 describe('ducking', () => {
   const dryGain = (m: AudioManager, bus: AudioCategory): FakeGain => (gainOf(m.busInput(bus)).outputs[0] as FakeGain);
   const wetGain = (m: AudioManager, bus: AudioCategory): FakeGain => (gainOf(m.reverbInput(bus)).outputs[0] as FakeGain);
@@ -254,6 +220,28 @@ describe('ducking', () => {
     const { manager } = make();
     expect(() => manager.duck('ui', -6, -1, -1)).not.toThrow();
   });
+
+  it('ducks nothing for a non-finite amount and leaves the bus usable', () => {
+    const { manager } = make();
+    for (const amount of [Number.NaN, Infinity, -Infinity]) manager.duck('ui', amount, 1, 1);
+    expect(dryGain(manager, 'ui').gain.events).toEqual([]);
+    manager.duck('ui', -6, 1, 1);
+    expect(dryGain(manager, 'ui').gain.events.filter(e => e.type === 'linear').at(-1)!.value).toBeCloseTo(10 ** (-6 / 20), 10);
+  });
+
+  it('treats a non-finite hold or release as zero: every scheduled value and time stays finite', () => {
+    const { manager } = make();
+    manager.duck('effects', -9, Number.NaN, Infinity);
+    manager.duck('ambient', -9, -Infinity, Number.NaN);
+    for (const bus of ['effects', 'ambient'] as const) {
+      const events = dryGain(manager, bus).gain.events;
+      expect(events.length).toBeGreaterThan(0);
+      for (const event of events) {
+        expect(Number.isFinite(event.time)).toBe(true);
+        expect(Number.isFinite(event.value)).toBe(true);
+      }
+    }
+  });
 });
 
 describe('suspend, resume and page visibility', () => {
@@ -274,14 +262,6 @@ describe('suspend, resume and page visibility', () => {
     await expect(manager.resume()).resolves.toBeUndefined();
   });
 
-  it('suspend pauses a running context only', () => {
-    const { ctx, manager } = make();
-    manager.suspend();
-    expect(ctx.suspendCalls).toHaveLength(1);
-    manager.suspend();
-    expect(ctx.suspendCalls).toHaveLength(1);
-  });
-
   it('suspends while the page is hidden and resumes when it is shown again', () => {
     const { ctx, visibility } = make();
     visibility!.setHidden(true);
@@ -297,14 +277,6 @@ describe('suspend, resume and page visibility', () => {
     visibility!.setHidden(true);
     visibility!.setHidden(false);
     expect(ctx.suspendCalls).toHaveLength(0);
-    expect(ctx.resumeCalls).toHaveLength(0);
-  });
-
-  it('does not resume on show after an explicit suspend', () => {
-    const { ctx, manager, visibility } = make();
-    visibility!.setHidden(true);
-    manager.suspend();
-    visibility!.setHidden(false);
     expect(ctx.resumeCalls).toHaveLength(0);
   });
 
@@ -345,24 +317,19 @@ describe('without Web Audio', () => {
     expect(manager.context).toBeNull();
   });
 
-  it('still stores volumes and mute so settings keep working', () => {
+  it('still stores volumes so settings keep working', () => {
     const manager = new AudioManager({ createContext: () => { throw new Error('blocked'); } });
     manager.setVolume('music', 0.1);
     manager.applyVolumes({ master: 0.2 });
-    manager.setMuted(true);
     expect(manager.getVolume('music')).toBe(0.1);
     expect(manager.getVolume('master')).toBe(0.2);
     expect(manager.getVolume('ui')).toBe(AUDIO_DEFAULT_VOLUMES.ui);
-    expect(manager.isMuted).toBe(true);
-    manager.setMuted(false);
-    expect(manager.isMuted).toBe(false);
   });
 
   it('turns every audio call into a no-op', async () => {
     const manager = new AudioManager();
     await expect(manager.resume()).resolves.toBeUndefined();
     expect(() => {
-      manager.suspend();
       manager.duck('ui', -6, 1, 1);
       manager.setReverbImpulse(fakeBuffer(1));
       manager.dispose();

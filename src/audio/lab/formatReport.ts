@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Report formatting
 // Plain-text table of the rendered mixes for the terminal.
 
+import { linearstep } from '../../core/math/Linearstep.js';
 import type { MixReport } from './labReport.js';
 
 const COLUMNS: ReadonlyArray<readonly [string, (mix: MixReport) => string]> = [
@@ -12,6 +13,7 @@ const COLUMNS: ReadonlyArray<readonly [string, (mix: MixReport) => string]> = [
   ['LUFS int', mix => mix.stats.integratedLufs.toFixed(1)],
   ['LUFS st max', mix => mix.stats.shortTermMaxLufs.toFixed(1)],
   ['clips', mix => String(mix.stats.clipCount)],
+  ['drive %', mix => (mix.stats.clipperDrive * 100).toFixed(3)],
   ['DC', mix => mix.stats.dcOffset.toFixed(4)],
   ['mono loss dB', mix => mix.stats.monoLossDb.toFixed(1)],
   ['voices', mix => String(mix.peakVoices)],
@@ -34,7 +36,7 @@ export function formatEnvelope(mix: MixReport, floorDb = -60): string {
   const blocks = ' .:-=+*#%@';
   return mix.stats.envelopeDbfs
     .map((db) => {
-      const level = Math.max(0, Math.min(1, (db - floorDb) / -floorDb));
+      const level = linearstep(floorDb, 0, db);
       return blocks[Math.min(blocks.length - 1, Math.floor(level * blocks.length))] ?? ' ';
     })
     .join('');

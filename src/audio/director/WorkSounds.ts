@@ -9,11 +9,11 @@
 // run on real frame time (`update`), so nothing here multiplies at 8x.
 
 import type { OneShotId } from '../SoundCatalog.js';
-import type { LoopHandle } from '../AudioPlayer.js';
 import type { ActionType, GameState } from '../../core/state/GameState.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
 import { DIRECTOR_CONFIG, WORK_CONFIG } from '../../core/config/audio/game.js';
 import { clamp } from '../engine/units.js';
+import { BedFeed } from './BedFeed.js';
 import { playCue } from './playCue.js';
 import type { DirectorEnv, EntityKind } from './types.js';
 import type { Spot } from './worldSnapshot.js';
@@ -48,11 +48,10 @@ export class WorkSounds {
   private suppressedUntilS = 0;
   private nearUnits = 0;
   private level = 0;
-  private sentLevel = 0;
-  private readonly bed: LoopHandle;
+  private readonly bed: BedFeed;
 
   constructor(private readonly env: DirectorEnv) {
-    this.bed = env.player.loop('amb_machinery');
+    this.bed = new BedFeed(env.player.loop('amb_machinery'), WORK_CONFIG.machinery.epsilon);
   }
 
   /** Rebuild the working units from the game state. Call after every command and tick. */
@@ -118,7 +117,7 @@ export class WorkSounds {
     this.nearUnits = 0;
     this.level = 0;
     this.suppressedUntilS = 0;
-    this.setBed(0);
+    this.bed.set(0, WORK_CONFIG.machinery.rampS);
   }
 
   /** Re-pick the nearest work sites and count the units close enough to add to the bed. */
@@ -143,13 +142,6 @@ export class WorkSounds {
     const target = active ? Math.sqrt(clamp(this.nearUnits / config.unitsForFull, 0, 1)) : 0;
     this.level += (target - this.level) * (1 - Math.exp(-dtS / config.smoothTauS));
     if (target === 0 && this.level < config.epsilon) this.level = 0;
-    this.setBed(this.level * config.maxLevel);
-  }
-
-  private setBed(level: number): void {
-    const reachedSilence = level === 0 && this.sentLevel !== 0;
-    if (!reachedSilence && Math.abs(level - this.sentLevel) < WORK_CONFIG.machinery.epsilon) return;
-    this.sentLevel = level;
-    this.bed.setLevel(level, WORK_CONFIG.machinery.rampS);
+    this.bed.set(this.level * config.maxLevel, config.rampS);
   }
 }

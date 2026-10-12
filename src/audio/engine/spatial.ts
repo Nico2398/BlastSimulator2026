@@ -20,8 +20,13 @@ export interface SpatialResult {
 }
 
 /** Distance (m) inside which a source is at full level: a zoomed-in camera hears a small neighbourhood. */
-function referenceDistance(viewDistance: number, cfg: SpatialConfig = SPATIAL_CONFIG): number {
+export function referenceDistance(viewDistance: number, cfg: SpatialConfig = SPATIAL_CONFIG): number {
   return clamp(viewDistance * cfg.referencePerViewMetre, cfg.minReferenceM, cfg.maxReferenceM);
+}
+
+/** Distance (m) beyond which a positional sound is culled. */
+export function cullDistance(viewDistance: number, cfg: SpatialConfig = SPATIAL_CONFIG): number {
+  return referenceDistance(viewDistance, cfg) * cfg.cullDistanceFactor;
 }
 
 /** Level trim of the camera height: pulling back widens what is heard but makes all of it quieter. */
@@ -35,11 +40,11 @@ export function computeSpatial(listener: Listener, point: WorldPoint, cfg: Spati
   const dz = point.z - listener.z;
   const distance = Math.hypot(dx, dz);
   const reference = referenceDistance(listener.viewDistance, cfg);
-  const cullDistance = reference * cfg.cullDistanceFactor;
+  const cull = cullDistance(listener.viewDistance, cfg);
 
   const inverse = distance <= reference ? 1 : reference / (reference + cfg.rolloff * (distance - reference));
-  const edgeStart = cullDistance * (1 - cfg.cullFadeFraction);
-  const edge = distance <= edgeStart ? 1 : clamp((cullDistance - distance) / (cullDistance - edgeStart), 0, 1);
+  const edgeStart = cull * (1 - cfg.cullFadeFraction);
+  const edge = distance <= edgeStart ? 1 : clamp((cull - distance) / (cull - edgeStart), 0, 1);
   const gain = Math.max(inverse, cfg.floorGain) * edge * zoomTrim(listener.viewDistance, cfg);
 
   const side = distance > 0 ? (dx * listener.rightX + dz * listener.rightZ) / distance : 0;
@@ -51,5 +56,5 @@ export function computeSpatial(listener: Listener, point: WorldPoint, cfg: Spati
     cfg.lowpassMinHz,
     cfg.lowpassMaxHz,
   );
-  return { audible: distance < cullDistance && gain >= cfg.audibleGain, gain, pan, lowpassHz };
+  return { audible: distance < cull && gain >= cfg.audibleGain, gain, pan, lowpassHz };
 }

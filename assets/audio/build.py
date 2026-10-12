@@ -3,8 +3,11 @@
 
     python3 assets/audio/build.py --sources <dir> [--out public/audio/sfx] [--only name ...] [--report]
     python3 assets/audio/build.py --credits
+    python3 assets/audio/build.py --sources <dir> --verify-upstream <official-dir>
+    python3 assets/audio/build.py --selftest
 
 <dir> holds the upstream packs laid out as recipe.json "packs[*].dir" expects.
+--verify-upstream closes the licensing gap of the mirror packs: see its --help text.
 Pipeline per sound: decode layers to float mono 44.1 kHz -> optional ffmpeg
 filter -> slice -> mix -> DC removal -> trim silence -> length cap -> bass body
 (only sounds whose energy is stranded below small-speaker cutoff, see
@@ -13,11 +16,15 @@ recipe.json "body") -> fades -> loudness normalisation with soft-knee limiter
 Only numpy and ffmpeg are needed. Output is deterministic for a given input.
 """
 import argparse
+import hashlib
 import json
 import math
 import subprocess
 import sys
+import tempfile
+import wave
 from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -330,18 +337,187 @@ def credits_text(recipe, template):
             cells = [first, f"[{pack['title']}]({pack['url']})", src, who.replace("|", "/"), lic, ", ".join(changes)]
             rows.append("| " + " | ".join(cells) + " |")
     ccby_lines = "\n".join(f'- `"src/wav/{f}" {t}`' for f, t in sorted(ccby.items()))
-    return template.replace("{{CCBY}}", ccby_lines).replace("{{FILES}}", "\n".join(rows))
+    mirror = recipe["mirrors"]["open-game-sfx-index"]
+    zips = "\n".join(f"   - {recipe['packs'][k]['title']}: {recipe['packs'][k]['official_zip']}" for k in used_mirror_packs(recipe))
+    return (
+        template.replace("{{CCBY}}", ccby_lines)
+        .replace("{{FILES}}", "\n".join(rows))
+        .replace("{{OPENSFX_COMMIT}}", recipe["packs"]["opensfx"]["commit"])
+        .replace("{{MIRROR_COMMIT}}", mirror["commit"])
+        .replace("{{OFFICIAL_ZIPS}}", zips)
+    )
+
+
+# ---- upstream verification (closes the "mirror is not first-party" gap) ----
+
+def used_mirror_packs(recipe):
+    """Packs a sound uses whose files were taken from the community mirror, in recipe order."""
+    used = {ly["pack"] for entry in recipe["sounds"].values() for ly in entry["layers"]}
+    return [k for k, v in recipe["packs"].items() if "mirror" in v and k in used]
+
+
+def used_mirror_layers(recipe):
+    """Sorted unique (pack, file) pairs of the mirror packs that sounds actually use."""
+    return sorted({(ly["pack"], ly["file"]) for entry in recipe["sounds"].values() for ly in entry["layers"] if "mirror" in recipe["packs"][ly["pack"]]})
+
+
+def md5_file(path):
+    return hashlib.md5(Path(path).read_bytes()).hexdigest()
+
+
+def pcm_md5(path):
+    return hashlib.md5(decode(path).astype("<f4").tobytes()).hexdigest()
+
+
+def index_upstream(upstream):
+    """Files under the unzipped official packs by file name and by stem, ignoring macOS archive junk."""
+    by_name, by_stem = {}, {}
+    for p in sorted(Path(upstream).rglob("*")):
+        if not p.is_file() or "__MACOSX" in p.parts or p.name.startswith("._"):
+            continue
+        by_name.setdefault(p.name, []).append(p)
+        by_stem.setdefault(p.stem, []).append(p)
+    return by_name, by_stem
+
+
+def pack_slug(pack):
+    """Folder-name hint of a pack's official zip (kenney_impact-sounds.zip -> impact-sounds)."""
+    stem = Path(urlparse(pack["official_zip"]).path).stem
+    return stem[len("kenney_"):] if stem.startswith("kenney_") else stem
+
+
+def prefer_pack(candidates, slug):
+    """Files from a folder that names the pack, when there are any: Kenney packs share file names."""
+    named = [c for c in candidates if slug.lower() in str(c).lower()]
+    return named or candidates
+
+
+def verify_layer(source, pack, file, index):
+    """(status, detail) of one mirror file against the official packs: MATCH, DIFFERENT or NOT FOUND."""
+    by_name, by_stem = index
+    slug = pack_slug(pack)
+    mine = md5_file(source)
+    same_name = prefer_pack(by_name.get(file, []), slug)
+    for candidate in same_name:
+        if md5_file(candidate) == mine:
+            return "MATCH", str(candidate)
+    if same_name:
+        return "DIFFERENT", f"{len(same_name)} file(s) of that name differ, e.g. {same_name[0]}"
+    # The mirror converts AIFF to lossless WAV, so a changed container is expected: compare the decoded samples.
+    converted = [c for c in prefer_pack(by_stem.get(Path(file).stem, []), slug) if c.suffix.lower() != Path(file).suffix.lower()]
+    if converted:
+        pcm = pcm_md5(source)
+        for candidate in converted:
+            if pcm_md5(candidate) == pcm:
+                return "MATCH", f"{candidate} (decoded samples; container converted by the mirror)"
+        return "DIFFERENT", f"{converted[0]} has other samples"
+    return "NOT FOUND", ""
+
+
+def verify_upstream(recipe, sources_root, upstream):
+    """One (file, pack, status, detail) row per mirror file the sounds use."""
+    index = index_upstream(upstream)
+    rows = []
+    for pack_name, file in used_mirror_layers(recipe):
+        pack = recipe["packs"][pack_name]
+        source = Path(sources_root) / pack["dir"] / file
+        if not source.is_file():
+            raise FileNotFoundError(source)
+        status, detail = verify_layer(source, pack, file, index)
+        rows.append((file, pack_name, status, detail))
+    return rows
+
+
+def verify_report(rows):
+    """The table, a summary line and the process exit code (0 only when every file matched)."""
+    width = max([len(r[0]) for r in rows] + [4])
+    pack_width = max([len(r[1]) for r in rows] + [4])
+    lines = [f"{'file':<{width}}  {'pack':<{pack_width}}  status     detail"]
+    lines += [f"{f:<{width}}  {p:<{pack_width}}  {s:<9}  {d}" for f, p, s, d in rows]
+    counts = {s: sum(1 for r in rows if r[2] == s) for s in ("MATCH", "DIFFERENT", "NOT FOUND")}
+    lines.append(f"{len(rows)} file(s): {counts['MATCH']} MATCH, {counts['DIFFERENT']} DIFFERENT, {counts['NOT FOUND']} NOT FOUND")
+    if counts["MATCH"] == len(rows) and rows:
+        lines.append("Every mirror file matches the official pack. Still confirm the 'License: Creative Commons CC0'"
+                     " line on each pack page, then record the check in assets/audio/credits.template.md.")
+    return "\n".join(lines), 0 if rows and counts["MATCH"] == len(rows) else 1
+
+
+def verify_epilog(recipe):
+    zips = "\n".join(f"  {recipe['packs'][k]['official_zip']}" for k in used_mirror_packs(recipe))
+    return (
+        "--verify-upstream <dir>: <dir> holds the official packs, unzipped (any folder layout). For every mirror file a\n"
+        "sound uses, the same-named file is looked up there and compared by md5 with the file in --sources; a changed\n"
+        "container (the mirror converts AIFF to WAV) is compared by decoded samples. Prints MATCH / DIFFERENT /\n"
+        "NOT FOUND per file and exits 1 unless every file matched. Official downloads (from the mirror's SOURCES.md):\n"
+        f"{zips}\n"
+        "Then confirm 'License: Creative Commons CC0' on each pack page (and on the OpenGameArt page)."
+    )
+
+
+def selftest():
+    """Run verify_upstream on a tiny fake tree; raises AssertionError when a status is wrong."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        mirror, official = root / "mirror", root / "official"
+        (mirror / "kenney").mkdir(parents=True)
+        (mirror / "oga").mkdir()
+        for name, data in {"same.ogg": b"same", "changed.ogg": b"mine", "gone.ogg": b"gone", "shared.ogg": b"mine"}.items():
+            (mirror / "kenney" / name).write_bytes(data)
+        t = np.arange(4410) / SR
+        for name, freq in {"Same.wav": 440, "Other.wav": 880}.items():
+            pcm = (np.sin(2 * math.pi * freq * t) * 12000).astype("<i2").tobytes()
+            with wave.open(str(mirror / "oga" / name), "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(SR)
+                w.writeframes(pcm)
+        pack_dir = official / "kenney_fake-pack" / "Audio"
+        other_dir = official / "kenney_other-pack" / "Audio"
+        junk_dir = official / "__MACOSX" / "kenney_fake-pack" / "Audio"
+        for d in (pack_dir, other_dir, junk_dir, official / "oga_zip"):
+            d.mkdir(parents=True)
+        (pack_dir / "same.ogg").write_bytes(b"same")
+        (pack_dir / "changed.ogg").write_bytes(b"theirs")
+        (junk_dir / "gone.ogg").write_bytes(b"gone")
+        (pack_dir / "._same.ogg").write_bytes(b"junk")
+        (other_dir / "shared.ogg").write_bytes(b"not mine")
+        (pack_dir / "shared.ogg").write_bytes(b"mine")
+        for name, wav in {"Same.aiff": "Same.wav", "Other.aiff": "Same.wav"}.items():
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(mirror / "oga" / wav), "-c:a", "pcm_s16be", str(official / "oga_zip" / name)], check=True)
+        pack = lambda d, slug: {"dir": d, "mirror": "m", "official_zip": f"https://example.invalid/kenney_{slug}.zip"}
+        recipe = {
+            "packs": {"fake": pack("kenney", "fake-pack"), "oga": {**pack("oga", "x"), "official_zip": "https://example.invalid/oga_zip.zip"}},
+            "sounds": {"s": {"layers": [{"pack": "fake", "file": f} for f in ("same.ogg", "changed.ogg", "gone.ogg", "shared.ogg")]
+                             + [{"pack": "oga", "file": "Same.wav"}, {"pack": "oga", "file": "Other.wav"}]}},
+        }
+        got = {r[0]: r[2] for r in verify_upstream(recipe, mirror, official)}
+        want = {"same.ogg": "MATCH", "changed.ogg": "DIFFERENT", "gone.ogg": "NOT FOUND", "shared.ogg": "MATCH", "Same.wav": "MATCH", "Other.wav": "DIFFERENT"}
+        assert got == want, f"selftest: got {got}, wanted {want}"
+        assert verify_report([("a", "p", "MATCH", "")])[1] == 0
+        assert verify_report([("a", "p", "MATCH", ""), ("b", "p", "DIFFERENT", "")])[1] == 1
+        assert verify_report([("a", "p", "NOT FOUND", "")])[1] == 1
+        assert verify_report([])[1] == 1
+    print("selftest OK: MATCH, DIFFERENT, NOT FOUND, pack-folder preference, junk skipping and AIFF/WAV sample comparison behave")
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    try:
+        epilog = verify_epilog(json.loads((HERE / "recipe.json").read_text()))
+    except (OSError, ValueError, KeyError):
+        epilog = None
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0], epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sources")
     ap.add_argument("--recipe", default=str(HERE / "recipe.json"))
     ap.add_argument("--out", default=str(HERE.parent.parent / "public" / "audio" / "sfx"))
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--credits", action="store_true", help="write public/audio/CREDITS.md and exit")
+    ap.add_argument("--verify-upstream", metavar="DIR", help="compare every mirror file a sound uses with the official pack unzipped in DIR (needs --sources); exit 1 unless all MATCH")
+    ap.add_argument("--selftest", action="store_true", help="check --verify-upstream on a generated fake tree (needs ffmpeg, no network) and exit")
     args = ap.parse_args()
+    if args.selftest:
+        selftest()
+        return
     recipe = json.loads(Path(args.recipe).read_text())
     if args.credits:
         template = (HERE / "credits.template.md").read_text()
@@ -349,6 +525,14 @@ def main():
         dest.write_text(credits_text(recipe, template))
         print(f"wrote {dest}")
         return
+    if args.verify_upstream:
+        if not args.sources:
+            ap.error("--verify-upstream needs --sources (the files the sounds were built from)")
+        if not Path(args.verify_upstream).is_dir():
+            ap.error(f"--verify-upstream: {args.verify_upstream} is not a directory")
+        text, code = verify_report(verify_upstream(recipe, args.sources, args.verify_upstream))
+        print(text)
+        sys.exit(code)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     if not args.sources:

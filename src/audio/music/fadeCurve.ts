@@ -33,13 +33,35 @@ export function buildFadeCurve(fade: Fade, points: number): Float32Array {
   return curve;
 }
 
-/** Queue `fade` on a gain param, replacing anything already queued. */
+/**
+ * Queue `fade` on a gain param, replacing anything already queued. Browsers differ on what an overlapping
+ * curve does (some throw NotSupportedError from `setValueAtTime` inside a running one), so every step is
+ * fenced: curve, else linear ramp, else the end level assigned at once. It never throws.
+ */
 export function scheduleFade(param: AudioParam, fade: Fade, points: number): void {
-  param.cancelScheduledValues(fade.startS);
-  param.setValueAtTime(fade.from, fade.startS);
   try {
-    param.setValueCurveAtTime(buildFadeCurve(fade, points), fade.startS, fade.durationS);
+    param.cancelScheduledValues(fade.startS);
+    param.setValueAtTime(fade.from, fade.startS);
+    try {
+      param.setValueCurveAtTime(buildFadeCurve(fade, points), fade.startS, fade.durationS);
+    } catch {
+      param.linearRampToValueAtTime(fade.to, fade.startS + fade.durationS);
+    }
   } catch {
-    param.linearRampToValueAtTime(fade.to, fade.startS + fade.durationS);
+    assignLevel(param, fade.to);
+  }
+}
+
+/** Set `value` outright, dropping what is queued; a param that refuses even that is left as it is. */
+export function assignLevel(param: AudioParam, value: number): void {
+  try {
+    param.cancelScheduledValues(0);
+  } catch {
+    // nothing queued that can be dropped
+  }
+  try {
+    param.value = value;
+  } catch {
+    // the param is unreachable: the fade is lost, the music keeps its last level
   }
 }

@@ -27,6 +27,13 @@ export const UI_SOUND_CONFIG = {
   hoverKeyboardQuietMs: 700,
 } as const;
 
+/**
+ * Where players read the audio credits and licences (public/audio/credits.html renders CREDITS.md). The CC-BY
+ * attribution the sound banks require has to be reachable from the running game; the Settings panel opens this.
+ * Absolute on the page origin, like the model and sample URLs.
+ */
+export const AUDIO_CREDITS_URL = '/audio/credits.html';
+
 /** Extra pitch per selected thing, so workers, vehicles and buildings are subtly different without being different sounds. */
 export const UI_SELECTION_PITCH_CENTS = {
   employee: 150,

@@ -3,9 +3,10 @@
 import { describe, expect, it } from 'vitest';
 import { Random } from '../../../../src/core/math/Random.js';
 import { SYNTH_LEVELS } from '../../../../src/core/config/audio/synth.js';
-import { attackDecay, controlTrack, fadeEdges } from '../../../../src/audio/synth/envelopes.js';
+import { attackDecay, controlTrack, decayTo, fadeEdges } from '../../../../src/audio/synth/envelopes.js';
 import { Biquad, filterBuffer, type BiquadKind } from '../../../../src/audio/synth/filters.js';
-import { dbToGain, mixInto, mixIntoCircular, saturate } from '../../../../src/audio/synth/mix.js';
+import { dbToGain } from '../../../../src/audio/engine/units.js';
+import { mixInto, mixIntoCircular, saturate } from '../../../../src/audio/synth/mix.js';
 import { brownNoise, unitRms, whiteNoise } from '../../../../src/audio/synth/noise.js';
 import { accumulatePhase, loopSine, sawAt, squareAt } from '../../../../src/audio/synth/oscillators.js';
 import { rngFor, variantAt } from '../../../../src/audio/synth/seed.js';
@@ -118,6 +119,13 @@ describe('Biquad', () => {
 });
 
 describe('envelopes', () => {
+  it('decayTo starts at `start`, falls a fraction 1 - 1/e of the way in one time constant and settles on `end`', () => {
+    expect(decayTo(900, 100, 0, 0.5)).toBe(900);
+    expect(decayTo(900, 100, 0.5, 0.5)).toBeCloseTo(100 + 800 / Math.E, 9);
+    expect(decayTo(900, 100, 50, 0.5)).toBeCloseTo(100, 9);
+    expect(decayTo(100, 900, 0.5, 0.5)).toBeCloseTo(900 - 800 / Math.E, 9); // rising sweeps work the same way
+  });
+
   it('attackDecay is silent before 0, rises over the attack, then decays exponentially', () => {
     expect(attackDecay(-0.1, 0.01, 0.5)).toBe(0);
     expect(attackDecay(0, 0.01, 0.5)).toBe(0);

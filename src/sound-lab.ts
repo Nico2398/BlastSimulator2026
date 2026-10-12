@@ -7,7 +7,7 @@
 
 import { Random } from './core/math/Random.js';
 import { LAB_PANEL_CONFIG, LAB_RENDER_CONFIG } from './core/config/audio/lab.js';
-import { AudioEngine, type AudioEngineOptions } from './audio/AudioEngine.js';
+import { AudioEngine, fetchArrayBuffer, type AudioEngineOptions } from './audio/AudioEngine.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { SOUND_CATALOG } from './audio/SoundCatalog.js';
 import { planPreload } from './audio/engine/preloadPlan.js';
@@ -36,12 +36,6 @@ declare global {
 
 const params = new URLSearchParams(window.location.search);
 const autotest = params.get('autotest') === '1';
-
-async function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.arrayBuffer();
-}
 
 const fetchBytes = memoizeBytes(fetchArrayBuffer);
 

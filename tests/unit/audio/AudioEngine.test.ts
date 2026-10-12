@@ -8,6 +8,7 @@ import { AudioManager } from '../../../src/audio/AudioManager.js';
 import { NULL_AUDIO_PLAYER } from '../../../src/audio/AudioPlayer.js';
 import type { SoundDefinition } from '../../../src/audio/SoundCatalog.js';
 import type { RenderedAudio, SynthRecipe } from '../../../src/audio/synth/types.js';
+import { SAMPLE_BANK_CONFIG } from '../../../src/core/config/audio/engine.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { FakeAudioContext, FakeConvolver, asAudioContext } from '../../helpers/audioFakes.js';
 
@@ -52,6 +53,7 @@ function rig(over: Partial<AudioEngineOptions> = {}, fail: string[] = []): Rig {
     fetchBytes,
     recipes: { thunder: recipe(), wind_bed: recipe(true) },
     renderImpulse: () => tone(32, 2),
+    sleep: async () => undefined,
     ...over,
   });
   return { ctx, manager, engine, fetched, readyAtFetch };
@@ -153,6 +155,31 @@ describe('AudioEngine preload', () => {
     await expect(engine.preload()).resolves.toBeUndefined();
   });
 
+  it('records an unexpected pipeline error in failedAssets instead of hiding it', async () => {
+    const { engine, manager } = rig({ renderImpulse: () => tone(8, 2) });
+    vi.spyOn(manager, 'setReverbImpulse').mockImplementation(() => { throw new Error('boom'); });
+    expect(engine.failedAssets).toEqual([]);
+    await engine.preload();
+    expect(engine.failedAssets).toContain('preload');
+    expect(engine.preloaded).toBe(true);
+  });
+
+  it('retries a failed sample once before recording it, and uses the retry when it succeeds', async () => {
+    let attempts = 0;
+    const sleeps: number[] = [];
+    const { engine } = rig({
+      sleep: async (ms) => { sleeps.push(ms); },
+      fetchBytes: async (url) => {
+        if (url.includes('click_a') && ++attempts === 1) throw new Error('flaky');
+        return new ArrayBuffer(4);
+      },
+    });
+    await engine.preload();
+    expect(attempts).toBe(2);
+    expect(sleeps).toEqual([SAMPLE_BANK_CONFIG.retryBackoffMs]);
+    expect(engine.failedAssets).toEqual([]);
+  });
+
   it('reads the asset base from the options', async () => {
     const { engine, fetched } = rig({ assetBase: '/cdn/sfx/' });
     await engine.preload();
@@ -213,6 +240,7 @@ describe('AudioEngine defaults', () => {
     const engine = new AudioEngine(manager, {
       random: new Random(1),
       fetchBytes: async () => { throw new Error('offline'); },
+      sleep: async () => undefined,
       recipes: {},
       renderImpulse: () => { throw new Error('none'); },
     });

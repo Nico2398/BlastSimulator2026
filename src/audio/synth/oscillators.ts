@@ -2,7 +2,8 @@
 // Phase is accumulated from a per-sample frequency track, so pitch glides and vibrato
 // never produce the clicks a naive sin(2*pi*f(t)*t) does.
 
-const TWO_PI = 2 * Math.PI;
+/** One full turn in radians. */
+export const TWO_PI = 2 * Math.PI;
 
 /**
  * Phase in cycles at every sample for a frequency track in Hz. With `closeLoop` the track

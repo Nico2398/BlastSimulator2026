@@ -50,7 +50,7 @@ npm run console           # Interactive gameplay testing (no browser)
 npm run qualimetry        # jscpd duplication across src/, scripts/ (repo-wide ceiling)
 npm run qualimetry:diff   # duplication introduced by this branch's diff
 npm run check:i18n        # en.json / fr.json parity
-npm run sounds:check      # audio: assets decode in headless Chromium, offline mix levels (needs a browser; reuses or starts a dev server)
+npm run sounds:check      # audio: every asset decodes in headless Chromium, offline mix levels and clipper drive (needs a browser; reuses or starts a dev server)
 npm run audio:smoke       # audio: wiring in a real engine, intended cues of a scripted game (needs a browser)
 ```
 

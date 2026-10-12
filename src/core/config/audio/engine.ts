@@ -11,11 +11,19 @@ export const SAMPLE_BANK_CONFIG = {
   fileExtension: '.mp3',
   /** Files fetched and decoded at once. */
   decodeConcurrency: 4,
+  /** Extra attempts after a failed fetch or decode, so one transient network error does not silence a sample for the session. */
+  retries: 1,
+  /** Wait before retry number n is n times this (ms). */
+  retryBackoffMs: 250,
 } as const;
 
 /** Rendering of the generative sounds at startup. */
 export const SYNTH_RENDER_CONFIG = {
-  /** A render task yields to the event loop once it has run this long (ms), so the page keeps painting. */
+  /**
+   * The render loop yields to the event loop between variants once it has run this long (ms). A single variant
+   * renders atomically, so this bounds how often the page can paint, not how long one stall lasts: measured in
+   * Chromium, startup is nine main-thread stalls of 70-105 ms (rain, wind and snap are the heavy ones).
+   */
   sliceBudgetMs: 16,
 } as const;
 
@@ -24,7 +32,10 @@ export const SYNTH_RENDER_CONFIG = {
  * Web Audio compressors are not brickwall (the attack lets a transient through),
  * so a WaveShaperNode after it bends whatever still gets past toward a ceiling.
  * The clipper is a safety net, not part of the sound: the mix is gain-staged to
- * stay below its knee.
+ * stay below its knee. Mind the compressor's automatic makeup gain (the spec
+ * mandates it, about +1.7 dB, a factor of 1.22 measured in a Chromium offline
+ * render): the effective knee is therefore about 0.66 at the limiter's input
+ * (0.8 / 1.22), not 0.8, and the output tops out near 0.87 (-1.2 dBFS).
  */
 export const MASTER_LIMITER_CONFIG = {
   thresholdDb: -3,
@@ -72,6 +83,8 @@ export const VOICE_CONFIG = {
   defaultLoopRampS: 0.25,
   /** Smallest loop fade-out (s) so a level of 0 never cuts abruptly. */
   minLoopRampS: 0.01,
+  /** A bed that wants to play but lost its voice (stolen at the cap) is restarted at most this often (real ms). */
+  loopRearmIntervalMs: 1000,
   /** Cooldown entries beyond this count are swept when expired. */
   cooldownSweepThreshold: 64,
   /** Pitch is clamped to this many cents either way so jitter plus caller shift cannot leave the audible band. */
@@ -80,9 +93,14 @@ export const VOICE_CONFIG = {
   stopMarginS: 0.005,
 } as const;
 
-/** Which samples must be decoded before the first click or boom (tier 1). */
+/**
+ * Which samples must be decoded before `ready` flips (tier 1): the samples of every interface-bus sound and of
+ * every sampled sound of at least this priority. Generative sounds are never tier 1: synth cues (blast snap, sub,
+ * tail, beeps, siren, weather beds) render only after tier 3, so `ready` excludes them and they can be missing for
+ * the first second or two after load.
+ */
 export const PRELOAD_CONFIG = {
-  /** Samples used by a catalog entry of at least this priority are tier 1. */
+  /** Samples used by a catalog entry of at least this priority are tier 1 (interface-bus samples are tier 1 whatever their priority). */
   essentialPriority: 3,
 } as const;
 

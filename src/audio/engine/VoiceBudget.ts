@@ -4,6 +4,8 @@
 // lowest-priority, oldest voice. Pure bookkeeping on an injected millisecond
 // clock, so it is tested without any audio.
 
+import { CooldownGate } from './cooldown.js';
+
 export interface VoiceRequest {
   /** Sound id: the per-sound voice cap counts voices sharing it. */
   readonly sound: string;
@@ -29,14 +31,17 @@ interface ActiveVoice {
 
 export class VoiceBudget {
   private readonly active = new Set<ActiveVoice>();
-  private readonly cooldownUntil = new Map<string, number>();
+  /** Catalog cooldowns, on the same millisecond clock as the budget. */
+  private readonly cooldowns: CooldownGate;
   private serial = 0;
 
   constructor(
     private readonly globalCap: number,
-    private readonly clock: () => number,
-    private readonly sweepThreshold: number,
-  ) {}
+    clock: () => number,
+    sweepThreshold: number,
+  ) {
+    this.cooldowns = new CooldownGate(clock, sweepThreshold);
+  }
 
   get activeCount(): number { return this.active.size; }
 
@@ -46,11 +51,7 @@ export class VoiceBudget {
    * sound takes this voice's slot; the voice must stop itself there.
    */
   acquire(request: VoiceRequest, onSteal: () => void): VoiceTicket | null {
-    const now = this.clock();
-    if (request.cooldownMs > 0) {
-      const until = this.cooldownUntil.get(request.key);
-      if (until !== undefined && now < until) return null;
-    }
+    if (request.cooldownMs > 0 && !this.cooldowns.isReady(request.key)) return null;
     if (this.countOf(request.sound) >= request.maxVoices) return null;
     if (this.active.size >= this.globalCap) {
       const victim = this.pickVictim(request.priority);
@@ -58,7 +59,7 @@ export class VoiceBudget {
       this.active.delete(victim);
       victim.onSteal();
     }
-    if (request.cooldownMs > 0) this.markCooldown(request.key, now + request.cooldownMs, now);
+    if (request.cooldownMs > 0) this.cooldowns.start(request.key, request.cooldownMs);
     return this.admit(request, onSteal);
   }
 
@@ -84,11 +85,5 @@ export class VoiceBudget {
       }
     }
     return victim;
-  }
-
-  private markCooldown(key: string, until: number, now: number): void {
-    this.cooldownUntil.set(key, until);
-    if (this.cooldownUntil.size <= this.sweepThreshold) return;
-    for (const [k, expiry] of this.cooldownUntil) if (expiry <= now) this.cooldownUntil.delete(k);
   }
 }

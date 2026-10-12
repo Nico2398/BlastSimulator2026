@@ -124,6 +124,29 @@ describe('unlock, duck and dispose', () => {
   });
 });
 
+describe('failures stay inside the director', () => {
+  class ThrowingPlayer extends RecordingPlayer {
+    override setTrack(track: MusicTrack | null): void { super.setTrack(track); throw new Error('player down'); }
+    override tick(): void { throw new Error('player down'); }
+  }
+
+  it('update never throws, whatever the player does, and does not retry a track it already asked for', () => {
+    const player = new ThrowingPlayer();
+    const director = new MusicDirector({ player, output: new FakeMusicOutput(), tracks: [menu, desert], config: MUSIC_CONFIG });
+    expect(() => director.update(ctx('menu'))).not.toThrow();
+    expect(() => director.update(ctx('menu'))).not.toThrow();
+    expect(() => director.update(ctx('game', 'desert_badlands'))).not.toThrow();
+    expect(player.set).toEqual([menu, desert]);
+  });
+
+  it('duck never throws when the audio graph does', () => {
+    const output = new FakeMusicOutput();
+    output.duck = () => { throw new Error('graph down'); };
+    const director = new MusicDirector({ player: new RecordingPlayer(), output, tracks: [menu], config: MUSIC_CONFIG });
+    expect(() => director.duck()).not.toThrow();
+  });
+});
+
 describe('createMusicDirector', () => {
   it('wires a real player: menu starts a stream, the game crossfades to the biome track', () => {
     const output = new FakeMusicOutput();

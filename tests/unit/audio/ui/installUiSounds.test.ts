@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { installUiSounds, type UiSoundOptions } from '../../../../src/audio/ui/installUiSounds.js';
 import { UI_SOUND_CONFIG } from '../../../../src/core/config/audio/ui.js';
 import { button, el } from '../../../../src/ui/dom.js';
-import { RecordingPlayer } from './recordingPlayer.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
 let player: RecordingPlayer;
 let now: number;
@@ -108,7 +108,6 @@ describe('click tone', () => {
   });
 
   it.each([
-    ['rail panel button', { 'data-panel': 'build' }],
     ['panel close button', { 'data-panel-close': '' }],
     ['speed button', { 'data-speed': '4' }],
     ['pause button', { 'data-action': 'pause-toggle' }],
@@ -117,6 +116,18 @@ describe('click tone', () => {
     btn.setAttribute('aria-pressed', 'true');
     click(btn);
     expect(player.calls).toEqual([]);
+  });
+
+  it('stays silent on a tool rail panel button, whose open or close cue comes from UIManager', () => {
+    const rail = mount(el('div', { attrs: { id: 'bs-toolbar' } }));
+    click(mount(el('button', { attrs: { 'data-panel': 'build' } }), rail));
+    expect(player.calls).toEqual([]);
+  });
+
+  it('keeps the generic click on a top bar panel chip, which plays no panel cue when its panel is already open', () => {
+    const topBar = mount(el('div', { attrs: { id: 'bs-hud-top' } }));
+    click(mount(el('button', { attrs: { 'data-panel': 'finances' } }), topBar));
+    expect(player.ids).toEqual(['ui_click']);
   });
 
   it('clicks a [role=button] and a select, and ignores everything else', () => {

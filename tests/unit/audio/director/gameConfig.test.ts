@@ -35,6 +35,8 @@ describe('game audio tuning data', () => {
     expect(LIFE_CONFIG.minDb).toBeLessThan(LIFE_CONFIG.maxDb);
     expect(AMBIENCE_CONFIG.thunder.minDelayS).toBeLessThan(AMBIENCE_CONFIG.thunder.maxDelayS);
     expect(AMBIENCE_CONFIG.thunder.rumbleMinIntervalS).toBeLessThan(AMBIENCE_CONFIG.thunder.rumbleMaxIntervalS);
+    expect(AMBIENCE_CONFIG.thunder.rumbleFirstMinS).toBeLessThan(AMBIENCE_CONFIG.thunder.rumbleFirstMaxS);
+    expect(AMBIENCE_CONFIG.thunder.rumbleFirstMaxS).toBeLessThanOrEqual(AMBIENCE_CONFIG.thunder.rumbleMinIntervalS);
     expect(BLAST_AUDIO_CONFIG.tailMinDelayS).toBeLessThan(BLAST_AUDIO_CONFIG.tailMaxDelayS);
     expect(BLAST_AUDIO_CONFIG.rain.minBins).toBeLessThanOrEqual(BLAST_AUDIO_CONFIG.rain.maxBins);
     expect(SIREN_CONFIG.fastIntervalS).toBeLessThan(SIREN_CONFIG.slowIntervalS);
@@ -43,8 +45,18 @@ describe('game audio tuning data', () => {
     expect(AMBIENCE_CONFIG.windViewNearM).toBeLessThan(AMBIENCE_CONFIG.windViewFarM);
   });
 
-  it('never boosts a blast above +4 dB, as designed', () => {
-    expect(BLAST_AUDIO_CONFIG.maxBoostDb).toBeLessThanOrEqual(4);
+  it('never boosts a blast above +3 dB: +4 dB drove the stacked blast layers into the clipper', () => {
+    expect(BLAST_AUDIO_CONFIG.maxBoostDb).toBeLessThanOrEqual(3);
+  });
+
+  it('renews the blast pre-roll hold before it runs out, and gives up after it', () => {
+    const { refreshS, holdS, maxHoldS } = BLAST_AUDIO_CONFIG.preRollDuck;
+    expect(refreshS).toBeLessThan(holdS);
+    expect(holdS).toBeLessThan(maxHoldS);
+  });
+
+  it('gives the weather beds a dwell at least as long as their cross-fade', () => {
+    expect(AMBIENCE_CONFIG.minDwellS).toBeGreaterThanOrEqual(AMBIENCE_CONFIG.rampS);
   });
 
   it('lets the timeline lookahead fit inside the late-skip window', () => {

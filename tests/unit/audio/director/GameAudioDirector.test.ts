@@ -4,10 +4,12 @@ import type { BlastInfo } from '../../../../src/audio/director/blastPlan.js';
 import type { OneShotId } from '../../../../src/audio/SoundCatalog.js';
 import type { PlayOptions, SoundHandle } from '../../../../src/audio/AudioPlayer.js';
 import { AMBIENCE_CONFIG, BLAST_AUDIO_CONFIG, DIFF_CONFIG, HAUL_BUDGET_CONFIG, SIREN_CONFIG, WORK_CONFIG } from '../../../../src/core/config/audio/game.js';
+import { parseCommand } from '../../../../src/console/ConsoleRunner.js';
 import { EventEmitter } from '../../../../src/core/state/EventEmitter.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { Random } from '../../../../src/core/math/Random.js';
-import { addAction, addBuilding, addEmployee, addVehicle, advanceTicks, listenerAt, makeState, mount, RecordingPlayer, removeAction, startWorking } from './helpers.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
+import { addAction, addBuilding, addEmployee, addVehicle, advanceTicks, fallingTo, listenerAt, makeState, mount, removeAction, startWorking } from './helpers.js';
 
 class ThrowingPlayer extends RecordingPlayer {
   throwOnPlay = false;
@@ -47,7 +49,7 @@ function setup(options: { state?: GameState; entityPosition?: (kind: 'employee' 
     }
   };
   const command = (line: string, overrides: Partial<CommandReport> = {}): void => {
-    director.onCommand({ command: line, success: true, prevState: state, state, ...overrides });
+    director.onCommand({ parsed: parseCommand(line), success: true, prevState: state, state, ...overrides });
   };
   return { player, emitter, errors, director, state, run, command, clock: () => clock };
 }
@@ -56,7 +58,7 @@ function setup(options: { state?: GameState; entityPosition?: (kind: 'employee' 
 function started(options: Parameters<typeof setup>[0] = {}) {
   const s = setup(options);
   s.run(FRAME);
-  s.player.clearPlays();
+  s.player.clear();
   return s;
 }
 
@@ -82,7 +84,7 @@ describe('GameAudioDirector baseline', () => {
     s.director.update({ dtS: FRAME, state: next, menuUp: false, listener: LISTENER });
     expect(s.player.plays).toHaveLength(0);
     addBuilding(next, 'management_office', 5, 5);
-    s.director.onCommand({ command: 'build x', success: true, prevState: next, state: next });
+    s.director.onCommand({ parsed: parseCommand('build x'), success: true, prevState: next, state: next });
     expect(s.player.ids).toEqual(['building_built']);
   });
 
@@ -90,7 +92,7 @@ describe('GameAudioDirector baseline', () => {
     const s = started();
     const next = makeState();
     addBuilding(next, 'living_quarters', 3, 3);
-    s.director.onCommand({ command: 'new_game', success: true, prevState: s.state, state: next });
+    s.director.onCommand({ parsed: parseCommand('new_game'), success: true, prevState: s.state, state: next });
     expect(s.player.plays).toHaveLength(0);
   });
 
@@ -107,7 +109,7 @@ describe('GameAudioDirector baseline', () => {
 
   it('ignores commands with no game', () => {
     const s = started();
-    s.director.onCommand({ command: 'help', success: true, prevState: null, state: null });
+    s.director.onCommand({ parsed: parseCommand('help'), success: true, prevState: null, state: null });
     expect(s.player.plays).toHaveLength(0);
     expect(s.errors).toEqual([]);
   });
@@ -132,7 +134,7 @@ describe('GameAudioDirector state cues', () => {
     s.command('tick 8');
     expect(s.player.ids.sort()).toEqual(['building_built', 'coins_big', 'vehicle_start']);
 
-    s.player.clearPlays();
+    s.player.clear();
     addBuilding(s.state, 'research_center', 9, 9);
     advanceTicks(s.state, 9);
     s.command('tick 9');
@@ -158,7 +160,7 @@ describe('GameAudioDirector state cues', () => {
     expect(s.player.ids).toEqual(['notify_alert', 'event_mafia']);
     expect(s.player.of('event_mafia')[0]?.opts.delayS).toBe(DIFF_CONFIG.eventAlert.flourishDelayS);
     expect(s.player.ducks).toEqual([{ bus: 'ambient', ...DIFF_CONFIG.eventAlert.duck }]);
-    s.player.clearPlays();
+    s.player.clear();
     s.command('tick');
     s.run(2);
     expect(s.player.plays).toHaveLength(0);
@@ -187,6 +189,45 @@ describe('GameAudioDirector state cues', () => {
     const next = makeState();
     s.director.update({ dtS: FRAME, state: next, menuUp: false, listener: LISTENER });
     s.emitter.emit('bankruptcy:triggered', { cash: -1 });
+    expect(s.player.ids).toEqual(['level_win', 'level_lose']);
+  });
+});
+
+describe('GameAudioDirector level-end sting after "keep playing"', () => {
+  function wonThenKeptPlaying() {
+    const s = started();
+    s.state.levelEnded = true;
+    s.state.levelEndReason = 'completed';
+    s.command('tick');
+    expect(s.player.ids).toEqual(['level_win']);
+    // convertWinToFreePlay: the same state object, running again.
+    s.state.levelEnded = false;
+    s.state.levelEndReason = null;
+    s.command('campaign keep_playing');
+    return s;
+  }
+
+  it('plays the lose sting for a defeat the diff sees in the free play that followed a win', () => {
+    const s = wonThenKeptPlaying();
+    s.state.levelEnded = true;
+    s.state.levelEndReason = 'bankruptcy';
+    s.command('tick');
+    expect(s.player.ids).toEqual(['level_win', 'level_lose']);
+  });
+
+  it('plays the lose sting for a defeat the core event announces in that free play', () => {
+    const s = wonThenKeptPlaying();
+    s.emitter.emit('bankruptcy:triggered', { cash: -1 });
+    expect(s.player.ids).toEqual(['level_win', 'level_lose']);
+  });
+
+  it('still plays only one sting while the level stays over', () => {
+    const s = wonThenKeptPlaying();
+    s.state.levelEnded = true;
+    s.state.levelEndReason = 'bankruptcy';
+    s.command('tick');
+    s.emitter.emit('bankruptcy:triggered', { cash: -1 });
+    s.command('tick');
     expect(s.player.ids).toEqual(['level_win', 'level_lose']);
   });
 });
@@ -260,7 +301,7 @@ describe('GameAudioDirector menus and pause', () => {
   it('opens the weather beds when the game starts and closes them behind a menu', () => {
     const s = started();
     s.state.weather.current = 'heavy_rain';
-    s.run(1);
+    s.run(AMBIENCE_CONFIG.minDwellS + 1);
     expect(s.player.bed('amb_rain_heavy').level).toBeGreaterThan(0.5);
     s.run(1, { menuUp: true });
     expect(s.player.bed('amb_rain_heavy').level).toBe(0);
@@ -272,7 +313,7 @@ describe('GameAudioDirector menus and pause', () => {
     s.run(1);
     const calm = s.player.bed('amb_wind').level;
     s.state.weather.current = 'storm';
-    s.run(1);
+    s.run(AMBIENCE_CONFIG.minDwellS + 1);
     expect(s.player.bed('amb_wind').level).toBeGreaterThan(calm * 2);
     expect(s.player.bed('amb_rain_heavy').level).toBe(AMBIENCE_CONFIG.weather.storm.rainHeavy);
   });
@@ -288,7 +329,7 @@ describe('GameAudioDirector menus and pause', () => {
     const rain = s.player.bed('amb_rain_heavy').level;
 
     s.state.isPaused = true;
-    s.player.clearPlays();
+    s.player.clear();
     s.run(30);
     expect(s.player.of('work_drill')).toHaveLength(0);
     expect(s.player.bed('amb_machinery').level).toBe(0);
@@ -322,7 +363,7 @@ describe('GameAudioDirector work sounds', () => {
     expect(s.player.of('work_dig').length).toBeGreaterThan(0);
     driller.taskTicksRemaining = null;
     s.command('tick');
-    s.player.clearPlays();
+    s.player.clear();
     s.run(20);
     expect(s.player.of('work_dig')).toHaveLength(0);
   });
@@ -386,7 +427,7 @@ describe('GameAudioDirector blasts', () => {
   const info = (overrides: Partial<BlastInfo> = {}): BlastInfo => ({
     origin: { x: 20, z: 10 },
     holeCount: 30,
-    flights: Array.from({ length: 400 }, (_, i) => ({ delayS: 0.2, durationS: 1 + (i % 50) * 0.1, impactSpeed: 30, to: { x: 20 + (i % 10), z: 10 } })),
+    flights: Array.from({ length: 400 }, (_, i) => fallingTo({ x: 20 + (i % 10), z: 10 }, { delayS: 0.2, durationS: 1 + (i % 50) * 0.1, impactSpeed: 30 })),
     report: null,
     ...overrides,
   });
@@ -421,7 +462,8 @@ describe('GameAudioDirector blasts', () => {
   it('dips the ambience as the blast job starts', () => {
     const s = started();
     s.emitter.emit('blast:started', { originX: 0, originY: 0, originZ: 0 });
-    expect(s.player.ducks).toEqual([{ bus: 'ambient', ...BLAST_AUDIO_CONFIG.preRollDuck }]);
+    const { amountDb, holdS, releaseS } = BLAST_AUDIO_CONFIG.preRollDuck;
+    expect(s.player.ducks).toEqual([{ bus: 'ambient', amountDb, holdS, releaseS }]);
   });
 
   it('cuts the scheduled sounds when playback is skipped', () => {
@@ -447,7 +489,7 @@ describe('GameAudioDirector blasts', () => {
         s.state.chargesByHole = {};
         s.state.lastBlastReport = {} as unknown as GameState['lastBlastReport'];
         s.command('tick');
-        s.player.clearPlays();
+        s.player.clear();
       }
       s.director.onBlast(info({ holeCount: 4, flights: [] }));
     }
@@ -459,7 +501,7 @@ describe('GameAudioDirector blasts', () => {
     const s = started();
     addBuilding(s.state, 'living_quarters', 15, 10);
     s.command('tick');
-    s.player.clearPlays();
+    s.player.clear();
     s.state.buildings.buildings.length = 0;
     s.state.lastBlastReport = {} as unknown as GameState['lastBlastReport'];
     s.command('tick');
@@ -469,6 +511,82 @@ describe('GameAudioDirector blasts', () => {
     const crashes = s.player.of('building_demolished');
     expect(crashes).toHaveLength(1);
     expect((crashes[0]?.atS ?? 0) + (crashes[0]?.opts.delayS ?? 0)).toBeGreaterThan(BLAST_AUDIO_CONFIG.boomDelayS);
+  });
+
+  it('hears a building and a vehicle that flyrock destroyed, where they stood, once and after the boom', () => {
+    const s = started();
+    const hall = addBuilding(s.state, 'living_quarters', 15, 10);
+    const truck = addVehicle(s.state, 'debris_hauler', 22, 12);
+    s.command('tick');
+    s.player.clear();
+    // The blast removes them from the game; the renderer then fires the flash, before anyone looks at the world again.
+    s.state.buildings.buildings.length = 0;
+    s.state.vehicles.vehicles.length = 0;
+    s.state.lastBlastReport = {} as unknown as GameState['lastBlastReport'];
+    s.director.onBlast(info({ flights: [], report: { accidents: [{ type: 'building_destroyed', entityId: hall.id }, { type: 'vehicle_destroyed', entityId: truck.id }] } }));
+    s.command('tick');
+    s.run(3);
+    const crash = s.player.of('building_demolished');
+    const scrap = s.player.of('vehicle_scrap');
+    expect(crash).toHaveLength(1);
+    expect(crash[0]?.opts.at).toEqual({ x: 15, z: 10 });
+    expect(scrap).toHaveLength(1);
+    expect(scrap[0]?.opts.at).toEqual({ x: 22, z: 12 });
+    const boom = s.player.of('blast_boom')[0];
+    for (const cue of [...crash, ...scrap]) expect((cue.atS) + (cue.opts.delayS ?? 0)).toBeGreaterThan(boom ? boom.atS + (boom.opts.delayS ?? 0) : Infinity);
+  });
+
+  it('does not voice a building twice when the report lists it and an accident names it', () => {
+    const s = started();
+    const hall = addBuilding(s.state, 'living_quarters', 15, 10);
+    s.command('tick');
+    s.player.clear();
+    s.state.buildings.buildings.length = 0;
+    s.director.onBlast(info({ flights: [], report: { destroyedBuildings: [{ x: 15, z: 10, buildingId: hall.id }], accidents: [{ type: 'building_destroyed', entityId: hall.id }] } }));
+    s.run(3);
+    expect(s.player.of('building_demolished')).toHaveLength(1);
+  });
+
+  it('stays quiet about a destroyed vehicle when the flash comes after the world was looked at again', () => {
+    const s = started();
+    const truck = addVehicle(s.state, 'debris_hauler', 22, 12);
+    s.command('tick');
+    s.state.vehicles.vehicles.length = 0;
+    s.command('tick');
+    s.player.clear();
+    s.director.onBlast(info({ flights: [], report: { accidents: [{ type: 'vehicle_destroyed', entityId: truck.id }] } }));
+    s.run(3);
+    expect(s.player.of('vehicle_scrap')).toHaveLength(0);
+  });
+
+  it('holds the dip and the work sounds until the flash, however long the blast job takes', () => {
+    const s = started();
+    startWorking(addEmployee(s.state, 6, 0), 'drill_hole');
+    s.command('tick');
+    s.run(BLAST_AUDIO_CONFIG.preRollDuck.holdS + 3);
+    expect(s.player.of('work_drill').length).toBeGreaterThan(0);
+    s.player.clear();
+    s.player.ducks.length = 0;
+    s.emitter.emit('blast:started', { originX: 0, originY: 0, originZ: 0 });
+    const longJobS = 3 * BLAST_AUDIO_CONFIG.preRollDuck.holdS + 2;
+    s.run(longJobS);
+    expect(s.player.of('work_drill')).toHaveLength(0);
+    expect(s.player.ducks.length).toBeGreaterThanOrEqual(Math.floor(longJobS / BLAST_AUDIO_CONFIG.preRollDuck.holdS));
+    s.director.onBlast(info());
+    const ducksAtFlash = s.player.ducks.length;
+    s.run(1);
+    expect(s.player.ducks).toHaveLength(ducksAtFlash);
+  });
+
+  it('forgets the rain still to fall when a menu comes up, and keeps the tail and the later blasts', () => {
+    const s = started();
+    s.director.onBlast(info({ report: { secondaryBlasts: [{ x: 40, z: 10, explosivesKg: 100 }] } }));
+    s.run(FRAME, { menuUp: true });
+    const rainAtMenu = s.player.plays.filter(p => p.id.startsWith('debris')).length;
+    s.run(8, { menuUp: true });
+    expect(s.player.plays.filter(p => p.id.startsWith('debris'))).toHaveLength(rainAtMenu);
+    expect(s.player.of('blast_tail')).toHaveLength(1);
+    expect(s.player.of('blast_boom')).toHaveLength(2);
   });
 
   it('ignores a blast with no game or behind a menu', () => {
@@ -499,7 +617,7 @@ describe('GameAudioDirector evacuation siren', () => {
     expect(s.player.bed('blast_siren').level).toBe(1);
     const slow = s.player.of('blast_beep').length;
     expect(slow).toBeGreaterThanOrEqual(3);
-    s.player.clearPlays();
+    s.player.clear();
     for (const worker of crew) worker.x = 5000;
     s.command('tick');
     s.run(6);
@@ -549,6 +667,22 @@ describe('GameAudioDirector evacuation siren', () => {
     const { s } = armed();
     s.run(1, { menuUp: true });
     expect(s.player.bed('blast_siren').level).toBe(0);
+  });
+
+  it('is muted, with no beeps, while the game is paused, and resumes with it', () => {
+    const { s } = armed();
+    s.run(2);
+    expect(s.player.bed('blast_siren').level).toBe(1);
+    s.state.isPaused = true;
+    s.run(1);
+    expect(s.player.bed('blast_siren').level).toBe(0);
+    s.player.clear();
+    s.run(20);
+    expect(s.player.of('blast_beep')).toHaveLength(0);
+    s.state.isPaused = false;
+    s.run(2);
+    expect(s.player.bed('blast_siren').level).toBe(1);
+    expect(s.player.of('blast_beep').length).toBeGreaterThan(0);
   });
 });
 

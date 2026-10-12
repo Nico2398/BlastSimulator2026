@@ -4,6 +4,7 @@
 // down), crest factor, loudness, a coarse per-second envelope and how much the
 // stereo image loses when folded to mono. Every figure is a finite number.
 
+import { MASTER_LIMITER_CONFIG } from '../../core/config/audio/engine.js';
 import { LAB_STATS_CONFIG } from '../../core/config/audio/lab.js';
 import { blockFramesFor, blockPowers, gatedMean, slidingMeans } from './blockPower.js';
 import { downmixToMono } from './downmix.js';
@@ -19,6 +20,13 @@ export interface PcmStats {
   readonly peakDbfs: number;
   /** Samples at the rail of a 16-bit file. */
   readonly clipCount: number;
+  /**
+   * Fraction (0 to 1) of all samples whose magnitude is above the safety clipper's knee. The clipper is
+   * monotonic, so a sample leaves it above the knee exactly when it entered above it: this measures how hard
+   * the mix drives a clipper that keeps the final peak under its ceiling whatever happens (the peak and the
+   * 16-bit rail count cannot see the drive).
+   */
+  readonly clipperDrive: number;
   /** Largest per-channel mean, as a fraction of full scale. */
   readonly dcOffset: number;
   /** RMS of the whole signal (dBFS, per-channel mean power). */
@@ -38,12 +46,14 @@ export interface PcmStats {
 interface Scan {
   peak: number;
   clipCount: number;
+  /** Samples above the clipper knee. */
+  hotCount: number;
   nonFinite: number;
   dcOffset: number;
 }
 
 function scanChannels(channels: readonly Float32Array[]): Scan {
-  const scan: Scan = { peak: 0, clipCount: 0, nonFinite: 0, dcOffset: 0 };
+  const scan: Scan = { peak: 0, clipCount: 0, hotCount: 0, nonFinite: 0, dcOffset: 0 };
   for (const channel of channels) {
     let sum = 0;
     for (let i = 0; i < channel.length; i++) {
@@ -56,6 +66,7 @@ function scanChannels(channels: readonly Float32Array[]): Scan {
       sum += v;
       if (magnitude > scan.peak) scan.peak = magnitude;
       if (magnitude >= LAB_STATS_CONFIG.clipThreshold) scan.clipCount++;
+      if (magnitude > MASTER_LIMITER_CONFIG.clipKnee) scan.hotCount++;
     }
     scan.dcOffset = Math.max(scan.dcOffset, Math.abs(sum / Math.max(1, channel.length)));
   }
@@ -79,6 +90,7 @@ export function measurePcm(channels: readonly Float32Array[], sampleRate: number
   const cfg = LAB_STATS_CONFIG;
   const frames = channels[0]?.length ?? 0;
   const scan = scanChannels(channels);
+  const totalSamples = Math.max(1, frames * channels.length);
   const rmsDb = powerToDb(meanPower(channels));
   const perChannelPowers = blockPowers(channels, blockFramesFor(sampleRate)).map(power => power / Math.max(1, channels.length));
   const gatedPower = gatedMean(slidingMeans(perChannelPowers, cfg.gateWindowBlocks), cfg.absoluteGateDb, cfg.relativeGateDb);
@@ -93,6 +105,7 @@ export function measurePcm(channels: readonly Float32Array[], sampleRate: number
     nonFiniteCount: scan.nonFinite,
     peakDbfs: roundDb(peakDb),
     clipCount: scan.clipCount,
+    clipperDrive: Math.round((scan.hotCount / totalSamples) * 1e6) / 1e6,
     dcOffset: Math.round(scan.dcOffset * 1e6) / 1e6,
     rmsDbfs: roundDb(rmsDb),
     gatedRmsDbfs: roundDb(gatedDb),

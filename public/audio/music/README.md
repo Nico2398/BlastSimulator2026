@@ -16,7 +16,9 @@ The game streams music from this folder. None ships yet: `MUSIC_TRACKS` in `src/
    - `scope` decides when it plays: `menu` (main menu, world map, sandbox setup), `biome` (a biome id from `src/core/world/BiomeCatalog.ts`), `level` (a campaign level id from `src/core/campaign/Level.ts`), `game` (any game with no more specific track).
    - In a game the most specific track wins: level, then biome, then `game`. The biome is the level's declared mine type, not the biome terrain generation happens to land on.
    - `gainDb` trims the track (default 0); `loop: false` plays it once and then stays silent (default loops).
-3. Run `npx vitest run tests/unit/audio/music`. It fails on a duplicate id, an unknown biome or level, or a missing file.
+3. Run `npx vitest run tests/unit/audio/music`. `MusicCatalog.test.ts` passes the catalog through `musicTrackProblems` (`tests/helpers/musicCatalogChecks.ts`), which reports a duplicate or empty id, a `file` that is not a bare basename, a missing mp3, and an unknown biome or level. Because the catalog is empty today, `musicCatalogChecks.test.ts` proves each of those rules on bad fixtures.
+
+4. With the first track, add the Music slider to Settings (the `dev-audio` skill, "Music track"), and credit the file as described under Licensing; the Settings "Audio credits" button shows `CREDITS.md`, so the credit reaches players.
 
 Tracks crossfade (2.5 s, equal power) when the screen or biome changes. The loading and level-end screens keep the current music.
 

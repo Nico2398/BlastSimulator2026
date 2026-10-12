@@ -48,6 +48,16 @@ export const LAB_STATS_CONFIG = {
 export const LAB_CHECK_LIMITS = {
   /** After the master limiter nothing should come closer to full scale than this (dBFS). */
   maxPeakDbfs: -0.1,
+  /**
+   * The safety clipper pins the final peak under its ceiling (-0.27 dBFS), so the peak limit above can only
+   * fire on a broken graph. How hard the mix drives the clipper is the real over-boost guard: the fraction of
+   * samples above MASTER_LIMITER_CONFIG.clipKnee. Measured on the three lab mixes (2026-10, maxBoostDb 3):
+   * ui-tour 0.002 %, blast 0.085 %, busy-mine 0.0002 %. Re-scaling the measured blast gives about 0.21 % at
+   * +1 dB, 0.36 % at +2 dB and 0.55 % at +3 dB, so the warning sits at about +1 dB of the loudest mix and the
+   * failure at over 10 times today's blast, well beyond any intended gain change.
+   */
+  warnClipperDrive: 0.0025,
+  maxClipperDrive: 0.01,
   /** A mix whose gated RMS is below this is silent (dBFS). */
   minGatedRmsDbfs: -60,
   /** Warn (never fail) beyond these. */

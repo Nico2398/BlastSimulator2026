@@ -9,11 +9,9 @@ import { finishRender } from '../finish.js';
 import { Biquad } from '../filters.js';
 import { settleLoop } from '../loop.js';
 import { whiteNoise } from '../noise.js';
-import { accumulatePhase, loopSine, sawAt } from '../oscillators.js';
+import { accumulatePhase, loopSine, sawAt, TWO_PI } from '../oscillators.js';
 import { rngFor } from '../seed.js';
 import type { SynthRecipe } from '../types.js';
-
-const TWO_PI = 2 * Math.PI;
 
 export const SIREN_LOOP: SynthRecipe = {
   variants: 1,

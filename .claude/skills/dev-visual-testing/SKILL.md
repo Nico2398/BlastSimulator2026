@@ -100,7 +100,7 @@ the naming conventions the renderer relies on.
 
 Audio has no screenshot. `/sound-lab.html` (dev server only, never in the production build) lists every
 sound by bus for auditioning and downloads offline mixes as WAV; `npm run sounds:check` drives it headless and
-measures decode, levels and clipping; `npm run audio:smoke` drives the game and asserts which cues fire. All
+measures decode, levels and how hard the mix drives the safety clipper; `npm run audio:smoke` drives the game and asserts which cues fire. All
 three need the browser path `npm run verify:env` reports, none of them hears anything, and a visual PASS says
 nothing about sound. What each proves: `dev-audio`.
 

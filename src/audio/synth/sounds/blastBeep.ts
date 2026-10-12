@@ -6,11 +6,9 @@ import { BLAST_BEEP_CONFIG } from '../../../core/config/audio/synth.js';
 import { finishRender } from '../finish.js';
 import { Biquad } from '../filters.js';
 import { whiteNoise } from '../noise.js';
-import { sawAt, squareAt } from '../oscillators.js';
+import { sawAt, squareAt, TWO_PI } from '../oscillators.js';
 import { rngFor } from '../seed.js';
 import type { SynthRecipe } from '../types.js';
-
-const TWO_PI = 2 * Math.PI;
 
 export const BLAST_BEEP: SynthRecipe = {
   variants: 1,

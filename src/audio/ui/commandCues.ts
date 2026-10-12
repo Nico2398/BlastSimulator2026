@@ -4,7 +4,7 @@
 // drill grid is one `drill_plan grid`), and `tick` is silent, so nothing multiplies at 8x speed.
 // The mapping itself is data in commandCueTable.ts.
 
-import type { AudioPlayer, PlayOptions, WorldPoint } from '../AudioPlayer.js';
+import type { AudioPlayer } from '../AudioPlayer.js';
 import { safePlay } from './safePlay.js';
 import type { CommandClaim } from './CommandClaim.js';
 import { COMMAND_CUES, type CueRule, type CueSpec, type VerbRule } from './commandCueTable.js';
@@ -38,18 +38,10 @@ function pickRule(verb: VerbRule, parsed: ParsedCommandLike): CueRule {
   return rule === undefined ? verb.otherwise : rule;
 }
 
-/** Read an `at:x,z` argument; null unless both parts are finite numbers. */
-function namedPoint(parsed: ParsedCommandLike): WorldPoint | null {
-  const [x, z] = (parsed.namedArgs['at'] ?? '').split(',').map(Number);
-  return x !== undefined && z !== undefined && Number.isFinite(x) && Number.isFinite(z) ? { x, z } : null;
-}
-
 /** Play the success cue of `spec`; false when the rule has none (its sound belongs to someone else). */
-function playSpec(player: AudioPlayer, spec: CueSpec, parsed: ParsedCommandLike): boolean {
+function playSpec(player: AudioPlayer, spec: CueSpec): boolean {
   if (spec.cue === undefined) return false;
-  const point = spec.atNamedPoint === true ? namedPoint(parsed) : null;
-  const opts: PlayOptions | undefined = point === null ? undefined : { at: point };
-  safePlay(player, spec.cue, opts);
+  safePlay(player, spec.cue);
   if (spec.then !== undefined) safePlay(player, spec.then.cue, { delayS: spec.then.delayS });
   return true;
 }
@@ -75,5 +67,5 @@ export function commandCue(
     ctx?.claim?.mark();
     return;
   }
-  if (playSpec(player, rule, parsed)) ctx?.claim?.mark();
+  if (playSpec(player, rule)) ctx?.claim?.mark();
 }

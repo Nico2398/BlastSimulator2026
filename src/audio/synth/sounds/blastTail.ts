@@ -4,16 +4,15 @@
 // channel has its own noise so the two are decorrelated.
 
 import { BLAST_TAIL_CONFIG } from '../../../core/config/audio/synth.js';
-import { attackDecay, controlTrack } from '../envelopes.js';
+import { attackDecay, controlTrack, decayTo } from '../envelopes.js';
 import { finishRender } from '../finish.js';
 import { Biquad } from '../filters.js';
 import { mixInto } from '../mix.js';
 import { brownNoise } from '../noise.js';
+import { TWO_PI } from '../oscillators.js';
 import { rngFor, variantIndex } from '../seed.js';
 import type { SynthRecipe } from '../types.js';
 import type { Random } from '../../../core/math/Random.js';
-
-const TWO_PI = 2 * Math.PI;
 
 interface DebrisTick {
   readonly index: number;
@@ -56,7 +55,7 @@ export const BLAST_TAIL: SynthRecipe = {
       const noise = brownNoise(rng, n, sr, 25);
       const filter = new Biquad('lowpass', sr, c.startCutoffHz, c.filterQ);
       const lfos = [0, 1, 2].map(() => ({ hz: rng.nextFloat(c.rollLfoHz.min, c.rollLfoHz.max), phase: rng.next() * TWO_PI }));
-      const cutoff = controlTrack(n, (i) => c.endCutoffHz + (c.startCutoffHz - c.endCutoffHz) * Math.exp(-i / sr / c.cutoffTauSec));
+      const cutoff = controlTrack(n, (i) => decayTo(c.startCutoffHz, c.endCutoffHz, i / sr, c.cutoffTauSec));
       const level = controlTrack(n, (i) => {
         const t = i / sr;
         let roll = 0;

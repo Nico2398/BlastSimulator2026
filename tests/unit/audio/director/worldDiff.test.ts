@@ -21,7 +21,7 @@ describe('diffWorld', () => {
     const state = makeState();
     addBuilding(state, 'living_quarters', 1, 1);
     const diff = diffWorld(takeSnapshot(state), state, noCategory);
-    expect(diff).toEqual({ cues: [], blastLanded: false, levelEnd: null, eventAlert: false });
+    expect(diff).toEqual({ cues: [], blastLanded: false, levelEnd: null, levelReopened: false, eventAlert: false });
   });
 
   describe('buildings and vehicles', () => {
@@ -199,17 +199,18 @@ describe('diffWorld', () => {
     it('adds up everything that came in, across categories worth a coin', () => {
       const state = makeState();
       const prev = takeSnapshot(state);
-      income(state, 1500, 'sales');
+      income(state, 1500, 'contracts');
       income(state, 1500, 'bonus');
       expect(sounds(state, prev)).toEqual(['coins_big']);
     });
 
-    it('stays silent for upkeep, refunds and smuggling', () => {
+    it('stays silent for upkeep, refunds, smuggling and any category not worth a coin', () => {
       const state = makeState();
       const prev = takeSnapshot(state);
       state.finances.transactions.push({ tick: 1, amount: 50000, type: 'expense', category: 'salaries', description: 'Payroll' });
       income(state, 50000, 'refund');
       income(state, 50000, 'smuggling');
+      income(state, 50000, 'sales');
       expect(sounds(state, prev)).toEqual([]);
     });
 
@@ -230,33 +231,38 @@ describe('diffWorld', () => {
   });
 
   describe('accidents', () => {
-    it('plays worker_collapse at an injured worker', () => {
+    it('leaves every casualty and property accident to the blast timeline', () => {
       const state = makeState();
       const worker = addEmployee(state, 4, 5);
       const prev = takeSnapshot(state);
-      state.damage.accidents.push({ tick: 1, type: 'injury', entityId: worker.id, fragmentId: 0, kineticEnergy: 0 });
+      for (const type of ['injury', 'death', 'building_damage', 'vehicle_damage'] as const) {
+        state.damage.accidents.push({ tick: 1, type, entityId: worker.id, fragmentId: 0, kineticEnergy: 0 });
+      }
+      expect(sounds(state, prev)).toEqual([]);
+    });
+  });
+
+  describe('level end', () => {
+    it('reports a level that just ended, once', () => {
+      const state = makeState();
+      const prev = takeSnapshot(state);
+      state.levelEndReason = 'bankruptcy';
+      expect(diffWorld(prev, state, noCategory).levelEnd).toBe('lose');
+      expect(diffWorld(takeSnapshot(state), state, noCategory).levelEnd).toBeNull();
+    });
+
+    it('reports a finished level that runs again (keep playing), and only then', () => {
+      const state = makeState();
+      state.levelEnded = true;
+      state.levelEndReason = 'completed';
+      const prev = takeSnapshot(state);
+      expect(diffWorld(prev, state, noCategory).levelReopened).toBe(false);
+      state.levelEnded = false;
+      state.levelEndReason = null;
       const diff = diffWorld(prev, state, noCategory);
-      expect(diff.cues.map(c => c.sound)).toEqual(['worker_collapse']);
-      expect(diff.cues[0]?.site?.entity).toEqual({ kind: 'employee', id: worker.id });
-    });
-
-    it('adds a bad-news alert for a death', () => {
-      const state = makeState();
-      const worker = addEmployee(state, 4, 5);
-      const prev = takeSnapshot(state);
-      state.damage.accidents.push({ tick: 1, type: 'death', entityId: worker.id, fragmentId: 0, kineticEnergy: 0 });
-      expect(sounds(state, prev)).toEqual(['worker_collapse', 'notify_bad']);
-    });
-
-    it('ignores property damage and leaves blast casualties to the blast timeline', () => {
-      const state = makeState();
-      const worker = addEmployee(state, 4, 5);
-      const prev = takeSnapshot(state);
-      state.damage.accidents.push({ tick: 1, type: 'building_damage', entityId: 1, fragmentId: 0, kineticEnergy: 0 });
-      expect(sounds(state, prev)).toEqual([]);
-      state.damage.accidents.push({ tick: 1, type: 'death', entityId: worker.id, fragmentId: 0, kineticEnergy: 0 });
-      landBlast(state);
-      expect(sounds(state, prev)).toEqual([]);
+      expect(diff.levelReopened).toBe(true);
+      expect(diff.levelEnd).toBeNull();
+      expect(diffWorld(takeSnapshot(state), state, noCategory).levelReopened).toBe(false);
     });
   });
 
@@ -343,7 +349,7 @@ describe('diffWorld', () => {
       const prev = takeSnapshot(state);
       addBuilding(state, 'living_quarters', 1, 1);
       advanceTicks(state, 9);
-      expect(diffWorld(prev, state, noCategory)).toEqual({ cues: [], blastLanded: false, levelEnd: null, eventAlert: false });
+      expect(diffWorld(prev, state, noCategory)).toEqual({ cues: [], blastLanded: false, levelEnd: null, levelReopened: false, eventAlert: false });
       state.tickCount = prev.tick - 1;
       expect(sounds(state, prev)).toEqual([]);
     });

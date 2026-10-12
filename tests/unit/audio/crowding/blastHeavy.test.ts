@@ -27,12 +27,12 @@ describe(`${SCENARIO} at 8x`, () => {
     for (const layer of MAIN_LAYERS) expect(sim().recorder.heard.filter(p => p.id === layer), layer).toHaveLength(5);
   });
 
-  it('keeps every shot to 42 sounds in twenty seconds', () => {
-    // Measured 19, 23, 35, 34 and 11 sounds (a 15 s rain of up to 30 impacts after the four layers, duds and a tail).
+  it('keeps every shot to 39 sounds in twenty seconds', () => {
+    // Measured 15, 13, 30, 27 and 8 sounds (the rain of the rock that moves after the four layers, duds and a tail).
     for (const shot of shots()) {
       const timeline = sim().recorder.heard.filter(p => isBlastSound(p.id) && p.id !== 'blast_beep' && p.startS >= shot.startS - 0.01 && p.startS < shot.startS + TIMELINE_S);
-      expect(timeline.length).toBeLessThanOrEqual(42);
-      expect(peakIn(timeline, 1)).toBeLessThanOrEqual(24); // measured 19: four layers, 10 impacts and 4 pebbles in the first second
+      expect(timeline.length).toBeLessThanOrEqual(39);
+      expect(peakIn(timeline, 1)).toBeLessThanOrEqual(20); // measured 15 at most in any one second of any shot
     }
   });
 
@@ -50,21 +50,22 @@ describe(`${SCENARIO} at 8x`, () => {
     expect(sim().recorder.ducks.filter(d => d.bus === 'ambient').length).toBeGreaterThanOrEqual(shots().length * 2);
   });
 
-  it('keeps the busiest second under 26 sounds and 26 voices, the shots and 37 hires included', () => {
-    // Measured 23 sounds in a second and 20 voices at once; the engine caps at 32.
+  it('keeps the busiest second under 22 sounds and 17 voices, the shots and 37 hires included', () => {
+    // Measured 17 sounds in a second and 13 voices at once; the engine caps at 32.
     const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(26);
-    expect(stats.maxVoices).toBeLessThanOrEqual(26);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(22);
+    expect(stats.maxVoices).toBeLessThanOrEqual(17);
   });
 
-  it('keeps the world to 5 sounds a second, 18 in ten seconds and 40 in thirty', () => {
-    // Measured 4, 14 and 33. vehicle_start reaches 9 because the scripted player buys 19 vehicles back to back and
-    // each one starts its engine (the director's answer to a purchase); work_drill and charge_loaded reach 9 too.
-    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 18, per30s: 40 }, { vehicle_start: 11, work_drill: 12, charge_loaded: 11, drill_done: 10 });
+  it('keeps the world to 5 sounds a second, 17 in ten seconds and 38 in thirty', () => {
+    // Measured 4, 13 and 29. vehicle_start and charge_loaded reach 9 because the scripted player buys 19 vehicles back
+    // to back (each one starts its engine, the director's answer to a purchase) and charges holes in bulk; vehicle_scrap
+    // reaches 4 because flyrock destroys vehicles in two shots 27 s apart, two scrap cues from each (the blast plan's cap).
+    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 17, per30s: 38 }, { vehicle_start: 11, charge_loaded: 11, vehicle_scrap: 4 });
   });
 
-  it('plays under 100 sounds a minute, a scripted player hiring 37 people included', () => {
-    // Measured 79.4 a minute over 280 s at 8x.
-    expect(summarize(sim().recorder.plays, sim().realS).totalPerMinute).toBeLessThan(100);
+  it('plays under 97 sounds a minute, a scripted player hiring 37 people included', () => {
+    // Measured 74.9 a minute over 280 s at 8x.
+    expect(summarize(sim().recorder.plays, sim().realS).totalPerMinute).toBeLessThan(97);
   });
 });

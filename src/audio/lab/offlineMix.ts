@@ -17,7 +17,7 @@
 
 import { Random } from '../../core/math/Random.js';
 import { LAB_RENDER_CONFIG } from '../../core/config/audio/lab.js';
-import { AudioEngine } from '../AudioEngine.js';
+import { AudioEngine, yieldOneMacrotask } from '../AudioEngine.js';
 import { AudioManager } from '../AudioManager.js';
 import type { ByteSource } from '../engine/SampleBank.js';
 import { SYNTH_RECIPES, renderReverbIr } from '../synth/recipes.js';
@@ -61,12 +61,10 @@ export interface RenderedMix {
   readonly renderMs: number;
 }
 
-const nextMacrotask = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
-
 export async function renderMix(scenario: MixScenario, deps: OfflineMixDeps): Promise<RenderedMix> {
   const cfg = LAB_RENDER_CONFIG;
   const wallClock = deps.wallClock ?? (() => performance.now());
-  const nextTask = deps.nextTask ?? nextMacrotask;
+  const nextTask = deps.nextTask ?? yieldOneMacrotask;
   const startedMs = wallClock();
   const frames = Math.ceil(scenario.durationS * cfg.sampleRate);
   const context = deps.createContext(cfg.channels, frames, cfg.sampleRate);

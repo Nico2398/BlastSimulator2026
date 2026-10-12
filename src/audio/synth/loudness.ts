@@ -74,13 +74,21 @@ export function gainForGatedRms(channels: readonly Float32Array[], sampleRate: n
   return gain;
 }
 
-/** Largest absolute sample over all channels, in dBFS. */
-export function samplePeakDb(channels: readonly Float32Array[]): number {
+/**
+ * Largest absolute sample over all channels, linear. NaN or infinity anywhere makes the result
+ * non-finite (Math.max propagates NaN), so `Number.isFinite(samplePeak(...))` also tells a clean buffer.
+ */
+export function samplePeak(channels: readonly ArrayLike<number>[]): number {
   let peak = 0;
   for (const channel of channels) {
     for (let i = 0; i < channel.length; i++) peak = Math.max(peak, Math.abs(channel[i] as number));
   }
-  return toDb(peak);
+  return peak;
+}
+
+/** Largest absolute sample over all channels, in dBFS. */
+export function samplePeakDb(channels: readonly Float32Array[]): number {
+  return toDb(samplePeak(channels));
 }
 
 const SINC_HALF_TAPS = 6;
@@ -109,12 +117,9 @@ function interpolationKernels(): number[][] {
  */
 export function truePeakDb(channels: readonly Float32Array[]): number {
   const kernels = interpolationKernels();
-  let samplePeak = 0;
-  for (const channel of channels) {
-    for (let i = 0; i < channel.length; i++) samplePeak = Math.max(samplePeak, Math.abs(channel[i] as number));
-  }
-  const candidate = samplePeak * SYNTH_LEVELS.truePeakCandidateRatio;
-  let peak = samplePeak;
+  const sampled = samplePeak(channels);
+  const candidate = sampled * SYNTH_LEVELS.truePeakCandidateRatio;
+  let peak = sampled;
   for (const channel of channels) {
     const last = channel.length - 1;
     for (let i = 0; i < last; i++) {

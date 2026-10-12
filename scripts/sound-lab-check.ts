@@ -7,8 +7,9 @@
  * AudioContext runs and plays, then renders the lab's mix scenarios (interface
  * tour, blast, busy mine) offline through the real graph and measures them.
  * Fails (exit 1) on: a sample or recipe that does not load or render, a context
- * that never runs, NaN in a mix, a peak above -0.1 dBFS after the limiter, or a
- * silent mix (gated RMS under -60 dBFS).
+ * that never runs, fewer assets loaded than the preload plan expects, NaN in a mix, a peak
+ * above -0.1 dBFS after the limiter, a mix that drives the safety clipper too hard (share of
+ * samples above its knee, LAB_CHECK_LIMITS), or a silent mix (gated RMS under -60 dBFS).
  *
  * It serves the game itself: a dev server already answering on the port (default :5173) is reused,
  * otherwise a Vite server is started in this process and stopped when the check ends.
@@ -17,28 +18,25 @@
  *   npm run sounds:check -- --scenario blast --out /tmp/mixes
  *
  * Output: a table of every mix, and each mix as <out>/<scenario>.wav plus
- * <out>/report.json, to open in any audio tool or inspect with ffmpeg.
+ * <out>/report.json, to open in any audio tool or inspect with ffmpeg. Without --out a fresh
+ * private temp directory is created and printed.
  *
  * Exit codes: 0 all clear, 1 a check failed, 2 the check could not run
  * (the server could not start, no Chromium, bad arguments).
  */
 
-import puppeteer from 'puppeteer';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CHECK_USAGE, parseCheckArgs } from '../src/audio/lab/checkArgs.js';
-import { evaluateReport } from '../src/audio/lab/checks.js';
+import { evaluateReport, expectedAssetCount, savableMixes } from '../src/audio/lab/checks.js';
 import { formatEnvelope, formatMixTable } from '../src/audio/lab/formatReport.js';
 import type { SoundLabReport } from '../src/audio/lab/labReport.js';
-import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
+import type { MixScenarioName } from '../src/audio/lab/mixTypes.js';
+import { chromeOrFail, EXIT_COULD_NOT_RUN, EXIT_FAILED, errorText, fail, launchAudioBrowser, sleep } from './shared/audio-check.js';
 import { ensureDevServer, type DevServerHandle } from './shared/dev-server.js';
 
-const EXIT_FAILED = 1;
-const EXIT_COULD_NOT_RUN = 2;
 const PROGRESS_POLL_MS = 1000;
-/** Without a user gesture the page still needs this to start its context. */
-const AUTOPLAY_FLAG = '--autoplay-policy=no-user-gesture-required';
 
 interface PageHandle {
   evaluate<T>(fn: () => T): Promise<T>;
@@ -47,14 +45,7 @@ interface PageHandle {
 
 type LabWindow = Window & { __soundLab?: SoundLabReport; __soundLabWav?: (name: string) => string | null };
 
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-
 const LAB_PATH = '/sound-lab.html';
-
-function fail(message: string, code: number): never {
-  console.error(message);
-  process.exit(code);
-}
 
 /** Wait for `done`, printing each new progress line; false when the timeout ran out first. */
 async function waitForDone(page: PageHandle, timeoutS: number): Promise<boolean> {
@@ -76,10 +67,10 @@ async function waitForDone(page: PageHandle, timeoutS: number): Promise<boolean>
   return false;
 }
 
-async function saveMixes(page: PageHandle, report: SoundLabReport, outDir: string): Promise<string[]> {
+async function saveMixes(page: PageHandle, report: SoundLabReport, scenarios: readonly MixScenarioName[], outDir: string): Promise<string[]> {
   mkdirSync(outDir, { recursive: true });
   const written: string[] = [];
-  for (const mix of report.mixes) {
+  for (const mix of savableMixes(report, scenarios)) {
     const base64 = await page.evaluate((name: string) => (window as LabWindow).__soundLabWav?.(name) ?? null, mix.name);
     if (!base64) continue;
     const file = join(outDir, `${mix.name}.wav`);
@@ -91,7 +82,7 @@ async function saveMixes(page: PageHandle, report: SoundLabReport, outDir: strin
 }
 
 function printReport(report: SoundLabReport, files: string[], outDir: string): void {
-  const assets = `${report.loaded.length}/${report.expected.samples + report.expected.recipes + 1}`;
+  const assets = `${report.loaded.length}/${expectedAssetCount(report)}`;
   console.log('');
   console.log(`live AudioContext : ${report.contextState} at ${report.sampleRate} Hz (clock ${report.contextClockAdvanced ? 'advanced' : 'did not advance'})`);
   console.log(`engine ready      : ${report.ready}; live play returned a voice: ${report.livePlayOk}`);
@@ -110,32 +101,28 @@ function printReport(report: SoundLabReport, files: string[], outDir: string): v
 }
 
 async function main(): Promise<void> {
-  const parsed = parseCheckArgs(process.argv.slice(2), join(tmpdir(), 'blastsim-sound-lab'));
+  const parsed = parseCheckArgs(process.argv.slice(2));
   if (parsed.kind === 'help') {
     console.log(CHECK_USAGE);
     return;
   }
   if (parsed.kind === 'error') fail(`${parsed.message}\n\n${CHECK_USAGE}`, EXIT_COULD_NOT_RUN);
   const options = parsed.options;
+  // A fixed shared path could be pre-created by another user as symlinks; a fresh 0700 directory cannot.
+  const outDir = options.outDir ?? mkdtempSync(join(tmpdir(), 'blastsim-sound-lab-'));
 
+  const executablePath = chromeOrFail();
   let server: DevServerHandle;
   try {
     server = await ensureDevServer(options.port, LAB_PATH);
   } catch (error) {
-    fail(`Could not serve the game on port ${options.port}: ${String(error instanceof Error ? error.message : error)}\nFree the port or pass --port <n>.`, EXIT_COULD_NOT_RUN);
+    fail(`Could not serve the game on port ${options.port}: ${errorText(error)}\nFree the port or pass --port <n>.`, EXIT_COULD_NOT_RUN);
   }
   const url = `${server.origin}${LAB_PATH}`;
   console.log(server.started ? `Started a dev server at ${server.origin}` : `Using the dev server already running at ${server.origin}`);
 
-  let executablePath: string;
-  try {
-    executablePath = resolveChromePathOrThrow();
-  } catch (error) {
-    await server.stop();
-    fail(String(error instanceof Error ? error.message : error), EXIT_COULD_NOT_RUN);
-  }
 
-  const browser = await puppeteer.launch({ headless: true, args: [...LAUNCH_ARGS, AUTOPLAY_FLAG], executablePath });
+  const browser = await launchAudioBrowser(executablePath);
   let report: SoundLabReport | null = null;
   let files: string[] = [];
   const pageErrors: string[] = [];
@@ -152,7 +139,7 @@ async function main(): Promise<void> {
       const lab = (window as LabWindow).__soundLab;
       return lab ? JSON.parse(JSON.stringify(lab)) as SoundLabReport : null;
     });
-    if (report) files = await saveMixes(page, report, options.outDir);
+    if (report) files = await saveMixes(page, report, options.scenarios, outDir);
     if (!finished && report) report.errors = [...report.errors, `timed out after ${options.timeoutS} s at "${report.progress}"`];
   } finally {
     await browser.close();
@@ -161,7 +148,7 @@ async function main(): Promise<void> {
 
   if (!report) fail('The page never published window.__soundLab (did sound-lab.html fail to load?).', EXIT_FAILED);
   report.errors = [...report.errors, ...pageErrors.map(error => `page error: ${error}`)];
-  printReport(report, files, options.outDir);
+  printReport(report, files, outDir);
 
   const verdict = evaluateReport(report);
   for (const warning of verdict.warnings) console.warn(`warning: ${warning}`);

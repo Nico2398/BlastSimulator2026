@@ -287,6 +287,40 @@ describe('failures stay local', () => {
   });
 });
 
+describe('fades the audio clock refuses', () => {
+  it('a track change inside a running curve still crossfades: the outgoing element is retired, the new one is audible', () => {
+    const { player, factory, gainOf, clock } = make();
+    player.setTrack(menu);
+    clock.t = 1;
+    player.setTrack(desert);
+    const [a, b] = factory.elements as [FakeElement, FakeElement];
+    gainOf(a).gain.throwOnSet = true;
+    gainOf(b).gain.throwOnSet = true;
+    clock.t = 2;
+    expect(() => player.setTrack(alpine)).not.toThrow();
+    expect(gainOf(b).gain.value).toBe(0);
+    const c = factory.elements[2]!;
+    expect(c.playCalls).toBe(1);
+    clock.t = 2 + MUSIC_CONFIG.crossfadeS;
+    player.tick();
+    expect(b.attributes.has('src')).toBe(false);
+  });
+
+  it('a param that refuses even an assignment cannot break a switch or a cut', () => {
+    const { player, factory, gainOf, clock } = make({ ...MUSIC_CONFIG, crossfadeS: 0, fadeInS: 0, fadeOutS: 0 });
+    player.setTrack(menu);
+    const a = factory.elements[0]!;
+    gainOf(a).gain.throwOnSet = true;
+    gainOf(a).gain.throwOnAssign = true;
+    clock.t = 5;
+    expect(() => player.setTrack(null)).not.toThrow();
+    expect(gainOf(a).gain.value).toBe(1);
+    gainOf(a).gain.throwOnAssign = false;
+    expect(() => player.setTrack(desert)).not.toThrow();
+    expect(factory.elements).toHaveLength(2);
+  });
+});
+
 describe('dispose', () => {
   it('frees the current and the fading elements and ignores later requests', () => {
     const { player, factory, clock } = make();

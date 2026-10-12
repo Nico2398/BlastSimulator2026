@@ -1,10 +1,9 @@
 // BlastSimulator2026 — Fixtures for the game audio director tests
-// A recording AudioPlayer (what was played, with which options, what was ducked,
-// how each bed was driven), a manual clock, a director environment built on
-// them, and builders that make a real GameState and put entities into it.
+// A director environment built on the shared recording player and a manual clock,
+// and builders that make a real GameState and put entities into it.
 
-import type { AudioPlayer, Listener, LoopHandle, LoopOptions, PlayOptions, SoundHandle } from '../../../../src/audio/AudioPlayer.js';
-import type { LoopId, OneShotId, SoundBus } from '../../../../src/audio/SoundCatalog.js';
+import type { Listener, WorldPoint } from '../../../../src/audio/AudioPlayer.js';
+import type { BlastInfo } from '../../../../src/audio/director/blastPlan.js';
 import { createDirectorEnv } from '../../../../src/audio/director/env.js';
 import type { DirectorEnv, EntityPositionFn } from '../../../../src/audio/director/types.js';
 import type { ActionType, GameState, PendingAction, PendingActionStatus } from '../../../../src/core/state/GameState.js';
@@ -13,89 +12,11 @@ import { hireEmployee, type Employee, type EmployeeRole } from '../../../../src/
 import { purchaseVehicle, type Vehicle, type VehicleRole } from '../../../../src/core/entities/Vehicle.js';
 import type { Building, BuildingType } from '../../../../src/core/entities/Building.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
-export interface PlayRecord {
-  readonly id: OneShotId;
-  readonly opts: PlayOptions;
-  readonly handle: RecordedHandle;
-  /** Real clock time of the call, to check what was scheduled when. */
-  readonly atS: number;
-}
-
-export class RecordedHandle implements SoundHandle {
-  stops: Array<number | undefined> = [];
-  stop(fadeS?: number): void {
-    this.stops.push(fadeS);
-  }
-  get stopped(): boolean {
-    return this.stops.length > 0;
-  }
-}
-
-export class RecordedLoop implements LoopHandle {
-  readonly calls: Array<{ level: number; rampS: number | undefined }> = [];
-  stops = 0;
-  setLevel(level: number, rampS?: number): void {
-    this.calls.push({ level, rampS });
-  }
-  stop(): void {
-    this.stops++;
-  }
-  get level(): number {
-    return this.calls[this.calls.length - 1]?.level ?? 0;
-  }
-}
-
-export class RecordingPlayer implements AudioPlayer {
-  ready = true;
-  readonly plays: PlayRecord[] = [];
-  readonly ducks: Array<{ bus: SoundBus; amountDb: number; holdS: number; releaseS: number }> = [];
-  readonly loops = new Map<LoopId, RecordedLoop>();
-  readonly listeners: Listener[] = [];
-  /** Clock stamped on each play, set by tests. */
-  now = (): number => 0;
-
-  play(id: OneShotId, opts: PlayOptions = {}): SoundHandle | null {
-    const handle = new RecordedHandle();
-    this.plays.push({ id, opts, handle, atS: this.now() });
-    return handle;
-  }
-
-  loop(id: LoopId, opts: LoopOptions = {}): LoopHandle {
-    let loop = this.loops.get(id);
-    if (!loop) {
-      loop = new RecordedLoop();
-      this.loops.set(id, loop);
-      if (opts.level !== undefined) loop.setLevel(opts.level, opts.rampS);
-    }
-    return loop;
-  }
-
-  duck(bus: SoundBus, amountDb: number, holdS: number, releaseS: number): void {
-    this.ducks.push({ bus, amountDb, holdS, releaseS });
-  }
-
-  setListener(listener: Listener): void {
-    this.listeners.push(listener);
-  }
-
-  /** Ids played, in order. */
-  get ids(): OneShotId[] {
-    return this.plays.map(p => p.id);
-  }
-
-  of(id: OneShotId): PlayRecord[] {
-    return this.plays.filter(p => p.id === id);
-  }
-
-  bed(id: LoopId): RecordedLoop {
-    return this.loop(id) as RecordedLoop;
-  }
-
-  clearPlays(): void {
-    this.plays.length = 0;
-    this.ducks.length = 0;
-  }
+/** A fragment that drops onto `to` from a few metres up: it visibly moves, so the blast's rain counts it. */
+export function fallingTo(to: WorldPoint, timing: { delayS: number; durationS: number; impactSpeed: number }): BlastInfo['flights'][number] {
+  return { ...timing, from: { x: to.x, y: 4, z: to.z }, to: { x: to.x, y: 0, z: to.z } };
 }
 
 export function listenerAt(x: number, z: number, viewDistance = 40): Listener {

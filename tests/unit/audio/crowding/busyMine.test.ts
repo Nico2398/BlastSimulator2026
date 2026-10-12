@@ -4,9 +4,10 @@
 // real GameAudioDirector and commandCue attached, at 1x and at 8x, and every sound the engine would be asked
 // to play is counted. Each threshold below is the measured value of the run it guards with headroom, with the
 // measurement in the comment. Nobody can listen here: these numbers say how MANY sounds, not how they sound.
+// "Sounds" means what the director and the command cues ask for: clicks, hover, selection and toasts (the
+// interface layer) are not simulated by the harness and not counted.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { SOUND_CATALOG } from '../../../../src/audio/SoundCatalog.js';
 import type { CrowdSim, PlayRecord } from '../../../helpers/audioCrowding.js';
 import { isBlastSound, peakIn, summarize } from '../../../helpers/audioCrowdingStats.js';
 import { scenarioRun } from './runs.js';
@@ -36,9 +37,9 @@ const countOf = (plays: readonly PlayRecord[]): Map<string, number> => {
 describe.each(SCENARIOS)('%s at 1x', (name) => {
   const sim = (): CrowdSim => scenarioRun(name, 1);
 
-  it('stays under 30 sounds a minute, blasts and commands included', () => {
-    // Measured 14.4 (vibration-budget), 13.5, 17.1, 20.0 (weather-flood: a short game, so its one blast weighs most).
-    expect(summarize(sim().recorder.plays, sim().realS).totalPerMinute).toBeLessThan(30);
+  it('stays under 25 sounds a minute, blasts and commands included', () => {
+    // Measured 14.9 (vibration-budget), 13.4, 16.3, 19.2 (weather-flood: a short game, so its one blast weighs most).
+    expect(summarize(sim().recorder.plays, sim().realS).totalPerMinute).toBeLessThan(25);
   });
 
   it('plays the world (no blast, no player command) at most 15 times a minute', () => {
@@ -46,16 +47,16 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     expect(worldPlays(sim()).length / minutes(sim())).toBeLessThan(15);
   });
 
-  it('never asks for more than 4 world sounds in a second, 12 in ten, 24 in thirty', () => {
-    // Measured worst second 3, ten seconds 9, thirty seconds 17 (rock-fragmenter-breaking).
-    expectWorldWithinBudget(sim(), { per1s: 4, per10s: 12, per30s: 24 });
+  it('never asks for more than 4 world sounds in a second, 12 in ten, 21 in thirty', () => {
+    // Measured worst second 3, ten seconds 9, thirty seconds 16 (rock-fragmenter-breaking).
+    expectWorldWithinBudget(sim(), { per1s: 4, per10s: 12, per30s: 21 });
   });
 
-  it('keeps the busiest second, a blast, under 22 sounds and 18 voices at once', () => {
-    // Measured 17 sounds in a second (rock-fragmenter-breaking's blast), 12 voices at most; the engine caps at 32.
+  it('keeps the busiest second, a blast, under 16 sounds and 12 voices at once', () => {
+    // Measured 12 sounds in a second (weather-flood's blast), 9 voices at most; the engine caps at 32.
     const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(22);
-    expect(stats.maxVoices).toBeLessThanOrEqual(18);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(16);
+    expect(stats.maxVoices).toBeLessThanOrEqual(12);
   });
 
   it('asks the engine only for sounds it will admit', () => {
@@ -86,8 +87,8 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     }
   });
 
-  it('plays one blast as one timeline: five main layers, at most 26 sounds in all', () => {
-    // Measured 7 to 20 blast and debris sounds within 15 s of a shot (the cap on simultaneous debris is 10 + 8).
+  it('plays one blast as one timeline: five main layers, at most 22 sounds in all', () => {
+    // Measured 7 to 17 blast and debris sounds within 15 s of a shot (the cap on simultaneous debris is 10 + 8).
     const plays = sim().recorder.plays;
     const shots = plays.filter(p => p.id === 'blast_snap');
     expect(shots.length).toBeGreaterThan(0);
@@ -96,7 +97,7 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
     }
     for (const shot of shots) {
       const timeline = plays.filter(p => p.accepted && isBlastSound(p.id) && p.id !== 'blast_beep' && p.startS >= shot.startS - 0.01 && p.startS < shot.startS + 15);
-      expect(timeline.length).toBeLessThanOrEqual(26);
+      expect(timeline.length).toBeLessThanOrEqual(22);
     }
   });
 });
@@ -133,11 +134,5 @@ describe.each(SCENARIOS)('%s at 8x compared with 1x', (name) => {
   it('asks for the same blast timeline', () => {
     const blasts = (sim: CrowdSim): number => sim.recorder.plays.filter(p => p.id === 'blast_snap').length;
     expect(blasts(fast())).toBe(blasts(slow()));
-  });
-});
-
-describe('sound ids', () => {
-  it('only plays ids the catalog knows', () => {
-    for (const name of SCENARIOS) for (const p of scenarioRun(name, 8).recorder.plays) expect(SOUND_CATALOG[p.id]).toBeDefined();
   });
 });

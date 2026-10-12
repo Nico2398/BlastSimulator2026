@@ -29,18 +29,22 @@ export interface AudioEngineOptions {
   /** Millisecond clock for cooldowns and render slicing. */
   readonly now?: () => number;
   readonly yieldToEventLoop?: () => Promise<void>;
+  /** Wait `ms` before a failed sample is retried; defaults to a timer. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 /** Loaded assets so far, out of all assets the preload will try. */
 type PreloadProgress = (done: number, total: number) => void;
 
-async function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
+/** Fetch a file's bytes, or throw on a non-2xx answer. Shared with the sound lab. */
+export async function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
   return response.arrayBuffer();
 }
 
-const yieldOneMacrotask = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+/** Let the event loop run one task (paint, input) before continuing. Shared with the lab renderer. */
+export const yieldOneMacrotask = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
 export class AudioEngine implements AudioPlayer {
   private readonly player: SoundPlayer | null;
@@ -50,6 +54,7 @@ export class AudioEngine implements AudioPlayer {
   private essentialsLoaded = false;
   private preloading: Promise<void> | null = null;
   private preloadSettled = false;
+  private preloadCrashed = false;
 
   constructor(private readonly manager: AudioManager, options: AudioEngineOptions) {
     const ctx = manager.context;
@@ -64,7 +69,7 @@ export class AudioEngine implements AudioPlayer {
     this.samples = new SampleBank(
       options.fetchBytes ?? fetchArrayBuffer,
       options.decode ?? (bytes => ctx.decodeAudioData(bytes)),
-      { base: options.assetBase ?? SAMPLE_BANK_CONFIG.assetBase },
+      { base: options.assetBase ?? SAMPLE_BANK_CONFIG.assetBase, ...(options.sleep && { delay: options.sleep }) },
     );
     const samples = this.samples;
     this.synth = new SynthBank(ctx, {
@@ -86,22 +91,24 @@ export class AudioEngine implements AudioPlayer {
     });
   }
 
-  /** True once the interface and blast cues are decoded. */
+  /** True once the tier-1 samples (interface sounds and high-priority sampled sounds) are decoded. Synth cues (blast synths, siren, weather) come later: see `preloaded`. */
   get ready(): boolean { return this.player !== null && this.essentialsLoaded; }
 
   /** True once the preload has tried every sample and recipe, whether or not they all loaded. */
   get preloaded(): boolean { return this.preloadSettled; }
 
-  /** Sample files and synth recipes the preload could not load (empty while it is still running). */
-  get failedAssets(): readonly string[] { return [...(this.samples?.failed ?? []), ...(this.synth?.failed ?? [])]; }
+  /** Sample files and synth recipes the preload could not load, plus 'preload' when it died unexpectedly (empty while it is still running). */
+  get failedAssets(): readonly string[] {
+    return [...(this.samples?.failed ?? []), ...(this.synth?.failed ?? []), ...(this.preloadCrashed ? ['preload'] : [])];
+  }
 
   /**
    * Load all audio in three tiers: samples of interface and high-priority
-   * sounds (flips `ready`), the remaining samples, then the synth recipes and
-   * the reverb impulse. Safe to call twice (same promise); never rejects.
+   * sampled sounds (flips `ready`), the remaining samples, then the synth
+   * recipes and the reverb impulse (so `ready` excludes synth cues). Safe to call twice (same promise); never rejects.
    */
   preload(onProgress?: PreloadProgress): Promise<void> {
-    this.preloading ??= this.runPreload(onProgress).catch(() => undefined).finally(() => { this.preloadSettled = true; });
+    this.preloading ??= this.runPreload(onProgress).catch(() => { this.preloadCrashed = true; }).finally(() => { this.preloadSettled = true; });
     return this.preloading;
   }
 

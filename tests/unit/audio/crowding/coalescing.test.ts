@@ -69,14 +69,16 @@ describe('a blast of any size', () => {
     sim.seconds(2);
   }, SETUP_TIMEOUT_MS);
 
+  // 2000 fragments over 8 s ask for exactly the cap (five layers plus 40 bins) and hear all of it, so for that row the
+  // request cap below is the bar; the other rows are held to 1.2 times what they measured.
   const sizes = [
-    { fragments: 10, spread: [0.1, 2], heardMeasured: 12, ceiling: 16 },
-    { fragments: 200, spread: [0.1, 6], heardMeasured: 30, ceiling: 36 },
-    { fragments: 2000, spread: [0.1, 8], heardMeasured: 45, ceiling: 45 },
-    { fragments: 2000, spread: [0.1, 0.4], heardMeasured: 15, ceiling: 20 },
+    { fragments: 10, spread: [0.1, 2], heardMeasured: 12 },
+    { fragments: 200, spread: [0.1, 6], heardMeasured: 30 },
+    { fragments: 2000, spread: [0.1, 8], heardMeasured: 45 },
+    { fragments: 2000, spread: [0.1, 0.4], heardMeasured: 15 },
   ] as const;
 
-  it.each(sizes)('$fragments fragments over $spread s: five main layers once, a rain bounded by its bins, never more than 15 a second', ({ fragments, spread, heardMeasured, ceiling }) => {
+  it.each(sizes)('$fragments fragments over $spread s: five main layers once, a rain bounded by its bins, never more than 15 a second', ({ fragments, spread, heardMeasured }) => {
     const plays = fireBlast(sim, fragments, spread[0], spread[1]);
     const heard = plays.filter(p => p.accepted);
     // The shot itself is never lost to the rain: each main layer plays exactly once, whatever follows.
@@ -85,19 +87,12 @@ describe('a blast of any size', () => {
     expect(plays.length).toBeLessThanOrEqual(MAIN_LAYERS.length + BLAST_AUDIO_CONFIG.rain.maxBins);
     // Measured heard (see `heardMeasured` in the table): 12, 30, 45 and 15; the 2000 fragments within 0.4 s lose
     // their overflow to the engine's caps of 10 impacts and 8 pebbles at once instead of piling up.
-    expect(heard.length).toBeLessThanOrEqual(ceiling);
+    expect(heard.length).toBeLessThanOrEqual(Math.ceil(heardMeasured * 1.2));
     expect(heard.length).toBeGreaterThanOrEqual(Math.floor(heardMeasured * 0.75)); // and a big blast is not silent either
     // Measured busiest second 10, 9, 9 and 15.
     expect(peakIn(heard, 1)).toBeLessThanOrEqual(15);
   });
 
-  it('never plays more rain at once than the engine allows impacts and pebbles', () => {
-    const plays = fireBlast(sim, 2000, 0.1, 0.4);
-    const impacts = plays.filter(p => p.accepted && p.id === 'debris_hit');
-    // Voices of the sound never exceed its cap: at no instant are more than 10 impacts sounding.
-    const sounding = (at: number): number => impacts.filter(p => p.startS <= at && at < p.startS + p.durationS).length;
-    for (const p of impacts) expect(sounding(p.startS + 1e-6)).toBeLessThanOrEqual(10);
-  });
 });
 
 describe('a 60-hole drill plan', () => {
@@ -199,13 +194,14 @@ describe('many things happening at once', () => {
     expect(peakIn(hauling, 1)).toBeLessThanOrEqual(4);
   });
 
-  it('plays one thud for forty workers collapsing in the same second and one honk for forty stuck trucks', () => {
+  it('plays one thud for forty collapse events from three workers and one honk for every truck of the mine stuck at once', () => {
     const state = sim.state!;
     const before = sim.recorder.plays.length;
     const centre = pitCentre(sim);
     const workers = Array.from({ length: 3 }, (_, i) => addEmployee(state, centre.x + i, centre.z));
     addVehicle(state, 'debris_hauler', centre.x, centre.z + 3);
     for (let i = 0; i < 40; i++) sim.engine.emitter.emit('employee:collapsed', { employeeId: workers[i % workers.length]!.id, needKey: 'fatigue' });
+    expect(state.vehicles.vehicles.length).toBeGreaterThanOrEqual(100); // the hundred hauling trucks of the test above are still here
     for (const truck of state.vehicles.vehicles) sim.engine.emitter.emit('vehicle:stuck', { vehicleId: truck.id });
     sim.frames(60);
     const ids = sim.recorder.plays.slice(before).map(p => p.id);

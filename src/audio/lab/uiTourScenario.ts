@@ -18,7 +18,7 @@ const TOUR: ReadonlyArray<readonly [OneShotId, number]> = [
   ['ui_slider', 0.1], ['ui_slider', 0.1], ['ui_slider', 0.1], ['ui_slider', 0.1], ['ui_slider', 0.9],
   ['ui_select', 0.8], ['ui_confirm', 0.9], ['ui_back', 0.7], ['ui_close', 1.2],
   // refusals and a modal
-  ['ui_denied', 1], ['ui_error', 1.1], ['ui_invalid', 1.1], ['blast_cancel', 1.6], ['ui_modal', 1.4], ['ui_confirm', 1.2],
+  ['ui_denied', 1], ['ui_invalid', 1.1], ['blast_cancel', 1.6], ['ui_modal', 1.4], ['ui_confirm', 1.2],
   // notifications of rising severity
   ['notify_info', 1.2], ['notify_good', 1.2], ['notify_warn', 1.3], ['notify_bad', 1.4], ['notify_alert', 2.2],
   // event alerts

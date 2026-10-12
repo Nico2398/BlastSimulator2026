@@ -2,9 +2,10 @@
 // Each entry point maps to one catalog sound; notifications coalesce within a synchronous burst.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { UiCues, type NotificationSeverity, type SelectionKind, type VolumeChannel } from '../../../../src/audio/ui/UiCues.js';
+import { UiCues, type NotificationSeverity, type SelectionKind } from '../../../../src/audio/ui/UiCues.js';
+import type { VolumeChannel } from '../../../../src/audio/AudioManager.js';
 import { UI_SELECTION_PITCH_CENTS } from '../../../../src/core/config/audio/ui.js';
-import { RecordingPlayer } from './recordingPlayer.js';
+import { RecordingPlayer } from '../../../helpers/audioPlayerFakes.js';
 
 let player: RecordingPlayer;
 let cues: UiCues;
@@ -86,11 +87,10 @@ describe('entitySelected', () => {
 });
 
 describe('one-liners', () => {
-  it('maps refusals, modals and confirmations', () => {
+  it('maps refusals and modals', () => {
     cues.placementRefused();
     cues.modalShown();
-    cues.confirmAccepted();
-    expect(player.ids).toEqual(['ui_invalid', 'ui_modal', 'ui_confirm']);
+    expect(player.ids).toEqual(['ui_invalid', 'ui_modal']);
   });
 });
 

@@ -6,11 +6,11 @@
 // brings a clap after a delay that feels like distance, and storms add distant
 // rumbles between flashes.
 
-import type { LoopHandle } from '../AudioPlayer.js';
 import type { LoopId } from '../SoundCatalog.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
 import { AMBIENCE_CONFIG } from '../../core/config/audio/game.js';
 import { clamp } from '../engine/units.js';
+import { BedFeed } from './BedFeed.js';
 import { lerp } from './scalar.js';
 import type { DirectorEnv } from './types.js';
 
@@ -42,21 +42,28 @@ function windViewFactor(viewDistance: number | null): number {
 }
 
 export class Ambience {
-  private readonly beds: Record<BedName, LoopHandle>;
-  private readonly sent: Record<BedName, number> = { wind: 0, rainLight: 0, rainHeavy: 0 };
+  private readonly beds: Record<BedName, BedFeed>;
+  /** The real weather, for thunder. */
   private weather: WeatherState | null = null;
+  /** The weather the beds follow: the real one, a change at a time. */
+  private bedWeather: WeatherState | null = null;
+  private bedWeatherAgeS = 0;
   private heard = false;
   private rumbleTimerS: number | null = null;
+  /** Real seconds since the last storm, to tell a short gap between storms from the end of them. */
+  private calmS = 0;
   private lastMenuUp = false;
 
   constructor(private readonly env: DirectorEnv) {
     const { player } = env;
-    this.beds = { wind: player.loop(BED_IDS.wind), rainLight: player.loop(BED_IDS.rainLight), rainHeavy: player.loop(BED_IDS.rainHeavy) };
+    const feed = (id: LoopId): BedFeed => new BedFeed(player.loop(id), AMBIENCE_CONFIG.epsilon);
+    this.beds = { wind: feed(BED_IDS.wind), rainLight: feed(BED_IDS.rainLight), rainHeavy: feed(BED_IDS.rainHeavy) };
   }
 
   update(dtS: number, input: AmbienceInput): void {
     this.weather = input.weather;
     this.heard = input.weather !== null && !input.menuUp;
+    this.followWeather(dtS, input.weather);
     this.setBeds(input);
     this.lastMenuUp = input.menuUp;
     this.runRumbles(dtS, input);
@@ -73,17 +80,28 @@ export class Ambience {
 
   /** Fade every bed to silence and forget the weather. */
   clear(): void {
-    for (const name of Object.keys(this.beds) as BedName[]) this.send(name, 0, AMBIENCE_CONFIG.menuRampS);
+    for (const name of Object.keys(this.beds) as BedName[]) this.beds[name].set(0, AMBIENCE_CONFIG.menuRampS);
     this.weather = null;
+    this.bedWeather = null;
     this.heard = false;
     this.rumbleTimerS = null;
+    this.calmS = 0;
+  }
+
+  /** The beds take a new weather at once from silence or a quiet game, and otherwise at most once per dwell. */
+  private followWeather(dtS: number, weather: WeatherState | null): void {
+    this.bedWeatherAgeS += dtS;
+    if (weather === this.bedWeather) return;
+    if (weather !== null && this.bedWeather !== null && this.bedWeatherAgeS < AMBIENCE_CONFIG.minDwellS) return;
+    this.bedWeather = weather;
+    this.bedWeatherAgeS = 0;
   }
 
   private targets(input: AmbienceInput): Record<BedName, number> {
-    if (input.menuUp || input.weather === null) {
+    if (input.menuUp || this.bedWeather === null) {
       return { wind: input.menuUp ? AMBIENCE_CONFIG.menuWindLevel : 0, rainLight: 0, rainHeavy: 0 };
     }
-    const levels = AMBIENCE_CONFIG.weather[input.weather];
+    const levels = AMBIENCE_CONFIG.weather[this.bedWeather];
     const calm = input.paused ? AMBIENCE_CONFIG.pausedFactor : 1;
     return {
       wind: clamp(levels.wind * windViewFactor(input.viewDistance), 0, 1) * calm,
@@ -95,24 +113,24 @@ export class Ambience {
   private setBeds(input: AmbienceInput): void {
     const targets = this.targets(input);
     const rampS = input.menuUp !== this.lastMenuUp || input.menuUp ? AMBIENCE_CONFIG.menuRampS : AMBIENCE_CONFIG.rampS;
-    for (const name of Object.keys(this.beds) as BedName[]) this.send(name, targets[name], rampS);
+    for (const name of Object.keys(this.beds) as BedName[]) this.beds[name].set(targets[name], rampS);
   }
 
-  private send(name: BedName, level: number, rampS: number): void {
-    const reachedSilence = level === 0 && this.sent[name] !== 0;
-    if (!reachedSilence && Math.abs(level - this.sent[name]) < AMBIENCE_CONFIG.epsilon) return;
-    this.sent[name] = level;
-    this.beds[name].setLevel(level, rampS);
-  }
-
-  /** Distant rumbles between flashes, during storms only. */
+  /**
+   * Distant rumbles between flashes, during storms only. The clock counts storm time: it starts at the first
+   * storm second (a short wait, so even a brief storm can rumble), stands still through a pause, a menu or a
+   * calm gap between two storms, and starts over only after a calm that long that the storm is truly over.
+   */
   private runRumbles(dtS: number, input: AmbienceInput): void {
     const config = AMBIENCE_CONFIG.thunder;
-    if (this.weather !== 'storm' || input.paused || input.menuUp) {
-      this.rumbleTimerS = null;
+    if (this.weather !== 'storm') {
+      this.calmS += dtS;
+      if (this.calmS >= config.rumbleResetCalmS) this.rumbleTimerS = null;
       return;
     }
-    this.rumbleTimerS ??= this.env.random.nextFloat(config.rumbleMinIntervalS, config.rumbleMaxIntervalS);
+    this.calmS = 0;
+    if (input.paused || input.menuUp) return;
+    this.rumbleTimerS ??= this.env.random.nextFloat(config.rumbleFirstMinS, config.rumbleFirstMaxS);
     this.rumbleTimerS -= dtS;
     if (this.rumbleTimerS > 0) return;
     this.rumbleTimerS = this.env.random.nextFloat(config.rumbleMinIntervalS, config.rumbleMaxIntervalS);

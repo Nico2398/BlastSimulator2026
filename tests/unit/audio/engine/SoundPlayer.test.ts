@@ -406,6 +406,22 @@ describe('SoundPlayer stopping', () => {
     expect(() => handle.stop()).not.toThrow();
   });
 
+  it('stops a voice whose fade is NaN or Infinity as if it had no fade, with finite automation', () => {
+    const s = setup({ ui_click: sampleDef(['a'], { maxVoices: 3, cooldownMs: 0 }) });
+    loadAll(s, ['a']);
+    s.ctx.currentTime = 3;
+    for (const fade of [Number.NaN, Infinity, -Infinity, -2]) {
+      s.player.play('ui_click')!.stop(fade);
+    }
+    for (const source of s.ctx.sources()) {
+      expect(source.stops).toEqual([3 + VOICE_CONFIG.stopMarginS]);
+      for (const event of gainOf(source).gain.events) {
+        expect(Number.isFinite(event.time)).toBe(true);
+        expect(Number.isFinite(event.value)).toBe(true);
+      }
+    }
+  });
+
   it('returns null and frees the slot when the graph cannot be built', () => {
     const s = setup({ ui_click: sampleDef(['a'], { maxVoices: 1 }) });
     loadAll(s, ['a']);
@@ -568,5 +584,98 @@ describe('SoundPlayer loops', () => {
     s.ctx.sources()[1]!.end();
     handle.setLevel(0.9);
     expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(2);
+  });
+
+  /** A bed stolen at the voice cap: 31 debris voices plus a blast sound fill the cap and evict the oldest, lowest-priority voice. */
+  function stealBed(s: Setup): { wind: FakeSource } {
+    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    loadAll(s, ['a', 'boom']);
+    s.player.loop('amb_wind').setLevel(0.8);
+    for (let i = 0; i < VOICE_CONFIG.globalVoiceCap - 1; i++) s.player.play('debris_hit');
+    s.player.play('blast_boom');
+    const wind = s.ctx.sources()[0]!;
+    expect(wind.stops).toHaveLength(1);
+    return { wind };
+  }
+
+  const crowded = (): Partial<Record<string, SoundDefinition>> => ({
+    ...bed(),
+    debris_hit: sampleDef(['a'], { priority: 1 }),
+    blast_boom: sampleDef(['boom'], { priority: 4 }),
+  });
+
+  it('bed stolen then restored without a setLevel call', () => {
+    const s = setup(crowded());
+    s.player.setListener(LISTENER);
+    stealBed(s);
+    s.ctx.sources()[1]!.end();
+    expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(1);
+
+    s.advance(VOICE_CONFIG.loopRearmIntervalMs);
+    s.player.setListener(LISTENER);
+
+    const loops = s.ctx.sources().filter(n => n.loop);
+    expect(loops).toHaveLength(2);
+    expect(gainOf(loops[1]!).gain.events.at(-1)!.value).toBeCloseTo(0.8 * dbToGain(-6), 10);
+  });
+
+  it('re-arms lost beds at most once per interval of real time', () => {
+    const s = setup(crowded());
+    s.player.setListener(LISTENER);
+    stealBed(s);
+    s.ctx.sources()[1]!.end();
+
+    s.advance(VOICE_CONFIG.loopRearmIntervalMs - 1);
+    s.player.setListener(LISTENER);
+    expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(1);
+
+    s.advance(1);
+    s.player.setListener(LISTENER);
+    expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(2);
+  });
+
+  it('keeps trying while the cap is still full, and starts the bed once a slot frees up', () => {
+    const s = setup(crowded());
+    s.player.setListener(LISTENER);
+    stealBed(s);
+
+    s.advance(VOICE_CONFIG.loopRearmIntervalMs);
+    s.player.setListener(LISTENER);
+    expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(1);
+
+    s.ctx.sources()[1]!.end();
+    s.advance(VOICE_CONFIG.loopRearmIntervalMs);
+    s.player.setListener(LISTENER);
+    expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(2);
+  });
+
+  it('does not restart a bed whose level is zero', () => {
+    const s = setup(crowded());
+    s.player.setListener(LISTENER);
+    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    const handle = s.player.loop('amb_wind');
+    handle.setLevel(1);
+    handle.setLevel(0);
+    s.advance(VOICE_CONFIG.loopRearmIntervalMs);
+    s.player.setListener(LISTENER);
+    expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(1);
+  });
+
+  it('every catalog loop outranks the one-shots that fill the cap, so a newcomer takes a work sound, not the bed', () => {
+    for (const [id, def] of Object.entries(SOUND_CATALOG)) {
+      if ('loop' in def && def.loop) expect(def.priority, id).toBeGreaterThanOrEqual(3);
+    }
+    const s = setup({
+      debris_hit: sampleDef(['a'], { priority: 1 }),
+      ui_click: sampleDef(['c'], { priority: 2 }),
+    });
+    loadAll(s, ['a', 'c']);
+    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.player.loop('amb_wind').setLevel(1);
+    for (let i = 0; i < VOICE_CONFIG.globalVoiceCap - 1; i++) s.player.play('debris_hit');
+    expect(s.player.play('ui_click')).not.toBeNull();
+    const [wind, firstDebris] = s.ctx.sources();
+    expect(wind!.stops).toHaveLength(0);
+    expect(firstDebris!.stops).toHaveLength(1);
   });
 });
