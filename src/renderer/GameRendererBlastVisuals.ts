@@ -20,6 +20,23 @@ import type { FragmentAnimator } from './FragmentAnimator.js';
 import type { BlastEffects } from './BlastEffects.js';
 import type { BirdFlocks } from './ambient/BirdFlocks.js';
 import { drain, type Steps } from '../core/engine/Steps.js';
+import type { FragmentFlight } from '../core/mining/BlastResolve.js';
+import type { BlastReport } from '../core/mining/BlastExecution.js';
+
+/**
+ * What a blast looks like at the instant its flash and shake start, handed to whoever
+ * wants to sync to that instant (the audio layer). Plain data: no Three.js types.
+ */
+export interface BlastTriggerInfo {
+  /** Where the flash is drawn (world x/z in metres). */
+  readonly origin: { readonly x: number; readonly z: number };
+  /** Holes that fired together. */
+  readonly holeCount: number;
+  /** Every fragment's flight, for the debris timeline. */
+  readonly flights: readonly FragmentFlight[];
+  /** The resolved blast report, when the state holds one. */
+  readonly report: BlastReport | null;
+}
 
 /** Mutable GameRenderer fields these blast-visual helpers read/write, passed in place of `this` (#767). */
 export interface BlastVisualsDeps {
@@ -31,6 +48,8 @@ export interface BlastVisualsDeps {
   blastEffects: BlastEffects | null;
   birds: BirdFlocks | null;
   getTerrainSurfaceY: (x: number, z: number) => number;
+  /** Called once per blast, right where the flash and shake are triggered; null when nobody listens. */
+  onBlastTriggered: ((info: BlastTriggerInfo) => void) | null;
 }
 
 /** Trigger blast visual effects. Call from main.ts immediately after a successful blast command. */
@@ -113,10 +132,18 @@ export function* onBlastSteps(deps: BlastVisualsDeps, ctx: MiningContext): Steps
     holes.push({ x: ox, y: origin.y, z: oz });
   }
 
+  const holeCount = blastHoles.length;
   deps.blastEffects.trigger({
     holes,
     energyLevel: 0.6,
     origin,
+  });
+  // The one place a blast's flash starts, on both the sliced and the synchronous path.
+  deps.onBlastTriggered?.({
+    origin: { x: origin.x, z: origin.z },
+    holeCount,
+    flights: ctx.lastBlastFlights ?? [],
+    report: ctx.state.lastBlastReport,
   });
 }
 

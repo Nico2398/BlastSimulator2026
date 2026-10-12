@@ -1035,3 +1035,47 @@ describe('NotificationCenter — charge awaiting funds toast (#1345)', () => {
     expect(warnToasts(center)).toHaveLength(2);
   });
 });
+
+describe('NotificationCenter — interface cue', () => {
+  it('voices each notification by its severity', () => {
+    const notification = vi.fn();
+    const center = new NotificationCenter();
+    center.setCues({ notification });
+    for (const severity of ['info', 'positive', 'warn', 'critical'] as const) {
+      center.notify({ severity, title: 'T', body: '' });
+    }
+    expect(notification.mock.calls.map(c => c[0])).toEqual(['info', 'positive', 'warn', 'critical']);
+  });
+
+  it('stays quiet for a silent notification, which still reaches the toasts and the log', () => {
+    const notification = vi.fn();
+    const center = new NotificationCenter();
+    center.setCues({ notification });
+    center.notify({ severity: 'positive', title: 'Research', body: '', silent: true });
+    expect(notification).not.toHaveBeenCalled();
+    expect(center.getToasts()).toHaveLength(1);
+    expect(center.getLog()).toHaveLength(1);
+  });
+
+  it('works without cues and stops voicing once they are removed', () => {
+    const notification = vi.fn();
+    const center = new NotificationCenter();
+    expect(() => center.notify({ severity: 'warn', title: 'T', body: '' })).not.toThrow();
+    center.setCues({ notification });
+    center.setCues(null);
+    center.notify({ severity: 'warn', title: 'T', body: '' });
+    expect(notification).not.toHaveBeenCalled();
+  });
+
+  it('voices a toast the center raises itself from game state (a blocked order warns)', () => {
+    const notification = vi.fn();
+    const center = new NotificationCenter();
+    center.setCues({ notification });
+    const state = makeState();
+    center.update(state);
+    state.chargeAwaitingFunds = ['H1'];
+    center.update(state);
+    expect(notification).toHaveBeenCalledWith('warn');
+  });
+});
+

@@ -14,6 +14,8 @@ export function wireResearchNotifications(
   emitter.on('research:completed', ({ targetType, targetTier }) =>
     notify({
       severity: 'positive',
+      // The audio director owns this one: it plays the `unlock` sting for research:completed.
+      silent: true,
       title: t('notification.title.research'),
       body: t('notification.research.completed', { type: t(`building.${targetType}.name`), tier: targetTier }),
     }));

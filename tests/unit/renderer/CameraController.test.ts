@@ -223,6 +223,34 @@ describe('CameraController', () => {
       expect(controller.distance).toBeCloseTo(before, 6);
     });
 
+    describe('groundRight (the pan axis, shared with the audio listener)', () => {
+      /** The camera's local +X axis in world space, flattened onto the ground and normalised. */
+      const matrixRight = () => {
+        camera.updateMatrixWorld(true);
+        const e = camera.matrixWorld.elements;
+        const len = Math.hypot(e[0]!, e[2]!);
+        return { x: e[0]! / len, z: e[2]! / len };
+      };
+
+      it('is a unit vector on the ground plane that matches the camera\'s screen-right at any yaw', () => {
+        for (const swing of [0, 7, -13, 31]) {
+          if (swing !== 0) drag(canvas, 0, 5, swing, 0);
+          const right = controller.groundRight();
+          expect(right.y).toBe(0);
+          expect(right.length()).toBeCloseTo(1, 9);
+          expect(right.x).toBeCloseTo(matrixRight().x, 6);
+          expect(right.z).toBeCloseTo(matrixRight().z, 6);
+        }
+      });
+
+      it('is unmoved by a camera-position shake, since it comes from the orbit yaw, not the matrix', () => {
+        const still = controller.groundRight().clone();
+        camera.position.add(new THREE.Vector3(1.5, -0.8, 2));
+        camera.updateMatrixWorld(true);
+        expect(controller.groundRight().equals(still)).toBe(true);
+      });
+    });
+
     it('clamps pitch short of straight down and of the horizon', () => {
       drag(canvas, 0, 60, 0, 40); // hard toward top-down
       expect(pitchDeg(camera, target)).toBeLessThanOrEqual(90);

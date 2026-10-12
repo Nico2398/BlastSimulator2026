@@ -672,6 +672,9 @@ export const TUMBLE_MAX_RATE_RAD_S = Math.PI * 2;
  *  thrown and dropped fragments. */
 export const TUMBLE_DROP_FACTOR = 0.12;
 
+/** A fragment that settles closer than this (squared, m^2) to where it started did not move: nothing to animate or sound. */
+export const MIN_ANIMATED_DISPLACEMENT_SQ_M2 = 1e-6;
+
 /** How long the squash-and-bounce settle plays after a fragment lands (s). */
 export const SETTLE_DURATION_S = 0.35;
 
@@ -1836,19 +1839,17 @@ export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;
 /** Maximum vertical gap (metres) between two fragments' AABB extents for stacking. */
 export const FRAGMENT_SUPPORT_VERTICAL_GAP = 0.1;
 
-/** Delay (ms) between the blast boom and the post-blast rumble sound. */
-export const BLAST_RUMBLE_OFFSET_MS = 800;
-
 /**
  * Default volume (0–1) per audio channel, before any stored player setting applies.
  * Keys must match the audio layer's `VolumeChannel` exactly: userSettings.ts derives
  * its list of persistable channels from them.
  */
-export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'ui', number> = {
+export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'ui' | 'music', number> = {
   master: 1,
   effects: 1,
-  ambient: 0.4,
-  ui: 0.6,
+  ambient: 0.7,
+  ui: 0.7,
+  music: 0.6,
 };
 
 /**

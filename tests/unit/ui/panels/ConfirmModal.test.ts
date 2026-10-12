@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ConfirmModal } from '../../../../src/ui/panels/ConfirmModal.js';
 
 function makeModal(): { modal: ConfirmModal; container: HTMLElement } {
@@ -97,3 +97,31 @@ describe('ConfirmModal', () => {
     expect(container.contains(modal.root)).toBe(false);
   });
 });
+
+describe('ConfirmModal — interface cue', () => {
+  const config = { icon: 'trash' as const, title: 'Scrap?', body: 'Gone.', confirmLabel: 'Scrap', onConfirm: () => {} };
+
+  it('plays the modal cue each time it opens, and not when it closes', () => {
+    const { modal } = makeModal();
+    const modalShown = vi.fn();
+    modal.setCues({ modalShown });
+
+    modal.show(config);
+    expect(modalShown).toHaveBeenCalledTimes(1);
+    modal.hide();
+    expect(modalShown).toHaveBeenCalledTimes(1);
+    modal.show(config);
+    expect(modalShown).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens silently without cues or once they are removed', () => {
+    const { modal } = makeModal();
+    expect(() => modal.show(config)).not.toThrow();
+    const modalShown = vi.fn();
+    modal.setCues({ modalShown });
+    modal.setCues(null);
+    modal.show(config);
+    expect(modalShown).not.toHaveBeenCalled();
+  });
+});
+

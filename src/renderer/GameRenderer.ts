@@ -61,7 +61,7 @@ import {
   frameCameraOnGrid, refreshPanLeash, clearAll,
   type SceneSetupDeps,
 } from './GameRendererSceneSetup.js';
-import { onBlast, onBlastSteps, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
+import { onBlast, onBlastSteps, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps, type BlastTriggerInfo } from './GameRendererBlastVisuals.js';
 import type { Steps } from '../core/engine/Steps.js';
 import { modelLibrary } from './models/ModelLibrary.js';
 import {
@@ -147,8 +147,23 @@ export class GameRenderer {
   private renderedVehicleIds = new Set<number>();
   private renderedEmployeeIds = new Set<number>();
 
+  /** Told once per blast, at the instant its flash and shake start (the audio layer syncs to it). */
+  private blastTriggeredHandler: ((info: BlastTriggerInfo) => void) | null = null;
+  /** Told each time the storm sky flashes. */
+  private lightningHandler: (() => void) | null = null;
+
   constructor(sceneManager: SceneManager) {
     this.sm = sceneManager;
+  }
+
+  /** Register the one listener for a blast's flash-and-shake instant; null removes it. */
+  setBlastTriggeredHandler(cb: ((info: BlastTriggerInfo) => void) | null): void {
+    this.blastTriggeredHandler = cb;
+  }
+
+  /** Register the one listener for storm lightning flashes; null removes it. */
+  setLightningHandler(cb: (() => void) | null): void {
+    this.lightningHandler = cb;
   }
 
   /** Prop ids the ambient layer stood in for when it was last built, for diagnostics. */
@@ -806,6 +821,8 @@ export class GameRenderer {
       siteBoundsChanged: () => false,
       // Read every frame long after the load, so it reads the live grid on `this`.
       getRainGroundY: (x, z) => this.rainGroundY(x, z),
+      // Resolved at flash time, so a handler set after the sky was built still hears it.
+      onLightning: () => this.lightningHandler?.(),
     };
     deps.getTerrainSurfaceY = (x, z) => getTerrainSurfaceY(deps.lastGrid, x, z);
     deps.getSmoothTerrainSurfaceY = (x, z) => getSmoothTerrainSurfaceY(deps.lastGrid, x, z);
@@ -861,6 +878,7 @@ export class GameRenderer {
       blastEffects: this.blastEffects,
       birds: this.birds,
       getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
+      onBlastTriggered: this.blastTriggeredHandler,
     };
   }
 

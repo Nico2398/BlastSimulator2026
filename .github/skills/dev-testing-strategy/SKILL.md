@@ -50,7 +50,11 @@ npm run console           # Interactive gameplay testing (no browser)
 npm run qualimetry        # jscpd duplication across src/, scripts/ (repo-wide ceiling)
 npm run qualimetry:diff   # duplication introduced by this branch's diff
 npm run check:i18n        # en.json / fr.json parity
+npm run sounds:check      # audio: every asset decodes in headless Chromium, offline mix levels and clipper drive (needs a browser; reuses or starts a dev server)
+npm run audio:smoke       # audio: wiring in a real engine, intended cues of a scripted game (needs a browser)
 ```
+
+The two audio commands prove assets, levels and wiring, never how anything sounds; what each does and does not prove: `dev-audio`. They are not among the four channels and run on request, not in `npm run validate`.
 
 `npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.
 
@@ -109,10 +113,11 @@ The gate has three layers, and reading it in this order is the point:
    leaving that list is the ratchet turning; a file joining it needs a reason.
 
 `coverage.exclude` is short by design and every entry earns its place: the two entry points
-(`main.ts`, `console.ts`) and the host-API wrappers (`SceneManager`, `PostPipeline`, `AudioHooks`,
-the IndexedDB and download backends), which a Node run can only exercise against a mock of the
-browser API rather than against our own behaviour — the `scenario` and `visual` channels are what
-prove those. Nothing else under `src/` is exempt.
+(`main.ts`, `console.ts`) and the dev pages' entry scripts (`model-viewer.ts`, `sound-lab.ts`), the
+host-API wrappers (`SceneManager`, `PostPipeline`, the IndexedDB and in-memory backends), which a Node run can
+only exercise against a mock of the browser API rather than against our own behaviour — the
+`scenario` and `visual` channels are what prove those. Nothing else under `src/` is exempt, `src/audio/`
+included: it runs against fake contexts and a recording player and meets the floor file by file.
 
 **Coverage measures execution, not verification.** A test that calls a function and asserts nothing
 scores 100%. These floors catch code the suite never reaches; they say nothing about whether the

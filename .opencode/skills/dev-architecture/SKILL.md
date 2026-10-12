@@ -27,7 +27,7 @@ description: >
 - `src/physics/` → Cannon-es. Active only during blasts.
 - `src/persistence/` → Save backends (IndexedDB, File, Download). Imports only from core.
 - `src/ui/` → HTML overlay. Reads GameState.
-- `src/audio/` → Web Audio API.
+- `src/audio/` → Web Audio: sound catalog, engine, synth, directors, music. Imports core types and events; core never imports it. Module map, data flow, how to add a sound: `dev-audio`.
 - `src/console/` → CLI mode, same core logic as UI.
 
 **State flows one way:** Input → Core → State mutation → Event emitted → Renderer/UI/Audio
@@ -59,7 +59,7 @@ Player Input (UI click / Console command)
    ┌────────────┐
    │  Renderer   │ (Three.js — visual update)
    │  Physics    │ (Cannon-es — if blast active)
-   │  Audio      │ (placeholder sounds)
+   │  Audio      │ (samples + synth: dev-audio)
    │  UI/HUD     │ (DOM overlay update)
    └────────────┘
 ```
@@ -95,7 +95,13 @@ src/
 ├── physics/                # PhysicsWorld, BlastPhysics, FragmentBody, CollisionHandler
 ├── renderer/               # SceneManager, TerrainMesh, FragmentMesh, BuildingMesh, etc.
 ├── ui/                     # MainMenu, WorldMapUI, HUD, BlastPlanUI, ContractUI, etc.
-├── audio/                  # AudioManager, SoundCatalog, Placeholder
+├── audio/                  # SoundCatalog (every sound), AudioManager (context + bus graph), AudioEngine (preload + AudioPlayer)
+│   ├── engine/             # SoundPlayer, VoiceBudget, spatial, ducking, SampleBank, SynthBank
+│   ├── synth/              # Generative sounds: pure deterministic DSP recipes
+│   ├── director/           # GameAudioDirector: core events, state diffs, work, blast timeline, siren, ambience
+│   ├── ui/                 # installUiSounds (DOM delegation), UiCues, commandCue
+│   ├── music/              # MusicCatalog, MusicPlayer, MusicDirector (no tracks yet)
+│   ├── debug/ lab/         # ?audioLog play log; sound lab and offline mix logic
 └── console/                # ConsoleRunner, commands/, ConsoleFormatter
 ```
 

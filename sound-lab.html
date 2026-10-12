@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlastSimulator2026 — sound lab</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 16px; background: #14161a; color: #e6e8ec; font: 14px/1.4 system-ui, sans-serif; }
+      h1 { margin: 0 0 8px; font-size: 22px; }
+      h2 { margin: 0 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: #9aa4b2; }
+      .status { margin: 0 0 12px; padding: 8px 12px; border-radius: 6px; background: #1f2530; font-family: ui-monospace, monospace; }
+      .status.bad { background: #4a2326; }
+      .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 12px; }
+      .panel { padding: 12px; border-radius: 8px; background: #1b1f27; margin-bottom: 12px; }
+      .grid .panel { margin-bottom: 0; }
+      .hint { margin: 0 0 8px; color: #8b95a5; font-size: 12px; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid #262c37; }
+      .row .name { display: flex; flex-direction: column; min-width: 180px; }
+      .row small { color: #8b95a5; }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+      .result { min-width: 60px; color: #7ecf8f; font-size: 12px; }
+      .result.dropped { color: #f0a35e; }
+      .slider { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .row .slider { margin-bottom: 0; }
+      .slider .caption { min-width: 110px; color: #9aa4b2; }
+      .row .slider .caption { min-width: 0; }
+      .readout { min-width: 56px; font-family: ui-monospace, monospace; font-size: 12px; }
+      button, select { padding: 5px 12px; border: 1px solid #3a4352; border-radius: 6px; background: #262d3a; color: inherit; font: inherit; cursor: pointer; }
+      button:hover { background: #2f3848; }
+      button[aria-pressed="true"] { background: #2e6b45; }
+      button:disabled { opacity: 0.5; cursor: progress; }
+      .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      .mix-output { margin: 8px 0 0; overflow-x: auto; font-size: 12px; }
+      .failed { color: #f08a8a; }
+      .ok { color: #7ecf8f; }
+      table { border-collapse: collapse; font-size: 12px; }
+      th, td { padding: 2px 12px 2px 0; text-align: left; }
+      summary { cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev-only page: auditions every sound of the game through the real audio engine.
+         Query: ?autotest=1[&scenarios=ui-tour,blast,busy-mine] runs the automated check
+         that `npm run sounds:check` drives. Not part of the production build. -->
+    <div id="lab-root"></div>
+    <script type="module" src="/src/sound-lab.ts"></script>
+  </body>
+</html>

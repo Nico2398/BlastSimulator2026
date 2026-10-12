@@ -249,7 +249,15 @@ Real-time with adjustable speed: 1x, 2x, 4x, 8x. Pause available. Some actions a
 
 ## Audio System
 
-Hooks for all events. Placeholder synthesized sounds. Categories: ambient, blast, vehicle, UI, event, weather.
+Sound is feedback and atmosphere: alive, never crowded. Sampled sounds from licensed free banks are layered with generative ones (blast, siren, weather). Volume channels: master, effects, ambient, interface (music reserved). The Settings panel's "Audio credits" button opens the sound banks' licences and required attribution in a new tab.
+
+- **Interface:** every control has a click/hover/toggle sound inferred from what it is; panels open and close, toasts sound by severity, a refused action buzzes. Orders, hires, firings and purchases confirm with their own cue. Nothing sounds on the per-second tick.
+- **World:** work bursts at the nearest sites, hauling and dumping, vehicles starting, buildings finishing, drilled holes, loaded charges, finished surveys, workers collapsing, coins for income, a shift bell, research and level-up flourishes, event alerts by category (union, lawsuit, mafia, politics), level win and lose stings.
+- **Blast:** evacuation siren and quickening warning beeps, a cancel tone, then snap, crack, boom and sub-bass scaled to the shot, a tail, the debris rain from the real fragment flights, secondary and dud charges; the ambience ducks under it.
+- **Ambience:** wind, light and heavy rain beds follow the weather, thunder follows lightning, a machinery bed follows crew activity, rare distant sounds make the mine feel inhabited.
+- **Music:** none shipped; the architecture selects a menu track, one per biome and optionally one per campaign level.
+
+Sound is positional (pan, distance, zoom). Everything is rate-limited in real time, so 8x speed never multiplies the noise. Implementation, licensing, tools and tuning: `dev-audio`.
 
 ## Localization (i18n)
 

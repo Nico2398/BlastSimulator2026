@@ -96,6 +96,14 @@ python3 assets/models/blender/sheet.py --cols 4 worker        # tile captures in
 The `dev-3d-models` skill holds the generator pipeline, the art direction and
 the naming conventions the renderer relies on.
 
+### Sound lab
+
+Audio has no screenshot. `/sound-lab.html` (dev server only, never in the production build) lists every
+sound by bus for auditioning and downloads offline mixes as WAV; `npm run sounds:check` drives it headless and
+measures decode, levels and how hard the mix drives the safety clipper; `npm run audio:smoke` drives the game and asserts which cues fire. All
+three need the browser path `npm run verify:env` reports, none of them hears anything, and a visual PASS says
+nothing about sound. What each proves: `dev-audio`.
+
 ## Scenario Testing (State Dumps + Optional Screenshots)
 
 ### Single scenario runner

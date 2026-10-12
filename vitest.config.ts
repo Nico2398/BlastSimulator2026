@@ -35,14 +35,16 @@ export default defineConfig({
         // Dev-only model viewer page: same host-bound construction as main.ts,
         // proven by `npm run models:preview` in a real browser.
         'src/model-viewer.ts',
+        // Dev-only sound lab page: a DOM and AudioContext host. Its logic lives in
+        // src/audio/lab/** (covered); `npm run sounds:check` drives it in a real browser.
+        'src/sound-lab.ts',
 
         // Thin wrappers over host APIs that exist only in a browser: a
-        // WebGLRenderer and its post-processing passes, an AudioContext, an
-        // IndexedDB connection, an anchor-click download. A unit test here
+        // WebGLRenderer and its post-processing passes, an IndexedDB
+        // connection, an anchor-click download. A unit test here
         // asserts against a mock of the API, not against our own behaviour.
         'src/renderer/SceneManager.ts',
         'src/renderer/post/PostPipeline.ts',
-        'src/audio/AudioHooks.ts',
         'src/persistence/IndexedDBPersistence.ts',
         'src/persistence/InMemoryPersistence.ts',
 

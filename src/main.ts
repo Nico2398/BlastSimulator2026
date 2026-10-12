@@ -15,7 +15,7 @@ import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { shouldAutoStartTutorial, shouldKeepTutorialRunning, shouldRestartTutorialOnRetry, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
 import { probeTutorialState } from './ui/tutorialStateProbe.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
-import { isControlLive } from './ui/tutorialActivationGuard.js';
+import { isControlLive, isRailedControl } from './ui/tutorialActivationGuard.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { WorldMap } from './ui/screens/WorldMap.js';
 import { LevelEndScreen } from './ui/screens/LevelEndScreen.js';
@@ -30,7 +30,18 @@ import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingS
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
-import { AudioHooks } from './audio/AudioHooks.js';
+import { AudioEngine } from './audio/AudioEngine.js';
+import { NULL_AUDIO_PLAYER, type AudioPlayer } from './audio/AudioPlayer.js';
+import { installAudioDebug } from './audio/debug/audioDebug.js';
+import { UiCues } from './audio/ui/UiCues.js';
+import { CommandClaim } from './audio/ui/CommandClaim.js';
+import { installAudioUnlock } from './audio/ui/audioUnlock.js';
+import { installUiSounds } from './audio/ui/installUiSounds.js';
+import { commandCue } from './audio/ui/commandCues.js';
+import { GameAudioDirector } from './audio/director/GameAudioDirector.js';
+import { createMusicDirector } from './audio/music/MusicDirector.js';
+import { deriveMusicContext } from './audio/music/musicContext.js';
+import { Random } from './core/math/Random.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
 import { loadCampaignProfile, saveCampaignProfile } from './persistence/CampaignProfileStore.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
@@ -98,6 +109,37 @@ if (storedSettings.locale) setLocale(storedSettings.locale);
 const uiContainer = document.getElementById('bs-ui-root') ?? document.body;
 const uiManager = new UIManager(uiContainer);
 
+// --- Audio ---
+// The manager owns the Web Audio context and the volume channels; Settings needs it everywhere, headless included.
+const audioMgr = new AudioManager();
+if (storedSettings.volumes) audioMgr.applyVolumes(storedSettings.volumes);
+uiManager.setAudioManager(audioMgr);
+// Sound variation is not gameplay, so it seeds from the clock rather than from a game seed.
+const audioRandom = new Random(Date.now());
+// A scenario run (headless Chromium, no gesture, no speakers) gets the null player: every handler below
+// still runs, so a fault in one surfaces there, but nothing is fetched, decoded or played.
+const audioEngine = scenarioMode ? null : new AudioEngine(audioMgr, { random: audioRandom });
+// `?audioLog=1` records every request in window.__audioLog (the browser smoke test reads it); otherwise this is the player itself.
+const audioPlayer: AudioPlayer = installAudioDebug(window, window.location.search, audioEngine ?? NULL_AUDIO_PLAYER, () => ({
+  ready: audioEngine?.ready ?? false,
+  preloaded: audioEngine?.preloaded ?? false,
+  failedAssets: audioEngine?.failedAssets ?? [],
+  contextState: audioMgr.context?.state ?? 'none',
+}));
+// Decode after the models are in, so the main menu does not hitch; the engine drops sounds until it is ready.
+if (audioEngine) void modelsReady.catch(() => undefined).then(() => audioEngine.preload());
+// A command's own cue, or the panel/modal a click opened, supersedes the generic click of that control: all sides share this claim.
+const commandClaim = new CommandClaim();
+const uiCues = new UiCues(audioPlayer, { claim: commandClaim });
+uiManager.setUiCues(uiCues);
+// Buttons, dropdowns and sliders all get their sound from this one listener. The tutorial's activation guard is
+// installed later (when the tutorial starts), so inert railed controls are muted through `isInert`, not by order.
+installUiSounds(document, audioPlayer, { isInert: target => isRailedControl(target), claim: commandClaim });
+// No streaming in scenario runs; with an empty track catalogue the director does nothing either way.
+const music = scenarioMode ? null : createMusicDirector(audioMgr);
+// Browsers hold audio back until a gesture they accept: every gesture retries until the context is running.
+installAudioUnlock(document, audioMgr, music);
+
 // --- Scene picking: hover tags, click-to-select, selection bar (redesign P2) ---
 // Declared here (with the other core objects) but wired further down, once
 // window.__gameConsole/t()/ctx are ready — same declare-early/wire-when-ready
@@ -155,6 +197,8 @@ placementController.setArmedStateHandler((armed) => {
 placementController.setFeedbackHandler(() => {
   selectionOverlay.setBlockedTile(placementController.refusedTile);
 });
+// A refused placement click (not a hover over a refused tile) gets its own buzz; the accepted one is voiced by the build command.
+placementController.setRefusedHandler(() => uiCues.placementRefused());
 // Read-only site-claim preview (#558): would this tile's claim be refused,
 // and why. `ctx` is assigned below (createRunner()) but this closure only
 // reads it once the player actually hovers/anchors a tile, well after that
@@ -434,16 +478,6 @@ levelEndScreen.setOnBackToSandbox(() => {
   sandboxPanel.show();
 });
 
-// --- Audio ---
-const audioMgr = new AudioManager();
-if (storedSettings.volumes) audioMgr.applyVolumes(storedSettings.volumes);
-uiManager.setAudioManager(audioMgr);
-const audioHooks = new AudioHooks(audioMgr);
-// Resume AudioContext on first user interaction (browser autoplay policy)
-document.addEventListener('pointerdown', () => {
-  audioMgr.resume().then(() => audioHooks.startAmbient());
-}, { once: true });
-
 // --- Console Bridge ---
 // window.__gameConsole(cmd) routes commands to the same ConsoleRunner used in CLI mode.
 // Required by scripts/screenshot.ts to drive the game from headless Chrome.
@@ -451,6 +485,25 @@ const { runner, ctx, emitter } = createRunner();
 // An armed blast resolves a few slices per frame instead of freezing one
 // (#1603). Scenario runs keep the synchronous fire their scripted steps expect.
 ctx.sliceBlasts = !scenarioMode;
+
+// The world's sound: core events, per-tick state changes, the blast timeline, weather and distant life.
+// It reads the renderer's live entity positions (a hired worker or a bought vehicle sounds where it stands).
+const gameAudio = new GameAudioDirector({
+  player: audioPlayer,
+  emitter,
+  random: audioRandom,
+  entityPosition: (kind, id) => {
+    const position = gameRenderer.entityWorldPosition(kind, id);
+    return position ? { x: position.x, z: position.z } : null;
+  },
+});
+// A blast sounds at the instant its flash and shake start: the renderer reports that one moment, on the sliced
+// path (landBlast) and the synchronous one (afterGameCommand) alike, so a blast is voiced exactly once.
+gameRenderer.setBlastTriggeredHandler((info) => {
+  gameAudio.onBlast(info);
+  music?.duck();
+});
+gameRenderer.setLightningHandler(() => gameAudio.onLightning());
 
 // Campaign progress outlives any one GameState (#1312). Scenario runs ignore
 // (and never write) the stored profile so a shared browser's leftovers cannot
@@ -467,26 +520,27 @@ const persistCampaignProfile = (): void => {
 emitter.on('level:complete', persistCampaignProfile);
 
 // --- Subscribe to game-over emitter events for UI notifications ---
+// The four game-over toasts below are silent: the audio director plays the `lose` sting for the same events.
 emitter.on('bankruptcy:triggered', ({ cash }) => {
-  uiManager.notify({ severity: 'critical', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: formatBalance(cash) }) });
+  uiManager.notify({ severity: 'critical', silent: true, title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: formatBalance(cash) }) });
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
   uiManager.notify({ severity: 'warn', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_warning', { duration: formatGameDuration(ticksRemaining) }) });
 });
 emitter.on('ecology:shutdown', () => {
-  uiManager.notify({ severity: 'critical', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_shutdown') });
+  uiManager.notify({ severity: 'critical', silent: true, icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_shutdown') });
 });
 emitter.on('ecology:warning', ({ ticksRemaining }) => {
   uiManager.notify({ severity: 'warn', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_warning', { duration: formatGameDuration(ticksRemaining) }) });
 });
 emitter.on('arrest:triggered', () => {
-  uiManager.notify({ severity: 'critical', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_triggered') });
+  uiManager.notify({ severity: 'critical', silent: true, icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_triggered') });
 });
 emitter.on('arrest:warning', ({ exposure }) => {
   uiManager.notify({ severity: 'warn', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_warning', { percent: Math.round(exposure * 100) }) });
 });
 emitter.on('revolt:triggered', () => {
-  uiManager.notify({ severity: 'critical', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_triggered') });
+  uiManager.notify({ severity: 'critical', silent: true, icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_triggered') });
 });
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
   uiManager.notify({ severity: 'warn', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_warning', { duration: formatGameDuration(ticksRemaining) }) });
@@ -558,12 +612,18 @@ function onLevelStateReplaced(state: GameState): void {
  * LoadingScreen, enterLevel()). Only the level-entry paths pass it; every
  * other caller gets the immediate sync.
  */
-function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
+function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean; scripted?: boolean }): CommandResult {
   finishBlastJob();
   const prevState = ctx.state;
   const prevBlastReport = ctx.state?.lastBlastReport ?? null;
   const result = runCommand({ runner, ctx, emitter }, cmd);
-  afterGameCommand(result, parseCommand(cmd).command, prevState, prevBlastReport, opts);
+  const parsed = parseCommand(cmd);
+  afterGameCommand(result, parsed.command, prevState, prevBlastReport, opts);
+  // Sound, once per command and not in afterGameCommand (landBlast re-enters that). Owners: commandCue voices the
+  // order, hire or refusal (a player's act); the director voices what the world did (built, scrapped, paid, blown).
+  // `scripted` marks commands the tutorial runs for the player, which must not click like the player's own.
+  commandCue(audioPlayer, parsed, result.success, { scripted: opts?.scripted === true, claim: commandClaim });
+  gameAudio.onCommand({ parsed, success: result.success, prevState, state: ctx.state });
   return result;
 }
 
@@ -612,7 +672,6 @@ function* landBlast(result: CommandResult, prevBlastReport: NonNullable<typeof c
   const report = ctx.state?.lastBlastReport ?? null;
   if (ctx.state && report !== null && report !== prevBlastReport) {
     yield* gameRenderer.onBlastSteps(ctx);
-    audioHooks.onBlast();
     yield;
   }
   // The blast's report is already drawn above: tell the follow-up so it does not draw it again.
@@ -665,7 +724,6 @@ function afterGameCommand(
   // `blast` subcommand can succeed without firing anything.
   if (!enteredNewLevel && ctx.state && ctx.state.lastBlastReport !== prevBlastReport && ctx.state.lastBlastReport !== null) {
     gameRenderer.onBlast(ctx);
-    audioHooks.onBlast();
   }
   // Show blast plan overlay during planning commands, and refresh it whenever
   // a preview command runs or software tier changes — otherwise the overlay's
@@ -674,14 +732,6 @@ function afterGameCommand(
   if (['drill_plan', 'charge', 'preview', 'buy_software', 'blast_preview'].includes(cmdName)) {
     gameRenderer.showBlastPlanOverlay(ctx);
   }
-  // UI click sound for any command
-  audioHooks.onUIClick();
-
-  // Weather change audio
-  if (ctx.state) {
-    audioHooks.onWeatherChange(ctx.state.weather.current);
-  }
-
   // Update UI after every command
   if (ctx.state) {
     uiManager.update(ctx.state, gameRenderer.blastPlayback);
@@ -1099,11 +1149,13 @@ window.__skipBlastPlayback = () => {
   finishBlastJob();
   gameRenderer.finishTerrainRemesh();
   gameRenderer.skipFragmentPlayback();
+  gameAudio.cancelBlast(); // the debris rain is scheduled ahead on the audio clock: cut what has not landed
 };
 // Hold the collapse at a chosen moment, so a harness can step through it at the
 // spacing the pictures need rather than the spacing the frame rate allows.
 window.__seekBlastPlayback = (t: number) => {
   gameRenderer.seekFragmentPlayback(t);
+  gameAudio.cancelBlast();
 };
 window.__blastPlaybackDuration = () => gameRenderer.fragmentPlaybackDuration;
 // How far a blast's deferred crater remesh has to go (#1603), for a harness waiting on it.
@@ -1127,7 +1179,8 @@ window.__loadingScreenPreview = (kind = 'level', locale) => {
 window.__loadingScreenHide = () => { loadingScreen.hide(); };
 
 uiManager.setGameConsole(window.__gameConsole);
-tutorial.setGameConsole(window.__gameConsole);
+// The tutorial only runs scripted demonstrations through this console, so its commands make no player sound.
+tutorial.setGameConsole((cmd) => runGameCommand(cmd, { scripted: true }));
 
 // Tutorial start bridge (Puppeteer) + console command (scenario tests)
 window.__startTutorial = () => tutorial.start(ctx.state ?? undefined);
@@ -1191,6 +1244,7 @@ function showSelection(entity: EntityPick, state: GameState): void {
 scenePicking.setSelectChangeHandler((entity) => {
   if (entity && ctx.state) {
     showSelection(entity, ctx.state);
+    uiCues.entitySelected(entity.kind);
   } else {
     shownRampWidth = null;
     shownVehicleKey = null;
@@ -1338,7 +1392,6 @@ new KeyboardShortcuts({
 // At 1x speed: 1 tick/second. At 4x: 4 ticks/second.
 // Accumulated time prevents tick drift from frame-rate variation.
 let accumulatedGameMs = 0;
-let hadPendingEvent = false;
 
 /** A full-screen menu covers the mine; the simulation must not run behind it. */
 function fullScreenMenuUp(): boolean {
@@ -1382,15 +1435,6 @@ scene.start((dt) => {
     accumulatedGameMs = 0;
   }
 
-  // Play chime when a new pending event appears
-  if (ctx.state) {
-    const hasPendingEvent = !!ctx.state.events.pendingEvent;
-    if (hasPendingEvent && !hadPendingEvent) {
-      audioHooks.onEventNotification();
-    }
-    hadPendingEvent = hasPendingEvent;
-  }
-
   // Update UI from current state on each frame
   if (ctx.state) {
     uiManager.update(ctx.state, gameRenderer.blastPlayback);
@@ -1398,4 +1442,23 @@ scene.start((dt) => {
     if (!fullScreenMenuUp()) savesModal.onTick(ctx.state);
   }
   if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
+
+  // Sound follows the camera's ground target (stable under blast shake, unlike camera.position) and its right
+  // vector, with real seconds: the sim's speed never changes how long a sound lasts.
+  const viewTarget = scene.cameraController.viewTarget;
+  const right = scene.cameraController.groundRight();
+  const viewDistance = scene.cameraController.distance;
+  gameAudio.update({
+    dtS: dt,
+    state: ctx.state,
+    menuUp: fullScreenMenuUp(),
+    listener: { x: viewTarget.x, z: viewTarget.z, rightX: right.x, rightZ: right.z, viewDistance },
+  });
+  music?.update(deriveMusicContext({
+    menuVisible: mainMenu.visible || worldMap.visible || sandboxPanel.visible,
+    loadingVisible: loadingScreen.visible,
+    levelEndVisible: levelEndScreen.visible,
+    mineType: ctx.state?.mineType,
+    activeLevelId: ctx.state?.campaign.activeLevelId,
+  }));
 });

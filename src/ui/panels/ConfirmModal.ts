@@ -12,6 +12,7 @@
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
+import type { UiCues } from '../../audio/ui/UiCues.js';
 
 export interface ConfirmModalConfig {
   icon: IconName;
@@ -31,6 +32,7 @@ export class ConfirmModal {
 
   private open = false;
   private onConfirmCb: (() => void) | null = null;
+  private cues: Pick<UiCues, 'modalShown'> | null = null;
 
   constructor(container: HTMLElement) {
     this.overlay = el('div', {
@@ -85,6 +87,8 @@ export class ConfirmModal {
 
   get root(): HTMLElement { return this.overlay; }
 
+  setCues(cues: Pick<UiCues, 'modalShown'> | null): void { this.cues = cues; }
+
   show(config: ConfirmModalConfig): void {
     this.onConfirmCb = config.onConfirm;
     this.iconChip.replaceChildren(iconEl(config.icon, 18));
@@ -94,6 +98,7 @@ export class ConfirmModal {
     this.cancelBtn.textContent = t('ui.confirm.cancel');
     this.open = true;
     this.overlay.style.display = '';
+    this.cues?.modalShown();
   }
 
   hide(): void {

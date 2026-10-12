@@ -1290,3 +1290,104 @@ describe('GameRenderer — deferred blast remesh (#1603)', () => {
     expect(renderer.terrainMeshRevisionCount).toBe(revision + 2);
   });
 });
+
+
+describe('GameRenderer — audio sync callbacks', () => {
+  function oneFlight(): NonNullable<ReturnType<typeof makeCtx>['lastBlastFlights']> {
+    return [{
+      fragmentId: 0, from: { x: 10, y: 20, z: 10 }, to: { x: 12, y: 0, z: 11 },
+      delayS: 0.2, durationS: 1.5, impactSpeed: 9, thrown: true,
+    }];
+  }
+
+  it('reports each blast once, at the flash, with its origin, hole count, flights and report', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const seen: unknown[] = [];
+    renderer.setBlastTriggeredHandler(info => seen.push(info));
+    ctx.lastBlastFragments = [{ x: 10, y: 5, z: 10 }, { x: 14, y: 5, z: 12 }];
+    ctx.lastBlastFlights = oneFlight();
+    ctx.lastBlastHoles = [
+      { id: 'h1', x: 10, z: 10 }, { id: 'h2', x: 14, z: 12 },
+    ] as unknown as NonNullable<typeof ctx.lastBlastHoles>;
+    ctx.state!.lastBlastReport = { rating: 'good' } as unknown as BlastReport;
+
+    renderer.onBlast(ctx);
+
+    expect(seen).toHaveLength(1);
+    const info = seen[0] as { origin: { x: number; z: number }; holeCount: number; flights: unknown; report: unknown };
+    expect(info.origin).toEqual({ x: 12, z: 11 }); // centroid of the fragments
+    expect(info.holeCount).toBe(2);
+    expect(info.flights).toBe(ctx.lastBlastFlights);
+    expect(info.report).toBe(ctx.state!.lastBlastReport);
+  });
+
+  it('reports the same single blast on the sliced path', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const handler = vi.fn();
+    renderer.setBlastTriggeredHandler(handler);
+    ctx.lastBlastFragments = [{ x: 10, y: 5, z: 10 }];
+
+    for (const _ of renderer.onBlastSteps(ctx)) { /* run every slice */ }
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a blast with no hole data as zero holes and no flights', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const handler = vi.fn();
+    renderer.setBlastTriggeredHandler(handler);
+
+    renderer.onBlast(ctx);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0]![0]).toMatchObject({ holeCount: 0, flights: [], report: null });
+  });
+
+  it('does not report a blast before a game is loaded, and survives a missing or removed handler', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const handler = vi.fn();
+    renderer.setBlastTriggeredHandler(handler);
+    renderer.onBlast(makeCtx());
+    expect(handler).not.toHaveBeenCalled();
+
+    const loaded = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    loaded.syncFromContext(ctx);
+    expect(() => loaded.onBlast(ctx)).not.toThrow(); // never set
+    loaded.setBlastTriggeredHandler(handler);
+    loaded.setBlastTriggeredHandler(null);
+    loaded.onBlast(ctx);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('tells the lightning handler each time the storm sky flashes, including one set after the sky was built', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    ctx.state!.weather.current = 'storm';
+    renderer.syncFromContext(ctx);
+    const handler = vi.fn();
+    renderer.setLightningHandler(handler);
+
+    for (let i = 0; i < 400; i++) renderer.update(0.05); // 20 s: past the first flash delay
+
+    expect(handler.mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('stays quiet under a clear sky', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const handler = vi.fn();
+    renderer.setLightningHandler(handler);
+
+    for (let i = 0; i < 400; i++) renderer.update(0.05);
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+});

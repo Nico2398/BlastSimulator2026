@@ -19,13 +19,23 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { syncLangPills } from '../langPills.js';
 import { saveLocale, saveVolume } from '../userSettings.js';
 import type { AudioManager, AudioCategory } from '../../audio/AudioManager.js';
+import type { UiCues } from '../../audio/ui/UiCues.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
 import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from '../settingsHooks.js';
 import { autoSaveSlotFor, relativeTime } from './SavesModal.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
+import { AUDIO_CREDITS_URL } from '../../core/config/audio/ui.js';
 
 export type GetStateCallback = () => GameState | null;
+
+/** Opens a URL in a new tab; the page that opens it keeps no handle on the new one. */
+type UrlOpener = (url: string) => void;
+
+const openInNewTab: UrlOpener = url => { window.open(url, '_blank', 'noopener'); };
+
+/** data-action of the Audio credits button. */
+export const AUDIO_CREDITS_ACTION = 'open-audio-credits';
 
 const AUDIO_CHANNELS: readonly { channel: 'master' | AudioCategory; labelKey: string }[] = [
   { channel: 'master', labelKey: 'ui.settings.audio.master' },
@@ -56,7 +66,9 @@ export class SettingsPanel extends PanelBase {
   private onReplayTutorialCb?: () => void;
   private onOpenSavesCb?: () => void;
   private onReturnToMenuCb?: () => void;
+  private openUrl: UrlOpener = openInNewTab;
   private audioManager?: AudioManager;
+  private cues: Pick<UiCues, 'volumeAdjusted'> | null = null;
   private backend: SaveBackend | null = null;
   private getState?: GetStateCallback;
   private readonly locale = new LocaleTextRegistry();
@@ -129,6 +141,14 @@ export class SettingsPanel extends PanelBase {
     const audioHeader = sectionHeader(t('ui.settings.audio'));
     this.locale.bindText(audioHeader.querySelector('.bsx-section-label') as HTMLElement, 'ui.settings.audio');
     const audioRows = AUDIO_CHANNELS.map(({ channel, labelKey }) => this.audioRow(channel, labelKey));
+    // The CC-BY sound banks require their attribution to reach players: a plain page in a new tab.
+    const creditsBtn = button('ghost', t('ui.settings.audio.credits'), {
+      dataAction: AUDIO_CREDITS_ACTION, onClick: () => this.openUrl(AUDIO_CREDITS_URL),
+    });
+    creditsBtn.style.width = '100%';
+    // The body is a flex column shorter than its content: without this the button is squeezed to a sliver.
+    creditsBtn.style.flexShrink = '0';
+    this.locale.bindText(creditsBtn.querySelector('span') as HTMLElement, 'ui.settings.audio.credits');
 
     // ── Keyboard ──
     const keyboardHeader = sectionHeader(t('ui.settings.keyboard'));
@@ -174,7 +194,7 @@ export class SettingsPanel extends PanelBase {
 
     body.append(
       langHeader, langRow,
-      audioHeader, ...audioRows,
+      audioHeader, ...audioRows, creditsBtn,
       keyboardHeader, keyboardBox,
       this.sessionSection,
       policyNote,
@@ -191,6 +211,12 @@ export class SettingsPanel extends PanelBase {
   setReturnToMenuHandler(cb: () => void): void { this.onReturnToMenuCb = cb; }
   setBackend(backend: SaveBackend): void { this.backend = backend; }
   setGetState(fn: GetStateCallback): void { this.getState = fn; }
+
+  /** Replace how the credits page is opened (tests; the default is a new tab with `noopener`). */
+  setUrlOpener(opener: UrlOpener): void { this.openUrl = opener; }
+
+  /** Slider feedback: lets the player hear the level they are setting. */
+  setCues(cues: Pick<UiCues, 'volumeAdjusted'> | null): void { this.cues = cues; }
 
   setAudioManager(mgr: AudioManager): void {
     this.audioManager = mgr;
@@ -220,6 +246,8 @@ export class SettingsPanel extends PanelBase {
 
     const input = el('input', { attrs: {
       type: 'range', min: '0', max: '100', value: '100',
+      // This row ticks on the bus it controls (volumeAdjusted below); the generic slider tick stays out.
+      'data-sfx': 'none',
       style: 'flex:1;accent-color:var(--bsx-amber)',
     } }) as HTMLInputElement;
     const readout = el('span', {
@@ -230,6 +258,7 @@ export class SettingsPanel extends PanelBase {
       readout.textContent = input.value;
       this.audioManager?.setVolume(channel, Number(input.value) / 100);
       saveVolume(channel, Number(input.value) / 100);
+      this.cues?.volumeAdjusted(channel);
     });
     this.volumeEls[channel] = { input, readout };
 
