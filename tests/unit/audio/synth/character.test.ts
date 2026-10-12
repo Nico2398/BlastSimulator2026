@@ -3,6 +3,7 @@
 // tracks, envelopes and event statistics.
 
 import { describe, expect, it } from 'vitest';
+import { BLAST_SNAP_CONFIG, SYNTH_LEVELS } from '../../../../src/core/config/audio/synth.js';
 import { filterBuffer } from '../../../../src/audio/synth/filters.js';
 import type { RenderedAudio } from '../../../../src/audio/synth/types.js';
 import { bandPower, dominantFrequency, goertzelPower, toDb, windowOf } from './helpers.js';
@@ -63,6 +64,67 @@ describe('blast_sub', () => {
     const fast = renderCached('blast_sub', 1);
     const at = (a: RenderedAudio): number => dominantFrequency(windowOf(a, 0.3, 0.5), a.sampleRate, 20, 120, 1);
     expect(at(slow)).not.toBe(at(fast));
+  });
+});
+
+describe('blast_snap', () => {
+  const MS = 0.001;
+  /** RMS (dB) of consecutive 1 ms windows over the first `count` milliseconds. */
+  const earlyEnvelopeDb = (audio: RenderedAudio, count: number): number[] => {
+    const size = Math.round(MS * audio.sampleRate);
+    const x = audio.channels[0] as Float32Array;
+    return Array.from({ length: count }, (_, k) => rmsDb(x.subarray(k * size, (k + 1) * size)));
+  };
+
+  it.each([0, 1])('variant %i is a half-second mono burst at 44.1 kHz', (variant) => {
+    const audio = renderCached('blast_snap', variant);
+    expect(audio.sampleRate).toBe(44100);
+    expect(audio.channels).toHaveLength(1);
+    expect((audio.channels[0] as Float32Array).length / audio.sampleRate).toBeCloseTo(0.5, 3);
+  });
+
+  it.each([0, 1])('variant %i has an instantaneous onset: its 1 ms RMS is within 3 dB of its maximum inside the first 3 ms', (variant) => {
+    const audio = renderCached('blast_snap', variant);
+    const whole = windowedDb(audio, MS);
+    const within = Math.max(...earlyEnvelopeDb(audio, 3));
+    expect(within).toBeGreaterThanOrEqual(Math.max(...whole) - 3);
+  });
+
+  it.each([0, 1])('variant %i reaches half of its peak within 0.3 ms and starts from silence, not a step', (variant) => {
+    const audio = renderCached('blast_snap', variant);
+    const x = audio.channels[0] as Float32Array;
+    const peak = x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    let half = 0;
+    while (Math.abs(x[half] as number) < peak / 2) half++;
+    expect(half / audio.sampleRate).toBeLessThanOrEqual(0.0003);
+    expect(x[0]).toBeCloseTo(0, 9);
+    expect(BLAST_SNAP_CONFIG.fadeInSec).toBeLessThan(SYNTH_LEVELS.fadeInSec);
+  });
+
+  it.each([0, 1])('variant %i decays: the first 10 ms sit far above the 100 ms point and the tail', (variant) => {
+    const levels = windowedDb(renderCached('blast_snap', variant), 0.01);
+    expect(levels[0]).toBe(Math.max(...levels));
+    expect((levels[10] as number) + 12).toBeLessThan(levels[0] as number);
+    expect((levels[levels.length - 2] as number) + 30).toBeLessThan(levels[0] as number);
+  });
+
+  it.each([0, 1])('variant %i is a broadband crack: the first 30 ms carry far more 1-8 kHz energy than the last 200 ms', (variant) => {
+    const audio = renderCached('blast_snap', variant);
+    const crack = (from: number, to: number): number => toDb(bandPower(windowOf(audio, from, to), audio.sampleRate, 1000, 8000, 100));
+    expect(crack(0, 0.03) - crack(0.3, 0.5)).toBeGreaterThan(30);
+  });
+
+  it.each([0, 1])('variant %i keeps a punch below 150 Hz and a sizzle brighter than the mid band after the crack', (variant) => {
+    const audio = renderCached('blast_snap', variant);
+    expect(dominantFrequency(windowOf(audio, 0.02, 0.12), audio.sampleRate, 40, 200, 2)).toBeLessThan(150);
+    const density = (lo: number, hi: number, step: number): number => toDb(bandPower(windowOf(audio, 0.08, 0.2), audio.sampleRate, lo, hi, step));
+    expect(density(3000, 9000, 100)).toBeGreaterThan(density(1000, 2000, 50) + 2);
+  });
+
+  it('is quiet above 16 kHz, where noise gives the worst inter-sample overshoot', () => {
+    const audio = renderCached('blast_snap', 0);
+    const x = windowOf(audio, 0, 0.03);
+    expect(toDb(bandPower(x, audio.sampleRate, 17000, 21000, 200) / bandPower(x, audio.sampleRate, 1000, 8000, 100))).toBeLessThan(-6);
   });
 });
 

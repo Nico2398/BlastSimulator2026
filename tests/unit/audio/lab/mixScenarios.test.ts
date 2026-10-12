@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { SOUND_CATALOG, type SoundDefinition } from '../../../../src/audio/SoundCatalog.js';
 import { buildMixScenario } from '../../../../src/audio/lab/mixScenarios.js';
 import { isMixScenarioName, MIX_SCENARIO_NAMES, type MixScenario } from '../../../../src/audio/lab/mixTypes.js';
+import { BLAST_AUDIO_CONFIG } from '../../../../src/core/config/audio/game.js';
 import { LAB_RENDER_CONFIG } from '../../../../src/core/config/audio/lab.js';
 
 const catalog: Readonly<Record<string, SoundDefinition>> = SOUND_CATALOG;
@@ -92,25 +93,27 @@ describe('blast', () => {
   const scenario = buildMixScenario('blast');
   const plays = scenario.events.flatMap(e => (e.kind === 'play' ? [e] : []));
 
-  it('arms with a siren and quickening beeps, then fires the shot with its crack, boom and sub together', () => {
+  it('arms with a siren and quickening beeps, then fires the shot: snap and sub together, the sampled crack and boom just behind', () => {
     const beeps = plays.filter(e => e.id === 'blast_beep').map(e => e.t);
     expect(beeps.length).toBeGreaterThan(5);
     const gaps = beeps.slice(1).map((t, i) => t - (beeps[i] ?? 0));
     expect(gaps[gaps.length - 1]).toBeLessThan(gaps[0] ?? 0);
-    const crack = plays.find(e => e.id === 'blast_crack');
+    const snap = plays.find(e => e.id === 'blast_snap');
     const sub = plays.find(e => e.id === 'blast_sub');
-    expect(crack).toBeDefined();
-    expect(sub?.t).toBe(crack?.t);
-    expect(crack!.t).toBeGreaterThan(Math.max(...beeps));
+    const crack = plays.find(e => e.id === 'blast_crack');
+    expect(snap).toBeDefined();
+    expect(sub?.t).toBe(snap?.t);
+    expect(snap!.t).toBeGreaterThan(Math.max(...beeps));
+    expect(crack!.t - snap!.t).toBeCloseTo(BLAST_AUDIO_CONFIG.crackDelayS, 9);
   });
 
   it('rains debris after the shot and ducks the ambience for it', () => {
-    const crackAt = plays.find(e => e.id === 'blast_crack')!.t;
+    const shotAt = plays.find(e => e.id === 'blast_snap')!.t;
     const debris = plays.filter(e => e.id === 'debris_hit' || e.id === 'debris_pebble');
     expect(debris.length).toBeGreaterThan(20);
-    expect(debris.every(e => e.t >= crackAt)).toBe(true);
+    expect(debris.every(e => e.t >= shotAt)).toBe(true);
     const ducks = scenario.events.filter(e => e.kind === 'duck');
-    expect(ducks.some(d => d.t === crackAt && d.bus === 'ambient')).toBe(true);
+    expect(ducks.some(d => d.t === shotAt && d.bus === 'ambient')).toBe(true);
   });
 
   it('runs the rain and wind beds under it and stops the siren before the shot', () => {
@@ -118,7 +121,7 @@ describe('blast', () => {
     expect(loops.some(l => l.id === 'amb_rain_heavy' && l.level > 0)).toBe(true);
     expect(loops.some(l => l.id === 'amb_wind' && l.level > 0)).toBe(true);
     const sirenOff = loops.find(l => l.id === 'blast_siren' && l.level === 0);
-    expect(sirenOff!.t).toBeLessThan(plays.find(e => e.id === 'blast_crack')!.t);
+    expect(sirenOff!.t).toBeLessThan(plays.find(e => e.id === 'blast_snap')!.t);
   });
 });
 

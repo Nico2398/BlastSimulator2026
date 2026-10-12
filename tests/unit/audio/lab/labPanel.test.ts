@@ -94,7 +94,7 @@ describe('the catalog on the page', () => {
 
   it('describes where a sound comes from', () => {
     expect(describeSound(SOUND_CATALOG.ui_click)).toBe('2 samples · -6 dB · priority 2');
-    expect(describeSound(SOUND_CATALOG.ui_hover)).toContain('sample · -14 dB');
+    expect(describeSound(SOUND_CATALOG.ui_hover)).toContain('sample · -10.5 dB');
     expect(describeSound(SOUND_CATALOG.blast_crack)).toContain('+2 dB');
     expect(describeSound(SOUND_CATALOG.blast_sub)).toContain('synth blast_sub');
   });

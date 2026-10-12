@@ -14,6 +14,17 @@ export const UI_SOUND_CONFIG = {
   dangerGainDb: -1,
   /** A slider's tick rises across its travel by this many cents (centred on its midpoint). */
   sliderPitchSpanCents: 400,
+  /**
+   * A click cue waits this long (a macrotask) before playing, so the command the click ran can claim the moment
+   * with its own cue and the generic click stays out of the way.
+   */
+  claimDeferMs: 0,
+  /**
+   * After a key press, a pointer that has not moved since is not hovering anything new: closing a panel with Escape
+   * puts whatever lay beneath it under the resting pointer. Hover ticks stay silent for this long, or until the
+   * pointer moves, whichever comes first.
+   */
+  hoverKeyboardQuietMs: 700,
 } as const;
 
 /** Extra pitch per selected thing, so workers, vehicles and buildings are subtly different without being different sounds. */

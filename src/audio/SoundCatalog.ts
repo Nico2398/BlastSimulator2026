@@ -8,13 +8,21 @@
 // Level convention. Every sample file is normalised to -18 dBFS gated RMS with a
 // -1 dBFS peak ceiling (see public/audio/CREDITS.md); every synth recipe is
 // rendered to the same level (loops: -26 dBFS). `gainDb` is the trim against
-// that reference, so 0 means "as loud as an ordinary effect".
+// that reference, so 0 means "as loud as an ordinary effect". A few spiky files
+// (coins, hammer, till...) sit under -18 because the asset limiter budget caps
+// their gain, and a hard-transient recipe (blast_snap) lands under it for the
+// same reason; their trims here include the measured shortfall.
+//
+// The blast layers (snap, crack, boom, sub) are trimmed together: they stack within
+// 30 ms, so the sum, not each one, has to clear the master safety clipper's knee.
+// Re-measure with `npm run sounds:check` after changing any of them.
 
 /** Buses a sound can play on: the user-facing volume sliders other than master/music. */
 export type SoundBus = 'effects' | 'ambient' | 'ui';
 
 /** Procedural sounds rendered at startup by src/audio/synth. */
 export type SynthRecipeId =
+  | 'blast_snap'
   | 'blast_sub'
   | 'blast_tail'
   | 'blast_beep'
@@ -66,19 +74,19 @@ const synth = (recipe: SynthRecipeId): SynthSource => ({ kind: 'synth', recipe }
 export const SOUND_CATALOG = {
   // ── Interface: generic controls (delegated from the DOM) ──
   ui_click: { bus: 'ui', source: sample('ui_click_1', 'ui_click_2'), gainDb: -6, pitchJitterCents: 60, cooldownMs: 25, maxVoices: 3, priority: 2 },
-  ui_hover: { bus: 'ui', source: sample('ui_hover'), gainDb: -14, cooldownMs: 70, maxVoices: 2, priority: 1 },
+  ui_hover: { bus: 'ui', source: sample('ui_hover'), gainDb: -10.5, cooldownMs: 70, maxVoices: 2, priority: 1 },
   ui_open: { bus: 'ui', source: sample('ui_open'), gainDb: -6, cooldownMs: 60, maxVoices: 2, priority: 2 },
   ui_close: { bus: 'ui', source: sample('ui_close'), gainDb: -6, cooldownMs: 60, maxVoices: 2, priority: 2 },
-  ui_tab: { bus: 'ui', source: sample('ui_tab'), gainDb: -7, cooldownMs: 60, maxVoices: 2, priority: 2 },
+  ui_tab: { bus: 'ui', source: sample('ui_tab'), gainDb: -5.5, cooldownMs: 60, maxVoices: 2, priority: 2 },
   ui_toggle_on: { bus: 'ui', source: sample('ui_toggle_on'), gainDb: -6, cooldownMs: 40, maxVoices: 2, priority: 2 },
   ui_toggle_off: { bus: 'ui', source: sample('ui_toggle_off'), gainDb: -6, cooldownMs: 40, maxVoices: 2, priority: 2 },
-  ui_slider: { bus: 'ui', source: sample('ui_slider'), gainDb: -9, pitchJitterCents: 40, cooldownMs: 55, maxVoices: 2, priority: 1 },
+  ui_slider: { bus: 'ui', source: sample('ui_slider'), gainDb: -7, pitchJitterCents: 40, cooldownMs: 55, maxVoices: 2, priority: 1 },
   ui_denied: { bus: 'ui', source: sample('ui_denied'), gainDb: -3, cooldownMs: 120, maxVoices: 2, priority: 3 },
   ui_error: { bus: 'ui', source: sample('ui_error'), gainDb: -3, cooldownMs: 150, maxVoices: 2, priority: 3 },
   ui_confirm: { bus: 'ui', source: sample('ui_confirm'), gainDb: -4, cooldownMs: 60, maxVoices: 2, priority: 2 },
   ui_back: { bus: 'ui', source: sample('ui_back'), gainDb: -7, cooldownMs: 60, maxVoices: 2, priority: 2 },
   ui_select: { bus: 'ui', source: sample('ui_select'), gainDb: -6, pitchJitterCents: 50, cooldownMs: 50, maxVoices: 2, priority: 2 },
-  ui_invalid: { bus: 'ui', source: sample('ui_invalid'), gainDb: -4, cooldownMs: 250, maxVoices: 1, priority: 2 },
+  ui_invalid: { bus: 'ui', source: sample('ui_invalid'), gainDb: -2, cooldownMs: 250, maxVoices: 1, priority: 2 },
   ui_modal: { bus: 'ui', source: sample('ui_modal'), gainDb: -5, cooldownMs: 200, maxVoices: 1, priority: 2 },
 
   // ── Interface: notifications and event alerts ──
@@ -96,31 +104,31 @@ export const SOUND_CATALOG = {
   order_queued: { bus: 'ui', source: sample('order_queued'), gainDb: -5, cooldownMs: 120, maxVoices: 2, priority: 2 },
   order_done: { bus: 'ui', source: sample('order_done'), gainDb: -9, cooldownMs: 250, maxVoices: 2, priority: 1 },
   build_placed: { bus: 'effects', source: sample('place_1', 'place_2', 'place_3', 'place_4'), gainDb: -4, pitchJitterCents: 80, cooldownMs: 120, maxVoices: 2, priority: 2 },
-  hire: { bus: 'ui', source: sample('hire'), gainDb: -3, cooldownMs: 150, maxVoices: 2, priority: 2 },
-  fire: { bus: 'ui', source: sample('fire'), gainDb: -3, cooldownMs: 150, maxVoices: 2, priority: 2 },
+  hire: { bus: 'ui', source: sample('hire'), gainDb: -0.5, cooldownMs: 150, maxVoices: 2, priority: 2 },
+  fire: { bus: 'ui', source: sample('fire'), gainDb: -1, cooldownMs: 150, maxVoices: 2, priority: 2 },
   purchase: { bus: 'ui', source: sample('purchase'), gainDb: -3, cooldownMs: 150, maxVoices: 2, priority: 2 },
   unlock: { bus: 'ui', source: sample('unlock'), gainDb: -4, cooldownMs: 300, maxVoices: 1, priority: 3 },
   level_up: { bus: 'ui', source: sample('level_up'), gainDb: -7, cooldownMs: 600, maxVoices: 1, priority: 2 },
-  coins_small: { bus: 'ui', source: sample('coins_small'), gainDb: -6, pitchJitterCents: 100, cooldownMs: 500, maxVoices: 2, priority: 2 },
-  coins_big: { bus: 'ui', source: sample('coins_big'), gainDb: -4, cooldownMs: 800, maxVoices: 1, priority: 2 },
-  cash_till: { bus: 'ui', source: sample('cash_till'), gainDb: -4, cooldownMs: 1500, maxVoices: 1, priority: 3 },
+  coins_small: { bus: 'ui', source: sample('coins_small'), gainDb: -2.5, pitchJitterCents: 100, cooldownMs: 500, maxVoices: 2, priority: 2 },
+  coins_big: { bus: 'ui', source: sample('coins_big'), gainDb: 2, cooldownMs: 800, maxVoices: 1, priority: 2 },
+  cash_till: { bus: 'ui', source: sample('cash_till'), gainDb: 0, cooldownMs: 1500, maxVoices: 1, priority: 3 },
 
   // ── World: construction, vehicles, crew ──
   building_built: { bus: 'effects', source: sample('impact_plate_1', 'impact_plate_2'), gainDb: -2, pitchJitterCents: 120, cooldownMs: 300, maxVoices: 2, priority: 2, spatial: true, reverbSend: 0.2 },
   building_demolished: { bus: 'effects', source: sample('crash_1', 'crash_2'), gainDb: 0, pitchJitterCents: 150, cooldownMs: 400, maxVoices: 2, priority: 3, spatial: true, reverbSend: 0.4 },
   vehicle_start: { bus: 'effects', source: sample('truck_start'), gainDb: -4, pitchJitterCents: 100, cooldownMs: 900, maxVoices: 2, priority: 2, spatial: true, reverbSend: 0.15 },
   vehicle_horn: { bus: 'effects', source: sample('horn'), gainDb: -5, pitchJitterCents: 80, cooldownMs: 2500, maxVoices: 1, priority: 2, spatial: true, reverbSend: 0.25 },
-  vehicle_scrap: { bus: 'effects', source: sample('impact_metal_1', 'impact_metal_2'), gainDb: -2, pitchJitterCents: 150, cooldownMs: 300, maxVoices: 2, priority: 2, spatial: true, reverbSend: 0.2 },
-  shift_bell: { bus: 'effects', source: sample('bell'), gainDb: -7, cooldownMs: 4000, maxVoices: 1, priority: 2 },
+  vehicle_scrap: { bus: 'effects', source: sample('impact_metal_1', 'impact_metal_2'), gainDb: 0, pitchJitterCents: 150, cooldownMs: 300, maxVoices: 2, priority: 2, spatial: true, reverbSend: 0.2 },
+  shift_bell: { bus: 'effects', source: sample('bell'), gainDb: -5.5, cooldownMs: 4000, maxVoices: 1, priority: 2 },
   worker_collapse: { bus: 'effects', source: sample('impact_soft_1', 'impact_soft_2', 'impact_soft_3'), gainDb: -3, pitchJitterCents: 120, cooldownMs: 800, maxVoices: 2, priority: 2, spatial: true },
-  drill_done: { bus: 'effects', source: sample('impact_metal_1', 'impact_metal_2'), gainDb: -7, pitchJitterCents: 200, cooldownMs: 300, maxVoices: 2, priority: 1, spatial: true },
-  charge_loaded: { bus: 'effects', source: sample('charge_click'), gainDb: -6, pitchJitterCents: 150, cooldownMs: 250, maxVoices: 2, priority: 1, spatial: true },
-  survey_done: { bus: 'effects', source: sample('survey_ping'), gainDb: -5, cooldownMs: 600, maxVoices: 1, priority: 2, spatial: true, reverbSend: 0.3 },
+  drill_done: { bus: 'effects', source: sample('impact_metal_1', 'impact_metal_2'), gainDb: -5, pitchJitterCents: 200, cooldownMs: 300, maxVoices: 2, priority: 1, spatial: true },
+  charge_loaded: { bus: 'effects', source: sample('charge_click'), gainDb: -4.5, pitchJitterCents: 150, cooldownMs: 250, maxVoices: 2, priority: 1, spatial: true },
+  survey_done: { bus: 'effects', source: sample('survey_ping'), gainDb: -3, cooldownMs: 600, maxVoices: 1, priority: 2, spatial: true, reverbSend: 0.3 },
 
   // ── World: work and hauling (short bursts, one site at a time) ──
   work_drill: { bus: 'effects', source: sample('drill_1', 'drill_2'), gainDb: -4, pitchJitterCents: 120, cooldownMs: 400, maxVoices: 2, priority: 1, spatial: true, reverbSend: 0.15 },
   work_dig: { bus: 'effects', source: sample('dig_1', 'dig_2', 'dig_3'), gainDb: -4, pitchJitterCents: 150, cooldownMs: 400, maxVoices: 2, priority: 1, spatial: true, reverbSend: 0.1 },
-  work_hammer: { bus: 'effects', source: sample('hammer_1', 'hammer_2'), gainDb: -5, pitchJitterCents: 120, cooldownMs: 400, maxVoices: 2, priority: 1, spatial: true },
+  work_hammer: { bus: 'effects', source: sample('hammer_1', 'hammer_2'), gainDb: -2, pitchJitterCents: 120, cooldownMs: 400, maxVoices: 2, priority: 1, spatial: true },
   haul_load: { bus: 'effects', source: sample('impact_soft_1', 'impact_soft_2', 'impact_soft_3'), gainDb: -5, pitchJitterCents: 200, gainJitterDb: 2, cooldownMs: 150, maxVoices: 3, priority: 1, spatial: true },
   haul_dump: { bus: 'effects', source: sample('dump_1', 'dump_2'), gainDb: -4, pitchJitterCents: 150, gainJitterDb: 2, cooldownMs: 200, maxVoices: 2, priority: 1, spatial: true, reverbSend: 0.15 },
   boulder_break: { bus: 'effects', source: sample('boulder_break'), gainDb: -2, pitchJitterCents: 200, cooldownMs: 250, maxVoices: 2, priority: 2, spatial: true, reverbSend: 0.25 },
@@ -133,12 +141,13 @@ export const SOUND_CATALOG = {
   blast_siren: { bus: 'effects', source: synth('siren_loop'), gainDb: -4, priority: 4, loop: true },
   blast_crack: { bus: 'effects', source: sample('blast_crack_1', 'blast_crack_2', 'blast_crack_3'), gainDb: 2, pitchJitterCents: 100, maxVoices: 3, priority: 4, spatial: true, reverbSend: 0.4 },
   blast_boom: { bus: 'effects', source: sample('blast_boom_1', 'blast_boom_2'), gainDb: 3, pitchJitterCents: 80, maxVoices: 3, priority: 4, spatial: true, reverbSend: 0.55 },
-  blast_sub: { bus: 'effects', source: synth('blast_sub'), gainDb: 2, maxVoices: 2, priority: 4, reverbSend: 0.2 },
+  blast_snap: { bus: 'effects', source: synth('blast_snap'), gainDb: -2, maxVoices: 3, priority: 4, spatial: true, reverbSend: 0.25 },
+  blast_sub: { bus: 'effects', source: synth('blast_sub'), gainDb: -2, maxVoices: 2, priority: 4, reverbSend: 0.2 },
   blast_tail: { bus: 'effects', source: synth('blast_tail'), gainDb: 0, maxVoices: 2, priority: 4, reverbSend: 0.65 },
   blast_dud: { bus: 'effects', source: sample('blast_dud'), gainDb: -3, pitchJitterCents: 150, cooldownMs: 150, maxVoices: 3, priority: 3, spatial: true, reverbSend: 0.3 },
 
   // ── Level end stings ──
-  level_win: { bus: 'effects', source: sample('level_win'), gainDb: -2, maxVoices: 1, priority: 4 },
+  level_win: { bus: 'effects', source: sample('level_win'), gainDb: 0, maxVoices: 1, priority: 4 },
   level_lose: { bus: 'effects', source: sample('level_lose'), gainDb: -2, maxVoices: 1, priority: 4 },
 
   // ── Ambient ──

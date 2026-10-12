@@ -3,7 +3,7 @@
 
 import { isMixScenarioName, MIX_SCENARIO_NAMES, type MixScenarioName } from './mixTypes.js';
 
-export interface CheckOptions {
+interface CheckOptions {
   /** Scenarios to render; all of them when none were named. */
   readonly scenarios: readonly MixScenarioName[];
   readonly outDir: string;

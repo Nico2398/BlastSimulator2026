@@ -1,8 +1,8 @@
 // BlastSimulator2026 — Blast timeline plan
-// Everything a blast sounds like, as data: the crack, boom and sub-bass at t=0,
-// the tail a moment after, a rain of debris binned from the fragment flights,
-// secondary explosions, collapsing buildings, duds and one muted alert for
-// casualties. Pure: it needs the blast's description and a random source, and
+// Everything a blast sounds like, as data: the synthesized snap and sub-bass at
+// t=0, the sampled crack and boom a few milliseconds behind, the tail a moment
+// after, a rain of debris binned from the fragment flights, secondary
+// explosions, collapsing buildings, duds and one muted alert for casualties. Pure: it needs the blast's description and a random source, and
 // returns cues with their start times; nothing here plays anything.
 
 import type { OneShotId } from '../SoundCatalog.js';
@@ -54,9 +54,10 @@ function blastIntensity(holeCount: number, chargeKg: number): number {
 function mainBlastCues(info: BlastInfo, intensity: number, random: Random): PlannedCue[] {
   const boostDb = intensity * CFG.maxBoostDb;
   return [
-    { atS: 0, sound: 'blast_crack', options: { at: info.origin, gainDb: boostDb, key: 'blast:crack' } },
-    { atS: CFG.boomDelayS, sound: 'blast_boom', options: { at: info.origin, gainDb: boostDb, pitchCents: -intensity * CFG.boomPitchDropCents, key: 'blast:boom' } },
+    { atS: 0, sound: 'blast_snap', options: { at: info.origin, gainDb: boostDb, key: 'blast:snap' } },
     { atS: 0, sound: 'blast_sub', options: { gainDb: boostDb, key: 'blast:sub' } },
+    { atS: CFG.crackDelayS, sound: 'blast_crack', options: { at: info.origin, gainDb: boostDb, key: 'blast:crack' } },
+    { atS: CFG.boomDelayS, sound: 'blast_boom', options: { at: info.origin, gainDb: boostDb, pitchCents: -intensity * CFG.boomPitchDropCents, key: 'blast:boom' } },
     { atS: random.nextFloat(CFG.tailMinDelayS, CFG.tailMaxDelayS), sound: 'blast_tail', options: { gainDb: boostDb * CFG.tailBoostShare, key: 'blast:tail' } },
   ];
 }
@@ -123,8 +124,9 @@ function secondaryCues(report: BlastReportView, random: Random): PlannedCue[] {
     const gainDb = config.minGainDb + size * (config.maxGainDb - config.minGainDb);
     const at = { x: blast.x, z: blast.z };
     return [
-      { atS, sound: 'blast_crack', options: { at, gainDb, pitchCents: config.crackPitchCents, key: `blast:secondary:crack:${i}` } },
-      { atS: atS + config.crackDelayS, sound: 'blast_boom', options: { at, gainDb, pitchCents: config.boomPitchCents, key: `blast:secondary:boom:${i}` } },
+      { atS, sound: 'blast_snap', options: { at, gainDb: gainDb + config.snapGainOffsetDb, pitchCents: config.snapPitchCents, key: `blast:secondary:snap:${i}` } },
+      { atS: atS + CFG.crackDelayS, sound: 'blast_crack', options: { at, gainDb, pitchCents: config.crackPitchCents, key: `blast:secondary:crack:${i}` } },
+      { atS: atS + config.boomDelayS, sound: 'blast_boom', options: { at, gainDb, pitchCents: config.boomPitchCents, key: `blast:secondary:boom:${i}` } },
     ] satisfies PlannedCue[];
   });
 }

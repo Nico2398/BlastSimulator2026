@@ -92,7 +92,7 @@ const recipe = (loop: boolean): SynthRecipe => ({
 
 /** One short constant-level recipe per id, so a render needs no real synthesis. */
 export const FAKE_RECIPES = {
-  blast_sub: recipe(false), blast_tail: recipe(false), blast_beep: recipe(false), blast_cancel: recipe(false),
+  blast_snap: recipe(false), blast_sub: recipe(false), blast_tail: recipe(false), blast_beep: recipe(false), blast_cancel: recipe(false),
   siren_loop: recipe(true), thunder: recipe(false), wind_bed: recipe(true), rain_light_bed: recipe(true),
   rain_heavy_bed: recipe(true), machinery_bed: recipe(true),
 } as Record<SynthRecipeId, SynthRecipe>;

@@ -49,12 +49,14 @@ function fixture(): Fixture {
 }
 
 describe('BlastAudio timeline', () => {
-  it('starts the crack, boom and sub-bass the moment the flash fires', () => {
+  it('starts the snap, crack, boom and sub-bass the moment the flash fires, the sampled layers a few ms behind', () => {
     const f = fixture();
     f.blast.play(bigBlast(), 0);
     const started = f.h.player.plays.filter(p => p.atS === 0);
-    expect(started.map(p => p.id)).toEqual(expect.arrayContaining(['blast_crack', 'blast_boom', 'blast_sub']));
-    expect(f.h.player.of('blast_crack')[0]?.opts.delayS).toBe(0);
+    expect(started.map(p => p.id)).toEqual(expect.arrayContaining(['blast_snap', 'blast_crack', 'blast_boom', 'blast_sub']));
+    expect(f.h.player.of('blast_snap')[0]?.opts.delayS).toBe(0);
+    expect(f.h.player.of('blast_sub')[0]?.opts.delayS).toBe(0);
+    expect(f.h.player.of('blast_crack')[0]?.opts.delayS).toBe(cfg.crackDelayS);
     expect(f.h.player.of('blast_boom')[0]?.opts.delayS).toBe(cfg.boomDelayS);
   });
 

@@ -144,6 +144,7 @@ export class GameAudioDirector {
       if (playing) this.events.flush();
       else this.events.clear();
       this.work.update(dtS, playing && !frozen);
+      if (frame.menuUp) this.blast.hush();
       this.blast.update(dtS);
       this.siren.update(dtS, {
         armed: state !== null && state.pendingDetonation !== null,

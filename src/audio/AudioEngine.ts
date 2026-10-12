@@ -49,6 +49,7 @@ export class AudioEngine implements AudioPlayer {
   private readonly catalog: Readonly<Record<string, SoundDefinition>>;
   private essentialsLoaded = false;
   private preloading: Promise<void> | null = null;
+  private preloadSettled = false;
 
   constructor(private readonly manager: AudioManager, options: AudioEngineOptions) {
     const ctx = manager.context;
@@ -88,13 +89,19 @@ export class AudioEngine implements AudioPlayer {
   /** True once the interface and blast cues are decoded. */
   get ready(): boolean { return this.player !== null && this.essentialsLoaded; }
 
+  /** True once the preload has tried every sample and recipe, whether or not they all loaded. */
+  get preloaded(): boolean { return this.preloadSettled; }
+
+  /** Sample files and synth recipes the preload could not load (empty while it is still running). */
+  get failedAssets(): readonly string[] { return [...(this.samples?.failed ?? []), ...(this.synth?.failed ?? [])]; }
+
   /**
    * Load all audio in three tiers: samples of interface and high-priority
    * sounds (flips `ready`), the remaining samples, then the synth recipes and
    * the reverb impulse. Safe to call twice (same promise); never rejects.
    */
   preload(onProgress?: PreloadProgress): Promise<void> {
-    this.preloading ??= this.runPreload(onProgress).catch(() => undefined);
+    this.preloading ??= this.runPreload(onProgress).catch(() => undefined).finally(() => { this.preloadSettled = true; });
     return this.preloading;
   }
 

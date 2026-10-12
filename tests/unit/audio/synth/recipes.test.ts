@@ -8,6 +8,7 @@ import { MACHINERY_CONFIG, RAIN_HEAVY_CONFIG, RAIN_LIGHT_CONFIG, SIREN_CONFIG, S
 import { maxLineProminenceDb, renderCached, sameSamples, sortedSteps, windowOf } from './helpers.js';
 
 const EXPECTED_IDS: Record<SynthRecipeId, true> = {
+  blast_snap: true,
   blast_sub: true,
   blast_tail: true,
   blast_beep: true,
@@ -25,6 +26,9 @@ const LOOPS = CASES.filter(({ id }) => SYNTH_RECIPES[id].loop);
 const ONE_SHOTS = CASES.filter(({ id }) => !SYNTH_RECIPES[id].loop);
 /** Sounds whose character is a steady or gliding tone; every other recipe must read as noise-like. */
 const TONAL: readonly SynthRecipeId[] = ['blast_beep', 'blast_cancel', 'siren_loop', 'blast_sub'];
+/** Sharp-transient noise: its crest factor is too high to reach the reference RMS under the true-peak ceiling, so it lands below it. */
+const PEAK_LIMITED: readonly SynthRecipeId[] = ['blast_snap'];
+const PEAK_LIMITED_MAX_SHORTFALL_DB = 4;
 
 describe('recipe table', () => {
   it('covers every SynthRecipeId and nothing else', () => {
@@ -34,6 +38,7 @@ describe('recipe table', () => {
   it('declares the planned variant counts', () => {
     const counts = Object.fromEntries(IDS.map((id) => [id, SYNTH_RECIPES[id].variants]));
     expect(counts).toEqual({
+      blast_snap: 2,
       blast_sub: 2,
       blast_tail: 2,
       blast_beep: 1,
@@ -62,6 +67,24 @@ describe('recipe table', () => {
   });
 });
 
+describe('blast_snap catalog entry', () => {
+  it('is a spatial, never-dropped synth shot on the effects bus with three voices and a reverb send', () => {
+    const entry = SOUND_CATALOG.blast_snap;
+    expect(entry.bus).toBe('effects');
+    expect(entry.source).toEqual({ kind: 'synth', recipe: 'blast_snap' });
+    expect(entry.maxVoices).toBe(3);
+    expect(entry.priority).toBe(4);
+    expect(entry.spatial).toBe(true);
+    expect(entry.reverbSend).toBeGreaterThan(0);
+    expect(entry.reverbSend).toBeLessThanOrEqual(0.4);
+    expect('loop' in entry).toBe(false);
+  });
+
+  it('keeps every catalog trim within +6 dB', () => {
+    for (const [name, def] of Object.entries(SOUND_CATALOG)) expect(def.gainDb, name).toBeLessThanOrEqual(6);
+  });
+});
+
 describe.each(CASES)('$label', ({ id, variant }) => {
   const audio = renderCached(id, variant);
   const loop = SYNTH_RECIPES[id].loop;
@@ -84,7 +107,13 @@ describe.each(CASES)('$label', ({ id, variant }) => {
 
   it('sits at the reference level with true peak under the ceiling and no DC', () => {
     const target = loop ? SYNTH_LEVELS.loopDb : SYNTH_LEVELS.oneShotDb;
-    expect(Math.abs(gatedRmsDb(audio.channels, audio.sampleRate) - target)).toBeLessThan(0.25);
+    const shortfall = target - gatedRmsDb(audio.channels, audio.sampleRate);
+    if (PEAK_LIMITED.includes(id)) {
+      expect(shortfall).toBeGreaterThanOrEqual(-0.25);
+      expect(shortfall).toBeLessThan(PEAK_LIMITED_MAX_SHORTFALL_DB);
+    } else {
+      expect(Math.abs(shortfall)).toBeLessThan(0.25);
+    }
     expect(truePeakDb(audio.channels)).toBeLessThanOrEqual(SYNTH_LEVELS.peakCeilingDb + 1e-3);
     expect(Math.abs(dcOffset(audio.channels))).toBeLessThan(1e-3);
   });

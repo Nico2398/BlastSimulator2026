@@ -34,6 +34,14 @@ function pointer(type: 'pointerdown' | 'pointerover', target: Element, buttons =
   target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, buttons }));
 }
 
+function key(type: 'keydown' = 'keydown', target: EventTarget = document.body): void {
+  target.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, key: 'Escape' }));
+}
+
+function movePointer(target: EventTarget = document.body): void {
+  target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, cancelable: true }));
+}
+
 function slider(value: string, attrs: Record<string, string> = {}): HTMLInputElement {
   const input = el('input', { attrs: { type: 'range', ...attrs } });
   input.value = value;
@@ -307,6 +315,89 @@ describe('hover', () => {
     now += 1000;
     pointer('pointerover', mount(button('ghost', 'Other')));
     expect(player.ids).toEqual(['ui_hover', 'ui_hover']);
+  });
+});
+
+describe('hover after a key press', () => {
+  it('stays silent when the pointer has not moved since the key (Escape closed a panel under it)', () => {
+    const btn = mount(button('ghost', 'Under'));
+    key();
+    now += 10;
+    pointer('pointerover', btn);
+    expect(player.calls).toEqual([]);
+  });
+
+  it('ticks once the pointer has moved after the key', () => {
+    const btn = mount(button('ghost', 'Under'));
+    key();
+    now += 10;
+    movePointer();
+    pointer('pointerover', btn);
+    expect(player.ids).toEqual(['ui_hover']);
+  });
+
+  it('ticks once the quiet window has passed, even with a still pointer', () => {
+    const btn = mount(button('ghost', 'Under'));
+    key();
+    now += UI_SOUND_CONFIG.hoverKeyboardQuietMs - 1;
+    pointer('pointerover', btn);
+    expect(player.calls).toEqual([]);
+    const other = mount(button('ghost', 'Other'));
+    now += 1;
+    pointer('pointerover', other);
+    expect(player.ids).toEqual(['ui_hover']);
+  });
+
+  it('counts only the pointer movement that follows the latest key', () => {
+    const btn = mount(button('ghost', 'Under'));
+    movePointer();
+    key();
+    now += 10;
+    pointer('pointerover', btn);
+    expect(player.calls).toEqual([]);
+  });
+
+  it('restarts the window on every key, as a held key repeats', () => {
+    const btn = mount(button('ghost', 'Under'));
+    key();
+    now += UI_SOUND_CONFIG.hoverKeyboardQuietMs - 1;
+    key();
+    now += UI_SOUND_CONFIG.hoverKeyboardQuietMs - 1;
+    pointer('pointerover', btn);
+    expect(player.calls).toEqual([]);
+  });
+
+  it('is not affected by a mouse that was never preceded by a key', () => {
+    const btn = mount(button('ghost', 'Mouse'));
+    pointer('pointerover', btn);
+    expect(player.ids).toEqual(['ui_hover']);
+  });
+
+  it('does not replay on the control it settled on once the quiet window is over', () => {
+    const btn = mount(button('ghost', 'Under'));
+    key();
+    pointer('pointerover', btn);
+    now += UI_SOUND_CONFIG.hoverKeyboardQuietMs;
+    pointer('pointerover', btn.querySelector('span')!);
+    expect(player.calls).toEqual([]);
+  });
+
+  it('leaves clicks and disabled-press denials alone', () => {
+    const btn = mount(button('ghost', 'Go'));
+    const off = mount(button('ghost', 'Off', { disabled: true }));
+    key();
+    pointer('pointerdown', off);
+    click(btn);
+    expect(player.ids).toEqual(['ui_denied', 'ui_click']);
+  });
+
+  it('stops listening to keys once disposed', () => {
+    const btn = mount(button('ghost', 'Under'));
+    dispose();
+    key();
+    install();
+    pointer('pointerover', btn);
+    expect(player.ids).toEqual(['ui_hover']);
   });
 });
 

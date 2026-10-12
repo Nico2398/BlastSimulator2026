@@ -4,10 +4,11 @@
 
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { AudioManager, type AudioCategory } from '../../../src/audio/AudioManager.js';
+import { buildSoftClipCurve } from '../../../src/audio/engine/softClip.js';
 import { AUDIO_DEFAULT_VOLUMES } from '../../../src/core/config/balance.js';
 import { DUCK_CONFIG, MASTER_LIMITER_CONFIG, MIXER_CONFIG } from '../../../src/core/config/audio/engine.js';
 import {
-  FakeAudioContext, FakeCompressor, FakeConvolver, FakeGain, FakeVisibility, asAudioContext, asNode, fakeBuffer,
+  FakeAudioContext, FakeCompressor, FakeConvolver, FakeGain, FakeVisibility, FakeWaveShaper, asAudioContext, asNode, fakeBuffer,
   type FakeNode,
 } from '../../helpers/audioFakes.js';
 
@@ -26,15 +27,37 @@ afterEach(() => {
 });
 
 describe('graph', () => {
-  it('ends in a limiter-configured compressor on the destination', () => {
+  it('ends in a limiter-configured compressor feeding the safety clipper, then the destination', () => {
     const { ctx } = make();
     const limiter = ctx.all<FakeCompressor>('compressor')[0]!;
-    expect(limiter.outputs).toEqual([ctx.destination]);
+    const clipper = ctx.all<FakeWaveShaper>('shaper')[0]!;
+    expect(limiter.outputs).toEqual([clipper]);
+    expect(clipper.outputs).toEqual([ctx.destination]);
     expect(limiter.threshold.value).toBe(MASTER_LIMITER_CONFIG.thresholdDb);
     expect(limiter.knee.value).toBe(MASTER_LIMITER_CONFIG.kneeDb);
     expect(limiter.ratio.value).toBe(MASTER_LIMITER_CONFIG.ratio);
     expect(limiter.attack.value).toBe(MASTER_LIMITER_CONFIG.attackS);
     expect(limiter.release.value).toBe(MASTER_LIMITER_CONFIG.releaseS);
+  });
+
+  it('shapes the clipper with the soft-clip curve at the configured oversampling', () => {
+    const { ctx } = make();
+    const clipper = ctx.all<FakeWaveShaper>('shaper')[0]!;
+    const expected = buildSoftClipCurve(MASTER_LIMITER_CONFIG.clipCurveSize, MASTER_LIMITER_CONFIG.clipKnee, MASTER_LIMITER_CONFIG.clipCeiling);
+    expect(clipper.oversample).toBe(MASTER_LIMITER_CONFIG.clipOversample);
+    expect(clipper.curve).toEqual(expected);
+    expect(ctx.all<FakeWaveShaper>('shaper')).toHaveLength(1);
+  });
+
+  it('chains master gain, limiter, clipper and destination in that order', () => {
+    const { ctx } = make();
+    const limiter = ctx.all<FakeCompressor>('compressor')[0]!;
+    const clipper = ctx.all<FakeWaveShaper>('shaper')[0]!;
+    const master = ctx.all<FakeGain>('gain').find(g => g.outputs.includes(limiter))!;
+    expect(master.outputs).toEqual([limiter]);
+    expect(master.reaches(clipper)).toBe(true);
+    expect(clipper.reaches(master)).toBe(false);
+    expect(clipper.reaches(ctx.destination)).toBe(true);
   });
 
   it('routes every bus through volume and duck gains into the master, then the limiter', () => {

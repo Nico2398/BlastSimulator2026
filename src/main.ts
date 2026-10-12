@@ -32,7 +32,9 @@ import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioEngine } from './audio/AudioEngine.js';
 import { NULL_AUDIO_PLAYER, type AudioPlayer } from './audio/AudioPlayer.js';
+import { installAudioDebug } from './audio/debug/audioDebug.js';
 import { UiCues } from './audio/ui/UiCues.js';
+import { CommandClaim } from './audio/ui/CommandClaim.js';
 import { installUiSounds } from './audio/ui/installUiSounds.js';
 import { commandCue } from './audio/ui/commandCues.js';
 import { GameAudioDirector } from './audio/director/GameAudioDirector.js';
@@ -117,14 +119,22 @@ const audioRandom = new Random(Date.now());
 // A scenario run (headless Chromium, no gesture, no speakers) gets the null player: every handler below
 // still runs, so a fault in one surfaces there, but nothing is fetched, decoded or played.
 const audioEngine = scenarioMode ? null : new AudioEngine(audioMgr, { random: audioRandom });
-const audioPlayer: AudioPlayer = audioEngine ?? NULL_AUDIO_PLAYER;
+// `?audioLog=1` records every request in window.__audioLog (the browser smoke test reads it); otherwise this is the player itself.
+const audioPlayer: AudioPlayer = installAudioDebug(window, window.location.search, audioEngine ?? NULL_AUDIO_PLAYER, () => ({
+  ready: audioEngine?.ready ?? false,
+  preloaded: audioEngine?.preloaded ?? false,
+  failedAssets: audioEngine?.failedAssets ?? [],
+  contextState: audioMgr.context?.state ?? 'none',
+}));
 // Decode after the models are in, so the main menu does not hitch; the engine drops sounds until it is ready.
 if (audioEngine) void modelsReady.catch(() => undefined).then(() => audioEngine.preload());
-const uiCues = new UiCues(audioPlayer);
+// A command's own cue, or the panel/modal a click opened, supersedes the generic click of that control: all sides share this claim.
+const commandClaim = new CommandClaim();
+const uiCues = new UiCues(audioPlayer, { claim: commandClaim });
 uiManager.setUiCues(uiCues);
 // Buttons, dropdowns and sliders all get their sound from this one listener. The tutorial's activation guard is
 // installed later (when the tutorial starts), so inert railed controls are muted through `isInert`, not by order.
-installUiSounds(document, audioPlayer, { isInert: target => isRailedControl(target) });
+installUiSounds(document, audioPlayer, { isInert: target => isRailedControl(target), claim: commandClaim });
 // No streaming in scenario runs; with an empty track catalogue the director does nothing either way.
 const music = scenarioMode ? null : createMusicDirector(audioMgr);
 // Browsers hold audio back until the first gesture: resume the context and start any waiting music on it.
@@ -619,7 +629,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean; scripted?:
   // Sound, once per command and not in afterGameCommand (landBlast re-enters that). Owners: commandCue voices the
   // order, hire or refusal (a player's act); the director voices what the world did (built, scrapped, paid, blown).
   // `scripted` marks commands the tutorial runs for the player, which must not click like the player's own.
-  commandCue(audioPlayer, parsed, result.success, { scripted: opts?.scripted === true });
+  commandCue(audioPlayer, parsed, result.success, { scripted: opts?.scripted === true, claim: commandClaim });
   gameAudio.onCommand({ command: cmd, success: result.success, prevState, state: ctx.state });
   return result;
 }

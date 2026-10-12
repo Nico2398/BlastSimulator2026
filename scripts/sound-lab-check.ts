@@ -10,33 +10,33 @@
  * that never runs, NaN in a mix, a peak above -0.1 dBFS after the limiter, or a
  * silent mix (gated RMS under -60 dBFS).
  *
- * The dev server must already be running on :5173 (this script starts nothing):
+ * It serves the game itself: a dev server already answering on the port (default :5173) is reused,
+ * otherwise a Vite server is started in this process and stopped when the check ends.
  *
- *   npm run dev                                   # terminal 1
- *   npm run sounds:check                          # terminal 2
+ *   npm run sounds:check
  *   npm run sounds:check -- --scenario blast --out /tmp/mixes
  *
  * Output: a table of every mix, and each mix as <out>/<scenario>.wav plus
  * <out>/report.json, to open in any audio tool or inspect with ffmpeg.
  *
  * Exit codes: 0 all clear, 1 a check failed, 2 the check could not run
- * (server unreachable, no Chromium, bad arguments).
+ * (the server could not start, no Chromium, bad arguments).
  */
 
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CHECK_USAGE, parseCheckArgs, type CheckOptions } from '../src/audio/lab/checkArgs.js';
+import { CHECK_USAGE, parseCheckArgs } from '../src/audio/lab/checkArgs.js';
 import { evaluateReport } from '../src/audio/lab/checks.js';
 import { formatEnvelope, formatMixTable } from '../src/audio/lab/formatReport.js';
 import type { SoundLabReport } from '../src/audio/lab/labReport.js';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
+import { ensureDevServer, type DevServerHandle } from './shared/dev-server.js';
 
 const EXIT_FAILED = 1;
 const EXIT_COULD_NOT_RUN = 2;
 const PROGRESS_POLL_MS = 1000;
-const SERVER_PROBE_TIMEOUT_MS = 3000;
 /** Without a user gesture the page still needs this to start its context. */
 const AUTOPLAY_FLAG = '--autoplay-policy=no-user-gesture-required';
 
@@ -49,18 +49,7 @@ type LabWindow = Window & { __soundLab?: SoundLabReport; __soundLabWav?: (name: 
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
-function labUrl(options: CheckOptions): string {
-  return `http://localhost:${options.port}/sound-lab.html`;
-}
-
-async function serverIsUp(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(SERVER_PROBE_TIMEOUT_MS) });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+const LAB_PATH = '/sound-lab.html';
 
 function fail(message: string, code: number): never {
   console.error(message);
@@ -129,18 +118,20 @@ async function main(): Promise<void> {
   if (parsed.kind === 'error') fail(`${parsed.message}\n\n${CHECK_USAGE}`, EXIT_COULD_NOT_RUN);
   const options = parsed.options;
 
-  const url = labUrl(options);
-  if (!(await serverIsUp(url))) {
-    fail(
-      `Dev server not reachable at ${url}.\nStart it in another terminal, then run this again:\n  npm run dev\n  npm run sounds:check`,
-      EXIT_COULD_NOT_RUN,
-    );
+  let server: DevServerHandle;
+  try {
+    server = await ensureDevServer(options.port, LAB_PATH);
+  } catch (error) {
+    fail(`Could not serve the game on port ${options.port}: ${String(error instanceof Error ? error.message : error)}\nFree the port or pass --port <n>.`, EXIT_COULD_NOT_RUN);
   }
+  const url = `${server.origin}${LAB_PATH}`;
+  console.log(server.started ? `Started a dev server at ${server.origin}` : `Using the dev server already running at ${server.origin}`);
 
   let executablePath: string;
   try {
     executablePath = resolveChromePathOrThrow();
   } catch (error) {
+    await server.stop();
     fail(String(error instanceof Error ? error.message : error), EXIT_COULD_NOT_RUN);
   }
 
@@ -165,6 +156,7 @@ async function main(): Promise<void> {
     if (!finished && report) report.errors = [...report.errors, `timed out after ${options.timeoutS} s at "${report.progress}"`];
   } finally {
     await browser.close();
+    await server.stop();
   }
 
   if (!report) fail('The page never published window.__soundLab (did sound-lab.html fail to load?).', EXIT_FAILED);

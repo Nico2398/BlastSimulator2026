@@ -5,6 +5,7 @@
 import type { SynthRecipeId } from '../SoundCatalog.js';
 import { BLAST_BEEP } from './sounds/blastBeep.js';
 import { BLAST_CANCEL } from './sounds/blastCancel.js';
+import { BLAST_SNAP } from './sounds/blastSnap.js';
 import { BLAST_SUB } from './sounds/blastSub.js';
 import { BLAST_TAIL } from './sounds/blastTail.js';
 import { MACHINERY_BED } from './sounds/machinery.js';
@@ -16,6 +17,7 @@ import { WIND_BED } from './sounds/wind.js';
 import type { RenderedAudio, SynthRecipe } from './types.js';
 
 export const SYNTH_RECIPES: Record<SynthRecipeId, SynthRecipe> = {
+  blast_snap: BLAST_SNAP,
   blast_sub: BLAST_SUB,
   blast_tail: BLAST_TAIL,
   blast_beep: BLAST_BEEP,

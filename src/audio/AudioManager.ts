@@ -2,7 +2,7 @@
 // Owns the AudioContext and the mixing graph; knows nothing about individual
 // sounds.
 //
-//   voice -> bus (user volume -> duck) -> master gain -> limiter -> destination
+//   voice -> bus (user volume -> duck) -> master gain -> limiter -> soft clipper -> destination
 //   voice -> reverb send -> reverb bus (user volume -> duck) -> convolver -> return -> master gain
 //
 // Every bus has a dry lane and a wet lane so a volume slider or a duck affects
@@ -13,6 +13,7 @@
 import { AUDIO_DEFAULT_VOLUMES } from '../core/config/balance.js';
 import { DUCK_CONFIG, MASTER_LIMITER_CONFIG, MIXER_CONFIG } from '../core/config/audio/engine.js';
 import { jumpTo, smoothTo } from './engine/audioParams.js';
+import { buildSoftClipCurve } from './engine/softClip.js';
 import { duckLevelAt, mergeDuck, NO_DUCK, scheduleDuck, type DuckState } from './engine/ducking.js';
 import { clamp, dbToGain } from './engine/units.js';
 
@@ -208,8 +209,12 @@ export class AudioManager {
     limiter.ratio.value = MASTER_LIMITER_CONFIG.ratio;
     limiter.attack.value = MASTER_LIMITER_CONFIG.attackS;
     limiter.release.value = MASTER_LIMITER_CONFIG.releaseS;
+    const clipper = ctx.createWaveShaper();
+    clipper.curve = buildSoftClipCurve(MASTER_LIMITER_CONFIG.clipCurveSize, MASTER_LIMITER_CONFIG.clipKnee, MASTER_LIMITER_CONFIG.clipCeiling);
+    clipper.oversample = MASTER_LIMITER_CONFIG.clipOversample;
     master.connect(limiter);
-    limiter.connect(ctx.destination);
+    limiter.connect(clipper);
+    clipper.connect(ctx.destination);
 
     const convolver = ctx.createConvolver();
     const reverbReturn = ctx.createGain();

@@ -50,6 +50,14 @@ export class BlastAudio {
     this.dispatch();
   }
 
+  /**
+   * A full-screen menu hides the game: book nothing more. What is already playing (the shot, its tail) rings
+   * out; the rain of debris still waiting for its turn is forgotten.
+   */
+  hush(): void {
+    this.queue = [];
+  }
+
   /** Cut the blast short: forget what is not yet booked and fade out what is. */
   cancel(): void {
     this.queue = [];

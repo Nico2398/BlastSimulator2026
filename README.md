@@ -261,7 +261,7 @@ After any rendering change:
 | `src/renderer/` | Covered by visual tests (no unit target) |
 | `src/console/` | 80% |
 
-**Coverage configuration:** v8 provider via `@vitest/coverage-v8`; reports: text, json, html, lcov — output to `coverage/`. Minimum per-file thresholds: statements 60%, branches 45%, functions 40%, lines 60%. Excluded from coverage: `src/audio/`, `src/renderer/`, `src/ui/`, `src/persistence/`, console commands, i18n files, event follow-up files, main entry points.
+**Coverage configuration:** v8 provider via `@vitest/coverage-v8`; reports: text, json, html, lcov — output to `coverage/`. Minimum per-file thresholds: statements 85%, branches 75%, functions 65%, lines 85% (a short coverage-debt list in `vitest.config.ts` pins the files that cannot meet them yet). Excluded from coverage: the entry points (`src/main.ts`, `src/console.ts`), the dev pages' entry scripts (`src/model-viewer.ts`, `src/sound-lab.ts`) and a few host-API wrappers (`SceneManager`, `PostPipeline`, the IndexedDB and in-memory persistence backends). `src/audio/` is measured like the rest of `src/`.
 
 ### Performance Benchmarks
 
@@ -315,7 +315,7 @@ src/
   renderer/     Three.js visuals (depends on core, never the reverse)
   physics/      Cannon-es rigid body simulation (active only during blasts)
   ui/           HTML overlay panels (reads from GameState)
-  audio/        Web Audio API sound system
+  audio/        Web Audio sound system: sampled and generative sound effects, interface and gameplay directors, music architecture (see Audio)
   persistence/  Save backends: FilePersistence, IndexedDBPersistence, InMemoryPersistence
   console/      CLI mode — same core logic as the browser UI
   main.ts       Browser entry point
@@ -333,6 +333,8 @@ scripts/
   build-itch.sh         Full itch.io deployment build
   check-tasks.sh        Task consistency checker
   screenshot.ts         Puppeteer-based screenshot script
+  sound-lab-check.ts    Audio check: assets decode in a real browser, offline mix levels (npm run sounds:check)
+  audio-smoke.ts        Audio wiring smoke test in a real browser (npm run audio:smoke)
   scenario-test.ts      Full scenario test runner (Puppeteer)
   ui-diagnostic.ts      UI button diagnostic tool
   validate.sh           Full validation pipeline
@@ -441,3 +443,20 @@ The assignment comment *is* the trigger, and it carries the whole assignment: th
 **Why the PAT matters:** GitHub does not trigger workflows from events created with `GITHUB_TOKEN`. An assignment comment posted with it wakes no runner, and a PR opened with it raises no `pull_request` event, so auto-merge and the next assignment never happen. Every comment and PR in the loop must come from `PAT_TOKEN_COPILOT_AUTOMATION`.
 
 Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill, which keeps the GitHub Actions loop itself (entry points, issue labels as state, parallel runs and scopes, the merge gate, rescue, watchdog) in `references/github-loop.md`.
+
+---
+
+## Audio
+
+**What ships.** Interface sounds (hover, click, panels, toasts, refusals), gameplay cues (orders queued and finished, hiring, purchases, construction, drilling, charging, hauling, collapses, income, level stings), a full blast sequence (evacuation siren and warning beeps, snap, crack, boom and sub-bass scaled to the shot, a tail, debris rain from the real fragment flights) and weather ambience (wind, rain, thunder, machinery). Sound is positional and rate-limited in real time, so 8x speed never turns it into noise. 80 recorded one-shots (`public/audio/sfx/`, about 620 KB) are layered with sounds generated in code at startup. There is no music yet: the engine already selects a menu track, one per biome and optionally one per campaign level (`public/audio/music/README.md`), and the Settings panel gains a Music slider with the first track. There is no in-game credits screen yet.
+
+**Preview in the sound lab.** `npm run dev`, then open `http://localhost:5173/sound-lab.html`: every sound by bus with positional controls, the live blast and a busy-mine soundtrack, and offline mixes you can download as WAV. The page exists on the dev server only, not in the production build.
+
+| Command | What it does |
+|---------|--------------|
+| `npm run sounds:check` | Headless Chromium: every sample decodes, every generated sound renders, offline mixes (interface tour, blast, busy mine) are measured for peaks and silence; writes WAVs and `report.json` |
+| `npm run audio:smoke` | Headless Chromium: the real engine preloads without failures, real clicks produce the intended cues, a scripted game plays the cues it should |
+
+Both need Chrome or Chromium (`npm run verify:env` reports the path). They measure levels and wiring; whether it sounds right takes a pair of ears. Module map, how to add sounds, tuning and licensing rules: the `dev-audio` skill.
+
+**Licensing and credits.** Only sounds we may redistribute ship: CC0 first, CC-BY only with the attribution kept. Every file, its source, author and licence is listed in [`public/audio/CREDITS.md`](public/audio/CREDITS.md) (generated from `assets/audio/recipe.json`, shipped with the game in `dist/audio/`). Most sounds are CC0 (mainly Kenney, kenney.nl). Eight files are derived from six OpenSFX recordings (the OpenTTD base sound set (https://github.com/OpenTTD/OpenSFX)), under Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/), changed from the originals (trimmed, filtered, loudness-normalised, re-encoded): "Crash" and "Big crash" (original "crash.wav" by sagetyrtle, edited by Janis Lukss), "Cash till" (Janis Lukss), "Jackhammer" (original "air hammer half close.wav" by Bluesy1905, cut and edited by Wuzzy), "Modern car horn" (original "claxon.wav" by han1, edited by Janis Lukss) and "Building bridge" (original "in the smithy 2.wav" by l0calh05t, edited by Wuzzy). The verbatim attribution lines are in `public/audio/CREDITS.md`.

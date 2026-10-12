@@ -58,6 +58,10 @@ declare global {
      */
     __loadingScreenPreview: (kind?: 'level' | 'sandbox', locale?: 'en' | 'fr') => void;
     __loadingScreenHide: () => void;
+    /** Present only with `?audioLog=1`: every sound request the game made, oldest first (capped) — read by `npm run audio:smoke`. */
+    __audioLog?: import('../audio/debug/playLog.js').PlayRecord[];
+    /** Present only with `?audioLog=1`: whether the engine is ready, its preload done, the context state and the assets that failed to load. */
+    __audioStatus?: () => import('../audio/debug/audioDebug.js').AudioStatus;
   }
 }
 

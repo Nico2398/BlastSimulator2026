@@ -6,6 +6,7 @@
 
 import type { AudioPlayer, PlayOptions, WorldPoint } from '../AudioPlayer.js';
 import { safePlay } from './safePlay.js';
+import type { CommandClaim } from './CommandClaim.js';
 import { COMMAND_CUES, type CueRule, type CueSpec, type VerbRule } from './commandCueTable.js';
 
 /** The shape of ConsoleRunner's ParsedCommand, restated so the audio layer needs nothing from the console. */
@@ -18,6 +19,11 @@ export interface ParsedCommandLike {
 export interface CommandCueContext {
   /** True for commands the player did not issue (scripted tutorial steps, automatic pauses): they stay silent. */
   readonly scripted?: boolean;
+  /**
+   * Marked whenever a cue is played (success cue or `ui_denied`), so the generic click of the control that ran the
+   * command stays silent. A command that plays nothing leaves it alone and its control keeps the click.
+   */
+  readonly claim?: CommandClaim;
 }
 
 function ownEntry<T>(table: Readonly<Record<string, T>>, key: string): T | undefined {
@@ -38,17 +44,20 @@ function namedPoint(parsed: ParsedCommandLike): WorldPoint | null {
   return x !== undefined && z !== undefined && Number.isFinite(x) && Number.isFinite(z) ? { x, z } : null;
 }
 
-function playSpec(player: AudioPlayer, spec: CueSpec, parsed: ParsedCommandLike): void {
-  if (spec.cue === undefined) return;
+/** Play the success cue of `spec`; false when the rule has none (its sound belongs to someone else). */
+function playSpec(player: AudioPlayer, spec: CueSpec, parsed: ParsedCommandLike): boolean {
+  if (spec.cue === undefined) return false;
   const point = spec.atNamedPoint === true ? namedPoint(parsed) : null;
   const opts: PlayOptions | undefined = point === null ? undefined : { at: point };
   safePlay(player, spec.cue, opts);
   if (spec.then !== undefined) safePlay(player, spec.then.cue, { delayS: spec.then.delayS });
+  return true;
 }
 
 /**
  * Voice the outcome of one console command: its success cue, or `ui_denied` when a player-meaningful
  * command was refused. Unknown, periodic and information-only commands play nothing.
+ * `ctx.claim` is marked exactly when something was played.
  */
 export function commandCue(
   player: AudioPlayer,
@@ -63,7 +72,8 @@ export function commandCue(
   if (rule === null) return;
   if (!success) {
     safePlay(player, 'ui_denied');
+    ctx?.claim?.mark();
     return;
   }
-  playSpec(player, rule, parsed);
+  if (playSpec(player, rule, parsed)) ctx?.claim?.mark();
 }

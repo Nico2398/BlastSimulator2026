@@ -6,8 +6,10 @@
 
 <dir> holds the upstream packs laid out as recipe.json "packs[*].dir" expects.
 Pipeline per sound: decode layers to float mono 44.1 kHz -> optional ffmpeg
-filter -> slice -> mix -> DC removal -> trim silence -> length cap -> fades ->
-loudness normalisation with soft-knee limiter -> libmp3lame VBR.
+filter -> slice -> mix -> DC removal -> trim silence -> length cap -> bass body
+(only sounds whose energy is stranded below small-speaker cutoff, see
+recipe.json "body") -> fades -> loudness normalisation with soft-knee limiter
+-> libmp3lame VBR.
 Only numpy and ffmpeg are needed. Output is deterministic for a given input.
 """
 import argparse
@@ -30,6 +32,18 @@ def decode(path, af=None):
     cmd += ["-ac", "1", "-ar", str(SR), "-f", "f32le", "-"]
     raw = subprocess.run(cmd, check=True, capture_output=True).stdout
     return np.frombuffer(raw, dtype="<f4").astype(np.float64)
+
+
+def apply_af(x, chain):
+    """Run a float mono signal through an ffmpeg audio filter chain."""
+    cmd = ["ffmpeg", "-v", "error", "-f", "f32le", "-ar", str(SR), "-ac", "1", "-i", "-", "-af", chain, "-f", "f32le", "-"]
+    raw = subprocess.run(cmd, input=x.astype("<f4").tobytes(), check=True, capture_output=True).stdout
+    return np.frombuffer(raw, dtype="<f4").astype(np.float64)
+
+
+def apply_af_zero_phase(x, chain):
+    """Forward then backward pass: magnitude response squared, no group delay."""
+    return apply_af(apply_af(x, chain)[::-1].copy(), chain)[::-1].copy()
 
 
 def db(x):
@@ -67,6 +81,53 @@ def soft_limit(x, ceiling_db, knee_db):
     span = ceil - knee
     y[over] = np.sign(x[over]) * (knee + span * np.tanh((a[over] - knee) / span))
     return y
+
+
+def band_shares(x, rule):
+    """Fraction of the 20 Hz - 20 kHz power inside the rule's low and mid bands."""
+    n = 1 << (len(x) - 1).bit_length()
+    power = np.abs(np.fft.rfft(x, n)) ** 2
+    freqs = np.fft.rfftfreq(n, 1 / SR)
+    total = power[(freqs >= 20) & (freqs <= 20000)].sum()
+
+    def share(band):
+        return float(power[(freqs >= band[0]) & (freqs < band[1])].sum() / max(total, 1e-24))
+
+    return share(rule["low_band_hz"]), share(rule["mid_band_hz"])
+
+
+def body_applies(x, body):
+    """Rule: most energy sits below the small-speaker cutoff and little is left in the band they reproduce."""
+    if len(x) < 2:
+        return False, 0.0, 0.0
+    rule = body["rule"]
+    low, mid = band_shares(x, rule)
+    return low >= rule["min_low_share"] and mid < rule["max_mid_share"], low, mid
+
+
+def frame_power(x, n_frames, frame=882):
+    return np.mean(x[: n_frames * frame].reshape(n_frames, frame) ** 2, axis=1)
+
+
+def body_layer(x, body):
+    """Psychoacoustic bass body: own low band -> hard saturation -> 180-900 Hz band, mixed at rel_db.
+
+    rel_db is the layer's power against the mix over the 20 ms frames within window_db of the
+    loudest one, so the level is independent of the source gain and of the saturation depth.
+    """
+    chain = body["chain"]
+    low = apply_af_zero_phase(x, chain["low"])
+    peak = float(np.max(np.abs(low)))
+    n_frames = len(x) // 882
+    if peak < 1e-9 or n_frames == 0:
+        return x
+    sat = apply_af(low / peak, f"asoftclip=type=tanh:threshold={chain['drive_threshold']}")
+    layer = apply_af_zero_phase(sat, chain["band"])
+    ms_mix, ms_layer = frame_power(x, n_frames), frame_power(layer, n_frames)
+    keep = ms_mix > ms_mix.max() * 10 ** (-body["window_db"] / 10)
+    if float(np.mean(ms_layer[keep])) < 1e-24:
+        return x
+    return x + layer * math.sqrt(np.mean(ms_mix[keep]) / np.mean(ms_layer[keep])) * 10 ** (body["rel_db"] / 20)
 
 
 def trim_silence(x, thresh_db, lead_ms, tail_ms):
@@ -181,6 +242,9 @@ def build_one(name, entry, recipe, src, out_dir):
     cap = int(max_s * SR)
     truncated = len(x) > cap
     x = x[:cap]
+    applies, low_share, mid_share = body_applies(x, recipe["body"])
+    if applies:
+        x = body_layer(x, recipe["body"])
     fade_out_ms = entry.get("fade_out_ms", kind["fade_out_ms"])
     x_in = fade(x, spec["fade_in_ms"], fade_out_ms * (2 if truncated and "fade_out_ms" not in entry else 1))
     ceiling_db = spec["peak_ceiling_db"]
@@ -195,6 +259,8 @@ def build_one(name, entry, recipe, src, out_dir):
             break
         ceiling_db -= excess + 0.1
     info["decoded_peak_db"] = decoded_peak
+    info["body"] = applies
+    info["low_share"], info["mid_share"] = low_share, mid_share
     return dest, info
 
 
@@ -293,7 +359,7 @@ def main():
     for name in names:
         dest, info = build_one(name, recipe["sounds"][name], recipe, src, out_dir)
         built.append(dest)
-        print(f"{name:<20} gain {info['gain_db']:+6.1f} dB  limiter {info['limited_db']:4.1f} dB  decoded peak {info['decoded_peak_db']:5.1f}", file=sys.stderr)
+        print(f"{name:<20} gain {info['gain_db']:+6.1f} dB  limiter {info['limited_db']:4.1f} dB  decoded peak {info['decoded_peak_db']:5.1f}  low {info['low_share']:.2f} mid {info['mid_share']:.2f}{'  BODY' if info['body'] else ''}", file=sys.stderr)
     if args.report:
         report(built)
 

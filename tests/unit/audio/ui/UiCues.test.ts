@@ -19,7 +19,7 @@ function runDeferred(): void {
 beforeEach(() => {
   player = new RecordingPlayer();
   deferred = [];
-  cues = new UiCues(player, task => { deferred.push(task); });
+  cues = new UiCues(player, { defer: task => { deferred.push(task); } });
 });
 
 describe('panelShown', () => {

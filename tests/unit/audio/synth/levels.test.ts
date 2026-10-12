@@ -76,6 +76,17 @@ describe('finishRender', () => {
     expect(Math.abs(out[out.length - 1] as number)).toBeLessThan(1e-3);
   });
 
+  it('a one-shot may ask for a shorter fade-in, which keeps its onset', () => {
+    const burst = Float32Array.from({ length: Math.round(SR * 0.5) }, (_, i) => Math.exp(-i / SR / 0.05) * (i % 2 === 0 ? 1 : -1));
+    const first = (fadeInSec?: number): number => {
+      const out = finishRender([burst], SR, 'oneShot', fadeInSec).channels[0] as Float32Array;
+      return Math.abs(out[Math.round(0.0005 * SR)] as number) / Math.max(...out.map(Math.abs));
+    };
+    expect(first(0.0001)).toBeGreaterThan(0.9);
+    expect(first(SYNTH_LEVELS.fadeInSec)).toBeLessThan(0.3);
+    expect(first()).toBeCloseTo(first(SYNTH_LEVELS.fadeInSec), 6);
+  });
+
   it('loops land on the loop level and keep their first sample (no fades)', () => {
     const cosine = sine(100, 2, 0.7, Math.PI / 2);
     const { channels } = finishRender([cosine], SR, 'loop');

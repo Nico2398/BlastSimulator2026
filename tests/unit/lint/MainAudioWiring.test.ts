@@ -36,6 +36,7 @@ describe('src/main.ts — commands are voiced once, by runGameCommand', () => {
   it('runGameCommand voices the command and tells the director, after afterGameCommand', () => {
     const body = functionBody('runGameCommand');
     expect(body).toContain('commandCue(audioPlayer, parsed, result.success');
+    expect(body).toContain('claim: commandClaim');
     expect(body).toContain('gameAudio.onCommand({');
     expect(body.indexOf('afterGameCommand(')).toBeLessThan(body.indexOf('commandCue('));
   });
@@ -83,9 +84,18 @@ describe('src/main.ts — a blast is voiced once, where the renderer fires its f
 describe('src/main.ts — the audio block', () => {
   it('builds no engine and preloads nothing in a scenario run, and preloads after the models', () => {
     expect(source).toContain('const audioEngine = scenarioMode ? null : new AudioEngine(');
-    expect(source).toContain('const audioPlayer: AudioPlayer = audioEngine ?? NULL_AUDIO_PLAYER;');
+    expect(source).toContain('audioEngine ?? NULL_AUDIO_PLAYER, () => ({');
     expect(source).toMatch(/if \(audioEngine\) void modelsReady\.[^\n]*audioEngine\.preload\(\)/);
     expect(occurrences('.preload(')).toBe(1);
+  });
+
+  it('records the intended sounds only behind the audioLog flag, on the engine or the null player alike', () => {
+    expect(occurrences('installAudioDebug(')).toBe(1);
+    expect(source).toMatch(/const audioPlayer: AudioPlayer = installAudioDebug\(window, window\.location\.search, audioEngine \?\? NULL_AUDIO_PLAYER,/);
+    // everything the directors and interface layers call goes through the wrapped player
+    expect(source).toContain('new UiCues(audioPlayer, { claim: commandClaim })');
+    expect(source).toContain('player: audioPlayer,');
+    expect(source).not.toMatch(/new GameAudioDirector\(\{[^}]*player: audioEngine/);
   });
 
   it('streams no music in a scenario run', () => {
@@ -103,8 +113,17 @@ describe('src/main.ts — the audio block', () => {
   });
 
   it('installs the interface sounds muting tutorial-inert controls', () => {
-    expect(source).toContain('installUiSounds(document, audioPlayer, { isInert: target => isRailedControl(target) });');
+    expect(source).toContain('isInert: target => isRailedControl(target)');
     expect(source).toContain('uiManager.setUiCues(uiCues);');
+  });
+
+  it('shares one command claim between the delegated click and the command cue, so a command, a panel or a modal supersedes the click', () => {
+    expect(occurrences('new CommandClaim()')).toBe(1);
+    expect(source).toMatch(/installUiSounds\(document, audioPlayer, \{[^}]*claim: commandClaim[^}]*\}\);/);
+    expect(occurrences('claim: commandClaim')).toBe(3);
+    // the claim exists before anything that takes it
+    expect(source.indexOf('new CommandClaim()')).toBeLessThan(source.indexOf('new UiCues('));
+    expect(source.indexOf('new CommandClaim()')).toBeLessThan(source.indexOf('installUiSounds('));
   });
 
   it('voices scene selection and refused placement clicks', () => {

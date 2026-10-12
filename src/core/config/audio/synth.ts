@@ -64,6 +64,43 @@ export const BLAST_SUB_CONFIG = {
   ] satisfies readonly BlastSubVariant[],
 } as const;
 
+interface BlastSnapVariant {
+  /** Decay time constant of the broadband crack. */
+  readonly crackTauSec: number;
+  /** Start of the falling body sine. */
+  readonly bodyStartHz: number;
+  readonly bodyEndHz: number;
+}
+
+/** The shot's instantaneous onset: a broadband crack over a short punch, with a bright sizzle behind. */
+export const BLAST_SNAP_CONFIG = {
+  sampleRate: 44100,
+  durationSec: 0.5,
+  /** Fade-in, far shorter than the shared one: the crack must start at full strength, and 0.2 ms only keeps the first sample from being a step. */
+  fadeInSec: 0.0002,
+  crackHighpassHz: 800,
+  /** Keeps the crack off the top octave, where noise makes the largest inter-sample overshoots. */
+  crackLowpassHz: 14000,
+  /** Noise punch between these edges. */
+  bodyBandHz: { low: 150, high: 900 },
+  bodyNoiseGain: 0.7,
+  bodyNoiseTauSec: 0.045,
+  /** Sine that falls from the variant's start to its end frequency. */
+  bodySineGain: 0.45,
+  bodySineTauSec: 0.05,
+  bodyPitchTauSec: 0.05,
+  /** Sizzle band and level against the crack (linear: 0.25 is -12 dB). */
+  sizzleBandHz: { low: 3000, high: 9000 },
+  sizzleGain: 0.25,
+  sizzleTauSec: 0.12,
+  /** Peak-normalised sum goes through tanh at this drive, for edge. */
+  drive: 2.2,
+  variants: [
+    { crackTauSec: 0.014, bodyStartHz: 140, bodyEndHz: 70 },
+    { crackTauSec: 0.02, bodyStartHz: 128, bodyEndHz: 64 },
+  ] satisfies readonly BlastSnapVariant[],
+} as const;
+
 export const BLAST_TAIL_CONFIG = {
   sampleRate: 22050,
   durationSec: 4.5,

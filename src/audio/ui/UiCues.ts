@@ -4,6 +4,7 @@
 
 import type { AudioPlayer } from '../AudioPlayer.js';
 import type { OneShotId } from '../SoundCatalog.js';
+import type { CommandClaim } from './CommandClaim.js';
 import { UI_SELECTION_PITCH_CENTS } from '../../core/config/audio/ui.js';
 import { safePlay } from './safePlay.js';
 
@@ -24,20 +25,32 @@ const NOTIFICATION_CUES: Readonly<Record<NotificationSeverity, { readonly rank: 
   critical: { rank: 3, id: 'notify_bad' },
 };
 
+interface UiCuesOptions {
+  /**
+   * Runs a task after the current synchronous work. The simulation applies a whole tick as one synchronous
+   * command, so every toast of that tick lands before the task and only one is voiced. Default: a microtask.
+   */
+  readonly defer?: (task: () => void) => void;
+  /**
+   * Shared with installUiSounds. A cue that is the direct consequence of an activation (a panel, a modal, a
+   * confirmation) marks it, so the generic click of the control that caused it stays silent. Toasts do not.
+   */
+  readonly claim?: CommandClaim;
+}
+
 export class UiCues {
   private pendingSeverity: NotificationSeverity | null = null;
+  private readonly defer: (task: () => void) => void;
+  private readonly claim: CommandClaim | undefined;
 
-  /**
-   * @param defer Runs a task after the current synchronous work. The simulation applies a whole tick as one
-   *   synchronous command, so every toast of that tick lands before the task and only one is voiced.
-   */
-  constructor(
-    private readonly player: AudioPlayer,
-    private readonly defer: (task: () => void) => void = task => queueMicrotask(task),
-  ) {}
+  constructor(private readonly player: AudioPlayer, options: UiCuesOptions = {}) {
+    this.defer = options.defer ?? (task => queueMicrotask(task));
+    this.claim = options.claim;
+  }
 
   /** A side panel opened or closed (every route: rail, shortcut, Escape). */
   panelShown(open: boolean): void {
+    this.claim?.mark();
     safePlay(this.player, open ? 'ui_open' : 'ui_close');
   }
 
@@ -64,11 +77,13 @@ export class UiCues {
 
   /** A modal dialog appeared. */
   modalShown(): void {
+    this.claim?.mark();
     safePlay(this.player, 'ui_modal');
   }
 
   /** The player accepted a confirmation dialog. */
   confirmAccepted(): void {
+    this.claim?.mark();
     safePlay(this.player, 'ui_confirm');
   }
 

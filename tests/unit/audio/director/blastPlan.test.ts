@@ -27,17 +27,33 @@ function flights(count: number, from: number, to: number, speed = 30, at = { x: 
 }
 
 describe('planBlast main report', () => {
-  it('opens with a crack and sub-bass at 0 and a boom a hair after, the loud ones placed at the blast', () => {
+  it('opens with the synthesized snap and sub-bass at 0, the loud ones placed at the blast', () => {
+    const cues = plan(blast());
+    const snap = of(cues, 'blast_snap')[0];
+    const sub = of(cues, 'blast_sub')[0];
+    expect(snap?.atS).toBe(0);
+    expect(snap?.options.at).toEqual(ORIGIN);
+    expect(snap?.options.pitchCents).toBeUndefined();
+    expect(sub?.atS).toBe(0);
+    expect(sub?.options.at).toBeUndefined();
+  });
+
+  it('lets the sampled crack follow the snap by the configured 20-40 ms and the boom by its own delay', () => {
     const cues = plan(blast());
     const crack = of(cues, 'blast_crack')[0];
     const boom = of(cues, 'blast_boom')[0];
-    const sub = of(cues, 'blast_sub')[0];
-    expect(crack?.atS).toBe(0);
+    expect(cfg.crackDelayS).toBeGreaterThanOrEqual(0.02);
+    expect(cfg.crackDelayS).toBeLessThanOrEqual(0.04);
+    expect(crack?.atS).toBe(cfg.crackDelayS);
     expect(crack?.options.at).toEqual(ORIGIN);
     expect(boom?.atS).toBe(cfg.boomDelayS);
     expect(boom?.options.at).toEqual(ORIGIN);
-    expect(sub?.atS).toBe(0);
-    expect(sub?.options.at).toBeUndefined();
+  });
+
+  it('orders the layers snap and sub, then boom, then crack, then the tail', () => {
+    const cues = plan(blast());
+    expect(cues.slice(0, 2).map(c => c.sound).sort()).toEqual(['blast_snap', 'blast_sub']);
+    expect(cues.slice(2).map(c => c.sound)).toEqual(['blast_boom', 'blast_crack', 'blast_tail']);
   });
 
   it('brings the tail in a beat after the boom', () => {
@@ -57,6 +73,16 @@ describe('planBlast main report', () => {
     expect(levels[0]).toBeGreaterThanOrEqual(0);
     expect(levels[levels.length - 1]).toBe(cfg.maxBoostDb);
     expect(levels.every(l => l <= cfg.maxBoostDb)).toBe(true);
+  });
+
+  it('scales the snap with the same intensity as the crack and the sub-bass', () => {
+    for (const holeCount of [0, 1, 10, 60, 500]) {
+      const cues = plan(blast({ holeCount }));
+      const boost = of(cues, 'blast_crack')[0]?.options.gainDb;
+      expect(of(cues, 'blast_snap')[0]?.options.gainDb).toBe(boost);
+      expect(of(cues, 'blast_sub')[0]?.options.gainDb).toBe(boost);
+    }
+    expect(of(plan(blast({ holeCount: 60 })), 'blast_snap')[0]?.options.gainDb).toBe(cfg.maxBoostDb);
   });
 
   it('weighs charge mass alongside hole count, and prefers the mass the renderer states', () => {
@@ -151,7 +177,25 @@ describe('planBlast debris rain', () => {
 describe('planBlast consequences', () => {
   it('adds nothing without a report', () => {
     const cues = plan(blast());
-    expect(cues.map(c => c.sound).sort()).toEqual(['blast_boom', 'blast_crack', 'blast_sub', 'blast_tail']);
+    expect(cues.map(c => c.sound).sort()).toEqual(['blast_boom', 'blast_crack', 'blast_snap', 'blast_sub', 'blast_tail']);
+  });
+
+  it('adds a quieter, lower snap at the head of each secondary blast, ahead of its crack and boom', () => {
+    const secondaryBlasts = [0, 1].map(i => ({ x: 300 + i, z: 20, explosivesKg: 100 }));
+    const cues = plan(blast({ report: { secondaryBlasts } }));
+    const snaps = of(cues, 'blast_snap').slice(1);
+    const cracks = of(cues, 'blast_crack').slice(1);
+    const booms = of(cues, 'blast_boom').slice(1);
+    expect(snaps).toHaveLength(2);
+    snaps.forEach((snap, i) => {
+      expect(snap.options.at).toEqual({ x: 300 + i, z: 20 });
+      expect(snap.options.pitchCents).toBe(cfg.secondary.snapPitchCents);
+      expect(snap.options.gainDb).toBe((cracks[i]?.options.gainDb ?? NaN) + cfg.secondary.snapGainOffsetDb);
+      expect(snap.options.gainDb).toBeLessThan(cracks[i]?.options.gainDb ?? NaN);
+      expect(cracks[i]?.atS).toBeCloseTo(snap.atS + cfg.crackDelayS, 9);
+      expect(booms[i]?.atS).toBeCloseTo(snap.atS + cfg.secondary.boomDelayS, 9);
+    });
+    expect(snaps[0]?.atS).toBeGreaterThanOrEqual(cfg.secondary.firstDelayS);
   });
 
   it('adds lower, delayed secondary blasts at their own position, capped', () => {

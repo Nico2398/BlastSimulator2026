@@ -20,8 +20,11 @@ export const SYNTH_RENDER_CONFIG = {
 } as const;
 
 /**
- * Master-bus brickwall: a DynamicsCompressorNode set up as a limiter so a
- * blast stacked on a siren and a thunder clap never clips the output.
+ * Master-bus limiter: a DynamicsCompressorNode, then a safety soft clipper.
+ * Web Audio compressors are not brickwall (the attack lets a transient through),
+ * so a WaveShaperNode after it bends whatever still gets past toward a ceiling.
+ * The clipper is a safety net, not part of the sound: the mix is gain-staged to
+ * stay below its knee.
  */
 export const MASTER_LIMITER_CONFIG = {
   thresholdDb: -3,
@@ -29,6 +32,14 @@ export const MASTER_LIMITER_CONFIG = {
   ratio: 20,
   attackS: 0.002,
   releaseS: 0.15,
+  /** Linear level below which the clipper is the identity. */
+  clipKnee: 0.8,
+  /** Linear level the clipper's shoulder approaches (about -0.27 dBFS); the node's input clamp holds the output slightly below it. */
+  clipCeiling: 0.97,
+  /** Samples of the transfer curve over [-1, 1]; odd so 0 maps to 0 exactly. */
+  clipCurveSize: 4097,
+  /** Oversampling of the clipper, so the saturation does not alias. */
+  clipOversample: '4x',
 } as const;
 
 /** Bus graph behaviour. */

@@ -22,14 +22,19 @@ export const DIRECTOR_CONFIG = {
   nearRangeFactor: 2.5,
 } as const;
 
-/** Per-entity cues fed by core events. One flush plays at most `maxPerFlush`, nearest to the listener first. */
+/**
+ * Per-entity cues fed by core events. One flush plays at most `maxPerFlush`, nearest to the listener first.
+ * `spacingS` is the least real time between two plays of the intent whichever entity makes them: without it a
+ * big crew at 8x would repeat a cue as fast as the entities take turns (measured: 15 collapses in 30 s, five
+ * times the 1x peak), because the per-entity cooldown only spaces one entity from itself. 0 for none.
+ */
 export const EVENT_CUES = {
-  haulLoad: { maxPerFlush: 2, entityCooldownS: 1.5 },
-  haulDump: { maxPerFlush: 2, entityCooldownS: 1.5 },
-  boulder: { maxPerFlush: 1, entityCooldownS: 2 },
-  vehicleStart: { maxPerFlush: 1, entityCooldownS: 5 },
-  horn: { maxPerFlush: 1, entityCooldownS: 30 },
-  collapse: { maxPerFlush: 1, entityCooldownS: 10 },
+  haulLoad: { maxPerFlush: 2, entityCooldownS: 1.5, spacingS: 0 },
+  haulDump: { maxPerFlush: 2, entityCooldownS: 1.5, spacingS: 0 },
+  boulder: { maxPerFlush: 1, entityCooldownS: 2, spacingS: 0 },
+  vehicleStart: { maxPerFlush: 1, entityCooldownS: 5, spacingS: 5 },
+  horn: { maxPerFlush: 1, entityCooldownS: 30, spacingS: 0 },
+  collapse: { maxPerFlush: 1, entityCooldownS: 10, spacingS: 6 },
 } as const;
 
 /** Global budget shared by every hauling cue, so a big blast's hundreds of trips stay a texture at any speed. */
@@ -41,7 +46,8 @@ export const HAUL_BUDGET_CONFIG = {
 /** Cues that are not tied to an entity: one per burst, with a cooldown. */
 export const FLAG_CUES = {
   levelUp: { cooldownS: 2.5 },
-  shiftBell: { cooldownS: 8 },
+  /** A shift bell is a landmark, not a texture: one per this many real seconds however many shifts change. */
+  shiftBell: { cooldownS: 20 },
   unlock: { cooldownS: 1 },
   /** Off-screen collapse falls back to a muted alert, since nobody can see it. */
   offscreenCollapse: { cooldownS: 10, gainDb: -3 },
@@ -60,9 +66,11 @@ export const DIFF_CONFIG = {
     demolished: 0.5,
     vehicleStart: 0.8,
     vehicleScrap: 0.5,
-    orderDone: 0.8,
-    drillDone: 0.5,
-    chargeLoaded: 0.5,
+    orderDone: 3,
+    // Acknowledgements of a finished hole or a loaded charge: a 60-hole plan at 8x finishes holes every real
+    // second, so these are spaced in real time (1x peaks were 4 to 8 per 30 s; 8x reached 17).
+    drillDone: 3,
+    chargeLoaded: 3,
     surveyDone: 1,
     collapse: 2,
     notifyBad: 3,
@@ -121,9 +129,15 @@ export const BLAST_AUDIO_CONFIG = {
   /** A blast of this many holes (or kilograms of charge) is "full scale": +maxBoostDb. */
   fullScaleHoles: 60,
   fullScaleChargeKg: 600,
-  /** Loudness added on top of the catalog trim at full scale; never above. */
-  maxBoostDb: 4,
-  /** The boom trails the crack by this long so their transients do not stack (s). */
+  /**
+   * Loudness added on top of the catalog trim at full scale; never above. Kept small on purpose: the snap, sub and
+   * crack stack within 30 ms, and the master compressor lets that first transient through, so a bigger boost lands
+   * in the safety clipper (measured by `npm run sounds:check`: +4 dB put the blast mix at +0.3 dBFS).
+   */
+  maxBoostDb: 3,
+  /** The sampled crack trails the synthesized snap (which fires with the sub-bass at t = 0) by this long, so the snap's onset stays clean (s). */
+  crackDelayS: 0.03,
+  /** The boom body trails the snap by this long so the transients do not stack (s). */
   boomDelayS: 0.02,
   /** Pitch drop of the boom at full scale (cents): a big shot is deeper. */
   boomPitchDropCents: 350,
@@ -173,7 +187,11 @@ export const BLAST_AUDIO_CONFIG = {
     /** Lower than the main blast: a distant, heavier thud. */
     boomPitchCents: -500,
     crackPitchCents: -300,
-    crackDelayS: 0.02,
+    /** The snap is this much quieter than the sampled layers, and lower: a distant crack. */
+    snapGainOffsetDb: -3,
+    snapPitchCents: -200,
+    /** The boom follows the snap by this long (s); the crack follows by the main `crackDelayS`. */
+    boomDelayS: 0.02,
     /** Stored explosives that earn the full level. */
     fullScaleKg: 200,
     minGainDb: -6,

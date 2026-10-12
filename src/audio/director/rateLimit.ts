@@ -10,11 +10,16 @@ export class CooldownGate {
 
   constructor(private readonly now: () => number) {}
 
+  /** True when `key` is off cooldown; does not start one. */
+  isReady(key: string): boolean {
+    const until = this.until.get(key);
+    return until === undefined || this.now() >= until;
+  }
+
   /** True (and the key goes on cooldown) when `key` is off cooldown. */
   tryPass(key: string, cooldownS: number): boolean {
     const now = this.now();
-    const until = this.until.get(key);
-    if (until !== undefined && now < until) return false;
+    if (!this.isReady(key)) return false;
     this.until.set(key, now + cooldownS);
     if (this.until.size > DIRECTOR_CONFIG.cooldownSweepThreshold) this.sweep(now);
     return true;

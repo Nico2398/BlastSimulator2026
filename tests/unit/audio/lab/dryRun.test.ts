@@ -51,7 +51,7 @@ describe.each(MIX_SCENARIO_NAMES)('dry run of %s', (name) => {
 describe('the real recipes', () => {
   it('are all in the table the lab wraps', () => {
     expect(Object.keys(SYNTH_RECIPES).sort()).toEqual([
-      'blast_beep', 'blast_cancel', 'blast_sub', 'blast_tail', 'machinery_bed', 'rain_heavy_bed', 'rain_light_bed', 'siren_loop', 'thunder', 'wind_bed',
+      'blast_beep', 'blast_cancel', 'blast_snap', 'blast_sub', 'blast_tail', 'machinery_bed', 'rain_heavy_bed', 'rain_light_bed', 'siren_loop', 'thunder', 'wind_bed',
     ]);
   });
 });

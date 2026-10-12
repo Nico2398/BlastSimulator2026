@@ -43,7 +43,7 @@ export class FakeParam {
   get scheduled(): ParamEvent[] { return this.events.filter(e => e.type !== 'cancel'); }
 }
 
-export type FakeKind = 'gain' | 'biquad' | 'panner' | 'source' | 'compressor' | 'convolver' | 'destination';
+export type FakeKind = 'gain' | 'biquad' | 'panner' | 'source' | 'compressor' | 'shaper' | 'convolver' | 'destination';
 
 export class FakeNode {
   readonly outputs: FakeNode[] = [];
@@ -116,6 +116,14 @@ export class FakeCompressor extends FakeNode {
     this.ratio = new FakeParam(12, ctx);
     this.attack = new FakeParam(0.003, ctx);
     this.release = new FakeParam(0.25, ctx);
+  }
+}
+
+export class FakeWaveShaper extends FakeNode {
+  curve: Float32Array | null = null;
+  oversample: 'none' | '2x' | '4x' = 'none';
+  constructor(ctx: FakeAudioContext) {
+    super('shaper', ctx);
   }
 }
 
@@ -199,6 +207,7 @@ export class FakeAudioContext {
   createBiquadFilter(): FakeBiquad { return this.track(new FakeBiquad(this)); }
   createStereoPanner(): FakePanner { return this.track(new FakePanner(this)); }
   createDynamicsCompressor(): FakeCompressor { return this.track(new FakeCompressor(this)); }
+  createWaveShaper(): FakeWaveShaper { return this.track(new FakeWaveShaper(this)); }
   createConvolver(): FakeConvolver { return this.track(new FakeConvolver(this)); }
   createBufferSource(): FakeSource { return this.track(new FakeSource(this)); }
 

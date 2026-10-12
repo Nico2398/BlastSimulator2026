@@ -57,13 +57,17 @@ Every file goes through one deterministic pipeline (`assets/audio/build.py`, par
    ffmpeg filter, slice, and mix the layers;
 2. remove DC offset, trim silence below -55 dBFS keeping a 2 ms lead, cap the length per kind
    (ui 1.0 s, work 1.6 s, sting 3.5 s, blast 3.0 s; individual files may be shorter);
-3. 1 ms fade-in and a 15 to 40 ms fade-out (longer where a file is cut short);
-4. normalise to -18 dBFS RMS measured over 20 ms frames above -50 dBFS, with a -1 dBFS peak
+3. sounds whose power sits mostly below 150 Hz (at least 50 percent) with under 15 percent in
+   150 to 1500 Hz, which laptop and phone speakers cannot reproduce, get a derived "bass body"
+   layer added: their own sub-150 Hz band, saturated so it produces odd harmonics, band-limited
+   to 180 to 900 Hz and mixed 6 dB under the sound (recipe.json `body`);
+4. 1 ms fade-in and a 15 to 40 ms fade-out (longer where a file is cut short);
+5. normalise to -18 dBFS RMS measured over 20 ms frames above -50 dBFS, with a -1 dBFS peak
    ceiling enforced by a soft-knee (tanh) limiter, never a hard clip. Gain is raised no further
    than lets the limiter take 6 dB off the peaks, so very spiky sounds (coins, cash till, hammer)
    end up a few dB under -18 dBFS RMS instead of being squashed. The ceiling is tightened and the
    file re-encoded until the decoded MP3 peak is at or below -1 dBFS;
-5. encode mono MP3, libmp3lame VBR quality 2 (2 to 38 KB per file, about 620 KB in total).
+6. encode mono MP3, libmp3lame VBR quality 2 (2 to 38 KB per file, about 620 KB in total).
 
 Per-sound gain and spatial behaviour in game are set in the game's sound catalog, not here.
 

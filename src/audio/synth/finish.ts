@@ -37,12 +37,15 @@ function scaled(source: readonly Float32Array[], gain: number, ceiling: number):
   });
 }
 
-/** Bring `raw` (left untouched) to the reference level for its kind. Loops keep their wrap and get no fades. */
-export function finishRender(raw: readonly Float32Array[], sampleRate: number, kind: SoundKind): RenderedAudio {
+/**
+ * Bring `raw` (left untouched) to the reference level for its kind. Loops keep their wrap and get no fades;
+ * a one-shot whose onset must stay sharp passes a shorter `fadeInSec` than the shared default.
+ */
+export function finishRender(raw: readonly Float32Array[], sampleRate: number, kind: SoundKind, fadeInSec: number = SYNTH_LEVELS.fadeInSec): RenderedAudio {
   const work = raw.map((channel) => Float32Array.from(channel));
   for (const channel of work) removeDc(channel);
   if (kind === 'oneShot') {
-    for (const channel of work) fadeEdges(channel, sampleRate, SYNTH_LEVELS.fadeInSec, SYNTH_LEVELS.fadeOutSec);
+    for (const channel of work) fadeEdges(channel, sampleRate, fadeInSec, SYNTH_LEVELS.fadeOutSec);
   }
   const targetDb = kind === 'oneShot' ? SYNTH_LEVELS.oneShotDb : SYNTH_LEVELS.loopDb;
   const ceiling = dbToGain(SYNTH_LEVELS.peakCeilingDb);

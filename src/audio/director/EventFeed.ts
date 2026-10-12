@@ -112,9 +112,10 @@ export class EventFeed {
     }
     heard.sort((a, b) => a.distance - b.distance);
 
+    const spacingKey = `spacing:${intent}`;
     let played = 0;
     for (const { id } of heard) {
-      if (played >= policy.maxPerFlush || (cue.budgeted && !this.haulBudget.canTake())) break;
+      if (played >= policy.maxPerFlush || (cue.budgeted && !this.haulBudget.canTake()) || !this.env.gate.isReady(spacingKey)) break;
       const point = this.env.positionOf(cue.entity, id);
       if (!point) continue;
       const issued = playCue(this.env, {
@@ -126,9 +127,11 @@ export class EventFeed {
       });
       if (!issued) continue;
       played++;
+      if (policy.spacingS > 0) this.env.gate.tryPass(spacingKey, policy.spacingS);
       if (cue.budgeted) this.haulBudget.take();
     }
-    if (intent === 'collapse' && played === 0 && ids.size > 0) {
+    // Nobody in earshot fell: one muted alert, so the collapse is not lost to a worker off screen.
+    if (intent === 'collapse' && heard.length === 0 && ids.size > 0) {
       playCue(this.env, { sound: 'notify_bad', key: 'offscreen_collapse', cooldownS: FLAG_CUES.offscreenCollapse.cooldownS, gainDb: FLAG_CUES.offscreenCollapse.gainDb });
     }
   }

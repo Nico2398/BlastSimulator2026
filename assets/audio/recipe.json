@@ -32,6 +32,27 @@
    "fade_out_ms": 40
   }
  },
+ "body": {
+  "rule": {
+   "low_band_hz": [
+    20,
+    150
+   ],
+   "mid_band_hz": [
+    150,
+    1500
+   ],
+   "min_low_share": 0.5,
+   "max_mid_share": 0.15
+  },
+  "chain": {
+   "low": "lowpass=f=140",
+   "drive_threshold": 0.15,
+   "band": "highpass=f=180,lowpass=f=900"
+  },
+  "window_db": 35,
+  "rel_db": -6
+ },
  "packs": {
   "uisfx": {
    "title": "uisfx 0.4.0 (npm), 'mechanical' personality",
