@@ -22,8 +22,8 @@
 // glossaryConformance.test.ts and textAccuracy.test.ts.
 
 import { describe, it, expect } from 'vitest';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 import { LOCALE_SHARED_VALUE_ALLOWLIST } from '../../../src/core/i18n/localeSharedValuesAllowlist.js';
 
 const en: Record<string, string> = enLocale as Record<string, string>;

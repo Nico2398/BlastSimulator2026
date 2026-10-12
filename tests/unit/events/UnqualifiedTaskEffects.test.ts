@@ -4,8 +4,8 @@ import { describe, it, expect } from 'vitest';
 import { UNQUALIFIED_TASK_EFFECTS } from '../../../src/core/events/UnqualifiedTaskEffects.js';
 import { UNQUALIFIED_CONTRACTOR_FEE } from '../../../src/core/config/balance.js';
 import { planTraining } from '../../../src/core/entities/EmployeeTraining.js';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 import { SURVEY_FEE, setupUnqualified, totalDebit } from '../../helpers/unqualifiedWorld.js';
 
 const TICK = 40;

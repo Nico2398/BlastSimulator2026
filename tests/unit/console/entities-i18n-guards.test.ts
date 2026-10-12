@@ -40,8 +40,8 @@ import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
 import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { Random } from '../../../src/core/math/Random.js';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 function makeCtx(cash = 1_000_000): GameContext {
   return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash });

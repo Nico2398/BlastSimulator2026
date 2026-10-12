@@ -25,8 +25,8 @@ import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 import { t } from '../../../src/core/i18n/I18n.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 

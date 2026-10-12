@@ -1,7 +1,14 @@
 import { defineConfig } from 'vitest/config';
 
+// Node 25+ ships a global `localStorage` (undefined unless --localstorage-file
+// is given) that shadows jsdom's in `@vitest-environment jsdom` tests. Turn it off
+// where the flag exists so the suite runs on any Node, not just the CI one.
+const nodeMajor = Number(process.versions.node.split('.')[0]);
+const execArgv = nodeMajor >= 25 ? ['--no-experimental-webstorage'] : [];
+
 export default defineConfig({
   test: {
+    poolOptions: { threads: { execArgv }, forks: { execArgv } },
     include: [
       'tests/unit/**/*.test.ts',
       'tests/integration/**/*.test.ts',

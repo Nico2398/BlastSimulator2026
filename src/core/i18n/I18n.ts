@@ -2,8 +2,8 @@
 // Pure TypeScript, no side effects, no DOM.
 // Usage: t('blast.fragments', { count: 42 }) → "42 fragments detected"
 
-import enLocale from './locales/en.json' assert { type: 'json' };
-import frLocale from './locales/fr.json' assert { type: 'json' };
+import enLocale from './locales/en.json' with { type: 'json' };
+import frLocale from './locales/fr.json' with { type: 'json' };
 
 // Exported so UI code (e.g. shared language-pill helpers) can type against
 // the same locale union instead of re-declaring 'en' | 'fr' locally.

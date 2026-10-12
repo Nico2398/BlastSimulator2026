@@ -132,8 +132,8 @@ describe('tutorial keys — en and fr translations differ', () => {
 
 // ── #1335: contract-accept card removed, sell-ore copy reworded ─────────────
 
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 import { GLOSSARY } from '../../../src/core/i18n/glossary.js';
 
 describe('#1335: contract-accept locale keys are gone', () => {

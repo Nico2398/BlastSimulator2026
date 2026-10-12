@@ -17,8 +17,8 @@ import {
 } from '../../../src/core/entities/Building.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 const EN = enLocale as Record<string, string>;
 const FR = frLocale as Record<string, string>;

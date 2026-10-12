@@ -13,8 +13,8 @@ import { candidatesForRole, createHiringPool, takeCandidate } from '../../src/co
 import { HIRING_COSTS, calculateSalary, fireEmployee, hireEmployee, createEmployeeState, type EmployeeRole } from '../../src/core/entities/Employee.js';
 import { HIRING_POOL_REFRESH_INTERVAL, PAY_CYCLE_TICKS } from '../../src/core/config/balance.js';
 import { setLocale, t } from '../../src/core/i18n/I18n.js';
-import en from '../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import fr from '../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import en from '../../src/core/i18n/locales/en.json' with { type: 'json' };
+import fr from '../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 const ROLES: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 const SEED = 42;

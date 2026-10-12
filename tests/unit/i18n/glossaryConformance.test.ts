@@ -22,8 +22,8 @@
 // `note` field of each GLOSSARY entry in glossary.ts.
 
 import { describe, it, expect } from 'vitest';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 import { GLOSSARY } from '../../../src/core/i18n/glossary.js';
 import type { LocaleTerm } from '../../../src/core/i18n/glossary.js';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
-import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import enLocale from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
 const en = enLocale as Record<string, string>;
 const fr = frLocale as Record<string, string>;
