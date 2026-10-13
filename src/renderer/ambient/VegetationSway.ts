@@ -8,7 +8,8 @@
 // that has not loaded falls back to a stand-in built here (a cone tree, a
 // crossed-quad blade) through the same path, and its id is recorded so the
 // layer is rebuilt once it arrives. Static once built — no per-frame CPU
-// work at all, bar hiding props the playable mesh later claims (dropClaimed, #1664). Sway comes from the shared {uTime, uWind} ambient uniforms,
+// work at all, bar hiding props the playable mesh later claims (dropClaimed,
+// #1664). Sway comes from the shared {uTime, uWind} ambient uniforms,
 // updated once per frame and read by every material that references them.
 
 import * as THREE from 'three';
