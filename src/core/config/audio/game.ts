@@ -32,6 +32,8 @@ export const EVENT_CUES = {
   boulder: { maxPerFlush: 1, entityCooldownS: 2, spacingS: 0 },
   vehicleStart: { maxPerFlush: 1, entityCooldownS: 5, spacingS: 5 },
   horn: { maxPerFlush: 1, entityCooldownS: 30, spacingS: 0 },
+  /** A backup alarm is the sound of a worksite and the most tiring one: one truck at a time, a quarter minute apart. */
+  reverse: { maxPerFlush: 1, entityCooldownS: 30, spacingS: 15 },
   collapse: { maxPerFlush: 1, entityCooldownS: 10, spacingS: 6 },
 } as const;
 
@@ -44,8 +46,8 @@ export const HAUL_BUDGET_CONFIG = {
 /** Cues that are not tied to an entity: one per burst, with a cooldown. */
 export const FLAG_CUES = {
   levelUp: { cooldownS: 2.5 },
-  /** A shift bell is a landmark, not a texture: one per this many real seconds however many shifts change. */
-  shiftBell: { cooldownS: 20 },
+  /** A shift whistle is a landmark, not a texture: one per this many real seconds however many shifts change. */
+  shiftWhistle: { cooldownS: 20 },
   unlock: { cooldownS: 1 },
   /** Off-screen collapse falls back to a muted alert, since nobody can see it. */
   offscreenCollapse: { cooldownS: 10, gainDb: -3 },
@@ -101,22 +103,27 @@ export const WORK_CONFIG = {
   /** How often the nearest sites are re-picked (s). */
   selectionIntervalS: 0.5,
   /** Gap between two bursts of one site (s), random in this range. */
-  burstMinS: 1.8,
-  burstMaxS: 4,
+  burstMinS: 2.2,
+  burstMaxS: 5,
   /** A freshly picked site starts within this many seconds, so sites never sync up. */
   firstBurstMaxS: 1.2,
+  /**
+   * The diesel bed under the bursts. Only machines with someone working or driving them count, each weighted 1 within
+   * the listener's reference distance and fading to 0 at `rangeFactor` times it: a crew on foot or a machine across the
+   * pit adds nothing, so the bed is not a constant drone under the whole game.
+   */
   machinery: {
-    /** Working or driving units near the listener for the bed to reach full level. */
-    unitsForFull: 6,
-    /** Highest bed level: it is a texture under everything else. */
-    maxLevel: 0.7,
+    /** Weighted machines near the listener for the bed to reach full level. */
+    unitsForFull: 2,
+    /** Highest bed level: an engine idling under the bursts, never a wall. */
+    maxLevel: 0.45,
     /** Smoothing time constant of the activity measure (s). */
     smoothTauS: 2.5,
     rampS: 0.8,
     /** Level changes smaller than this are not sent to the player. */
     epsilon: 0.03,
-    /** Units count within this multiple of the reference distance. */
-    rangeFactor: 3.5,
+    /** A machine's weight reaches 0 at this multiple of the reference distance. */
+    rangeFactor: 2,
   },
 } as const;
 
@@ -221,7 +228,10 @@ export const SIREN_CONFIG = {
 } as const;
 
 interface WeatherBedLevels {
+  /** The calm breeze recording. */
   readonly wind: number;
+  /** The storm wind recording (gusts through trees). */
+  readonly windStorm: number;
   readonly rainLight: number;
   readonly rainHeavy: number;
 }
@@ -232,8 +242,8 @@ export const AMBIENCE_CONFIG = {
   rampS: 3,
   /** Fade when a full-screen menu opens or closes (s). */
   menuRampS: 1.5,
-  /** The one thing left audible behind a menu: wind, barely. */
-  menuWindLevel: 0.1,
+  /** The one thing left audible behind a menu: a breeze, barely. */
+  menuWindLevel: 0.06,
   /** Weather beds while the simulation is paused or the level is over. */
   pausedFactor: 0.55,
   /** Level changes smaller than this are not sent to the player. */
@@ -248,14 +258,18 @@ export const AMBIENCE_CONFIG = {
   windViewNearM: 20,
   windViewFarM: 120,
   windViewSwing: 0.15,
+  /**
+   * Fair weather is close to silence (0.1 is about -46 dBFS before the bus): the site makes the sound, the air only keeps
+   * a lull from being dead. Weather is heard when it is weather: rain, a storm, a cold wind.
+   */
   weather: {
-    sunny: { wind: 0.25, rainLight: 0, rainHeavy: 0 },
-    cloudy: { wind: 0.35, rainLight: 0, rainHeavy: 0 },
-    light_rain: { wind: 0.4, rainLight: 0.8, rainHeavy: 0 },
-    heavy_rain: { wind: 0.6, rainLight: 0, rainHeavy: 0.85 },
-    storm: { wind: 0.9, rainLight: 0, rainHeavy: 1 },
-    heat_wave: { wind: 0.15, rainLight: 0, rainHeavy: 0 },
-    cold_snap: { wind: 0.55, rainLight: 0, rainHeavy: 0 },
+    sunny: { wind: 0.1, windStorm: 0, rainLight: 0, rainHeavy: 0 },
+    cloudy: { wind: 0.16, windStorm: 0, rainLight: 0, rainHeavy: 0 },
+    light_rain: { wind: 0.14, windStorm: 0, rainLight: 0.6, rainHeavy: 0 },
+    heavy_rain: { wind: 0, windStorm: 0.3, rainLight: 0, rainHeavy: 0.75 },
+    storm: { wind: 0, windStorm: 0.75, rainLight: 0, rainHeavy: 0.9 },
+    heat_wave: { wind: 0.05, windStorm: 0, rainLight: 0, rainHeavy: 0 },
+    cold_snap: { wind: 0.22, windStorm: 0.18, rainLight: 0, rainHeavy: 0 },
   } satisfies Record<WeatherState, WeatherBedLevels>,
   thunder: {
     /** Lightning to thunder, random in this range: how far away the strike feels (s). */
@@ -278,10 +292,10 @@ export const AMBIENCE_CONFIG = {
   },
 } as const;
 
-/** Rare far-away sounds that make the world feel inhabited. */
+/** Rare far-away sounds that make the world feel inhabited: the rest of the site, heard across the pit. */
 export const LIFE_CONFIG = {
-  minIntervalS: 25,
-  maxIntervalS: 70,
+  minIntervalS: 22,
+  maxIntervalS: 55,
   /** Where the sound seems to come from, metres from the listener. */
   minDistanceM: 90,
   maxDistanceM: 220,
@@ -291,10 +305,12 @@ export const LIFE_CONFIG = {
   maxDb: -6,
   /** Candidate sounds (catalog ids) and their relative odds. */
   sounds: {
-    vehicle_scrap: 3,
-    vehicle_horn: 2,
+    vehicle_reverse: 3,
+    work_drill: 2,
     work_hammer: 2,
     haul_dump: 2,
-    building_demolished: 1,
+    vehicle_start: 1,
+    vehicle_horn: 1,
+    vehicle_scrap: 1,
   },
 } as const;

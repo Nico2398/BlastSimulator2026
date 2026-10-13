@@ -21,8 +21,8 @@ import { createRunner, runCommand, type RunnerWithContext } from '../../src/cons
 import { BASE_TICK_MS } from '../../src/core/config/balance.js';
 import { VOICE_CONFIG } from '../../src/core/config/audio/engine.js';
 import {
-  BLAST_BEEP_CONFIG, BLAST_CANCEL_CONFIG, BLAST_SNAP_CONFIG, BLAST_SUB_CONFIG, BLAST_TAIL_CONFIG,
-  SIREN_CONFIG as SIREN_SYNTH_CONFIG, THUNDER_CONFIG,
+  BLAST_BEEP_CONFIG, BLAST_CANCEL_CONFIG, BLAST_SNAP_CONFIG, BLAST_SUB_CONFIG, DEVICE_SOUNDS,
+  SIREN_CONFIG as SIREN_SYNTH_CONFIG,
 } from '../../src/core/config/audio/synth.js';
 import { Random } from '../../src/core/math/Random.js';
 import { parseMp3 } from './mp3Info.js';
@@ -77,11 +77,10 @@ function sampleDurationS(name: string): number {
 const SYNTH_DURATION_S: Readonly<Record<string, number>> = {
   blast_snap: BLAST_SNAP_CONFIG.durationSec,
   blast_sub: BLAST_SUB_CONFIG.durationSec,
-  blast_tail: BLAST_TAIL_CONFIG.durationSec,
   blast_beep: BLAST_BEEP_CONFIG.durationSec,
   blast_cancel: BLAST_CANCEL_CONFIG.durationSec,
   siren_loop: SIREN_SYNTH_CONFIG.durationSec,
-  thunder: Math.max(...THUNDER_CONFIG.variants.map(v => v.durationSec)),
+  ...Object.fromEntries(Object.entries(DEVICE_SOUNDS).map(([id, device]) => [id, device.durationSec])),
 };
 
 const durationCache = new Map<string, number>();

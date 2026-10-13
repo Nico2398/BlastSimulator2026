@@ -48,7 +48,7 @@ describe('WorkSounds bursts', () => {
     expect(f.h.player.plays).toHaveLength(0);
   });
 
-  it('bursts at a working site every 1.8 to 4 real seconds, with jitter', () => {
+  it('bursts at a working site every 2.2 to 5 real seconds, with jitter', () => {
     const f = fixture();
     worker(f.state, 5);
     f.work.refresh(f.state);
@@ -69,7 +69,7 @@ describe('WorkSounds bursts', () => {
   it.each([
     ['drill_hole', 'work_drill'],
     ['dig_ramp_segment', 'work_dig'],
-    ['level_ground', 'work_dig'],
+    ['level_ground', 'work_compact'],
     ['place_building', 'work_hammer'],
     ['demolish_building', 'work_hammer'],
     ['repair_vehicle', 'work_hammer'],
@@ -199,7 +199,19 @@ describe('WorkSounds bursts', () => {
   });
 });
 
+/** A vehicle at (x, z) with a driver on board, driving. */
+function driving(state: GameState, x: number, z = 0): void {
+  const rig = addVehicle(state, 'debris_hauler', x, z);
+  const driver = addEmployee(state, x, z, 'driver');
+  mount(state, driver, rig);
+  driver.itinerary = {} as never;
+  driver.taskTicksRemaining = null;
+}
+
 describe('WorkSounds machinery bed', () => {
+  // listenerAt(0, 0, 40): a 40 m camera, so a reference distance of 24 m and a fade to nothing at 48 m (rangeFactor 2).
+  const level = (f: Fixture): number => f.h.player.bed('amb_machinery').level;
+
   it('stays untouched with nothing going on', () => {
     const f = fixture();
     f.work.refresh(f.state);
@@ -207,9 +219,17 @@ describe('WorkSounds machinery bed', () => {
     expect(f.h.player.bed('amb_machinery').calls).toHaveLength(0);
   });
 
-  it('swells with the working units near the listener, smoothly, up to its ceiling', () => {
+  it('is not fed by a crew on foot, however big: no engine, no diesel', () => {
     const f = fixture();
     for (let i = 0; i < 12; i++) worker(f.state, 5 + i, 'charge_hole');
+    f.work.refresh(f.state);
+    f.run(30);
+    expect(f.h.player.bed('amb_machinery').calls).toHaveLength(0);
+  });
+
+  it('swells with the machines near the listener, smoothly, up to its ceiling', () => {
+    const f = fixture();
+    for (let i = 0; i < 4; i++) driving(f.state, 5, i);
     f.work.refresh(f.state);
     f.run(30);
     const bed = f.h.player.bed('amb_machinery');
@@ -221,28 +241,46 @@ describe('WorkSounds machinery bed', () => {
     expect(bed.calls.every(c => c.rampS === WORK_CONFIG.machinery.rampS)).toBe(true);
   });
 
-  it('counts drivers too, and scales with how many', () => {
-    const few = fixture();
-    const many = fixture();
-    for (const [f, n] of [[few, 1], [many, 5]] as const) {
-      for (let i = 0; i < n; i++) {
-        const rig = addVehicle(f.state, 'debris_hauler', 5, i);
-        const driver = addEmployee(f.state, 5, i, 'driver');
-        mount(f.state, driver, rig);
-        driver.itinerary = {} as never;
-        driver.taskTicksRemaining = null;
-      }
+  it('scales with how many machines run, and counts a machine once however many ride it', () => {
+    const one = fixture();
+    const crowded = fixture();
+    const two = fixture();
+    driving(one.state, 5);
+    driving(crowded.state, 5);
+    const passenger = addEmployee(crowded.state, 5, 0, 'driver');
+    const rig = crowded.state.vehicles.vehicles[0];
+    if (!rig) throw new Error('no vehicle');
+    mount(crowded.state, passenger, rig);
+    passenger.itinerary = {} as never;
+    passenger.taskTicksRemaining = null;
+    driving(two.state, 5, 0);
+    driving(two.state, 5, 2);
+    for (const f of [one, crowded, two]) {
       f.work.refresh(f.state);
       f.run(30);
     }
-    const level = (f: Fixture): number => f.h.player.bed('amb_machinery').level;
-    expect(level(few)).toBeGreaterThan(0);
-    expect(level(many)).toBeGreaterThan(level(few));
+    expect(level(one)).toBeGreaterThan(0);
+    expect(level(crowded)).toBeCloseTo(level(one), 6);
+    expect(level(two)).toBeGreaterThan(level(one));
+  });
+
+  it('fades a machine out with distance, to nothing at rangeFactor times the reference distance', () => {
+    const at = (x: number): number => {
+      const f = fixture();
+      driving(f.state, x);
+      f.work.refresh(f.state);
+      f.run(30);
+      return level(f);
+    };
+    expect(at(10)).toBeCloseTo(at(20), 6);
+    expect(at(36)).toBeLessThan(at(20));
+    expect(at(36)).toBeGreaterThan(0);
+    expect(at(60)).toBe(0);
   });
 
   it('fades to silence when paused or when the work ends, and reaches exactly zero', () => {
     const f = fixture();
-    for (let i = 0; i < 6; i++) worker(f.state, 5 + i, 'charge_hole');
+    for (let i = 0; i < 2; i++) driving(f.state, 5, i);
     f.work.refresh(f.state);
     f.run(20);
     expect(f.h.player.bed('amb_machinery').level).toBeGreaterThan(0.3);
@@ -250,9 +288,9 @@ describe('WorkSounds machinery bed', () => {
     expect(f.h.player.bed('amb_machinery').level).toBe(0);
   });
 
-  it('ignores units out of earshot', () => {
+  it('ignores machines out of earshot', () => {
     const f = fixture();
-    for (let i = 0; i < 6; i++) worker(f.state, 3000 + i, 'charge_hole');
+    for (let i = 0; i < 6; i++) driving(f.state, 3000 + i);
     f.work.refresh(f.state);
     f.run(20);
     expect(f.h.player.bed('amb_machinery').level).toBe(0);
@@ -261,6 +299,7 @@ describe('WorkSounds machinery bed', () => {
   it('clear() silences the bed and forgets the sites', () => {
     const f = fixture();
     for (let i = 0; i < 6; i++) worker(f.state, 5 + i);
+    driving(f.state, 5);
     f.work.refresh(f.state);
     f.run(20);
     f.work.clear();

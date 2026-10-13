@@ -3,8 +3,7 @@
 // tracks, envelopes and event statistics.
 
 import { describe, expect, it } from 'vitest';
-import { BLAST_SNAP_CONFIG, SYNTH_LEVELS } from '../../../../src/core/config/audio/synth.js';
-import { filterBuffer } from '../../../../src/audio/synth/filters.js';
+import { BLAST_SNAP_CONFIG, DEVICE_SOUNDS, SYNTH_LEVELS } from '../../../../src/core/config/audio/synth.js';
 import type { RenderedAudio } from '../../../../src/audio/synth/types.js';
 import { bandPower, dominantFrequency, goertzelPower, toDb, windowOf } from './helpers.js';
 import { renderCached } from './helpers.js';
@@ -28,15 +27,6 @@ function windowedDb(audio: RenderedAudio, windowSec: number, channel = 0): numbe
 function bandRatioDb(audio: RenderedAudio, from: number, to: number, a: [number, number, number], b: [number, number, number]): number {
   const w = windowOf(audio, from, to);
   return toDb(bandPower(w, audio.sampleRate, ...a) / bandPower(w, audio.sampleRate, ...b));
-}
-
-/** Spread of the loudest 4 ms windows over the typical one: how clicky a band is. */
-function clickinessDb(samples: Float32Array, sampleRate: number): number {
-  const size = Math.round(0.004 * sampleRate);
-  const levels: number[] = [];
-  for (let start = 0; start + size <= samples.length; start += size) levels.push(rmsDb(samples.subarray(start, start + size)));
-  levels.sort((a, b) => a - b);
-  return (levels[Math.floor(levels.length * 0.99)] as number) - (levels[levels.length >> 1] as number);
 }
 
 describe('blast_sub', () => {
@@ -128,35 +118,6 @@ describe('blast_snap', () => {
   });
 });
 
-describe('blast_tail', () => {
-  const audio = renderCached('blast_tail', 0);
-
-  it('is a low rumble, not a hiss', () => {
-    expect(bandRatioDb(audio, 0.2, 4, [20, 400, 10], [2000, 6000, 100])).toBeGreaterThan(20);
-  });
-
-  it('swells in, then decays', () => {
-    const x = audio.channels[0] as Float32Array;
-    const attack = rmsDb(x.subarray(0, Math.round(0.05 * audio.sampleRate)));
-    const peak = rmsDb(windowOf(audio, 0.25, 0.35));
-    const end = rmsDb(windowOf(audio, 4, 4.5));
-    expect(peak).toBeGreaterThan(attack + 10);
-    expect(end).toBeLessThan(peak - 15);
-  });
-
-  it('darkens as it recedes: the filter sweep moves energy from 300-900 Hz toward the sub-bass', () => {
-    const early = bandRatioDb(audio, 0.2, 1, [300, 900, 20], [20, 150, 5]);
-    const late = bandRatioDb(audio, 3, 4, [300, 900, 20], [20, 150, 5]);
-    expect(early).toBeGreaterThan(late + 8);
-  });
-
-  it('carries sparse debris clicks above the rumble', () => {
-    const x = audio.channels[0] as Float32Array;
-    const highs = filterBuffer(x.subarray(0, Math.round(1.5 * audio.sampleRate)), 'highpass', audio.sampleRate, 700);
-    expect(clickinessDb(highs, audio.sampleRate)).toBeGreaterThan(6);
-  });
-});
-
 describe('blast_beep', () => {
   const audio = renderCached('blast_beep', 0);
   const x = audio.channels[0] as Float32Array;
@@ -227,86 +188,103 @@ describe('siren_loop', () => {
   });
 });
 
-describe('thunder', () => {
-  it.each([0, 1, 2])('variant %i opens with a broadband crackle front', (variant) => {
-    const audio = renderCached('thunder', variant);
-    const front = windowOf(audio, 0, 0.4);
-    const later = windowOf(audio, 2.5, 3.5);
-    expect(toDb(bandPower(front, audio.sampleRate, 1200, 6000, 100)) - toDb(bandPower(later, audio.sampleRate, 1200, 6000, 100))).toBeGreaterThan(12);
+/** Level (dB) of a window of a render. */
+const levelDb = (audio: RenderedAudio, from: number, to: number): number => rmsDb(windowOf(audio, from, to));
+
+describe('reverse_beeper', () => {
+  const audio = renderCached('reverse_beeper', 0);
+  const { tones } = DEVICE_SOUNDS.reverse_beeper;
+
+  it('beeps near 1.15 kHz, the pitch of a common backup alarm', () => {
+    const beep = windowOf(audio, 0.1, 0.3);
+    expect(dominantFrequency(beep, audio.sampleRate, 400, 4000, 10)).toBeGreaterThan(1100);
+    expect(dominantFrequency(beep, audio.sampleRate, 400, 4000, 10)).toBeLessThan(1200);
   });
 
-  it.each([0, 1, 2])('variant %i is dominated by a low rumble overall', (variant) => {
-    const audio = renderCached('thunder', variant);
-    expect(bandRatioDb(audio, 0.5, 5, [20, 300, 10], [1500, 5000, 100])).toBeGreaterThan(15);
-  });
-
-  it.each([0, 1, 2])('variant %i has several rolling lobes and a long fade', (variant) => {
-    const audio = renderCached('thunder', variant);
-    const levels = windowedDb(audio, 0.25);
-    const lobes = levels.filter((v, i) => i > 0 && i < levels.length - 1 && v - (levels[i - 1] as number) >= 1.5 && v - (levels[i + 1] as number) >= 1.5);
-    expect(lobes.length).toBeGreaterThanOrEqual(2);
-    expect(Math.max(...levels.slice(-4))).toBeLessThan(Math.max(...levels) - 15);
-  });
-});
-
-describe('wind_bed', () => {
-  const audio = renderCached('wind_bed', 0);
-
-  it('is low and mid air movement with almost nothing at the top', () => {
-    expect(bandRatioDb(audio, 2, 6, [100, 1500, 10], [4000, 5000, 10])).toBeGreaterThan(30);
-  });
-
-  it('gusts slowly: one-second levels vary by a few dB without being static or wild', () => {
-    const levels = windowedDb(audio, 1);
-    const spread = Math.max(...levels) - Math.min(...levels);
-    expect(spread).toBeGreaterThan(3);
-    expect(spread).toBeLessThan(12);
+  it('is three beeps with silence between them, not a held tone', () => {
+    expect(tones).toHaveLength(3);
+    tones.slice(1).forEach((tone, k) => {
+      const before = tones[k] as typeof tone;
+      const gapStart = before.atSec + before.durSec;
+      const off = levelDb(audio, gapStart + 0.1, tone.atSec - 0.1);
+      for (const beep of [before, tone]) {
+        expect(levelDb(audio, beep.atSec + 0.1, beep.atSec + beep.durSec - 0.1) - off, `gap before ${tone.atSec}`).toBeGreaterThan(30);
+      }
+    });
   });
 });
 
-describe('rain beds', () => {
-  const light = renderCached('rain_light_bed', 0);
-  const heavy = renderCached('rain_heavy_bed', 0);
+describe('phone_ring', () => {
+  const audio = renderCached('phone_ring', 0);
 
-  it('light rain is mostly broadband hiss above 1 kHz', () => {
-    expect(bandRatioDb(light, 2, 4, [1000, 9000, 100], [20, 150, 5])).toBeGreaterThan(8);
+  it('trills: consecutive half-periods of the ringer sit on its two pitches', () => {
+    const [ring] = DEVICE_SOUNDS.phone_ring.tones;
+    if (ring?.trillHz === undefined) throw new Error('phone_ring needs a trilling tone');
+    const half = 1 / (ring.trillHz * 2);
+    const pitchOfHalf = (k: number): number => dominantFrequency(
+      windowOf(audio, ring.atSec + k * half + 0.004, ring.atSec + (k + 1) * half - 0.004), audio.sampleRate, 800, 1600, 10,
+    );
+    for (const k of [2, 4, 6]) {
+      expect(Math.abs(pitchOfHalf(k) - ring.hz), `half ${k}`).toBeLessThan(60);
+      expect(Math.abs(pitchOfHalf(k + 1) - (ring.altHz ?? 0)), `half ${k + 1}`).toBeLessThan(60);
+    }
   });
 
-  it('heavy rain adds a low roar relative to its hiss', () => {
-    const roar = (a: RenderedAudio): number => bandRatioDb(a, 2, 4, [100, 300, 5], [2000, 8000, 100]);
-    expect(roar(heavy)).toBeGreaterThan(roar(light) + 8);
-  });
-
-  it('light rain has distinct droplet pings standing out of the hiss', () => {
-    const band = (a: RenderedAudio): Float32Array => filterBuffer(filterBuffer(a.channels[0] as Float32Array, 'highpass', a.sampleRate, 3000), 'lowpass', a.sampleRate, 7000);
-    expect(clickinessDb(band(light), light.sampleRate)).toBeGreaterThan(10);
-    expect(clickinessDb(band(light), light.sampleRate)).toBeGreaterThan(clickinessDb(band(heavy), heavy.sampleRate) + 4);
+  it('rings twice with a gap', () => {
+    expect(levelDb(audio, 0.1, 0.35) - levelDb(audio, 0.47, 0.57)).toBeGreaterThan(30);
+    expect(levelDb(audio, 0.72, 0.97) - levelDb(audio, 0.47, 0.57)).toBeGreaterThan(30);
   });
 });
 
-describe('machinery_bed', () => {
-  const audio = renderCached('machinery_bed', 0);
-  const x = audio.channels[0] as Float32Array;
-
-  it('is a low rumble with a quiet clatter on top', () => {
-    expect(toDb(bandPower(x, audio.sampleRate, 20, 500, 5) / bandPower(x, audio.sampleRate, 4000, 8000, 100))).toBeGreaterThan(20);
+describe('site radio', () => {
+  it.each(['radio_order', 'radio_info', 'radio_good', 'radio_warn', 'radio_end'] as const)('%s sits in the radio band', (id) => {
+    const audio = renderCached(id, 0);
+    const x = audio.channels[0] as Float32Array;
+    const band = bandPower(x, audio.sampleRate, 400, 2800, 20);
+    expect(toDb(bandPower(x, audio.sampleRate, 40, 150, 5) / band)).toBeLessThan(-20);
+    expect(toDb(bandPower(x, audio.sampleRate, 6000, 10000, 100) / band)).toBeLessThan(-20);
   });
 
-  it('is made of pulses, not a drone: short-window level varies strongly', () => {
-    const size = Math.round(0.005 * audio.sampleRate);
-    const levels: number[] = [];
-    for (let start = 0; start + size <= x.length; start += size) levels.push(Math.sqrt(x.subarray(start, start + size).reduce((s, v) => s + v * v, 0) / size));
-    const mean = levels.reduce((s, v) => s + v, 0) / levels.length;
-    const sd = Math.sqrt(levels.reduce((s, v) => s + (v - mean) ** 2, 0) / levels.length);
-    expect(sd / mean).toBeGreaterThan(0.4);
+  it('opens with an audible burst of broadband squelch hiss before the beep', () => {
+    const audio = renderCached('radio_order', 0);
+    const [first] = DEVICE_SOUNDS.radio_order.tones;
+    if (!first) throw new Error('radio_order needs a tone');
+    const hiss = windowOf(audio, 0.005, 0.04);
+    expect(levelDb(audio, 0.005, 0.04)).toBeGreaterThan(levelDb(audio, first.atSec + 0.01, first.atSec + first.durSec - 0.01) - 12);
+    expect(toDb(bandPower(hiss, audio.sampleRate, 1800, 2800, 20) / bandPower(hiss, audio.sampleRate, 400, 1400, 20))).toBeGreaterThan(-12);
   });
 
-  it('pulses at the firing rate: the level envelope has more energy at 20-27 Hz than at 6-14 Hz', () => {
-    const size = Math.round(0.005 * audio.sampleRate);
-    const levels: number[] = [];
-    for (let start = 0; start + size <= x.length; start += size) levels.push(Math.sqrt(x.subarray(start, start + size).reduce((s, v) => s + v * v, 0) / size));
-    const mean = levels.reduce((s, v) => s + v, 0) / levels.length;
-    const envelope = Float32Array.from(levels, (v) => v - mean);
-    expect(toDb(bandPower(envelope, 200, 20, 27, 0.25) / bandPower(envelope, 200, 6, 14, 0.25))).toBeGreaterThan(3);
+  it('acknowledges an order with two notes, the second higher', () => {
+    const audio = renderCached('radio_order', 0);
+    const [first, second] = DEVICE_SOUNDS.radio_order.tones;
+    if (!first || !second) throw new Error('radio_order needs two tones');
+    const pitch = (tone: typeof first): number => dominantFrequency(
+      windowOf(audio, tone.atSec + 0.01, tone.atSec + tone.durSec - 0.01), audio.sampleRate, 600, 2400, 10,
+    );
+    expect(pitch(second)).toBeGreaterThan(pitch(first) * 1.2);
+  });
+});
+
+describe('alarm_buzzer', () => {
+  const audio = renderCached('alarm_buzzer', 0);
+
+  it('rasps: a low buzz whose upper harmonics carry about as much energy as its fundamental', () => {
+    const [buzzTone] = DEVICE_SOUNDS.alarm_buzzer.tones;
+    if (!buzzTone) throw new Error('alarm_buzzer needs a tone');
+    const buzz = windowOf(audio, 0.03, 0.17);
+    const fundamental = goertzelPower(buzz, audio.sampleRate, buzzTone.hz);
+    let harmonics = 0;
+    for (let k = 3; k <= 15; k += 2) harmonics += goertzelPower(buzz, audio.sampleRate, buzzTone.hz * k);
+    expect(dominantFrequency(buzz, audio.sampleRate, 100, 300, 5)).toBeCloseTo(buzzTone.hz, -1);
+    expect(toDb(harmonics / fundamental)).toBeGreaterThan(-6);
+  });
+});
+
+describe('instrument_beep', () => {
+  it('is a high piezo beep near 2.7 kHz', () => {
+    const audio = renderCached('instrument_beep', 0);
+    const beep = windowOf(audio, 0.01, 0.05);
+    expect(dominantFrequency(beep, audio.sampleRate, 1000, 5000, 20)).toBeGreaterThan(2600);
+    expect(dominantFrequency(beep, audio.sampleRate, 1000, 5000, 20)).toBeLessThan(2800);
   });
 });

@@ -103,9 +103,11 @@ export class AudioEngine implements AudioPlayer {
   }
 
   /**
-   * Load all audio in three tiers: samples of interface and high-priority
-   * sampled sounds (flips `ready`), the remaining samples, then the synth
-   * recipes and the reverb impulse (so `ready` excludes synth cues). Safe to call twice (same promise); never rejects.
+   * Load all audio in tiers: samples of interface and high-priority sampled
+   * sounds (flips `ready`), then the synth recipes rendered while the remaining
+   * samples download (the radio and phone cues are synth, so they come right
+   * after the essentials and before the large beds), then the reverb impulse.
+   * `ready` excludes synth cues. Safe to call twice (same promise); never rejects.
    */
   preload(onProgress?: PreloadProgress): Promise<void> {
     this.preloading ??= this.runPreload(onProgress).catch(() => { this.preloadCrashed = true; }).finally(() => { this.preloadSettled = true; });
@@ -130,8 +132,9 @@ export class AudioEngine implements AudioPlayer {
 
     await samples.load(plan.essentialSamples, tick);
     this.essentialsLoaded = true;
-    await samples.load(plan.otherSamples, tick);
+    const others = samples.load(plan.otherSamples, tick);
     await synth.renderAll(plan.recipes, tick);
+    await others;
     const impulse = await synth.renderImpulse();
     if (impulse) this.manager.setReverbImpulse(impulse);
     tick();

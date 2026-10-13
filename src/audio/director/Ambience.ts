@@ -1,10 +1,12 @@
 // BlastSimulator2026 — Ambience
-// The weather beds (wind, light and heavy rain), thunder and the way a pause or
-// a menu quiets them. Beds follow the weather by cross-fading over a few
-// seconds; behind a full-screen menu everything fades away except a very quiet
-// wind, so the menu is not dead. Thunder follows the sky: a lightning flash
-// brings a clap after a delay that feels like distance, and storms add distant
-// rumbles between flashes.
+// The weather beds (a calm breeze, storm wind, light and heavy rain), thunder and
+// the way a pause or a menu quiets them. Beds are field recordings and follow the
+// weather by cross-fading over a few seconds. Fair weather is nearly silent on
+// purpose: the site itself (machines, trucks, the radio) is what you hear, and
+// the air is only there to keep a quiet moment from being dead. Behind a
+// full-screen menu everything fades away except a faint breeze. Thunder follows
+// the sky: a lightning flash brings a clap after a delay that feels like
+// distance, and storms add distant rumbles between flashes.
 
 import type { LoopId } from '../SoundCatalog.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
@@ -25,13 +27,16 @@ interface AmbienceInput {
   readonly viewDistance: number | null;
 }
 
-type BedName = 'wind' | 'rainLight' | 'rainHeavy';
+type BedName = 'wind' | 'windStorm' | 'rainLight' | 'rainHeavy';
 
 const BED_IDS: Readonly<Record<BedName, LoopId>> = {
   wind: 'amb_wind',
+  windStorm: 'amb_wind_storm',
   rainLight: 'amb_rain_light',
   rainHeavy: 'amb_rain_heavy',
 };
+
+const BED_NAMES = Object.keys(BED_IDS) as BedName[];
 
 /** Wind swells as the camera pulls back and eases as it zooms in. */
 function windViewFactor(viewDistance: number | null): number {
@@ -57,7 +62,7 @@ export class Ambience {
   constructor(private readonly env: DirectorEnv) {
     const { player } = env;
     const feed = (id: LoopId): BedFeed => new BedFeed(player.loop(id), AMBIENCE_CONFIG.epsilon);
-    this.beds = { wind: feed(BED_IDS.wind), rainLight: feed(BED_IDS.rainLight), rainHeavy: feed(BED_IDS.rainHeavy) };
+    this.beds = { wind: feed(BED_IDS.wind), windStorm: feed(BED_IDS.windStorm), rainLight: feed(BED_IDS.rainLight), rainHeavy: feed(BED_IDS.rainHeavy) };
   }
 
   update(dtS: number, input: AmbienceInput): void {
@@ -80,7 +85,7 @@ export class Ambience {
 
   /** Fade every bed to silence and forget the weather. */
   clear(): void {
-    for (const name of Object.keys(this.beds) as BedName[]) this.beds[name].set(0, AMBIENCE_CONFIG.menuRampS);
+    for (const name of BED_NAMES) this.beds[name].set(0, AMBIENCE_CONFIG.menuRampS);
     this.weather = null;
     this.bedWeather = null;
     this.heard = false;
@@ -99,12 +104,14 @@ export class Ambience {
 
   private targets(input: AmbienceInput): Record<BedName, number> {
     if (input.menuUp || this.bedWeather === null) {
-      return { wind: input.menuUp ? AMBIENCE_CONFIG.menuWindLevel : 0, rainLight: 0, rainHeavy: 0 };
+      return { wind: input.menuUp ? AMBIENCE_CONFIG.menuWindLevel : 0, windStorm: 0, rainLight: 0, rainHeavy: 0 };
     }
     const levels = AMBIENCE_CONFIG.weather[this.bedWeather];
     const calm = input.paused ? AMBIENCE_CONFIG.pausedFactor : 1;
+    const view = windViewFactor(input.viewDistance);
     return {
-      wind: clamp(levels.wind * windViewFactor(input.viewDistance), 0, 1) * calm,
+      wind: clamp(levels.wind * view, 0, 1) * calm,
+      windStorm: clamp(levels.windStorm * view, 0, 1) * calm,
       rainLight: levels.rainLight * calm,
       rainHeavy: levels.rainHeavy * calm,
     };
@@ -113,7 +120,7 @@ export class Ambience {
   private setBeds(input: AmbienceInput): void {
     const targets = this.targets(input);
     const rampS = input.menuUp !== this.lastMenuUp || input.menuUp ? AMBIENCE_CONFIG.menuRampS : AMBIENCE_CONFIG.rampS;
-    for (const name of Object.keys(this.beds) as BedName[]) this.beds[name].set(targets[name], rampS);
+    for (const name of BED_NAMES) this.beds[name].set(targets[name], rampS);
   }
 
   /**

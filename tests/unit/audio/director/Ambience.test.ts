@@ -20,7 +20,7 @@ interface Fixture {
   readonly h: Harness;
   readonly ambience: Ambience;
   run(seconds: number, input: Partial<Input>): void;
-  level(bed: 'amb_wind' | 'amb_rain_light' | 'amb_rain_heavy'): number;
+  level(bed: 'amb_wind' | 'amb_wind_storm' | 'amb_rain_light' | 'amb_rain_heavy'): number;
 }
 
 function fixture(seed = 42): Fixture {
@@ -43,7 +43,7 @@ describe('Ambience beds', () => {
   it('has no bed running before there is anything to hear', () => {
     const f = fixture();
     f.run(10, { weather: null });
-    for (const bed of ['amb_wind', 'amb_rain_light', 'amb_rain_heavy'] as const) expect(f.h.player.bed(bed).calls).toEqual([]);
+    for (const bed of ['amb_wind', 'amb_wind_storm', 'amb_rain_light', 'amb_rain_heavy'] as const) expect(f.h.player.bed(bed).calls).toEqual([]);
   });
 
   it('sets a calm wind and no rain in sunny weather', () => {
@@ -51,8 +51,17 @@ describe('Ambience beds', () => {
     f.run(1, { weather: 'sunny', viewDistance: 70 });
     expect(f.level('amb_wind')).toBeGreaterThan(cfg.weather.sunny.wind * (1 - cfg.windViewSwing));
     expect(f.level('amb_wind')).toBeLessThan(cfg.weather.sunny.wind * (1 + cfg.windViewSwing));
+    expect(f.h.player.bed('amb_wind_storm').calls).toEqual([]);
     expect(f.h.player.bed('amb_rain_light').calls).toEqual([]);
     expect(f.h.player.bed('amb_rain_heavy').calls).toEqual([]);
+  });
+
+  it('keeps fair weather close to silence: the site, not the air, is what a sunny day sounds like', () => {
+    for (const weather of ['sunny', 'cloudy', 'heat_wave'] as const) {
+      const levels = cfg.weather[weather];
+      expect(levels.wind + levels.windStorm + levels.rainLight + levels.rainHeavy, weather).toBeLessThanOrEqual(0.2);
+    }
+    expect(cfg.menuWindLevel).toBeLessThan(cfg.weather.sunny.wind);
   });
 
   it.each(['sunny', 'cloudy', 'light_rain', 'heavy_rain', 'storm', 'heat_wave', 'cold_snap'] as const)('settles on the %s levels, never above 1', weather => {
@@ -60,17 +69,21 @@ describe('Ambience beds', () => {
     f.run(1, { weather, viewDistance: 70 });
     const levels = cfg.weather[weather];
     const swing = 1 + cfg.windViewSwing;
-    expect(f.level('amb_wind')).toBeLessThanOrEqual(Math.min(1, levels.wind * swing) + 1e-9);
-    expect(f.level('amb_wind')).toBeGreaterThan(0);
+    for (const [bed, level] of [['amb_wind', levels.wind], ['amb_wind_storm', levels.windStorm]] as const) {
+      expect(f.level(bed), bed).toBeLessThanOrEqual(Math.min(1, level * swing) + 1e-9);
+      if (level > 0) expect(f.level(bed), bed).toBeGreaterThan(level * (1 - cfg.windViewSwing) - 1e-9);
+      else expect(f.level(bed), bed).toBe(0);
+    }
+    expect(f.level('amb_wind') + f.level('amb_wind_storm')).toBeGreaterThan(0);
     expect(f.level('amb_rain_light')).toBeCloseTo(levels.rainLight, 6);
     expect(f.level('amb_rain_heavy')).toBeCloseTo(levels.rainHeavy, 6);
   });
 
-  it('orders the wind from calm to storm', () => {
+  it('orders the wind, breeze and storm wind together, from calm to storm', () => {
     const wind = (weather: WeatherState): number => {
       const f = fixture();
       f.run(1, { weather });
-      return f.level('amb_wind');
+      return f.level('amb_wind') + f.level('amb_wind_storm');
     };
     expect(wind('heat_wave')).toBeLessThan(wind('sunny'));
     expect(wind('sunny')).toBeLessThan(wind('cloudy'));

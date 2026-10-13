@@ -28,52 +28,52 @@ function harness(recipes: SynthBankOptions['recipes'], over: Partial<SynthBankOp
 
 describe('SynthBank', () => {
   it('renders every variant into buffers with the rendered samples', async () => {
-    const { bank } = harness({ thunder: recipe(3), blast_sub: recipe(1) });
+    const { bank } = harness({ phone_ring: recipe(3), blast_sub: recipe(1) });
     await bank.renderAll();
-    const thunder = bank.buffers('thunder') as unknown as FakeAudioBuffer[];
-    expect(thunder).toHaveLength(3);
-    expect(thunder[2]!.getChannelData(0)[0]).toBe(3);
-    expect(thunder[0]!.sampleRate).toBe(44100);
+    const ring = bank.buffers('phone_ring') as unknown as FakeAudioBuffer[];
+    expect(ring).toHaveLength(3);
+    expect(ring[2]!.getChannelData(0)[0]).toBe(3);
+    expect(ring[0]!.sampleRate).toBe(44100);
     expect(bank.buffers('blast_sub')).toHaveLength(1);
-    expect(bank.buffers('wind_bed')).toEqual([]);
+    expect(bank.buffers('siren_loop')).toEqual([]);
   });
 
   it('keeps all channels of a stereo render', async () => {
-    const { bank } = harness({ thunder: recipe(1, () => tone(0.25, 4, 2)) });
+    const { bank } = harness({ phone_ring: recipe(1, () => tone(0.25, 4, 2)) });
     await bank.renderAll();
-    const buffer = bank.buffers('thunder')[0] as unknown as FakeAudioBuffer;
+    const buffer = bank.buffers('phone_ring')[0] as unknown as FakeAudioBuffer;
     expect(buffer.numberOfChannels).toBe(2);
     expect(buffer.getChannelData(1)[3]).toBe(0.25);
   });
 
   it('renders only the listed ids and reports each', async () => {
-    const { bank } = harness({ thunder: recipe(1), blast_sub: recipe(1) });
+    const { bank } = harness({ phone_ring: recipe(1), blast_sub: recipe(1) });
     const seen: string[] = [];
     await bank.renderAll(['blast_sub'], id => seen.push(id));
     expect(seen).toEqual(['blast_sub']);
-    expect(bank.buffers('thunder')).toEqual([]);
+    expect(bank.buffers('phone_ring')).toEqual([]);
   });
 
   it('records a recipe that throws and carries on with the others', async () => {
     const { bank } = harness({
-      thunder: recipe(2, () => { throw new Error('not implemented'); }),
+      phone_ring: recipe(2, () => { throw new Error('not implemented'); }),
       blast_sub: recipe(1),
     });
-    await expect(bank.renderAll(['thunder', 'blast_sub', 'wind_bed'])).resolves.toBeUndefined();
-    expect(bank.buffers('thunder')).toEqual([]);
+    await expect(bank.renderAll(['phone_ring', 'blast_sub', 'siren_loop'])).resolves.toBeUndefined();
+    expect(bank.buffers('phone_ring')).toEqual([]);
     expect(bank.buffers('blast_sub')).toHaveLength(1);
-    expect([...bank.failed].sort()).toEqual(['thunder', 'wind_bed']);
+    expect([...bank.failed].sort()).toEqual(['phone_ring', 'siren_loop']);
   });
 
   it('treats an empty render as a failure', async () => {
-    const { bank } = harness({ thunder: recipe(1, () => ({ sampleRate: 44100, channels: [] })) });
+    const { bank } = harness({ phone_ring: recipe(1, () => ({ sampleRate: 44100, channels: [] })) });
     await bank.renderAll();
-    expect(bank.buffers('thunder')).toEqual([]);
-    expect(bank.failed).toEqual(['thunder']);
+    expect(bank.buffers('phone_ring')).toEqual([]);
+    expect(bank.failed).toEqual(['phone_ring']);
   });
 
   it('does not yield while the slice budget holds', async () => {
-    const { bank, yields } = harness({ thunder: recipe(4) });
+    const { bank, yields } = harness({ phone_ring: recipe(4) });
     await bank.renderAll();
     expect(yields).toEqual([]);
   });
@@ -83,7 +83,7 @@ describe('SynthBank', () => {
     const yields: number[] = [];
     const ctx = new FakeAudioContext();
     const bank = new SynthBank(asAudioContext(ctx), {
-      recipes: { thunder: recipe(5, v => { clock += 10; return tone(v); }) },
+      recipes: { phone_ring: recipe(5, v => { clock += 10; return tone(v); }) },
       renderImpulse: () => tone(0),
       yieldToEventLoop: async () => { yields.push(clock); },
       now: () => clock,
@@ -92,7 +92,7 @@ describe('SynthBank', () => {
     await bank.renderAll();
     // 10 ms per variant: the 16 ms budget is spent after every second one
     expect(yields).toEqual([20, 40]);
-    expect(bank.buffers('thunder')).toHaveLength(5);
+    expect(bank.buffers('phone_ring')).toHaveLength(5);
   });
 
   it('builds the reverb impulse, and survives a failing renderer', async () => {

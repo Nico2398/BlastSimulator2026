@@ -138,6 +138,9 @@ export class FakeConvolver extends FakeNode {
 export class FakeSource extends FakeNode {
   buffer: FakeAudioBuffer | null = null;
   loop = false;
+  /** Web Audio defaults: 0 and 0 mean "the whole buffer". */
+  loopStart = 0;
+  loopEnd = 0;
   readonly playbackRate: FakeParam;
   onended: (() => void) | null = null;
   /** Arguments of every start() call. */

@@ -7,27 +7,28 @@ import { BLAST_BEEP } from './sounds/blastBeep.js';
 import { BLAST_CANCEL } from './sounds/blastCancel.js';
 import { BLAST_SNAP } from './sounds/blastSnap.js';
 import { BLAST_SUB } from './sounds/blastSub.js';
-import { BLAST_TAIL } from './sounds/blastTail.js';
-import { MACHINERY_BED } from './sounds/machinery.js';
-import { RAIN_HEAVY_BED, RAIN_LIGHT_BED } from './sounds/rain.js';
+import {
+  ALARM_BUZZER, INSTRUMENT_BEEP, PHONE_RING, RADIO_END, RADIO_GOOD, RADIO_INFO, RADIO_ORDER, RADIO_WARN, REVERSE_BEEPER,
+} from './sounds/devices.js';
 import { renderOutdoorIr } from './sounds/reverb.js';
 import { SIREN_LOOP } from './sounds/siren.js';
-import { THUNDER } from './sounds/thunder.js';
-import { WIND_BED } from './sounds/wind.js';
 import type { RenderedAudio, SynthRecipe } from './types.js';
 
 export const SYNTH_RECIPES: Record<SynthRecipeId, SynthRecipe> = {
   blast_snap: BLAST_SNAP,
   blast_sub: BLAST_SUB,
-  blast_tail: BLAST_TAIL,
   blast_beep: BLAST_BEEP,
   blast_cancel: BLAST_CANCEL,
   siren_loop: SIREN_LOOP,
-  thunder: THUNDER,
-  wind_bed: WIND_BED,
-  rain_light_bed: RAIN_LIGHT_BED,
-  rain_heavy_bed: RAIN_HEAVY_BED,
-  machinery_bed: MACHINERY_BED,
+  radio_order: RADIO_ORDER,
+  radio_info: RADIO_INFO,
+  radio_good: RADIO_GOOD,
+  radio_warn: RADIO_WARN,
+  radio_end: RADIO_END,
+  phone_ring: PHONE_RING,
+  alarm_buzzer: ALARM_BUZZER,
+  reverse_beeper: REVERSE_BEEPER,
+  instrument_beep: INSTRUMENT_BEEP,
 };
 
 /** Impulse response of the shared outdoor reverb (stereo, ~2.4 s). */

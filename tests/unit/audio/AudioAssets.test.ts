@@ -18,16 +18,20 @@ const ROOT = join(import.meta.dirname, '../../..');
 const SFX_DIR = join(ROOT, 'public/audio/sfx');
 const CREDITS = readFileSync(join(ROOT, 'public/audio/CREDITS.md'), 'utf8');
 
-// About 1.5 times what ships (largest file 38 KB, 617 KB in total), so growth of the set is a decision and not an accident.
-const MAX_FILE_BYTES = 60 * 1024;
-const MAX_TOTAL_BYTES = 1024 * 1024;
+// About 1.3 to 1.5 times what ships, so growth of the set is a decision and not an accident: one-shots up to 48 KB, the
+// looped beds (bed_*, 21.6 s of recording at most) up to 146 KB, 1.69 MB in total.
+const MAX_FILE_BYTES = 64 * 1024;
+const MAX_BED_BYTES = 200 * 1024;
+const MAX_TOTAL_BYTES = 2.4 * 1024 * 1024;
+const DEFAULT_SAMPLE_RATE = 44100;
 /** Encoder delay plus padding that the frame count includes but playback trims. */
 const FRAME_SLACK_S = 0.1;
 const MIN_DURATION_S = 0.03;
 const ALLOWED_LICENCES = new Set(['CC0-1.0', 'CC-BY-3.0', 'CC-BY-4.0']);
 
 interface Recipe {
-  readonly kinds: Record<string, { readonly max_s: number }>;
+  readonly spec: { readonly mp3: { readonly sample_rate?: number } };
+  readonly kinds: Record<string, { readonly max_s: number; readonly mp3?: { readonly sample_rate?: number } }>;
   readonly mirrors: Record<string, { readonly commit: string }>;
   readonly packs: Record<string, {
     readonly license: string;
@@ -41,6 +45,7 @@ interface Recipe {
   readonly sounds: Record<string, {
     readonly kind: string;
     readonly max_s?: number;
+    readonly loop?: { readonly period_s: number; readonly pad_s: number };
     readonly layers: readonly { readonly pack: string; readonly file: string }[];
   }>;
 }
@@ -118,7 +123,9 @@ describe('sampled sound assets', () => {
       const info = parseMp3(readFileSync(join(SFX_DIR, file)));
       expect(info, `${file}: no MPEG Layer III frame sync`).not.toBeNull();
       expect(info!.channels, `${file} channels`).toBe(1);
-      expect(info!.sampleRate, `${file} sample rate`).toBe(44100);
+      const kind = RECIPE.kinds[RECIPE.sounds[file.replace(/\.mp3$/, '')]!.kind]!;
+      const rate = kind.mp3?.sample_rate ?? RECIPE.spec.mp3.sample_rate ?? DEFAULT_SAMPLE_RATE;
+      expect(info!.sampleRate, `${file} sample rate`).toBe(rate);
       expect(info!.hasXing, `${file}: VBR header missing, duration is a guess`).toBe(true);
     }
   });
@@ -138,10 +145,30 @@ describe('sampled sound assets', () => {
     let total = 0;
     for (const file of SHIPPED) {
       const bytes = readFileSync(join(SFX_DIR, file)).length;
-      expect(bytes, `${file} is ${bytes} bytes`).toBeLessThanOrEqual(MAX_FILE_BYTES);
+      const cap = RECIPE.sounds[file.replace(/\.mp3$/, '')]!.loop ? MAX_BED_BYTES : MAX_FILE_BYTES;
+      expect(bytes, `${file} is ${bytes} bytes`).toBeLessThanOrEqual(cap);
       total += bytes;
     }
     expect(total).toBeLessThanOrEqual(MAX_TOTAL_BYTES);
+  });
+
+  it('loops every bed over the period the build wrote, and only beds', () => {
+    const beds = Object.entries(SOUND_CATALOG).filter(([, def]) => def.source.kind === 'sample' && def.source.loopRegion);
+    expect(beds.length).toBeGreaterThan(0);
+    for (const [id, def] of Object.entries(SOUND_CATALOG)) {
+      if (def.source.kind !== 'sample') continue;
+      const region = def.source.loopRegion;
+      expect(Boolean(region), `${id}: a sampled loop needs a loopRegion, a one-shot must not have one`).toBe('loop' in def);
+      for (const file of def.source.files) {
+        const loop = RECIPE.sounds[file]!.loop;
+        expect(Boolean(loop), `${id}: ${file} is ${loop ? '' : 'not '}built as a loop`).toBe(Boolean(region));
+        if (!region || !loop) continue;
+        expect(region.startS, `${file} run-in`).toBeCloseTo(loop.pad_s, 6);
+        expect(region.endS - region.startS, `${file} period`).toBeCloseTo(loop.period_s, 6);
+        const info = parseMp3(readFileSync(join(SFX_DIR, `${file}.mp3`)))!;
+        expect(info.durationS, `${file} length`).toBeGreaterThanOrEqual(region.endS + loop.pad_s - FRAME_SLACK_S);
+      }
+    }
   });
 
   it('never ships two byte-identical files', () => {

@@ -13,6 +13,11 @@ filter -> slice -> mix -> DC removal -> trim silence -> length cap -> bass body
 (only sounds whose energy is stranded below small-speaker cutoff, see
 recipe.json "body") -> fades -> loudness normalisation with soft-knee limiter
 -> libmp3lame VBR.
+Looped beds (an entry with "loop") skip trimming, body and fades: the take is
+cross-faded into one seamless period, normalised, then written as that period
+with a short continuation on each side (see loop_bed), so any window of one
+period inside the file loops without a seam whatever the decoder's MP3 delay.
+Kinds may override the loudness target and the MP3 settings.
 Only numpy and ffmpeg are needed. Output is deterministic for a given input.
 """
 import argparse
@@ -158,8 +163,8 @@ def fade(x, in_ms, out_ms):
     return x
 
 
-def normalise(x, spec, ceiling):
-    target = spec["target_rms_db"]
+def normalise(x, spec, ceiling, target=None):
+    target = spec["target_rms_db"] if target is None else target
     gate = spec["gate_db"]
     knee = spec["limiter_knee_db"]
     max_over = spec["max_overshoot_db"]
@@ -194,10 +199,68 @@ def encode_mp3(x, dest, mp3):
     cmd = [
         "ffmpeg", "-v", "error", "-y", "-f", "s16le", "-ar", str(SR), "-ac", "1", "-i", "-",
         "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact",
-        "-c:a", "libmp3lame", "-q:a", str(mp3["vbr_quality"]), "-write_id3v2", "0",
-        str(dest),
     ]
+    if "sample_rate" in mp3:
+        cmd += ["-ar", str(mp3["sample_rate"])]
+    cmd += ["-c:a", "libmp3lame", "-q:a", str(mp3["vbr_quality"]), "-write_id3v2", "0", str(dest)]
     subprocess.run(cmd, input=pcm, check=True)
+
+
+def loop_period(x, period_s, crossfade_s):
+    """One seamless period: the take's head is cross-faded (equal power) with what follows the period's end."""
+    n, c = int(round(period_s * SR)), int(round(crossfade_s * SR))
+    if len(x) < n + c:
+        raise ValueError(f"loop needs {period_s + crossfade_s:g} s of audio, the layers give {len(x) / SR:.2f} s")
+    theta = np.linspace(0, np.pi / 2, c)
+    p = x[:n].copy()
+    p[:c] = x[:c] * np.sin(theta) + x[n : n + c] * np.cos(theta)
+    return p
+
+
+def loop_bed(p, pad_s):
+    """The period with `pad_s` of its own end before it and of its own start after it: periodic over the whole file."""
+    pad = int(round(pad_s * SR))
+    return np.concatenate([p[len(p) - pad :], p, p[:pad]])
+
+
+def encode_checked(x_in, spec, kind, dest, wrap=lambda y: y):
+    """Normalise, encode, and tighten the ceiling until the decoded file honours it (MP3 coding overshoots sample peaks)."""
+    mp3 = {**spec["mp3"], **kind.get("mp3", {})}
+    target = kind.get("target_rms_db", spec["target_rms_db"])
+    ceiling_db = spec["peak_ceiling_db"]
+    for _ in range(4):
+        x, info = normalise(x_in, spec, ceiling_db, target)
+        encode_mp3(wrap(x), dest, mp3)
+        decoded_peak = db(float(np.max(np.abs(decode(dest)))))
+        excess = decoded_peak - spec["peak_ceiling_db"]
+        if excess <= 0.05:
+            break
+        ceiling_db -= excess + 0.1
+    info["decoded_peak_db"] = decoded_peak
+    return info
+
+
+def build_loop(name, entry, recipe, src, out_dir):
+    """A looped bed: no trim, body or fades; normalised as one period, so the file is periodic end to end."""
+    spec = recipe["spec"]
+    kind = recipe["kinds"][entry["kind"]]
+    loop = entry["loop"]
+    if loop["period_s"] > kind["max_s"]:
+        raise ValueError(f"{name}: loop period {loop['period_s']} exceeds kind cap {kind['max_s']}")
+    # A period of whole MP3 frames (1152 samples at the output rate) encodes to identical frames every cycle, so the
+    # decoded file stays periodic to the bit; any other period leaves codec noise across the seam.
+    out_rate = {**spec["mp3"], **kind.get("mp3", {})}.get("sample_rate", SR)
+    frames = loop["period_s"] * out_rate / 1152
+    if abs(frames - round(frames)) > 1e-6:
+        raise ValueError(f"{name}: loop period {loop['period_s']} s is {frames:.3f} MP3 frames at {out_rate} Hz, not a whole number")
+    x = render_layers(entry, src)
+    x = x - float(np.mean(x))
+    p = loop_period(x, loop["period_s"], loop["crossfade_s"])
+    dest = out_dir / f"{name}.mp3"
+    info = encode_checked(p, spec, kind, dest, lambda y: loop_bed(y, loop["pad_s"]))
+    info["body"] = False
+    info["low_share"], info["mid_share"] = band_shares(p, recipe["body"]["rule"])
+    return dest, info
 
 
 class Sources:
@@ -238,6 +301,8 @@ def render_layers(entry, src):
 
 
 def build_one(name, entry, recipe, src, out_dir):
+    if "loop" in entry:
+        return build_loop(name, entry, recipe, src, out_dir)
     spec = recipe["spec"]
     kind = recipe["kinds"][entry["kind"]]
     x = render_layers(entry, src)
@@ -254,18 +319,8 @@ def build_one(name, entry, recipe, src, out_dir):
         x = body_layer(x, recipe["body"])
     fade_out_ms = entry.get("fade_out_ms", kind["fade_out_ms"])
     x_in = fade(x, spec["fade_in_ms"], fade_out_ms * (2 if truncated and "fade_out_ms" not in entry else 1))
-    ceiling_db = spec["peak_ceiling_db"]
     dest = out_dir / f"{name}.mp3"
-    # MP3 coding overshoots sample peaks; tighten the ceiling until the decoded file honours it.
-    for _ in range(4):
-        x, info = normalise(x_in, spec, ceiling_db)
-        encode_mp3(x, dest, spec["mp3"])
-        decoded_peak = db(float(np.max(np.abs(decode(dest)))))
-        excess = decoded_peak - spec["peak_ceiling_db"]
-        if excess <= 0.05:
-            break
-        ceiling_db -= excess + 0.1
-    info["decoded_peak_db"] = decoded_peak
+    info = encode_checked(x_in, spec, kind, dest)
     info["body"] = applies
     info["low_share"], info["mid_share"] = low_share, mid_share
     return dest, info
@@ -332,6 +387,8 @@ def credits_text(recipe, template):
             changes = [describe_layer(ly) or "none"]
             if i == 0 and "max_s" in entry:
                 changes.append(f"whole sound cut to {entry['max_s']:g} s")
+            if i == 0 and "loop" in entry:
+                changes.append(f"looped: {entry['loop']['period_s']:g} s period, {entry['loop']['crossfade_s']:g} s cross-fade")
             first = f"`{name}.mp3`" if i == 0 else ""
             src = f"[`{ly['file']}`]({url})" if url != pack["url"] else f"`{ly['file']}`"
             cells = [first, f"[{pack['title']}]({pack['url']})", src, who.replace("|", "/"), lic, ", ".join(changes)]
@@ -345,6 +402,8 @@ def credits_text(recipe, template):
         .replace("{{OPENSFX_COMMIT}}", recipe["packs"]["opensfx"]["commit"])
         .replace("{{MIRROR_COMMIT}}", mirror["commit"])
         .replace("{{OFFICIAL_ZIPS}}", zips)
+        .replace("{{OPENOMSI_ZIP}}", recipe["packs"]["openomsi"]["release_zip"])
+        .replace("{{OPENOMSI_SHA256}}", recipe["packs"]["openomsi"]["release_sha256"])
     )
 
 
@@ -497,7 +556,11 @@ def selftest():
         assert verify_report([("a", "p", "MATCH", ""), ("b", "p", "DIFFERENT", "")])[1] == 1
         assert verify_report([("a", "p", "NOT FOUND", "")])[1] == 1
         assert verify_report([])[1] == 1
-    print("selftest OK: MATCH, DIFFERENT, NOT FOUND, pack-folder preference, junk skipping and AIFF/WAV sample comparison behave")
+    bed = loop_bed(loop_period(np.random.default_rng(1).standard_normal(SR * 3), 2.0, 0.5), 0.25)
+    n = 2 * SR
+    assert len(bed) == n + 2 * int(0.25 * SR) and np.array_equal(bed[:-n], bed[n:]), "selftest: a bed is not periodic"
+    print("selftest OK: MATCH, DIFFERENT, NOT FOUND, pack-folder preference, junk skipping and AIFF/WAV sample comparison"
+          " behave; a looped bed is periodic over the whole file")
 
 
 def main():

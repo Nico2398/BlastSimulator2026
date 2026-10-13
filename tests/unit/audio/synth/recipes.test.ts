@@ -4,28 +4,34 @@ import { describe, expect, it } from 'vitest';
 import { SOUND_CATALOG, type SynthRecipeId } from '../../../../src/audio/SoundCatalog.js';
 import { SYNTH_RECIPES } from '../../../../src/audio/synth/recipes.js';
 import { dcOffset, gatedRmsDb, truePeakDb } from '../../../../src/audio/synth/loudness.js';
-import { MACHINERY_CONFIG, RAIN_HEAVY_CONFIG, RAIN_LIGHT_CONFIG, SIREN_CONFIG, SYNTH_LEVELS, WIND_CONFIG } from '../../../../src/core/config/audio/synth.js';
+import { SIREN_CONFIG, SYNTH_LEVELS } from '../../../../src/core/config/audio/synth.js';
 import { maxLineProminenceDb, renderCached, sameSamples, sortedSteps, windowOf } from './helpers.js';
 
 const EXPECTED_IDS: Record<SynthRecipeId, true> = {
   blast_snap: true,
   blast_sub: true,
-  blast_tail: true,
   blast_beep: true,
   blast_cancel: true,
   siren_loop: true,
-  thunder: true,
-  wind_bed: true,
-  rain_light_bed: true,
-  rain_heavy_bed: true,
-  machinery_bed: true,
+  radio_order: true,
+  radio_info: true,
+  radio_good: true,
+  radio_warn: true,
+  radio_end: true,
+  phone_ring: true,
+  alarm_buzzer: true,
+  reverse_beeper: true,
+  instrument_beep: true,
 };
 const IDS = Object.keys(EXPECTED_IDS) as SynthRecipeId[];
 const CASES = IDS.flatMap((id) => Array.from({ length: SYNTH_RECIPES[id].variants }, (_, variant) => ({ id, variant, label: `${id}#${variant}` })));
 const LOOPS = CASES.filter(({ id }) => SYNTH_RECIPES[id].loop);
 const ONE_SHOTS = CASES.filter(({ id }) => !SYNTH_RECIPES[id].loop);
 /** Sounds whose character is a steady or gliding tone; every other recipe must read as noise-like. */
-const TONAL: readonly SynthRecipeId[] = ['blast_beep', 'blast_cancel', 'siren_loop', 'blast_sub'];
+const TONAL: readonly SynthRecipeId[] = [
+  'blast_beep', 'blast_cancel', 'siren_loop', 'blast_sub',
+  'radio_order', 'radio_info', 'radio_good', 'radio_warn', 'phone_ring', 'alarm_buzzer', 'reverse_beeper', 'instrument_beep',
+];
 /** Sharp-transient noise: its crest factor is too high to reach the reference RMS under the true-peak ceiling, so it lands below it. */
 const PEAK_LIMITED: readonly SynthRecipeId[] = ['blast_snap'];
 const PEAK_LIMITED_MAX_SHORTFALL_DB = 4;
@@ -40,15 +46,18 @@ describe('recipe table', () => {
     expect(counts).toEqual({
       blast_snap: 2,
       blast_sub: 2,
-      blast_tail: 2,
       blast_beep: 1,
       blast_cancel: 1,
       siren_loop: 1,
-      thunder: 3,
-      wind_bed: 1,
-      rain_light_bed: 1,
-      rain_heavy_bed: 1,
-      machinery_bed: 1,
+      radio_order: 1,
+      radio_info: 1,
+      radio_good: 1,
+      radio_warn: 1,
+      radio_end: 1,
+      phone_ring: 1,
+      alarm_buzzer: 1,
+      reverse_beeper: 1,
+      instrument_beep: 1,
     });
   });
 
@@ -62,7 +71,7 @@ describe('recipe table', () => {
   });
 
   it('wraps out-of-range variant indices instead of failing', () => {
-    expect(sameSamples(SYNTH_RECIPES.thunder.render(3), renderCached('thunder', 0))).toBe(true);
+    expect(sameSamples(SYNTH_RECIPES.blast_snap.render(2), renderCached('blast_snap', 0))).toBe(true);
     expect(sameSamples(SYNTH_RECIPES.blast_sub.render(-1), renderCached('blast_sub', 1))).toBe(true);
   });
 });
@@ -161,11 +170,6 @@ describe('variants', () => {
     }
   });
 
-  it('thunder arrangements differ in length', () => {
-    const lengths = [0, 1, 2].map((v) => (renderCached('thunder', v).channels[0] as Float32Array).length);
-    expect(new Set(lengths).size).toBe(3);
-  });
-
   it('stereo recipes use decorrelated channels', () => {
     const correlation = (a: Float32Array, b: Float32Array): number => {
       let cross = 0;
@@ -186,23 +190,7 @@ describe('variants', () => {
 });
 
 describe('loop modulators', () => {
-  const whole = (value: number): boolean => Number.isInteger(value);
-
-  it('wind, rain and siren modulate in whole cycles per loop', () => {
-    expect(WIND_CONFIG.bands.every((b) => whole(b.gustCycles) && whole(b.driftCycles))).toBe(true);
-    expect(whole(WIND_CONFIG.swellCycles)).toBe(true);
-    expect(whole(RAIN_LIGHT_CONFIG.swellCycles) && whole(RAIN_HEAVY_CONFIG.swellCycles)).toBe(true);
-    expect(whole(SIREN_CONFIG.vibratoCycles)).toBe(true);
-  });
-
-  it('machinery holds a whole number of firings per layer, near 22-26 Hz', () => {
-    for (const layer of MACHINERY_CONFIG.layers) {
-      expect(whole(layer.firings)).toBe(true);
-      expect(whole(layer.driftCycles)).toBe(true);
-      const rate = layer.firings / MACHINERY_CONFIG.durationSec;
-      expect(rate).toBeGreaterThanOrEqual(22);
-      expect(rate).toBeLessThanOrEqual(26);
-    }
-    expect(new Set(MACHINERY_CONFIG.layers.map((l) => l.firings)).size).toBe(MACHINERY_CONFIG.layers.length);
+  it('the siren modulates in whole cycles per loop', () => {
+    expect(Number.isInteger(SIREN_CONFIG.vibratoCycles)).toBe(true);
   });
 });

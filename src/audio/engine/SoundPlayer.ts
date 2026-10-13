@@ -6,7 +6,7 @@
 
 import type { LoopHandle, LoopOptions, Listener, PlayOptions, SoundHandle, WorldPoint } from '../AudioPlayer.js';
 import { NULL_AUDIO_PLAYER, type AudioPlayer } from '../AudioPlayer.js';
-import type { LoopId, OneShotId, SoundBus, SoundDefinition, SynthRecipeId } from '../SoundCatalog.js';
+import type { LoopId, LoopRegion, OneShotId, SoundBus, SoundDefinition, SynthRecipeId } from '../SoundCatalog.js';
 import type { Random } from '../../core/math/Random.js';
 import { SPATIAL_CONFIG, VOICE_CONFIG } from '../../core/config/audio/engine.js';
 import { LoopBed } from './LoopBed.js';
@@ -53,6 +53,8 @@ interface VoiceShape {
   readonly rate: number;
   readonly spatial: SpatialResult | null;
   readonly loop: boolean;
+  /** Looped samples: the period to repeat (a synth loop repeats its whole buffer). */
+  readonly loopRegion?: LoopRegion;
   readonly startAt: number;
   readonly offset: number;
 }
@@ -157,6 +159,9 @@ export class SoundPlayer implements AudioPlayer {
     const reservation = this.reserve(id, def, id);
     if (!reservation) return null;
     const candidate = this.choose(id, candidates);
+    const region = def.source.kind === 'sample' ? def.source.loopRegion : undefined;
+    const from = region?.startS ?? 0;
+    const span = region ? region.endS - region.startS : candidate.buffer.duration;
     return this.build(reservation, {
       candidate,
       def,
@@ -165,8 +170,9 @@ export class SoundPlayer implements AudioPlayer {
       rate: 1,
       spatial: null,
       loop: true,
+      ...(region ? { loopRegion: region } : {}),
       startAt: this.o.context.currentTime,
-      offset: this.o.random.next() * candidate.buffer.duration,
+      offset: from + this.o.random.next() * span,
     });
   }
 
@@ -223,6 +229,10 @@ export class SoundPlayer implements AudioPlayer {
       source.buffer = shape.candidate.buffer;
       source.playbackRate.value = shape.rate;
       source.loop = shape.loop;
+      if (shape.loopRegion) {
+        source.loopStart = shape.loopRegion.startS;
+        source.loopEnd = shape.loopRegion.endS;
+      }
       nodes.push(source);
 
       let head: AudioNode = source;

@@ -101,29 +101,6 @@ export const BLAST_SNAP_CONFIG = {
   ] satisfies readonly BlastSnapVariant[],
 } as const;
 
-export const BLAST_TAIL_CONFIG = {
-  sampleRate: 22050,
-  durationSec: 4.5,
-  startCutoffHz: 900,
-  endCutoffHz: 120,
-  cutoffTauSec: 1.1,
-  filterQ: 0.8,
-  swellSec: 0.22,
-  decayTauSec: 1.4,
-  /** Three slow rolling modulators; frequencies are drawn per channel from this range. */
-  rollLfoHz: { min: 3, max: 9 },
-  rollDepth: 0.3,
-  debris: {
-    /** Clicks per second at t = 0, falling with `tauSec`. */
-    startRate: 55,
-    tauSec: 1.5,
-    gain: 0.32,
-    freqHz: { min: 700, max: 3200 },
-    ringTauSec: { min: 0.002, max: 0.006 },
-  },
-  variantCount: 2,
-} as const;
-
 export const BLAST_BEEP_CONFIG = {
   sampleRate: 44100,
   durationSec: 0.14,
@@ -176,156 +153,125 @@ export const SIREN_CONFIG = {
   echoGain: 0.3,
 } as const;
 
-interface ThunderVariant {
-  readonly durationSec: number;
-  readonly crackSec: number;
-  readonly crackCentreHz: number;
-  readonly crackBursts: number;
-  readonly lobes: readonly { readonly atSec: number; readonly riseSec: number; readonly tauSec: number; readonly gain: number }[];
-  readonly startCutoffHz: number;
-  readonly cutoffTauSec: number;
-}
-
-export const THUNDER_CONFIG = {
-  sampleRate: 22050,
-  endCutoffHz: 70,
-  filterQ: 0.9,
-  crackQ: 0.8,
-  crackGain: 1,
-  rumbleGain: 1.1,
-  overallTauSec: 2.6,
-  variants: [
-    {
-      durationSec: 5.2, crackSec: 0.35, crackCentreHz: 2600, crackBursts: 5,
-      lobes: [
-        { atSec: 0.12, riseSec: 0.2, tauSec: 0.9, gain: 1 },
-        { atSec: 1.1, riseSec: 0.3, tauSec: 0.8, gain: 0.75 },
-        { atSec: 2.1, riseSec: 0.35, tauSec: 0.9, gain: 0.55 },
-      ],
-      startCutoffHz: 650, cutoffTauSec: 1.8,
-    },
-    {
-      durationSec: 6.1, crackSec: 0.4, crackCentreHz: 1900, crackBursts: 7,
-      lobes: [
-        { atSec: 0.2, riseSec: 0.15, tauSec: 0.6, gain: 0.8 },
-        { atSec: 0.8, riseSec: 0.25, tauSec: 1.2, gain: 1 },
-        { atSec: 2.0, riseSec: 0.4, tauSec: 0.8, gain: 0.6 },
-        { atSec: 3.1, riseSec: 0.4, tauSec: 1, gain: 0.45 },
-      ],
-      startCutoffHz: 520, cutoffTauSec: 2.2,
-    },
-    {
-      durationSec: 6.9, crackSec: 0.3, crackCentreHz: 3300, crackBursts: 4,
-      lobes: [
-        { atSec: 0.1, riseSec: 0.1, tauSec: 0.5, gain: 0.7 },
-        { atSec: 0.9, riseSec: 0.5, tauSec: 1.1, gain: 1 },
-        { atSec: 2.4, riseSec: 0.5, tauSec: 1.2, gain: 0.7 },
-        { atSec: 3.6, riseSec: 0.6, tauSec: 1.1, gain: 0.5 },
-        { atSec: 4.5, riseSec: 0.6, tauSec: 0.9, gain: 0.3 },
-      ],
-      startCutoffHz: 760, cutoffTauSec: 2.6,
-    },
-  ] satisfies readonly ThunderVariant[],
-} as const;
-
-interface BandedNoise {
-  readonly centreHz: number;
-  readonly q: number;
+/** One tone of a device sound: a band-limited square wave (piezo, buzzer, ringer), optionally trilling between two pitches. */
+interface DeviceTone {
+  readonly atSec: number;
+  readonly durSec: number;
+  readonly hz: number;
+  /** Second pitch the tone alternates with, `trillHz` times a second (an electronic phone ringer). */
+  readonly altHz?: number;
+  readonly trillHz?: number;
   readonly gain: number;
-  /** Gust cycles per loop for the amplitude and for the centre drift. */
-  readonly gustCycles: number;
-  readonly driftCycles: number;
-  readonly driftDepth: number;
 }
 
-export const WIND_CONFIG = {
-  sampleRate: 11025,
-  durationSec: 16,
-  lowpassHz: 2800,
-  /** Fraction of the gust depth that is steady air. */
-  floor: 0.4,
-  bands: [
-    { centreHz: 200, q: 1.1, gain: 1, gustCycles: 3, driftCycles: 2, driftDepth: 0.3 },
-    { centreHz: 520, q: 1.4, gain: 0.8, gustCycles: 5, driftCycles: 3, driftDepth: 0.35 },
-    { centreHz: 1100, q: 1.6, gain: 0.45, gustCycles: 7, driftCycles: 5, driftDepth: 0.3 },
-  ] satisfies readonly BandedNoise[],
-  /** Common slow swell shared by all bands, whole cycles per loop. */
-  swellCycles: 1,
-  swellDepth: 0.35,
-} as const;
+/** A burst of radio hiss: the squelch opening when a call starts, or its tail when the sender lets go. */
+interface DeviceHiss {
+  readonly atSec: number;
+  readonly durSec: number;
+  readonly gain: number;
+  /** Exponential decay time constant (s); omitted for a flat burst. */
+  readonly tauSec?: number;
+}
 
-export interface RainConfig {
+/** The small loudspeaker everything is heard through: band limits and how hard it is driven. */
+interface DeviceSpeaker {
+  readonly highpassHz: number;
+  readonly lowpassHz: number;
+  /** tanh drive; above 1 the speaker breaks up a little, as cheap ones do. */
+  readonly drive: number;
+}
+
+export interface DeviceSoundConfig {
   readonly sampleRate: number;
   readonly durationSec: number;
-  readonly hissHighpassHz: number;
-  readonly hissLowpassHz: number;
-  readonly hissGain: number;
-  readonly patterHz: number;
-  readonly patterGain: number;
-  readonly roarHz: number;
-  readonly roarGain: number;
-  readonly dropletsPerSec: number;
-  readonly dropletGain: number;
-  readonly dropletHz: { readonly min: number; readonly max: number };
-  readonly dropletTauSec: { readonly min: number; readonly max: number };
-  readonly swellCycles: number;
-  readonly swellDepth: number;
+  /** Odd harmonics of the square wave: few for a piezo beep, many for a rasping buzzer. */
+  readonly harmonics: number;
+  /** Edge ramp of every tone (s): short enough to read as a beep, long enough not to click. */
+  readonly edgeSec: number;
+  readonly tones: readonly DeviceTone[];
+  readonly hiss: readonly DeviceHiss[];
+  readonly speaker: DeviceSpeaker;
 }
 
-export const RAIN_LIGHT_CONFIG: RainConfig = {
-  sampleRate: 24000,
-  durationSec: 12,
-  hissHighpassHz: 1000,
-  hissLowpassHz: 9000,
-  hissGain: 0.5,
-  patterHz: 450,
-  patterGain: 0.35,
-  roarHz: 200,
-  roarGain: 0,
-  dropletsPerSec: 60,
-  dropletGain: 3,
-  dropletHz: { min: 3000, max: 7000 },
-  dropletTauSec: { min: 0.0015, max: 0.004 },
-  swellCycles: 3,
-  swellDepth: 0.12,
-};
+/** Radio band: a handheld's speaker passes roughly 400 Hz to 3 kHz, and breaks up a little when pushed. */
+const RADIO_SPEAKER: DeviceSpeaker = { highpassHz: 420, lowpassHz: 3000, drive: 1.6 };
+/** Squelch opening (a short flat burst) and its tail when the sender lets go. */
+const SQUELCH_OPEN: DeviceHiss = { atSec: 0, durSec: 0.045, gain: 0.5 };
+const squelchTail = (atSec: number): DeviceHiss => ({ atSec, durSec: 0.16, gain: 0.55, tauSec: 0.06 });
 
-export const RAIN_HEAVY_CONFIG: RainConfig = {
-  sampleRate: 24000,
-  durationSec: 12,
-  hissHighpassHz: 900,
-  hissLowpassHz: 10000,
-  hissGain: 1,
-  patterHz: 500,
-  patterGain: 0.7,
-  roarHz: 180,
-  roarGain: 0.9,
-  dropletsPerSec: 400,
-  dropletGain: 1.1,
-  dropletHz: { min: 3000, max: 7000 },
-  dropletTauSec: { min: 0.001, max: 0.003 },
-  swellCycles: 2,
-  swellDepth: 0.1,
-};
-
-export const MACHINERY_CONFIG = {
+const radio = (tones: readonly DeviceTone[], tailAtSec: number): DeviceSoundConfig => ({
   sampleRate: 22050,
-  durationSec: 6,
-  /** Whole firings per loop for each engine layer (23.0 Hz and about 23.7 Hz). */
-  layers: [
-    { firings: 138, gain: 1, driftCycles: 2, driftPhase: 0, pattern: [1, 0.78, 0.92, 0.7] },
-    { firings: 142, gain: 0.7, driftCycles: 3, driftPhase: 0.3, pattern: [0.85, 1, 0.72, 0.9] },
-  ],
-  driftDepth: 0.03,
-  timingJitter: 0.09,
-  amplitudeJitter: 0.22,
-  pulseHz: { min: 70, max: 90 },
-  pulseTauSec: 0.013,
-  thumpTauSec: 0.006,
-  thumpGain: 0.7,
-  lowpassHz: 420,
-  clatterBand: { lowHz: 1500, highHz: 3000, gain: 0.16, gateTauSec: 0.009 },
-} as const;
+  durationSec: tailAtSec + 0.18,
+  harmonics: 4,
+  edgeSec: 0.004,
+  tones,
+  hiss: [SQUELCH_OPEN, squelchTail(tailAtSec)],
+  speaker: RADIO_SPEAKER,
+});
+
+/** Electronic and radio sounds of the worksite. The real devices are tone and noise generators, so synthesis is the honest source. */
+export const DEVICE_SOUNDS = {
+  /** An order acknowledged over the site radio: squelch, a quick two-note "copy", the tail. */
+  radio_order: radio([{ atSec: 0.06, durSec: 0.055, hz: 1180, gain: 0.5 }, { atSec: 0.125, durSec: 0.065, hz: 1560, gain: 0.5 }], 0.21),
+  /** A report: one low beep. */
+  radio_info: radio([{ atSec: 0.06, durSec: 0.09, hz: 990, gain: 0.45 }], 0.17),
+  /** Good news: a rising pair. */
+  radio_good: radio([{ atSec: 0.06, durSec: 0.07, hz: 1040, gain: 0.5 }, { atSec: 0.14, durSec: 0.1, hz: 1390, gain: 0.5 }], 0.26),
+  /** A warning: two pairs of low beeps. */
+  radio_warn: radio([
+    { atSec: 0.06, durSec: 0.07, hz: 760, gain: 0.55 }, { atSec: 0.15, durSec: 0.07, hz: 760, gain: 0.55 },
+    { atSec: 0.3, durSec: 0.07, hz: 760, gain: 0.55 }, { atSec: 0.39, durSec: 0.07, hz: 760, gain: 0.55 },
+  ], 0.48),
+  /** A job reported done: the squelch closing, nothing else. */
+  radio_end: { ...radio([], 0.03), hiss: [{ atSec: 0, durSec: 0.03, gain: 0.35 }, squelchTail(0.03)] },
+  /** The site cabin phone: two bursts of an electronic ringer trilling between two pitches. */
+  phone_ring: {
+    sampleRate: 22050,
+    durationSec: 1.25,
+    harmonics: 5,
+    edgeSec: 0.006,
+    tones: [
+      { atSec: 0, durSec: 0.42, hz: 1020, altHz: 1290, trillHz: 18, gain: 0.45 },
+      { atSec: 0.62, durSec: 0.42, hz: 1020, altHz: 1290, trillHz: 18, gain: 0.45 },
+    ],
+    hiss: [],
+    speaker: { highpassHz: 500, lowpassHz: 4200, drive: 1.3 },
+  },
+  /** The site alarm buzzer: two short, low, rasping buzzes. */
+  alarm_buzzer: {
+    sampleRate: 22050,
+    durationSec: 0.62,
+    harmonics: 14,
+    edgeSec: 0.005,
+    tones: [{ atSec: 0, durSec: 0.2, hz: 185, gain: 0.6 }, { atSec: 0.29, durSec: 0.26, hz: 185, gain: 0.6 }],
+    hiss: [],
+    speaker: { highpassHz: 220, lowpassHz: 3400, drive: 2.4 },
+  },
+  /** A truck's backup alarm: three beeps of the classic ~1.15 kHz sounder, half a second apart. */
+  reverse_beeper: {
+    sampleRate: 22050,
+    durationSec: 2.05,
+    harmonics: 3,
+    edgeSec: 0.012,
+    tones: [
+      { atSec: 0, durSec: 0.4, hz: 1150, gain: 0.5 },
+      { atSec: 0.8, durSec: 0.4, hz: 1150, gain: 0.5 },
+      { atSec: 1.6, durSec: 0.4, hz: 1150, gain: 0.5 },
+    ],
+    hiss: [],
+    speaker: { highpassHz: 650, lowpassHz: 3600, drive: 1.4 },
+  },
+  /** A survey instrument logging a point: two short high piezo beeps. */
+  instrument_beep: {
+    sampleRate: 22050,
+    durationSec: 0.22,
+    harmonics: 2,
+    edgeSec: 0.003,
+    tones: [{ atSec: 0, durSec: 0.06, hz: 2700, gain: 0.45 }, { atSec: 0.11, durSec: 0.06, hz: 2700, gain: 0.45 }],
+    hiss: [],
+    speaker: { highpassHz: 900, lowpassHz: 6000, drive: 1.1 },
+  },
+} as const satisfies Record<string, DeviceSoundConfig>;
 
 export const REVERB_CONFIG = {
   sampleRate: 32000,

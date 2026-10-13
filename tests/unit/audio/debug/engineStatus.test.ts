@@ -11,7 +11,7 @@ import { FakeAudioContext, asAudioContext } from '../../../helpers/audioFakes.js
 
 const CATALOG = {
   ui_click: { bus: 'ui', source: { kind: 'sample', files: ['click_a', 'click_missing'] }, gainDb: 0, priority: 2 },
-  thunder: { bus: 'ambient', source: { kind: 'synth', recipe: 'thunder' }, gainDb: 0, priority: 2 },
+  thunder: { bus: 'ambient', source: { kind: 'synth', recipe: 'phone_ring' }, gainDb: 0, priority: 2 },
 } as const satisfies Record<string, SoundDefinition>;
 
 const tone = (): RenderedAudio => ({ sampleRate: 44100, channels: [new Float32Array(16).fill(0.1)] });
@@ -25,7 +25,7 @@ function engineWith(failingRecipe: boolean): AudioEngine {
       if (url.includes('missing')) throw new Error('404');
       return new ArrayBuffer(4);
     },
-    recipes: { thunder: { variants: 1, loop: false, render: () => { if (failingRecipe) throw new Error('x'); return tone(); } } },
+    recipes: { phone_ring: { variants: 1, loop: false, render: () => { if (failingRecipe) throw new Error('x'); return tone(); } } },
     renderImpulse: tone,
   });
 }
@@ -49,7 +49,7 @@ describe('AudioEngine load status', () => {
   it('lists a recipe that failed to render beside the failed samples', async () => {
     const engine = engineWith(true);
     await engine.preload();
-    expect(engine.failedAssets).toEqual(['click_missing', 'thunder']);
+    expect(engine.failedAssets).toEqual(['click_missing', 'phone_ring']);
   });
 
   it('settles as preloaded without a context and reports nothing failed', async () => {
