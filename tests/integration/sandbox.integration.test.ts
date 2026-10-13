@@ -19,6 +19,7 @@ import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { stateForSave, loadGridForState } from '../../src/console/commands/world.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
+import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
 
 /**
@@ -435,9 +436,16 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
   });
 
   it('does not store a climate bias for a seed that already lands on the picked biome', () => {
-    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:1');
-    const bias = ctx.state!.world!.climateBias;
-    if (bias !== undefined) expect([...bias]).not.toEqual([...getBiome('desert_badlands')!.climateCenter]);
+    const centre = getBiome('desert_badlands')!.climateCenter;
+    let seed = 1;
+    while (resolveGeneratedBiome(seed, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, centre).id !== 'desert_badlands') {
+      seed++;
+      if (seed > 500) throw new Error('no seed lands on desert_badlands with the biome centre');
+    }
+    // Precondition: the centre bias alone already resolves to the picked biome.
+    expect(resolveGeneratedBiome(seed, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, centre).id).toBe('desert_badlands');
+    const { ctx } = start(`sandbox start biome:desert_badlands difficulty:normal seed:${seed}`);
+    expect(ctx.state!.world!.climateBias).toBeUndefined();
   });
 
   it('save then load keeps world.climateBias and regenerates the same terrain', () => {
