@@ -11,7 +11,7 @@ import { cellRand, subSeed } from '../../core/math/Hash.js';
 import type { Village } from '../../core/world/Structures.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import type { ModelLibrary } from '../models/ModelLibrary.js';
-import { ClaimedInstances } from './ClaimedInstances.js';
+import { ClaimableProps } from './ClaimableProps.js';
 import { InstancedProp } from '../models/InstancedProp.js';
 import { houseModelId, rockModelId, HOUSE_VARIANTS, ROCK_VARIANTS } from '../models/ModelIds.js';
 
@@ -40,9 +40,7 @@ const ROCK_SINK = 0.12;
 const HOUSE_DRAW_DISTANCE = 900;
 
 export class Scenery {
-  private readonly scene: THREE.Scene;
-  private readonly props: InstancedProp[] = [];
-  private readonly claimed = new ClaimedInstances();
+  private readonly props: ClaimableProps;
   private rockCount = 0;
   private houseCount = 0;
   /** Prop ids this build wanted and the library did not have — a rebuild once they load draws them. */
@@ -59,7 +57,7 @@ export class Scenery {
     sampleGroundHeight: (x: number, z: number) => number,
     biomeId: string | undefined,
   ) {
-    this.scene = scene;
+    this.props = new ClaimableProps(scene);
     const dummy = new THREE.Object3D();
 
     // ---- Rocks ----
@@ -104,10 +102,7 @@ export class Scenery {
         dummy.updateMatrix();
         prop.setMatrixAt(i, dummy.matrix);
       }
-      prop.commit();
-      this.claimed.track(prop, points);
-      prop.addTo(this.scene);
-      this.props.push(prop);
+      this.props.add(prop, points);
       this.rockCount += points.length;
     }
 
@@ -140,9 +135,7 @@ export class Scenery {
         dummy.updateMatrix();
         prop.setMatrixAt(i, dummy.matrix);
       }
-      prop.commit();
-      prop.addTo(this.scene);
-      this.props.push(prop);
+      this.props.add(prop);
       this.houseCount += entries.length;
     }
   }
@@ -157,12 +150,10 @@ export class Scenery {
 
   /** Hide instances on ground the playable mesh has claimed; returns how many were newly hidden (#1664). */
   dropClaimed(isClaimed: (x: number, z: number) => boolean): number {
-    return this.claimed.dropClaimed(isClaimed);
+    return this.props.dropClaimed(isClaimed);
   }
 
   dispose(): void {
-    this.claimed.clear();
-    for (const prop of this.props) prop.dispose(this.scene);
-    this.props.length = 0;
+    this.props.dispose();
   }
 }
