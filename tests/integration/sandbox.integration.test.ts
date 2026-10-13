@@ -16,6 +16,10 @@ import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { stateForSave, loadGridForState } from '../../src/console/commands/world.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import { getBiome } from '../../src/core/world/BiomeCatalog.js';
+import { resolveContractOres } from '../../src/core/campaign/Level.js';
 
 /**
  * Solid-voxel count inside a fixed height window around the sandbox datum — a
@@ -352,5 +356,129 @@ describe('sandbox is endless free play (#1321)', () => {
     expect({ seed: ctx.state!.seed, cash: ctx.state!.cash, solid: solidCount(ctx.grid!) }).toEqual(first);
     expect(ctx.state!.tickCount).toBe(0);
     expect(ctx.state!.levelEndReason).toBeNull();
+  });
+});
+
+// #1668: a sandbox site generates the biome the player picked, on every seed.
+describe('sandbox generated biome equals the picked biome (#1668)', () => {
+  const DESERT_ROCKS = ['cruite', 'sandite', 'molite'];
+  const VOLCANIC_ROCKS = ['gnarlite', 'obstiite', 'titanite'];
+  const DESERT_ORES = ['dirtite', 'rustite', 'blingite'];
+  const WRONG_ORES = ['sparkium', 'craktonite'];
+
+  /** Distinct dominant rock ids in a window of the grid, sampled on a coarse lattice. */
+  function rocksIn(grid: VoxelGrid): Set<string> {
+    const out = new Set<string>();
+    for (let x = 0; x < grid.sizeX; x += 4) {
+      for (let z = 0; z < grid.sizeZ; z += 4) {
+        for (let y = SANDBOX_DATUM - 24; y <= SANDBOX_DATUM + 16; y += 2) {
+          const id = grid.dominantRockAt(x, y, z);
+          if (id) out.add(id);
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Dominant rock of every sampled voxel, for cell-by-cell comparison of two grids. */
+  function rockFingerprint(grid: VoxelGrid): string {
+    const cells: string[] = [];
+    for (let x = 0; x < grid.sizeX; x += 4) {
+      for (let z = 0; z < grid.sizeZ; z += 4) {
+        for (let y = SANDBOX_DATUM - 24; y <= SANDBOX_DATUM + 16; y += 2) cells.push(grid.dominantRockAt(x, y, z));
+      }
+    }
+    return cells.join(',');
+  }
+
+  function start(args: string) {
+    const made = createRunner();
+    const result = made.runner.run(args);
+    expect(result.success).toBe(true);
+    return made;
+  }
+
+  it('desert_badlands seed 29 yields only desert rocks', () => {
+    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const rocks = rocksIn(ctx.grid!);
+    expect(rocks.size).toBeGreaterThan(0);
+    for (const volcanic of VOLCANIC_ROCKS) expect(rocks.has(volcanic), `${volcanic} present`).toBe(false);
+    expect([...rocks].some(r => DESERT_ROCKS.includes(r))).toBe(true);
+    for (const r of rocks) expect(DESERT_ROCKS, `unexpected rock ${r}`).toContain(r);
+  });
+
+  it('desert_badlands seed 29 offers only desert ores on the contract board', () => {
+    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const allowed = resolveContractOres(ctx.state!);
+    for (const ore of WRONG_ORES) expect(allowed).not.toContain(ore);
+    for (const ore of allowed) expect(DESERT_ORES).toContain(ore);
+    const offered = ctx.state!.contracts.available.map(c => c.oreId);
+    expect(offered.length).toBeGreaterThan(0);
+    for (const ore of offered) expect(DESERT_ORES).toContain(ore);
+  });
+
+  it('starting the same site twice rebuilds identical voxels', () => {
+    const a = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const b = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    expect(solidCount(b.ctx.grid!)).toBe(solidCount(a.ctx.grid!));
+    expect(rockFingerprint(b.ctx.grid!)).toBe(rockFingerprint(a.ctx.grid!));
+  });
+
+  it('persists the shifted climate bias on the world and embeds the same bias in a save', () => {
+    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const centre = getBiome('desert_badlands')!.climateCenter;
+    const bias = ctx.state!.world!.climateBias;
+    expect(bias).toBeDefined();
+    expect([...bias!]).not.toEqual([...centre]);
+    const saved = stateForSave(ctx, ctx.state!);
+    expect(saved.world!.voxels!.gen.climateBias).toEqual(bias);
+  });
+
+  it('does not store a climate bias for a seed that already lands on the picked biome', () => {
+    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:1');
+    const bias = ctx.state!.world!.climateBias;
+    if (bias !== undefined) expect([...bias]).not.toEqual([...getBiome('desert_badlands')!.climateCenter]);
+  });
+
+  it('save then load keeps world.climateBias and regenerates the same terrain', () => {
+    const live = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const bias = live.ctx.state!.world!.climateBias;
+    const loaded = createRunner().ctx;
+    const state = deserialize(serialize(stateForSave(live.ctx, live.ctx.state!)));
+    expect(loadGridForState(loaded, state)).toBeNull();
+    expect(loaded.state!.world!.climateBias).toEqual(bias);
+    expect(rockFingerprint(loaded.grid!)).toBe(rockFingerprint(live.ctx.grid!));
+    expect(solidCount(loaded.grid!)).toBe(solidCount(live.ctx.grid!));
+  });
+
+  it('a save with no embedded voxels regenerates through the saved climate bias', () => {
+    const live = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const loaded = createRunner().ctx;
+    const state = deserialize(serialize(live.ctx.state!)); // no world.voxels: the fallback path
+    expect(state.world!.voxels).toBeUndefined();
+    expect(loadGridForState(loaded, state)).toBeNull();
+    expect(rockFingerprint(loaded.grid!)).toBe(rockFingerprint(live.ctx.grid!));
+    for (const volcanic of VOLCANIC_ROCKS) expect(rocksIn(loaded.grid!).has(volcanic)).toBe(false);
+  });
+
+  it('a save without world.climateBias loads using the biome centre', () => {
+    const live = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const state = deserialize(serialize(live.ctx.state!));
+    delete state.world!.climateBias;
+    const loaded = createRunner().ctx;
+    expect(loadGridForState(loaded, state)).toBeNull();
+
+    // The un-shifted centre bias is the pre-#1668 behaviour: seed 29 drifts to volcanic rock.
+    expect(VOLCANIC_ROCKS.some(r => rocksIn(loaded.grid!).has(r))).toBe(true);
+    const centre = getBiome('desert_badlands')!.climateCenter;
+    const gen = stateForSave(loaded, loaded.state!).world!.voxels!.gen;
+    expect(gen.climateBias).toEqual([...centre]);
+  });
+
+  it('new_game biome:desert_badlands seed:29 is unchanged: centre bias, no stored climateBias', () => {
+    const { ctx } = start('new_game mine_type:desert_badlands seed:29');
+    expect(ctx.state!.world!.climateBias).toBeUndefined();
+    const gen = stateForSave(ctx, ctx.state!).world!.voxels!.gen;
+    expect(gen.climateBias).toEqual([...getBiome('desert_badlands')!.climateCenter]);
   });
 });
