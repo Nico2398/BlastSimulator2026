@@ -158,10 +158,11 @@ describe('sandboxLevelDef', () => {
     expect(level.startingCash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
   });
 
-  it('takes climateBias from the chosen biome so terrain lands in that biome', () => {
+  it('solves climateBias per seed so terrain lands in the chosen biome', () => {
     for (const biome of getAllBiomes()) {
       const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id }));
-      expect(level.climateBias).toEqual(getBiome(biome.id)!.climateCenter);
+      const landed = resolveGeneratedBiome(level.terrainSeed, level.gridX, level.gridZ, level.climateBias);
+      expect(landed.id).toBe(biome.id);
     }
   });
 

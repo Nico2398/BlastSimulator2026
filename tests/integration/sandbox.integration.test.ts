@@ -412,7 +412,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
     const allowed = resolveContractOres(ctx.state!);
     for (const ore of WRONG_ORES) expect(allowed).not.toContain(ore);
     for (const ore of allowed) expect(DESERT_ORES).toContain(ore);
-    const offered = ctx.state!.contracts.available.map(c => c.oreId);
+    const offered = ctx.state!.contracts.available.map(c => c.materialId).filter(id => id !== '');
     expect(offered.length).toBeGreaterThan(0);
     for (const ore of offered) expect(DESERT_ORES).toContain(ore);
   });
