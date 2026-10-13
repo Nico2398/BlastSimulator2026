@@ -20,7 +20,7 @@ import { rampWidthOf, type RampDef } from '../core/mining/Ramp.js';
 import { rampFootprint } from '../core/mining/RampWidening.js';
 import type { RampFootprint } from '../core/state/GameState.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
-import type { SurfaceHeightSampler } from './GroundTint.js';
+import { bilinearSurfaceHeight, type SurfaceHeightSampler } from './GroundTint.js';
 
 export const RAMP_ARROW_COLOR = 0xffd21f;
 const UNDERLAY_COLOR = 0x1a1408;
@@ -88,9 +88,34 @@ export function buildRampArrow(
   group.name = 'ramp-arrow';
   markSceneOverlay(group);
   group.add(buildCorridorOutline(layout, sampler, color));
-  group.add(buildArrowMesh(layout, sampler, UNDERLAY_MARGIN, UNDERLAY_COLOR, 0.75, 0));
-  group.add(buildArrowMesh(layout, sampler, 0, color, 1, 1));
+  const floor = corridorFloorSampler(layout.corridor, sampler);
+  group.add(buildArrowMesh(layout, floor, UNDERLAY_MARGIN, UNDERLAY_COLOR, 0.75, 0));
+  group.add(buildArrowMesh(layout, floor, 0, color, 1, 1));
   return group;
+}
+
+/**
+ * The corridor's floor under (x, z): the ground as the terrain renders it,
+ * read from the carved band's own columns only.
+ *
+ * `sampler` answers one height per voxel column, and the terrain renders a
+ * slope between neighbouring columns — so the four columns around the point
+ * are blended. Read straight, a shaft running down a dug ramp jumped at every
+ * tile edge: a saw-tooth laid over a smooth road.
+ *
+ * Every column is clamped into the band. The arrow reaches past its end tiles'
+ * centres (END_REACH), the underlay past that again (UNDERLAY_MARGIN), into
+ * the ground beyond each end. Once the lower end is dug, that ground is the top
+ * of the end wall, a full ramp depth above the floor, and the arrowhead's tip
+ * read up there stood the head up the wall as a tall dark triangle, drawn over
+ * everything since the arrow has no depth test. The arrow lies on the floor, so
+ * past the band it stays level with the floor's edge.
+ */
+function corridorFloorSampler(corridor: RampFootprint, sampler: SurfaceHeightSampler): SurfaceHeightSampler {
+  const { clamp } = THREE.MathUtils;
+  const column: SurfaceHeightSampler = (x, z) =>
+    sampler(clamp(x, corridor.minX, corridor.maxX), clamp(z, corridor.minZ, corridor.maxZ));
+  return (x, z) => bilinearSurfaceHeight(column, x, z);
 }
 
 /**
