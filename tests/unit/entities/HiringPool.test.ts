@@ -381,10 +381,10 @@ describe('scripted extraQualifications (#1648)', () => {
     createHiringPool(1, 0, [{ id: 1, role, name: 'Ex Tra', unionized: false, skillBonus, ...(extra !== undefined ? { extraQualifications: extra } : {}) }]).candidates[0]!;
 
   it('appends a new category after the role defaults', () => {
-    const c = one([{ category: 'driving.truck', proficiencyLevel: 1 }]);
+    const c = one([{ category: 'driving.excavator', proficiencyLevel: 1 }]);
     const cats = c.qualifications.map(q => q.category);
-    expect(cats).toEqual([...ROLE_STARTING_QUALIFICATIONS.blaster.map(q => q.category), 'driving.truck']);
-    expect(c.qualifications.find(q => q.category === 'driving.truck')!.proficiencyLevel).toBe(1);
+    expect(cats).toEqual([...ROLE_STARTING_QUALIFICATIONS.blaster.map(q => q.category), 'driving.excavator']);
+    expect(c.qualifications.find(q => q.category === 'driving.excavator')!.proficiencyLevel).toBe(1);
   });
 
   it('keeps the higher level when the category already exists (extra lower)', () => {

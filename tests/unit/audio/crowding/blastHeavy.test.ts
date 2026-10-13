@@ -27,11 +27,11 @@ describe(`${SCENARIO} at 8x`, () => {
     for (const layer of MAIN_LAYERS) expect(sim().recorder.heard.filter(p => p.id === layer), layer).toHaveLength(5);
   });
 
-  it('keeps every shot to 39 sounds in twenty seconds', () => {
-    // Measured 15, 13, 30, 27 and 8 sounds (the rain of the rock that moves after the four layers, duds and a tail).
+  it('keeps every shot to 42 sounds in twenty seconds', () => {
+    // Measured 15, 13, 30, 40 and 12 sounds since blasters hold the truck licence (#1667) and drive the charging truck, which shifts shot timing (the rain of the rock that moves after the four layers, duds and a tail).
     for (const shot of shots()) {
       const timeline = sim().recorder.heard.filter(p => isBlastSound(p.id) && p.id !== 'blast_beep' && p.startS >= shot.startS - 0.01 && p.startS < shot.startS + TIMELINE_S);
-      expect(timeline.length).toBeLessThanOrEqual(39);
+      expect(timeline.length).toBeLessThanOrEqual(42);
       expect(peakIn(timeline, 1)).toBeLessThanOrEqual(20); // measured 15 at most in any one second of any shot
     }
   });

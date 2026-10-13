@@ -89,8 +89,8 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
     const state = makeState();
     const dual = hireDual(state);
     // Blaster and licence holder survive on separate people, neither holds both.
-    const { employee: blaster } = hireEmployee(state.employees, 'blaster', new Random(7), 10, 10);
-    assignSkill(state.employees, blaster.id, 'blasting', 1);
+    // A driller holds blasting but no truck licence (a blaster does since #1667).
+    const { employee: blaster } = hireEmployee(state.employees, 'driller', new Random(7), 10, 10);
     const { employee: driver } = hireEmployee(state.employees, 'driver', new Random(8), 10, 10);
     assignSkill(state.employees, driver.id, LICENCE as never, 1);
     purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);

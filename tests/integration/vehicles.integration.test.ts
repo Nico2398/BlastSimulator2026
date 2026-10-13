@@ -172,8 +172,8 @@ describe('Vehicle fleet', () => {
 
   it('rejects unqualified driver', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-    // blaster has no driving skill
-    const eid = hireOne(ctx, 'blaster');
+    // driller has no truck licence (blaster does since #1667)
+    const eid = hireOne(ctx, 'driller');
 
     const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
 
@@ -454,8 +454,8 @@ describe('Vehicle fleet', () => {
     const state = createGame({ seed: 42 });
     purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     const rng = new Random(42);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    // blaster has no driving.truck qualification, and is co-located with the
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // driller has no driving.truck qualification, and is co-located with the
     // vehicle (both default to (0,0)) so the boarding-range check isn't what
     // rejects this attempt.
 
