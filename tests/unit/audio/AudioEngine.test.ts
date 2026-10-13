@@ -16,8 +16,8 @@ const CATALOG = {
   ui_click: { bus: 'ui', source: { kind: 'sample', files: ['click_a', 'click_b'] }, gainDb: 0, priority: 2 },
   blast_boom: { bus: 'effects', source: { kind: 'sample', files: ['boom'] }, gainDb: 0, priority: 4 },
   work_dig: { bus: 'effects', source: { kind: 'sample', files: ['dig'] }, gainDb: 0, priority: 1 },
-  thunder: { bus: 'ambient', source: { kind: 'synth', recipe: 'thunder' }, gainDb: 0, priority: 2 },
-  amb_wind: { bus: 'ambient', source: { kind: 'synth', recipe: 'wind_bed' }, gainDb: 0, priority: 1, loop: true },
+  thunder: { bus: 'ambient', source: { kind: 'synth', recipe: 'phone_ring' }, gainDb: 0, priority: 2 },
+  amb_wind: { bus: 'ambient', source: { kind: 'synth', recipe: 'siren_loop' }, gainDb: 0, priority: 1, loop: true },
 } as const satisfies Record<string, SoundDefinition>;
 
 const tone = (length = 16, channels = 1): RenderedAudio => ({
@@ -51,7 +51,7 @@ function rig(over: Partial<AudioEngineOptions> = {}, fail: string[] = []): Rig {
     random: new Random(3),
     catalog: CATALOG,
     fetchBytes,
-    recipes: { thunder: recipe(), wind_bed: recipe(true) },
+    recipes: { phone_ring: recipe(), siren_loop: recipe(true) },
     renderImpulse: () => tone(32, 2),
     sleep: async () => undefined,
     ...over,
@@ -93,9 +93,25 @@ describe('AudioEngine preload', () => {
     expect(engine.play('ui_click')).not.toBeNull();
   });
 
-  it('loads interface and blast samples first, other samples next, synth last', async () => {
-    const { engine, fetched, readyAtFetch, ctx } = rig();
+  it('loads interface and blast samples first, then renders synth while the other samples download', async () => {
+    let renderedWhileDownloading: boolean | null = null;
+    let otherSampleArrived = false;
+    const probe = rig({
+      recipes: {
+        phone_ring: { variants: 1, loop: false, render: () => { renderedWhileDownloading = !otherSampleArrived; return tone(); } },
+        siren_loop: recipe(true),
+      },
+      fetchBytes: async (url: string) => {
+        probe.fetched.push(url);
+        probe.readyAtFetch.set(url, probe.engine.ready);
+        await Promise.resolve();
+        if (url.endsWith('dig.mp3')) otherSampleArrived = true;
+        return new ArrayBuffer(4);
+      },
+    });
+    const { engine, fetched, readyAtFetch, ctx } = probe;
     await engine.preload();
+    expect(renderedWhileDownloading).toBe(true);
     expect(fetched.slice(0, 3).sort()).toEqual(['/audio/sfx/boom.mp3', '/audio/sfx/click_a.mp3', '/audio/sfx/click_b.mp3']);
     expect(fetched[3]).toBe('/audio/sfx/dig.mp3');
     expect(readyAtFetch.get('/audio/sfx/click_a.mp3')).toBe(false);
@@ -131,7 +147,7 @@ describe('AudioEngine preload', () => {
   it('never rejects, even when every file and recipe fails', async () => {
     const { engine, manager } = rig(
       {
-        recipes: { thunder: { variants: 1, loop: false, render: () => { throw new Error('x'); } } },
+        recipes: { phone_ring: { variants: 1, loop: false, render: () => { throw new Error('x'); } } },
         renderImpulse: () => { throw new Error('y'); },
       },
       ['click', 'boom', 'dig'],

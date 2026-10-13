@@ -28,14 +28,23 @@ describe('planPreload', () => {
     expect(plan.otherSamples).toEqual([]);
   });
 
-  it('collects each synth recipe once for tier 3', () => {
+  it('collects each synth recipe once', () => {
     const plan = planPreload({
-      one: { bus: 'effects', source: { kind: 'synth', recipe: 'thunder' }, gainDb: 0, priority: 2 },
-      two: { bus: 'ambient', source: { kind: 'synth', recipe: 'thunder' }, gainDb: 0, priority: 2 },
-      three: { bus: 'ambient', source: { kind: 'synth', recipe: 'wind_bed' }, gainDb: 0, priority: 1, loop: true },
+      one: { bus: 'effects', source: { kind: 'synth', recipe: 'phone_ring' }, gainDb: 0, priority: 2 },
+      two: { bus: 'ambient', source: { kind: 'synth', recipe: 'phone_ring' }, gainDb: 0, priority: 2 },
+      three: { bus: 'ambient', source: { kind: 'synth', recipe: 'siren_loop' }, gainDb: 0, priority: 1, loop: true },
     });
-    expect(plan.recipes).toEqual(['thunder', 'wind_bed']);
+    expect(plan.recipes).toEqual(['phone_ring', 'siren_loop']);
     expect(plan.essentialSamples).toEqual([]);
+  });
+
+  it('never holds `ready` for a looped bed, whatever its priority: beds fade in, and their files are the largest', () => {
+    const plan = planPreload({
+      bed: { ...sample(['bed_file'], { priority: 3, bus: 'ambient' }), loop: true },
+      alarm: sample(['alarm'], { priority: 3 }),
+    });
+    expect(plan.essentialSamples).toEqual(['alarm']);
+    expect(plan.otherSamples).toEqual(['bed_file']);
   });
 
   it('covers every file and recipe of the real catalog exactly once', () => {
@@ -48,6 +57,8 @@ describe('planPreload', () => {
     expect(plan.essentialSamples).toContain('blast_boom_1');
     expect(plan.otherSamples).toContain('dig_1');
     expect(plan.recipes).toContain('blast_sub');
+    expect(plan.otherSamples).toContain('bed_wind');
+    expect(plan.essentialSamples).not.toContain('bed_wind');
     expect(new Set(plan.recipes).size).toBe(plan.recipes.length);
   });
 });

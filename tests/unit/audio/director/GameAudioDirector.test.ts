@@ -256,13 +256,13 @@ describe('GameAudioDirector event cues', () => {
     expect(hauling[0]?.opts.at?.x).toBeGreaterThanOrEqual(2);
   });
 
-  it('rings one shift bell for a whole crew', () => {
+  it('blows one shift whistle for a whole crew', () => {
     const s = started();
     for (let id = 1; id <= 40; id++) s.emitter.emit('employee:shift_change', { employeeId: id });
     advanceTicks(s.state, 1);
     s.command('tick');
     s.run(1);
-    expect(s.player.ids).toEqual(['shift_bell']);
+    expect(s.player.ids).toEqual(['shift_whistle']);
   });
 
   it('flushes event cues on the next frame when no command followed', () => {
@@ -311,17 +311,23 @@ describe('GameAudioDirector menus and pause', () => {
   it('follows the weather of the running game', () => {
     const s = started();
     s.run(1);
-    const calm = s.player.bed('amb_wind').level;
+    const air = (): number => s.player.bed('amb_wind').level + s.player.bed('amb_wind_storm').level;
+    const calm = air();
     s.state.weather.current = 'storm';
     s.run(AMBIENCE_CONFIG.minDwellS + 1);
-    expect(s.player.bed('amb_wind').level).toBeGreaterThan(calm * 2);
+    expect(air()).toBeGreaterThan(calm * 2);
+    expect(s.player.bed('amb_wind_storm').level).toBeGreaterThan(0);
     expect(s.player.bed('amb_rain_heavy').level).toBe(AMBIENCE_CONFIG.weather.storm.rainHeavy);
   });
 
   it('eases the beds, stops work sounds and mutes the machinery while paused', () => {
     const s = started();
     s.state.weather.current = 'heavy_rain';
-    for (let i = 0; i < 8; i++) startWorking(addEmployee(s.state, 5 + i, 0), 'drill_hole');
+    for (let i = 0; i < 8; i++) {
+      const driller = addEmployee(s.state, 5 + i, 0);
+      mount(s.state, driller, addVehicle(s.state, 'drill_rig', 5 + i, 0));
+      startWorking(driller, 'drill_hole');
+    }
     s.command('tick');
     s.run(30);
     expect(s.player.of('work_drill').length).toBeGreaterThan(0);
@@ -762,6 +768,6 @@ describe('GameAudioDirector robustness', () => {
     expect(s.player.bed('amb_wind').level).toBe(0);
     s.emitter.emit('employee:shift_change', { employeeId: 1 });
     s.run(1);
-    expect(s.player.of('shift_bell')).toHaveLength(0);
+    expect(s.player.of('shift_whistle')).toHaveLength(0);
   });
 });

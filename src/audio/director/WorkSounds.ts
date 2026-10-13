@@ -1,8 +1,10 @@
 // BlastSimulator2026 — Work sounds
 // While crews and machines are actually working, the nearest work sites make
-// short bursts (drill, dig, hammer) on a real-time timer with random jitter, and
-// a quiet machinery bed follows how much is going on near the listener. Only
-// the few nearest sites sound at once, so a busy mine is a texture, not a wall.
+// short bursts (drill, dig, compactor, hammer) on a real-time timer with random
+// jitter, and a quiet diesel bed follows how many engines are running close to
+// the listener: crew on foot add nothing to it, a machine fades out of it with
+// distance, and with no machine near it is silent. Only the few nearest sites
+// sound at once, so a busy mine is a texture, not a wall.
 //
 // The list of working units is rebuilt from the game state after each command
 // or tick (`refresh`); the timers, the nearest-site choice and the bed level
@@ -14,6 +16,7 @@ import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js
 import { DIRECTOR_CONFIG, WORK_CONFIG } from '../../core/config/audio/game.js';
 import { clamp } from '../engine/units.js';
 import { BedFeed } from './BedFeed.js';
+import { distanceM, referenceM } from './listening.js';
 import { playCue } from './playCue.js';
 import type { DirectorEnv, EntityKind } from './types.js';
 import type { Spot } from './worldSnapshot.js';
@@ -22,7 +25,7 @@ import type { Spot } from './worldSnapshot.js';
 const WORK_SOUND: Readonly<Partial<Record<ActionType, OneShotId>>> = {
   drill_hole: 'work_drill',
   dig_ramp_segment: 'work_dig',
-  level_ground: 'work_dig',
+  level_ground: 'work_compact',
   place_building: 'work_hammer',
   demolish_building: 'work_hammer',
   repair_vehicle: 'work_hammer',
@@ -43,10 +46,12 @@ interface Site extends Unit {
 
 export class WorkSounds {
   private sites = new Map<string, Site>();
-  private units: Unit[] = [];
+  /** One per vehicle with someone in it working or driving: the engines that feed the bed. */
+  private machines: Unit[] = [];
   private selectionTimerS = 0;
   private suppressedUntilS = 0;
-  private nearUnits = 0;
+  /** Engines near the listener, each weighted by how close it is (1 within the reference distance). */
+  private nearMachines = 0;
   private level = 0;
   private readonly bed: BedFeed;
 
@@ -60,7 +65,7 @@ export class WorkSounds {
     for (const vehicle of state.vehicles.vehicles) for (const id of vehicle.occupantIds) rider.set(id, vehicle.id);
 
     const sites = new Map<string, Site>();
-    const units: Unit[] = [];
+    const machines = new Map<number, Unit>();
     for (const employee of state.employees.employees) {
       if (!employee.alive) continue;
       const activity = computeEmployeeActivity(employee, state.vehicles);
@@ -70,7 +75,7 @@ export class WorkSounds {
         entity: vehicleId !== undefined ? { kind: 'vehicle', id: vehicleId } : { kind: 'employee', id: employee.id },
         point: { x: employee.x, z: employee.z },
       };
-      units.push(unit);
+      if (vehicleId !== undefined) machines.set(vehicleId, unit);
       const sound = activity.kind === 'working' && activity.actionType ? WORK_SOUND[activity.actionType] : undefined;
       if (!sound) continue;
       const key = `work:${employee.id}`;
@@ -78,7 +83,7 @@ export class WorkSounds {
       sites.set(key, { ...unit, key, sound, timerS: previous?.timerS ?? 0, selected: previous?.selected ?? false });
     }
     this.sites = sites;
-    this.units = units;
+    this.machines = [...machines.values()];
   }
 
   /** Keep work bursts quiet for a while (a blast is going off). */
@@ -113,14 +118,14 @@ export class WorkSounds {
   /** Silence the bed and forget every site. */
   clear(): void {
     this.sites.clear();
-    this.units = [];
-    this.nearUnits = 0;
+    this.machines = [];
+    this.nearMachines = 0;
     this.level = 0;
     this.suppressedUntilS = 0;
     this.bed.set(0, WORK_CONFIG.machinery.rampS);
   }
 
-  /** Re-pick the nearest work sites and count the units close enough to add to the bed. */
+  /** Re-pick the nearest work sites and weigh the engines close enough to add to the bed. */
   private select(): void {
     const audible = [...this.sites.values()].flatMap(site => {
       const point = this.env.resolve(site);
@@ -133,13 +138,22 @@ export class WorkSounds {
       site.selected = chosen.has(site);
       if (site.selected && !wasSelected) site.timerS = this.env.random.nextFloat(0, WORK_CONFIG.firstBurstMaxS);
     }
-    this.nearUnits = this.units.filter(unit => this.env.isNear(this.env.resolve(unit), WORK_CONFIG.machinery.rangeFactor)).length;
+    this.nearMachines = this.machines.reduce((sum, machine) => sum + this.proximity(this.env.resolve(machine)), 0);
   }
 
-  /** Ease the machinery bed toward how busy the area near the listener is. */
+  /** 1 within the listener's reference distance, falling linearly to 0 at `rangeFactor` times it. */
+  private proximity(point: Spot): number {
+    const listener = this.env.listener();
+    if (!listener) return 1;
+    const reference = referenceM(listener.viewDistance);
+    const fade = reference * (WORK_CONFIG.machinery.rangeFactor - 1);
+    return clamp(1 - (distanceM(listener, point) - reference) / fade, 0, 1);
+  }
+
+  /** Ease the machinery bed toward how many engines run near the listener. */
   private followActivity(dtS: number, active: boolean): void {
     const config = WORK_CONFIG.machinery;
-    const target = active ? Math.sqrt(clamp(this.nearUnits / config.unitsForFull, 0, 1)) : 0;
+    const target = active ? Math.sqrt(clamp(this.nearMachines / config.unitsForFull, 0, 1)) : 0;
     this.level += (target - this.level) * (1 - Math.exp(-dtS / config.smoothTauS));
     if (target === 0 && this.level < config.epsilon) this.level = 0;
     this.bed.set(this.level * config.maxLevel, config.rampS);

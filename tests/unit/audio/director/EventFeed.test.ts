@@ -25,6 +25,10 @@ function fixture(): Fixture {
   return { h, emitter, feed, state, errors };
 }
 
+/** The cues that spend the shared hauling budget (the backup alarm that goes with them does not). */
+const HAULING = new Set(['haul_load', 'haul_dump', 'boulder_break']);
+const hauling = (h: Harness): Harness['player']['plays'] => h.player.plays.filter(p => HAULING.has(p.id));
+
 describe('EventFeed hauling', () => {
   it('plays a bounded number of loads for a hundred hauls in one burst, nearest first', () => {
     const { h, emitter, feed, state } = fixture();
@@ -42,7 +46,7 @@ describe('EventFeed hauling', () => {
     emitter.emit('vehicle:haul_delivered', { vehicleId: truck.id, fragmentId: 1 });
     emitter.emit('vehicle:boulder_broken', { vehicleId: truck.id, fragmentId: 1, pieceIds: [2, 3] });
     feed.flush();
-    expect(h.player.ids).toEqual(['haul_dump', 'boulder_break']);
+    expect(h.player.ids).toEqual(['haul_dump', 'vehicle_reverse', 'boulder_break']);
   });
 
   it('spends one shared budget, so a long busy spell stays a texture', () => {
@@ -53,12 +57,12 @@ describe('EventFeed hauling', () => {
       emitter.emit('vehicle:haul_delivered', { vehicleId: truck.id, fragmentId: 0 });
       feed.flush();
     }
-    expect(h.player.plays).toHaveLength(HAUL_BUDGET_CONFIG.capacity);
+    expect(hauling(h)).toHaveLength(HAUL_BUDGET_CONFIG.capacity);
     feed.update(2);
     const truck = addVehicle(state, 'debris_hauler', 2, 30);
     emitter.emit('vehicle:haul_loaded', { vehicleId: truck.id, fragmentId: 0 });
     feed.flush();
-    expect(h.player.plays).toHaveLength(HAUL_BUDGET_CONFIG.capacity + 1);
+    expect(hauling(h)).toHaveLength(HAUL_BUDGET_CONFIG.capacity + 1);
   });
 
   it('keeps one vehicle to one cue per cooldown, in real time', () => {
@@ -94,7 +98,7 @@ describe('EventFeed hauling', () => {
     feed.flush();
     h.advance(100);
     feed.flush();
-    expect(h.player.plays).toHaveLength(1);
+    expect(h.player.ids).toEqual(['haul_load', 'vehicle_reverse']);
   });
 
   it('remembers at most a bounded number of vehicles per burst', () => {
@@ -106,7 +110,27 @@ describe('EventFeed hauling', () => {
     feed.attach(new Subscriptions(emitter, () => undefined));
     for (let id = 1; id <= DIRECTOR_CONFIG.maxPendingEntities + 300; id++) emitter.emit('vehicle:haul_loaded', { vehicleId: id, fragmentId: 0 });
     feed.flush();
-    expect(lookups).toBeLessThanOrEqual(DIRECTOR_CONFIG.maxPendingEntities * 2);
+    // A haul marks two intents (the load and the backup alarm); each remembers at most maxPendingEntities vehicles.
+    expect(lookups).toBeLessThanOrEqual(DIRECTOR_CONFIG.maxPendingEntities * 2 * 2);
+  });
+
+  it('sounds a backup alarm with the hauling, one truck at a time and spaced well apart, outside the hauling budget', () => {
+    const { h, emitter, feed, state } = fixture();
+    const haul = (y: number): void => {
+      const truck = addVehicle(state, 'debris_hauler', 2, y);
+      emitter.emit('vehicle:haul_loaded', { vehicleId: truck.id, fragmentId: 0 });
+      emitter.emit('vehicle:haul_delivered', { vehicleId: truck.id, fragmentId: 0 });
+      feed.flush();
+    };
+    for (let burst = 0; burst < 10; burst++) {
+      haul(burst);
+      h.advance(1);
+    }
+    expect(h.player.of('vehicle_reverse')).toHaveLength(1);
+    h.advance(EVENT_CUES.reverse.spacingS);
+    haul(20);
+    expect(h.player.of('vehicle_reverse')).toHaveLength(2);
+    expect(EVENT_CUES.reverse.spacingS).toBeGreaterThanOrEqual(10);
   });
 });
 
@@ -161,11 +185,11 @@ describe('EventFeed one-per-burst cues', () => {
     feed.flush();
     for (let id = 1; id <= 50; id++) emitter.emit('employee:shift_change', { employeeId: id });
     feed.flush();
-    expect(h.player.ids).toEqual(['shift_bell']);
-    h.advance(FLAG_CUES.shiftBell.cooldownS);
+    expect(h.player.ids).toEqual(['shift_whistle']);
+    h.advance(FLAG_CUES.shiftWhistle.cooldownS);
     emitter.emit('employee:shift_change', { employeeId: 1 });
     feed.flush();
-    expect(h.player.ids).toEqual(['shift_bell', 'shift_bell']);
+    expect(h.player.ids).toEqual(['shift_whistle', 'shift_whistle']);
   });
 
   it('plays one level-up for a burst of promotions and one unlock for finished research', () => {
@@ -196,7 +220,7 @@ describe('EventFeed one-per-burst cues', () => {
     const truck = addVehicle(state, 'debris_hauler', 2, 50);
     emitter.emit('vehicle:haul_loaded', { vehicleId: truck.id, fragmentId: 0 });
     feed.flush();
-    expect(h.player.plays).toHaveLength(HAUL_BUDGET_CONFIG.capacity + 1);
+    expect(hauling(h)).toHaveLength(HAUL_BUDGET_CONFIG.capacity + 1);
   });
 });
 

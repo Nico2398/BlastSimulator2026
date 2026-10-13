@@ -25,7 +25,7 @@ export function buildBlastScenario(random: Random): MixScenario {
   const builder = new TimelineBuilder();
   const rain = AMBIENCE_CONFIG.weather.heavy_rain;
   builder
-    .loop(0, 'amb_wind', Math.max(rain.wind, PLAN.windLevel), PLAN.bedRampS)
+    .loop(0, 'amb_wind_storm', Math.max(rain.windStorm, PLAN.windLevel), PLAN.bedRampS)
     .loop(0, 'amb_rain_heavy', PLAN.rainLevel, PLAN.bedRampS)
     .loop(PLAN.sirenOnS, 'blast_siren', 1, SIREN_CONFIG.rampInS);
   addBeeps(builder, PLAN.firstBeepS, PLAN.lastBeepS);

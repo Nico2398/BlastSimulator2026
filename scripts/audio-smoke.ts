@@ -256,6 +256,9 @@ const DEBRIS_CUES = ['play:debris_hit', 'play:debris_pebble'];
 /** Ticks run after the first boom so the debris rain and the tail are handed to the player. */
 const AFTER_BOOM_TICKS = 30;
 const BLAST_MAX_TICKS = 400;
+/** What arming a detonation sounds like, and how long (real s) the frames that start it may take to come. */
+const ARMED_CUES = ['loop:blast_siren', 'play:blast_beep'];
+const ARMED_SETTLE_S = 5;
 
 interface CommandResult {
   readonly success: boolean;
@@ -296,17 +299,21 @@ async function tickUntilPlay(page: Page, id: string, maxTicks: number, extra: nu
   }, id, maxTicks, extra, TICK_CHUNK);
 }
 
+/** The log since `from`, polled until it holds every `expected` key or `settleS` real seconds passed (frame-driven cues). */
+async function settledLogSince(page: Page, from: number, expected: readonly string[], settleS: number): Promise<PlayRecord[]> {
+  let own = await logSince(page, from);
+  const deadline = Date.now() + settleS * 1000;
+  while (missingCues(own, expected).length > 0 && Date.now() < deadline) {
+    await sleep(POLL_MS);
+    own = await logSince(page, from);
+  }
+  return own;
+}
+
 async function runGameStep(page: Page, step: GameStep): Promise<void> {
   const from = await logLength(page);
   const result = await gameCommand(page, step.command);
-  let own = await logSince(page, from);
-  if (step.settleS !== undefined) {
-    const deadline = Date.now() + step.settleS * 1000;
-    while (missingCues(own, step.expect ?? []).length > 0 && Date.now() < deadline) {
-      await sleep(POLL_MS);
-      own = await logSince(page, from);
-    }
-  }
+  const own = await settledLogSince(page, from, step.expect ?? [], step.settleS ?? 0);
   const problems = missingCues(own, step.expect ?? []).map(key => `${key} missing after "${step.command}"`);
   if (result.success === (step.refused === true)) problems.push(`"${step.command}" ${result.success ? 'succeeded' : 'failed'}: ${result.output}`);
   if (step.until !== undefined) {
@@ -320,8 +327,9 @@ async function runGameStep(page: Page, step: GameStep): Promise<void> {
 async function blastSteps(page: Page): Promise<void> {
   const from = await logLength(page);
   const armed = await gameCommand(page, 'blast detonate');
-  const armedCues = await logSince(page, from);
-  const problems = missingCues(armedCues, ['loop:blast_siren', 'play:blast_beep']).map(key => `${key} missing when armed`);
+  // The siren and its beeps follow the armed state on the next rendered frame, not inside the command: wait for one.
+  const armedCues = await settledLogSince(page, from, ARMED_CUES, ARMED_SETTLE_S);
+  const problems = missingCues(armedCues, ARMED_CUES).map(key => `${key} missing when armed`);
   if (!armed.success) problems.push(`"blast detonate" failed: ${armed.output}`);
   check(problems.length === 0, 'arm the blast: siren bed and warning beeps', problems.join('; '));
 

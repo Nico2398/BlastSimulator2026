@@ -30,6 +30,23 @@
   "blast": {
    "max_s": 3.0,
    "fade_out_ms": 40
+  },
+  "ambience": {
+   "max_s": 8.0,
+   "fade_out_ms": 600,
+   "mp3": {
+    "vbr_quality": 5,
+    "sample_rate": 32000
+   }
+  },
+  "bed": {
+   "max_s": 30.0,
+   "fade_out_ms": 0,
+   "target_rms_db": -26,
+   "mp3": {
+    "vbr_quality": 6,
+    "sample_rate": 32000
+   }
   }
  },
  "body": {
@@ -81,17 +98,6 @@
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
-  "kenney-scifi": {
-   "title": "Kenney Sci-Fi Sounds",
-   "author": "Kenney (kenney.nl)",
-   "dir": "github/open-game-sfx-index/audio/sci-fi-sounds",
-   "url": "https://kenney.nl/assets/sci-fi-sounds",
-   "via": "open-game-sfx-index mirror",
-   "mirror": "open-game-sfx-index",
-   "official_zip": "https://kenney.nl/media/pages/assets/sci-fi-sounds/6b296f9ecf-1677589334/kenney_sci-fi-sounds.zip",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
-  },
   "kenney-rpg": {
    "title": "Kenney RPG Audio",
    "author": "Kenney (kenney.nl)",
@@ -100,50 +106,6 @@
    "via": "open-game-sfx-index mirror",
    "mirror": "open-game-sfx-index",
    "official_zip": "https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
-  },
-  "kenney-jingles": {
-   "title": "Kenney Music Jingles",
-   "author": "Kenney (kenney.nl)",
-   "dir": "github/open-game-sfx-index/audio/music-jingles",
-   "url": "https://kenney.nl/assets/music-jingles",
-   "via": "open-game-sfx-index mirror",
-   "mirror": "open-game-sfx-index",
-   "official_zip": "https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
-  },
-  "kenney-digital": {
-   "title": "Kenney Digital Audio",
-   "author": "Kenney (kenney.nl)",
-   "dir": "github/open-game-sfx-index/audio/digital-audio",
-   "url": "https://kenney.nl/assets/digital-audio",
-   "via": "open-game-sfx-index mirror",
-   "mirror": "open-game-sfx-index",
-   "official_zip": "https://kenney.nl/media/pages/assets/digital-audio/216eac4753-1677590265/kenney_digital-audio.zip",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
-  },
-  "kenney-interface": {
-   "title": "Kenney Interface Sounds",
-   "author": "Kenney (kenney.nl)",
-   "dir": "github/open-game-sfx-index/audio/interface-sounds",
-   "url": "https://kenney.nl/assets/interface-sounds",
-   "via": "open-game-sfx-index mirror",
-   "mirror": "open-game-sfx-index",
-   "official_zip": "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
-  },
-  "oga-wobbleboxx": {
-   "title": "Level Up, Power Up, Coin Get (13 sounds)",
-   "author": "wobbleboxx (OpenGameArt.org)",
-   "dir": "github/open-game-sfx-index/audio/oga-levelup-powerup",
-   "url": "https://opengameart.org/content/level-up-power-up-coin-get-13-sounds",
-   "via": "open-game-sfx-index mirror",
-   "mirror": "open-game-sfx-index",
-   "official_zip": "https://opengameart.org/sites/default/files/SoundPack01.zip",
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
@@ -165,15 +127,6 @@
    "license": "CC0-1.0",
    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
-  "kenney-kit-fps": {
-   "title": "Kenney Starter Kit FPS",
-   "author": "Kenney (kenney.nl)",
-   "dir": "github/Starter-Kit-FPS/sounds",
-   "url": "https://github.com/KenneyNL/Starter-Kit-FPS",
-   "via": "first-party repository (code MIT; assets incl. sound effects CC0 per README)",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
-  },
   "godot-audio-effects": {
    "title": "Godot demo projects, audio/audio_effects/sfx",
    "author": "see per-file credit (Freesound.org uploaders)",
@@ -186,21 +139,8 @@
     "Whistle.wav": {
      "credit": "\"Whistle\" by OwlStorm, Freesound 320150",
      "url": "https://freesound.org/people/OwlStorm/sounds/320150/"
-    },
-    "sad_trombone.wav": {
-     "credit": "\"Sad Trombone\" by kirbydx, Freesound 175409",
-     "url": "https://freesound.org/people/kirbydx/sounds/175409/"
     }
    }
-  },
-  "meta-piano": {
-   "title": "Meta Open Sound, meta-piano",
-   "author": "Meta Creative Audio team",
-   "dir": "github/Meta-open-sound/systems/instruments/meta-piano/ogg",
-   "url": "https://github.com/facebookincubator/Meta-open-sound",
-   "via": "repository README: recorded by Meta's Creative Audio team, all CC0 1.0",
-   "license": "CC0-1.0",
-   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
   },
   "opensfx": {
    "title": "OpenSFX (OpenTTD base sounds)",
@@ -231,54 +171,264 @@
      "license": "CC0-1.0",
      "url": "https://freesound.org/people/saphix/sounds/36794/"
     },
-    "osfx_33.wav": {
-     "psfo": "\"Jackhammer\". Original \"air hammer half close.wav\" by \"Bluesy1905\". Cut and edited by \"Wuzzy\". License: Creative Commons Attribution 3.0 Unported.",
-     "license": "CC-BY-3.0",
-     "url": "https://freesound.org/people/Bluesy1905/sounds/344934/"
-    },
-    "osfx_35.wav": {
-     "psfo": "\"Modern car horn\". Original \"claxon.wav\" by \"han1\". Edited by Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
-     "license": "CC-BY-3.0",
-     "url": "https://freesound.org/people/han1/sounds/19026/"
-    },
-    "osfx_39.wav": {
-     "psfo": "\"Building bridge\". Original \"in the smithy 2.wav\" by \"l0calh05t\". Edited by \"Wuzzy\". License: Creative Commons Attribution 3.0 Unported.",
-     "license": "CC-BY-3.0",
-     "url": "https://freesound.org/people/l0calh05t/sounds/19027/"
-    },
     "osfx_16.wav": {
      "psfo": "\"Train/ship breakdown\". Original \"Dumpster_Diving.wav\" by \"1sticky8\". Edited by \"Wuzzy\". License: Creative Commons Zero 1.0.",
      "license": "CC0-1.0",
      "url": "https://freesound.org/people/1sticky8/sounds/78484/"
+    },
+    "osfx_03.wav": {
+     "psfo": "\"Factory Whistle\". By Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://github.com/OpenTTD/OpenSFX"
+    },
+    "osfx_15.wav": {
+     "psfo": "\"Road vehicle breakdown\". Original \"Dropping a large gun.wav\" by \"Leady\". Edited by Janis Lukss. License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://github.com/OpenTTD/OpenSFX"
+    },
+    "osfx_26.wav": {
+     "psfo": "\"Truck/old bus start, pull away with horn\". Original \"file0375.mp3\" by \"saphix\" and \"Industrial Air Horn.wav\" by \"mcpable\". Edited by \"Wuzzy\". License: Creative Commons Zero 1.0.",
+     "license": "CC0-1.0",
+     "url": "https://freesound.org/people/saphix/sounds/36794/"
+    },
+    "osfx_29.wav": {
+     "psfo": "\"Applause\". Original \"Approx 850 - Enthusiast Audience.wav\" by \"lonemonk\". Edited by \"Wuzzy\". License: Creative Commons Attribution 3.0 Unported.",
+     "license": "CC-BY-3.0",
+     "url": "https://github.com/OpenTTD/OpenSFX"
     }
    },
    "commit": "d0bf8d4deda22d5a7f8d01953433cb2644663e9f"
+  },
+  "openomsi": {
+   "title": "openOMSI ambience pack (release ambience-1)",
+   "author": "see per-file credit (Freesound.org recordists)",
+   "dir": "github/openOMSI-ambience-1",
+   "url": "https://github.com/openOMSI-org/openOMSI/tree/main/tools/ambience",
+   "via": "release asset openOMSI-ambience-1.zip of github.com/openOMSI-org/openOMSI (sha256 f0f90ed4108dcd28c492cc2d0ff4fd01c776cb12886556187280eb3d714cacc3); its pack.json and CREDITS.md give each take's Freesound source, author and licence",
+   "release_zip": "https://github.com/openOMSI-org/openOMSI/releases/download/ambience-1/openOMSI-ambience-1.zip",
+   "release_sha256": "f0f90ed4108dcd28c492cc2d0ff4fd01c776cb12886556187280eb3d714cacc3",
+   "license": "per file",
+   "license_url": "",
+   "files": {
+    "roadworks/277500_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"JACKHAMMER Tascam DR-05\" by dr_elvis01, Freesound 277500 (take 1, cut 15.5-60.5 s)",
+     "url": "https://freesound.org/s/277500/"
+    },
+    "roadworks/378102_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Komatsu S280 Excavator doing road work breaking up pavement 01.wav\" by AGFX, Freesound 378102 (take 1, cut 12-57 s)",
+     "url": "https://freesound.org/s/378102/"
+    },
+    "roadworks/378102_2.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Komatsu S280 Excavator doing road work breaking up pavement 01.wav\" by AGFX, Freesound 378102 (take 2, cut 140.5-185.5 s)",
+     "url": "https://freesound.org/s/378102/"
+    },
+    "roadworks/341268_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Road Works in Swiss Cottage, London\" by JoeDinesSound, Freesound 341268 (take 1, cut 12-57 s)",
+     "url": "https://freesound.org/s/341268/"
+    },
+    "roadworks/449121_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Operating a Plate Compactor.wav\" by SampleDiaries, Freesound 449121 (take 1, cut 19-64 s)",
+     "url": "https://freesound.org/s/449121/"
+    },
+    "roadworks/698751_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"vibratory plate compactor machine\" by Petrosilia, Freesound 698751 (take 1, cut 66-111 s)",
+     "url": "https://freesound.org/s/698751/"
+    },
+    "workshop/metal/547409_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"workshop noise.wav\" by Ian_G, Freesound 547409 (take 1, cut 1-27.1 s)",
+     "url": "https://freesound.org/s/547409/"
+    },
+    "workshop/metal/475217_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Ambience - Metal workshop with grinders and machinery.wav\" by jodybruchon, Freesound 475217 (take 1, cut 175.5-220.5 s)",
+     "url": "https://freesound.org/s/475217/"
+    },
+    "depot/air/607820_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"bus air brakes and drive away\" by PostProdDog, Freesound 607820 (take 1, cut 0.45-18.25 s)",
+     "url": "https://freesound.org/s/607820/"
+    },
+    "depot/yard/453415_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"bus coach ext diesel truck engine idle throaty.flac\" by kyles, Freesound 453415 (take 1, cut 1-24.1 s)",
+     "url": "https://freesound.org/s/453415/"
+    },
+    "crowd/de/550916_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"BGSaSc Walla Medium Crowd German Berlin Talking People 01\" by Profispiesser, Freesound 550916 (take 1, cut 2-47 s)",
+     "url": "https://freesound.org/s/550916/"
+    },
+    "far/snow_shovel/615841_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Snow Shoveling.wav\" by crowcountingman, Freesound 615841 (take 1, cut 7.9-15.7 s)",
+     "url": "https://freesound.org/s/615841/"
+    },
+    "thunder/close/434359_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Close lightning strike 2018 07 07\" by csengeri, Freesound 434359 (take 1, cut 1.15-31.15 s)",
+     "url": "https://freesound.org/s/434359/"
+    },
+    "thunder/close/446753_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Heavy Thunder Strike - no Rain - QUADRO.wav\" by BlueDelta, Freesound 446753 (take 1, cut 0.4-30.4 s)",
+     "url": "https://freesound.org/s/446753/"
+    },
+    "thunder/mid/194364_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Thunder Clap OWB KY 441x16.wav\" by Dave Welsh, Freesound 194364 (take 1, cut 0.7-30.7 s)",
+     "url": "https://freesound.org/s/194364/"
+    },
+    "thunder/mid/367702_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"THUNDER long rumbling - no Rain - 4-CHANNEL-44kHz.wav\" by BlueDelta, Freesound 367702 (take 1, cut 0.15-30.15 s)",
+     "url": "https://freesound.org/s/367702/"
+    },
+    "thunder/rain/361772_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"2016-10-06 Thunder Crack.wav\" by kingsrow, Freesound 361772 (take 1, cut 0.35-27.9 s)",
+     "url": "https://freesound.org/s/361772/"
+    },
+    "thunder/far/361401_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Distant Thunder\" by richwise, Freesound 361401 (take 1, cut 0.9-30.9 s)",
+     "url": "https://freesound.org/s/361401/"
+    },
+    "thunder/far/267550_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Thunder3\" by Yoyodaman234, Freesound 267550 (take 1, cut 0.5-30.5 s)",
+     "url": "https://freesound.org/s/267550/"
+    },
+    "wind/bare/637566_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"forest light wind through bare trees winter GREAT FOR FALLING SNOW.flac\" by kyles, Freesound 637566 (take 1, cut 9-54 s)",
+     "url": "https://freesound.org/s/637566/"
+    },
+    "wind/bare/502523_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Stormy winds through the trees.mp3\" by Simon Spiers, Freesound 502523 (take 1, cut 100-145 s)",
+     "url": "https://freesound.org/s/502523/"
+    },
+    "rain/light/380651_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"Light rain on street.wav\" by BonnyOrbit, Freesound 380651 (take 1, cut 3-48 s)",
+     "url": "https://freesound.org/s/380651/"
+    },
+    "rain/moderate/217236_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"steady rain in the city.wav\" by roofusj, Freesound 217236 (take 1, cut 19-64 s)",
+     "url": "https://freesound.org/s/217236/"
+    },
+    "rain/heavy/171981_1.mp3": {
+     "license": "CC0-1.0",
+     "credit": "\"AMB_M_City_Rain_Heavy.wav\" by conleec, Freesound 171981 (take 1, cut 44.5-89.5 s)",
+     "url": "https://freesound.org/s/171981/"
+    }
+   }
   }
  },
  "sounds": {
-  "bell": {
-   "kind": "sting",
+  "bed_diesel": {
+   "kind": "bed",
    "layers": [
     {
-     "pack": "kenney-impact",
-     "file": "impactBell_heavy_000.ogg"
+     "pack": "openomsi",
+     "file": "depot/yard/453415_1.mp3",
+     "start": 1.5,
+     "af": "lowpass=f=5000"
     }
    ],
-   "max_s": 1.5,
-   "fade_out_ms": 200
+   "loop": {
+    "period_s": 18,
+    "crossfade_s": 2.5,
+    "pad_s": 0.5
+   }
+  },
+  "bed_rain_heavy": {
+   "kind": "bed",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "rain/moderate/217236_1.mp3",
+     "start": 3.0
+    },
+    {
+     "pack": "openomsi",
+     "file": "rain/heavy/171981_1.mp3",
+     "start": 10.0,
+     "gain_db": -5
+    }
+   ],
+   "loop": {
+    "period_s": 16.2,
+    "crossfade_s": 2.5,
+    "pad_s": 0.5
+   }
+  },
+  "bed_rain_light": {
+   "kind": "bed",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "rain/light/380651_1.mp3",
+     "start": 3.0
+    }
+   ],
+   "loop": {
+    "period_s": 16.2,
+    "crossfade_s": 2.5,
+    "pad_s": 0.5
+   }
+  },
+  "bed_wind": {
+   "kind": "bed",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "wind/bare/637566_1.mp3",
+     "start": 2.0,
+     "af": "highpass=f=110"
+    }
+   ],
+   "loop": {
+    "period_s": 21.6,
+    "crossfade_s": 3,
+    "pad_s": 0.5
+   }
+  },
+  "bed_wind_storm": {
+   "kind": "bed",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "wind/bare/502523_1.mp3",
+     "start": 0.0,
+     "af": "highpass=f=80"
+    }
+   ],
+   "loop": {
+    "period_s": 21.6,
+    "crossfade_s": 3,
+    "pad_s": 0.5
+   }
   },
   "blast_boom_1": {
    "kind": "blast",
    "layers": [
     {
-     "pack": "kenney-scifi",
-     "file": "lowFrequency_explosion_000.ogg"
-    },
-    {
-     "pack": "kenney-scifi",
-     "file": "explosionCrunch_002.ogg",
-     "gain_db": -7,
-     "af": "lowpass=f=1000,lowpass=f=1000,lowpass=f=1000"
+     "pack": "openomsi",
+     "file": "thunder/close/446753_1.mp3",
+     "start": 0.7,
+     "dur": 3.0,
+     "align_db": -24,
+     "af": "lowpass=f=1600",
+     "fade_out_ms": 600
     }
    ],
    "fade_out_ms": 300
@@ -287,61 +437,102 @@
    "kind": "blast",
    "layers": [
     {
-     "pack": "kenney-scifi",
-     "file": "lowFrequency_explosion_001.ogg"
-    },
-    {
-     "pack": "kenney-scifi",
-     "file": "explosionCrunch_004.ogg",
-     "gain_db": -8,
-     "af": "lowpass=f=800,lowpass=f=800,lowpass=f=800"
+     "pack": "openomsi",
+     "file": "thunder/mid/367702_1.mp3",
+     "start": 4.9,
+     "dur": 3.0,
+     "align_db": -20,
+     "af": "lowpass=f=1400",
+     "fade_out_ms": 600
     }
    ],
-   "max_s": 2.4,
    "fade_out_ms": 300
   },
   "blast_crack_1": {
    "kind": "blast",
    "layers": [
     {
-     "pack": "kenney-scifi",
-     "file": "explosionCrunch_000.ogg"
+     "pack": "openomsi",
+     "file": "thunder/close/434359_1.mp3",
+     "start": 1.85,
+     "dur": 1.5,
+     "align_db": -8,
+     "af": "highpass=f=150",
+     "fade_out_ms": 300
     }
-   ],
-   "max_s": 1.0,
-   "fade_out_ms": 120
+   ]
   },
   "blast_crack_2": {
    "kind": "blast",
    "layers": [
     {
-     "pack": "kenney-scifi",
-     "file": "explosionCrunch_001.ogg"
+     "pack": "openomsi",
+     "file": "thunder/mid/194364_1.mp3",
+     "start": 12.9,
+     "dur": 1.6,
+     "align_db": -12,
+     "af": "highpass=f=150",
+     "fade_out_ms": 300
     }
-   ],
-   "max_s": 1.2,
-   "fade_out_ms": 120
+   ]
   },
   "blast_crack_3": {
    "kind": "blast",
    "layers": [
     {
-     "pack": "kenney-scifi",
-     "file": "explosionCrunch_003.ogg"
+     "pack": "openomsi",
+     "file": "thunder/rain/361772_1.mp3",
+     "start": 7.9,
+     "dur": 1.6,
+     "align_db": -12,
+     "af": "highpass=f=150",
+     "fade_out_ms": 300
     }
-   ],
-   "max_s": 1.3,
-   "fade_out_ms": 120
+   ]
   },
   "blast_dud": {
-   "kind": "blast",
+   "kind": "ui",
    "layers": [
     {
-     "pack": "kenney-kit-fps",
-     "file": "enemy_destroy.ogg"
+     "pack": "kenney-impact",
+     "file": "impactSoft_heavy_001.ogg",
+     "af": "lowpass=f=700"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactPunch_heavy_002.ogg",
+     "gain_db": -4,
+     "af": "lowpass=f=700"
     }
-   ],
-   "max_s": 1.0
+   ]
+  },
+  "blast_rumble_1": {
+   "kind": "ambience",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "thunder/close/446753_1.mp3",
+     "start": 3.5,
+     "dur": 6.5,
+     "af": "lowpass=f=1200",
+     "fade_in_ms": 300,
+     "fade_out_ms": 1500
+    }
+   ]
+  },
+  "blast_rumble_2": {
+   "kind": "ambience",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "thunder/far/361401_1.mp3",
+     "start": 9.5,
+     "dur": 6.5,
+     "af": "lowpass=f=1200",
+     "fade_in_ms": 200,
+     "fade_out_ms": 1500
+    }
+   ]
   },
   "boulder_break": {
    "kind": "work",
@@ -396,6 +587,32 @@
     }
    ]
   },
+  "compact_1": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "roadworks/449121_1.mp3",
+     "start": 30.9,
+     "dur": 1.5,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
+    }
+   ]
+  },
+  "compact_2": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "roadworks/698751_1.mp3",
+     "start": 17.0,
+     "dur": 1.5,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
+    }
+   ]
+  },
   "crash_1": {
    "kind": "work",
    "layers": [
@@ -422,8 +639,12 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "kenney-kit-citybuilder",
-     "file": "removal-a.ogg"
+     "pack": "openomsi",
+     "file": "roadworks/378102_1.mp3",
+     "start": 7.45,
+     "dur": 1.5,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
     }
    ]
   },
@@ -431,8 +652,12 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "kenney-kit-citybuilder",
-     "file": "removal-b.ogg"
+     "pack": "openomsi",
+     "file": "roadworks/378102_1.mp3",
+     "start": 28.4,
+     "dur": 1.5,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
     }
    ]
   },
@@ -440,8 +665,25 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "kenney-kit-citybuilder",
-     "file": "removal-d.ogg"
+     "pack": "openomsi",
+     "file": "roadworks/378102_2.mp3",
+     "start": 31.25,
+     "dur": 1.5,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
+    }
+   ]
+  },
+  "dig_4": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "roadworks/341268_1.mp3",
+     "start": 20.45,
+     "dur": 1.5,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
     }
    ]
   },
@@ -449,12 +691,12 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "opensfx",
-     "file": "osfx_33.wav",
-     "start": 0.0,
-     "dur": 1.2,
-     "fade_in_ms": 4,
-     "fade_out_ms": 30
+     "pack": "openomsi",
+     "file": "roadworks/277500_1.mp3",
+     "start": 9.0,
+     "dur": 1.45,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
     }
    ]
   },
@@ -462,12 +704,25 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "opensfx",
-     "file": "osfx_33.wav",
-     "start": 1.25,
-     "dur": 1.2,
-     "fade_in_ms": 4,
-     "fade_out_ms": 30
+     "pack": "openomsi",
+     "file": "roadworks/277500_1.mp3",
+     "start": 29.95,
+     "dur": 1.45,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
+    }
+   ]
+  },
+  "drill_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "roadworks/277500_1.mp3",
+     "start": 43.2,
+     "dur": 1.45,
+     "fade_in_ms": 40,
+     "fade_out_ms": 160
     }
    ]
   },
@@ -478,9 +733,67 @@
      "pack": "opensfx",
      "file": "osfx_16.wav",
      "start": 0.0,
-     "dur": 0.75,
-     "fade_in_ms": 4,
-     "fade_out_ms": 40
+     "dur": 0.4,
+     "gain_db": -6
+    },
+    {
+     "pack": "openomsi",
+     "file": "far/snow_shovel/615841_1.mp3",
+     "start": 0.6,
+     "dur": 1.3,
+     "gain_db": -4,
+     "af": "lowpass=f=2500,highpass=f=120",
+     "fade_in_ms": 60,
+     "fade_out_ms": 300
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_000.ogg",
+     "at": 0.05
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_003.ogg",
+     "at": 0.18,
+     "gain_db": -2
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_001.ogg",
+     "at": 0.3,
+     "gain_db": -4,
+     "af": "asetrate=44100*0.8,aresample=44100"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_004.ogg",
+     "at": 0.42,
+     "gain_db": -5
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_002.ogg",
+     "at": 0.56,
+     "gain_db": -7,
+     "af": "asetrate=44100*0.8,aresample=44100"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_000.ogg",
+     "at": 0.64,
+     "gain_db": -7
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_001.ogg",
+     "at": 0.8,
+     "gain_db": -9
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_002.ogg",
+     "at": 0.95,
+     "gain_db": -11
     }
    ]
   },
@@ -490,10 +803,62 @@
     {
      "pack": "opensfx",
      "file": "osfx_16.wav",
-     "start": 0.5,
-     "dur": 0.77,
-     "fade_in_ms": 4,
-     "fade_out_ms": 40
+     "start": 0.35,
+     "dur": 0.4,
+     "gain_db": -7
+    },
+    {
+     "pack": "openomsi",
+     "file": "far/snow_shovel/615841_1.mp3",
+     "start": 1.4,
+     "dur": 1.3,
+     "gain_db": -4,
+     "af": "lowpass=f=2500,highpass=f=120",
+     "fade_in_ms": 60,
+     "fade_out_ms": 300
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_002.ogg",
+     "at": 0.04
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_001.ogg",
+     "at": 0.15,
+     "gain_db": -3,
+     "af": "asetrate=44100*0.8,aresample=44100"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_004.ogg",
+     "at": 0.27,
+     "gain_db": -4
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_000.ogg",
+     "at": 0.4,
+     "gain_db": -6,
+     "af": "asetrate=44100*0.8,aresample=44100"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_003.ogg",
+     "at": 0.52,
+     "gain_db": -7
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_002.ogg",
+     "at": 0.7,
+     "gain_db": -8
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_000.ogg",
+     "at": 0.86,
+     "gain_db": -10
     }
    ]
   },
@@ -501,75 +866,54 @@
    "kind": "sting",
    "layers": [
     {
-     "pack": "kenney-rpg",
-     "file": "bookClose.ogg",
-     "at": 0.0,
-     "gain_db": 0,
-     "align_db": -22
+     "pack": "kenney-impact",
+     "file": "impactWood_heavy_000.ogg"
     },
     {
      "pack": "kenney-impact",
-     "file": "impactWood_heavy_001.ogg",
-     "at": 0.0,
-     "gain_db": -8,
-     "dur": 0.3,
-     "af": "highpass=f=60"
-    },
-    {
-     "pack": "kenney-rpg",
-     "file": "bookPlace1.ogg",
-     "at": 0.34,
-     "gain_db": 3,
-     "align_db": -22
+     "file": "impactWood_heavy_002.ogg",
+     "at": 0.32
     },
     {
      "pack": "kenney-impact",
-     "file": "impactWood_heavy_003.ogg",
-     "at": 0.34,
-     "gain_db": -5,
-     "dur": 0.3,
-     "af": "highpass=f=60"
+     "file": "impactWood_heavy_004.ogg",
+     "at": 0.64,
+     "gain_db": 2
     }
-   ],
-   "max_s": 1.2,
-   "fade_out_ms": 120
+   ]
   },
   "event_mafia": {
    "kind": "sting",
    "layers": [
     {
-     "pack": "meta-piano",
-     "file": "INSPiano_Vel04_C2_01.ogg",
-     "dur": 3.0
-    },
-    {
-     "pack": "meta-piano",
-     "file": "INSPiano_Vel04_Cs2_01.ogg",
-     "dur": 3.0,
-     "at": 0.035,
-     "gain_db": -1
-    },
-    {
-     "pack": "meta-piano",
-     "file": "INSPiano_Vel04_C1_01.ogg",
-     "dur": 3.0,
-     "gain_db": -4
+     "pack": "kenney-impact",
+     "file": "impactWood_medium_000.ogg",
+     "af": "lowpass=f=3000"
     },
     {
      "pack": "kenney-impact",
-     "file": "impactSoft_heavy_001.ogg",
-     "gain_db": -2
+     "file": "impactWood_medium_002.ogg",
+     "at": 0.3,
+     "af": "lowpass=f=3000"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactWood_medium_004.ogg",
+     "at": 0.6,
+     "gain_db": 1,
+     "af": "lowpass=f=3000"
     }
-   ],
-   "max_s": 2.6,
-   "fade_out_ms": 500
+   ]
   },
   "event_politics": {
    "kind": "sting",
    "layers": [
     {
-     "pack": "kenney-jingles",
-     "file": "jingles_SAX03.ogg"
+     "pack": "opensfx",
+     "file": "osfx_29.wav",
+     "start": 0.0,
+     "dur": 2.6,
+     "fade_out_ms": 700
     }
    ]
   },
@@ -577,19 +921,29 @@
    "kind": "sting",
    "layers": [
     {
+     "pack": "openomsi",
+     "file": "crowd/de/550916_1.mp3",
+     "start": 5.0,
+     "dur": 2.3,
+     "gain_db": -2,
+     "fade_in_ms": 200,
+     "fade_out_ms": 500
+    },
+    {
      "pack": "godot-audio-effects",
      "file": "Whistle.wav",
+     "at": 0.15,
      "align_db": -40
     }
    ],
-   "max_s": 1.4
+   "max_s": 2.6
   },
   "fire": {
    "kind": "ui",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/remove-from-cart.ogg"
+     "pack": "kenney-rpg",
+     "file": "doorClose_2.ogg"
     }
    ]
   },
@@ -597,11 +951,12 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "opensfx",
-     "file": "osfx_39.wav",
-     "start": 0.3,
-     "dur": 0.55,
-     "fade_in_ms": 3
+     "pack": "openomsi",
+     "file": "workshop/metal/547409_1.mp3",
+     "start": 0.78,
+     "dur": 1.3,
+     "fade_in_ms": 20,
+     "fade_out_ms": 200
     }
    ]
   },
@@ -609,11 +964,38 @@
    "kind": "work",
    "layers": [
     {
-     "pack": "opensfx",
-     "file": "osfx_39.wav",
-     "start": 1.5,
-     "dur": 0.62,
-     "fade_in_ms": 3
+     "pack": "openomsi",
+     "file": "workshop/metal/547409_1.mp3",
+     "start": 13.3,
+     "dur": 1.3,
+     "fade_in_ms": 20,
+     "fade_out_ms": 200
+    }
+   ]
+  },
+  "hammer_3": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "workshop/metal/475217_1.mp3",
+     "start": 10.45,
+     "dur": 1.2,
+     "fade_in_ms": 40,
+     "fade_out_ms": 200
+    }
+   ]
+  },
+  "hammer_4": {
+   "kind": "work",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "workshop/metal/475217_1.mp3",
+     "start": 25.9,
+     "dur": 1.2,
+     "fade_in_ms": 20,
+     "fade_out_ms": 200
     }
    ]
   },
@@ -621,17 +1003,27 @@
    "kind": "ui",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/add-to-cart.ogg"
+     "pack": "kenney-rpg",
+     "file": "bookFlip3.ogg"
+    },
+    {
+     "pack": "kenney-rpg",
+     "file": "bookPlace1.ogg",
+     "at": 0.18,
+     "gain_db": 2
     }
    ]
   },
   "horn": {
-   "kind": "work",
+   "kind": "sting",
    "layers": [
     {
      "pack": "opensfx",
-     "file": "osfx_35.wav"
+     "file": "osfx_26.wav",
+     "start": 1.9,
+     "dur": 1.5,
+     "fade_in_ms": 10,
+     "fade_out_ms": 150
     }
    ]
   },
@@ -812,20 +1204,25 @@
    "kind": "sting",
    "layers": [
     {
-     "pack": "godot-audio-effects",
-     "file": "sad_trombone.wav",
-     "af": "atempo=1.18"
+     "pack": "opensfx",
+     "file": "osfx_15.wav"
+    },
+    {
+     "pack": "opensfx",
+     "file": "osfx_03.wav",
+     "at": 0.3,
+     "gain_db": -2,
+     "af": "asetrate=44100*0.7,aresample=44100,lowpass=f=2200"
     }
-   ],
-   "max_s": 3.2,
-   "fade_out_ms": 250
+   ]
   },
   "level_up": {
    "kind": "ui",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/level-up.ogg"
+     "pack": "kenney-impact",
+     "file": "impactBell_heavy_000.ogg",
+     "af": "asetrate=44100*2.5,aresample=44100"
     }
    ]
   },
@@ -833,73 +1230,87 @@
    "kind": "sting",
    "layers": [
     {
-     "pack": "oga-wobbleboxx",
-     "file": "Upper01.wav"
-    }
-   ],
-   "max_s": 3.4,
-   "fade_out_ms": 300
-  },
-  "notify_alert": {
-   "kind": "ui",
-   "layers": [
+     "pack": "opensfx",
+     "file": "osfx_03.wav"
+    },
     {
-     "pack": "uisfx",
-     "file": "mechanical/mention.ogg"
+     "pack": "opensfx",
+     "file": "osfx_29.wav",
+     "at": 0.5,
+     "gain_db": -3,
+     "fade_out_ms": 600
     }
    ]
   },
-  "notify_bad": {
-   "kind": "ui",
+  "load_1": {
+   "kind": "work",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/disconnect.ogg"
+     "pack": "kenney-impact",
+     "file": "impactMining_000.ogg"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_003.ogg",
+     "at": 0.09,
+     "gain_db": -3
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMetal_heavy_000.ogg",
+     "at": 0.02,
+     "gain_db": -8,
+     "af": "lowpass=f=1500"
     }
    ]
   },
-  "notify_good": {
-   "kind": "ui",
+  "load_2": {
+   "kind": "work",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/reward.ogg"
+     "pack": "kenney-impact",
+     "file": "impactMining_001.ogg"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMining_004.ogg",
+     "at": 0.12,
+     "gain_db": -4
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactGeneric_light_000.ogg",
+     "at": 0.3,
+     "gain_db": -8
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactMetal_heavy_003.ogg",
+     "gain_db": -9,
+     "af": "lowpass=f=1500"
     }
    ]
   },
-  "notify_info": {
-   "kind": "ui",
+  "load_3": {
+   "kind": "work",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/info.ogg"
-    }
-   ]
-  },
-  "notify_warn": {
-   "kind": "ui",
-   "layers": [
+     "pack": "kenney-impact",
+     "file": "impactMining_002.ogg"
+    },
     {
-     "pack": "uisfx",
-     "file": "mechanical/warning.ogg"
-    }
-   ]
-  },
-  "order_done": {
-   "kind": "ui",
-   "layers": [
+     "pack": "kenney-impact",
+     "file": "impactMining_000.ogg",
+     "at": 0.07,
+     "gain_db": -5,
+     "af": "asetrate=44100*0.85,aresample=44100"
+    },
     {
-     "pack": "uisfx",
-     "file": "mechanical/complete.ogg"
-    }
-   ]
-  },
-  "order_queued": {
-   "kind": "ui",
-   "layers": [
-    {
-     "pack": "uisfx",
-     "file": "mechanical/queued.ogg"
+     "pack": "kenney-impact",
+     "file": "impactMetal_heavy_002.ogg",
+     "at": 0.01,
+     "gain_db": -9,
+     "af": "lowpass=f=1500"
     }
    ]
   },
@@ -939,35 +1350,64 @@
     }
    ]
   },
-  "purchase": {
-   "kind": "ui",
+  "shift_whistle": {
+   "kind": "sting",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/purchase.ogg"
+     "pack": "opensfx",
+     "file": "osfx_03.wav"
     }
    ]
   },
-  "survey_ping": {
-   "kind": "work",
+  "thunder_1": {
+   "kind": "ambience",
    "layers": [
     {
-     "pack": "kenney-interface",
-     "file": "pluck_002.ogg"
-    },
+     "pack": "openomsi",
+     "file": "thunder/far/361401_1.mp3",
+     "start": 20.5,
+     "dur": 7.5,
+     "fade_in_ms": 50,
+     "fade_out_ms": 1500
+    }
+   ]
+  },
+  "thunder_2": {
+   "kind": "ambience",
+   "layers": [
     {
-     "pack": "kenney-interface",
-     "file": "pluck_002.ogg",
-     "at": 0.2,
-     "gain_db": -10,
-     "af": "lowpass=f=3500"
-    },
+     "pack": "openomsi",
+     "file": "thunder/far/267550_1.mp3",
+     "start": 3.4,
+     "dur": 7.5,
+     "fade_in_ms": 50,
+     "fade_out_ms": 1500
+    }
+   ]
+  },
+  "thunder_3": {
+   "kind": "ambience",
+   "layers": [
     {
-     "pack": "kenney-interface",
-     "file": "pluck_002.ogg",
-     "at": 0.4,
-     "gain_db": -18,
-     "af": "lowpass=f=2500"
+     "pack": "openomsi",
+     "file": "thunder/mid/367702_1.mp3",
+     "start": 10.4,
+     "dur": 7.5,
+     "fade_in_ms": 50,
+     "fade_out_ms": 1500
+    }
+   ]
+  },
+  "thunder_4": {
+   "kind": "ambience",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "thunder/rain/361772_1.mp3",
+     "start": 13.8,
+     "dur": 7.5,
+     "fade_in_ms": 50,
+     "fade_out_ms": 1500
     }
    ]
   },
@@ -982,6 +1422,19 @@
    ],
    "max_s": 2.2,
    "fade_out_ms": 200
+  },
+  "truck_start_2": {
+   "kind": "sting",
+   "layers": [
+    {
+     "pack": "openomsi",
+     "file": "depot/air/607820_1.mp3",
+     "start": 2.55,
+     "dur": 3.0,
+     "fade_in_ms": 10,
+     "fade_out_ms": 500
+    }
+   ]
   },
   "ui_back": {
    "kind": "ui",
@@ -1023,8 +1476,8 @@
    "kind": "ui",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/success.ogg"
+     "pack": "kenney-rpg",
+     "file": "bookPlace3.ogg"
     }
    ]
   },
@@ -1095,8 +1548,8 @@
    "kind": "ui",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/swipe.ogg"
+     "pack": "kenney-rpg",
+     "file": "bookFlip2.ogg"
     }
    ]
   },
@@ -1122,8 +1575,16 @@
    "kind": "ui",
    "layers": [
     {
-     "pack": "uisfx",
-     "file": "mechanical/unlock.ogg"
+     "pack": "kenney-impact",
+     "file": "impactBell_heavy_001.ogg",
+     "af": "asetrate=44100*2,aresample=44100"
+    },
+    {
+     "pack": "kenney-impact",
+     "file": "impactBell_heavy_000.ogg",
+     "at": 0.14,
+     "gain_db": -4,
+     "af": "asetrate=44100*2,aresample=44100"
     }
    ]
   }

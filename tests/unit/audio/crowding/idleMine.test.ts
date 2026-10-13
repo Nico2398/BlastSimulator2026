@@ -31,14 +31,14 @@ describe('an idle mine at 1x', () => {
   });
 
   it('plays under 4.5 sounds a minute: bells and far-off life, nothing like a work site', () => {
-    // Measured 16 sounds in 302 s (3.2 a minute): 7 shift bells, 7 distant-life sounds, the player's two commands.
+    // Measured 16 sounds in 302 s (3.2 a minute): 7 shift whistles, 7 distant-life sounds, the player's two commands.
     const stats = summarize(idle1x.recorder.plays, idle1x.realS);
     expect(stats.totalPerMinute).toBeLessThan(4.5);
     expect(stats.maxVoices).toBeLessThanOrEqual(1);
   });
 
   it('plays at most two sounds in any ten seconds once the opening commands are done', () => {
-    // Measured 2: a shift bell and a distant sound can fall in the same ten seconds.
+    // Measured 2: a shift whistle and a distant sound can fall in the same ten seconds.
     const later = idle1x.recorder.heard.filter(p => p.tS > SETUP_S);
     expect(peakIn(later, 10)).toBeLessThanOrEqual(2);
   });
@@ -107,18 +107,20 @@ describe('a full-screen menu', () => {
   });
 
   it('leaves only a barely audible wind: every bed ends at the menu level or lower', () => {
-    // The machinery bed eases down from its working level (0.18 when the menu came up) to silence, not instantly.
-    const finalLevel = new Map<string, number>();
-    for (const change of sim.recorder.beds.slice(bedsBefore)) finalLevel.set(change.id, change.level);
+    // The machinery bed only follows engines running near the listener; in this idle mine none is, so it is silent
+    // before the menu and stays silent behind it (eased down, never cut, when a machine had raised it).
+    const levelOf = (changes: typeof sim.recorder.beds): Map<string, number> => new Map(changes.map(change => [change.id, change.level]));
+    const finalLevel = levelOf(sim.recorder.beds.slice(bedsBefore));
     expect(finalLevel.size).toBeGreaterThan(0);
     for (const [id, level] of finalLevel) expect(level, id).toBeLessThanOrEqual(AMBIENCE_CONFIG.menuWindLevel);
-    expect(finalLevel.get('amb_machinery')).toBe(0);
+    const machinery = finalLevel.get('amb_machinery') ?? levelOf(sim.recorder.beds.slice(0, bedsBefore)).get('amb_machinery') ?? 0;
+    expect(machinery).toBe(0);
   });
 
   it('plays no backlog when it closes: what the world raised behind it is forgotten', () => {
     sim.menuUp = false;
     sim.frames(8 * 60);
-    // Measured: only the mine's own life resumes (a shift bell, a hammer, a building going up).
+    // Measured: only the mine's own life resumes (a shift whistle, a hammer, a building going up).
     const raisedBehindIt = new Set(['level_up', 'unlock', 'haul_load', 'haul_dump', 'vehicle_horn', 'thunder']);
     expect(sim.recorder.plays.slice(playsBefore).filter(p => raisedBehindIt.has(p.id))).toEqual([]);
   });

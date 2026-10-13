@@ -56,7 +56,7 @@ function scenarioSection(lab: LabControls, loops: LoopRow[]): HTMLElement {
   }, { 'data-action': 'stop-all' });
   return h('section', { class: 'panel', 'data-section': 'scenarios' },
     h('h2', {}, 'Scenarios'),
-    h('p', { class: 'hint' }, 'Blast: heavy rain, the siren and its beeps, then a synthetic round planned by the game\'s own blast planner, with the ambience ducked (about 26 s). Busy mine: work bursts, hauls and horns over the machinery bed.'),
+    h('p', { class: 'hint' }, 'Blast: heavy rain, the siren and its beeps, then a synthetic round planned by the game\'s own blast planner, with the ambience ducked (about 26 s). Busy mine: work bursts, hauls, backup alarms and horns over the diesel bed.'),
     h('div', { class: 'buttons' }, button('Blast', () => { lab.playBlast(); }, { 'data-action': 'blast' }), busy, stop));
 }
 

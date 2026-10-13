@@ -5,14 +5,14 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SOUND_CATALOG } from '../../../../src/audio/SoundCatalog.js';
-import { BLAST_TAIL_CONFIG } from '../../../../src/core/config/audio/synth.js';
+import { BLAST_SUB_CONFIG } from '../../../../src/core/config/audio/synth.js';
 import { CrowdRecorder, CrowdSim, soundDurationS } from '../../../helpers/audioCrowding.js';
 import { formatStats, isBlastSound, maxInWindow, maxOverlap, peakIn, summarize } from '../../../helpers/audioCrowdingStats.js';
 import { listenerAt } from '../director/helpers.js';
 
 describe('soundDurationS', () => {
   it('reads a sample from its MP3 header and a synthesized sound from its recipe config', () => {
-    expect(soundDurationS('blast_tail')).toBe(BLAST_TAIL_CONFIG.durationSec);
+    expect(soundDurationS('blast_sub')).toBe(BLAST_SUB_CONFIG.durationSec);
     expect(soundDurationS('ui_click')).toBeGreaterThan(0.01);
     expect(soundDurationS('ui_click')).toBeLessThan(1);
     expect(soundDurationS('thunder')).toBeGreaterThan(5);

@@ -78,28 +78,28 @@ describe('AssetProbe recipes and impulse', () => {
   it('wraps recipes transparently and keeps the longest and loudest variant', () => {
     const probe = new AssetProbe();
     const wrapped = probe.wrapRecipes(recipes({
-      thunder: recipe(v => audio(v === 0 ? [0.1, 0.1] : [0.5, 0.2, 0.2, 0.2], 100), 2),
+      phone_ring: recipe(v => audio(v === 0 ? [0.1, 0.1] : [0.5, 0.2, 0.2, 0.2], 100), 2),
     }));
-    expect(wrapped.thunder.variants).toBe(2);
-    expect(wrapped.thunder.render(0).channels[0]).toHaveLength(2);
-    wrapped.thunder.render(1);
-    expect(probe.report().loaded).toEqual([{ name: 'thunder', kind: 'recipe', durationS: 0.04, peakDbfs: -6 }]);
+    expect(wrapped.phone_ring.variants).toBe(2);
+    expect(wrapped.phone_ring.render(0).channels[0]).toHaveLength(2);
+    wrapped.phone_ring.render(1);
+    expect(probe.report().loaded).toEqual([{ name: 'phone_ring', kind: 'recipe', durationS: 0.04, peakDbfs: -6 }]);
   });
 
   it('records a recipe that throws, renders nothing, NaN or silence, and rethrows', () => {
     const probe = new AssetProbe();
     const wrapped = probe.wrapRecipes(recipes({
-      wind_bed: recipe(() => { throw new Error('boom'); }),
-      rain_light_bed: recipe(() => ({ sampleRate: 100, channels: [] })),
-      rain_heavy_bed: recipe(() => audio([0.5, Number.NaN])),
-      thunder: recipe(() => audio([0, 0, 0])),
+      radio_order: recipe(() => { throw new Error('boom'); }),
+      radio_info: recipe(() => ({ sampleRate: 100, channels: [] })),
+      radio_good: recipe(() => audio([0.5, Number.NaN])),
+      phone_ring: recipe(() => audio([0, 0, 0])),
     }));
-    for (const id of ['wind_bed', 'rain_light_bed', 'rain_heavy_bed', 'thunder'] as const) expect(() => wrapped[id].render(0)).toThrow();
+    for (const id of ['radio_order', 'radio_info', 'radio_good', 'phone_ring'] as const) expect(() => wrapped[id].render(0)).toThrow();
     expect(probe.report().failed).toEqual([
-      'recipe:wind_bed (boom)',
-      'recipe:rain_light_bed (rendered no audio)',
-      'recipe:rain_heavy_bed (rendered NaN or infinite samples)',
-      'recipe:thunder (rendered silence (peak -120 dBFS))',
+      'recipe:radio_order (boom)',
+      'recipe:radio_info (rendered no audio)',
+      'recipe:radio_good (rendered NaN or infinite samples)',
+      'recipe:phone_ring (rendered silence (peak -120 dBFS))',
     ]);
   });
 

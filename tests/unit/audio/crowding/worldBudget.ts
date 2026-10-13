@@ -12,8 +12,8 @@ export const worldPlays = (sim: CrowdSim): PlayRecord[] => sim.recorder.heard.fi
 /**
  * Most plays of one kind of world sound in any 30 real seconds. Each is the measured worst over the played games
  * with headroom (work_drill 8, work_hammer 13, vehicle_start 6, drill_done 6, charge_loaded 6, boulder_break 10,
- * haul_load 7, haul_dump 7, shift_bell 2, worker_collapse 4); a kind not listed was never heard more than twice.
- * vehicle_start, shift_bell, worker_collapse, drill_done and charge_loaded are spaced in real time by the director
+ * haul_load 7, haul_dump 7, shift_whistle 2, worker_collapse 4); a kind not listed was never heard more than twice.
+ * vehicle_start, shift_whistle, worker_collapse, drill_done and charge_loaded are spaced in real time by the director
  * (EVENT_CUES.spacingS, FLAG_CUES, DIFF_CONFIG), so these ceilings hold at any game speed.
  */
 const CEILING_PER_30S: Readonly<Record<string, number>> = {
@@ -25,7 +25,7 @@ const CEILING_PER_30S: Readonly<Record<string, number>> = {
   boulder_break: 12,
   haul_load: 8,
   haul_dump: 8,
-  shift_bell: 2,
+  shift_whistle: 2,
   worker_collapse: 5,
 };
 const DEFAULT_CEILING_PER_30S = 3;

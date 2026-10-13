@@ -91,10 +91,10 @@ const recipe = (loop: boolean): SynthRecipe => ({
 });
 
 /** One short constant-level recipe per id, so a render needs no real synthesis. */
-export const FAKE_RECIPES = {
-  blast_snap: recipe(false), blast_sub: recipe(false), blast_tail: recipe(false), blast_beep: recipe(false), blast_cancel: recipe(false),
-  siren_loop: recipe(true), thunder: recipe(false), wind_bed: recipe(true), rain_light_bed: recipe(true),
-  rain_heavy_bed: recipe(true), machinery_bed: recipe(true),
-} as Record<SynthRecipeId, SynthRecipe>;
+export const FAKE_RECIPES: Record<SynthRecipeId, SynthRecipe> = {
+  blast_snap: recipe(false), blast_sub: recipe(false), blast_beep: recipe(false), blast_cancel: recipe(false), siren_loop: recipe(true),
+  radio_order: recipe(false), radio_info: recipe(false), radio_good: recipe(false), radio_warn: recipe(false), radio_end: recipe(false),
+  phone_ring: recipe(false), alarm_buzzer: recipe(false), reverse_beeper: recipe(false), instrument_beep: recipe(false),
+};
 
 export const FAKE_IMPULSE = (): RenderedAudio => ({ sampleRate: 48000, channels: [new Float32Array(480).fill(0.1), new Float32Array(480).fill(0.1)] });

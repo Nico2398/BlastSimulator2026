@@ -443,12 +443,12 @@ describe('SoundPlayer stopping', () => {
 
 describe('SoundPlayer loops', () => {
   const bed = (): Partial<Record<string, SoundDefinition>> => ({
-    amb_wind: { bus: 'ambient', source: { kind: 'synth', recipe: 'wind_bed' }, gainDb: -6, priority: 1, loop: true },
+    amb_wind: { bus: 'ambient', source: { kind: 'synth', recipe: 'siren_loop' }, gainDb: -6, priority: 1, loop: true },
   });
 
   it('plays nothing until the level first rises above zero', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     expect(s.ctx.sources()).toHaveLength(0);
     handle.setLevel(0);
@@ -462,7 +462,7 @@ describe('SoundPlayer loops', () => {
 
   it('starts a looping source on the ambient bus and ramps its level', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     s.ctx.currentTime = 10;
     s.player.loop('amb_wind').setLevel(0.5, 2);
     const [source] = s.ctx.sources();
@@ -480,7 +480,7 @@ describe('SoundPlayer loops', () => {
 
   it('reuses the running voice for level changes', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     handle.setLevel(0.2);
     handle.setLevel(0.8, 1);
@@ -491,7 +491,7 @@ describe('SoundPlayer loops', () => {
 
   it('fades out and releases the voice at level zero, and restarts on the next rise', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     s.ctx.currentTime = 1;
     const handle = s.player.loop('amb_wind');
     handle.setLevel(1);
@@ -507,7 +507,7 @@ describe('SoundPlayer loops', () => {
 
   it('never fades out faster than the minimum', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     handle.setLevel(1);
     handle.setLevel(0, 0);
@@ -516,7 +516,7 @@ describe('SoundPlayer loops', () => {
 
   it('stop() is a fade to zero', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     handle.setLevel(1);
     handle.stop(1);
@@ -526,7 +526,7 @@ describe('SoundPlayer loops', () => {
 
   it('starts at the requested level when given options', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     s.player.loop('amb_wind', { level: 0.3, rampS: 1 });
     expect(s.ctx.sources()).toHaveLength(1);
     s.player.loop('amb_wind');
@@ -540,7 +540,7 @@ describe('SoundPlayer loops', () => {
     expect(s.ctx.sources()).toHaveLength(0);
     s.player.refreshLoops();
     expect(s.ctx.sources()).toHaveLength(0);
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     s.player.refreshLoops();
     expect(s.ctx.sources()).toHaveLength(1);
     s.player.refreshLoops();
@@ -557,7 +557,7 @@ describe('SoundPlayer loops', () => {
 
   it('ignores a non-finite level', () => {
     const s = setup(bed());
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     handle.setLevel(Number.NaN);
     expect(s.ctx.sources()).toHaveLength(0);
@@ -570,7 +570,7 @@ describe('SoundPlayer loops', () => {
       blast_boom: sampleDef(['boom'], { priority: 4 }),
     });
     loadAll(s, ['a', 'boom']);
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     handle.setLevel(1);
     for (let i = 0; i < VOICE_CONFIG.globalVoiceCap - 1; i++) s.player.play('debris_hit');
@@ -588,7 +588,7 @@ describe('SoundPlayer loops', () => {
 
   /** A bed stolen at the voice cap: 31 debris voices plus a blast sound fill the cap and evict the oldest, lowest-priority voice. */
   function stealBed(s: Setup): { wind: FakeSource } {
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     loadAll(s, ['a', 'boom']);
     s.player.loop('amb_wind').setLevel(0.8);
     for (let i = 0; i < VOICE_CONFIG.globalVoiceCap - 1; i++) s.player.play('debris_hit');
@@ -652,13 +652,35 @@ describe('SoundPlayer loops', () => {
   it('does not restart a bed whose level is zero', () => {
     const s = setup(crowded());
     s.player.setListener(LISTENER);
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
     const handle = s.player.loop('amb_wind');
     handle.setLevel(1);
     handle.setLevel(0);
     s.advance(VOICE_CONFIG.loopRearmIntervalMs);
     s.player.setListener(LISTENER);
     expect(s.ctx.sources().filter(n => n.loop)).toHaveLength(1);
+  });
+
+  it('loops a recorded bed over its period only, starting somewhere inside it', () => {
+    const region = { startS: 0.5, endS: 4.5 };
+    const s = setup({ amb_wind: { bus: 'ambient', source: { kind: 'sample', files: ['bed'], loopRegion: region }, gainDb: 0, priority: 3, loop: true } }, fixedRandom(0.75));
+    loadAll(s, ['bed'], 5);
+    s.player.loop('amb_wind').setLevel(0.5);
+    const [source] = s.ctx.sources();
+    expect(source!.loop).toBe(true);
+    expect(source!.loopStart).toBe(region.startS);
+    expect(source!.loopEnd).toBe(region.endS);
+    expect(source!.starts[0]!.offset).toBeCloseTo(region.startS + 0.75 * (region.endS - region.startS), 9);
+  });
+
+  it('leaves a synth bed looping over its whole buffer', () => {
+    const s = setup(bed(), fixedRandom(0.5));
+    s.rendered.set('siren_loop', [fakeBuffer(4)]);
+    s.player.loop('amb_wind').setLevel(0.5);
+    const [source] = s.ctx.sources();
+    expect(source!.loopStart).toBe(0);
+    expect(source!.loopEnd).toBe(0);
+    expect(source!.starts[0]!.offset).toBeCloseTo(2, 9);
   });
 
   it('every catalog loop outranks the one-shots that fill the cap, so a newcomer takes a work sound, not the bed', () => {
@@ -669,8 +691,7 @@ describe('SoundPlayer loops', () => {
       debris_hit: sampleDef(['a'], { priority: 1 }),
       ui_click: sampleDef(['c'], { priority: 2 }),
     });
-    loadAll(s, ['a', 'c']);
-    s.rendered.set('wind_bed', [fakeBuffer(4)]);
+    loadAll(s, ['a', 'c', 'bed_wind'], 23);
     s.player.loop('amb_wind').setLevel(1);
     for (let i = 0; i < VOICE_CONFIG.globalVoiceCap - 1; i++) s.player.play('debris_hit');
     expect(s.player.play('ui_click')).not.toBeNull();

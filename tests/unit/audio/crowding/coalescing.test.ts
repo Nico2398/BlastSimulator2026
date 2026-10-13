@@ -155,7 +155,7 @@ describe('many things happening at once', () => {
       for (let employeeId = 1; employeeId <= 40; employeeId++) sim.engine.emitter.emit('employee:shift_change', { employeeId });
       sim.frames(60);
     }
-    const bells = sim.recorder.plays.slice(before).filter(p => p.id === 'shift_bell');
+    const bells = sim.recorder.plays.slice(before).filter(p => p.id === 'shift_whistle');
     // A bell is a landmark: no two within 20 s, so a minute of shift changes is 3 bells (measured 3). Before the
     // spacing went from 8 to 20 s it rang 8 times in the same minute.
     expect(bells).toHaveLength(3);

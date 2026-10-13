@@ -1,17 +1,17 @@
 // BlastSimulator2026 — Preload plan
 // Splits the catalog's audio into loading tiers: the samples that gate `ready`,
-// the rest of the samples, then the generative sounds. Synth cues are always
-// last, so `ready` says nothing about them.
+// the rest of the samples, and the generative sounds (AudioEngine renders those
+// while the rest of the samples download). `ready` says nothing about synth cues.
 
 import { PRELOAD_CONFIG } from '../../core/config/audio/engine.js';
 import type { SoundDefinition, SynthRecipeId } from '../SoundCatalog.js';
 
 interface PreloadPlan {
-  /** Tier 1: every sample of an interface-bus sound or of a sampled sound with priority >= PRELOAD_CONFIG.essentialPriority. */
+  /** Tier 1: every sample of an interface-bus sound or of a sampled one-shot with priority >= PRELOAD_CONFIG.essentialPriority. */
   readonly essentialSamples: readonly string[];
   /** Tier 2: the remaining samples. */
   readonly otherSamples: readonly string[];
-  /** Tier 3: recipes to render, after all samples and whatever their priority (the reverb impulse comes with them). */
+  /** Recipes to render, after the essential samples and whatever their priority (the reverb impulse comes after them). */
   readonly recipes: readonly SynthRecipeId[];
 }
 
@@ -24,7 +24,8 @@ export function planPreload(catalog: Readonly<Record<string, SoundDefinition>>):
       recipes.add(def.source.recipe);
       continue;
     }
-    const isEssential = def.priority >= PRELOAD_CONFIG.essentialPriority || def.bus === 'ui';
+    // A bed fades in, so it never holds up `ready`: its files are the largest and come with the other samples.
+    const isEssential = def.bus === 'ui' || (def.priority >= PRELOAD_CONFIG.essentialPriority && !def.loop);
     for (const file of def.source.files) (isEssential ? essential : other).add(file);
   }
   for (const file of essential) other.delete(file);

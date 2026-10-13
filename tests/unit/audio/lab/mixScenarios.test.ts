@@ -116,10 +116,10 @@ describe('blast', () => {
     expect(ducks.some(d => d.t === shotAt && d.bus === 'ambient')).toBe(true);
   });
 
-  it('runs the rain and wind beds under it and stops the siren before the shot', () => {
+  it('runs the rain and storm wind beds under it and stops the siren before the shot', () => {
     const loops = scenario.events.flatMap(e => (e.kind === 'loop' ? [e] : []));
     expect(loops.some(l => l.id === 'amb_rain_heavy' && l.level > 0)).toBe(true);
-    expect(loops.some(l => l.id === 'amb_wind' && l.level > 0)).toBe(true);
+    expect(loops.some(l => l.id === 'amb_wind_storm' && l.level > 0)).toBe(true);
     const sirenOff = loops.find(l => l.id === 'blast_siren' && l.level === 0);
     expect(sirenOff!.t).toBeLessThan(plays.find(e => e.id === 'blast_snap')!.t);
   });

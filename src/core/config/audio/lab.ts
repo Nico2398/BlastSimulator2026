@@ -100,9 +100,9 @@ export const LAB_BLAST_SHAPE = {
 
 /** The arming phase of the blast scenario: siren, beeps that speed up, then the shot. */
 export const LAB_BLAST_SCENARIO = {
-  /** Heavy rain is on, so the ducked beds are audible. */
-  rainLevel: 0.85,
-  windLevel: 0.6,
+  /** Heavy rain is on, so the ducked beds are audible (AMBIENCE_CONFIG.weather.heavy_rain: storm wind and heavy rain). */
+  rainLevel: 0.75,
+  windLevel: 0.3,
   bedRampS: 1,
   sirenOnS: 1,
   firstBeepS: 2,
@@ -117,16 +117,18 @@ export const LAB_BUSY_MINE = {
   durationS: 60,
   stormFromS: 45,
   stormRampS: 3,
-  windLevel: 0.25,
-  stormWindLevel: 0.9,
-  stormRainLevel: 1,
+  /** The fair-weather breeze, then the storm wind and rain (AMBIENCE_CONFIG.weather: sunny, storm). */
+  windLevel: 0.1,
+  stormWindLevel: 0.75,
+  stormRainLevel: 0.9,
   /** A passing shower before the storm. */
-  lightRain: { fromS: 26, toS: 40, level: 0.8, rampS: 3 },
-  machineryLevel: 0.7,
+  lightRain: { fromS: 26, toS: 40, level: 0.6, rampS: 3 },
+  /** Two machines working next to the listener: the diesel bed at its ceiling (WORK_CONFIG.machinery.maxLevel). */
+  machineryLevel: 0.45,
   /** Crews are this far from the listener (m). */
   nearM: { min: 8, max: 40 },
   haulGapS: { min: 1.6, max: 3 },
-  workGapS: { min: 1.8, max: 4 },
+  workGapS: { min: 2.2, max: 5 },
   /** Far-away life sounds (m) and level (dB). */
   farM: { min: 90, max: 150 },
   farGainDb: -8,

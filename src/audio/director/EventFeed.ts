@@ -14,7 +14,7 @@ import type { Subscriptions } from './Subscriptions.js';
 import type { DirectorEnv, EntityKind } from './types.js';
 
 type EntityIntent = keyof typeof EVENT_CUES;
-type FlagIntent = 'levelUp' | 'shiftBell' | 'unlock';
+type FlagIntent = 'levelUp' | 'shiftWhistle' | 'unlock';
 
 interface EntityCue {
   readonly sound: OneShotId;
@@ -29,6 +29,7 @@ const ENTITY_CUES: Readonly<Record<EntityIntent, EntityCue>> = {
   boulder: { sound: 'boulder_break', entity: 'vehicle', budgeted: true },
   vehicleStart: { sound: 'vehicle_start', entity: 'vehicle', budgeted: false },
   horn: { sound: 'vehicle_horn', entity: 'vehicle', budgeted: false },
+  reverse: { sound: 'vehicle_reverse', entity: 'vehicle', budgeted: false },
   collapse: { sound: 'worker_collapse', entity: 'employee', budgeted: false },
 };
 
@@ -36,7 +37,7 @@ const ENTITY_CUES: Readonly<Record<EntityIntent, EntityCue>> = {
 // created silent (researchNotifications, crewNotifications), so the toast cue never doubles them.
 const FLAG_SOUNDS: Readonly<Record<FlagIntent, OneShotId>> = {
   levelUp: 'level_up',
-  shiftBell: 'shift_bell',
+  shiftWhistle: 'shift_whistle',
   unlock: 'unlock',
 };
 
@@ -51,14 +52,15 @@ export class EventFeed {
   ) {}
 
   attach(subs: Subscriptions): void {
-    subs.on('vehicle:haul_loaded', e => this.mark('haulLoad', e.vehicleId));
-    subs.on('vehicle:haul_delivered', e => this.mark('haulDump', e.vehicleId));
+    // A truck backs up to the loader and to the tip: its backup alarm goes with both, spaced so it stays a landmark.
+    subs.on('vehicle:haul_loaded', e => { this.mark('haulLoad', e.vehicleId); this.mark('reverse', e.vehicleId); });
+    subs.on('vehicle:haul_delivered', e => { this.mark('haulDump', e.vehicleId); this.mark('reverse', e.vehicleId); });
     subs.on('vehicle:boulder_broken', e => this.mark('boulder', e.vehicleId));
     subs.on('employee:mounted', e => this.mark('vehicleStart', e.vehicleId));
     subs.on('vehicle:stuck', e => this.mark('horn', e.vehicleId));
     subs.on('employee:collapsed', e => this.mark('collapse', e.employeeId));
     subs.on('employee:levelup', () => this.flags.add('levelUp'));
-    subs.on('employee:shift_change', () => this.flags.add('shiftBell'));
+    subs.on('employee:shift_change', () => this.flags.add('shiftWhistle'));
     subs.on('research:completed', () => this.flags.add('unlock'));
     subs.on('level:complete', () => this.stings.play('win'));
     subs.on('bankruptcy:triggered', () => this.stings.play('lose'));
