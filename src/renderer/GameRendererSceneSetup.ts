@@ -453,3 +453,8 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.renderedVehicleIds.clear();
   deps.renderedEmployeeIds.clear();
 }
+
+/** Hide ambient props (vegetation, scenery) standing on ground the playable mesh now claims (#1664). */
+export function dropClaimedAmbient(_deps: Pick<SceneSetupDeps, 'vegetation' | 'scenery'>, _grid: VoxelGrid): void {
+  // TODO: implement
+}

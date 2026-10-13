@@ -151,6 +151,11 @@ export class Scenery {
     return this.houseCount;
   }
 
+  /** Hide instances on ground the playable mesh has claimed; returns how many were newly hidden (#1664). */
+  dropClaimed(_isClaimed: (x: number, z: number) => boolean): number {
+    return 0;
+  }
+
   dispose(): void {
     for (const prop of this.props) prop.dispose(this.scene);
     this.props.length = 0;

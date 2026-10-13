@@ -48,6 +48,8 @@ export interface TerrainDeps {
   borderWall: WorldBorderWall | null;
   sm: SceneManager;
   refreshPanLeash: () => void;
+  /** Called when the playable mesh claims new ground after load (#1664). */
+  onSiteClaimed?: (grid: VoxelGrid) => void;
 }
 
 /**
