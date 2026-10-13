@@ -114,4 +114,69 @@ describe('Scenery', () => {
     expect(s.missingModelIds).toEqual([]);
     s.dispose();
   });
+
+  describe('dropClaimed (#1664)', () => {
+    const readMatrices = (mesh: THREE.InstancedMesh): THREE.Matrix4[] =>
+      Array.from({ length: mesh.count }, (_, i) => { const m = new THREE.Matrix4(); mesh.getMatrixAt(i, m); return m; });
+    const posOf = (m: THREE.Matrix4) => new THREE.Vector3().setFromMatrixPosition(m);
+
+    it('hides a scattered rock inside the claimed rect, keeps the others bit-identical, and leaves houses alone', () => {
+      let ground = 3;
+      const scene = new THREE.Scene();
+      const s = new Scenery(scene, 42, library, [VILLAGE], RECT, 20, 20, () => ground, 'green_foothills');
+      const rocks = meshesNamed(scene, 'scenery-rocks');
+      const target = posOf(readMatrices(rocks[0]!)[0]!);
+      const claimed = (x: number, z: number) => Math.abs(x - target.x) <= 3 && Math.abs(z - target.z) <= 3;
+      const before = rocks.map(r => readMatrices(r).map(m => m.elements.slice()));
+      const housesBefore = meshesNamed(scene, 'scenery-houses').map(r => readMatrices(r).map(m => m.elements.slice()));
+
+      const hidden = s.dropClaimed(claimed);
+      ground = -50;
+      expect(hidden).toBeGreaterThan(0);
+
+      let insideCount = 0;
+      rocks.forEach((mesh, k) => {
+        readMatrices(mesh).forEach((m, i) => {
+          const p = posOf(m);
+          if (claimed(p.x, p.z)) {
+            insideCount++;
+            expect(new THREE.Vector3().setFromMatrixScale(m).x).toBe(0);
+          } else {
+            expect(m.elements).toEqual(before[k]![i]);
+          }
+        });
+      });
+      expect(insideCount).toBe(hidden);
+      expect(meshesNamed(scene, 'scenery-houses').map(r => readMatrices(r).map(m => m.elements.slice()))).toEqual(housesBefore);
+      s.dispose();
+    });
+
+    it('does not hide houses even when the claim covers the village', () => {
+      const scene = new THREE.Scene();
+      const s = new Scenery(scene, 42, library, [VILLAGE], RECT, 20, 20, flat, 'green_foothills');
+      s.dropClaimed((x, z) => Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < 100);
+      for (const mesh of meshesNamed(scene, 'scenery-houses')) {
+        for (const m of readMatrices(mesh)) expect(new THREE.Vector3().setFromMatrixScale(m).x).toBeGreaterThan(0);
+      }
+      s.dispose();
+    });
+
+    it('is idempotent and returns 0 when nothing is claimed', () => {
+      const scene = new THREE.Scene();
+      const s = new Scenery(scene, 42, library, [], RECT, 20, 20, flat, 'green_foothills');
+      expect(s.dropClaimed(() => false)).toBe(0);
+      expect(s.dropClaimed(() => true)).toBeGreaterThan(0);
+      expect(s.dropClaimed(() => true)).toBe(0);
+      s.dispose();
+    });
+
+    it('does not throw without props or after dispose', () => {
+      const scene = new THREE.Scene();
+      const empty = new Scenery(scene, 42, new ModelLibrary(), [VILLAGE], RECT, 20, 20, flat, 'green_foothills');
+      expect(() => empty.dropClaimed(() => true)).not.toThrow();
+      const s = new Scenery(scene, 42, library, [], RECT, 20, 20, flat, 'green_foothills');
+      s.dispose();
+      expect(() => s.dropClaimed(() => true)).not.toThrow();
+    });
+  });
 });

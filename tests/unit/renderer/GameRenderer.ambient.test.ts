@@ -2,10 +2,13 @@
 // Split out of GameRenderer.test.ts: each test here builds a real landscape
 // (seconds each), and vitest only parallelises across files.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import * as THREE from 'three';
+import { meshClaimsCell } from '../../../src/renderer/terrain/PlayableCoverage.js';
+import { dropClaimedAmbient } from '../../../src/renderer/GameRendererSceneSetup.js';
 import { makeMockSceneManager } from '../../helpers/rendererFixtures.js';
 
 describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)', () => {
@@ -66,5 +69,81 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
 
     expect(grassCountAfterFirst).toBe(1);
     expect(grassCountAfterSecond).toBe(1); // still exactly one — the stale mesh was disposed, not left behind
+  });
+});
+
+describe('GameRenderer — ambient props never stand on claimed ground (#1664)', () => {
+  /** Every visible (non-zero-scale) vegetation/scenery instance position. */
+  function visibleProps(scene: THREE.Scene): Array<{ x: number; z: number }> {
+    const out: Array<{ x: number; z: number }> = [];
+    const m = new THREE.Matrix4();
+    for (const c of scene.children) {
+      if (!(c instanceof THREE.InstancedMesh) || !(c.name.startsWith('vegetation-') || c.name === 'scenery-rocks')) continue;
+      for (let i = 0; i < c.count; i++) {
+        c.getMatrixAt(i, m);
+        if (new THREE.Vector3().setFromMatrixScale(m).x === 0) continue;
+        const p = new THREE.Vector3().setFromMatrixPosition(m);
+        out.push({ x: p.x, z: p.z });
+      }
+    }
+    return out;
+  }
+
+  async function ctxWithClaim() {
+    const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
+    const grid = ctx.grid!;
+    // Claim a strip of rim ground before the ambient layer is built.
+    grid.addChunk(grid.maxX / 16, 0);
+    grid.addChunk(grid.maxX / 16, 1);
+    return ctx;
+  }
+
+  it('buildAmbient on a grid with an already-claimed chunk leaves no visible prop on meshed ground', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await ctxWithClaim();
+    renderer.syncFromContext(ctx);
+
+    const props = visibleProps(sm.scene);
+    expect(props.length).toBeGreaterThan(0);
+    expect(props.filter(p => meshClaimsCell(ctx.grid!, Math.floor(p.x), Math.floor(p.z)))).toEqual([]);
+  });
+
+  it('a claim made after load hides the props on it through the terrain remesh path', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
+    renderer.syncFromContext(ctx);
+    const grid = ctx.grid!;
+    const before = visibleProps(sm.scene).length;
+
+    grid.addChunk(grid.maxX / 16, 0);
+    grid.addChunk(grid.maxX / 16, 1);
+    renderer.remeshTerrainRegion(ctx, { minX: grid.maxX - 16, minY: 0, minZ: 0, maxX: grid.maxX + 16, maxY: 4, maxZ: 32 });
+
+    const after = visibleProps(sm.scene);
+    expect(after.length).toBeLessThan(before);
+    expect(after.filter(p => meshClaimsCell(grid, Math.floor(p.x), Math.floor(p.z)))).toEqual([]);
+  });
+
+  it('dropClaimedAmbient asks vegetation and scenery to hide exactly the meshClaimsCell ground', async () => {
+    const ctx = await makeGameContext({ size: 32 });
+    const grid = ctx.grid!;
+    const vegetation = { dropClaimed: vi.fn(() => 0) };
+    const scenery = { dropClaimed: vi.fn(() => 0) };
+    dropClaimedAmbient({ vegetation, scenery } as any, grid);
+
+    for (const spy of [vegetation.dropClaimed, scenery.dropClaimed]) {
+      expect(spy).toHaveBeenCalledTimes(1);
+      const predicate = (spy.mock.calls[0] as unknown as [(x: number, z: number) => boolean])[0];
+      expect(predicate(4.5, 4.5)).toBe(meshClaimsCell(grid, 4.5, 4.5));
+      expect(predicate(4.5, 4.5)).toBe(true);
+      expect(predicate(grid.maxX + 40, grid.maxZ + 40)).toBe(false);
+    }
+  });
+
+  it('dropClaimedAmbient tolerates missing modules', async () => {
+    const ctx = await makeGameContext({ size: 32 });
+    expect(() => dropClaimedAmbient({ vegetation: null, scenery: null }, ctx.grid!)).not.toThrow();
   });
 });

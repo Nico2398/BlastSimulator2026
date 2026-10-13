@@ -263,3 +263,107 @@ describe('VegetationSway — prop models', () => {
     veg.dispose();
   });
 });
+
+describe('VegetationSway — dropClaimed (#1664)', () => {
+  const instanceScale = (mesh: THREE.InstancedMesh, i: number): number => {
+    const m = new THREE.Matrix4();
+    mesh.getMatrixAt(i, m);
+    return new THREE.Vector3().setFromMatrixScale(m).x;
+  };
+  const instanceXZ = (mesh: THREE.InstancedMesh, i: number): { x: number; z: number } => {
+    const m = new THREE.Matrix4();
+    mesh.getMatrixAt(i, m);
+    const p = new THREE.Vector3().setFromMatrixPosition(m);
+    return { x: p.x, z: p.z };
+  };
+  const snapshot = (mesh: THREE.InstancedMesh): number[][] =>
+    Array.from({ length: mesh.count }, (_, i) => {
+      const m = new THREE.Matrix4();
+      mesh.getMatrixAt(i, m);
+      return m.elements.slice();
+    });
+
+  it('hides grass inside the claimed rect with a zero scale, even if the ground later drops, and leaves the rest bit-identical', () => {
+    let ground = 5;
+    const scene = new THREE.Scene();
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [], 16, 16, RECT, () => ground);
+    const mesh = grassMesh(scene)!;
+    const before = snapshot(mesh);
+    const target = instanceXZ(mesh, 0);
+    const claimed = (x: number, z: number) => Math.abs(x - target.x) <= 3 && Math.abs(z - target.z) <= 3;
+
+    const hidden = veg.dropClaimed(claimed);
+    ground = -50; // the ground under the claim was dug away afterwards
+    expect(hidden).toBeGreaterThan(0);
+
+    const after = snapshot(mesh);
+    let insideCount = 0;
+    for (let i = 0; i < mesh.count; i++) {
+      const { x, z } = instanceXZ(mesh, i);
+      if (claimed(x, z)) {
+        insideCount++;
+        expect(instanceScale(mesh, i)).toBe(0);
+      } else {
+        expect(after[i]).toEqual(before[i]);
+      }
+    }
+    expect(insideCount).toBe(hidden);
+    veg.dispose();
+  });
+
+  it('hides library-drawn grass tufts and trees on claimed ground', async () => {
+    const library = await loadedModelLibrary(Array.from({ length: GRASS_VARIANTS }, (_, v) => grassModelId(v)));
+    const scene = new THREE.Scene();
+    const tree = makeTree({ x: 100, z: 100 });
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [tree, makeTree({ x: 200, z: 200 })], 16, 16, RECT, flatGround, { library, biomeId: 'green_foothills' });
+    const tufts = scene.children.filter((c): c is THREE.InstancedMesh => c.name === 'vegetation-grass');
+    expect(tufts.length).toBeGreaterThan(0);
+
+    const hidden = veg.dropClaimed((x, z) => x > 90 && x < 110 && z > 90 && z < 110 || (x < 0 || z < 0));
+    expect(hidden).toBeGreaterThanOrEqual(1);
+
+    // Every tree mesh: the tree at (100,100) is hidden, the one at (200,200) is not.
+    let visibleNear = 0;
+    let visibleFar = 0;
+    for (const mesh of scene.children.filter((c): c is THREE.InstancedMesh => c instanceof THREE.InstancedMesh && c.name.startsWith('vegetation-tree'))) {
+      for (let i = 0; i < mesh.count; i++) {
+        const { x } = instanceXZ(mesh, i);
+        const visible = instanceScale(mesh, i) > 0;
+        if (Math.abs(x - 100) < 1 && visible) visibleNear++;
+        if (Math.abs(x - 200) < 1 && visible) visibleFar++;
+      }
+    }
+    expect(visibleNear).toBe(0);
+    expect(visibleFar).toBeGreaterThan(0);
+    veg.dispose();
+  });
+
+  it('is idempotent: a repeated claim hides nothing new', () => {
+    const scene = new THREE.Scene();
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [], 16, 16, RECT, flatGround);
+    const mesh = grassMesh(scene)!;
+    const target = instanceXZ(mesh, 0);
+    const claimed = (x: number, z: number) => Math.abs(x - target.x) <= 3 && Math.abs(z - target.z) <= 3;
+    expect(veg.dropClaimed(claimed)).toBeGreaterThan(0);
+    expect(veg.dropClaimed(claimed)).toBe(0);
+    veg.dispose();
+  });
+
+  it('returns 0 and changes nothing when no instance is claimed', () => {
+    const scene = new THREE.Scene();
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [makeTree()], 16, 16, RECT, flatGround);
+    const mesh = grassMesh(scene)!;
+    const before = snapshot(mesh);
+    expect(veg.dropClaimed(() => false)).toBe(0);
+    expect(snapshot(mesh)).toEqual(before);
+    veg.dispose();
+  });
+
+  it('does not throw with no props, nor after dispose', () => {
+    const scene = new THREE.Scene();
+    const veg = new VegetationSway(scene, 42, createAmbientUniforms(), [], 16, 16, RECT, flatGround);
+    veg.dispose();
+    expect(() => veg.dropClaimed(() => true)).not.toThrow();
+    expect(veg.dropClaimed(() => true)).toBe(0);
+  });
+});

@@ -10,9 +10,9 @@
 // getTerrainSurfaceY must delegate to getSmoothTerrainSurfaceY so entity
 // placement matches what TerrainMesh actually draws at that column.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { VoxelGrid, computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../../src/core/world/VoxelGrid.js';
-import { getTerrainSurfaceY, landscapeEdgeHeightSampler } from '../../../src/renderer/GameRendererTerrain.js';
+import { getTerrainSurfaceY, landscapeEdgeHeightSampler, remeshTerrainRegion, type TerrainDeps } from '../../../src/renderer/GameRendererTerrain.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
 describe('getTerrainSurfaceY (#1007)', () => {
@@ -84,5 +84,77 @@ describe('landscapeEdgeHeightSampler ensureLandscape base size (#1188)', () => {
     expect(ctx.landscape).not.toBeNull();
     expect(ctx.landscape!.playableRect.maxX).toBe(baseSizeX);
     expect(ctx.landscape!.playableRect.maxZ).toBe(baseSizeZ);
+  });
+});
+
+describe('remeshTerrainRegion onSiteClaimed (#1664)', () => {
+  const REGION = { minX: 0, minY: 0, minZ: 0, maxX: 4, maxY: 4, maxZ: 4 };
+
+  function makeDeps(extra: Partial<TerrainDeps> = {}) {
+    const calls: string[] = [];
+    const deps = {
+      terrain: null,
+      terrainMeshRevision: 0,
+      lastCutBounds: '',
+      landscape: null,
+      landscapeHandle: null,
+      landscapeStreamer: null,
+      borderWall: null,
+      refreshPanLeash: () => { calls.push('leash'); },
+      ...extra,
+    } as unknown as TerrainDeps;
+    return { deps, calls };
+  }
+
+  it('fires with the grid once the claim moved the site bounds, right after the pan leash refresh', () => {
+    const ctx = makeGameContext({ size: 32 });
+    const onSiteClaimed = vi.fn();
+    const { deps, calls } = makeDeps();
+    deps.onSiteClaimed = (g) => { calls.push('claimed'); onSiteClaimed(g); };
+
+    remeshTerrainRegion(deps, ctx, REGION); // first sight of the bounds
+    onSiteClaimed.mockClear();
+    calls.length = 0;
+
+    ctx.grid!.addChunk(ctx.grid!.maxX / 16, 0);
+    remeshTerrainRegion(deps, ctx, REGION);
+
+    expect(onSiteClaimed).toHaveBeenCalledTimes(1);
+    expect(onSiteClaimed).toHaveBeenCalledWith(ctx.grid);
+    expect(calls).toEqual(['leash', 'claimed']);
+  });
+
+  it('does not fire for a dig inside already-owned ground', () => {
+    const ctx = makeGameContext({ size: 32 });
+    const onSiteClaimed = vi.fn();
+    const { deps } = makeDeps({ onSiteClaimed });
+
+    remeshTerrainRegion(deps, ctx, REGION);
+    onSiteClaimed.mockClear();
+    remeshTerrainRegion(deps, ctx, REGION);
+    remeshTerrainRegion(deps, ctx, REGION);
+
+    expect(onSiteClaimed).not.toHaveBeenCalled();
+  });
+
+  it('is optional: a claim with no callback still refreshes the leash', () => {
+    const ctx = makeGameContext({ size: 32 });
+    const { deps, calls } = makeDeps();
+    remeshTerrainRegion(deps, ctx, REGION);
+    ctx.grid!.addChunk(ctx.grid!.maxX / 16, 0);
+    calls.length = 0;
+    expect(() => remeshTerrainRegion(deps, ctx, REGION)).not.toThrow();
+    expect(calls).toEqual(['leash']);
+  });
+
+  it('is not called when the context has no grid', () => {
+    const ctx = makeGameContext({ size: 32 });
+    const onSiteClaimed = vi.fn();
+    const { deps } = makeDeps({ onSiteClaimed });
+    remeshTerrainRegion(deps, ctx, REGION);
+    onSiteClaimed.mockClear();
+    ctx.grid = null as never;
+    remeshTerrainRegion(deps, ctx, REGION);
+    expect(onSiteClaimed).not.toHaveBeenCalled();
   });
 });
