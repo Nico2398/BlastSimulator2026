@@ -255,3 +255,17 @@ export function isInBorderZone(
   return x < borderWidth || x >= sizeX - borderWidth
     || z < borderWidth || z >= sizeZ - borderWidth;
 }
+
+/**
+ * Climate bias that makes the centre of a (seed, size) site generate `target`'s
+ * biome. Returns `target.climateCenter` when the seed already lands there.
+ */
+export function climateBiasLandingOn(
+  _seed: number,
+  _sizeX: number,
+  _sizeZ: number,
+  target: BiomeDef,
+): readonly [number, number] {
+  // TODO: implement
+  return target.climateCenter;
+}
