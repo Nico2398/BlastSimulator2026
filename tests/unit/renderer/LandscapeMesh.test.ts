@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
 import { NODES_PER_CHUNK, LADDER_STEPS, type LandscapeChunk, type LandscapeChunkId, type LazyLandscapeMap } from '../../../src/core/world/LandscapeMap.js';
@@ -1276,5 +1276,84 @@ describe('buildBoundaryQuad — the flat-edge rule stops at the claim (#907)', (
     const { positions } = run(playable, palette, compId);
     const trueSampled = sample(4, 2).height;
     expect(heightAt(positions, 4, 2)!).toBeCloseTo(trueSampled, 9);
+  });
+});
+
+describe('LandscapeMesh.setMaterial (#1674)', () => {
+  function buildTwo(lm: LandscapeMesh) {
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 1_000_000, minZ: 1_000_000, maxX: 1_000_032, maxZ: 1_000_032 };
+    const idA: LandscapeChunkId = { level: 0, cx: 0, cz: 0 };
+    const idB: LandscapeChunkId = { level: 0, cx: 1, cz: 0 };
+    const chunkA = makeFakeChunk(idA, -100, -100, 4, compId);
+    const chunkB = makeFakeChunk(idB, 100, 100, 4, compId);
+    const handle = makeFakeHandle(rect, [chunkA, chunkB], compId);
+    const steps = uniformNeighbourSteps(chunkA.step);
+    lm.buildChunk(idA, handle, palette, steps);
+    return { lm, handle, palette, steps, idB };
+  }
+
+  it('reassigns every resident chunk mesh to the new material and reports it as current', () => {
+    const first = makeMaterial();
+    const next = makeMaterial();
+    const lm = new LandscapeMesh(makeScene(), first);
+    const { handle, palette, steps, idB } = buildTwo(lm);
+    lm.buildChunk(idB, handle, palette, steps);
+    expect(lm.meshCount).toBe(2);
+
+    lm.setMaterial(next);
+
+    expect(lm.currentMaterial).toBe(next);
+    for (const mesh of lm.meshes) expect(mesh.material).toBe(next);
+    lm.dispose();
+  });
+
+  it('chunks built after the swap use the new material', () => {
+    const next = makeMaterial();
+    const lm = new LandscapeMesh(makeScene(), makeMaterial());
+    const { handle, palette, steps, idB } = buildTwo(lm);
+
+    lm.setMaterial(next);
+    lm.buildChunk(idB, handle, palette, steps);
+
+    expect(lm.meshCount).toBe(2);
+    for (const mesh of lm.meshes) expect(mesh.material).toBe(next);
+    lm.dispose();
+  });
+
+  it('setting the same material is a no-op', () => {
+    const first = makeMaterial();
+    const lm = new LandscapeMesh(makeScene(), first);
+    buildTwo(lm);
+
+    lm.setMaterial(first);
+
+    expect(lm.currentMaterial).toBe(first);
+    for (const mesh of lm.meshes) expect(mesh.material).toBe(first);
+    lm.dispose();
+  });
+
+  it('never disposes either material', () => {
+    const first = makeMaterial();
+    const next = makeMaterial();
+    const firstDispose = vi.spyOn(first, 'dispose');
+    const nextDispose = vi.spyOn(next, 'dispose');
+    const lm = new LandscapeMesh(makeScene(), first);
+    buildTwo(lm);
+
+    lm.setMaterial(next);
+    lm.setMaterial(first);
+    lm.dispose();
+
+    expect(firstDispose).not.toHaveBeenCalled();
+    expect(nextDispose).not.toHaveBeenCalled();
+  });
+
+  it('with no resident chunks only the current material changes', () => {
+    const next = makeMaterial();
+    const lm = new LandscapeMesh(makeScene(), makeMaterial());
+    lm.setMaterial(next);
+    expect(lm.currentMaterial).toBe(next);
+    expect(lm.meshCount).toBe(0);
   });
 });
