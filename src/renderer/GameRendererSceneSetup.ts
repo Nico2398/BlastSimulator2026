@@ -50,6 +50,7 @@ import { GhostMesh } from './GhostMesh.js';
 import { warmupShaders } from './ShaderWarmup.js';
 import { RampArrowLayer } from './RampArrow.js';
 import { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
+import { meshClaimsCell } from './terrain/PlayableCoverage.js';
 
 /**
  * How far past the playable rect manual panning may wander (#458 T6.1/D13).
@@ -348,6 +349,8 @@ export function buildAmbient(deps: SceneSetupDeps, ctx: MiningContext): void {
   deps.fireflies = FIREFLY_BIOMES.has(biome.id)
     ? new Fireflies(deps.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
     : null;
+  // Props scattered above are blind to chunks claimed since the level loaded.
+  dropClaimedAmbient(deps, ctx.grid);
 }
 
 /**
@@ -455,6 +458,8 @@ export function clearAll(deps: SceneSetupDeps): void {
 }
 
 /** Hide ambient props (vegetation, scenery) standing on ground the playable mesh now claims (#1664). */
-export function dropClaimedAmbient(_deps: Pick<SceneSetupDeps, 'vegetation' | 'scenery'>, _grid: VoxelGrid): void {
-  // TODO: implement
+export function dropClaimedAmbient(deps: Pick<SceneSetupDeps, 'vegetation' | 'scenery'>, grid: VoxelGrid): void {
+  const isClaimed = (x: number, z: number): boolean => meshClaimsCell(grid, x, z);
+  deps.vegetation?.dropClaimed(isClaimed);
+  deps.scenery?.dropClaimed(isClaimed);
 }

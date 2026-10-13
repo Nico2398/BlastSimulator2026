@@ -58,7 +58,7 @@ import {
 } from './GameRendererTerrain.js';
 import {
   loadGame, buildPlayableMesh, buildLandscapeMesh, buildAmbient,
-  frameCameraOnGrid, refreshPanLeash, clearAll,
+  frameCameraOnGrid, refreshPanLeash, clearAll, dropClaimedAmbient,
   type SceneSetupDeps,
 } from './GameRendererSceneSetup.js';
 import { onBlast, onBlastSteps, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps, type BlastTriggerInfo } from './GameRendererBlastVisuals.js';
@@ -725,6 +725,7 @@ export class GameRenderer {
       borderWall: sceneDeps.borderWall,
       sm: this.sm,
       refreshPanLeash: () => this.refreshPanLeash(),
+      onSiteClaimed: (g) => dropClaimedAmbient({ vegetation: this.vegetation, scenery: this.scenery }, g),
     };
   }
 
@@ -752,6 +753,7 @@ export class GameRenderer {
       borderWall: this.borderWall,
       sm: this.sm,
       refreshPanLeash: () => this.refreshPanLeash(),
+      onSiteClaimed: (g) => dropClaimedAmbient({ vegetation: this.vegetation, scenery: this.scenery }, g),
     };
   }
 

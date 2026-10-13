@@ -8,7 +8,7 @@
 // that has not loaded falls back to a stand-in built here (a cone tree, a
 // crossed-quad blade) through the same path, and its id is recorded so the
 // layer is rebuilt once it arrives. Static once built — no per-frame CPU
-// work at all. Sway comes from the shared {uTime, uWind} ambient uniforms,
+// work at all, bar hiding props the playable mesh later claims (dropClaimed, #1664). Sway comes from the shared {uTime, uWind} ambient uniforms,
 // updated once per frame and read by every material that references them.
 
 import * as THREE from 'three';
@@ -25,6 +25,7 @@ import {
   BUSH_VARIANTS, FLOWER_VARIANTS, GRASS_VARIANTS, TREE_VARIANTS, type TreeFamily,
 } from '../models/ModelIds.js';
 import type { SwayOptions } from '../models/CartoonMaterial.js';
+import { ClaimedInstances } from './ClaimedInstances.js';
 
 /** Which tree family a biome grows; biomes not listed get the deciduous set. */
 export const TREE_FAMILY_BY_BIOME: Readonly<Record<string, TreeFamily>> = {
@@ -170,6 +171,7 @@ transformed.xz += uWind * sway;`);
 export class VegetationSway {
   private readonly scene: THREE.Scene;
   private readonly props: InstancedProp[] = [];
+  private readonly claimed = new ClaimedInstances();
   private treeCount = 0;
   private bushCount = 0;
   private grassCount = 0;
@@ -223,6 +225,7 @@ export class VegetationSway {
         prop.setMatrixAt(i, dummy.matrix);
       }
       prop.commit();
+      this.claimed.track(prop, points);
       prop.addTo(this.scene);
       this.props.push(prop);
       this.treeCount += points.length;
@@ -327,6 +330,7 @@ export class VegetationSway {
       prop.setMatrixAt(i, scratch.matrix);
     }
     prop.commit();
+    this.claimed.track(prop, points);
     prop.addTo(this.scene);
     this.props.push(prop);
   }
@@ -353,6 +357,11 @@ export class VegetationSway {
       this.grassMesh.setMatrixAt(i, scratch.matrix);
     }
     this.grassMesh.instanceMatrix.needsUpdate = true;
+    const mesh = this.grassMesh;
+    this.claimed.track({
+      setMatrixAt: (i, m) => mesh.setMatrixAt(i, m),
+      commit: () => { mesh.instanceMatrix.needsUpdate = true; },
+    }, points);
     this.scene.add(this.grassMesh);
   }
 
@@ -377,11 +386,12 @@ export class VegetationSway {
   }
 
   /** Hide instances on ground the playable mesh has claimed; returns how many were newly hidden (#1664). */
-  dropClaimed(_isClaimed: (x: number, z: number) => boolean): number {
-    return 0;
+  dropClaimed(isClaimed: (x: number, z: number) => boolean): number {
+    return this.claimed.dropClaimed(isClaimed);
   }
 
   dispose(): void {
+    this.claimed.clear();
     for (const prop of this.props) prop.dispose(this.scene);
     this.props.length = 0;
     for (const proto of this.fallbackPrototypes) {

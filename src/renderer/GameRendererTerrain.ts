@@ -100,6 +100,7 @@ export function remeshTerrainRegion(deps: TerrainDeps, ctx: MiningContext, regio
   // player follow the ground they just took, the landscape has to stop
   // covering it, and the wall has to be re-raised on the new frontier.
   deps.refreshPanLeash();
+  if (ctx.grid) deps.onSiteClaimed?.(ctx.grid);
 
   // A null ctx.landscape means the grid itself was just replaced (new game,
   // campaign level, load) and buildLandscapeMesh is about to run with a
