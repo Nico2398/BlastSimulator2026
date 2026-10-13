@@ -250,6 +250,15 @@ export class GameRenderer {
     if (this.lastGrid !== ctx.grid) {
       console.log(`[GameRenderer] syncFromContext: grid changed! old=${this.lastGrid?.id} new=${ctx.grid.id}`);
       this.lastGrid = ctx.grid;
+      if (this.terrain && this.terrain.biomeId !== ctx.state.mineType) {
+        // Different biome: the terrain material is built per biome and shared
+        // by landscape and fragments, so rebuild all three on the new one.
+        this.loadGame(ctx);
+        this.lastGrid = ctx.grid;
+        this.lastState = ctx.state;
+        this.syncEntities(ctx);
+        return;
+      }
       // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
       this.terrain?.setGrid(ctx.grid);
       this.terrain?.buildAll();

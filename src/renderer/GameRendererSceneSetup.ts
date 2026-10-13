@@ -255,6 +255,9 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
     deps.landscape = new LandscapeMesh(deps.sm.scene, deps.terrain.sharedMaterial);
     deps.landscapeStreamer = createLandscapeChunkStreamer(deps.landscape);
   } else {
+    // The terrain (and its material) may have been rebuilt for another biome
+    // since this landscape was made; never keep drawing with a disposed one.
+    deps.landscape.setMaterial(deps.terrain.sharedMaterial);
     // Idempotent re-apply (a campaign level swap keeping the same GameRenderer
     // instance): the handle just changed under an existing mesh/streamer, so
     // drop every previously-resident chunk rather than let the next

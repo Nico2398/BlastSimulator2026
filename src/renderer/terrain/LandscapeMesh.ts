@@ -690,8 +690,10 @@ export class LandscapeMesh {
   constructor(private readonly scene: THREE.Scene, private material: THREE.Material) {}
 
   /** Swaps the material shared by every chunk mesh. */
-  setMaterial(_material: THREE.Material): void {
-    // TODO: implement
+  setMaterial(material: THREE.Material): void {
+    if (material === this.material) return;
+    this.material = material;
+    for (const mesh of this.meshesByChunk.values()) mesh.material = material;
   }
 
   /** The material currently applied to chunk meshes — diagnostics and tests. */
