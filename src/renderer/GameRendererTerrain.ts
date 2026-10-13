@@ -155,7 +155,15 @@ export function playableCut(grid: VoxelGrid, edgeHeight?: (x: number, z: number)
   };
 
   return {
-    rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
+    // Read at use, like every other answer here, never captured at creation.
+    // The streamer keeps the last cut update() handed it and rebuilds against
+    // it the moment a claim lands (invalidateNear) — mid-tick, before the next
+    // frame takes a fresh one. A rect captured before that claim told the
+    // mesher the claimed chunk was open ground, so the landscape went on
+    // drawing over it (the box cut's lower end claims one in the tutorial).
+    get rect() {
+      return { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ };
+    },
     ownsColumn: (x, z) => grid.containsColumn(x, z),
     boundaryHeightAt,
     // And how it SHADES that column: the density gradient at the very vertex
