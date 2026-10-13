@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
   requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION,
+  isInBorderZone, TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
 } from '../../../src/core/world/TerrainGen.js';
 import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
@@ -488,4 +489,92 @@ describe('TerrainGen — unclamped columns across every campaign level (#1189)',
       }
     });
   }
+});
+
+
+// #1670: ground outside the original site rectangle must carry ore, not be neutral border.
+describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
+  const big = (): TerrainConfig => ({
+    ...makeConfig(42, 'alpine_granite'), sizeX: 64, datum: Math.floor(64 * 0.55), sizeZ: 64,
+  });
+
+  /** Claim chunk (cx,cz) of a fresh grid and report ore stats over its solid voxels. */
+  function oreStats(grid: VoxelGrid, xs: number[], zs: number[]): { solid: number; ore: number } {
+    let solid = 0;
+    let ore = 0;
+    for (const x of xs) {
+      for (const z of zs) {
+        for (let y = 0; y < 30; y += 2) {
+          const v = grid.getVoxel(x, y, z);
+          if (!v || v.density <= 0) continue;
+          solid++;
+          if (Object.keys(v.oreDensities).length > 0) ore++;
+        }
+      }
+    }
+    return { solid, ore };
+  }
+
+  const range = (a: number, b: number): number[] => Array.from({ length: b - a }, (_, i) => a + i);
+
+  function claimOutside(grid: VoxelGrid): void {
+    for (const [cx, cz] of [[6, 1], [6, 2], [-2, 1], [-2, 2], [1, -2], [2, -2]] as const) grid.addChunk(cx, cz);
+  }
+
+  it('isInBorderZone is false outside the rectangle and true in the ring just inside', () => {
+    expect(isInBorderZone(-1, 10, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(100, 10, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(10, -3, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(10, 64, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(2, 10, 64, 64, 5)).toBe(true);
+    expect(isInBorderZone(61, 10, 64, 64, 5)).toBe(true);
+  });
+
+  it('generator version stays 1', () => {
+    expect(TERRAIN_GENERATOR_VERSION).toBe(1);
+  });
+
+  it('has ore in ground east, west and north of the rectangle', () => {
+    const grid = generateTerrain(big());
+    claimOutside(grid);
+    const east = oreStats(grid, range(100, 108), range(16, 48));
+    const west = oreStats(grid, range(-30, -22), range(16, 48));
+    const north = oreStats(grid, range(16, 48), range(-30, -22));
+    for (const s of [east, west, north]) {
+      expect(s.solid).toBeGreaterThan(0);
+      expect(s.ore).toBeGreaterThan(0);
+    }
+  });
+
+  it('outside ore rate is at least half the interior rate', () => {
+    const grid = generateTerrain(big());
+    claimOutside(grid);
+    const interior = oreStats(grid, range(10, 54), range(10, 54));
+    const outside = oreStats(grid, range(96, 112), range(16, 48));
+    expect(interior.ore).toBeGreaterThan(0);
+    expect(outside.solid).toBeGreaterThan(0);
+    expect(outside.ore / outside.solid).toBeGreaterThanOrEqual(0.5 * (interior.ore / interior.solid));
+  });
+
+  it('outside ore is deterministic across fresh generations', () => {
+    const a = generateTerrain(big());
+    const b = generateTerrain(big());
+    claimOutside(a);
+    claimOutside(b);
+    for (const [x, z] of [[100, 20], [101, 33], [-25, 20], [30, -25]] as const) {
+      for (let y = 0; y < 30; y += 3) {
+        expect(a.getVoxel(x, y, z)!.oreDensities).toEqual(b.getVoxel(x, y, z)!.oreDensities);
+      }
+    }
+  });
+
+  it('ore stays absent in the ring just inside the rectangle', () => {
+    const grid = generateTerrain(big());
+    for (const [x, z] of [[0, 0], [63, 63], [2, 30], [30, 61]] as const) {
+      for (let y = 0; y < 20; y++) {
+        const v = grid.getVoxel(x, y, z)!;
+        if (v.density > 0) expect(Object.keys(v.oreDensities).length).toBe(0);
+      }
+    }
+  });
 });

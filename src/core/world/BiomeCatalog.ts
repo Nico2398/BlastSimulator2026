@@ -23,7 +23,7 @@ export interface BiomeDef {
   readonly dominantRocks: readonly string[];
   /** Ore richness multiplier (1.0 = normal). */
   readonly oreRichness: number;
-  /** Border zone width in voxels (neutral, ore-free zone). */
+  /** Width in voxels of the ore-free ring just inside the starting rectangle's edge (none outside it). */
   readonly borderWidth: number;
   /** Forest placement density base, 0-1 (#458 T1.4/A15) — scaled further by per-point noise. */
   readonly forestDensity: number;
