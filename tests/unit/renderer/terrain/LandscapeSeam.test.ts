@@ -37,12 +37,11 @@ const SITE = 32;
  *  small is ~0.0005 of a lambert term — invisible. A crease is degrees. */
 const NORMAL_AGREEMENT_DEG = 0.05;
 
-/** A site generated from `heightField` exactly the way TerrainGen fills a real one. */
-function buildGrid(): VoxelGrid {
-  const grid = new VoxelGrid(SITE, SITE);
+/** Fills columns [minX, maxX) x [minZ, maxZ) from `heightField`, exactly the way TerrainGen fills a real one. */
+function fillFromHeightField(grid: VoxelGrid, minX: number, maxX: number, minZ: number, maxZ: number): void {
   const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
-  for (let x = 0; x < SITE; x++) {
-    for (let z = 0; z < SITE; z++) {
+  for (let x = minX; x < maxX; x++) {
+    for (let z = minZ; z < maxZ; z++) {
       const h = heightField(x, z);
       for (let y = 0; y <= Math.ceil(h + 1); y++) {
         const density = surfaceDensityAt(y, h);
@@ -50,6 +49,12 @@ function buildGrid(): VoxelGrid {
       }
     }
   }
+}
+
+/** A site generated from `heightField`. */
+function buildGrid(): VoxelGrid {
+  const grid = new VoxelGrid(SITE, SITE);
+  fillFromHeightField(grid, 0, SITE, 0, SITE);
   return grid;
 }
 
@@ -85,12 +90,11 @@ function cutFor(grid: VoxelGrid, sampleColumn: (x: number, z: number) => { heigh
 }
 
 function buildLandscapeMeshes(
-  grid: VoxelGrid,
   palette: CompositionPalette,
   compId: number,
   sampleColumn: (x: number, z: number) => { height: number; biomeId: number; surfCompId: number },
+  cut: PlayableCut,
 ): THREE.Mesh[] {
-  const cut = cutFor(grid, sampleColumn);
   const meshes: THREE.Mesh[] = [];
   for (const chunk of buildLevel0ChunkRing(compId)) {
     const mesh = buildChunkMesh(chunk, uniformNeighbourSteps(1), palette, cut, sampleColumn);
@@ -99,13 +103,20 @@ function buildLandscapeMeshes(
   return meshes;
 }
 
-function buildBoth(grid: VoxelGrid): { playable: TerrainMesh; landscapeMeshes: THREE.Mesh[] } {
+/** The landscape's own height sampler over `heightField`, for `grid`'s palette. */
+function heightFieldSampler(grid: VoxelGrid) {
   const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
-  const sampleColumn = (x: number, z: number) => ({ height: heightField(x, z), biomeId: 0, surfCompId: compId });
+  return (x: number, z: number) => ({ height: heightField(x, z), biomeId: 0, surfCompId: compId });
+}
+
+/** Both sheets over `grid`; the landscape is cut against `cut`, by default one taken now. */
+function buildBoth(grid: VoxelGrid, cut?: PlayableCut): { playable: TerrainMesh; landscapeMeshes: THREE.Mesh[] } {
+  const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+  const sampleColumn = heightFieldSampler(grid);
   const playable = new TerrainMesh(new THREE.Scene(), grid);
   playable.setEdgeHeightSampler((x, z) => sampleColumn(x, z).height);
   playable.buildAll();
-  const landscapeMeshes = buildLandscapeMeshes(grid, grid.palette, compId, sampleColumn);
+  const landscapeMeshes = buildLandscapeMeshes(grid.palette, compId, sampleColumn, cut ?? cutFor(grid, sampleColumn));
   return { playable, landscapeMeshes };
 }
 
@@ -168,20 +179,33 @@ describe('Playable/landscape seam — one continuous ground (#907, pinned to lev
   it('holds on an irregular site whose bounding box is not its shape (#473 D8)', () => {
     const grid = buildGrid();
     grid.addChunk(2, 0); // an L: a chunk east of the site's north half only
-    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
-    for (let x = 32; x < 48; x++) {
-      for (let z = 0; z < 16; z++) {
-        const h = heightField(x, z);
-        for (let y = 0; y <= Math.ceil(h + 1); y++) {
-          const density = surfaceDensityAt(y, h);
-          if (density > 0) grid.fillVoxel(x, y, z, compId, {}, density);
-        }
-      }
-    }
+    fillFromHeightField(grid, 32, 48, 0, 16);
     const { playable, landscapeMeshes } = buildBoth(grid);
 
     const seam = measureSeam(playable.meshes, landscapeMeshes, grid, 1, 1);
     expect(seam.doubleCovered).toEqual([]);
+    expect(seam.worstDisagreement, `worst at ${seam.worstAt}`).toBeLessThan(1e-6);
+  });
+
+  it('holds when the landscape is rebuilt against a cut taken before the site claimed more ground', () => {
+    // The streamer keeps the last cut update() handed it and rebuilds against
+    // that same object the moment a claim lands (invalidateNear) — mid-tick,
+    // before the next frame takes a fresh one. Ordering the tutorial's box
+    // cut, whose lower end runs past the site's south edge, claims the chunk
+    // there exactly that way. A cut that still answered with the pre-claim
+    // bounding box told the mesher the new chunk was open ground, and the
+    // landscape went on drawing over it: flaps across the claimed ground,
+    // and a lid over the end of the cut once it was dug.
+    const grid = buildGrid();
+    const cut = cutFor(grid, heightFieldSampler(grid));
+    grid.addChunk(0, 2); // the chunk south of the site's west half
+    fillFromHeightField(grid, 0, 16, 32, 48);
+    const { playable, landscapeMeshes } = buildBoth(grid, cut);
+
+    // No `uncovered` check, as for the L above: the fixture's landscape ring
+    // stops at z = 48, the claimed chunk's own south edge.
+    const seam = measureSeam(playable.meshes, landscapeMeshes, grid, 1, 1);
+    expect(seam.doubleCovered, 'cells drawn by both sheets').toEqual([]);
     expect(seam.worstDisagreement, `worst at ${seam.worstAt}`).toBeLessThan(1e-6);
   });
 });

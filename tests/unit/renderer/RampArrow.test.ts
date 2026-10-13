@@ -17,13 +17,15 @@ const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 const flat = (): number => 0;
 
-function bodyVertices(group: THREE.Group): THREE.Vector3[] {
-  const body = group.getObjectByName('ramp-arrow-body') as THREE.Mesh;
-  const pos = body.geometry.getAttribute('position') as THREE.BufferAttribute;
+function meshVertices(group: THREE.Group, name: string): THREE.Vector3[] {
+  const mesh = group.getObjectByName(name) as THREE.Mesh;
+  const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
   const out: THREE.Vector3[] = [];
   for (let i = 0; i < pos.count; i++) out.push(new THREE.Vector3().fromBufferAttribute(pos, i));
   return out;
 }
+
+const bodyVertices = (group: THREE.Group): THREE.Vector3[] => meshVertices(group, 'ramp-arrow-body');
 
 describe('rampArrowLayout()', () => {
   it('puts the tail on the origin tile and the tip on the last dug tile (tutorial box cut)', () => {
@@ -102,10 +104,42 @@ describe('buildRampArrow()', () => {
     expect(group.getObjectByName('ramp-corridor-outline')).toBeDefined();
   });
 
-  it('lies on the sampled ground', () => {
+  it('lies on the sampled ground along the corridor, and level past its last column', () => {
+    // Corridor columns x = 0..7; the tip reaches on to x = 7.92.
     const group = buildRampArrow({ originX: 0, originZ: 0, direction: 'east', length: 8 }, (x) => 10 - x)!;
-    for (const v of bodyVertices(group)) expect(v.y).toBeCloseTo(10 - v.x + 0.12, 5);
+    for (const v of bodyVertices(group)) expect(v.y).toBeCloseTo(10 - Math.min(v.x, 7) + 0.12, 5);
   });
+
+  it('runs smoothly down a dug ramp instead of stepping at every tile edge', () => {
+    // The game's sampler answers one height per voxel column, and the terrain
+    // renders a slope between neighbouring columns. Read straight, the shaft
+    // jumped at every tile edge — a saw-tooth laid over a smooth road.
+    const ramp = { originX: 10, originZ: 23, direction: 'south', length: 12 } as const;
+    const perColumn = (_x: number, z: number): number => 20 - 0.5 * Math.floor(z);
+    const group = buildRampArrow(ramp, perColumn)!;
+    for (const v of bodyVertices(group)) {
+      expect(v.y, `vertex at z ${v.z}`).toBeCloseTo(20 - 0.5 * Math.min(v.z, 34) + 0.12, 5);
+    }
+  });
+
+  it.each(['ramp-arrow-body', 'ramp-arrow-underlay'])(
+    '%s stays on the floor of a dug corridor where its ends reach past it',
+    (name) => {
+      // The tutorial box cut, dug 6 m below the ground around it. The arrow
+      // and its wider underlay both reach past the end tiles' centres — the
+      // underlay far enough to cross into the tile beyond each end, which is
+      // the top of the end wall once the cut is dug. A tip sampled up there
+      // stood the arrowhead up the wall as a tall dark triangle, drawn over
+      // everything since the arrow has no depth test.
+      const ramp = { originX: 10, originZ: 23, direction: 'south', length: 12 } as const;
+      const { minX, maxX, minZ, maxZ } = rampArrowLayout(ramp)!.corridor;
+      const inCut = (x: number, z: number): boolean => x >= minX && x < maxX + 1 && z >= minZ && z < maxZ + 1;
+      const group = buildRampArrow(ramp, (x, z) => (inCut(x, z) ? 4 : 10))!;
+      const verts = meshVertices(group, name);
+      expect(Math.max(...verts.map(v => v.z))).toBeGreaterThan(34.5); // still reaching the lower end
+      for (const v of verts) expect(v.y, `vertex at (${v.x}, ${v.z})`).toBeCloseTo(4.12, 5);
+    },
+  );
 
   it('takes a caller colour', () => {
     const group = buildRampArrow({ originX: 0, originZ: 0, direction: 'east', length: 3 }, flat, { color: 0xff0000 })!;
