@@ -261,11 +261,16 @@ export function isInBorderZone(
  * biome. Returns `target.climateCenter` when the seed already lands there.
  */
 export function climateBiasLandingOn(
-  _seed: number,
-  _sizeX: number,
-  _sizeZ: number,
+  seed: number,
+  sizeX: number,
+  sizeZ: number,
   target: BiomeDef,
 ): readonly [number, number] {
-  // TODO: implement
-  return target.climateCenter;
+  const fields = new WorldNoiseFields(seed);
+  if (centerBiome(fields, sizeX, sizeZ, target.climateCenter).id === target.id) return target.climateCenter;
+  // Bias is added to the raw centre climate, so cancel it to land on the biome's centre.
+  return [
+    target.climateCenter[0] - fields.temperature(sizeX / 2, sizeZ / 2),
+    target.climateCenter[1] - fields.humidity(sizeX / 2, sizeZ / 2),
+  ];
 }
