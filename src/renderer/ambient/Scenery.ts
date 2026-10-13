@@ -3,13 +3,15 @@
 // flattened pads with smoke rising from bare ground — the houses are the
 // same `House` records ChimneySmoke reads, so a chimney puff now starts on a
 // roof. Rocks are a seeded scatter in a band outside the playable rect,
-// coloured per biome. Static once built.
+// coloured per biome. Static once built, except that rocks on ground the
+// playable mesh later claims are hidden (dropClaimed, #1664); houses stay.
 
 import * as THREE from 'three';
 import { cellRand, subSeed } from '../../core/math/Hash.js';
 import type { Village } from '../../core/world/Structures.js';
 import type { Rect } from '../../core/world/WorldGen.js';
 import type { ModelLibrary } from '../models/ModelLibrary.js';
+import { ClaimableProps } from './ClaimableProps.js';
 import { InstancedProp } from '../models/InstancedProp.js';
 import { houseModelId, rockModelId, HOUSE_VARIANTS, ROCK_VARIANTS } from '../models/ModelIds.js';
 
@@ -38,8 +40,7 @@ const ROCK_SINK = 0.12;
 const HOUSE_DRAW_DISTANCE = 900;
 
 export class Scenery {
-  private readonly scene: THREE.Scene;
-  private readonly props: InstancedProp[] = [];
+  private readonly props: ClaimableProps;
   private rockCount = 0;
   private houseCount = 0;
   /** Prop ids this build wanted and the library did not have — a rebuild once they load draws them. */
@@ -56,7 +57,7 @@ export class Scenery {
     sampleGroundHeight: (x: number, z: number) => number,
     biomeId: string | undefined,
   ) {
-    this.scene = scene;
+    this.props = new ClaimableProps(scene);
     const dummy = new THREE.Object3D();
 
     // ---- Rocks ----
@@ -101,9 +102,7 @@ export class Scenery {
         dummy.updateMatrix();
         prop.setMatrixAt(i, dummy.matrix);
       }
-      prop.commit();
-      prop.addTo(this.scene);
-      this.props.push(prop);
+      this.props.add(prop, points);
       this.rockCount += points.length;
     }
 
@@ -136,9 +135,7 @@ export class Scenery {
         dummy.updateMatrix();
         prop.setMatrixAt(i, dummy.matrix);
       }
-      prop.commit();
-      prop.addTo(this.scene);
-      this.props.push(prop);
+      this.props.add(prop);
       this.houseCount += entries.length;
     }
   }
@@ -151,8 +148,12 @@ export class Scenery {
     return this.houseCount;
   }
 
+  /** Hide instances on ground the playable mesh has claimed; returns how many were newly hidden (#1664). */
+  dropClaimed(isClaimed: (x: number, z: number) => boolean): number {
+    return this.props.dropClaimed(isClaimed);
+  }
+
   dispose(): void {
-    for (const prop of this.props) prop.dispose(this.scene);
-    this.props.length = 0;
+    this.props.dispose();
   }
 }
