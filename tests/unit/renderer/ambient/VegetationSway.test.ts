@@ -299,8 +299,9 @@ describe('VegetationSway — dropClaimed (#1664)', () => {
     const after = snapshot(mesh);
     let insideCount = 0;
     for (let i = 0; i < mesh.count; i++) {
-      const { x, z } = instanceXZ(mesh, i);
-      if (claimed(x, z)) {
+      // Classify by the pre-hide position: a hidden matrix has translation 0.
+      const p = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(before[i]!));
+      if (claimed(p.x, p.z)) {
         insideCount++;
         expect(instanceScale(mesh, i)).toBe(0);
       } else {

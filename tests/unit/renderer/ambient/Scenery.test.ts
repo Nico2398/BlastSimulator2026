@@ -137,7 +137,8 @@ describe('Scenery', () => {
       let insideCount = 0;
       rocks.forEach((mesh, k) => {
         readMatrices(mesh).forEach((m, i) => {
-          const p = posOf(m);
+          // Classify by the pre-hide position: a hidden matrix has translation 0.
+          const p = posOf(new THREE.Matrix4().fromArray(before[k]![i]!));
           if (claimed(p.x, p.z)) {
             insideCount++;
             expect(new THREE.Vector3().setFromMatrixScale(m).x).toBe(0);
