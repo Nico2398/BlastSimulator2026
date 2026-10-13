@@ -173,6 +173,11 @@ export class TerrainMesh {
     this.material.setHeightRange(...gridHeightRange(grid));
   }
 
+  /** Biome the terrain material was built for, or undefined when none. */
+  get biomeId(): string | undefined {
+    return undefined; // TODO: implement
+  }
+
   /** ID of the currently-bound VoxelGrid, for diagnostics. */
   get gridId(): number {
     return this.grid.id;

@@ -687,7 +687,15 @@ export function buildChunkMesh(
 export class LandscapeMesh {
   private readonly meshesByChunk = new Map<string, THREE.Mesh>();
 
-  constructor(private readonly scene: THREE.Scene, private readonly material: THREE.Material) {}
+  constructor(private readonly scene: THREE.Scene, private material: THREE.Material) {}
+
+  /** Swaps the material shared by every chunk mesh. */
+  setMaterial(_material: THREE.Material): void {
+    // TODO: implement
+  }
+
+  /** The material currently applied to chunk meshes — diagnostics and tests. */
+  get currentMaterial(): THREE.Material { return this.material; }
 
   /** Total mesh count (one per resident chunk) — diagnostics and tests. */
   get meshCount(): number { return this.meshesByChunk.size; }
