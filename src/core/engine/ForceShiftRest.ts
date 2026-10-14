@@ -13,13 +13,13 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
-import { createRestPendingAction, resolveRestDestination, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId } from './RestActionHelpers.js';
-import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
+import { createRestPendingAction, resolveRestDestination, restTripFatigueCost, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId } from './RestActionHelpers.js';
+import { isMidVehicleGatedWork } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS, NEED_REST_NO_BUILDING_CAP, NEED_DRAIN_RATES } from '../config/balance.js';
+import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_DRAIN_RATES, NEED_REST_ARRIVAL_FATIGUE_FLOOR, NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE } from '../config/balance.js';
 
 /**
  * Shared leading guard of forceShiftRestIfNeeded and
@@ -192,38 +192,6 @@ function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee):
 }
 
 /**
- * True when `employee` is idle (activeActionId === null) but currently
- * mounted in a vehicle, and a `queued` (unclaimed) PendingAction exists
- * whose requiredVehicleRole matches that vehicle's own role.
- *
- * #1090 follow-up: TaskCompletionEffects.ts's own completeVehicleGatedAction
- * call, on completing a vehicle-gated action, deliberately does not re-claim
- * a same-role follow-up itself any more — "resolveActionCost/planItinerary
- * already own picking any same-role follow-up", via the ordinary cost-ranked
- * open-pool dispatch (tickEmployees, EmployeeDispatch.ts), which only runs
- * again on a LATER tick (TickPipeline.ts's own step 8d already ran earlier
- * this same tick, before the 8e completion that just freed this employee).
- * Without this guard, forceShiftRestIfNeededByPolicy's own "#707: genuinely
- * idle" handling (this function's own doc comment above) claims that idle
- * window first, on the very next tick, before tickEmployees ever gets a
- * chance to hand this employee their own vehicle's next same-role action at
- * near-zero cost (they are already seated in it) — sending them on a full
- * round trip to the rest building and back instead. For a distant
- * living_quarters, that round trip alone re-crosses the threshold every
- * time, so no multi-segment vehicle-gated order (e.g. a box-cut ramp) ever
- * finishes: confirmed live via needs.integration.test.ts's own #945 suite
- * and the tutorial-boxcut-full scenario, both of which only converge once
- * this guard defers to the pool dispatch a queued follow-up is still
- * genuinely there. Self-limiting rather than a blanket "never force-rest a
- * mounted idle employee": the moment the queued action is claimed (by this
- * employee or, if a closer/cheaper one exists, another), this returns false
- * and forceShiftRestIfNeededByPolicy's normal fatigue/shift checks resume —
- * an employee mounted in a vehicle nothing queued ever needs is never
- * deferred, and tickCollapse's own unconditional hard floor (NeedRestoration.ts)
- * still backstops the case where the queued action is real but never
- * actually reachable by anyone.
- */
-/**
  * True when `employee` drives a vehicle currently carrying cargo (#1091 —
  * itinerary-era equivalent of the old `haulingPhase === 'to_depot'` check,
  * FragmentTaskLifecycle.ts's deleted `isMidLoadedHaul`). Even though
@@ -237,6 +205,17 @@ function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee):
  */
 function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
   return state.vehicles.vehicles.some(v => vehicleDriverId(v) === employee.id && v.cargo.length > 0);
+}
+
+/**
+ * True when the employee, riding whatever they ride now, reaches (destX, destZ)
+ * still holding the arrival floor plus the job allowance. An unplannable trip
+ * counts as covered: nothing to cost, so nothing to cut the job short for.
+ */
+function fatigueCoversTripToRest(state: GameState, emp: Employee, destX: number, destZ: number): boolean {
+  const cost = restTripFatigueCost(state, emp, destX, destZ);
+  if (cost === null) return true;
+  return emp.fatigue - cost >= NEED_REST_ARRIVAL_FATIGUE_FLOOR + NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE;
 }
 
 /**
@@ -327,7 +306,7 @@ export function forceShiftRestIfNeededByPolicy(
   // deliberately excluding the mid-drive-to-target phase — on the reasoning
   // that protecting a long initial approach drive the same way just defers
   // the same crossing to tickCollapse's unconditional hard floor instead of
-  // this policy's own proactive one. That reasoning assumed a short
+  // this policy's own proactive one (superseded by #1673: see below). That reasoning assumed a short
   // approach drive relative to the fatigue budget between thresholds; #1151's
   // slope-based traversal (#1166 follow-up) can now make the SINGLE initial
   // approach alone cost more ticks than a full fatigue charge affords, and
@@ -347,9 +326,8 @@ export function forceShiftRestIfNeededByPolicy(
   // Extending this guard to the drive phase unconditionally, the same way
   // execution is protected (tried first), closed both livelocks but traded
   // them for a different regression: a vehicle-gated claim protected end to
-  // end (drive AND execution, with #1090's own hasClaimableSameRoleFollowUp
-  // guard below also deferring the one-tick idle gap between consecutive
-  // same-role claims) gives a multi-segment order like the #945 box-cut ramp
+  // end (drive AND execution, plus an idle-gap deferral between consecutive
+  // same-role claims, since removed by #1673) gives a multi-segment order like the #945 box-cut ramp
   // NO natural interruption point at all for its whole duration — fatigue
   // and the morale it drives (NEED_MORALE_EFFECT_PENALTIES) sink for the
   // entire grind with no intervening rest, direct-traced via
@@ -357,21 +335,14 @@ export function forceShiftRestIfNeededByPolicy(
   // before the blast step, worse than the unprotected original despite
   // converging structurally.
   //
-  // Execution stays unconditionally protected (isMidClaimedTaskExecution),
-  // matching the pre-#1166 contract this file's own pinned unit test still
-  // asserts (a bounded work stint, always deferred to tickCollapse's hard
-  // floor rather than fragmented by this policy's own threshold) — only the
-  // DRIVE phase gets the new, narrower condition: protected while fatigue
-  // still has headroom above NEED_SOFT_THRESHOLDS.fatigue (25), so this
-  // policy's own ROUTINE threshold crossing (fatigueRestThreshold, typically
-  // 60) no longer interrupts a single approach drive it can't recover from
-  // mid-route, but steps aside once fatigue is already low enough that the
-  // REACTIVE path (autoInsertNeedTasks) would be queueing a rest of its own
-  // — so a genuinely long multi-segment order still gets rest before
-  // fatigue/morale bottom out, just later than the old routine-threshold
-  // cadence rather than never.
-  if (isMidVehicleGatedWork(state, emp)
-    && (isMidClaimedTaskExecution(emp) || emp.fatigue > NEED_SOFT_THRESHOLDS.fatigue)) return;
+  // Execution stays unconditionally protected (isMidClaimedTaskExecution): a
+  // bounded work stint is finished, never fragmented. The DRIVE phase defers
+  // only while the gauge still covers the trip to the rest building in the
+  // current vehicle (fatigueCoversTripToRest, #1673) — or while the policy
+  // would not force a rest anyway — so the worker rests before fatigue runs
+  // out instead of leaving the collapse floor to do it.
+  const midVehicleWork = isMidVehicleGatedWork(state, emp);
+  if (midVehicleWork && isMidClaimedTaskExecution(emp)) return;
   // Already arrived and mid-execution of a task in
   // PROTECTED_MID_EXECUTION_ACTION_TYPES (#1039, #1049): an employee actively
   // working one (taskTicksRemaining !== null, not just claimed-but-still-
@@ -411,16 +382,11 @@ export function forceShiftRestIfNeededByPolicy(
   // back toward a living_quarters, possibly right back inside the danger
   // zone they were just ordered out of.
   if (isMidEvacuation(emp)) return;
-  // #1090 follow-up: idle but mounted, with a same-role follow-up already
-  // queued and unclaimed — about to be picked up by the ordinary cost-ranked
-  // pool dispatch at near-zero cost. See hasClaimableSameRoleFollowUp's own
-  // doc comment for the livelock this closes.
-  if (emp.activeActionId === null && hasClaimableSameRoleFollowUp(state, emp)) return;
-
   const snapshot = {
     id: emp.id, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked,
   };
-  if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
+  const forceRest = shouldForceRest(state.sitePolicy, snapshot, true);
+  if (!forceRest) return;
 
   // Resolve the rest destination and whether the round trip is worth its
   // fatigue cost BEFORE any side effect (interruptActiveAction below) touches
@@ -428,6 +394,9 @@ export function forceShiftRestIfNeededByPolicy(
   // the identical ordering requirement (#1170).
   const dest = resolveRestDestination(state, emp);
   if (!dest.worthwhile) return;
+  // Mid-drive to a vehicle-gated target: keep driving while the gauge still
+  // covers the trip to the rest building (#1673).
+  if (midVehicleWork && fatigueCoversTripToRest(state, emp, dest.targetX, dest.targetZ)) return;
   if (dest.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
 
   // #678 follow-up: release the action this employee was actively working
