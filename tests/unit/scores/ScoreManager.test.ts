@@ -176,7 +176,7 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
   });
 
   it('57 t of fresh loose rock with no heap lowers ecology below 50', () => {
-    const state = createScoreState();
+    const state = createScoreState(0); // decay off: a 57 t pulse (~0.01/tick) is below the 0.05 pull toward 50
     updateScores(state, makeInputs({ looseRockKg: 57 * T }));
     expect(state.ecology).toBeLessThan(50);
   });
@@ -191,7 +191,7 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
   });
 
   it.each([-500, Number.NaN, Number.POSITIVE_INFINITY])('looseRockKg %s leaves finite dust fields and a later real pile still works', (kg) => {
-    const state = createScoreState();
+    const state = createScoreState(0);
     updateScores(state, makeInputs({ looseRockKg: kg }));
     expect(Number.isFinite(state.freshDustKg)).toBe(true);
     expect(state.lastLooseRockKg === undefined || Number.isFinite(state.lastLooseRockKg)).toBe(true);
@@ -228,7 +228,7 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
   });
 
   describe('settling dust model (#1733)', () => {
-    /** Ecology lost in one update from a neutral 50, so applyDecay is a no-op. */
+    /** Ecology lost in one update from a neutral 50. Callers pass a decay-0 state so the pull toward 50 does not mask small losses. */
     function lossNow(state: ReturnType<typeof createScoreState>, kg: number): number {
       state.ecology = 50;
       updateScores(state, makeInputs({ looseRockKg: kg }));
@@ -295,16 +295,16 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
     });
 
     it('loss has no cap: a 5,000 t pulse costs more than an 80 t pulse', () => {
-      const small = lossNow(createScoreState(), 80 * T);
-      const big = lossNow(createScoreState(), 5000 * T);
+      const small = lossNow(createScoreState(0), 80 * T);
+      const big = lossNow(createScoreState(0), 5000 * T);
       expect(small).toBeGreaterThan(0);
       expect(big).toBeGreaterThan(small);
       expect(big).toBeGreaterThan(small * 10);
     });
 
     it('the first tick of a pulse costs the fresh rate per tonne', () => {
-      const loss = lossNow(createScoreState(), 1000 * T);
-      expect(loss).toBeCloseTo(ECOLOGY_DUST_PER_TONNE_PER_TICK * 1000 / 1000, 4);
+      const loss = lossNow(createScoreState(0), 1000 * T);
+      expect(loss).toBeCloseTo(ECOLOGY_DUST_PER_TONNE_PER_TICK * 1000, 4);
     });
 
     it('freshDustKg halves after one half-life without hauling', () => {
@@ -318,7 +318,7 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
     });
 
     it('after a pulse without hauling, loss decays toward the settled rate', () => {
-      const state = createScoreState();
+      const state = createScoreState(0);
       const L = 2000 * T;
       const first = lossNow(state, L);
       for (let i = 0; i < 599; i++) lossNow(state, L);

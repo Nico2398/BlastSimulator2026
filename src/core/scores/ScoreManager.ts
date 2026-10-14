@@ -70,7 +70,8 @@ const DUST_SETTLE_RETENTION = Math.pow(0.5, 1 / ECOLOGY_DUST_SETTLE_HALF_LIFE_TI
 function dustEcologyLoss(state: ScoreState, looseKg: number): number {
   const loose = Number.isFinite(looseKg) && looseKg > 0 ? looseKg : 0;
   const prev = state.lastLooseRockKg ?? loose;
-  const fresh = Math.min(loose, state.freshDustKg * DUST_SETTLE_RETENTION + Math.max(0, loose - prev));
+  const prevFresh = Number.isFinite(state.freshDustKg) ? state.freshDustKg : 0; // old saves lack the field
+  const fresh = Math.min(loose, prevFresh * DUST_SETTLE_RETENTION + Math.max(0, loose - prev));
   state.freshDustKg = fresh;
   state.lastLooseRockKg = loose;
   return (

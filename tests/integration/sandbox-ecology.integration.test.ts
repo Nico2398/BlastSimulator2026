@@ -95,11 +95,16 @@ function ticks(site: Site, n: number, stop: () => boolean = () => false): void {
  * shot until `notBefore` so the pattern goes off about every BLAST_INTERVAL ticks. Drilling and
  * charging take as long as they take, so an interval can stretch past BLAST_INTERVAL.
  */
-function fireOrdinaryPattern(site: Site, notBefore: number): void {
+const PATTERN_STARTS = ['36,28', '24,28', '36,42', '24,42', '48,28'];
+let patternIndex = 0;
+
+/** Fires one pattern; returns the ecology the instant before the shot. */
+function fireOrdinaryPattern(site: Site, notBefore: number): number {
   const { run, state } = site;
+  const start = PATTERN_STARTS[patternIndex++ % PATTERN_STARTS.length]!; // fresh ground each shot: the last crater is not drillable
   const alive = (phase: string) => expect(state.levelEnded, `level ended during ${phase}: ${String(state.levelEndReason)}`).toBe(false);
   alive('start');
-  const planned = run('drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:36,28');
+  const planned = run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${start}`);
   expect(planned.success, planned.output).toBe(true);
   ticks(site, 1500, () => state.plannedDrillHoles.length === 0);
   alive('drilling');
@@ -111,8 +116,10 @@ function fireOrdinaryPattern(site: Site, notBefore: number): void {
   alive('waiting for the next shot');
   clearBlastZone(site);
   topUp(state);
+  const pre = state.scores.ecology;
   const fired = run('blast');
   expect(fired.success, fired.output).toBe(true);
+  return pre;
 }
 
 /** Order everyone out of the blast radius and wait for the zone to read clear (the Blast panel's evacuate control). */
@@ -155,8 +162,7 @@ describe('sandbox ecology under ordinary play (#1733)', () => {
     const windows: Array<{ pre: number; startSample: number }> = [];
     let notBefore = 0;
     while (!state.levelEnded && state.tickCount < RUN_TICKS) {
-      const pre = state.scores.ecology;
-      fireOrdinaryPattern(site, notBefore);
+      const pre = fireOrdinaryPattern(site, notBefore);
       windows.push({ pre, startSample: site.samples.length });
       notBefore = state.tickCount + BLAST_INTERVAL;
     }

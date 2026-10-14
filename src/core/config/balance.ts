@@ -149,10 +149,12 @@ export const SCORE_DECAY_RATE = 0.05;
  * Ecology loss per tonne of FRESH loose rock (the pulse a blast just threw onto the ground), per
  * tick. Fresh dust decays with `ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS`. Measured against ordinary play:
  * one spoil heap (+0.2/tick), a ~2,344 t pile left lying and a blast about every 600 ticks. At
- * 0.00015 the pulse costs ~0.35/tick at its peak, so ecology dips to the low 60s and recovers
- * before the next blast, rather than falling off a cliff (#1733).
+ * 0.0002 the pulse costs ~0.47/tick at its peak, so ecology dips to the mid 30s and recovers
+ * before the next blast, rather than falling off a cliff (#1733). It is also high enough that a pile
+ * left lying with no heap drains 50 to 0 in ~240 ticks (0.00015 never got there: the 0.05/tick pull
+ * toward 50 won against the settled term).
  */
-export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.00015;
+export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.0002;
 /**
  * Ecology loss per tonne of SETTLED loose rock (lying past the fresh pulse), per tick. 0.000004
  * puts the same 2,344 t pile at ~0.0094/tick, well under one heap's +0.2, so one heap carries
