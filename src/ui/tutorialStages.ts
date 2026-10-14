@@ -198,7 +198,7 @@ function pickerStages(
  * area (every 8-neighbour step in the region + 1 margin passes
  * `isStepClimbable`) that still keeps ore (dirtite 46, rustite 8). Origin
  * (14,24) over the climbable neighbours (14,23)/(13,23): the scripted
- * 4kg/2.5m shot rates `good` there, but `catastrophic` (168 projections) from
+ * shot (then 4kg/2.5m, now 7kg, #1724) rates `good` there, but `catastrophic` (168 projections) from
  * those two. The
  * box-cut moved with it to x=10, west of the drill, and the warehouse pin to
  * (2,12) to stay in round-trip range. Measured on the seed-42 post-survey

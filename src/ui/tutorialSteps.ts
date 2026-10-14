@@ -266,7 +266,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'charge',
     titleKey: 'tutorial.step6.title',
     textKey: 'tutorial.step6',
-    commands: ['charge hole:* explosive:boomite amount:4 stemming:2.5'],
+    commands: ['charge hole:* explosive:boomite amount:7 stemming:2.5'],
     highlightTarget: TOOLBAR_TARGET.blast,
     tickBudget: 20,
     waitsOnWork: true,

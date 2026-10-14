@@ -17,7 +17,7 @@ export interface RatingCapFacts {
   oversizedFragments: number;
   fragmentCount: number;
   /** True when the blast never broke out of its sealed void (#1724). */
-  noBreakout?: boolean;
+  noBreakout: boolean;
 }
 
 const ORDER: readonly BlastRating[] = ['perfect', 'good', 'mediocre', 'bad', 'catastrophic'];
@@ -34,6 +34,8 @@ const CAP_RULES: readonly CapRule[] = [
   { id: 'casualty_or_destruction', applies: f => f.injuries > 0 || f.destroyedBuildings > 0, ceiling: 'bad' },
   { id: 'fizzled_failure', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_FAILURE, ceiling: 'bad' },
   { id: 'fizzled_partial', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_PARTIAL, ceiling: 'mediocre' },
+  // Rock sealed under an intact cap: nothing opened, so the shot cannot rate above Bad (#1724).
+  { id: 'no_breakout', applies: f => f.noBreakout, ceiling: 'bad' },
   { id: 'wet_holes', applies: f => f.wetHoleCount > 0 && f.fizzledHoleCount > 0, ceiling: 'good' },
   { id: 'oversize', applies: f => oversizeShare(f.oversizedFragments, f.fragmentCount) > BLAST_OVERSIZE_SHARE_CAP, ceiling: 'good' },
 ];

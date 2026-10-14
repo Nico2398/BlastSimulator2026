@@ -885,12 +885,13 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
     const WINDOW = 400;
     const start = state().tickCount;
     let idleWhileReachable = 0;
-    let midpointQueued = -1;
+    let peakQueued = -1;
     for (let i = 0; i < WINDOW; i++) {
       state().cash = Math.max(state().cash, 100000);
       for (const e of state().employees.employees) e.fatigue = 100;
       run('tick 1');
-      if (i === 150) midpointQueued = reachableQueued();
+      // Orders are unblocked as the crew reaches them, so the queue rises before it drains: measure from its peak, not a fixed tick (the peak moves with where the rock rests).
+      peakQueued = Math.max(peakQueued, reachableQueued());
       if (reachableQueued() === 0) continue;
       const drivers = state().employees.employees.filter(isTruckDriver);
       expect(drivers.length).toBeGreaterThan(0);
@@ -901,8 +902,8 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
 
     // Before the fix the crew idled for ~250 of the 400 ticks with reachable orders still queued.
     expect(idleWhileReachable).toBeLessThan(WINDOW / 10);
-    // Reachable orders left at the midpoint keep draining afterwards (stranded ones carry a blockedReason and are not counted).
-    if (midpointQueued > 0) expect(reachableQueued()).toBeLessThan(midpointQueued);
+    // Reachable orders left at the peak keep draining afterwards (stranded ones carry a blockedReason and are not counted).
+    if (peakQueued > 0) expect(reachableQueued()).toBeLessThan(peakQueued);
   }, 240_000);
 });
 

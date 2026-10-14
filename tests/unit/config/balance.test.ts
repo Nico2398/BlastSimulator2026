@@ -283,8 +283,8 @@ describe('Drill grid tool defaults (#1072)', () => {
 });
 
 describe('Charge panel defaults (#1330)', () => {
-  it('CHARGE_DEFAULT_AMOUNT_KG is 4', () => {
-    expect(CHARGE_DEFAULT_AMOUNT_KG).toBe(4);
+  it('CHARGE_DEFAULT_AMOUNT_KG is 7 (smallest charge that breaks out on the sandbox pad and the tutorial pit, #1724)', () => {
+    expect(CHARGE_DEFAULT_AMOUNT_KG).toBe(7);
   });
 
   it('CHARGE_DEFAULT_STEMMING_M is 2.5', () => {

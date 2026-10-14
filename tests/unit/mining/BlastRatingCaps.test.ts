@@ -6,7 +6,7 @@ import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_
 
 const NONE: RatingCapFacts = {
   deaths: 0, injuries: 0, destroyedBuildings: 0, wetHoleCount: 0, fizzledHoleCount: 0, chargedHoleCount: 0,
-  oversizedFragments: 0, fragmentCount: 100,
+  oversizedFragments: 0, fragmentCount: 100, noBreakout: false,
 };
 const facts = (o: Partial<RatingCapFacts> = {}): RatingCapFacts => ({ ...NONE, ...o });
 
@@ -177,7 +177,7 @@ function emptyResult(over: Partial<BlastResult> = {}): BlastResult {
     projectionCount: 0, maxProjectionSpeed: 0, vibrationAtVillages: [], totalRockVolume: 0,
     totalOreValue: 0, rating: 'perfect', crackedVoxels: 0, clearedVoxels: 0,
     clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
-    secondaryBlastEvents: [], maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [],
+    secondaryBlastEvents: [], maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [], brokeOut: true,
     ...over,
   };
 }

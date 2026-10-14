@@ -352,6 +352,7 @@ export function* fireBlastSteps(
       ...(report.ratingCap
         ? [t(`mining.blast.rating_cap_${report.ratingCap}`, { base: report.baseRating?.toUpperCase() ?? '' })]
         : []),
+      ...(result.clearedVoxels > 0 && !result.brokeOut ? [t('mining.blast.no_breakout')] : []),
       `Cleared voxels: ${result.clearedVoxels}`,
       `Cracked voxels: ${result.crackedVoxels}`,
       `Fragments: ${result.fragmentCount}`,

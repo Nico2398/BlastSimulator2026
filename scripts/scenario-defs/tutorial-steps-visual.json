@@ -762,7 +762,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:4 stemming:2.5",
+      "command": "charge hole:* explosive:boomite amount:7 stemming:2.5",
       "timeout": 90,
       "interaction": [
         {

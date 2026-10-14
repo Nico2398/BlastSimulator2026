@@ -492,12 +492,32 @@ export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
  *  never under-stem what a player could ever click. */
 export const MIN_STEMMING_M = 0.5;
 
-/** Default explosive amount (kg) the Charge panel opens with. Equal to the
- *  tutorial's scripted plan, which rates PERFECT (#1330). */
-export const CHARGE_DEFAULT_AMOUNT_KG = 4;
+/** Default explosive amount (kg) the Charge panel opens with, and the tutorial's
+ *  scripted charge (#1330, #1724). Chosen as the smallest charge that breaks out
+ *  of an 8 m, 4 m-spaced 3x3 pattern with every hole's column lowered, on both
+ *  the sandbox flat pad and the tutorial pit, rating at least good. Measured with
+ *  boomite and 2.5 m stemming (executeBlast; sandbox desert_badlands seed 42 pad at
+ *  28,18, tutorial_pit after the seismic survey, build_ramp 10,23-10,35 depth 6 and
+ *  drill_plan at 14,24):
+ *    kg    sandbox lowered/9, rating      tutorial lowered/9, rating
+ *    4     0   bad (no_breakout)          0   good (2 columns open at the edge)
+ *    4.5   0   bad (no_breakout)          0   good
+ *    5     9   good                       5   good
+ *    6     9   good                       5   good (1 projection)
+ *    6.5   9   good                       6   good
+ *    7     9   good                       9   good (1 projection, 5.5 m throw)
+ *    8     9   good                       9   mediocre (8 projections)
+ *  4 kg in a 8 m hole is a 2 m column under 6 m of burden: more than
+ *  BURDEN_BREAKOUT_MAX of cap, so the rock stays sealed in the ground (#1724). 7 kg
+ *  is the first charge the tutorial pit needs; it fits the hole (3.5 m column +
+ *  2.5 m stemming <= 8 m). */
+export const CHARGE_DEFAULT_AMOUNT_KG = 7;
 
-/** Default stemming column (m) the Charge panel opens with. Equal to the
- *  tutorial's scripted plan, which rates PERFECT (#1330). */
+/** Default stemming column (m) the Charge panel opens with, and the tutorial's
+ *  scripted stemming (#1330, #1724). Stemming works fully from 30 % of the hole depth
+ *  (`stemmingFactor`: 2.4 m of an 8 m hole), so 2.5 m is the shortest round column
+ *  that gives full confinement: 1.5 m and 2 m throw rock, and anything longer
+ *  changed no measured result (sweep 2-5 m at 5-7 kg). */
 export const CHARGE_DEFAULT_STEMMING_M = 2.5;
 
 /**
@@ -678,6 +698,11 @@ export const MIN_PILE_RISE = 0.05;
  *  from growing into a tower where a lot of rock lands on one spot. */
 export const PILE_SPILL_STEPS = 24;
 export const PILE_REPOSE_STEP = 0.7;
+
+/** How many voxel layers below a fragment's origin the search for the floor of its
+ *  void goes before giving up (#1724). Voids a blast opens under a cap are a few
+ *  metres deep; the bound only stops a scan down an unbounded empty column. */
+export const PILE_VOID_SCAN_MAX_LAYERS = 64;
 
 /** How far (metres) a settled fragment's underside may sit above the ground
  *  before it counts as floating. Loose rock perches on the pieces below it, so a

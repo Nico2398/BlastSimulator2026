@@ -129,8 +129,8 @@ export interface BlastResult {
   /** "x,z" of every ground column the blast removed rock from. Anything standing
    *  on one of these was standing on the blast. */
   clearedColumns: string[];
-  /** False when the blast failed to break out and its rock stayed inside the sealed void (#1724). */
-  brokeOut?: boolean;
+  /** True when some cleared voxel reached its column's pre-blast top; false when everything it broke stayed sealed under intact rock (#1724). */
+  brokeOut: boolean;
 }
 
 /**
@@ -177,7 +177,7 @@ export interface BlastReport {
   fizzledHoleIds?: string[];
   /** Secondary detonations from destroyed stocked explosive warehouses (#1394). Optional: omitted when none. */
   secondaryBlasts?: SecondaryBlastReport[];
-  /** False when the blast did not break out of its sealed void (#1724). Optional: absent = true. */
+  /** False when the blast cleared rock but never broke out of its sealed void (#1724). Optional: absent = true (pre-existing fixtures). */
   brokeOut?: boolean;
 }
 
@@ -205,7 +205,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     chargedHoleCount: wetHoles.chargedCount,
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
-    noBreakout: false, // TODO: implement (#1724)
+    noBreakout: result.clearedVoxels > 0 && !result.brokeOut,
   });
   return {
     tick,
@@ -221,6 +221,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     totalOreValue: result.totalOreValue,
     spent,
     ...(spentFromStock > 0 ? { spentFromStock } : {}),
+    brokeOut: result.brokeOut,
     destroyedBuildings: result.destroyedBuildings,
     accidents,
     ...(result.vibrationAtVillages.length > 0
@@ -411,6 +412,13 @@ export function* executeBlastSteps(
   //          heights below, so it sees the renormalised surface (#1148).
   const renormalisedMaxY = renormaliseCarvedColumns(grid, carvedColumns);
 
+  // The blast broke out when any cleared voxel sat at or above its column's
+  // pre-clear top: the cap lifted off. Otherwise the broken rock is sealed (#1724).
+  const brokeOut = toClear.some(c => {
+    const top = carvedColumns.get(`${c.x},${c.z}`)?.oldTopY;
+    return top === null || top === undefined || c.y >= top;
+  });
+
   // 4c. Fly the thrown rock, drop the rest, and stack it all where it lands.
   //     Fragments that travel together are grouped into a capped number of
   //     projectiles, then split back into their own pieces on impact — motion
@@ -550,7 +558,7 @@ export function* executeBlastSteps(
     destroyedBuildings,
     secondaryBlastEvents,
     clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
-    brokeOut: true, // TODO: implement (#1724)
+    brokeOut,
     maxThrowDistance,
     projectileCount,
     flights,
