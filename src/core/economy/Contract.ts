@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Contract system
 // Contracts define material delivery requirements with deadlines, payments, and penalties.
 
+import type { MarketId } from './Market.js';
 import { Random } from '../math/Random.js';
 import type { ScriptedOreSaleOffer } from '../config/balance.js';
 import {
@@ -79,6 +80,8 @@ export interface ContractState {
   lastRefreshTick: number;
   /** Outcome of the most recent negotiate attempt, so the panel can show it inline on the right card. Null until the first attempt. */
   lastNegotiation: { contractId: number; success: boolean; changes: NegotiationChange[] } | null;
+  /** Market pricing this contract board; absent = 'legacy' (#1681). */
+  market?: MarketId;
 }
 
 export function createContractState(): ContractState {

@@ -3,6 +3,7 @@
 // the sticky footer's EST. ORE VALUE needs a number derived only from what the
 // player already knows (survey estimates), never from ground-truth voxel data.
 
+import type { MarketId } from '../economy/Market.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
 import { freshSurveys } from './SurveyStaleness.js';
@@ -58,6 +59,7 @@ function coveredColumns(
 export function estimateBlastOreValue(
   plan: BlastPlan,
   surveyResults: readonly SurveyResult[],
+  _marketId?: MarketId,
 ): number {
   let value = 0;
   const surveys = freshSurveys(surveyResults);

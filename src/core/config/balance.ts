@@ -2481,3 +2481,13 @@ export const SANDBOX_FLAT_PAD_TARGET = 0.25;
 export const SANDBOX_FLAT_PAD_MAX_SPREAD = 2;
 /** Side length (voxels) of the flat pad. */
 export const SANDBOX_FLAT_PAD_SIZE = 9;
+
+// ── Production market (#1681) — placeholder values, set by implementation ──
+
+/** Ore sale prices (dollars/kg) in the production market. */
+export const PRODUCTION_ORE_PRICES: Record<string, number> = {};
+/** Market the sandbox uses. */
+export const SANDBOX_MARKET: 'legacy' | 'production' = 'production';
+export const SANDBOX_REFERENCE_CREW_COST_PER_TICK = 0;
+export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 0;
+export const SANDBOX_MAX_RICHNESS_RATIO = 0;

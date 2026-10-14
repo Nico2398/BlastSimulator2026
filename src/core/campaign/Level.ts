@@ -7,6 +7,7 @@ import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
+import type { MarketId } from '../economy/Market.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -70,6 +71,14 @@ export interface LevelDef {
   hiringScript?: readonly ScriptedCandidate[];
   /** Fixed ore-sale offer guaranteed on the contract board; omitted = none (#1600). */
   scriptedOreSale?: ScriptedOreSaleOffer;
+  /** Market pricing this level; omitted = 'legacy' (#1681). */
+  market?: MarketId;
+}
+
+/** Market of the active level; 'legacy' by default (#1681). */
+export function resolveMarketId(_state: GameState): MarketId {
+  // TODO: implement
+  return 'legacy';
 }
 
 // ── Level catalog ──

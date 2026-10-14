@@ -2,6 +2,7 @@
 // Orchestrates: validate → energy → fragmentation → terrain subtraction → results
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
+import type { MarketId } from '../economy/Market.js';
 import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
@@ -287,8 +288,9 @@ export function executeBlast(
   emitter?: EventEmitter,
   /** Hole ids currently holding water (stored hole water past the wet threshold — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
+  marketId?: MarketId,
 ): BlastResult | null {
-  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds));
+  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds, marketId));
 }
 
 /**
@@ -306,6 +308,7 @@ export function* executeBlastSteps(
   buildingState?: BuildingState,
   emitter?: EventEmitter,
   wetHoleIds: ReadonlySet<string> = new Set(),
+  _marketId?: MarketId,
 ): Steps<BlastResult | null> {
   // 1. Validate
   const errors = validateBlastPlan(plan);
