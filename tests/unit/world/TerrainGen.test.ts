@@ -686,14 +686,20 @@ describe('sandbox site blend (#1734)', () => {
 
   /**
    * Share of perimeter lines (every 4 m along each side, 1 m steps from the core edge outwards to 30 m past
-   * the grid edge) whose blend is walkable. Only steps touching a column the mask actually reshaped count:
+   * the grid edge) whose blend is walkable. Only steps the mask made steeper than the landscape's own count:
    * a cliff the landscape has on its own, inside the cone, is not the blend's doing.
    */
   function walkableShare(biome: string, seed: number): number {
     const ctx = buildTerrainContext(sandboxTerrainConfig(biome, seed)).worldGen;
     const h = (x: number, z: number): number => sampleSurfaceHeightY(ctx, x, z);
-    const reshaped = (x: number, z: number): boolean =>
-      Math.abs(h(x, z) - (sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset)) > 1e-6;
+    const natural = (x: number, z: number): number =>
+      sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset;
+    /**
+     * The blend made this step steeper than the landscape's own: a cliff the landscape has on its own, inside
+     * the cone, is not the blend's doing (the mask only flattens; it cannot erase a natural wall).
+     */
+    const blendSteepened = (x0: number, z0: number, x1: number, z1: number): boolean =>
+      Math.abs(h(x1, z1) - h(x0, z0)) > Math.abs(natural(x1, z1) - natural(x0, z0)) + 0.05;
     let ok = 0, total = 0;
     for (let along = 4; along < SITE; along += 4) {
       const lines: Array<(t: number) => [number, number]> = [
@@ -705,7 +711,7 @@ describe('sandbox site blend (#1734)', () => {
         for (let t = 0; t < CORE + REACH; t++) {
           const [x0, z0] = at(t);
           const [x1, z1] = at(t + 1);
-          if ((reshaped(x0, z0) || reshaped(x1, z1)) && !isStepClimbable(h(x0, z0), h(x1, z1), 1)) { climbable = false; break; }
+          if (blendSteepened(x0, z0, x1, z1) && !isStepClimbable(h(x0, z0), h(x1, z1), 1)) { climbable = false; break; }
         }
         total++;
         if (climbable) ok++;

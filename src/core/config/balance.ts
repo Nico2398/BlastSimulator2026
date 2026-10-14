@@ -2509,8 +2509,10 @@ export const OUTLINE_WOBBLE_WAVE_B_DIR: readonly [number, number] = [-0.5, 0.866
  * wobble gradient and residual relief on top of the cone push local slope past
  * the climb limit. At 0.25 every side of every biome/seed (1/7/42) has reachable
  * ring cells at 6/18/30 m, >= 73% of ring cells do at 6 m-30 m, flat 9x9 pads
- * are >= 68% and the blend band is climbable on >= 73% of the perimeter, so the blend band is walkable
- * and drill holes just outside the grid stay reachable. The outline wobbles
+ * are >= 68%, and the blend never makes a step steeper than the landscape's own
+ * (on >= 80% of the perimeter lines), so drill holes just outside the grid stay
+ * reachable. A natural wall inside the cone is flattened (clamped to the envelope)
+ * but not erased: a pointwise mask cannot, so it stays a cliff. The outline wobbles
  * (up to 6 m, flat side only) and corners round (8 m) so the edge is not a
  * visible rectangle.
  */
