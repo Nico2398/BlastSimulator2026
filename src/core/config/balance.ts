@@ -1636,6 +1636,12 @@ export const TRAINING_TIER_SPEED: Record<1 | 2 | 3, number> = {
 /** Fee to teach a skill the employee does not hold yet ($). */
 export const TRAINING_BASE_FEE = 2500;
 
+/** Fee of a course by the level it brings the skill to ($). */
+export const TRAINING_LEVEL_FEE: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }; // TODO: implement
+
+/** Course duration multiplier by the level it brings the skill to. */
+export const TRAINING_LEVEL_TICKS_MULT: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }; // TODO: implement
+
 // ─── Research Center ───────────────────────────────────────────────────────────
 
 /**

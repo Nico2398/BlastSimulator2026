@@ -82,6 +82,8 @@ export interface TrainingState {
   fee: number;
   /** Set when the course raises an already-held driving licence to this level (#1524). */
   raisesLicenceTo?: Exclude<LicenceLevel, 1>;
+  /** Level the course brings the skill to; absent in older saves (completes as before). */
+  grantsLevel?: 1 | 2 | 3;
 }
 
 // ── Employee instance ──

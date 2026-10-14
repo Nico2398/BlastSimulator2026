@@ -105,6 +105,32 @@ export interface TrainingPlan {
   salaryIncrease: number;
   /** Set when the course raises an already-held driving licence to this level (#1524). */
   raisesLicenceTo?: Exclude<LicenceLevel, 1>;
+  /** Level the course brings the skill to (the school's tier, capped at 3). */
+  grantsLevel?: 1 | 2 | 3;
+  /** Whether the course unlocks a missing skill or upgrades a held one. */
+  kind?: 'unlock' | 'upgrade';
+}
+
+/**
+ * Level at which `qualifications` hold `skill`: the licence level for driving
+ * skills (default 1), else the proficiency level; 0 when not held.
+ */
+export function heldCourseLevel(
+  qualifications: readonly Employee['qualifications'][number][],
+  skill: SkillCategory,
+): 0 | ProficiencyLevel {
+  void qualifications; void skill;
+  return 0; // TODO: implement
+}
+
+/** Refusal of a course the school's tier cannot give (held level >= tier, or tier 3 reached). */
+export function trainingRefusal(
+  employee: Employee,
+  skill: SkillCategory,
+  tier: BuildingTier,
+): { error: string } & RefusalKey {
+  void employee; void skill; void tier;
+  return { error: '' }; // TODO: implement
 }
 
 /**
