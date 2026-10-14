@@ -185,7 +185,9 @@ Caps only lower; precedence, most severe first:
 |--------|-----------|---------|
 | `death` | any employee death | catastrophic |
 | `casualty_or_destruction` | any injury, or any destroyed building (union by id of `result.destroyedBuildings` and `building_destroyed` accidents) | bad |
-| `wet_holes` | any `wetHoleIds` (fizzled or not) | good |
+| `fizzled_failure` | fizzled charges / charged holes >= `BLAST_FIZZLE_SHARE_FAILURE` (0.75; `fizzleShare`, 0 charged = 0) | bad |
+| `fizzled_partial` | same share >= `BLAST_FIZZLE_SHARE_PARTIAL` (0.25) | mediocre |
+| `wet_holes` | wet holes with at least one fizzled charge (wet holes whose charges fired no longer cap) | good |
 | `oversize` | oversized fragments / fragments strictly above `BLAST_OVERSIZE_SHARE_CAP` (0.30, 0 fragments = 0 share) | good |
 
 Vehicle-only loss does not cap. Console `Rating:` and the report modal read the capped value; the

@@ -829,7 +829,7 @@ describe('BlastReportModal wet holes note (#1348)', () => {
 });
 
 describe('BlastReportModal rating cap note (#1349)', () => {
-  for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize'] as const) {
+  for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize', 'fizzled_failure', 'fizzled_partial'] as const) {
     it(`renders the ${cap} cap note`, () => {
       const { modal, setPlayback } = makeModal();
       const state = makeState();
@@ -844,7 +844,7 @@ describe('BlastReportModal rating cap note (#1349)', () => {
     const state = makeState();
     state.lastBlastReport = makeReport();
     openReport(modal, state, setPlayback);
-    for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize']) {
+    for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize', 'fizzled_failure', 'fizzled_partial']) {
       expect(modal.root.textContent).not.toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
     }
   });

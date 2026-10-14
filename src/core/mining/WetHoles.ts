@@ -47,6 +47,8 @@ export function wetHoleIdsFor(state: GameState): Set<string> {
 export interface WetBlastHoles {
   wet: string[];
   fizzled: string[];
+  /** Number of holes carrying a charge, wet or not. */
+  chargedCount: number;
 }
 
 /** Split a blast's charges into wet holes and the ones whose water-sensitive explosive fizzles. Unknown explosive => not fizzled. */
@@ -59,5 +61,5 @@ export function classifyWetChargedHoles(
     const explosive = getExplosive(charges[id]!.explosiveId);
     return explosive !== undefined && waterEffect(true, explosive.waterSensitive, false) < 1;
   });
-  return { wet, fizzled };
+  return { wet, fizzled, chargedCount: Object.keys(charges).length };
 }

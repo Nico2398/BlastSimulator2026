@@ -526,19 +526,19 @@ function emptyBlastResult(): BlastResult {
 
 describe('buildBlastReport wet holes (#1348)', () => {
   it('includes wetHoleIds and fizzledHoleIds when wet holes exist', () => {
-    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: ['H1', 'H2'], fizzled: ['H1'] });
+    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: ['H1', 'H2'], fizzled: ['H1'], chargedCount: 2 });
     expect(report.wetHoleIds).toEqual(['H1', 'H2']);
     expect(report.fizzledHoleIds).toEqual(['H1']);
   });
 
   it('includes an empty fizzledHoleIds when wet holes exist but none fizzled', () => {
-    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: ['H1'], fizzled: [] });
+    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: ['H1'], fizzled: [], chargedCount: 1 });
     expect(report.wetHoleIds).toEqual(['H1']);
     expect(report.fizzledHoleIds).toEqual([]);
   });
 
   it('omits both fields when no hole was wet', () => {
-    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: [], fizzled: [] });
+    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: [], fizzled: [], chargedCount: 0 });
     expect('wetHoleIds' in report).toBe(false);
     expect('fizzledHoleIds' in report).toBe(false);
   });
