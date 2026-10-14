@@ -1410,12 +1410,35 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
 /** Sandbox difficulty ids a starting kit is keyed by (#1671). */
 export type SandboxStartingSiteId = 'easy' | 'normal' | 'hard';
 
-/** Free starting kit per sandbox difficulty (#1671). */
+const SANDBOX_KIT_BUILDINGS: readonly StartingBuildingSlot[] = DUSTY_HOLLOW_STARTING_SITE.buildings;
+const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
+};
+const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
+};
+
+/**
+ * Free starting kit per sandbox difficulty (#1671): every difficulty can drill,
+ * charge, fire, haul and sell its first blast with no purchases. Hard is the
+ * Dusty Hollow kit; normal adds a rock digger (a ramp into the crater) and its
+ * excavator-licensed driver; easy adds a rock fragmenter and its licensed
+ * driver. Each kit is a superset of the smaller one.
+ */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxStartingSiteId, StartingSiteComposition>> = {
-  // TODO: implement
-  easy: { employees: [], vehicles: [], buildings: [] },
-  normal: { employees: [], vehicles: [], buildings: [] },
-  hard: { employees: [], vehicles: [], buildings: [] },
+  hard: DUSTY_HOLLOW_STARTING_SITE,
+  normal: {
+    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
+    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
+    buildings: SANDBOX_KIT_BUILDINGS,
+  },
+  easy: {
+    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
+    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
+    buildings: SANDBOX_KIT_BUILDINGS,
+  },
 };
 
 /**

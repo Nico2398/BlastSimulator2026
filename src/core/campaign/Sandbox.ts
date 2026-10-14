@@ -30,7 +30,7 @@ export interface SandboxDifficultyDef {
   startingSite: StartingSiteComposition;
 }
 
-/** Named difficulty presets — the only thing that varies between them is starting cash (#504). */
+/** Named difficulty presets — starting cash and the size of the free starting kit vary (#504, #1671). */
 export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
   easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: 250_000 },
   normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: 100_000 },
@@ -42,7 +42,7 @@ export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy',
 export interface SandboxConfig {
   /** Biome id from BiomeCatalog — drives climate, rock mix and colour grade. */
   biome: string;
-  /** Named difficulty — currently only varies starting cash. */
+  /** Named difficulty — sets starting cash and the free starting kit. */
   difficulty: SandboxDifficultyId;
   /** Terrain seed. The same seed and parameters always rebuild the same map. */
   seed: number;

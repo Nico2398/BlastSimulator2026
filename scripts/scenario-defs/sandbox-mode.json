@@ -3,12 +3,12 @@
   "description": "Sandbox mode: a site built from biome/difficulty/seed starts from nothing, honours the seed, and is fully playable through to a blast (#504: 3-control setup).",
   "steps": [
     {
-      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true",
-      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #553: staffed:true (sandbox start supports the same flag as new_game, Sandbox.ts) hires a driller with blasting + drill_rig licence and buys an unmanned drill_rig for free — automatic drill dispatch needs both to ever land an ordered hole.",
+      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777",
+      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #1671: with no staffed: flag the difficulty opens on its free starting kit (crew, drill rig, charging truck, debris hauler, freight warehouse, spoil heap), so the full drill/charge/blast cycle needs no purchases.",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true"
+          "command": "sandbox start biome:alpine_granite difficulty:hard seed:777"
         }
       ],
       "role": "setup"
