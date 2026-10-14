@@ -11,6 +11,7 @@ import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import { findSurveyForColumn, surveyColumnKey } from '../../core/mining/SurveyColumn.js';
+import { oreDepthBands } from '../../core/mining/SurveyDepthProfile.js';
 import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
@@ -30,6 +31,8 @@ const VEHICLE_ICON: Record<string, IconName> = {
 /** Space reserved above the anchor for the tag before it flips to render below instead. */
 const FLIP_MARGIN_PX = 90;
 const ANCHOR_OFFSET_PX = 14;
+/** Depth ranges listed under each ore of a surveyed column. */
+const HOVER_DEPTH_RUNS_PER_ORE = 3;
 
 export class HoverTag {
   private readonly root: HTMLElement;
@@ -165,6 +168,14 @@ export class HoverTag {
       row.appendChild(el('span', { text: t(`ore.${oreId}.name`), attrs: { style: 'color:var(--bsx-text-secondary)' } }));
       row.appendChild(el('span', { className: 'bsx-mono', text: `${Math.round(density * 100)}%`, attrs: { style: 'color:var(--bsx-ore-text)' } }));
       wrap.appendChild(row);
+      const runs = oreDepthBands(survey.depthProfile?.[surveyColumnKey(terrain.tileX, terrain.tileZ)], oreId).slice(0, HOVER_DEPTH_RUNS_PER_ORE);
+      if (runs.length > 0) {
+        wrap.appendChild(el('div', {
+          className: 'bsx-mono',
+          text: runs.map(r => t('shell.hovertag.depth_range', { from: r.fromM, to: r.toM })).join(', '),
+          attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' },
+        }));
+      }
     }
     wrap.appendChild(el('div', {
       className: stale ? 'bsx-chip bsx-chip-warn' : 'bsx-chip bsx-chip-positive',

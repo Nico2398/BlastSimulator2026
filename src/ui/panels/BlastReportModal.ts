@@ -221,7 +221,10 @@ export class BlastReportModal {
       { key: t('ui.blast_workshop.report.stat_oversized'), value: `${report.oversizedFragments}`, ...(report.oversizedFragments > 0 ? { color: 'var(--bsx-amber)' } : {}) },
       { key: t('ui.blast_workshop.report.stat_volume'), value: `${report.totalRockVolume.toFixed(0)} m³` },
       { key: t('ui.blast_workshop.report.stat_projections'), value: `${report.projectionCount} · ${report.maxProjectionDistanceM.toFixed(0)} m`, ...(report.projectionCount > 0 ? { color: 'var(--bsx-critical-text)' } : {}) },
-      { key: t('ui.blast_workshop.report.stat_spent'), value: `$${formatMoney(report.spent)}`, color: 'var(--bsx-critical-text)' },
+      { key: t('ui.blast_workshop.report.stat_spent'), value: `$${formatMoney(report.spent)}`, color: 'var(--bsx-critical-text)', info: 'report-spent' },
+      ...((report.spentFromStock ?? 0) > 0
+        ? [{ key: t('ui.blast_workshop.report.stat_from_stock'), value: `$${formatMoney(report.spentFromStock ?? 0)}`, info: 'report-spent-from-stock' }]
+        : []),
       { key: t('ui.blast_workshop.report.stat_ore_value'), value: `$${formatMoney(report.totalOreValue)}`, color: 'var(--bsx-positive)' },
     ], 4));
 

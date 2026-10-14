@@ -2,7 +2,7 @@
 // Explosive Warehouse stock management and Freight Warehouse capacity checks.
 
 import type { Building, BuildingState } from './Building.js';
-import { getBuildingDef, getStorageCapacity, isOperating, warehouseStockKg } from './Building.js';
+import { getBuildingDef, getStorageCapacity, isOperating, warehouseFreeKg, warehouseStockKg } from './Building.js';
 
 // ── Explosive Warehouse ──────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ export function getExplosivesStockByType(state: BuildingState): Record<string, n
 export function getExplosivesFreeCapacity(state: BuildingState): number {
   let free = 0;
   for (const b of operatingExplosiveWarehouses(state)) {
-    free += Math.max(0, getBuildingDef(b.type, b.tier).capacity - warehouseStockKg(b));
+    free += warehouseFreeKg(b);
   }
   return free;
 }

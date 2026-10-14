@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { SavedBlastPlan } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { addHole, drillDepthRefusal } from '../../../core/mining/DrillPlan.js';
-import { createCharge, chargeOrderCost } from '../../../core/mining/ChargePlan.js';
+import { createCharge, recordedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction } from '../siteExpansion.js';
 import type { MiningContext } from './types.js';
@@ -63,7 +63,8 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
     const newId = idMap.get(o.oldHoleId)!;
     const hole = state.plannedDrillHoles.find(h => h.id === newId)!;
     dispatchChargeAction(state, hole, { explosiveId: o.explosiveId, amountKg: o.amountKg, stemmingM: o.stemmingM });
-    cost += chargeOrderCost(o.explosiveId, o.amountKg);
+    const recorded = state.plannedChargesByHole[hole.id];
+    if (recorded) cost += recordedChargesCost({ [hole.id]: recorded }).cashCost;
   }
 
   return {

@@ -627,6 +627,11 @@ export function warehouseStockKg(b: Pick<Building, 'storedExplosives'>): number 
   return total;
 }
 
+/** Unused explosive storage (kg) of one building: its tier's capacity minus its stock (#1685). */
+export function warehouseFreeKg(b: Pick<Building, 'type' | 'tier' | 'storedExplosives'>): number {
+  return Math.max(0, getBuildingDef(b.type, b.tier).capacity - warehouseStockKg(b));
+}
+
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
 
 export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';

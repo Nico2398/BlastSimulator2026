@@ -7,7 +7,7 @@ import { getExplosivesInStock } from '../../../src/core/entities/BuildingWarehou
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../../../src/core/config/balance.js';
 import {
-  bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor,
+  bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor, buyStockBlockReason,
 } from '../../../src/core/mining/ExplosiveStock.js';
 
 function makeState(cash = 100_000, warehouses = 1, tier: 1 | 2 | 3 = 1): GameState {
@@ -218,5 +218,67 @@ describe('returnOrderStock', () => {
     expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(2);
     expect(r.restockedKg).toBe(2);
     expect(r.cashRefund).toBeCloseTo(3 * 8.4, 6);
+  });
+});
+
+describe('buyStockBlockReason (#1685)', () => {
+  it('is null when the purchase would succeed', () => {
+    expect(buyStockBlockReason(makeState(), 'boomite', 50)).toBeNull();
+  });
+
+  it('agrees with buyExplosiveStock on every refusal reason', () => {
+    const cases: Array<[string, GameState, string, number]> = [
+      ['invalid_amount', makeState(), 'boomite', 0],
+      ['unknown_explosive', makeState(), 'no_such_explosive', 10],
+      ['no_warehouse', makeState(100_000, 0), 'boomite', 10],
+      ['over_capacity', makeState(), 'boomite', 100_000],
+      ['insufficient_funds', makeState(100), 'boomite', 100],
+    ];
+    for (const [reason, state, id, kg] of cases) {
+      expect(buyStockBlockReason(state, id, kg)).toBe(reason);
+      const real = buyExplosiveStock(state, id, kg);
+      expect(real.success).toBe(false);
+      if (!real.success) expect(real.reason).toBe(reason);
+    }
+  });
+
+  it('reports not_available for an explosive the level does not offer', () => {
+    const state = makeState();
+    state.campaign.activeLevelId = 'tutorial_pit';
+    expect(buyStockBlockReason(state, 'krackle', 10)).toBe('not_available');
+  });
+
+  it('checks in order: invalid before unknown, no_warehouse before funds', () => {
+    expect(buyStockBlockReason(makeState(), 'no_such_explosive', 0)).toBe('invalid_amount');
+    expect(buyStockBlockReason(makeState(0, 0), 'boomite', 10)).toBe('no_warehouse');
+    expect(buyStockBlockReason(makeState(0), 'boomite', 100_000)).toBe('over_capacity');
+  });
+
+  it('allows an exact fill and exact cash (boundaries)', () => {
+    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
+    const full = makeState(10_000_000);
+    expect(buyStockBlockReason(full, 'boomite', cap)).toBeNull();
+    expect(buyStockBlockReason(full, 'boomite', cap + 1)).toBe('over_capacity');
+    const exact = makeState();
+    const cost = 100 * bulkPricePerKg('boomite', explosivePriceFactor(exact));
+    exact.cash = cost;
+    expect(buyStockBlockReason(exact, 'boomite', 100)).toBeNull();
+  });
+
+  it('counts existing stock against capacity', () => {
+    const state = makeState(1_000_000);
+    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
+    buyExplosiveStock(state, 'boomite', cap - 10);
+    expect(buyStockBlockReason(state, 'krackle', 11)).toBe('over_capacity');
+    expect(buyStockBlockReason(state, 'krackle', 10)).toBeNull();
+  });
+
+  it('mutates nothing', () => {
+    const state = makeState();
+    const cash = state.cash;
+    buyStockBlockReason(state, 'boomite', 100);
+    expect(state.cash).toBe(cash);
+    expect(getExplosivesInStock(state.buildings)).toBe(0);
+    expect(state.finances.transactions).toHaveLength(0);
   });
 });

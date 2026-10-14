@@ -1213,3 +1213,72 @@ describe('SurveyCalc — computeBlastOreReport with stale surveys (#1356)', () =
     expect(report.estimatedYieldKg).toBeCloseTo(2.0 * 0.4 * ORE_DENSITY_KG_M3, 6);
   });
 });
+
+// ── #1683: depth-resolved results ─────────────────────────────────────────────
+
+describe('SurveyCalc — depthProfile (#1683)', () => {
+  const TOP = 60;
+  /** Column (5,*,5), granite y=30..60, gold 1.0 only 10-12 m below the surface. */
+  function seamGrid(): VoxelGrid {
+    const grid = new VoxelGrid(11, 11);
+    for (let y = 30; y <= TOP; y++) {
+      const depth = TOP - y;
+      grid.setVoxel(5, y, 5, {
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+        density: 1,
+        oreDensities: depth >= 10 && depth <= 12 ? { gold: 1.0 } : {},
+        fractureModifier: 1.0,
+      });
+    }
+    return grid;
+  }
+  const run = (method: SurveyMethod) =>
+    estimateSurveyResult(seamGrid(), { ...BASE_PARAMS, method, centerX: 5, centerZ: 5, skillLevel: 5 }, new Random(12345));
+
+  it('core sample reports the seam in the 1 m bands holding it', () => {
+    const bands = run('core_sample').depthProfile?.['5,5'];
+    expect(bands?.map(b => [b.fromM, b.toM])).toEqual([[10, 11], [11, 12], [12, 13]]);
+    expect(bands?.every(b => (b.ores['gold'] ?? 0) > 0)).toBe(true);
+  });
+
+  it('seismic reports the seam in the 5 m band 10-15', () => {
+    const bands = run('seismic').depthProfile?.['5,5'];
+    expect(bands?.map(b => [b.fromM, b.toM])).toEqual([[10, 15]]);
+  });
+
+  it('aerial carries no depth profile', () => {
+    expect(run('aerial').depthProfile).toBeUndefined();
+  });
+
+  it('same seed gives a deep-equal result, depth profile included', () => {
+    expect(run('core_sample')).toEqual(run('core_sample'));
+  });
+
+  it('a different seed changes the profile', () => {
+    const grid = seamGrid();
+    const a = estimateSurveyResult(grid, { ...BASE_PARAMS, method: 'core_sample', centerX: 5, centerZ: 5, skillLevel: 1 }, new Random(1));
+    const b = estimateSurveyResult(grid, { ...BASE_PARAMS, method: 'core_sample', centerX: 5, centerZ: 5, skillLevel: 1 }, new Random(2));
+    expect(a.depthProfile).toBeDefined();
+    expect(a.depthProfile).not.toEqual(b.depthProfile);
+  });
+
+  it('estimates and confidence for a seed are unchanged by the depth pass (pinned)', () => {
+    const grid = new VoxelGrid(11, 11);
+    for (let y = 30; y <= TOP; y++) {
+      grid.setVoxel(5, y, 5, {
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+        density: 1,
+        oreDensities: y >= 48 && y <= 50 ? { gold: 1.0 } : y === 58 ? { iron: 0.4 } : {},
+        fractureModifier: 1.0,
+      });
+    }
+    const at = (method: SurveyMethod) =>
+      estimateSurveyResult(grid, { ...BASE_PARAMS, method, centerX: 5, centerZ: 5, skillLevel: 3 }, new Random(42));
+    // Values captured before the depth pass existed (id 42 params differ only in non-numeric fields).
+    expect(at('core_sample').estimates).toEqual({ '5,5': { gold: 0.1 } });
+    expect(at('core_sample').confidence).toBeCloseTo(0.962, 12);
+    expect(at('seismic').estimates).toEqual({ '5,5': { gold: 0.1 } });
+    expect(at('seismic').confidence).toBeCloseTo(0.886, 12);
+    expect(at('aerial').estimates).toEqual({});
+  });
+});

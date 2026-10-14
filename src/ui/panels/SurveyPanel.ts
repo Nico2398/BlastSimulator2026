@@ -25,6 +25,7 @@ import {
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
 import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
+import { oreDepthLabel, buildDepthLog } from './surveyDepthSection.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -105,6 +106,9 @@ export class SurveyPanel extends PanelBase {
       sectionHeader(t('ui.survey.results')),
       this.resultsEl,
     );
+    // The body is the scroll region: its children keep their natural height
+    // rather than flex-shrinking (a squashed button, clipped result cards).
+    for (const child of Array.from(this.bodyEl.children)) (child as HTMLElement).style.flexShrink = '0';
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
@@ -377,16 +381,20 @@ export class SurveyPanel extends PanelBase {
         const pct = Math.round(density * 100);
         const bar = progressBar(pct, 'var(--bsx-ore)');
         bar.style.flex = '1';
+        const depth = oreDepthLabel(survey, oreId);
         oreRows.append(el('div', {
           attrs: { style: 'display:flex;align-items:center;gap:8px' },
           children: [
             el('span', { text: t(`ore.${oreId}.name`), attrs: { style: 'width:62px;font-size:10px;color:var(--bsx-text-secondary)' } }),
             bar,
+            ...(depth ? [el('span', { text: depth, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } })] : []),
             el('span', { text: `${pct}%`, className: 'bsx-mono', attrs: { style: 'width:28px;text-align:right;font-size:10px;color:var(--bsx-text-muted)' } }),
           ],
         }));
       }
       rows.push(oreRows);
+      const depthLog = buildDepthLog(survey);
+      if (depthLog) rows.push(depthLog);
     }
 
     rows.push(el('span', {
