@@ -431,6 +431,39 @@ describe('VoxelFragmentation — floorToGrade', () => {
     expect(isBroken(f, 5, 3, 5)).toBe(false);
   });
 
+  it('a hole\'s one-voxel breakout under grade is left standing beside rock floored to grade', () => {
+    const f = gradedField(6, [
+      { x: 5, z: 5, fromY: 5, toY: 11 }, // hole column: broke one voxel under grade
+      { x: 6, z: 5, fromY: 9, toY: 11 }, // neighbour broken near the top only: floored down to grade
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 6, 6, 5)).toBe(true);
+    expect(isBroken(f, 5, 5, 5)).toBe(false);
+    expect(isBroken(f, 5, 6, 5)).toBe(true);
+  });
+
+  it('a lone hole keeps its breakout under grade: nothing was floored beside it', () => {
+    const f = gradedField(6, [{ x: 5, z: 5, fromY: 5, toY: 11 }]);
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+
+    expect(isBroken(f, 5, 5, 5)).toBe(true);
+  });
+
+  it('breakout deeper than one voxel under grade stays broken even beside floored rock', () => {
+    const f = gradedField(6, [
+      { x: 5, z: 5, fromY: 3, toY: 11 },
+      { x: 6, z: 5, fromY: 9, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 5, 3, 5)).toBe(true);
+    expect(isBroken(f, 5, 5, 5)).toBe(true);
+  });
+
   it('never cuts more than BLAST_GRADE_MAX_CUT_M below a column\'s broken rock', () => {
     const f = gradedField(0, [{ x: 5, z: 5, fromY: 10, toY: 11 }]);
 

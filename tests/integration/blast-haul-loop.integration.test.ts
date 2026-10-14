@@ -52,16 +52,26 @@ function blastAndRamp() {
     if (h0 - getSmoothTerrainSurfaceY(grid, x, z) > 0.5) crater.push({ x, z });
   }
 
+  const inCrater = new Set(crater.map(c => `${c.x},${c.z}`));
+  const craterFragmentIds = new Set(state.logistics.fragments
+    .filter(f => inCrater.has(`${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`))
+    .map(f => f.fragment.id));
+
   expect(run('build_ramp start:32,46 end:32,27 depth:8')).toMatchObject({ success: true });
   tickWhile(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
   expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
-  return { run, state, crater };
+  return { run, state, crater, craterFragmentIds };
 }
 
-/** Builds `type` on the first spot of a coarse scan the placement rules accept (the pad is not flat everywhere). */
+/**
+ * Builds `type` on the first spot of a coarse scan the placement rules accept
+ * (the pad is not flat everywhere). The scan starts beside the ramp's upper end
+ * on the open plateau: a building on the sloped terrain elsewhere levels a pad
+ * that ends up ringed by steps, stranding the hauler on it.
+ */
 function placeAnywhere(run: (c: string) => unknown, type: string): void {
-  for (let z = 4; z < 60; z += 4) {
-    for (let x = 4; x < 60; x += 4) {
+  for (let z = 50; z < 62; z += 4) {
+    for (let x = 20; x < 48; x += 4) {
       if ((run(`build ${type} at:${x},${z}`) as { success: boolean }).success) return;
     }
   }
@@ -79,15 +89,15 @@ describe('blast, ramp to the floor, haul (#1723)', () => {
   }, 600_000);
 
   it('the hauler picks up debris from inside the crater without further orders', () => {
-    const { run, state, crater } = blastAndRamp();
+    const { run, state, craterFragmentIds } = blastAndRamp();
     placeAnywhere(run, 'freight_warehouse');
     tickWhile(run, state, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 600);
     upgradeFreightWarehousesToTier3(state, 75_000);
     placeAnywhere(run, 'spoil_heap');
 
-    const inCrater = new Set(crater.map(c => `${c.x},${c.z}`));
+    // Hauled debris leaves its crater column, so follow the fragments that started there by id.
     const hauled = () => state.logistics.fragments.filter(f =>
-      f.state !== 'on_ground' && inCrater.has(`${Math.round(f.fragment.position.x)},${Math.round(f.fragment.position.z)}`)).length;
+      craterFragmentIds.has(f.fragment.id) && f.state !== 'on_ground').length;
     const storedBefore = state.logistics.storedMassKg;
     tickWhile(run, state, () => hauled() > 0 && state.logistics.storedMassKg > storedBefore, 1500);
 
