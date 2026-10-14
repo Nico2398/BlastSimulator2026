@@ -75,7 +75,6 @@ describe('role starting qualifications — gameplay flows (#1339)', () => {
     run('tick 1');
     expect(outstandingChargeBlockedReason(state)).toBeNull();
     for (const a of state.pendingActions.filter(x => x.type === 'charge_hole')) {
-      expect(a.blockedReason).not.toBe('no_dual_qualified_employee');
       expect(a.blockedReason).toBeNull();
     }
 

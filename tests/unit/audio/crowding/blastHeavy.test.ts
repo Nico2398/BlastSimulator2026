@@ -1,5 +1,5 @@
 // BlastSimulator2026 — A blast-heavy game: five shots, a big crew, every shot a bounded event
-// blast-execution-visual hires 37 people, buys 19 vehicles and fires five blasts, played at 8x. Each shot is the
+// blast-execution-visual hires 28 people, buys 19 vehicles and fires five blasts, played at 8x. Each shot is the
 // loudest thing in the game by design; what is checked here is that it stays one event: five main layers, a rain
 // bounded by its bins, the work around it hushed for a moment, the ambience ducked, and no shot running into the next.
 
@@ -50,7 +50,7 @@ describe(`${SCENARIO} at 8x`, () => {
     expect(sim().recorder.ducks.filter(d => d.bus === 'ambient').length).toBeGreaterThanOrEqual(shots().length * 2);
   });
 
-  it('keeps the busiest second under 22 sounds and 17 voices, the shots and 37 hires included', () => {
+  it('keeps the busiest second under 22 sounds and 17 voices, the shots and 28 hires included', () => {
     // Measured 17 sounds in a second and 13 voices at once; the engine caps at 32.
     const stats = summarize(sim().recorder.plays, sim().realS);
     expect(stats.maxPerSecond).toBeLessThanOrEqual(22);
@@ -64,7 +64,7 @@ describe(`${SCENARIO} at 8x`, () => {
     expectWorldWithinBudget(sim(), { per1s: 5, per10s: 17, per30s: 38 }, { drill_done: 9, charge_loaded: 9, vehicle_scrap: 4 });
   });
 
-  it('plays under 97 sounds a minute, a scripted player hiring 37 people included', () => {
+  it('plays under 97 sounds a minute, a scripted player hiring 28 people included', () => {
     // Measured 74.4 a minute over 280 s at 8x.
     expect(summarize(sim().recorder.plays, sim().realS).totalPerMinute).toBeLessThan(97);
   });

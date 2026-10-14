@@ -355,9 +355,9 @@ describe('classifyQueuedOrders (#1306)', () => {
       expect(reasonOf(state)).toBe('no_vehicle_in_fleet');
     });
 
-    it('stamps no_licensed_driver when a blaster exists but nobody holds the truck licence', () => {
+    it('stamps no_licensed_driver when a blasting driller exists but nobody holds the truck licence', () => {
       const state = makeState();
-      // A 'driver' hire already holds driving.truck (the charging-truck licence); a driller holds blasting but no truck licence (a blaster does since #1667).
+      // A driller holds blasting but no driving.truck licence (a blaster would hold both since #1667).
       hire(state, IN_A, [], 'driller');
       purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
       order(state);
