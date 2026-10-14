@@ -33,9 +33,8 @@ export interface GeneralRestCompletionResult {
  * by processShiftCycle/completeRestTick — but once a site policy has been
  * applied, forceShiftRestIfNeededByPolicy (#678) sets pendingRestNeedKey/
  * restNeedKey for its own shift-forced rests too, so those ARE owned here,
- * not by completeRestTick. This function also resets ticksWorked on
- * completion, but only for rests it can identify as policy-forced (payload's
- * triggeredBy === 'shift_cycle_policy') — see the check inline below.
+ * not by completeRestTick. This function also resets ticksWorked to 0 on
+ * completion of any rest, whatever its origin (#1669).
  *
  * Injury does not block completion — an employee who becomes injured mid-rest
  * must still have their rest action finished and cleaned up, or activeActionId
@@ -55,15 +54,7 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     if (emp.restTicksRemaining > 0) continue;
 
     const completedActionId = emp.activeActionId;
-    // forceShiftRestIfNeededByPolicy marks its own rest action's payload with
-    // triggeredBy: 'shift_cycle_policy' (checked before completeRestForEmployee
-    // clears activeActionId) — that marker is what distinguishes it here from
-    // the other three rest creators (tickCollapse/tickNeedRestoration/
-    // autoInsertNeedTasks), whose payloads never use that value. Only a
-    // policy-forced shift rest restarts the continuous-work clock; see
-    // forceShiftRestIfNeededByPolicy's doc comment (#678).
     const completedAction = findPendingActionById(state, completedActionId);
-    const isPolicyShiftRest = completedAction?.payload.triggeredBy === 'shift_cycle_policy';
 
     completeRestForEmployee(state, emp, needKey, completedAction !== undefined ? resolveRestBuildingId(completedAction.payload) : undefined);
     // tickCollapse/tickNeedRestoration/autoInsertNeedTasks leave the rest
@@ -96,11 +87,11 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     // activeActionId happens to name when it isn't this rest's own action.
     completeIfOwnedRestAction(state, completedActionId);
 
-    // Mirrors completeRestTick's unconditional ticksWorked = 0 on completion —
-    // without this, a policy-forced rest never resets the continuous-work
-    // clock (nothing else does), so the very next tick immediately re-trips
-    // shouldForceRest and yanks the employee back into rest (#678).
-    if (isPolicyShiftRest) emp.ticksWorked = 0;
+    // Mirrors completeRestTick: any completed rest (collapse, need restoration,
+    // soft-threshold, policy-forced) restarts the continuous-work clock. Without
+    // it the site policy still sees the worker over shift and forces a second
+    // full rest (#678, #1669). A rest still counting down never reaches here.
+    emp.ticksWorked = 0;
 
     completed.push({ employeeId: emp.id, needKey });
   }
