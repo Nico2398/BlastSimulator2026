@@ -336,7 +336,10 @@ describe('resolveContractOres (#1364)', () => {
     for (const biome of getAllBiomes()) {
       it(`sandbox biome ${biome.id}`, () => {
         const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 7 });
-        const offered = new Set(resolveContractOres(stateFor(level, SANDBOX_LEVEL_ID)));
+        const state = stateFor(level, SANDBOX_LEVEL_ID);
+        // sandbox start persists the per-seed bias on the world (regenerateGrid)
+        state.world!.climateBias = [level.climateBias[0], level.climateBias[1]];
+        const offered = new Set(resolveContractOres(state));
         const inGrid = oresInGrid(level);
         for (const ore of inGrid) expect(offered.has(ore)).toBe(true);
       });

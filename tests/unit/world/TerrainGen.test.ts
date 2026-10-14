@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
   requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION,
+  climateBiasLandingOn, resolveGeneratedBiome,
   isInBorderZone, TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
 } from '../../../src/core/world/TerrainGen.js';
-import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
+import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
+import { getBiome, getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { VoxelGrid, chunkIndexOf, CHUNK_SIZE, getDominantRockId, MAX_VOXEL_ABS_Y } from '../../../src/core/world/VoxelGrid.js';
 import { sampleSurfaceHeightY, sampleSurfaceVoxelY, applyPitMask, sampleBaseHeight, type WorldGenContext } from '../../../src/core/world/WorldGen.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
@@ -489,6 +491,58 @@ describe('TerrainGen — unclamped columns across every campaign level (#1189)',
       }
     });
   }
+});
+
+describe('climateBiasLandingOn (#1668)', () => {
+  const SIZE = 64;
+  const SEEDS = Array.from({ length: 300 }, (_, i) => i).concat([28, 29, 34, 39, 60, 72, 106]);
+
+  function rawAtCentre(seed: number): [number, number] {
+    const f = new WorldNoiseFields(seed);
+    return [f.temperature(SIZE / 2, SIZE / 2), f.humidity(SIZE / 2, SIZE / 2)];
+  }
+
+  it.each(getAllBiomes().map(b => b.id))('%s: the returned bias lands the site centre on that biome for every seed', (id) => {
+    const target = getBiome(id)!;
+    const misses = SEEDS.filter(seed =>
+      resolveGeneratedBiome(seed, SIZE, SIZE, climateBiasLandingOn(seed, SIZE, SIZE, target)).id !== id);
+    expect(misses).toEqual([]);
+  });
+
+  it('returns the biome climate centre unchanged when the seed already lands there', () => {
+    const target = getBiome('desert_badlands')!;
+    const seed = SEEDS.find(s => resolveGeneratedBiome(s, SIZE, SIZE, target.climateCenter).id === target.id)!;
+    expect([...climateBiasLandingOn(seed, SIZE, SIZE, target)]).toEqual([...target.climateCenter]);
+  });
+
+  it('offsets the centre by the seed raw climate when the seed does not land there', () => {
+    const target = getBiome('desert_badlands')!;
+    expect(resolveGeneratedBiome(29, SIZE, SIZE, target.climateCenter).id).not.toBe(target.id);
+    const [rawT, rawH] = rawAtCentre(29);
+    const bias = climateBiasLandingOn(29, SIZE, SIZE, target);
+    expect(bias[0]).toBeCloseTo(target.climateCenter[0] - rawT, 9);
+    expect(bias[1]).toBeCloseTo(target.climateCenter[1] - rawH, 9);
+  });
+
+  it('lands on the target even for the seeds with the most extreme raw climate', () => {
+    const ranked = Array.from({ length: 3000 }, (_, seed) => {
+      const [t, h] = rawAtCentre(seed);
+      return { seed, extremity: Math.max(Math.abs(t), Math.abs(h)) };
+    }).sort((a, b) => b.extremity - a.extremity).slice(0, 5);
+    for (const { seed } of ranked) {
+      for (const target of getAllBiomes()) {
+        const bias = climateBiasLandingOn(seed, SIZE, SIZE, target);
+        expect(resolveGeneratedBiome(seed, SIZE, SIZE, bias).id, `seed ${seed} -> ${target.id}`).toBe(target.id);
+      }
+    }
+  });
+
+  it('is deterministic and depends on the site size only through the centre sample', () => {
+    const target = getBiome('red_canyon')!;
+    expect([...climateBiasLandingOn(77, SIZE, SIZE, target)]).toEqual([...climateBiasLandingOn(77, SIZE, SIZE, target)]);
+    const bias = climateBiasLandingOn(77, 96, 40, target);
+    expect(resolveGeneratedBiome(77, 96, 40, bias).id).toBe('red_canyon');
+  });
 });
 
 

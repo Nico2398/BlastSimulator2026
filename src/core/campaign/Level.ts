@@ -274,7 +274,7 @@ export function resolveContractOres(state: GameState): readonly string[] {
   const level = state.campaign.activeLevelId ? getLevel(state.campaign.activeLevelId) : undefined;
   const [seed, climateBias] = level
     ? [level.terrainSeed, level.climateBias] as const
-    : [state.seed, declared.climateCenter] as const;
+    : [state.seed, world.climateBias ?? declared.climateCenter] as const;
   const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, climateBias);
   return oresYieldedByRocks(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
 }
