@@ -436,3 +436,19 @@ export function restTripFatigueCost(
   if (itinerary === null) return null;
   return itinerary.estTotalTicks * NEED_DRAIN_RATES.fatigue.traveling;
 }
+
+/** How an employee covers a rest trip. */
+export type RestTripMode = 'walk' | 'drive';
+
+/** A plannable rest trip: chosen mode and its estimated tick cost. */
+export interface RestTrip { mode: RestTripMode; estTicks: number }
+
+/**
+ * Faster way for `emp` to reach (x,z). Unmounted: always 'walk'. Mounted: 'drive'
+ * only when driveTicks < walkTicks (tie -> walk) or alighting is refused (loaded
+ * haul). null = no plannable trip.
+ */
+export function chooseRestTrip(_state: GameState, _emp: Employee, _x: number, _z: number): RestTrip | null {
+  // TODO: implement
+  return null;
+}
