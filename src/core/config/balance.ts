@@ -1402,6 +1402,20 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }],
 };
 
+// TODO(#1672): fill with the sandbox 'normal' kit; not yet wired into Level.ts.
+export const GRUMPSTONE_RIDGE_STARTING_SITE: StartingSiteComposition = {
+  employees: [],
+  vehicles: [],
+  buildings: [],
+};
+
+// TODO(#1672): fill with the sandbox 'normal' kit; not yet wired into Level.ts.
+export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = {
+  employees: [],
+  vehicles: [],
+  buildings: [],
+};
+
 /**
  * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet
  * (the tutorial hires its own). The heap is not a scripted step, so the first
