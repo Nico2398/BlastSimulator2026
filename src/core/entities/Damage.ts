@@ -219,8 +219,7 @@ function processEmployeeHit(
   damage: DamageState,
 ): AccidentRecord | null {
   if (ke >= DEATH_THRESHOLD) {
-    recordEmployeeDeath(state, damage, emp.id);
-    return { tick, type: 'death', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
+    return bookEmployeeDeath(state, damage, emp.id, tick, frag.id, ke);
   }
   if (ke >= INJURY_THRESHOLD) {
     // Already injured (by an earlier, weaker fragment this same blast) —
@@ -250,11 +249,10 @@ export function bookEmployeeDeath(
   employeeId: number,
   tick: number,
   fragmentId = -1,
-  kineticEnergy = 0,
+  ke = 0,
 ): AccidentRecord {
-  void [employees, damage, employeeId, tick, fragmentId, kineticEnergy];
-  // TODO: implement
-  throw new Error('not implemented');
+  recordEmployeeDeath(employees, damage, employeeId);
+  return { tick, type: 'death', entityId: employeeId, fragmentId, kineticEnergy: ke };
 }
 
 function kineticEnergy(massKg: number, velocityMs: number): number {
