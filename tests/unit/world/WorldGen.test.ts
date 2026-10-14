@@ -11,6 +11,7 @@ import {
   DEFAULT_SHAPING,
   type Rect,
 } from '../../../src/core/world/WorldGen.js';
+import { DEFAULT_PIT_MASK } from '../../../src/core/config/balance.js';
 
 describe('sampleBaseHeight', () => {
   it('is deterministic for the same fields, shaping, and coordinates', () => {
@@ -253,5 +254,99 @@ describe('createWorldGenContext / sampleSurfaceVoxelY', () => {
     // flooring the low outliers, so the masked-only range is a bit wider
     // than before but still well short of raw.
     expect(range).toBeLessThan(25);
+  });
+});
+
+describe('applyPitMask — mask shape parameter (#1680)', () => {
+  const rect: Rect = { minX: 0, minZ: 0, maxX: 200, maxZ: 200 };
+  const SANDBOX_LIKE = { margin: 14, reliefKeep: 0.05 };
+
+  /** The pre-#1680 hard-coded 24 / 0.3 behaviour, spelled out. */
+  const legacy = (height: number, centre: number, dIn: number): number => {
+    const t = Math.min(1, Math.max(0, dIn / 24));
+    const w = t * t * (3 - 2 * t);
+    return height + w * (centre + (height - centre) * 0.3 - height);
+  };
+
+  it('DEFAULT_PIT_MASK is the legacy 24 / 0.3 shape', () => {
+    expect(DEFAULT_PIT_MASK).toEqual({ margin: 24, reliefKeep: 0.3 });
+  });
+
+  it('with no mask argument is bit-identical to the legacy behaviour at the rim', () => {
+    expect(applyPitMask(100, 0, rect, 0, 100)).toBe(legacy(100, 0, 0));
+  });
+
+  it('with no mask argument is bit-identical to the legacy behaviour mid-ramp', () => {
+    expect(applyPitMask(100, 0, rect, 12, 100)).toBe(legacy(100, 0, 12));
+    expect(applyPitMask(-40, 10, rect, 5, 100)).toBe(legacy(-40, 10, 5));
+  });
+
+  it('with no mask argument is bit-identical to the legacy behaviour at the centre', () => {
+    expect(applyPitMask(100, 0, rect, 100, 100)).toBe(legacy(100, 0, 100));
+  });
+
+  it('passing DEFAULT_PIT_MASK explicitly equals passing nothing', () => {
+    for (const x of [0, 3, 12, 24, 60, 100]) {
+      expect(applyPitMask(80, 5, rect, x, 100, DEFAULT_PIT_MASK)).toBe(applyPitMask(80, 5, rect, x, 100));
+    }
+  });
+
+  it('a custom mask leaves height untouched outside the rect', () => {
+    expect(applyPitMask(100, 0, rect, -50, 50, SANDBOX_LIKE)).toBe(100);
+    expect(applyPitMask(100, 0, rect, 250, 50, SANDBOX_LIKE)).toBe(100);
+  });
+
+  it('a custom mask leaves height untouched exactly at the rim', () => {
+    expect(applyPitMask(100, 0, rect, 0, 100, SANDBOX_LIKE)).toBeCloseTo(100, 10);
+  });
+
+  it('a custom mask reaches its own reliefKeep deep inside the rect', () => {
+    expect(applyPitMask(100, 0, rect, 100, 100, SANDBOX_LIKE)).toBeCloseTo(5, 5);
+  });
+
+  it('a custom mask finishes its ramp at its own margin, not the default one', () => {
+    // 14 m in: the sandbox mask is already fully compressed, the default is not.
+    expect(applyPitMask(100, 0, rect, 14, 100, SANDBOX_LIKE)).toBeCloseTo(5, 5);
+    expect(applyPitMask(100, 0, rect, 14, 100)).toBeGreaterThan(40);
+  });
+
+  it('the sandbox-like mask compresses more than the default at the same inward distance', () => {
+    for (const x of [3, 7, 12, 20, 40, 100]) {
+      const strong = applyPitMask(100, 0, rect, x, 100, SANDBOX_LIKE);
+      const weak = applyPitMask(100, 0, rect, x, 100);
+      expect(strong, `x=${x}`).toBeLessThan(weak);
+    }
+  });
+
+  it('compresses a depression toward the centre height too', () => {
+    const strong = applyPitMask(-100, 0, rect, 100, 100, SANDBOX_LIKE);
+    expect(strong).toBeCloseTo(-5, 5);
+  });
+});
+
+describe('createWorldGenContext — pit mask (#1680)', () => {
+  it('exposes DEFAULT_PIT_MASK when no mask is passed', () => {
+    const ctx = createWorldGenContext(42, 64, 20, 64);
+    expect(ctx.pitMask).toEqual(DEFAULT_PIT_MASK);
+  });
+
+  it('exposes the mask it was given', () => {
+    const mask = { margin: 14, reliefKeep: 0.05 };
+    const ctx = createWorldGenContext(42, 64, 20, 64, undefined, mask);
+    expect(ctx.pitMask).toEqual(mask);
+  });
+
+  it('sampleSurfaceVoxelY uses the context mask: a stronger mask flattens the interior', () => {
+    const def = createWorldGenContext(42, 64, 20, 64);
+    const strong = createWorldGenContext(42, 64, 20, 64, undefined, { margin: 14, reliefKeep: 0.05 });
+    const spread = (c: typeof def): number => {
+      let lo = Infinity, hi = -Infinity;
+      for (let x = 20; x < 44; x++) for (let z = 20; z < 44; z++) {
+        const y = sampleSurfaceVoxelY(c, x, z);
+        lo = Math.min(lo, y); hi = Math.max(hi, y);
+      }
+      return hi - lo;
+    };
+    expect(spread(strong)).toBeLessThan(spread(def));
   });
 });

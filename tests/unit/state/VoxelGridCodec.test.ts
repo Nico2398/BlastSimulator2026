@@ -16,6 +16,7 @@ import {
   type SerializedTerrainGen, type SerializedVoxels,
 } from '../../../src/core/state/VoxelGridCodec.js';
 import type { EditSegment } from '../../../src/core/world/TerrainEdits.js';
+import { SANDBOX_PIT_MASK, DEFAULT_PIT_MASK } from '../../../src/core/config/balance.js';
 
 /** A small, fast-to-generate generator identity, overridable per test. */
 function makeGen(overrides: Partial<SerializedTerrainGen> = {}): SerializedTerrainGen {
@@ -39,6 +40,7 @@ function genToConfig(gen: SerializedTerrainGen): TerrainConfig {
     datum: gen.datum,
     sizeZ: gen.sizeZ,
     ...(gen.mixedRockHardness !== undefined ? { mixedRockHardness: gen.mixedRockHardness } : {}),
+    ...(gen.pitMask !== undefined ? { pitMask: gen.pitMask } : {}),
   };
 }
 
@@ -194,6 +196,80 @@ describe('encodeVoxelGrid / decodeVoxelGrid — mixedRockHardness', () => {
 
     // And matches an independently-built mixed-hardness grid at the same config exactly.
     assertGridsMatchVoxelForVoxel(decoded, mixedGrid, mixedGen);
+  });
+});
+
+/** Every column's surface Y, row-major — a cheap fingerprint of a grid's shape. */
+function surfaceFingerprint(grid: VoxelGrid, sizeX: number, sizeZ: number): Array<number | null> {
+  const out: Array<number | null> = [];
+  for (let x = 0; x < sizeX; x++) for (let z = 0; z < sizeZ; z++) out.push(computeVoxelColumnSurfaceY(grid, x, z));
+  return out;
+}
+
+describe('encodeVoxelGrid / decodeVoxelGrid — pitMask (#1680)', () => {
+  const sandboxGen = (): SerializedTerrainGen => makeGen({ seed: 42, climateBias: [0.6, 0.7], sizeX: 64, datum: 24, sizeZ: 64, pitMask: SANDBOX_PIT_MASK });
+
+  it('a sandbox-mask config round-trips to identical surface Y over all columns', () => {
+    const gen = sandboxGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid, gen));
+    expect(surfaceFingerprint(decoded, 64, 64)).toEqual(surfaceFingerprint(grid, 64, 64));
+  });
+
+  it('the mask genuinely reaches generation: sandbox surface differs from the default-mask surface', () => {
+    const gen = sandboxGen();
+    const masked = generateTerrain(genToConfig(gen));
+    const plain = generateTerrain(genToConfig({ ...gen, pitMask: undefined }));
+    expect(surfaceFingerprint(masked, 64, 64)).not.toEqual(surfaceFingerprint(plain, 64, 64));
+  });
+
+  it('keeps payload.gen.pitMask equal to SANDBOX_PIT_MASK', () => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    expect(payload.gen.pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  it('a payload without pitMask decodes to the default-mask terrain', () => {
+    const gen = makeGen({ seed: 42, sizeX: 64, datum: 24, sizeZ: 64 });
+    const explicit = generateTerrain(genToConfig({ ...gen, pitMask: DEFAULT_PIT_MASK }));
+    const payload = encodeVoxelGrid(explicit, gen);
+    expect(payload.gen.pitMask).toBeUndefined();
+    expect(surfaceFingerprint(decodeVoxelGrid(payload), 64, 64)).toEqual(surfaceFingerprint(explicit, 64, 64));
+  });
+
+  it.each([
+    ['zero margin', { margin: 0, reliefKeep: 0.05 }],
+    ['negative margin', { margin: -5, reliefKeep: 0.05 }],
+    ['NaN margin', { margin: NaN, reliefKeep: 0.05 }],
+    ['NaN reliefKeep', { margin: 14, reliefKeep: NaN }],
+    ['reliefKeep below 0', { margin: 14, reliefKeep: -0.5 }],
+    ['reliefKeep above 1', { margin: 14, reliefKeep: 3 }],
+  ])('an invalid mask (%s) is rejected or clamped, never producing a broken grid', (_label, mask) => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const tampered: SerializedVoxels = { ...payload, gen: { ...payload.gen, pitMask: mask } };
+    let grid: VoxelGrid | undefined;
+    try {
+      grid = decodeVoxelGrid(tampered);
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      return;
+    }
+    for (const y of surfaceFingerprint(grid, 64, 64)) {
+      expect(Number.isFinite(y)).toBe(true);
+    }
+  });
+
+  it('a non-object mask is rejected or ignored', () => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const tampered = { ...payload, gen: { ...payload.gen, pitMask: 'strong' as unknown as typeof SANDBOX_PIT_MASK } };
+    try {
+      const grid = decodeVoxelGrid(tampered);
+      for (const y of surfaceFingerprint(grid, 64, 64)) expect(Number.isFinite(y)).toBe(true);
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+    }
   });
 });
 

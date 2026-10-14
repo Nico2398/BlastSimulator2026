@@ -21,6 +21,12 @@ import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
+import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import { SANDBOX_PIT_MASK, SANDBOX_FLAT_PAD_SIZE } from '../../src/core/config/balance.js';
+import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
+import { batchCharge } from '../../src/core/mining/ChargePlan.js';
+import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
+import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 /**
@@ -597,4 +603,95 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const densities = Object.values(survey.estimates).flatMap(col => Object.values(col));
     expect(densities.some(d => d > 0), 'the report contains ore').toBe(true);
   }, 60_000);
+});
+
+// #1680: sandbox sites are generated with a stronger pit mask; it must survive save/load.
+describe('sandbox pit mask persistence and flat ground (#1680)', () => {
+  function start(args: string) {
+    const made = createRunner();
+    expect(made.runner.run(args).success).toBe(true);
+    return made;
+  }
+
+  function surfaces(grid: VoxelGrid): Array<number | null> {
+    const out: Array<number | null> = [];
+    for (let x = 0; x < grid.sizeX; x++) for (let z = 0; z < grid.sizeZ; z++) out.push(computeVoxelColumnSurfaceY(grid, x, z));
+    return out;
+  }
+
+  it('records the sandbox mask on the world', () => {
+    const { ctx } = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    expect(ctx.state!.world!.pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  it('new_game leaves world.pitMask unset (default mask)', () => {
+    const { ctx } = start('new_game mine_type:alpine_granite seed:42');
+    expect(ctx.state!.world!.pitMask).toBeUndefined();
+  });
+
+  it('embeds the mask in a save and keeps world.pitMask through serialize/deserialize', () => {
+    const { ctx } = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const state = deserialize(serialize(stateForSave(ctx, ctx.state!)));
+    expect(state.world!.pitMask).toEqual(SANDBOX_PIT_MASK);
+    expect(state.world!.voxels!.gen.pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  it('save then load regenerates the same terrain', () => {
+    const live = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const loaded = createRunner().ctx;
+    const state = deserialize(serialize(stateForSave(live.ctx, live.ctx.state!)));
+    expect(loadGridForState(loaded, state)).toBeNull();
+    expect(loaded.state!.world!.pitMask).toEqual(SANDBOX_PIT_MASK);
+    expect(surfaces(loaded.grid!)).toEqual(surfaces(live.ctx.grid!));
+    expect(solidCount(loaded.grid!)).toBe(solidCount(live.ctx.grid!));
+  });
+
+  it('a save with no embedded voxels regenerates the same terrain through world.pitMask', () => {
+    const live = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const loaded = createRunner().ctx;
+    const state = deserialize(serialize(live.ctx.state!));
+    expect(state.world!.voxels).toBeUndefined();
+    expect(state.world!.pitMask).toEqual(SANDBOX_PIT_MASK);
+    expect(loadGridForState(loaded, state)).toBeNull();
+    expect(surfaces(loaded.grid!)).toEqual(surfaces(live.ctx.grid!));
+    expect(stateForSave(loaded, loaded.state!).world!.voxels!.gen.pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  it('a save without world.pitMask loads with the default mask (older saves)', () => {
+    const live = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const state = deserialize(serialize(live.ctx.state!));
+    delete state.world!.pitMask;
+    const loaded = createRunner().ctx;
+    expect(loadGridForState(loaded, state)).toBeNull();
+    expect(surfaces(loaded.grid!)).not.toEqual(surfaces(live.ctx.grid!));
+    expect(loaded.state!.world!.pitMask).toBeUndefined();
+  });
+
+  it('a 3x3 shatternite shot on the flattest pad of alpine seed 42 is not a catastrophic flyrock event', () => {
+    const { ctx } = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const grid = ctx.grid!;
+    const size = SANDBOX_FLAT_PAD_SIZE;
+
+    let best = { x0: 0, z0: 0, spread: Infinity };
+    for (let x0 = 0; x0 + size <= grid.sizeX; x0 += 3) {
+      for (let z0 = 0; z0 + size <= grid.sizeZ; z0 += 3) {
+        let lo = Infinity, hi = -Infinity;
+        for (let x = x0; x < x0 + size; x++) for (let z = z0; z < z0 + size; z++) {
+          const y = computeVoxelColumnSurfaceY(grid, x, z)!;
+          lo = Math.min(lo, y); hi = Math.max(hi, y);
+        }
+        if (hi - lo < best.spread) best = { x0, z0, spread: hi - lo };
+      }
+    }
+    expect(best.spread, 'no flat pad found on the sandbox site').toBeLessThanOrEqual(2);
+
+    const counter = { nextHoleId: 1 };
+    const holes = createGridPlan(counter, { x: best.x0 + 1, z: best.z0 + 1 }, 3, 3, 3, 6, 0.15);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'shatternite', 5, 2);
+    const result = executeBlast(assembleBlastPlan(holes, charges), grid, []);
+    expect(result, 'blast plan was rejected').not.toBeNull();
+    expect(result!.rating).not.toBe('catastrophic');
+  });
 });
