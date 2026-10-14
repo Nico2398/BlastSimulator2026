@@ -239,6 +239,29 @@ describe('judgeQueuedOrders (#1306)', () => {
     for (const id of ids) expect(verdicts.get(id)).toBe('reachable');
   });
 
+  it('a ramp lead layer whose centre is unreachable but whose neighbouring column is reads reachable (#1719)', () => {
+    const state = makeState();
+    hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']);
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z);
+    // Band centre (x=WALL_X) is the blocked wall; x=9 beside it is on the digger's side.
+    const cells = [8, 9, 10, 11, 12].map(x => ({ x, y: 0, z: 6 }));
+    const id = queue(state, 'dig_ramp_segment', { x: WALL_X, z: 6 }, {
+      requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+      payload: { rampId: 1, segmentIndex: 0, cells, region: null },
+    });
+    state.plannedRamps.push({
+      id: 1,
+      def: { originX: 8, originZ: 6, direction: 'east', length: 5, targetDepth: 6 },
+      footprint: { minX: 8, maxX: 12, minZ: 6, maxZ: 6 },
+      segments: [{ index: 0, actionId: id, cells, region: null, done: false }],
+    });
+    classifyQueuedOrders(state);
+    const action = state.pendingActions.find(a => a.id === id)!;
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
+    expect(action.blockedReason).not.toBe('target_unreachable');
+    expect(action.targetX).toBeLessThan(WALL_X);
+  });
+
   it('ignores a vehicle tier no candidate is licensed to drive (#1524)', () => {
     const state = makeState();
     const driver = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']); // level 1 licence
