@@ -18,7 +18,7 @@ import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult } from '../nav/Pathfinding.js';
-import type { NavGrid } from '../nav/NavGrid.js';
+import { isStepClimbable, type NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
 import {
@@ -27,6 +27,7 @@ import {
   MOVE_STUCK_ABANDON_TICKS,
   AGENT_OCCUPANCY_WAIT_TICKS,
   AGENT_FREE_CELL_SEARCH_MAX_RADIUS,
+  AGENT_FREE_CELL_MAX_RETURN_COST,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { employeeWorkState } from './EmployeeDispatch.js';
@@ -1014,6 +1015,17 @@ function handleAgentOccupancyBlock(
       if (crossing.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
       }
+      // Another idle employee behind the vehicle (the corridor's next cell) defeats the avoid-all search above;
+      // the mover then crosses the vehicle on a direct route and the corridor relocation clears that employee next hop.
+      if (state.navGrid) {
+        const direct = findPath(state.navGrid, {
+          agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+          avoidVehicles: false, ...(requiredClearance !== undefined && { requiredClearance }),
+        });
+        if (direct.found) {
+          return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result, blocker!);
+        }
+      }
     } else if (blockerIsStationaryBusyEmployee && state.navGrid) {
       // #1283 dense-grid follow-up: a busy EMPLOYEE blocker (unlike a
       // genuinely parked vehicle) sits inside a population that is itself
@@ -1236,11 +1248,19 @@ function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number
   updateVehicleCellOccupancy(state, blocker, true, true, prevX, prevZ);
 }
 
+/** True when a foot route from (fromX, fromZ) to (toX, toZ) exists and costs at most `AGENT_FREE_CELL_MAX_RETURN_COST`. */
+function hasShortReturnRoute(grid: NavGrid, fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+  const route = findPath(grid, { agentId: -1, fromX, fromZ, toX, toZ, avoidVehicles: false });
+  return route.found && route.totalCost <= AGENT_FREE_CELL_MAX_RETURN_COST;
+}
+
 /**
  * Nearest walkable cell (ring search: immediate neighbours first, then two
  * cells out) around (originX, originZ) that `isBlocked` reports free — shared
  * core `findNearestFreeCellForAgent` (below) builds its AgentOccupancy
- * freedom check on top of. Returns null when nothing within
+ * freedom check on top of. Only cells the origin can get back from qualify: a
+ * slope-limited step away, or a short walkable route (`AGENT_FREE_CELL_MAX_RETURN_COST`)
+ * from it. Returns null when nothing within
  * `AGENT_FREE_CELL_SEARCH_MAX_RADIUS` cells qualifies, or there is no NavGrid
  * yet.
  */
@@ -1254,6 +1274,7 @@ function findNearestFreeCell(
 
   const bx = Math.floor(originX);
   const bz = Math.floor(originZ);
+  const originY = grid.cellAt(bx, bz)?.surfaceY;
   let best: { x: number; z: number } | null = null;
   let bestDistSq = Infinity;
 
@@ -1269,6 +1290,10 @@ function findNearestFreeCell(
         if (isBlocked(x, z)) continue;
 
         const distSq = (x - bx) ** 2 + (z - bz) ** 2;
+        // A cell across a cliff is no sidestep: the mover could never climb back (strands a crew member on a steep site).
+        // A cliff step is fine when a short walkable route still joins the cells; a long loop round a bench is the same strand.
+        if (!isStepClimbable(originY, cell.surfaceY, Math.sqrt(distSq))
+          && !hasShortReturnRoute(grid, bx, bz, x, z)) continue;
         if (distSq < bestDistSq) {
           bestDistSq = distSq;
           best = { x, z };

@@ -16,13 +16,13 @@ describe('Level 2 — Win', () => {
   let ctx: ReturnType<typeof makeCampaignCtxWithUnlock>;
 
   beforeEach(() => {
-    ctx = makeCampaignCtxWithUnlock('grumpstone_ridge');
+    ctx = makeCampaignCtxWithUnlock('grumpstone_ridge', { levelDefaultStart: true });
   });
 
   it('starts level 2 with correct initial state', () => {
     expect(ctx.state).not.toBeNull();
-    // Level 2 starting cash is $75,000
-    expect(ctx.state!.cash).toBe(75000);
+    // Level 2 starting cash is $210,000 (#1672: sized to carry the free crew to its first sale)
+    expect(ctx.state!.cash).toBe(210000);
     expect(ctx.state!.campaign.activeLevelId).toBe('grumpstone_ridge');
     expect(ctx.grid).not.toBeNull();
     // Verify grid dimensions: grumpstone_ridge = 128x56x128 (#458 T6.1/D13)
@@ -37,16 +37,17 @@ describe('Level 2 — Win', () => {
     // Hire a driller
     const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
     expect(hireResult.success).toBe(true);
-    expect(ctx.state!.employees.employees.length).toBe(1);
+    expect(ctx.state!.employees.employees.length).toBe(5); // free kit of 4 (#1672) + the hire
 
     // Assign blasting skill
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
+    employeeCommand(ctx, ['assign_skill', '5'], { skill: 'blasting', level: '5' });
 
     // Charging needs a charging truck (#1649); performBlast buys it, so fund it
     fundChargingTruck(ctx);
 
     // Perform a blast at (15,15) — offset from origin to avoid center
-    const blastOutput = performBlast(ctx, 15, 15);
+    // The free crew walks round a cliff to reach its rig (~460 ticks on this seed), so allow it the time.
+    const blastOutput = performBlast(ctx, 15, 15, 1200);
     expect(blastOutput).toContain('BLAST REPORT');
     tickWithEvents(ctx, 5);
 

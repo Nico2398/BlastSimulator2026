@@ -21,6 +21,7 @@ function startLevel(levelId: string, args = '') {
   const { runner, ctx } = createRunner();
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
   recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
+  recordProfit(ctx.campaignProfile.campaign, 'grumpstone_ridge', 250000);
   const result = runner.run(`campaign start level:${levelId}${args ? ` ${args}` : ''}`);
   expect(result.success, result.output).toBe(true);
   return { runner, ctx, state: ctx.state!, result };
@@ -169,10 +170,18 @@ describe('campaign start level:tutorial_pit opens with a heap only (#1574)', () 
   });
 });
 
-describe('other levels stay bare (#1574)', () => {
-  it('grumpstone_ridge has no buildings', () => {
-    const { state } = startLevel('grumpstone_ridge');
-    expect(state.buildings.buildings).toHaveLength(0);
+describe('levels 2 and 3 open with a warehouse and a spoil heap (#1672); staffed:true stays bare of buildings (#1574)', () => {
+  it.each(['grumpstone_ridge', 'treranium_depths'])('%s opens with one warehouse and one heap', (levelId) => {
+    const { state } = startLevel(levelId);
+    expect(state.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
+    expect(ofType(state, 'spoil_heap')).toHaveLength(1);
+  });
+
+  it.each(['grumpstone_ridge', 'treranium_depths'])('%s restart leaves one heap, not two', (levelId) => {
+    const { runner, ctx } = startLevel(levelId);
+    expect(runner.run(`campaign start level:${levelId}`).success).toBe(true);
+    expect(ofType(ctx.state!, 'spoil_heap')).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings).toHaveLength(2);
   });
 
   it('new_game staffed:true has no buildings', () => {

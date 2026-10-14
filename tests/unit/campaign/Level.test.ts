@@ -361,9 +361,17 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
     ]);
   });
 
-  it('only dusty hollow and the tutorial declare a starting site; the tutorial opens with just a spoil heap (#1574)', () => {
+  it('every level declares a starting site; levels 2 and 3 open with the digger kit (#1672); the tutorial opens with just a spoil heap (#1574)', () => {
     for (const level of getAllLevels()) {
       if (level.id === 'dusty_hollow') continue;
+      if (level.id === 'grumpstone_ridge' || level.id === 'treranium_depths') {
+        expect(level.startingSite!.vehicles.map((v) => v.role).sort(), level.id)
+          .toEqual(['charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger']);
+        expect(level.startingSite!.employees, level.id).toHaveLength(4);
+        expect(level.startingSite!.buildings, level.id)
+          .toEqual([{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }]);
+        continue;
+      }
       if (level.id === 'tutorial_pit') {
         expect(level.startingSite!.employees).toEqual([]);
         expect(level.startingSite!.vehicles).toEqual([]);

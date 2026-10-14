@@ -16,6 +16,7 @@ function startLevel(levelId: string) {
   const { runner, ctx } = createRunner();
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
   recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
+  recordProfit(ctx.campaignProfile.campaign, 'grumpstone_ridge', 250000);
   const result = runner.run(`campaign start level:${levelId}`);
   expect(result.success, result.output).toBe(true);
   return { grid: ctx.grid!, state: ctx.state! };
