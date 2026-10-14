@@ -23,6 +23,7 @@ import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { RainField } from './ambient/RainField.js';
 import type { TerrainMesh } from './TerrainMesh.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from './EntitySync.js';
+import { columnOreValuePerM3 } from '../core/mining/SurveyOreSummary.js';
 import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 
@@ -263,6 +264,7 @@ export function buildSurveyOverlayOptions(
         surfaceY,
         confidence: survey.confidence,
         fresh,
+        valuePerM3: columnOreValuePerM3(survey.estimates[colKey]!),
       });
     }
   }

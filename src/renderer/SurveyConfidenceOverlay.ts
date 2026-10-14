@@ -1,9 +1,12 @@
 // BlastSimulator2026 — Survey Confidence Overlay
 // Colour-coded semi-transparent quads on terrain surfaces showing survey confidence.
-// Fresh points = green (high confidence) → yellow → red (low confidence).
+// Fresh points are coloured by the estimated ore value of their column on a fixed
+// log scale (red = lean → yellow → green = rich); a point without a value falls
+// back to its confidence colour. Survey confidence modulates quad opacity.
 // Stale (expired) points = grey.
 
 import * as THREE from 'three';
+import { SURVEY_OVERLAY_VALUE_FLOOR, SURVEY_OVERLAY_VALUE_CEIL, SURVEY_OVERLAY_QUAD_OPACITY_BASE } from '../core/config/balance.js';
 import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Constants ----------
@@ -38,6 +41,8 @@ export interface SurveyConfidencePoint {
   confidence: number;
   /** Whether this survey point is still fresh (not stale). */
   fresh: boolean;
+  /** Estimated ore value ($ per m³) of this column, for the value overlay mode. */
+  valuePerM3?: number;
 }
 
 /** Parameters to configure the survey confidence overlay appearance. */
@@ -58,16 +63,24 @@ export interface SurveyConfidenceOverlayOptions {
  * - confidence = 0.0 → red     (1.0, 0.0, 0.0)
  */
 export function confidenceToColor(confidence: number): THREE.Color {
-  const t = Math.max(0, Math.min(1, confidence));
-  if (t < 0.5) {
-    // Red → Yellow: (1, 0, 0) → (1, 1, 0)
-    const u = t / 0.5; // 0..1
-    return new THREE.Color(1, u, 0);
-  } else {
-    // Yellow → Green: (1, 1, 0) → (0, 1, 0)
-    const u = (t - 0.5) / 0.5; // 0..1
-    return new THREE.Color(1 - u, 1, 0);
-  }
+  return rampColor(confidence);
+}
+
+/** Red (0) → yellow (0.5) → green (1) ramp; t is clamped to [0, 1]. */
+function rampColor(t: number): THREE.Color {
+  const c = Math.max(0, Math.min(1, t));
+  return c < 0.5 ? new THREE.Color(1, c / 0.5, 0) : new THREE.Color(1 - (c - 0.5) / 0.5, 1, 0);
+}
+
+/**
+ * Map an estimated ore value ($ per m³) to the same red → yellow → green ramp
+ * on a log scale between SURVEY_OVERLAY_VALUE_FLOOR and _CEIL. Clamped; NaN and
+ * negatives read as the floor.
+ */
+export function valueToColor(valuePerM3: number): THREE.Color {
+  if (!(valuePerM3 > SURVEY_OVERLAY_VALUE_FLOOR)) return rampColor(0);
+  const span = Math.log(SURVEY_OVERLAY_VALUE_CEIL / SURVEY_OVERLAY_VALUE_FLOOR);
+  return rampColor(Math.log(valuePerM3 / SURVEY_OVERLAY_VALUE_FLOOR) / span);
 }
 
 // ---------- Overlay Class ----------
@@ -110,15 +123,15 @@ export class SurveyConfidenceOverlay {
 
     this.fallbackSampler.clearFlat();
     const patches: GroundTintPatch[] = points.map((pt): GroundTintPatch => {
-      // Determine color: grey for stale, confidence-colour for fresh
+      // Determine color: grey for stale, value colour (or confidence fallback) for fresh
       let color: THREE.Color;
       let quadOpacity: number;
       if (!pt.fresh) {
         color = new THREE.Color(0.5, 0.5, 0.5); // stale — grey
         quadOpacity = STALE_OPACITY;
       } else {
-        color = confidenceToColor(pt.confidence);
-        quadOpacity = 1.0;
+        color = pt.valuePerM3 !== undefined ? valueToColor(pt.valuePerM3) : confidenceToColor(pt.confidence);
+        quadOpacity = SURVEY_OVERLAY_QUAD_OPACITY_BASE + (1 - SURVEY_OVERLAY_QUAD_OPACITY_BASE) * Math.max(0, Math.min(1, pt.confidence));
       }
 
       if (this.fallbackSampler.usesFlatFallback) {

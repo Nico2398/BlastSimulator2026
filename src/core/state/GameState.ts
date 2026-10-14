@@ -68,7 +68,7 @@ import { createHiringPool, type HiringPoolState } from '../entities/HiringPool.j
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
-import type { RampWidth } from '../config/balance.js';
+import type { RampWidth, PitMaskShape } from '../config/balance.js';
 
 /** Save format version — increment when GameState shape changes. */
 // v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
@@ -565,6 +565,10 @@ export interface WorldState {
   voxels?: SerializedVoxels;
   /** Interleaved hard/soft rock strata (#458 D4/T1.3/A11), persisted so a no-voxels regeneration fallback matches the level's original generation (#1181). */
   mixedRockHardness?: boolean;
+  /** Ore deposits mode the terrain was generated with; absent = legacy veins (#1682). */
+  oreDeposits?: boolean;
+  /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
 }
 
 export interface SavedBlastPlan {

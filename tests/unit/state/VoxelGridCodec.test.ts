@@ -16,6 +16,7 @@ import {
   type SerializedTerrainGen, type SerializedVoxels,
 } from '../../../src/core/state/VoxelGridCodec.js';
 import type { EditSegment } from '../../../src/core/world/TerrainEdits.js';
+import { SANDBOX_PIT_MASK, DEFAULT_PIT_MASK } from '../../../src/core/config/balance.js';
 
 /** A small, fast-to-generate generator identity, overridable per test. */
 function makeGen(overrides: Partial<SerializedTerrainGen> = {}): SerializedTerrainGen {
@@ -39,6 +40,8 @@ function genToConfig(gen: SerializedTerrainGen): TerrainConfig {
     datum: gen.datum,
     sizeZ: gen.sizeZ,
     ...(gen.mixedRockHardness !== undefined ? { mixedRockHardness: gen.mixedRockHardness } : {}),
+    ...(gen.oreDeposits !== undefined ? { oreDeposits: gen.oreDeposits } : {}),
+    ...(gen.pitMask !== undefined ? { pitMask: gen.pitMask } : {}),
   };
 }
 
@@ -194,6 +197,67 @@ describe('encodeVoxelGrid / decodeVoxelGrid — mixedRockHardness', () => {
 
     // And matches an independently-built mixed-hardness grid at the same config exactly.
     assertGridsMatchVoxelForVoxel(decoded, mixedGrid, mixedGen);
+  });
+});
+
+/** Every column's surface Y, row-major — a cheap fingerprint of a grid's shape. */
+function surfaceFingerprint(grid: VoxelGrid, sizeX: number, sizeZ: number): Array<number | null> {
+  const out: Array<number | null> = [];
+  for (let x = 0; x < sizeX; x++) for (let z = 0; z < sizeZ; z++) out.push(computeVoxelColumnSurfaceY(grid, x, z));
+  return out;
+}
+
+describe('encodeVoxelGrid / decodeVoxelGrid — pitMask (#1680)', () => {
+  const sandboxGen = (): SerializedTerrainGen => makeGen({ seed: 42, climateBias: [0.6, 0.7], sizeX: 64, datum: 24, sizeZ: 64, pitMask: SANDBOX_PIT_MASK });
+
+  it('a sandbox-mask config round-trips to identical surface Y over all columns', () => {
+    const gen = sandboxGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const decoded = decodeVoxelGrid(encodeVoxelGrid(grid, gen));
+    expect(surfaceFingerprint(decoded, 64, 64)).toEqual(surfaceFingerprint(grid, 64, 64));
+  });
+
+  it('the mask genuinely reaches generation: sandbox surface differs from the default-mask surface', () => {
+    const gen = sandboxGen();
+    const masked = generateTerrain(genToConfig(gen));
+    const { pitMask: _mask, ...unmasked } = gen;
+    const plain = generateTerrain(genToConfig(unmasked));
+    expect(surfaceFingerprint(masked, 64, 64)).not.toEqual(surfaceFingerprint(plain, 64, 64));
+  });
+
+  it('keeps payload.gen.pitMask equal to SANDBOX_PIT_MASK', () => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    expect(payload.gen.pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  it('a payload without pitMask decodes to the default-mask terrain', () => {
+    const gen = makeGen({ seed: 42, sizeX: 64, datum: 24, sizeZ: 64 });
+    const explicit = generateTerrain(genToConfig({ ...gen, pitMask: DEFAULT_PIT_MASK }));
+    const payload = encodeVoxelGrid(explicit, gen);
+    expect(payload.gen.pitMask).toBeUndefined();
+    expect(surfaceFingerprint(decodeVoxelGrid(payload), 64, 64)).toEqual(surfaceFingerprint(explicit, 64, 64));
+  });
+
+  it.each([
+    ['zero margin', { margin: 0, reliefKeep: 0.05 }],
+    ['negative margin', { margin: -5, reliefKeep: 0.05 }],
+    ['NaN margin', { margin: NaN, reliefKeep: 0.05 }],
+    ['NaN reliefKeep', { margin: 14, reliefKeep: NaN }],
+    ['reliefKeep below 0', { margin: 14, reliefKeep: -0.5 }],
+    ['reliefKeep above 1', { margin: 14, reliefKeep: 3 }],
+  ])('an invalid mask (%s) is rejected', (_label, mask) => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const tampered: SerializedVoxels = { ...payload, gen: { ...payload.gen, pitMask: mask } };
+    expect(() => decodeVoxelGrid(tampered)).toThrow(/pit mask/);
+  });
+
+  it('a non-object mask is rejected', () => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const tampered = { ...payload, gen: { ...payload.gen, pitMask: 'strong' as unknown as typeof SANDBOX_PIT_MASK } };
+    expect(() => decodeVoxelGrid(tampered)).toThrow(/pit mask/);
   });
 });
 
@@ -510,5 +574,57 @@ describe('decodeVoxelGrid — edit rows at any height round-trip; corrupt rows a
       editFractures: [{ x: 5, y: -MAX_VOXEL_ABS_Y - 1, z: 5, modifier: 0.5 }],
     };
     expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: edit fracture y/);
+  });
+});
+
+describe('encodeVoxelGrid / decodeVoxelGrid — oreDeposits (#1682)', () => {
+  const params = { seed: 42, climateBias: [0.6, 0.7] as [number, number], sizeX: 64, datum: 24, sizeZ: 64 };
+
+  /** Number of (x, y, z) samples whose ore record differs between two grids. */
+  function oreDifferences(a: VoxelGrid, b: VoxelGrid): number {
+    let n = 0;
+    for (let x = 0; x < params.sizeX; x += 2) {
+      for (let z = 0; z < params.sizeZ; z += 2) {
+        for (let y = 0; y < TEST_HEIGHT_RANGE; y++) {
+          if (JSON.stringify(a.oresAt(x, y, z)) !== JSON.stringify(b.oresAt(x, y, z))) n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  it('round-trips oreDeposits through gen and regenerates the deposit ore, not the legacy veins', () => {
+    const gen = makeGen({ ...params, oreDeposits: true });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.gen.oreDeposits).toBe(true);
+
+    const decoded = decodeVoxelGrid(JSON.parse(JSON.stringify(payload)) as SerializedVoxels);
+    assertGridsMatchVoxelForVoxel(decoded, grid, gen);
+
+    // Deposits genuinely reached generation: the ore differs from the legacy-vein grid somewhere.
+    const legacy = generateTerrain(params);
+    expect(oreDifferences(decoded, legacy), 'deposit ore should differ from legacy veins').toBeGreaterThan(0);
+    expect(oreDifferences(decoded, grid)).toBe(0);
+  });
+
+  it('an absent oreDeposits serialises with no oreDeposits key and decodes to legacy veins', () => {
+    const gen = makeGen(params);
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(JSON.stringify(payload.gen)).not.toContain('oreDeposits');
+    expect('oreDeposits' in payload.gen).toBe(false);
+    expect(oreDifferences(decodeVoxelGrid(payload), generateTerrain(params))).toBe(0);
+  });
+
+  it('oreDeposits: false decodes to the same ore as absent', () => {
+    const gen = makeGen({ ...params, oreDeposits: false });
+    const decoded = decodeVoxelGrid(encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen));
+    expect(oreDifferences(decoded, generateTerrain(params))).toBe(0);
+  });
+
+  it('the generator version is unchanged by deposits', () => {
+    expect(TERRAIN_GENERATOR_VERSION).toBe(1);
+    expect(encodeVoxelGrid(generateTerrain(params), makeGen({ ...params, oreDeposits: true })).gen.version).toBe(1);
   });
 });

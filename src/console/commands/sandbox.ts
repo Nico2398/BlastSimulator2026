@@ -92,7 +92,10 @@ export function sandboxCommand(
     datum: level.datum,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
+    ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
+    ...(level.pitMask ? { pitMask: level.pitMask } : {}),
     startingCrew: true,
+    fleetMustStayMobile: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 

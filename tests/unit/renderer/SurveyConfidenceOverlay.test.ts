@@ -12,8 +12,10 @@ import * as THREE from 'three';
 import {
   SurveyConfidenceOverlay,
   confidenceToColor,
+  valueToColor,
   type SurveyConfidencePoint,
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
+import { SURVEY_OVERLAY_VALUE_FLOOR, SURVEY_OVERLAY_VALUE_CEIL } from '../../../src/core/config/balance.js';
 import type { SurfaceHeightSampler } from '../../../src/renderer/GroundTint.js';
 
 let scene: THREE.Scene;
@@ -184,5 +186,132 @@ describe('SurveyConfidenceOverlay — dispose/clear', () => {
     const overlay = new SurveyConfidenceOverlay(scene);
     expect(() => overlay.show({ points: [], opacity: 1 })).not.toThrow();
     expect(allPositionYs()).toHaveLength(0);
+  });
+});
+
+// ── Value colouring (#1684) ──────────────────────────────────────────────────
+
+/** Per-vertex RGBA of every vertex the overlay drew into `sc`. */
+function vertexColors(sc: THREE.Scene): [number, number, number, number][] {
+  const out: [number, number, number, number][] = [];
+  sc.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const a = o.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+    if (!a) return;
+    for (let i = 0; i < a.count; i++) out.push([a.getX(i), a.getY(i), a.getZ(i), a.itemSize > 3 ? a.getW(i) : 1]);
+  });
+  return out;
+}
+
+/** Colour a lone point gets when shown by itself. */
+function colorOf(p: SurveyConfidencePoint): [number, number, number, number] {
+  const sc = new THREE.Scene();
+  new SurveyConfidenceOverlay(sc).show({ points: [p], opacity: 1 });
+  const cols = vertexColors(sc);
+  expect(cols.length).toBeGreaterThan(0);
+  return cols[0]!;
+}
+
+const rgbDistance = (a: ArrayLike<number>, b: ArrayLike<number>): number =>
+  Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+
+const colorTuple = (c: THREE.Color): [number, number, number] => [c.r, c.g, c.b];
+
+describe('valueToColor (#1684)', () => {
+  it('clamps below the floor to the floor colour', () => {
+    const floor = valueToColor(SURVEY_OVERLAY_VALUE_FLOOR);
+    expect(rgbDistance(colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_FLOOR / 100)), colorTuple(floor))).toBeLessThan(1e-6);
+    expect(rgbDistance(colorTuple(valueToColor(0)), colorTuple(floor))).toBeLessThan(1e-6);
+  });
+
+  it('clamps above the ceiling to the ceiling colour', () => {
+    const ceil = valueToColor(SURVEY_OVERLAY_VALUE_CEIL);
+    expect(rgbDistance(colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_CEIL * 100)), colorTuple(ceil))).toBeLessThan(1e-6);
+  });
+
+  it('rejection: negative and NaN values do not throw and give a finite colour', () => {
+    for (const v of [-50, Number.NaN]) {
+      const c = valueToColor(v);
+      expect(Number.isFinite(c.r) && Number.isFinite(c.g) && Number.isFinite(c.b)).toBe(true);
+    }
+  });
+
+  it('poor and rich ends of the ramp are visibly different', () => {
+    const d = rgbDistance(
+      colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_FLOOR)),
+      colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_CEIL)),
+    );
+    expect(d).toBeGreaterThan(0.5);
+  });
+
+  it('log-spaced values give distinct colours step to step across the ramp', () => {
+    const ratio = Math.pow(SURVEY_OVERLAY_VALUE_CEIL / SURVEY_OVERLAY_VALUE_FLOOR, 1 / 4);
+    const cols = [0, 1, 2, 3, 4].map(i => colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_FLOOR * Math.pow(ratio, i))));
+    for (let i = 1; i < cols.length; i++) {
+      expect(rgbDistance(cols[i - 1]!, cols[i]!), `step ${i}`).toBeGreaterThan(0.05);
+    }
+    // No two stops collapse onto each other.
+    for (let i = 0; i < cols.length; i++) for (let j = i + 1; j < cols.length; j++) {
+      expect(rgbDistance(cols[i]!, cols[j]!)).toBeGreaterThan(0.05);
+    }
+  });
+
+  it('is log-scaled: the geometric midpoint sits halfway between the ends', () => {
+    const lo = colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_FLOOR));
+    const hi = colorTuple(valueToColor(SURVEY_OVERLAY_VALUE_CEIL));
+    const mid = colorTuple(valueToColor(Math.sqrt(SURVEY_OVERLAY_VALUE_FLOOR * SURVEY_OVERLAY_VALUE_CEIL)));
+    const dLo = rgbDistance(lo, mid);
+    const dHi = rgbDistance(mid, hi);
+    expect(dLo).toBeGreaterThan(0.1);
+    expect(dHi).toBeGreaterThan(0.1);
+    expect(Math.abs(dLo - dHi)).toBeLessThan(0.35 * (dLo + dHi));
+  });
+});
+
+describe('SurveyConfidenceOverlay — value colouring (#1684)', () => {
+  it('two fresh, equal-confidence points with different valuePerM3 get different vertex colours', () => {
+    const poor = colorOf(point({ confidence: 0.8, valuePerM3: SURVEY_OVERLAY_VALUE_FLOOR }));
+    const rich = colorOf(point({ confidence: 0.8, valuePerM3: SURVEY_OVERLAY_VALUE_CEIL }));
+    expect(rgbDistance(poor, rich)).toBeGreaterThan(0.3);
+  });
+
+  it('both columns in one show() call keep their own colours', () => {
+    const sc = new THREE.Scene();
+    new SurveyConfidenceOverlay(sc).show({
+      points: [
+        point({ x: 0, z: 0, confidence: 0.8, valuePerM3: SURVEY_OVERLAY_VALUE_FLOOR }),
+        point({ x: 5, z: 5, confidence: 0.8, valuePerM3: SURVEY_OVERLAY_VALUE_CEIL }),
+      ],
+      opacity: 1,
+    });
+    const distinct = new Set(vertexColors(sc).map(c => c.slice(0, 3).map(v => v.toFixed(3)).join(',')));
+    expect(distinct.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a fresh point with a value is coloured by value, not by confidence', () => {
+    const c = colorOf(point({ confidence: 0.9, valuePerM3: SURVEY_OVERLAY_VALUE_CEIL }));
+    const expected = valueToColor(SURVEY_OVERLAY_VALUE_CEIL);
+    expect(rgbDistance(c, colorTuple(expected))).toBeLessThan(0.02);
+  });
+
+  it('a fresh point without valuePerM3 falls back to the confidence colour', () => {
+    const c = colorOf(point({ confidence: 0.25 }));
+    expect(rgbDistance(c, colorTuple(confidenceToColor(0.25)))).toBeLessThan(0.02);
+  });
+
+  it('a stale point stays grey whatever its value', () => {
+    for (const valuePerM3 of [SURVEY_OVERLAY_VALUE_FLOOR, SURVEY_OVERLAY_VALUE_CEIL]) {
+      const c = colorOf(point({ fresh: false, confidence: 0.9, valuePerM3 }));
+      expect(Math.abs(c[0] - 0.5)).toBeLessThan(0.05);
+      expect(Math.abs(c[1] - 0.5)).toBeLessThan(0.05);
+      expect(Math.abs(c[2] - 0.5)).toBeLessThan(0.05);
+    }
+  });
+
+  it('confidence modulates quad opacity of a value-coloured point', () => {
+    const sure = colorOf(point({ confidence: 0.95, valuePerM3: SURVEY_OVERLAY_VALUE_CEIL }));
+    const unsure = colorOf(point({ confidence: 0.3, valuePerM3: SURVEY_OVERLAY_VALUE_CEIL }));
+    expect(sure[3]).toBeGreaterThan(unsure[3]);
+    expect(unsure[3]).toBeGreaterThan(0);
   });
 });

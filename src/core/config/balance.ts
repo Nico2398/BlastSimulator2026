@@ -2447,3 +2447,65 @@ export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
 
 /** Rendered seconds after which the blast report opens even if some debris is still moving. */
 export const BLAST_REPORT_MAX_PLAYBACK_S = 8;
+
+/**
+ * Value-overlay colour ramp floor ($ per m³ of rock column). Ore value per m³ =
+ * density × ORE_DENSITY_KG_M3 × valuePerKg; ores span 2–2000 $/kg, so one m³ at
+ * full density is worth 5 000 (dirtite) to 5 000 000 (treranium). Floor sits at
+ * a lean dirtite column (~20% density).
+ */
+export const SURVEY_OVERLAY_VALUE_FLOOR = 1000;
+
+/** Value-overlay colour ramp ceiling ($ per m³); log-scaled between floor and ceil. */
+export const SURVEY_OVERLAY_VALUE_CEIL = 1_000_000;
+
+/** Fresh survey-overlay quad opacity at confidence 0; rises linearly to 1 at confidence 1. */
+export const SURVEY_OVERLAY_QUAD_OPACITY_BASE = 0.55;
+
+// ─── Pit mask shape (#1680) ──────────────────────────────────────────────────
+
+/** How the pit-suitability mask flattens relief inside a playable rect. */
+export interface PitMaskShape {
+  /** Metres of blend measured inward from the rect's edge. */
+  margin: number;
+  /** Fraction of relief that survives at full compression, deep inside the rect. */
+  reliefKeep: number;
+}
+
+/** Mask used by campaign levels and standalone worlds. */
+export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
+
+/**
+ * Sandbox mask (#1680): a tighter blend (14 m) that keeps only 5% of relief
+ * inside the rect, so the sandbox start has room for flat 9x9 m pads while
+ * mountains stay dramatic around and beyond the pit. Measured on 64x64 sites,
+ * seeds 1/7/42, every biome: worst case ~32% flat pads (alpine, seed 42)
+ * against the 25% target. A wider margin or lower keep alone fails, because
+ * the blend ramp is the steep part.
+ */
+export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 14, reliefKeep: 0.05 };
+
+/** Target fraction of the sandbox start pad that must be flat. */
+export const SANDBOX_FLAT_PAD_TARGET = 0.25;
+/** Max height spread (voxels) across the flat pad. */
+export const SANDBOX_FLAT_PAD_MAX_SPREAD = 2;
+/** Side length (voxels) of the flat pad. */
+export const SANDBOX_FLAT_PAD_SIZE = 9;
+
+// Ore deposits on sandbox sites (#1682): each ore gets a low-frequency horizontal
+// deposit field; vein density is zero below its rarity cutoff and ramps up to
+// CORE_GAIN over EDGE_WIDTH above it, so ore clusters in discrete deposits.
+/** Frequency of the low-frequency deposit field that gates where an ore may appear. */
+export const ORE_DEPOSIT_FREQ = 0.03;
+/** Deposit-field cutoff per OreCatalog rarity tier: higher = rarer (smaller coverage). */
+export const ORE_DEPOSIT_RARITY_COVERAGE: Readonly<Record<string, number>> = {
+  common: 0.44,
+  uncommon: 0.52,
+  rare: 0.58,
+  very_rare: 0.65,
+  legendary: 0.72,
+};
+/** Multiplier boosting vein density at a deposit core. */
+export const ORE_DEPOSIT_CORE_GAIN = 3;
+/** Width of the soft falloff at a deposit edge, in deposit-field units. */
+export const ORE_DEPOSIT_EDGE_WIDTH = 0.4;

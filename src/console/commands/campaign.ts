@@ -189,6 +189,7 @@ export function campaignStartCommand(
     datum: level.datum,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
+    ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
     startingCrew: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });

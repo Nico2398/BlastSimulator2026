@@ -212,6 +212,19 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     expectRefusedUnchanged(ctx, () => loadTampered(ctx, v => { v.gen.datum = 1e9; }));
   });
 
+  it.each([
+    ['NaN margin', { margin: NaN, reliefKeep: 0.05 }],
+    ['reliefKeep out of range', { margin: 14, reliefKeep: 7 }],
+  ])('refuses a voxels-path save whose world.pitMask is invalid (%s), leaving ctx unchanged', (_l, mask) => {
+    const ctx = makeCtx();
+    expectRefusedUnchanged(ctx, () => {
+      const source = makeCtx();
+      const saved = JSON.parse(serialize(stateForSave(source, source.state!))) as { world: { pitMask?: unknown } };
+      saved.world.pitMask = mask;
+      return loadGridForState(ctx, deserialize(JSON.stringify(saved)));
+    });
+  });
+
   it('refuses to load a save whose voxels payload has a malformed "added" edit segment (no composition), leaving ctx unchanged', () => {
     const ctx = makeCtx();
     expectRefusedUnchanged(ctx, () => loadTampered(ctx, v => {

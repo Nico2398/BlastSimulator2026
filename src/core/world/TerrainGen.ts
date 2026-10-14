@@ -6,6 +6,7 @@
 import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
+import type { PitMaskShape } from '../config/balance.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
@@ -50,6 +51,18 @@ export function requireValidGenDimension(value: number, label: string): number {
 }
 
 /**
+ * The pit mask read from untrusted save JSON (#1680): margin finite and
+ * positive, reliefKeep finite in [0, 1]. Callers skip it when the mask is absent (default mask).
+ */
+export function requireValidPitMask(value: PitMaskShape, label: string): PitMaskShape {
+  const { margin, reliefKeep } = value ?? ({} as Partial<PitMaskShape>);
+  if (!Number.isFinite(margin) || margin <= 0 || !Number.isFinite(reliefKeep) || reliefKeep < 0 || reliefKeep > 1) {
+    throw new Error(`corrupt save: ${label} is not a valid pit mask`);
+  }
+  return { margin, reliefKeep };
+}
+
+/**
  * The datum read from untrusted save JSON. Unlike a size, a datum is a voxel
  * row, so zero and negative values are legitimate (`new_game size:1` yields
  * datum 0) — it only has to be an integer inside the grid's vertical range.
@@ -81,6 +94,10 @@ export interface TerrainConfig {
    * and hardest dominant rock (#458 D4/T1.3/A11).
    */
   mixedRockHardness?: boolean;
+  /** Gate ore veins to discrete rarity-sized deposits when true; off = legacy veins (#1682). */
+  oreDeposits?: boolean;
+  /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
 }
 
 export interface TerrainContext {
@@ -123,12 +140,12 @@ export function resolveGeneratedBiome(
  * which genuinely must be the same instance — see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
-  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness } = config;
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask } = config;
 
   const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
     return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
-  });
+  }, pitMask);
 
   const biome = centerBiome(worldGen.fields, sizeX, sizeZ, climateBias);
 
@@ -136,7 +153,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
     ? buildMixedHardnessStrata(biome.dominantRocks)
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
-  const oreVeins = new OreVeinSampler(seed);
+  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true });
 
   return { worldGen, biome, strata, oreVeins };
 }

@@ -20,6 +20,7 @@ import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
+import { columnOreValuePerM3 } from '../../../src/core/mining/SurveyOreSummary.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { RampArrowLayer } from '../../../src/renderer/RampArrow.js';
@@ -112,6 +113,33 @@ describe('buildSurveyOverlayOptions()', () => {
     const point = options!.points.find(p => p.x === 1000 && p.z === 1000);
     expect(point).toBeDefined();
     expect(point!.surfaceY).toBe(firstEmptyLayerAboveGround(grid, 1000, 1000));
+  });
+
+  it('sets valuePerM3 on each point from that column\'s own estimates (#1684)', () => {
+    const grid = new VoxelGrid(20, 20);
+    grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
+    grid.fillVoxel(6, 0, 5, 0, undefined, 1.0);
+    const state = makeState([makeSurveyResult({
+      estimates: { '5,5': { sparkium: 0.4 }, '6,5': { dirtite: 0.1 } },
+    })]);
+
+    const options = buildSurveyOverlayOptions(state, grid)!;
+    const rich = options.points.find(p => p.x === 5 && p.z === 5)!;
+    const poor = options.points.find(p => p.x === 6 && p.z === 5)!;
+
+    expect(rich.valuePerM3).toBeCloseTo(columnOreValuePerM3({ sparkium: 0.4 }), 3);
+    expect(poor.valuePerM3).toBeCloseTo(columnOreValuePerM3({ dirtite: 0.1 }), 3);
+    expect(rich.valuePerM3!).toBeGreaterThan(poor.valuePerM3!);
+  });
+
+  it('keeps valuePerM3 on stale-survey points too, so the overlay can decide the grey (#1684)', () => {
+    const grid = new VoxelGrid(20, 20);
+    grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
+    const state = makeState([makeSurveyResult({ stale: true })]);
+
+    const point = buildSurveyOverlayOptions(state, grid)!.points.find(p => p.x === 5 && p.z === 5)!;
+    expect(point.fresh).toBe(false);
+    expect(point.valuePerM3).toBeGreaterThan(0);
   });
 
   it('returns null when no grid is bound', () => {

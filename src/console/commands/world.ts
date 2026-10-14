@@ -8,7 +8,7 @@ import { placeStartingCrew, relocateVehiclesOffNarrowGround } from '../../core/s
 import { placeStartingBuildings, startingBuildingAnchor } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -19,7 +19,7 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE, type StartingBuildingSlot } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -102,6 +102,9 @@ function defaultDatumForSize(size: number): number {
   return Math.floor(size * 0.55);
 }
 
+/** Size, hardness and ore-mode fields terrain generation reads off a world. */
+interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] }
+
 /**
  * The base (level-original) size + hardness fields generation reads off a
  * `WorldState` — takes only the `WorldState` slice it reads, not the whole
@@ -110,12 +113,14 @@ function defaultDatumForSize(size: number): number {
  * generation": `regenerateGridParams` layers its own dimension validation on
  * top for a no-voxels load fallback.
  */
-function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; climateBias?: [number, number] } {
+function worldGenerationFields(world: WorldState): GenerationFields {
   return {
     sizeX: world.baseSizeX,
     datum: world.datum,
     sizeZ: world.baseSizeZ,
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
+    ...(world.oreDeposits !== undefined ? { oreDeposits: world.oreDeposits } : {}),
+    ...(world.pitMask !== undefined ? { pitMask: world.pitMask } : {}),
     ...(world.climateBias ? { climateBias: world.climateBias } : {}),
   };
 }
@@ -149,6 +154,8 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
     datum: config.datum,
     sizeZ: config.sizeZ,
     ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
+    ...(config.oreDeposits !== undefined ? { oreDeposits: config.oreDeposits } : {}),
+    ...(config.pitMask !== undefined ? { pitMask: config.pitMask } : {}),
   };
 }
 
@@ -167,7 +174,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
  * turns that into a clean `world.terrain_save_corrupt` refusal and rolls
  * `ctx` back.
  */
-function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; climateBias?: [number, number] } {
+function regenerateGridParams(state: GameState): GenerationFields {
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, datum: defaultDatumForSize(DEFAULT_GRID_SIZE), sizeZ: DEFAULT_GRID_SIZE };
   }
@@ -177,6 +184,7 @@ function regenerateGridParams(state: GameState): { sizeX: number; datum: number;
     sizeX: requireValidGenDimension(base.sizeX, 'world.baseSizeX'),
     datum: requireValidGenDatum(base.datum, 'world.datum'),
     sizeZ: requireValidGenDimension(base.sizeZ, 'world.baseSizeZ'),
+    ...(base.pitMask !== undefined ? { pitMask: requireValidPitMask(base.pitMask, 'world.pitMask') } : {}),
   };
 }
 
@@ -223,10 +231,8 @@ function gridDirtyRegion(grid: VoxelGrid): {
  */
 export function regenerateGrid(
   ctx: GameContext,
-  params: {
+  params: Omit<GenerationFields, 'climateBias'> & {
     seed: number; climateBias: readonly [number, number];
-    sizeX: number; datum: number; sizeZ: number;
-    mixedRockHardness?: boolean;
     /**
      * True only where this grid is a game's first (`new_game`, a campaign
      * level start, `sandbox`): the starting crew is then laid out on real
@@ -235,18 +241,28 @@ export function regenerateGrid(
      * mid-route, wherever the player left them — and must never be regrouped.
      */
     startingCrew?: boolean;
+    /** With `startingCrew`: no starting vehicle may block another's way to the site's middle (the sandbox, #1680). */
+    fleetMustStayMobile?: boolean;
     /** Buildings to place near the crew on a game's first grid (#1363). */
     startingBuildings?: readonly StartingBuildingSlot[];
   },
 ): void {
   if (!ctx.state) return;
-  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness } = params;
+  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask } = params;
   const config: TerrainConfig = {
     sizeX, datum, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    ...(oreDeposits !== undefined ? { oreDeposits } : {}),
+    ...(pitMask !== undefined ? { pitMask } : {}),
   };
+  if (ctx.state.world && pitMask !== undefined) {
+    ctx.state.world.pitMask = pitMask;
+  }
   if (ctx.state.world && mixedRockHardness !== undefined) {
     ctx.state.world.mixedRockHardness = mixedRockHardness;
+  }
+  if (ctx.state.world && oreDeposits !== undefined) {
+    ctx.state.world.oreDeposits = oreDeposits;
   }
   if (ctx.state.world) {
     // Persist only a bias that differs from the biome centre (sandbox seeds the raw climate misses).
@@ -282,7 +298,7 @@ export function regenerateGrid(
     }
   }
   snapAgentsToNavigableGround(ctx.state);
-  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state)) {
+  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state, { fleetMustStayMobile: params.fleetMustStayMobile === true })) {
     buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   refreshOrderReachability(ctx.state);
@@ -299,11 +315,7 @@ export function regenerateGrid(
  */
 export function ensureLandscape(
   ctx: GameContext,
-  params: {
-    seed: number; climateBias: readonly [number, number];
-    sizeX: number; datum: number; sizeZ: number;
-    mixedRockHardness?: boolean;
-  },
+  params: Omit<GenerationFields, 'climateBias'> & { seed: number; climateBias: readonly [number, number] },
 ): LandscapeHandle | null {
   if (!ctx.grid) return null;
   if (ctx.landscape) return ctx.landscape;
@@ -388,6 +400,16 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     return `Save has unknown mine type "${state.mineType}".`;
   }
 
+  // world.pitMask feeds restoreGrid/PlayableArea/landscape on every path, so
+  // check it before any of them runs (the voxels branch included).
+  if (state.world?.pitMask !== undefined) {
+    try {
+      requireValidPitMask(state.world.pitMask, 'world.pitMask');
+    } catch {
+      return t('world.terrain_save_corrupt');
+    }
+  }
+
   if (state.world?.voxels) {
     const mismatch = terrainVersionMismatch(state.world.voxels);
     if (mismatch) return mismatch;
@@ -411,10 +433,12 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     if (decodedGrid) {
       restoreGrid(ctx, decodedGrid);
     } else {
-      const { sizeX, datum, sizeZ, mixedRockHardness, climateBias } = regenerateGridParams(state);
+      const { sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask, climateBias } = regenerateGridParams(state);
       regenerateGrid(ctx, {
         seed: state.seed, climateBias: climateBias ?? biome.climateCenter, sizeX, datum, sizeZ,
         ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+        ...(oreDeposits !== undefined ? { oreDeposits } : {}),
+        ...(pitMask !== undefined ? { pitMask } : {}),
       });
     }
   } catch {

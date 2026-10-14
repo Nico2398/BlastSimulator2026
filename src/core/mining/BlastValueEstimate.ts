@@ -14,6 +14,11 @@ import { getOre } from '../world/OreCatalog.js';
 import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 
+/** Market value ($) of one m³ of rock at the given ore density fraction: density × ORE_DENSITY_KG_M3 × valuePerKg. */
+export function oreValuePerM3(density: number, valuePerKg: number): number {
+  return density * ORE_DENSITY_KG_M3 * valuePerKg;
+}
+
 /** Value of one cubic metre of rock at the given surveyed densities. */
 function voxelValue(densities: Record<string, number>): number {
   let value = 0;
@@ -21,7 +26,7 @@ function voxelValue(densities: Record<string, number>): number {
     if (!(density > 0)) continue;
     const ore = getOre(oreId);
     if (!ore) continue;
-    value += density * ORE_DENSITY_KG_M3 * ore.valuePerKg; // 1 m3 voxel
+    value += oreValuePerM3(density, ore.valuePerKg); // 1 m3 voxel
   }
   return value;
 }
