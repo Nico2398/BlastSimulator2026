@@ -249,29 +249,28 @@ export class GameRenderer {
     // while keeping the same seed). Detect and rebind if so.
     if (this.lastGrid !== ctx.grid) {
       console.log(`[GameRenderer] syncFromContext: grid changed! old=${this.lastGrid?.id} new=${ctx.grid.id}`);
-      this.lastGrid = ctx.grid;
-      if (this.terrain && this.terrain.biomeId !== ctx.state.mineType) {
+      const biomeChanged = this.terrain !== null && this.terrain.biomeId !== ctx.state.mineType;
+      if (biomeChanged) {
         // Different biome: the terrain material is built per biome and shared
         // by landscape and fragments, so rebuild all three on the new one.
+        // loadGame() binds lastGrid itself.
         this.loadGame(ctx);
+      } else {
         this.lastGrid = ctx.grid;
-        this.lastState = ctx.state;
-        this.syncEntities(ctx);
-        return;
+        // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
+        this.terrain?.setGrid(ctx.grid);
+        this.terrain?.buildAll();
+        this.terrainMeshRevision++;
+        // A differently-sized grid needs a fresh landscape too — same rebuild
+        // loadGame() does, but this branch fires even when loadGame() didn't
+        // (campaign level swaps grid size while keeping the seed, #458 T3.2).
+        this.buildLandscapeMesh(ctx);
+        this.buildAmbient(ctx);
+        // A campaign level can swap in a differently-sized grid while keeping the
+        // seed, so loadGame() never runs. Re-frame or the new site renders as a
+        // small off-centre patch of the previous site's view.
+        this.frameCameraOnGrid();
       }
-      // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
-      this.terrain?.setGrid(ctx.grid);
-      this.terrain?.buildAll();
-      this.terrainMeshRevision++;
-      // A differently-sized grid needs a fresh landscape too — same rebuild
-      // loadGame() does, but this branch fires even when loadGame() didn't
-      // (campaign level swaps grid size while keeping the seed, #458 T3.2).
-      this.buildLandscapeMesh(ctx);
-      this.buildAmbient(ctx);
-      // A campaign level can swap in a differently-sized grid while keeping the
-      // seed, so loadGame() never runs. Re-frame or the new site renders as a
-      // small off-centre patch of the previous site's view.
-      this.frameCameraOnGrid();
     }
 
     this.lastState = ctx.state;

@@ -140,12 +140,13 @@ export class TerrainMesh {
     mesh => mesh?.geometry.dispose(),
   );
 
-  private readonly biome: string | undefined;
+  /** Biome the terrain material was built for, or undefined when none. */
+  readonly biomeId: string | undefined;
 
   constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
     this.scene = scene;
     this.grid = grid;
-    this.biome = biomeId;
+    this.biomeId = biomeId;
 
     // Playable rect matches WorldGen's own formula exactly (#458 A19.4) — no
     // need to plumb the landscape handle through just for this.
@@ -174,11 +175,6 @@ export class TerrainMesh {
     this.grid = grid;
     this.remeshBatch.clear(); // marched from the old grid
     this.material.setHeightRange(...gridHeightRange(grid));
-  }
-
-  /** Biome the terrain material was built for, or undefined when none. */
-  get biomeId(): string | undefined {
-    return this.biome;
   }
 
   /** ID of the currently-bound VoxelGrid, for diagnostics. */

@@ -299,7 +299,6 @@ describe('GameRenderer — landscape material follows the terrain material acros
     renderer.update(0.016);
     renderer.flushLandscapeStreaming();
     const firstMaterial = renderer.terrain!.sharedMaterial;
-    const disposeSpy = vi.spyOn(firstMaterial, 'dispose');
 
     renderer.syncFromContext(await ctxFor('green_foothills'));
     renderer.update(0.016);
@@ -316,9 +315,6 @@ describe('GameRenderer — landscape material follows the terrain material acros
     sm.scene.traverse((o) => { if ((o as THREE.InstancedMesh).isInstancedMesh) instanced.push(o as THREE.InstancedMesh); });
     expect(instanced.some((m) => m.material === secondMaterial)).toBe(true);
     // Whatever disposal happened, nothing still in the scene draws with the disposed material.
-    if (disposeSpy.mock.calls.length > 0) {
-      expect(sceneMaterials(sm).has(firstMaterial)).toBe(false);
-    }
     expect(sceneMaterials(sm).has(firstMaterial)).toBe(false);
   });
 
