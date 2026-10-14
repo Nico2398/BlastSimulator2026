@@ -100,6 +100,9 @@ export function bandOresAtDepth(
   bands: readonly SurveyDepthBand[] | undefined,
   depthM: number,
 ): Record<string, number> | undefined {
-  void bands; void depthM;
-  return undefined; // TODO: implement
+  if (!Array.isArray(bands) || !Number.isFinite(depthM) || depthM < 0) return undefined;
+  for (const band of bands) {
+    if (band && depthM >= band.fromM && depthM < band.toM) return band.ores ?? undefined;
+  }
+  return undefined;
 }

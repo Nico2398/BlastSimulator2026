@@ -3,7 +3,7 @@
 import type { FragmentData } from './BlastExecution.js';
 import type { SurveyResult } from './SurveyCalc.js';
 import { freshSurveys } from './SurveyStaleness.js';
-import { findSurveyForColumn, surveyColumnKey } from './SurveyColumn.js';
+import { findSurveyForColumn, oresSurveyedAt } from './SurveyColumn.js';
 import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -30,23 +30,22 @@ export interface BlastOreReport {
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /**
- * Sum the estimated ore mass (kg) for a single fragment's grid column by
- * looking up the most recent matching survey entry at the fragment's immutable
- * `origin` (where the rock sat), never its landing `position`.
- * Returns 0 when no survey covers the fragment's column.
+ * Estimated ore mass (kg) for a fragment from the survey reading at its
+ * immutable `origin` (where the rock sat, never its landing `position`), at the
+ * origin's depth. `undefined` when no survey scanned that depth.
  */
-function fragmentColumnEstimateKg(
+function fragmentEstimateKg(
   fragment: OreReportFragment,
   surveys: readonly SurveyResult[],
-): number {
-  const { x, z } = fragment.origin;
+): number | undefined {
+  const { x, y, z } = fragment.origin;
   const survey = findSurveyForColumn(surveys, x, z);
-  if (!survey) return 0;
-  const colEstimates = survey.estimates[surveyColumnKey(x, z)];
-  if (!colEstimates) return 0;
-  const colAcc: Record<string, number> = {};
-  accumulateOreMass(colAcc, fragment.volume, colEstimates);
-  return Object.values(colAcc).reduce((sum, v) => sum + v, 0);
+  if (!survey) return undefined;
+  const densities = oresSurveyedAt(survey, x, z, Math.floor(y));
+  if (!densities) return undefined;
+  const acc: Record<string, number> = {};
+  accumulateOreMass(acc, fragment.volume, densities);
+  return Object.values(acc).reduce((sum, v) => sum + v, 0);
 }
 
 // ── Shared helper (exported for cross-module reuse) ────────────────────────────
@@ -125,7 +124,10 @@ export function fragmentHasOre(oreDensities: Record<string, number>): boolean {
  *
  * When `surveyResults` are provided, estimated ore mass is derived from the most
  * recent survey that covers each fragment's origin column (`surveyColumnKey`, floor-keyed).
- * `yieldRatio` is actual / estimated; defaults to 1.0 when no estimate exists.
+ * Each fragment is read at its origin depth (`oresSurveyedAt`); fragments at an unscanned
+ * depth add no estimate and their actual ore is left out of the `yieldRatio` numerator.
+ * `yieldRatio` is actual / estimated; defaults to 1.0 when no fragment was scanned.
+ * `totalYieldKg` and `oreYields` stay all-inclusive.
  */
 export function computeBlastOreReport(
   fragments: readonly OreReportFragment[],
@@ -136,18 +138,23 @@ export function computeBlastOreReport(
 
   const surveys = freshSurveys(surveyResults ?? []);
 
-  for (const fragment of fragments) {
-    // Accumulate actual ore mass per ore type
-    accumulateOreMass(oreYields, fragment.volume, fragment.oreDensities);
+  let scannedActualKg = 0;
+  let anyScanned = false;
 
-    // Accumulate survey-estimated ore mass for this fragment's column
-    if (surveys.length > 0) {
-      estimatedYieldKg += fragmentColumnEstimateKg(fragment, surveys);
-    }
+  for (const fragment of fragments) {
+    accumulateOreMass(oreYields, fragment.volume, fragment.oreDensities);
+    if (surveys.length === 0) continue;
+    const estimateKg = fragmentEstimateKg(fragment, surveys);
+    if (estimateKg === undefined) continue; // unscanned depth: out of the comparison
+    anyScanned = true;
+    estimatedYieldKg += estimateKg;
+    const actual: Record<string, number> = {};
+    accumulateOreMass(actual, fragment.volume, fragment.oreDensities);
+    scannedActualKg += Object.values(actual).reduce((sum, v) => sum + v, 0);
   }
 
   const totalYieldKg = Object.values(oreYields).reduce((sum, v) => sum + v, 0);
-  const yieldRatio = estimatedYieldKg > 0 ? totalYieldKg / estimatedYieldKg : 1.0;
+  const yieldRatio = anyScanned && estimatedYieldKg > 0 ? scannedActualKg / estimatedYieldKg : 1.0;
   const hasTreranium = (oreYields['treranium'] ?? 0) > 0;
   const absurdiumKg = oreYields['absurdium'] ?? 0;
   const absurdiumFraction = totalYieldKg > 0 ? absurdiumKg / totalYieldKg : 0;

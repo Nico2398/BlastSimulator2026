@@ -1,6 +1,8 @@
 // BlastSimulator2026 — Survey column addressing (single source of truth for column keys)
 
 import type { SurveyResult } from './SurveyCalc.js';
+import { bandOresAtDepth } from './SurveyDepthProfile.js';
+import { SURVEY_DEPTH_BELOW_SURFACE } from '../config/balance.js';
 
 /**
  * Key of the survey estimate column containing world position `(x, z)`.
@@ -46,6 +48,14 @@ export function oresSurveyedAt(
   z: number,
   y: number,
 ): Record<string, number> | undefined {
-  void survey; void x; void z; void y;
-  return undefined; // TODO: implement
+  const key = surveyColumnKey(x, z);
+  const column = survey.estimates?.[key];
+  const surfaceY = survey.surfaceYs?.[key];
+  const bands = survey.depthProfile?.[key];
+  if (!survey.depthProfile && !survey.surfaceYs) return column; // legacy save
+  if (typeof surfaceY !== 'number') return column;
+  const depth = surfaceY - y;
+  if (depth < 0 || depth >= SURVEY_DEPTH_BELOW_SURFACE[survey.method]) return undefined;
+  if (!survey.depthProfile) return column; // aerial: top window carries the column estimate
+  return bandOresAtDepth(bands, depth) ?? {};
 }

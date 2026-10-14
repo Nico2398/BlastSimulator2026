@@ -124,6 +124,7 @@ export function estimateSurveyResult(
 
   const radius = SURVEY_COVERAGE_RADIUS[method];
   const estimates: Record<string, Record<string, number>> = {};
+  const surfaceYs: Record<string, number> = {};
   const windows: Array<{ x: number; z: number; yLevels: number[] }> = [];
 
   const xMin = Math.max(grid.minX, Math.floor(centerX - radius));
@@ -172,20 +173,21 @@ export function estimateSurveyResult(
 
       if (Object.keys(colEstimates).length > 0) {
         estimates[surveyColumnKey(x, z)] = colEstimates;
+        surfaceYs[surveyColumnKey(x, z)] = anchorY;
         windows.push({ x, z, yLevels });
       }
     }
   }
 
   if (method === 'aerial') {
-    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, surfaceYs };
   }
   const depthProfile: Record<string, SurveyDepthBand[]> = {};
   for (const { x, z, yLevels } of windows) {
     const bands = buildDepthProfile(grid, x, z, yLevels, SURVEY_DEPTH_BAND_METRES[method], finalError, rng);
     if (bands.length > 0) depthProfile[surveyColumnKey(x, z)] = bands;
   }
-  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile };
+  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile, surfaceYs };
 }
 
 export {

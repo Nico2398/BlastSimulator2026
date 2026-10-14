@@ -19,9 +19,9 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
-import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
+import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
-import { wetHoleIdsFor, wetHoles } from '../../core/mining/WetHoles.js';
+import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
@@ -51,6 +51,7 @@ export class PreflightModal {
   /** True once DETONATE was pressed: the modal closes when the sequence ends (#1362). */
   private awaitingDetonation = false;
   private gridProvider: () => VoxelGrid | null = () => null;
+  private readonly estimateMemo = new OreEstimateMemo();
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -156,8 +157,7 @@ export class PreflightModal {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
-    const grid = this.gridProvider();
-    const estValue = grid ? estimateBlastOreValue(plan, state.surveyResults, grid, wetHoleIdsFor(state)) : 0;
+    const estValue = this.estimateMemo.get(state, plan, this.gridProvider());
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
