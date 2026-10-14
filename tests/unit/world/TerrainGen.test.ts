@@ -588,6 +588,43 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
     expect(TERRAIN_GENERATOR_VERSION).toBe(1);
   });
 
+  describe('oreDeposits switch (#1682)', () => {
+    const cfg = { sizeX: 64, datum: 24, sizeZ: 64, seed: 42, climateBias: [0.6, 0.7] as [number, number] };
+    const oreSignature = (grid: ReturnType<typeof generateTerrain>): string => {
+      const parts: string[] = [];
+      for (let x = 0; x < 64; x += 2) for (let z = 0; z < 64; z += 2) for (let y = 0; y < 40; y++) {
+        const ores = grid.oresAt(x, y, z);
+        if (ores && Object.keys(ores).length > 0) parts.push(`${x},${y},${z}:${JSON.stringify(ores)}`);
+      }
+      return parts.join('|');
+    };
+
+    it('absent and false generate identical ore', () => {
+      expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: false }))).toBe(oreSignature(generateTerrain(cfg)));
+    });
+
+    it('true generates different ore than absent, but identical rock', () => {
+      const on = generateTerrain({ ...cfg, oreDeposits: true });
+      const off = generateTerrain(cfg);
+      expect(oreSignature(on)).not.toBe(oreSignature(off));
+      for (let x = 0; x < 64; x += 4) for (let z = 0; z < 64; z += 4) for (let y = 0; y < 40; y += 3) {
+        expect(on.dominantRockAt(x, y, z)).toBe(off.dominantRockAt(x, y, z));
+      }
+    });
+
+    it('is deterministic, and buildTerrainContext hands the sampler the switch', () => {
+      expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: true }))).toBe(oreSignature(generateTerrain({ ...cfg, oreDeposits: true })));
+      const on = buildTerrainContext({ ...cfg, oreDeposits: true });
+      const off = buildTerrainContext(cfg);
+      const comp = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+      let differs = false;
+      for (let x = 0; x < 64 && !differs; x++) for (let z = 0; z < 64; z += 3) {
+        if (JSON.stringify(on.oreVeins.densitiesAt(x, 0, z, 5, comp, 1)) !== JSON.stringify(off.oreVeins.densitiesAt(x, 0, z, 5, comp, 1))) { differs = true; break; }
+      }
+      expect(differs).toBe(true);
+    });
+  });
+
   it('has ore in ground east, west and north of the rectangle', () => {
     const grid = generateTerrain(big());
     claimOutside(grid);

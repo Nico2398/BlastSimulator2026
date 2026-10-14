@@ -94,6 +94,8 @@ export interface TerrainConfig {
    * and hardest dominant rock (#458 D4/T1.3/A11).
    */
   mixedRockHardness?: boolean;
+  /** Gate ore veins to discrete rarity-sized deposits when true; off = legacy veins (#1682). */
+  oreDeposits?: boolean;
   /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
 }
@@ -138,7 +140,7 @@ export function resolveGeneratedBiome(
  * which genuinely must be the same instance — see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
-  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, pitMask } = config;
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask } = config;
 
   const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
@@ -151,7 +153,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
     ? buildMixedHardnessStrata(biome.dominantRocks)
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
-  const oreVeins = new OreVeinSampler(seed);
+  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true });
 
   return { worldGen, biome, strata, oreVeins };
 }

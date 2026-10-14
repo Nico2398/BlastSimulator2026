@@ -2495,3 +2495,21 @@ export const SANDBOX_FLAT_PAD_TARGET = 0.25;
 export const SANDBOX_FLAT_PAD_MAX_SPREAD = 2;
 /** Side length (voxels) of the flat pad. */
 export const SANDBOX_FLAT_PAD_SIZE = 9;
+
+// Ore deposits on sandbox sites (#1682): each ore gets a low-frequency horizontal
+// deposit field; vein density is zero below its rarity cutoff and ramps up to
+// CORE_GAIN over EDGE_WIDTH above it, so ore clusters in discrete deposits.
+/** Frequency of the low-frequency deposit field that gates where an ore may appear. */
+export const ORE_DEPOSIT_FREQ = 0.03;
+/** Deposit-field cutoff per OreCatalog rarity tier: higher = rarer (smaller coverage). */
+export const ORE_DEPOSIT_RARITY_COVERAGE: Readonly<Record<string, number>> = {
+  common: 0.44,
+  uncommon: 0.52,
+  rare: 0.58,
+  very_rare: 0.65,
+  legendary: 0.72,
+};
+/** Multiplier boosting vein density at a deposit core. */
+export const ORE_DEPOSIT_CORE_GAIN = 3;
+/** Width of the soft falloff at a deposit edge, in deposit-field units. */
+export const ORE_DEPOSIT_EDGE_WIDTH = 0.4;

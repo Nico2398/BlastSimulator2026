@@ -565,6 +565,8 @@ export interface WorldState {
   voxels?: SerializedVoxels;
   /** Interleaved hard/soft rock strata (#458 D4/T1.3/A11), persisted so a no-voxels regeneration fallback matches the level's original generation (#1181). */
   mixedRockHardness?: boolean;
+  /** Ore deposits mode the terrain was generated with; absent = legacy veins (#1682). */
+  oreDeposits?: boolean;
   /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
 }

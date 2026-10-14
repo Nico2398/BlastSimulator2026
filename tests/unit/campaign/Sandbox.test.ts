@@ -148,6 +148,14 @@ describe('randomSandboxSeed', () => {
 });
 
 describe('sandboxLevelDef', () => {
+  it('turns ore deposits on, for every biome and difficulty (#1682)', () => {
+    for (const biome of getAllBiomes()) {
+      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
+        expect(sandboxLevelDef(clampSandboxConfig({ biome: biome.id, difficulty })).oreDeposits).toBe(true);
+      }
+    }
+  });
+
   it('carries the chosen biome, seed and starting cash onto the level', () => {
     const level = sandboxLevelDef(clampSandboxConfig({
       biome: 'alpine_granite', seed: 777, difficulty: 'hard',
@@ -580,6 +588,7 @@ function sandboxTerrainConfig(biome: string, seed: number): TerrainConfig {
     datum: level.datum,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
+    ...(level.oreDeposits ? { oreDeposits: true } : {}),
     ...(level.pitMask ? { pitMask: level.pitMask } : {}),
   };
 }
