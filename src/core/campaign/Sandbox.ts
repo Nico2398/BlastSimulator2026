@@ -30,11 +30,21 @@ export interface SandboxDifficultyDef {
   startingSite: StartingSiteComposition;
 }
 
-/** Named difficulty presets — starting cash and the size of the free starting kit vary (#504, #1671). */
+/**
+ * Named difficulty presets — starting cash and the size of the free starting kit vary (#504, #1671).
+ *
+ * Cash bisected (#1671) on the headless first-blast-to-first-sale playthrough in
+ * tests/integration/sandbox.integration.test.ts (desert_badlands, seed 42, no
+ * buying or hiring): payroll and upkeep run while the first shot is drilled, hauled
+ * and sold, so too little cash ends in bankruptcy before the sale. Minimum that
+ * stays solvent: hard 82k fails / 90k passes, normal 108k fails / 112k passes
+ * (easy has slack at 250k). Chosen with ~30% margin: 120k / 150k / 250k, which
+ * keeps easy > normal > hard strictly.
+ */
 export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
   easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: 250_000 },
-  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: 100_000 },
-  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: 50_000 },
+  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: 150_000 },
+  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: 120_000 },
 } as const;
 
 export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy', 'normal', 'hard'];
