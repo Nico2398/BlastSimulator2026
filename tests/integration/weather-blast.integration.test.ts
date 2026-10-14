@@ -13,6 +13,16 @@ import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 import { TICKS_PER_DAY } from '../../src/core/config/balance.js';
 
 /**
+ * Wages run every tick and the shift policy rests the crew between jobs, so a
+ * long drive can drain the starting cash below a charge's price and park the
+ * job on funds (#1673). Funding is not what these tests exercise.
+ */
+function keepFunded(ctx: GameContext): void {
+  ctx.state!.cash = 500_000;
+  ctx.state!.finances.cash = 500_000;
+}
+
+/**
  * Ticks until every hole ordered by the last drill_plan grid has landed in
  * state.drillHoles (#553). Tops up employee need gauges each tick — this
  * file's staffed site is a single drill_rig/driller, and a multi-hole plan
@@ -25,6 +35,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    keepFunded(ctx);
     runner.run('tick 1');
   }
 }
@@ -38,6 +49,7 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    keepFunded(ctx);
     runner.run('tick 1');
   }
 }

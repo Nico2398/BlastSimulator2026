@@ -83,6 +83,10 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
       expect(shared, `command ${sim().commands[index - 1]}`).toEqual([]);
       // A command is at most one cue of its own, and the world adds at most one more beside it.
       expect(entry.command.size).toBeLessThanOrEqual(1);
+      // The first command after a shot is when its aftermath (a rig the blast scrapped, and the alert about it)
+      // reaches the speakers: those cues belong to the blast, not to the command that happened to follow it.
+      const firesBlast = (cmd: string | undefined): boolean => cmd === 'blast' || /^blast detonate/.test(cmd ?? '');
+      if (firesBlast(sim().commands[index - 2])) continue;
       if (entry.command.size > 0) expect([...entry.director].filter(id => !isBlastSound(id)).length).toBeLessThanOrEqual(1);
     }
   });

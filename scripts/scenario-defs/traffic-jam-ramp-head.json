@@ -21,6 +21,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous",
+      "description": "#1673: the default site policy (shift_8h) now rests a crew member at the shift length between two jobs, which would pull people out of the choreography this file times with fixed tick budgets. Continuous mode drops the shift-length trigger and keeps the fatigue threshold, so the crew rests exactly as it did before the shift rest applied between vehicle jobs.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "vehicle driver 3 4",
       "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
       "interaction": [

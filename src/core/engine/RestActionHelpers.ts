@@ -22,7 +22,7 @@ import { moveTo, alightOnArrival } from './MoveTo.js';
 import { leaveBuildingIfInside } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
-import { estimateLegDistance } from './PlanItinerary.js';
+import { estimateLegDistance, planItinerary } from './PlanItinerary.js';
 import { cellsToTravelTicks } from './ActionSelection.js';
 import { hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 
@@ -420,4 +420,19 @@ export function resolveRestDestination(
   const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
   const worthwhile = restRoundTripWorthwhile(state, emp, building, approach.x, approach.z);
   return { targetX: approach.x, targetZ: approach.z, buildingId: building.id, worthwhile };
+}
+
+/**
+ * Fatigue the employee would burn travelling to (targetX, targetZ), or null
+ * when no journey can be planned.
+ */
+export function restTripFatigueCost(
+  state: GameState,
+  emp: Employee,
+  targetX: number,
+  targetZ: number,
+): number | null {
+  const itinerary = planItinerary(state, emp, { kind: 'reposition', x: targetX, z: targetZ }, 'estimate');
+  if (itinerary === null) return null;
+  return itinerary.estTotalTicks * NEED_DRAIN_RATES.fatigue.traveling;
 }

@@ -134,6 +134,28 @@
       }
     },
     {
+      "command": "weather set heavy_rain",
+      "description": "#1673: weather follows the biome now (#1688) and the crew's shift rests move the timeline, so this desert site is not reliably rained on before the pattern is fired. Rain is set explicitly so the holes are wet for the tubing/drain steps below, whatever the clock reads.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set heavy_rain"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 5",
+      "description": "Let the rain wet the drilled holes.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "buy amount:10",
       "description": "#1649: a charging truck loads one hole at a time, so the pattern stands long enough for weather to wet it, and a wet boomite charge fizzles instead of firing. The blaster buys tubing from the Charge step's tubing card (a real control) to make the holes drainable.",
       "interaction": [

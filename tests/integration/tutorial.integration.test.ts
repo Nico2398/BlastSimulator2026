@@ -203,7 +203,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // derailed by an unrelated needs collapse mid-drive.
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
     }
@@ -212,7 +212,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // way the drill plan above was drained before blasting.
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
     }
@@ -254,14 +254,14 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
     expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       runCmd('tick 1');
     }
     expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       runCmd('tick 1');
     }
@@ -414,7 +414,7 @@ describe('tutorial training steps (#1339)', () => {
       expect(run('employee hire role:driver').success).toBe(true);
       expect(run('build driving_center at:6,7').success).toBe(true);
       for (let i = 0; i < 400 && countBuildingsOfType(ctx.state!, 'driving_center') === 0; i++) {
-        for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+        for (const emp of ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
         run('tick 1');
       }
       expect(countBuildingsOfType(ctx.state!, 'driving_center')).toBeGreaterThan(0);
@@ -472,7 +472,7 @@ function tickIfUnpaused(
 ): boolean {
   if (state.isPaused) return false;
   state.employees.employees.forEach((emp) => {
-    emp.fatigue = 100;
+    emp.fatigue = 100; emp.ticksWorked = 0;
   });
   run('tick 1');
   return true;
@@ -505,7 +505,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
     }
@@ -519,7 +519,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
 
     for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
 
@@ -576,7 +576,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     expect(run(boxCutStep.commands![0]!).success).toBe(true);
     for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
     }
@@ -587,7 +587,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     expect(run(drillPlanStep.commands![0]!).success).toBe(true);
     for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
     }
@@ -599,7 +599,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     expect(run(chargeStep.commands![0]!).success).toBe(true);
     for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
       for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
+        emp.fatigue = 100; emp.ticksWorked = 0;
       }
       run('tick 1');
     }
@@ -674,7 +674,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     const boxCutStep = TUTORIAL_STEPS.find((s) => s.id === 'box-cut')!;
     expect(run(boxCutStep.commands![0]!).success).toBe(true);
     for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
-      for (const emp of state.employees.employees) emp.fatigue = 100;
+      for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
       run('tick 1');
     }
     expect(state.plannedRamps.length).toBe(0);
@@ -689,7 +689,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     );
     expect(drill.success, drill.output).toBe(true);
     for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
-      for (const emp of state.employees.employees) emp.fatigue = 100;
+      for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
       run('tick 1');
     }
     expect(state.plannedDrillHoles.length).toBe(0);
@@ -700,7 +700,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     );
     expect(charge.success, charge.output).toBe(true);
     for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
-      for (const emp of state.employees.employees) emp.fatigue = 100;
+      for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
       run('tick 1');
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);

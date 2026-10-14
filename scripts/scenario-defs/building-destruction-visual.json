@@ -121,12 +121,15 @@
       "role": "observe"
     },
     {
-      "command": "tick 50",
-      "description": "#553: drain the ordered plan on open ground — both holes land well inside this pad (observed landing at tick 46, sandbox-measured). Kept as tight as the observed landing tick (plus a small margin) rather than a large round number: the staffed roster's ongoing salary/fuel cost burns real cash every tick with no income in this scenario, and the two warehouses built right after this step need $35,000 of what's left of the starting $50,000.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:200",
+      "description": "#553: drain the ordered plan on open ground — waits for the plan to drain instead of a hand-measured tick pad (the crew rests at the shift length between jobs, #1673), bounded tight: the staffed roster's ongoing salary/fuel cost burns real cash every tick with no income in this scenario, and the two warehouses built right after this step need $35,000 of what's left of the starting $50,000.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 120000
         },
         {
           "type": "screenshot"
@@ -139,7 +142,8 @@
           "holeCount": 2
         },
         "note": "Both holes have landed — none lost, none left ordered forever."
-      }
+      },
+      "timeout": 130
     },
     {
       "command": "build explosive_warehouse at:15,20",
