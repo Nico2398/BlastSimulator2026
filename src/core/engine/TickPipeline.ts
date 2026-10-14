@@ -46,6 +46,7 @@ import {
   employeeWorkState,
   BASE_TICK_MS,
 } from './GameLoop.js';
+import { onGroundMassKg } from '../economy/Logistics.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
@@ -250,7 +251,7 @@ export function runTick(
     hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'management_office'),
     maxRecentVibration: recentVillageVibration(state),
     employeeCount: state.employees.employees.length,
-    looseRockKg: 0, // TODO: wire to onGroundMassKg
+    looseRockKg: onGroundMassKg(state.logistics),
   };
   updateScores(state.scores, scoreInputs);
 

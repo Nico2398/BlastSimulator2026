@@ -522,9 +522,12 @@ export function inTransitMassKg(state: LogisticsState): number {
 }
 
 /** Total mass of fragments lying on the ground (not in transit, not stored), in kg. */
-export function onGroundMassKg(_state: LogisticsState): number {
-  // TODO: implement
-  return 0;
+export function onGroundMassKg(state: LogisticsState): number {
+  let total = 0;
+  for (const f of state.fragments) {
+    if (f.state === 'on_ground') total += f.fragment.mass;
+  }
+  return total;
 }
 
 /**
