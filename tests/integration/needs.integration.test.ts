@@ -21,6 +21,7 @@ import {
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import { assignSkill } from '../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
 import { purchaseVehicle, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { board } from '../../src/core/engine/Mount.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
@@ -1541,5 +1542,58 @@ describe('#1709 — park the rig and walk to rest: no collapse at any distance, 
     const run = runLayout('12,44', true);
     expect(run.quartersEntered).toBe(false);
     expect(run.maxFatigue).toBeLessThanOrEqual(NEED_REST_NO_BUILDING_CAP + 0.01);
+  });
+});
+
+describe('#1692 — well-being does not pin at the ceiling for a busy, housed crew', () => {
+  const TICKS = 1000;
+  const WINDOW = 200;
+
+  /** Run a busy crew of 8 for TICKS; returns wellBeing samples over the last WINDOW ticks. */
+  function runBusyCrew(extraQuartersTier: 2 | null): number[] {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const gx = state.voxelGrid?.sizeX ?? 32;
+    const gz = state.voxelGrid?.sizeZ ?? 32;
+    expect(placeBuilding(state.buildings, 'living_quarters', 2, 6, gx, gz, 1).success).toBe(true);
+    if (extraQuartersTier !== null) {
+      expect(placeBuilding(state.buildings, 'living_quarters', 14, 6, gx, gz, extraQuartersTier).success).toBe(true);
+    }
+    // The hiring pool is finite per role: cycle roles until the crew has 8.
+    const roles = ['driller', 'blaster', 'hauler', 'excavator', 'manager', 'surveyor'];
+    for (let i = 0; state.employees.employees.length < 8 && i < 60; i++) {
+      employeeCommand(ctx, ['hire'], { role: roles[i % roles.length]! });
+    }
+    expect(state.employees.employees.length).toBe(8);
+    const samples: number[] = [];
+    for (let i = 0; i < TICKS; i++) {
+      for (const emp of state.employees.employees) {
+        if (
+          emp.alive && !emp.injured && emp.trainingState === null &&
+          emp.activeActionId === null && emp.restTicksRemaining === null && emp.pendingRestDuration === null
+        ) {
+          employeeCommand(ctx, ['dispatch', String(emp.id)], { x: String(emp.x), z: String(emp.z) });
+        }
+      }
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+      if (i >= TICKS - WINDOW) samples.push(state.scores.wellBeing);
+    }
+    return samples;
+  }
+
+  it('with one T1 quarters, well-being stays below 98 over the last 200 ticks', () => {
+    const samples = runBusyCrew(null);
+    expect(Math.max(...samples)).toBeLessThan(98);
+  });
+
+  it('adding a T2 quarters gives a higher mean well-being over the last 200 ticks', () => {
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const t1 = mean(runBusyCrew(null));
+    const t1t2 = mean(runBusyCrew(2));
+    expect(t1t2).toBeGreaterThan(t1);
   });
 });

@@ -407,3 +407,116 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
     });
   });
 });
+
+describe('Well-being model — headroom, overwork, crowding, accidents (#1692)', () => {
+  function withQuarters(tier: 1 | 2 | 3) {
+    const buildings = createBuildingState();
+    buildings.unlockedTiers.living_quarters = 3;
+    const res = placeBuilding(buildings, 'living_quarters', 0, 0, 64, 64, tier);
+    expect(res.success).toBe(true);
+    return buildings;
+  }
+
+  function settle(tier: 1 | 2 | 3, ticks = 1000, overrides: Partial<ScoreInputs> = {}): number {
+    const state = createScoreState();
+    const buildings = withQuarters(tier);
+    for (let i = 0; i < ticks; i++) updateScores(state, makeInputs({ buildings, avgMorale: 70, ...overrides }));
+    return state.wellBeing;
+  }
+
+  it('a crew larger than the beds loses well-being versus a smaller crew with the same T1 quarters', () => {
+    const buildings = withQuarters(1);
+    const small = createScoreState();
+    const crowded = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(small, makeInputs({ buildings, avgMorale: 70, employeeCount: 10, bedCapacity: 20 }));
+      updateScores(crowded, makeInputs({ buildings, avgMorale: 70, employeeCount: 40, bedCapacity: 20 }));
+    }
+    expect(crowded.wellBeing).toBeLessThan(small.wellBeing);
+  });
+
+  it('crowding drag grows with the unhoused fraction of the crew', () => {
+    const buildings = withQuarters(1);
+    const mild = createScoreState();
+    const severe = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(mild, makeInputs({ buildings, avgMorale: 70, employeeCount: 25, bedCapacity: 20 }));
+      updateScores(severe, makeInputs({ buildings, avgMorale: 70, employeeCount: 80, bedCapacity: 20 }));
+    }
+    expect(severe.wellBeing).toBeLessThan(mild.wellBeing);
+  });
+
+  it('bedCapacity 0 applies no crowding drag however large the crew', () => {
+    const a = createScoreState();
+    const b = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(a, makeInputs({ avgMorale: 70, employeeCount: 0, bedCapacity: 0 }));
+      updateScores(b, makeInputs({ avgMorale: 70, employeeCount: 50, bedCapacity: 0 }));
+    }
+    expect(b.wellBeing).toBeCloseTo(a.wellBeing, 10);
+  });
+
+  it('a crew exactly filling the beds suffers no crowding drag', () => {
+    const buildings = withQuarters(1);
+    const full = createScoreState();
+    const empty = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(full, makeInputs({ buildings, avgMorale: 70, employeeCount: 20, bedCapacity: 20 }));
+      updateScores(empty, makeInputs({ buildings, avgMorale: 70, employeeCount: 0, bedCapacity: 20 }));
+    }
+    expect(full.wellBeing).toBeCloseTo(empty.wellBeing, 10);
+  });
+
+  it('crewFatigueStrain 0.5 loses well-being versus 0', () => {
+    const buildings = withQuarters(1);
+    const rested = createScoreState();
+    const tired = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(rested, makeInputs({ buildings, avgMorale: 70, crewFatigueStrain: 0 }));
+      updateScores(tired, makeInputs({ buildings, avgMorale: 70, crewFatigueStrain: 0.5 }));
+    }
+    expect(tired.wellBeing).toBeLessThan(rested.wellBeing);
+  });
+
+  it('recentAccidents: 1 lowers well-being versus none', () => {
+    const clean = createScoreState();
+    const hurt = createScoreState();
+    updateScores(clean, makeInputs({ avgMorale: 70 }));
+    updateScores(hurt, makeInputs({ avgMorale: 70, recentAccidents: 1 }));
+    expect(hurt.wellBeing).toBeLessThan(clean.wellBeing);
+  });
+
+  it('equilibrium well-being ranks T3 > T2 > T1 quarters after 1000 ticks', () => {
+    const t1 = settle(1);
+    const t2 = settle(2);
+    const t3 = settle(3);
+    expect(t3).toBeGreaterThan(t2);
+    expect(t2).toBeGreaterThan(t1);
+  });
+
+  it('T1 quarters with no drag do not pin well-being at the ceiling (headroom slows gains)', () => {
+    expect(settle(1)).toBeLessThan(96);
+  });
+
+  it('avgMorale 0 with no quarters still drives well-being to 0, at least ~1 point per tick', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ avgMorale: 0 }));
+    expect(state.wellBeing).toBeLessThanOrEqual(49);
+    for (let i = 0; i < 60; i++) updateScores(state, makeInputs({ avgMorale: 0 }));
+    expect(state.wellBeing).toBe(0);
+  });
+
+  it('a negative building well-being effect still applies in full', () => {
+    const buildings = withQuarters(1);
+    const def = getBuildingDef('living_quarters', 1);
+    const original = { ...def.scoreEffects };
+    try {
+      def.scoreEffects = { ...original, wellBeing: -20 };
+      const state = createScoreState();
+      updateScores(state, makeInputs({ buildings, avgMorale: 50 }));
+      expect(state.wellBeing).toBeLessThan(50);
+    } finally {
+      def.scoreEffects = original;
+    }
+  });
+});
