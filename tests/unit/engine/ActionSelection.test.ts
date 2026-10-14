@@ -13,7 +13,7 @@
 // .claude/rules/core-purity.md, not just transitive coverage through
 // EmployeeDispatch.test.ts's tickEmployees tests).
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   estimateActionCost,
   resolveActionCost,
@@ -26,6 +26,7 @@ import {
   isActionPastStuckBackoff,
 } from '../../../src/core/engine/ActionSelection.js';
 import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
+import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
@@ -33,7 +34,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
+import { DEBRIS_SELECTION_BINNING_MIN, ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
@@ -1016,6 +1017,76 @@ describe('selectBestActionForEmployee', () => {
 
     expect(result).not.toBeNull();
     expect(result!.action.id).toBe(1);
+  });
+
+  // ── Crater debris must not hide reachable debris (#1722) ───────────────
+  //
+  // thinDebrisCandidates keeps at most DEBRIS_SELECTION_MAX_BINS (16)
+  // representatives, nearest bins first. When the nearest bins all lie in a
+  // climb-walled crater, the post-thinning climb gate used to skip every
+  // representative and the employee idled, though reachable debris lay a
+  // little farther out.
+
+  describe.each(['haul_debris', 'fragment_debris'] as const)('%s orders in a crater nearer than a reachable piece (#1722)', type => {
+    // Debris itineraries need fragments, a depot and a vehicle; what is under
+    // test is which candidates reach costing, so the planner is stubbed to a
+    // straight-line cost and every candidate that reaches it is plannable.
+    beforeEach(() => {
+      vi.spyOn(PlanItineraryModule, 'planItinerary').mockImplementation((_state, employee, _goal, _fidelity, opts) => ({
+        estTotalTicks: Math.hypot(opts!.action!.targetX - employee.x, opts!.action!.targetZ - employee.z),
+      }) as unknown as ReturnType<typeof PlanItineraryModule.planItinerary>);
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** Crater of `binsWide` x 2 bins (7 orders per bin) between the employee and one reachable piece; all queued in the state's pool, which the debris bins index. */
+    function craterLayout(binsWide: number) {
+      const state = makeState(70, 70);
+      const craterCells = new Set<string>();
+      for (let x = 8; x < 8 + binsWide * 4; x++) for (let z = 8; z < 16; z++) craterCells.add(`${x},${z}`);
+      state.navGrid = makeGridWithCraterPocket(70, 70, craterCells);
+      const emp = makeEmployee(state, 0, 0);
+      const crater: PendingAction[] = [];
+      let id = 1;
+      for (let bx = 0; bx < binsWide; bx++) {
+        for (let bz = 0; bz < 2; bz++) {
+          for (let k = 0; k < 7; k++) crater.push(makeAction({ id: id++, type, targetX: 8 + bx * 4 + 1, targetZ: 8 + bz * 4 + 1 }));
+        }
+      }
+      const reachable = makeAction({ id: 9000, type, targetX: 0, targetZ: 55 });
+      state.pendingActions = [...crater, reachable];
+      state.nextPendingActionId = 9001;
+      return { state, emp, crater, reachable };
+    }
+
+    it('control: with at most MAX_BINS crater bins the reachable piece is still found', () => {
+      const { state, emp, crater, reachable } = craterLayout(7); // 14 crater bins
+      const filler = Array.from({ length: 40 }, (_, k) => makeAction({ id: 8000 + k, type, targetX: 10, targetZ: 9 }));
+      state.pendingActions.push(...filler);
+      const result = selectBestActionForEmployee(state, emp, [...crater, ...filler, reachable]);
+      expect(result).not.toBeNull();
+      expect(result!.action.id).toBe(9000);
+    });
+
+    it('returns the reachable piece when more than MAX_BINS crater bins are nearer', () => {
+      const { state, emp, crater, reachable } = craterLayout(10); // 20 crater bins, 140 orders
+      expect(crater.length).toBeGreaterThan(DEBRIS_SELECTION_BINNING_MIN);
+      const result = selectBestActionForEmployee(state, emp, [...crater, reachable]);
+      expect(result).not.toBeNull();
+      expect(result!.action.id).toBe(9000);
+    });
+
+    it('returns null when every piece lies in the crater', () => {
+      const { state, emp, crater } = craterLayout(10);
+      expect(selectBestActionForEmployee(state, emp, crater)).toBeNull();
+    });
+
+    it('an employee standing inside the crater still picks crater debris', () => {
+      const { state, crater } = craterLayout(10);
+      const inside = makeEmployee(state, 9, 9);
+      const result = selectBestActionForEmployee(state, inside, crater);
+      expect(result).not.toBeNull();
+      expect(crater.map(a => a.id)).toContain(result!.action.id);
+    });
   });
 });
 

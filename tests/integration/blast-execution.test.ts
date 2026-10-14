@@ -760,3 +760,54 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(ctx.state!.pendingDetonation).toBeNull();
   });
 });
+
+describe('Blast execution — haulers keep hauling reachable debris past a crater (#1722)', () => {
+  it('desert_badlands easy: while a reachable haul order is queued the truck driver is not left idle, and reachable orders drain', () => {
+    const engine = createRunner();
+    const { runner, ctx } = engine;
+    const run = (cmd: string) => runner.run(cmd);
+    const state = () => ctx.state!;
+    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42').success).toBe(true);
+
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:28,18').success).toBe(true);
+    tickFunded(run, state(), () => state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9, 1500);
+    expect(state().drillHoles.length).toBeGreaterThanOrEqual(9);
+    expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5').success).toBe(true);
+    tickFunded(run, state(), () => Object.keys(state().plannedChargesByHole).length === 0, 2500);
+    expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
+
+    expect(run('blast detonate').success).toBe(true);
+    tickFunded(run, state(), () => state().damage.blastCount > 0, 600);
+    expect(state().damage.blastCount).toBe(1);
+    // The fragments' haul orders are queued by the dispatcher a tick or so after the shot.
+    tickFunded(run, state(), () => state().pendingActions.filter(a => a.type === 'haul_debris').length > 0, 20);
+    expect(state().pendingActions.filter(a => a.type === 'haul_debris').length).toBeGreaterThan(128);
+
+    const isTruckDriver = (e: { alive: boolean; qualifications: { category: string }[] }) =>
+      e.alive && e.qualifications.some(q => q.category === 'driving.truck');
+    const reachableQueued = () => state().pendingActions.filter(a =>
+      a.type === 'haul_debris' && a.status === 'queued' && a.holderId === null && !a.blockedReason).length;
+
+    const WINDOW = 400;
+    const start = state().tickCount;
+    let idleWhileReachable = 0;
+    let midpointQueued = -1;
+    for (let i = 0; i < WINDOW; i++) {
+      state().cash = Math.max(state().cash, 100000);
+      for (const e of state().employees.employees) e.fatigue = 100;
+      run('tick 1');
+      if (i === 150) midpointQueued = reachableQueued();
+      if (reachableQueued() === 0) continue;
+      const drivers = state().employees.employees.filter(isTruckDriver);
+      expect(drivers.length).toBeGreaterThan(0);
+      // Some truck driver is working (or walking to work), not idle with reachable rock waiting.
+      if (drivers.every(e => e.activeActionId === null && e.restTicksRemaining === null)) idleWhileReachable++;
+    }
+    expect(state().tickCount - start).toBe(WINDOW);
+
+    // Before the fix the crew idled for ~250 of the 400 ticks with reachable orders still queued.
+    expect(idleWhileReachable).toBeLessThan(WINDOW / 10);
+    // Reachable orders left at the midpoint keep draining afterwards (stranded ones carry a blockedReason and are not counted).
+    if (midpointQueued > 0) expect(reachableQueued()).toBeLessThan(midpointQueued);
+  }, 240_000);
+});
