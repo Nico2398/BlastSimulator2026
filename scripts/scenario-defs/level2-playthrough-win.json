@@ -2067,7 +2067,7 @@
         {
           "type": "focusTile",
           "x": 31,
-          "z": 21,
+          "z": 41,
           "distance": 45,
           "pitch": 80,
           "yaw": 180
@@ -2075,9 +2075,9 @@
         {
           "type": "dragTiles",
           "x1": 25,
-          "z1": 15,
+          "z1": 35,
           "x2": 37,
-          "z2": 27
+          "z2": 47
         },
         {
           "type": "screenshot"
