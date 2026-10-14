@@ -2,6 +2,7 @@
 // Orchestrates: validate → energy → fragmentation → terrain subtraction → results
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
+import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
@@ -50,6 +51,7 @@ import {
   BLAST_SLICE_CELLS,
   BLAST_SLICE_ITEMS,
   BLAST_SLICE_STRIP_COLUMNS,
+  ORE_DENSITY_KG_M3,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -298,8 +300,9 @@ export function executeBlast(
   emitter?: EventEmitter,
   /** Hole ids currently holding water (stored hole water past the wet threshold — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
+  marketId?: MarketId,
 ): BlastResult | null {
-  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds));
+  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds, marketId));
 }
 
 /**
@@ -317,6 +320,7 @@ export function* executeBlastSteps(
   buildingState?: BuildingState,
   emitter?: EventEmitter,
   wetHoleIds: ReadonlySet<string> = new Set(),
+  marketId?: MarketId,
 ): Steps<BlastResult | null> {
   // 1. Validate
   const errors = validateBlastPlan(plan);
@@ -392,7 +396,7 @@ export function* executeBlastSteps(
       if ((v & (BLAST_SLICE_CELLS - 1)) === 0) yield;
       const { x, y, z } = fragmentation.fragmented[v]!;
       const ores = grid.oresAt(x, y, z);
-      if (ores) totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE);
+      if (ores) totalOreValue += calculateOreValue(ores, VoxelGrid.CELL_SIZE, marketId);
       totalRockVolume += VoxelGrid.CELL_SIZE ** 3;
       toClear.push({ x, y, z });
       clearedVoxels++;
@@ -800,16 +804,14 @@ function calculateBlastCenter(holes: readonly DrillHole[]): { x: number; z: numb
   return { x: sx / holes.length, z: sz / holes.length };
 }
 
-function calculateOreValue(oreDensities: Record<string, number>, voxelSize: number): number {
+function calculateOreValue(oreDensities: Record<string, number>, voxelSize: number, marketId?: MarketId): number {
   const volume = voxelSize * voxelSize * voxelSize;
   let value = 0;
   for (const [oreId, density] of Object.entries(oreDensities)) {
     const ore = getOre(oreId);
     if (ore && density > 0) {
-      // Ore mass = volume × density_fraction × arbitrary ore_density (assume 2500 kg/m³ for ore)
-      // Real ore density: 2500–4000 kg/m³ (iron ore ~3500)
-      const oreMass = volume * density * 2500;
-      value += oreMass * ore.valuePerKg;
+      const oreMass = volume * density * ORE_DENSITY_KG_M3;
+      value += oreMass * oreValuePerKg(oreId, marketId);
     }
   }
   return value;

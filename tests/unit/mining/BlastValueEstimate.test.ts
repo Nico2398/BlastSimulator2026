@@ -15,6 +15,7 @@ import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js
 import { identifyFragmentedVoxels, isFragmented } from '../../../src/core/mining/VoxelFragmentation.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
+import { oreValuePerKg } from '../../../src/core/economy/Market.js';
 import { ORE_DENSITY_KG_M3, SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 
 const SURFACE_Y = 24;
@@ -430,5 +431,30 @@ describe('estimateBlastOreValue — never reads ground truth (#1703)', () => {
 
     expect(estimateBlastOreValue(PLAN, [survey], rich)).toBeGreaterThan(0);
     expect(estimateBlastOreValue(PLAN, [survey], rich)).toBe(estimateBlastOreValue(PLAN, [survey], barren));
+  });
+});
+
+
+describe('estimateBlastOreValue market (#1681)', () => {
+  const grid = makeGrid({ dirtite: 0.9, blingite: 0.9 });
+  const survey = (ore: string): SurveyResult =>
+    makeSurvey({ bands: [{ fromM: 0, toM: 25, ores: { [ore]: 0.2 } }] });
+  const estimate = (ore: string, market?: 'legacy' | 'production'): number =>
+    estimateBlastOreValue(PLAN, [survey(ore)], grid, new Set(), market);
+
+  it('an undefined market equals the legacy market', () => {
+    expect(estimate('blingite')).toBe(estimate('blingite', 'legacy'));
+  });
+
+  it('production values each ore at its production price', () => {
+    for (const ore of ['dirtite', 'blingite']) {
+      expect(estimate(ore, 'production')).toBeGreaterThan(0);
+      const ratio = estimate(ore, 'production') / estimate(ore, 'legacy');
+      expect(ratio).toBeCloseTo(oreValuePerKg(ore, 'production') / oreValuePerKg(ore, 'legacy'), 9);
+    }
+  });
+
+  it('still returns 0 for an unsurveyed plan in production', () => {
+    expect(estimateBlastOreValue(PLAN, [], grid, new Set(), 'production')).toBe(0);
   });
 });

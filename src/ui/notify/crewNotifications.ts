@@ -8,7 +8,7 @@ import { CREW_TOAST_COOLDOWN_TICKS } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 
-type CrewKind = 'collapsed' | 'need_warning' | 'levelup' | 'trained' | 'training_cancelled' | 'stuck' | 'action_abandoned';
+type CrewKind = 'collapsed' | 'need_warning' | 'levelup' | 'trained' | 'upgraded' | 'training_cancelled' | 'stuck' | 'action_abandoned';
 
 const CREW_SEVERITY: Record<CrewKind, Severity> = {
   collapsed: 'critical',
@@ -18,6 +18,7 @@ const CREW_SEVERITY: Record<CrewKind, Severity> = {
   training_cancelled: 'warn',
   levelup: 'info',
   trained: 'info',
+  upgraded: 'info',
 };
 
 /**
@@ -74,6 +75,6 @@ export function wireCrewNotifications(
     raise('training_cancelled', employeeId, { skill: t(`skill.${skill}`), refund: formatMoney(refund) }));
   emitter.on('employee:levelup', ({ employeeId, category, newLevel }) =>
     raise('levelup', employeeId, { skill: t(`skill.${category}`), level: newLevel }));
-  emitter.on('employee:trained', ({ employeeId, skill }) =>
-    raise('trained', employeeId, { skill: t(`skill.${skill}`) }));
+  emitter.on('employee:trained', ({ employeeId, skill, level, isNew }) =>
+    raise(isNew ? 'trained' : 'upgraded', employeeId, { skill: t(`skill.${skill}`), level }));
 }

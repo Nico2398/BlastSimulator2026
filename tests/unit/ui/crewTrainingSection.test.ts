@@ -11,7 +11,7 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { planTraining } from '../../../src/core/entities/EmployeeTraining.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { QUALIFICATION_SALARY_BONUS, TRAINING_BASE_FEE } from '../../../src/core/config/balance.js';
+import { QUALIFICATION_SALARY_BONUS, TRAINING_BASE_FEE, TRAINING_LEVEL_FEE } from '../../../src/core/config/balance.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 function setup(): { state: GameState; employee: Employee } {
@@ -71,28 +71,101 @@ describe('makeTrainingSection — offer row (#1388)', () => {
   });
 });
 
-describe('makeTrainingSection — held skill (#1388)', () => {
-  it('renders a locked already-qualified row with no train button', () => {
+/** Level mention in an offer row: "level 2", "lvl 2" or "L2". */
+const levelMention = (n: number) => new RegExp(`(level|lvl)\\s*${n}\\b|\\bL${n}\\b`, 'i');
+
+function setupTier(tier: 1 | 2 | 3): { state: GameState; employee: Employee } {
+  setLocale('en');
+  const state = createGame({ seed: 42 });
+  state.cash = 1_000_000;
+  state.buildings.unlockedTiers['geology_lab'] = tier;
+  state.buildings.unlockedTiers['blasting_academy'] = tier;
+  placeBuilding(state.buildings, 'geology_lab', 10, 10, 64, 64, tier);
+  placeBuilding(state.buildings, 'blasting_academy', 30, 10, 64, 64, tier);
+  const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 2, 2); // blasting 1, no geology
+  return { state, employee };
+}
+
+describe('makeTrainingSection — level offers (#1726)', () => {
+  it('an unlock offer at a tier-1 school names level 1', () => {
     const { state, employee } = setup();
     const section = makeTrainingSection(employee, state, () => {});
-    expect(section.querySelector('.bs-train-btn[data-skill="blasting"]')).toBeNull();
+    expect(rowFor(section, 'geology').textContent).toMatch(levelMention(1));
+  });
+
+  it.each([2, 3] as const)('an unlock offer at a tier-%i school names that level, its fee and ticks', (tier) => {
+    const { state, employee } = setupTier(tier);
+    const plan = planTraining(employee, 'geology', tier)!;
+    const text = rowFor(makeTrainingSection(employee, state, () => {}), 'geology').textContent ?? '';
+    expect(text).toMatch(levelMention(plan.grantsLevel!));
+    expect(text).toContain(String(TRAINING_LEVEL_FEE[tier]));
+    expect(text).toContain(`${plan.ticks}h`);
+  });
+
+  it('a held level-1 skill at a tier-2 school is an enabled upgrade offer naming level 2 and the pay difference', () => {
+    const { state, employee } = setupTier(2);
+    const section = makeTrainingSection(employee, state, () => {});
+    const btn = section.querySelector('.bs-train-btn[data-skill="blasting"]') as HTMLButtonElement;
+    expect(btn).not.toBeNull();
+    expect(btn.disabled).toBe(false);
+    const text = rowFor(section, 'blasting').textContent ?? '';
+    expect(text).toMatch(levelMention(2));
+    expect(text).toContain(`+$${perHour(QUALIFICATION_SALARY_BONUS[2] - QUALIFICATION_SALARY_BONUS[1])}`);
+  });
+
+  it('the upgrade button dispatches the train callback with skill and school id', () => {
+    const { state, employee } = setupTier(2);
+    const school = state.buildings.buildings.find(b => b.type === 'blasting_academy')!;
+    const calls: Array<[string, number]> = [];
+    const section = makeTrainingSection(employee, state, (skill, id) => calls.push([skill, id]));
+    (section.querySelector('.bs-train-btn[data-skill="blasting"]') as HTMLButtonElement).click();
+    expect(calls).toEqual([['blasting', school.id]]);
+  });
+
+  it('the train button is disabled when cash is below the level fee', () => {
+    const { state, employee } = setupTier(3);
+    state.cash = TRAINING_LEVEL_FEE[3] - 1;
+    const btn = makeTrainingSection(employee, state, () => {}).querySelector('.bs-train-btn[data-skill="geology"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+});
+
+describe('makeTrainingSection — refused courses (#1726)', () => {
+  it('a held level-1 skill at a tier-1 school is not trainable and says a higher school is needed', () => {
+    const { state, employee } = setup();
+    const section = makeTrainingSection(employee, state, () => {});
+    expect(section.querySelector('.bs-train-btn[data-skill="blasting"]:not([disabled])')).toBeNull();
     const row = rowFor(section, 'blasting');
-    expect(row.textContent).toMatch(/already qualified/i);
-    expect(row.querySelector('button')).toBeNull();
+    expect(row.textContent).toMatch(/higher school/i);
+    expect(row.textContent).not.toMatch(/already qualified/i);
   });
 
-  it('a held skill at a higher level is also locked, never trainable', () => {
-    const { state, employee } = setup();
-    assignSkill(state.employees, employee.id, 'blasting', 4);
+  it('a held level-2 skill at a tier-2 school says a higher school is needed', () => {
+    const { state, employee } = setupTier(2);
+    assignSkill(state.employees, employee.id, 'blasting', 2);
     const section = makeTrainingSection(employee, state, () => {});
-    expect(section.querySelector('.bs-train-btn[data-skill="blasting"]')).toBeNull();
-    expect(rowFor(section, 'blasting').textContent).toMatch(/already qualified/i);
+    expect(section.querySelector('.bs-train-btn[data-skill="blasting"]:not([disabled])')).toBeNull();
+    expect(rowFor(section, 'blasting').textContent).toMatch(/higher school/i);
   });
 
-  it('when every taught skill is held, no train button is offered at all', () => {
+  it.each([3, 4, 5] as const)('a held level-%i skill says top level and offers no enabled button', (level) => {
+    const { state, employee } = setupTier(3);
+    assignSkill(state.employees, employee.id, 'blasting', level);
+    const section = makeTrainingSection(employee, state, () => {});
+    expect(section.querySelector('.bs-train-btn[data-skill="blasting"]:not([disabled])')).toBeNull();
+    expect(rowFor(section, 'blasting').textContent).toMatch(/top level/i);
+  });
+
+  it('a level-3 skill at a tier-1 school also says top level', () => {
+    const { state, employee } = setup();
+    assignSkill(state.employees, employee.id, 'blasting', 3);
+    expect(rowFor(makeTrainingSection(employee, state, () => {}), 'blasting').textContent).toMatch(/top level/i);
+  });
+
+  it('when no taught skill can be trained, no enabled train button is offered at all', () => {
     const { state, employee } = setup();
     assignSkill(state.employees, employee.id, 'geology', 1);
     const section = makeTrainingSection(employee, state, () => {});
-    expect(section.querySelectorAll('.bs-train-btn')).toHaveLength(0);
+    expect(section.querySelectorAll('.bs-train-btn:not([disabled])')).toHaveLength(0);
   });
 });

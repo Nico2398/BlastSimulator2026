@@ -5,6 +5,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { resolveMarketId } from '../../../core/campaign/Level.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -127,7 +128,7 @@ export function* fireBlastSteps(
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
   yield;
-  const result = yield* executeBlastSteps(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
+  const result = yield* executeBlastSteps(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds, resolveMarketId(ctx.state!));
   if (!result) return { success: false, output: t('mining.blast.execution_failed') };
 
   yield;
