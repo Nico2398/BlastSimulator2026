@@ -21,3 +21,9 @@ export function getLevelObjective(
   const profit = getOperatingProfit(finances);
   return { profit, target, fraction: clampedRatio(0, target, profit) };
 }
+
+/** Operating profit still missing to the active level's target (0 once met); Infinity when no target applies. */
+export function getProfitShortfall(activeLevelId: string | null, finances: FinanceState): number {
+  const objective = getLevelObjective(activeLevelId, finances);
+  return objective ? Math.max(0, objective.target - objective.profit) : Infinity;
+}
