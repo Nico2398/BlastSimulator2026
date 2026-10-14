@@ -440,3 +440,28 @@ describe('PreflightModal — waiting block hooks for the tutorial (#1591)', () =
     expect(el.dataset['phase']).toBe('stranded');
   });
 });
+
+describe('PreflightModal cost net of stock (#1685)', () => {
+  function stockedPlan(fromStockKg: number): GameState {
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg };
+    return state;
+  }
+
+  it('shows only the cash part of a partly stock-drawn charge', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(stockedPlan(3), 'sunny');
+    expect(modal.root.textContent).toContain('$24'); // 2 kg x $12
+    expect(modal.root.textContent).not.toContain('$60');
+  });
+
+  it('shows $0 cost when stock covered the whole pattern', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(stockedPlan(5), 'sunny');
+    expect(modal.root.textContent).toContain('$0');
+    expect(modal.root.textContent).not.toContain('$60');
+  });
+});

@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { placeBuilding } from '../../../../src/core/entities/Building.js';
+import { placeBuilding, storeExplosives, getBuildingDef } from '../../../../src/core/entities/Building.js';
 import { purchaseVehicle, resolveVehicleDriver } from '../../../../src/core/entities/Vehicle.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
@@ -457,5 +457,45 @@ describe('SelectionBar — ramp (#1298)', () => {
     const { bar } = makeBar();
     bar.show(entity('ramp', 99), makeState());
     expect(bar.visible).toBe(false);
+  });
+
+  // ── Explosive Warehouse stock and free capacity (#1685) ───────────────────
+
+  it('shows stock and free capacity for a selected Explosive Warehouse', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    storeExplosives(state.buildings, 'boomite', 100);
+    storeExplosives(state.buildings, 'krackle', 25);
+    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
+
+    bar.show(entity('building', building.id), state);
+
+    expect(root.textContent).toContain('125');
+    expect(root.textContent).toContain(String(cap - 125));
+    expect(root.textContent).toContain('kg');
+  });
+
+  it('shows zero stock and the full capacity for an empty Explosive Warehouse', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
+
+    bar.show(entity('building', building.id), state);
+
+    expect(root.textContent).toContain(String(cap));
+    expect(root.textContent).toContain('kg');
+  });
+
+  it('shows no stock figures for other buildings', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'freight_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    storeExplosives(state.buildings, 'boomite', 100);
+
+    bar.show(entity('building', building.id), state);
+
+    expect(root.textContent).not.toContain('kg');
   });
 });

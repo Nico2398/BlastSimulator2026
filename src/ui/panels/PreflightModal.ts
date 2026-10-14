@@ -20,7 +20,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
-import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
+import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
@@ -149,7 +149,7 @@ export class PreflightModal {
     else if (this.awaitingDetonation) { this.hide(); return; }
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
-    const planCost = plannedChargesCost(state.chargesByHole);
+    const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
 
@@ -179,7 +179,7 @@ export class PreflightModal {
     this.statsEl.replaceChildren(statGrid([
       { key: t('ui.blast_workshop.preflight.stat_holes'), value: `${state.drillHoles.length}` },
       { key: t('ui.blast_workshop.preflight.stat_charge'), value: `${chargeKg.toFixed(1)} kg` },
-      { key: t('ui.blast_workshop.preflight.stat_cost'), value: `$${formatMoney(planCost)}`, color: 'var(--bsx-critical-text)' },
+      { key: t('ui.blast_workshop.preflight.stat_cost'), value: `$${formatMoney(planCost)}`, color: 'var(--bsx-critical-text)', info: 'preflight-cost' },
       { key: t('ui.blast_workshop.preflight.stat_value'), value: `$${formatMoney(estValue)}`, color: 'var(--bsx-positive)' },
     ], 4));
 

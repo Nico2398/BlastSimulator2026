@@ -160,8 +160,10 @@ export interface BlastReport {
   maxProjectionDistanceM: number;
   /** Total value of ore actually recovered, per BlastCalc's pricing. */
   totalOreValue: number;
-  /** Total cost of the charges spent on this blast (kg × explosive $/kg, summed before the plan was cleared). */
+  /** Cash paid for the charges of this blast (list price of the kg not drawn from stock; summed before the plan was cleared). */
   spent: number;
+  /** List-price dollar value of the charge kg drawn from warehouse stock (#1685). Optional: absent = 0. */
+  spentFromStock?: number;
   destroyedBuildings: DestroyedBuildingInfo[];
   /** Casualties/damage this blast caused (#557). Optional: pre-existing literal fixtures omit it; buildBlastReport defaults to `[]`. */
   accidents?: AccidentRecord[];
@@ -187,7 +189,7 @@ export interface SecondaryBlastReport {
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = []): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = [], spentFromStock = 0): BlastReport {
   const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
   for (const a of accidents) if (a.type === 'building_destroyed') destroyedIds.add(a.entityId);
   const { rating, cap } = applyRatingCaps(result.rating, {
@@ -213,6 +215,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     maxProjectionDistanceM: result.maxThrowDistance,
     totalOreValue: result.totalOreValue,
     spent,
+    ...(spentFromStock > 0 ? { spentFromStock } : {}),
     destroyedBuildings: result.destroyedBuildings,
     accidents,
     ...(result.vibrationAtVillages.length > 0

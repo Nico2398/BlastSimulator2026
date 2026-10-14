@@ -2,6 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   dispatchChargeAction, cancelOutstandingChargeAction,
@@ -285,5 +287,50 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
   it('is null with no charge orders or none blocked', () => {
     expect(outstandingChargeBlockedReason({ pendingActions: [] })).toBeNull();
     expect(outstandingChargeBlockedReason({ pendingActions: [order('charge_hole', null)] })).toBeNull();
+  });
+});
+
+// ── fromStockKg is recorded at order time (#1685) ───────────────────────────
+
+describe('dispatchChargeAction records the stock draw on the planned charge (#1685)', () => {
+  function stockedState(kg: number): GameState {
+    const state = makeState();
+    placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
+    expect(buyExplosiveStock(state, 'boomite', kg).success).toBe(true);
+    return state;
+  }
+
+  it('records fromStockKg for a fully stock-covered order and spends no cash', () => {
+    const state = stockedState(100);
+    const cash = state.cash;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(state.plannedChargesByHole['H1']).toEqual({ ...BOOMITE_5KG, fromStockKg: 5 });
+    expect(state.cash).toBe(cash);
+  });
+
+  it('records only the stocked part when stock covers part of the order', () => {
+    const state = stockedState(3);
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(state.plannedChargesByHole['H1']!.fromStockKg).toBe(3);
+  });
+
+  it('omits fromStockKg when no stock is drawn', () => {
+    const state = makeState();
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(state.plannedChargesByHole['H1']).toEqual(BOOMITE_5KG);
+    expect('fromStockKg' in state.plannedChargesByHole['H1']!).toBe(false);
+  });
+
+  it('omits fromStockKg when only another explosive is stocked', () => {
+    const state = stockedState(100);
+    dispatchChargeAction(state, hole(1), { explosiveId: 'krackle', amountKg: 5, stemmingM: 2 });
+    expect(state.plannedChargesByHole['H1']!.fromStockKg).toBeUndefined();
+  });
+
+  it('a re-charge replaces the record: restocked kg are redrawn, not double counted', () => {
+    const state = stockedState(5);
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(state.plannedChargesByHole['H1']!.fromStockKg).toBe(5);
   });
 });
