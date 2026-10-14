@@ -43,8 +43,13 @@ function fragmentEstimateKg(
   if (!survey) return undefined;
   const densities = oresSurveyedAt(survey, x, z, Math.floor(y));
   if (!densities) return undefined;
+  return totalOreMassKg(fragment.volume, densities);
+}
+
+/** Total ore mass (kg) across all ores in a fragment of `volume` m³. */
+function totalOreMassKg(volume: number, oreDensities: Record<string, number>): number {
   const acc: Record<string, number> = {};
-  accumulateOreMass(acc, fragment.volume, densities);
+  accumulateOreMass(acc, volume, oreDensities);
   return Object.values(acc).reduce((sum, v) => sum + v, 0);
 }
 
@@ -148,9 +153,7 @@ export function computeBlastOreReport(
     if (estimateKg === undefined) continue; // unscanned depth: out of the comparison
     anyScanned = true;
     estimatedYieldKg += estimateKg;
-    const actual: Record<string, number> = {};
-    accumulateOreMass(actual, fragment.volume, fragment.oreDensities);
-    scannedActualKg += Object.values(actual).reduce((sum, v) => sum + v, 0);
+    scannedActualKg += totalOreMassKg(fragment.volume, fragment.oreDensities);
   }
 
   const totalYieldKg = Object.values(oreYields).reduce((sum, v) => sum + v, 0);

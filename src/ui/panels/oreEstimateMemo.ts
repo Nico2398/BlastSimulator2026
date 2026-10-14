@@ -20,7 +20,7 @@ export class OreEstimateMemo {
     const key = JSON.stringify([
       plan.holes, plan.charges, [...wet].sort(),
       state.surveyResults.map(s => [s.id, s.stale === true, s.completedTick]),
-      grid.dirtyChunks().length,
+      grid.editRevision,
     ]);
     if (grid === this.grid && key === this.key) return this.value;
     this.grid = grid;

@@ -23,7 +23,7 @@ import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { RainField } from './ambient/RainField.js';
 import type { TerrainMesh } from './TerrainMesh.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from './EntitySync.js';
-import { columnOreValuePerM3 } from '../core/mining/SurveyOreSummary.js';
+import { columnOreValuePerM3 } from '../core/mining/BlastValueEstimate.js';
 import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 

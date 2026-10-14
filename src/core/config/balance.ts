@@ -1897,6 +1897,9 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   core_sample: 40,
 } as const;
 
+/** Voxels of partial-density rock that cap a column's top solid voxel (the survey anchor). */
+export const SURVEY_CAP_VOXELS = 1;
+
 /** Depth-band thickness in metres for depth-resolved survey results. Aerial surveys report none. */
 export const SURVEY_DEPTH_BAND_METRES = {
   core_sample: 1,

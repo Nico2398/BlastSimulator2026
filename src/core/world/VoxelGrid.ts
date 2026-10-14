@@ -341,6 +341,7 @@ export class VoxelGrid {
   private readonly chunks = new Map<number, VoxelChunk>();
   /** Chunks whose contents have been written since generation — the save's dirty set (#473 D4). */
   private readonly dirty = new Set<number>();
+  private writeCount = 0;
   /** Generator + edit-record backing this grid's chunks, or null when nothing is attached (#1183). */
   private chunkSource: VoxelChunkSource | null = null;
 
@@ -973,6 +974,12 @@ export class VoxelGrid {
 
   private touch(chunk: VoxelChunk): void {
     this.dirty.add(chunkKey(chunk.cx, chunk.cz));
+    this.writeCount++;
+  }
+
+  /** Number of gameplay writes so far; changes whenever voxel contents may have, so a cache can key on it. */
+  get editRevision(): number {
+    return this.writeCount;
   }
 
   /** True while a `withoutEditRecording` call is in progress — nested calls save/restore this. */

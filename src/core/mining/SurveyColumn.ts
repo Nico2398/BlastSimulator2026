@@ -2,7 +2,7 @@
 
 import type { SurveyResult } from './SurveyCalc.js';
 import { bandOresAtDepth } from './SurveyDepthProfile.js';
-import { SURVEY_DEPTH_BELOW_SURFACE } from '../config/balance.js';
+import { SURVEY_CAP_VOXELS, SURVEY_DEPTH_BELOW_SURFACE } from '../config/balance.js';
 
 /**
  * Key of the survey estimate column containing world position `(x, z)`.
@@ -18,6 +18,11 @@ export function parseColumnKey(key: string): { x: number; z: number } {
   return { x: Number(x), z: Number(z) };
 }
 
+/** Guard for fields a hand-edited save may hold as a primitive. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
  * Most recently completed survey covering the column containing `(x, z)`
  * (an estimate, or a scanned surface for a column whose whole-window average
@@ -31,15 +36,12 @@ export function findSurveyForColumn(
   const colKey = surveyColumnKey(x, z);
   let best: SurveyResult | undefined;
   for (const survey of surveys) {
-    if (colKey in survey.estimates || (survey.surfaceYs !== undefined && colKey in survey.surfaceYs)) {
+    if (colKey in survey.estimates || (isRecord(survey.surfaceYs) && colKey in survey.surfaceYs)) {
       if (!best || survey.completedTick > best.completedTick) best = survey;
     }
   }
   return best;
 }
-
-/** Voxels of partial-density rock that cap a column's top solid voxel (the survey anchor). */
-const SURVEY_CAP_VOXELS = 1;
 
 /**
  * Ore densities the survey located at voxel level `y` of column `(x, z)`.

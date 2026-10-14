@@ -19,14 +19,13 @@ export function oreValuePerM3(density: number, valuePerKg: number): number {
   return density * ORE_DENSITY_KG_M3 * valuePerKg;
 }
 
-/** Value of one cubic metre of rock at the given surveyed densities. */
-function voxelValue(densities: Record<string, number>): number {
+/** Estimated ore value ($ per m³) of rock at the given densities; unknown ore ids and non-positive densities are ignored. */
+export function columnOreValuePerM3(densities: Readonly<Record<string, number>>): number {
   let value = 0;
   for (const [oreId, density] of Object.entries(densities)) {
     if (!(density > 0)) continue;
     const ore = getOre(oreId);
-    if (!ore) continue;
-    value += oreValuePerM3(density, ore.valuePerKg); // 1 m3 voxel
+    if (ore) value += oreValuePerM3(density, ore.valuePerKg);
   }
   return value;
 }
@@ -57,7 +56,7 @@ export function estimateBlastOreValue(
     const survey = findSurveyForColumn(surveys, x, z);
     if (!survey) continue;
     const densities = oresSurveyedAt(survey, x, z, y);
-    if (densities) value += voxelValue(densities) * survey.confidence;
+    if (densities) value += columnOreValuePerM3(densities) * survey.confidence;
   }
   return value;
 }
