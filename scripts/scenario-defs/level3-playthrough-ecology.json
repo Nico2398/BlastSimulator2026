@@ -1080,12 +1080,12 @@
           "employeeCount": 12,
           "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 36.9218042326012,
-          "nuisance": 36.20792548458591,
+          "ecology": 40.68403487021343,
+          "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (ECOLOGY_DUST_PER_TONNE_PER_TICK, capped by ECOLOGY_DUST_MAX_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect."
+        "note": "#1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (fresh rubble costs ECOLOGY_DUST_PER_TONNE_PER_TICK, settled rubble the lower ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged. #1733 (settling dust model, re-measured in command mode): rubble dust now settles instead of sitting at a cap, so ecology reads 36.78 -> 40.68 here; the level still reaches the same ecological_shutdown end."
       },
       "commandOutcome": "either"
     },
@@ -1126,8 +1126,8 @@
           "employeeCount": 12,
           "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 36.9218042326012,
-          "nuisance": 36.20792548458591,
+          "ecology": 40.68403487021343,
+          "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1150,8 +1150,8 @@
           "employeeCount": 12,
           "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 36.9218042326012,
-          "nuisance": 36.20792548458591,
+          "ecology": 40.68403487021343,
+          "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false

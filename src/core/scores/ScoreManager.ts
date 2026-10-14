@@ -4,7 +4,12 @@
 
 import type { ScoreId } from '../entities/Building.js';
 import { getBuildingScoreEffects, type BuildingState } from '../entities/Building.js';
-import { ECOLOGY_DUST_MAX_PER_TICK, ECOLOGY_DUST_PER_TONNE_PER_TICK, SCORE_DECAY_RATE } from '../config/balance.js';
+import {
+  ECOLOGY_DUST_PER_TONNE_PER_TICK,
+  ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK,
+  ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS,
+  SCORE_DECAY_RATE,
+} from '../config/balance.js';
 
 // ── Score state ──
 
@@ -23,11 +28,15 @@ export interface ScoreState {
    * definition declared (#555 tutorial worker-revolt fix).
    */
   decayRate: number;
+  /** Airborne dust from loose rock that has not yet settled (kg-equivalent). */
+  freshDustKg: number;
+  /** Loose-rock mass seen on the previous tick; undefined (old save) means no pulse. */
+  lastLooseRockKg: number | undefined;
 }
 
 /** Starting scores — neutral. `decayRate` defaults to the global constant when the caller has no level-specific override. */
 export function createScoreState(decayRate: number = SCORE_DECAY_RATE): ScoreState {
-  return { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate };
+  return { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate, freshDustKg: 0, lastLooseRockKg: 0 };
 }
 
 // ── Score inputs ──
@@ -51,10 +60,24 @@ export interface ScoreInputs {
 
 // ── Update logic ──
 
-/** Per-tick ecology loss from loose rubble on the ground, capped. */
-function dustEcologyLoss(kg: number): number {
-  if (!Number.isFinite(kg) || kg <= 0) return 0;
-  return Math.min(ECOLOGY_DUST_MAX_PER_TICK, (kg / 1000) * ECOLOGY_DUST_PER_TONNE_PER_TICK);
+const DUST_SETTLE_RETENTION = Math.pow(0.5, 1 / ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS);
+
+/**
+ * Per-tick ecology loss from loose rubble. Advances `state.freshDustKg` (the share of the rubble a
+ * recent blast threw up, settling with a half-life) and `state.lastLooseRockKg`. Fresh rock costs
+ * the high rate, settled rock the low one. No cap.
+ */
+function advanceDustAndEcologyLoss(state: ScoreState, looseKg: number): number {
+  const loose = Number.isFinite(looseKg) && looseKg > 0 ? looseKg : 0;
+  const prev = state.lastLooseRockKg ?? loose;
+  const prevFresh = Number.isFinite(state.freshDustKg) ? state.freshDustKg : 0; // old saves lack the field
+  const fresh = Math.min(loose, prevFresh * DUST_SETTLE_RETENTION + Math.max(0, loose - prev));
+  state.freshDustKg = fresh;
+  state.lastLooseRockKg = loose;
+  return (
+    (ECOLOGY_DUST_PER_TONNE_PER_TICK * fresh) / 1000 +
+    (ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK * (loose - fresh)) / 1000
+  );
 }
 
 /**
@@ -79,12 +102,11 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
 
   // ── Ecology ──
   // Spoil heaps (waste management) raise it; vibration and dust from loose
-  // rubble on the ground lower it. At 0 it stays pinned (revolt / ecological
-  // shutdown counters rely on exact 0), so positive deltas cannot lift it.
+  // rubble on the ground lower it. A net-positive delta can lift a score off 0
+  // (heap gain beats dust), so the shutdown warning leaves room to act.
   let ecDelta = buildingEffects.ecology * 0.1;
   ecDelta -= inputs.maxRecentVibration * 0.01; // Vibrations worsen ecology
-  ecDelta -= dustEcologyLoss(inputs.looseRockKg);
-  if (state.ecology <= 0) ecDelta = Math.min(ecDelta, 0);
+  ecDelta -= advanceDustAndEcologyLoss(state, inputs.looseRockKg);
   state.ecology = clampScore(state.ecology + ecDelta);
 
   // ── Neighbour relations (internal key: nuisance) ──
@@ -138,22 +160,9 @@ export function clampScore(value: number): number {
 }
 
 function applyDecay(value: number, rate: number): number {
-  // `value > 0` is deliberate, not a gap: a score driven all the way to
-  // exactly 0 (or 100) by a strongly negative/positive delta stays there
-  // instead of drifting back toward neutral on its own — the mechanic
-  // WorkerRevolt.ts's and EcologicalDisaster's own sustained-zero-tick
-  // counters depend on to ever fire at all (see
-  // level1-lose-revolt/level1-lose-ecology.integration.test.ts, which force a
-  // score to exactly 0 and require it to *stay* there). Reverted from a
-  // version of this fix that made 0 recoverable — investigated for #555's
-  // tutorial worker-revolt regression, but it silently broke every other
-  // level's own revolt/ecology lose condition, which relies on precisely
-  // this pinning. The actual #555 fix is `ScoreState.decayRate` (this file)
-  // sourced from the level's own `LevelDef.scoreDecayRate` instead of one
-  // hardcoded global rate — it keeps the tutorial's own well-being buffer
-  // (built up before the long box-cut/drill-plan stretch) draining slowly
-  // enough that the crisis never actually reaches this floor in the first
-  // place, rather than changing what happens once something does.
+  // Decay never lifts a score already at exactly 0 (or 100): the sustained-zero counters of
+  // WorkerRevolt / EcologicalDisaster need 0 to hold against drift. Only a net-positive delta
+  // in updateScores (e.g. spoil heap gain minus dust) lifts it.
   if (value > 50) return Math.max(50, value - rate);
   if (value > 0 && value < 50) return Math.min(50, value + rate);
   return value;

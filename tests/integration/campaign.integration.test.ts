@@ -40,7 +40,7 @@ import { addHole } from '../../src/core/mining/DrillPlan.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
-import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { makeRubbleFragment } from '../helpers/blastFixtures.js';
 import { STAR_ECOLOGY_MIN } from '../../src/core/config/balance.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -1227,21 +1227,7 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
 describe('ecology responds to how the mine is run (#1691)', () => {
   const ECOLOGY_RUN_TICKS = 400;
 
-  function rubble(id: number, massKg: number): FragmentData {
-    return {
-      id,
-      position: { x: 12 + (id % 5), y: 0, z: 12 + Math.floor(id / 5) },
-      volume: massKg / 2500,
-      mass: massKg,
-      rockId: 'sandite',
-      oreDensities: {},
-      initialVelocity: { x: 0, y: 0, z: 0 },
-      isProjection: false,
-      halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
-      shapeSeed: 1,
-      origin: { x: 12, y: 0, z: 12 },
-    };
-  }
+  const rubble = (id: number, massKg: number) => makeRubbleFragment(id, massKg, { x: 12, y: 0, z: 12 });
 
   /** Same seed, same site; events off so only the player's choices move ecology. */
   function runMine(opts: { heap: boolean; rubbleKg: number }) {

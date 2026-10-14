@@ -751,6 +751,16 @@ export function deserialize(json: string): GameState {
   // softwareTier above.
   ensureField(obj, 'ghostPreviewsRevision', v => typeof v === 'number', 0);
 
+  // Settling dust (#1733): scores persist verbatim, so the two dust keys round-trip. A save that
+  // predates them has no airborne dust (0); lastLooseRockKg is left absent, which the model
+  // reads as "no pulse" on the first tick rather than a phantom blast.
+  ensureField(
+    obj['scores'] as Record<string, unknown> | undefined,
+    'freshDustKg',
+    v => typeof v === 'number',
+    0,
+  );
+
   // v6 → v7: softwareTier/tubingState moved onto GameState from the
   // console-only MiningContext, so a save from before this had neither.
   ensureField(obj, 'softwareTier', v => typeof v === 'number', 0);
