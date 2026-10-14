@@ -358,7 +358,17 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
   const open = (c: Cell): number => countLegalStepNeighbours(navGrid, c.x, c.z, NAV_CLEARANCE_VEHICLE_CELLS);
   // The new cell must stay on the vehicle's own climb component: a roomier
   // cell in a cut-off pocket would strand the vehicle from every order.
+  // Unless that component is itself cut off from the site's middle (a thin
+  // diagonal ridge on a steep rim, #1680): then no roomier cell exists on it,
+  // and the vehicle may move to the site's main ground instead.
   let components: ReturnType<typeof computeClimbComponents> | null = null; // built on the first narrow vehicle
+  const centre = findNearestNavigableCell(
+    navGrid,
+    navGrid.originX + Math.floor(navGrid.width / 2),
+    navGrid.originZ + Math.floor(navGrid.height / 2),
+  );
+  const reachable = (a: Cell, b: Cell): boolean =>
+    (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS)).canReach(a.x, a.z, b.x, b.z);
   const occupied = new Set<string>([
     ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
     ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
@@ -375,7 +385,7 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
         !occupied.has(key(c))
         && isSpawnable(navGrid.cellAt(c.x, c.z))
         && open(c) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS
-        && (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS)).canReach(from.x, from.z, c.x, c.z)
+        && (reachable(from, c) || (!reachable(from, centre) && reachable(centre, c)))
         && others.every(o => chebyshev(o, c) >= CREW_SPAWN_VEHICLE_SEPARATION),
       ) ?? null;
     }

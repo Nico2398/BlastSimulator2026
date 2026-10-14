@@ -425,7 +425,7 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     expect(components.canReach(4, 5, hauler.x, hauler.z)).toBe(true);
   });
 
-  it('leaves a vehicle sealed in a pocket where the only roomier cells lie outside its climb component', () => {
+  it('moves a vehicle sealed in a pocket cut off from the site centre onto the main ground (#1680)', () => {
     const state = createGame({ seed: 42, staffed: true });
     buildGameNavGrid(state, makeSealedTrenchGrid(32), [], []);
     const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
@@ -437,8 +437,13 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     expect(countLegalStepNeighbours(navGrid, 4, 2, NAV_CLEARANCE_VEHICLE_CELLS)).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
     expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS).canReach(4, 5, 4, 2)).toBe(false);
 
-    expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
-    expect([hauler.x, hauler.z]).toEqual([4, 5]);
+    // Its own component holds no roomier cell and never reaches the site: the
+    // vehicle could never drive out, so it moves to ground that does (#1680).
+    const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+    expect(components.canReach(4, 5, 16, 16)).toBe(false);
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(true);
+    expect([hauler.x, hauler.z]).not.toEqual([4, 5]);
+    expect(components.canReach(hauler.x, hauler.z, 16, 16)).toBe(true);
   });
 
   it('keeps the vehicle separation from every other vehicle when it moves one', () => {
