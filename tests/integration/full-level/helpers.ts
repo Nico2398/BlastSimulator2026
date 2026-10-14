@@ -179,7 +179,9 @@ export function ensureDrillRigCrew(ctx: GameContext): void {
     vehicleCommand(ctx as any, ['buy', 'drill_rig'], {});
   }
   const driller = state.employees.employees.find(e => e.role === 'driller');
-  if (driller) {
+  // assign_skill rebuilds the qualification and drops its licenceLevel, so a driller who already
+  // holds the licence (the Treranium kit's tier-2 rig driver, #1679) is left alone.
+  if (driller && !driller.qualifications.some(q => q.category === 'driving.drill_rig')) {
     employeeCommand(ctx as any, ['assign_skill', String(driller.id)], { skill: 'driving.drill_rig', level: '1' });
   }
 }

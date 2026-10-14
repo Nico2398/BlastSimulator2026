@@ -2,11 +2,13 @@
 // A drill plan is a set of holes. Each hole has position, depth, and diameter.
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY, renormaliseVoxelColumnAfterCarve } from '../world/VoxelGrid.js';
+import type { Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
+  DRILL_RIG_MAX_DEPTH_M,
 } from '../config/balance.js';
 
 export interface DrillHole {
@@ -195,4 +197,32 @@ export function digVoxel(
     newSurfaceY,
     affectedCell: { x, z },
   };
+}
+
+type RigLike = Pick<Vehicle, 'type' | 'tier'>;
+
+/**
+ * Deepest hole (m) the fleet can drill: max DRILL_RIG_MAX_DEPTH_M[tier] over
+ * `drill_rig` vehicles. With no rig owned, falls back to the tier-1 value (#1679).
+ */
+export function fleetDrillReachM(vehicles: ReadonlyArray<RigLike>): number {
+  let reach = DRILL_RIG_MAX_DEPTH_M[1];
+  for (const v of vehicles) {
+    if (v.type !== 'drill_rig') continue;
+    reach = Math.max(reach, DRILL_RIG_MAX_DEPTH_M[v.tier]);
+  }
+  return reach;
+}
+
+/**
+ * Refusal for a hole deeper than the fleet's reach: null when depth <= reach,
+ * else the i18n key and params (#1679).
+ */
+export function drillDepthRefusal(
+  depth: number,
+  vehicles: ReadonlyArray<RigLike>,
+): { key: 'mining.drill_plan.refused_depth'; params: { depth: number; reach: number } } | null {
+  const reach = fleetDrillReachM(vehicles);
+  if (!(depth > reach)) return null; // within reach; NaN left to existing behaviour
+  return { key: 'mining.drill_plan.refused_depth', params: { depth, reach } };
 }

@@ -6,6 +6,7 @@ import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
 import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
+import { t } from '../../../../../src/core/i18n/I18n.js';
 import type { ConfirmModalConfig } from '../../../../../src/ui/panels/ConfirmModal.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
@@ -564,5 +565,114 @@ describe('DrillStep — replace-pattern confirm (#1345)', () => {
     const { configs, gameConsole } = armAndConfirm(state);
     expect(configs).toHaveLength(0);
     expect(gameConsole.mock.calls[0]![0]).not.toContain('confirm:true');
+  });
+});
+
+// ── Depth stepper follows the fleet's best rig (#1679) ───────────────────────
+
+type StripField = { key: string; value: number; onInc: () => void; onDec: () => void };
+type StripArg = { fields: StripField[]; confirmDisabledReason?: string; instruction?: string; result: string };
+
+function depthFieldOf(strip: { show: ReturnType<typeof vi.fn> }): StripField {
+  const arg = strip.show.mock.calls.at(-1)![0] as StripArg;
+  return arg.fields.find(f => f.key === 'depth')!;
+}
+
+function stateWithRigTier(tier: 1 | 2 | 3) {
+  const state = makeState();
+  state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.type !== 'drill_rig');
+  state.vehicles.vehicles.push({ id: 900, type: 'drill_rig', tier } as unknown as (typeof state.vehicles.vehicles)[number]);
+  return state;
+}
+
+/** Click the depth increment far past any plausible cap and return the resulting depth. */
+function pushDepthToMax(strip: { show: ReturnType<typeof vi.fn> }): number {
+  for (let i = 0; i < 60; i++) depthFieldOf(strip).onInc();
+  return depthFieldOf(strip).value;
+}
+
+describe('DrillStep — depth stepper capped at fleet reach (#1679)', () => {
+  for (const [tier, reach] of [[1, 12], [2, 24], [3, 40]] as const) {
+    for (const tool of ['grid-tool', 'add-hole-tool'] as const) {
+      it(`${tool}: tier-${tier} rig caps the depth stepper at ${reach} m`, () => {
+        const { step } = makeStep();
+        const { kit, controller, strip } = makeMockKit();
+        step.setPlacementKit(kit);
+        step.update(stateWithRigTier(tier), 'sunny');
+        (step.root.querySelector(`[data-action="${tool}"]`) as HTMLButtonElement).click();
+        controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+        expect(pushDepthToMax(strip)).toBe(reach);
+      });
+    }
+  }
+
+  it('the best rig wins when the fleet holds several tiers', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    const state = stateWithRigTier(1);
+    state.vehicles.vehicles.push({ id: 901, type: 'drill_rig', tier: 2 } as unknown as (typeof state.vehicles.vehicles)[number]);
+    step.update(state, 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    expect(pushDepthToMax(strip)).toBe(24);
+  });
+
+  it('the reach cap is not a hardcoded 40: a default tier-1 fleet stops at 12 m', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    const state = makeState();
+    step.update(state, 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    expect(pushDepthToMax(strip)).toBeLessThanOrEqual(12);
+  });
+
+  it('boundary: the minimum stays 1 m', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(stateWithRigTier(1), 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    for (let i = 0; i < 30; i++) depthFieldOf(strip).onDec();
+    expect(depthFieldOf(strip).value).toBe(1);
+  });
+
+  it('a previously chosen depth is clamped down when the reach shrinks', () => {
+    const { step, gameConsole } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(stateWithRigTier(3), 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+    expect(pushDepthToMax(strip)).toBe(40);
+    controller.cancel();
+
+    step.update(stateWithRigTier(1), 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+    controller.simulateConfirm();
+
+    expect(gameConsole.mock.calls[0]![0] as string).toContain('depth:12');
+  });
+
+  it('says why: the strip text states the reach from ui.blast_workshop.drill.depth_reach', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(stateWithRigTier(1), 'sunny');
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    const reason = t('ui.blast_workshop.drill.depth_reach', { reach: 12 });
+    expect(reason).not.toMatch(/depth_reach/);
+    expect(reason).toContain('12');
+    expect(JSON.stringify(strip.show.mock.calls.at(-1)![0])).toContain(reason);
   });
 });

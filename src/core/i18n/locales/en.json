@@ -3984,5 +3984,9 @@
   "entities.build_destroy_lost_ore": "Warning: {kg} kg of stored ore and rock will be lost with this warehouse.",
   "mining.blast.warehouse_stock_lost": "Freight Warehouse #{id} destroyed: {kg} kg of stored stock lost.",
   "notification.warehouse_stock_lost": "Freight Warehouse #{id} was destroyed. {kg} kg of stored stock is gone.",
-  "notification.title.warehouse_stock_lost": "Stock lost"
+  "notification.title.warehouse_stock_lost": "Stock lost",
+  "ui.fleet.tip.reach": "Deepest hole: {value} m",
+  "ui.fleet.card.reach": "Reach {value} m",
+  "ui.blast_workshop.drill.depth_reach": "Deepest hole your best rig can drill: {reach} m. Upgrade a drill rig to go deeper.",
+  "mining.drill_plan.refused_depth": "Cannot drill a {depth} m hole: your best drill rig reaches {reach} m. Buy or upgrade a drill rig to go deeper."
 }

@@ -12,7 +12,7 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { gridCellPositions } from '../../../core/mining/DrillPlan.js';
+import { gridCellPositions, fleetDrillReachM } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
@@ -25,6 +25,7 @@ import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
+  DRILL_HOLE_MIN_DEPTH_M,
 } from '../../../core/config/balance.js';
 
 
@@ -294,6 +295,16 @@ export class DrillStep {
     return this.lastState ? coveredByFootprint(cells, buildingFootprintOccupants(this.lastState)).size : 0;
   }
 
+  /** Deepest hole the owned fleet can drill; tier-1 reach before any state arrives. */
+  private reachM(): number {
+    return fleetDrillReachM(this.lastState?.vehicles.vehicles ?? []);
+  }
+
+  /** Pull the depth setting back inside the fleet's reach (a rig may have been lost). */
+  private clampDepthToReach(): void {
+    this.gridDepth = Math.min(this.gridDepth, this.reachM());
+  }
+
   /** Strip field stepping a clamped grid setting; re-renders the strip on change. */
   private stepField(
     key: 'spacing' | 'depth', label: string, prop: 'gridSpacing' | 'gridDepth',
@@ -343,6 +354,7 @@ export class DrillStep {
   private armGridTool(): void {
     this.armTool('rect', (kit, refresh) => {
       const { controller, overlay, strip } = kit;
+      this.clampDepthToReach();
       const sel = controller.selection;
       const region = controller.activeRegion;
       overlay.update(sel ? {
@@ -362,14 +374,14 @@ export class DrillStep {
         subtitle: sel ? `${cols} × ${rows}` : '',
         fields: [
           this.stepField('spacing', t('ui.blast_workshop.drill.spacing'), 'gridSpacing', 1, 20, refresh),
-          this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', 1, 40, refresh),
+          this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
         ],
         result: sel
           ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}${coveredCount > 0 ? ` — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: coveredCount })}` : ''}`
           : '—',
         confirmEnabled: controller.canConfirm && !allCovered,
         confirmDisabledReason: refusal.reason,
-        instruction: t('ui.blast_workshop.drill.grid_tool_hint'),
+        instruction: `${t('ui.blast_workshop.drill.grid_tool_hint')}\n${t('ui.blast_workshop.drill.depth_reach', { reach: this.reachM() })}`,
       });
     }, (sel, overlay) => {
       const cols = Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1);
@@ -390,6 +402,7 @@ export class DrillStep {
   private armAddHoleTool(): void {
     this.armTool('point', (kit, refresh) => {
       const { controller, overlay, strip } = kit;
+      this.clampDepthToReach();
       const sel = controller.selection;
       const covered = sel ? this.coveredCount([{ id: 'add', x: sel.x1, z: sel.z1 }]) > 0 : false;
       const footprintReason = covered && sel ? t('mining.drill_plan.refused_footprint', { x: Math.floor(sel.x1), z: Math.floor(sel.z1) }) : null;
@@ -401,12 +414,12 @@ export class DrillStep {
         title: t('ui.blast_workshop.drill.add_hole'),
         subtitle: sel ? `(${sel.x1}, ${sel.z1})` : '',
         fields: [
-          this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', 1, 40, refresh),
+          this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
         ],
         result: sel ? '1' : '—',
         confirmEnabled: controller.canConfirm && !covered,
         confirmDisabledReason: refusal.reason,
-        instruction: t('ui.blast_workshop.drill.add_hole_hint'),
+        instruction: `${t('ui.blast_workshop.drill.add_hole_hint')}\n${t('ui.blast_workshop.drill.depth_reach', { reach: this.reachM() })}`,
       });
     }, (sel, overlay) => {
       this.afterConfirm(overlay, `drill_plan add x:${sel.x1} z:${sel.z1} depth:${this.gridDepth} diameter:${this.gridDiameter}`);

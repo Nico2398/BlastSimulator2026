@@ -608,7 +608,7 @@ describe('NavGrid patching — blast', () => {
     const ctx = makeCtx();
     const nav = ctx.state!.navGrid!;
     expect(nav).toBeTruthy();
-    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '12' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
@@ -658,7 +658,7 @@ describe('NavGrid patching — blast', () => {
       for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) if (grid.densityAt(x, y, z) > 0) n++;
       return n;
     };
-    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '12' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
@@ -771,7 +771,7 @@ describe('NavGrid patching — event names (#1161)', () => {
 
   it('blast emits terrain:updated exactly once (the real carve) and nav:occupancy_changed exactly once (the corrective post-clear patch)', () => {
     const ctx = makeCtx();
-    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '12' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
