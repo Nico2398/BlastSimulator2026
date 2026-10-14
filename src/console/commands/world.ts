@@ -110,12 +110,13 @@ function defaultDatumForSize(size: number): number {
  * generation": `regenerateGridParams` layers its own dimension validation on
  * top for a no-voxels load fallback.
  */
-function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean } {
+function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; climateBias?: [number, number] } {
   return {
     sizeX: world.baseSizeX,
     datum: world.datum,
     sizeZ: world.baseSizeZ,
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
+    ...(world.climateBias ? { climateBias: world.climateBias } : {}),
   };
 }
 
@@ -124,10 +125,11 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
   if (!state.world) return null;
   const biome = getBiome(state.mineType);
   if (!biome) return null;
+  const { climateBias, ...fields } = worldGenerationFields(state.world);
   return {
     seed: state.seed,
-    climateBias: biome.climateCenter,
-    ...worldGenerationFields(state.world),
+    climateBias: climateBias ?? biome.climateCenter,
+    ...fields,
   };
 }
 
@@ -165,7 +167,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
  * turns that into a clean `world.terrain_save_corrupt` refusal and rolls
  * `ctx` back.
  */
-function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean } {
+function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; climateBias?: [number, number] } {
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, datum: defaultDatumForSize(DEFAULT_GRID_SIZE), sizeZ: DEFAULT_GRID_SIZE };
   }
@@ -245,6 +247,13 @@ export function regenerateGrid(
   };
   if (ctx.state.world && mixedRockHardness !== undefined) {
     ctx.state.world.mixedRockHardness = mixedRockHardness;
+  }
+  if (ctx.state.world) {
+    // Persist only a bias that differs from the biome centre (sandbox seeds the raw climate misses).
+    const centre = getBiome(ctx.state.mineType)?.climateCenter;
+    const differs = !centre || climateBias[0] !== centre[0] || climateBias[1] !== centre[1];
+    if (differs) ctx.state.world.climateBias = [climateBias[0], climateBias[1]];
+    else delete ctx.state.world.climateBias;
   }
   ctx.grid = generateTerrain(config);
   ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
@@ -402,9 +411,9 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     if (decodedGrid) {
       restoreGrid(ctx, decodedGrid);
     } else {
-      const { sizeX, datum, sizeZ, mixedRockHardness } = regenerateGridParams(state);
+      const { sizeX, datum, sizeZ, mixedRockHardness, climateBias } = regenerateGridParams(state);
       regenerateGrid(ctx, {
-        seed: state.seed, climateBias: biome.climateCenter, sizeX, datum, sizeZ,
+        seed: state.seed, climateBias: climateBias ?? biome.climateCenter, sizeX, datum, sizeZ,
         ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
       });
     }

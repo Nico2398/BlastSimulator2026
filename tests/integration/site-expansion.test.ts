@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { terrainConfigOf } from '../../src/console/commands/world.js';
 import { drillPlanCommand, buildRampCommand, surveyCommand, type MiningContext } from '../../src/console/commands/mining.js';
+import { tickCommand } from '../../src/console/commands/tick.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
 import type { ProtectedStructures } from '../../src/core/world/Structures.js';
@@ -161,6 +162,32 @@ describe('site expansion — survey claims its whole coverage disc, not just the
     for (const [x, z] of points) {
       expect(ctx.grid!.containsColumn(x, z)).toBe(true);
     }
+  });
+});
+
+describe('site expansion — ore exists in claimed ground outside the original rectangle (#1670)', () => {
+  it('a survey past the east edge claims ground that carries ore', () => {
+    const ctx = makeCtx();
+    hireSurveyor(ctx);
+    const result = surveyCommand(ctx, ['seismic'], { x: '40', z: '16' });
+    expect(result.success).toBe(true);
+    tickCommand(ctx, ['30'], {});
+    const grid = ctx.grid!;
+    let solid = 0;
+    let ore = 0;
+    for (let x = 33; x < grid.maxX; x++) {
+      for (let z = 0; z < 32; z++) {
+        if (!grid.containsColumn(x, z)) continue;
+        for (let y = 0; y < 20; y++) {
+          const v = grid.getVoxel(x, y, z);
+          if (!v || v.density <= 0) continue;
+          solid++;
+          if (Object.keys(v.oreDensities).length > 0) ore++;
+        }
+      }
+    }
+    expect(solid).toBeGreaterThan(0);
+    expect(ore).toBeGreaterThan(0);
   });
 });
 

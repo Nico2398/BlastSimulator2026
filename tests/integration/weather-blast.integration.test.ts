@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 
 /**
@@ -234,5 +235,39 @@ describe('blast report lists wet and fizzled holes (#1348)', () => {
     const { report, chargedIds } = tubedBlast('heavy_rain', 'krackle', false);
     expect(report.wetHoleIds).toEqual(chargedIds);
     expect(report.fizzledHoleIds).toEqual([]);
+  });
+});
+
+describe('fizzle share caps the blast rating (#1675)', () => {
+  it('a fully fizzled boomite blast in rain reports ratingCap fizzled_failure and rating bad', () => {
+    const wet = createRunner();
+    wet.runner.run('new_game seed:42 staffed:true');
+    wet.runner.run('weather set heavy_rain');
+    expect(drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain').success).toBe(true);
+    const report = wet.ctx.state!.lastBlastReport!;
+    expect(report.fizzledHoleIds).toEqual(report.wetHoleIds);
+    expect(report.ratingCap).toBe('fizzled_failure');
+    expect(report.rating).toBe('bad');
+  });
+
+  it('a krackle blast in wet holes is not capped and nothing fizzles', () => {
+    const wet = createRunner();
+    wet.runner.run('new_game seed:42 staffed:true');
+    wet.runner.run('weather set heavy_rain');
+    expect(drillChargeBlast(wet.runner, wet.ctx, 'krackle', 'heavy_rain').success).toBe(true);
+    const report = wet.ctx.state!.lastBlastReport!;
+    expect(report.wetHoleIds?.length).toBeGreaterThan(0);
+    expect(report.fizzledHoleIds).toEqual([]);
+    expect(report.ratingCap).not.toBe('wet_holes');
+    expect(report.ratingCap).not.toBe('fizzled_failure');
+    expect(report.ratingCap).not.toBe('fizzled_partial');
+  });
+
+  it('the console blast output names the fizzled cap', () => {
+    const wet = createRunner();
+    wet.runner.run('new_game seed:42 staffed:true');
+    wet.runner.run('weather set heavy_rain');
+    const result = drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
+    expect(result.output).toContain(t('mining.blast.rating_cap_fizzled_failure', { base: wet.ctx.state!.lastBlastReport!.baseRating?.toUpperCase() ?? '' }));
   });
 });

@@ -545,6 +545,8 @@ export interface WorldState {
    */
   baseSizeX: number;
   baseSizeZ: number;
+  /** Per-seed climate bias persisted by regenerateGrid; falls back to the biome's `climateCenter` when absent. */
+  climateBias?: [number, number];
   /** The VoxelGrid is not stored directly — either restored from `voxels` (v6+) or regenerated from seed. */
   gridReady: boolean;
   /**
