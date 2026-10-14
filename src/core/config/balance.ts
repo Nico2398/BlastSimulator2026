@@ -1799,6 +1799,7 @@ export const SURVEY_COVERAGE_RADIUS = {
  * (surfaceY, surfaceY - 1), unchanged by this issue.
  */
 export const SURVEY_DEPTH_BELOW_SURFACE = {
+  aerial:       1, // TODO: placeholder, implementer sets 2 (#1676)
   seismic:     15,
   core_sample:  8,
 } as const;
