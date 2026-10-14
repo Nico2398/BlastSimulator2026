@@ -1853,16 +1853,19 @@ export const SURVEY_COVERAGE_RADIUS = {
 } as const;
 
 /**
- * Depth (voxels) below a column's own surface that a seismic or core-sample
- * survey scans — replaces "down to y = 0" (#1186): column storage has no
- * floor any more (#1183/#1184), so "the whole column" is unbounded and has
- * to become "a bounded window below wherever the surface actually sits".
- * `aerial` needs no entry — it always samples exactly the top 2 levels
- * (surfaceY, surfaceY - 1), unchanged by this issue.
+ * Depth (voxels, i.e. metres) each survey method scans from a column's own
+ * surface — a bounded window below wherever the surface actually sits (#1186:
+ * column storage has no floor, so "the whole column" is unbounded).
+ * - aerial: the top 2 levels (surfaceY, surfaceY - 1), a shallow horizon.
+ * - seismic: 25 — deeper than the common ores, reaching into the uncommon ones.
+ * - core_sample: 40 — matches the deepest hole the Drill step offers (its depth
+ *   stepper tops out at 40 m), so a core sees everything a drill could reach.
+ * The survey panel shows these numbers to the player.
  */
 export const SURVEY_DEPTH_BELOW_SURFACE = {
-  seismic:     15,
-  core_sample:  8,
+  aerial:       2,
+  seismic:     25,
+  core_sample: 40,
 } as const;
 
 /** Error reduction applied per skill level above 1 (e.g. skill 3 → 2 × 0.12 = 0.24 reduction). */

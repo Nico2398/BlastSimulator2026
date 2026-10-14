@@ -4,6 +4,7 @@ import { SurveyPanel } from '../../../../src/ui/panels/SurveyPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
+import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../../src/core/mining/SurveyCalc.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
@@ -74,6 +75,28 @@ describe('SurveyPanel', () => {
     expect(text).toContain('$800'); // core_sample
     expect(text).toContain('$1,500'); // aerial
     expect(panel.root.querySelectorAll('[data-method]').length).toBe(3);
+  });
+
+  it('#1676: each method row shows its reach in metres, taken from SURVEY_DEPTH_BELOW_SURFACE', () => {
+    const { panel } = makePanel();
+    panel.update(makeState());
+    for (const method of ['aerial', 'seismic', 'core_sample'] as const) {
+      const card = panel.root.querySelector(`[data-method="${method}"]`)!;
+      expect(card.textContent).toContain(`${SURVEY_DEPTH_BELOW_SURFACE[method]} m deep`);
+    }
+    expect(panel.root.querySelector('[data-method="aerial"]')!.textContent).toContain('2 m deep');
+    expect(panel.root.querySelector('[data-method="seismic"]')!.textContent).toContain('25 m deep');
+    expect(panel.root.querySelector('[data-method="core_sample"]')!.textContent).toContain('40 m deep');
+  });
+
+  it('#1676: no method row says "full depth" or "surface only"', () => {
+    const { panel } = makePanel();
+    panel.update(makeState());
+    for (const method of ['aerial', 'seismic', 'core_sample'] as const) {
+      const text = panel.root.querySelector(`[data-method="${method}"]`)!.textContent!;
+      expect(text).not.toContain('full depth');
+      expect(text).not.toContain('surface only');
+    }
   });
 
   it('core_sample shows point-only radius, not a cell count', () => {

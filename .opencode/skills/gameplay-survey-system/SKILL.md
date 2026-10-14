@@ -17,9 +17,9 @@ Three tools with different cost/accuracy/coverage tradeoffs:
 
 | Method | Tool | i18n Key | Cost ($) | Time (ticks) | Accuracy | Coverage |
 |--------|------|---------|---------|-------------|---------|---------|
-| Seismic Survey | Detonates small charge + records reflections | `survey.seismic` | 3,000 | 8 | ±15% ore density | 20-cell radius, down to `SURVEY_DEPTH_BELOW_SURFACE.seismic` below the surface |
-| Core Sample | Drills narrow extraction core | `survey.core_sample` | 800 | 4 | ±5% ore density | Single column, down to `SURVEY_DEPTH_BELOW_SURFACE.core_sample` below the surface |
-| Aerial Spectroscopy | Drone scans surface mineral signature | `survey.aerial` | 1,500 | 3 | ±25% ore density | 30-cell radius, surface only (Y=0 to Y=−1) |
+| Seismic Survey | Detonates small charge + records reflections | `survey.seismic` | 3,000 | 8 | ±15% ore density | 20-cell radius, down to `SURVEY_DEPTH_BELOW_SURFACE.seismic` (25 m) below the surface |
+| Core Sample | Drills narrow extraction core | `survey.core_sample` | 800 | 4 | ±5% ore density | Single column, down to `SURVEY_DEPTH_BELOW_SURFACE.core_sample` (40 m, the deepest drill-rig hole) below the surface |
+| Aerial Spectroscopy | Drone scans surface mineral signature | `survey.aerial` | 1,500 | 3 | ±25% ore density | 30-cell radius, top `SURVEY_DEPTH_BELOW_SURFACE.aerial` (2) layers only |
 
 The Time (ticks) duration above starts once the assigned surveyor physically arrives at the target site, not when the survey is queued — walking there is separate travel time on top of it, arrival-gated per `dev-architecture`'s arrival-gated-actions convention.
 
@@ -44,8 +44,8 @@ A survey goes **stale when a blast clears a column inside its coverage disc** (`
    estimatedDensity = clamp(estimatedDensity, 0, 1)
    ```
 3. **Round to nearest 0.05** (discrete bands: 0%, 5%, 10%… 100%)
-4. **Aerial** surveys: only sample Y = surfaceY and surfaceY−1 (shallow horizon)
-5. **Seismic**: averages estimates over a 3-voxel vertical smear (coarser vertical resolution)
+4. **Depth window:** each method samples `SURVEY_DEPTH_BELOW_SURFACE[method]` layers from the surface down (aerial 2, seismic 25, core sample 40); the panel shows it as "N m deep". Depth vs rarity: aerial sees only the surface layer; seismic (25 m) goes past the common ores into the uncommon ones; core sample (40 m) reaches the deepest a drill can.
+5. **Seismic**: averages estimates over 3-voxel vertical groups (coarser vertical resolution; the trailing group may be smaller)
 
 Always use seeded PRNG (`src/core/math/Random.ts`) — never `Math.random()`.
 
@@ -58,6 +58,8 @@ Generation: per-rock Simplex noise field + level bias, normalized. Feeds texture
 ## Ore Veins
 
 Ores not spread homogeneously. Each ore type has separate Simplex field with high threshold → elongated vein shapes. Surface veins visible as color tints. Sub-surface veins require survey to detect.
+
+**Biome ore progression (#1677).** Ore depth windows (`OreCatalog`) are global; biome coverage comes from which rocks host which ores (`RockCatalog.oreProbabilities`). Every biome has a sellable common ore (dirtite/rustite/blingite) in 0-8 m, rarer and richer ore deeper, and no biome is barren in any 8 m slab of 0-40 m. Over seeds 1, 7, 42 on the 64x64 sandbox, most interior 8x8x8 m blocks hold >= 2 t ore in both the 0-8 m and 24-32 m slabs, and mean ore depth rises with rarity tier. Desert and red-canyon shallow ore stays bit-identical; only deeper ore was added. To extend a biome, add ore entries to its rocks, not new depth windows. Generation stays pure in seed + position (`TERRAIN_GENERATOR_VERSION` unchanged).
 
 ## Ore Grade Reporting Post-Blast
 

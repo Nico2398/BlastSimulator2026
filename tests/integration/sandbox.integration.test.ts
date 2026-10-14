@@ -570,3 +570,31 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
     expect(gen.climateBias).toEqual([...getBiome('desert_badlands')!.climateCenter]);
   });
 });
+
+// #1677: the opening-site survey finds ore in the two biomes whose ore used to be locked out.
+describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start survey finds ore (#1677)', (biome) => {
+  it.each(['aerial', 'core_sample'] as const)('%s survey at the start reports ore', (method) => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`).success).toBe(true);
+    runner.run('time resume');
+    const state = ctx.state!;
+    // The free kit has no surveyor: hire one and grant geology, as a player would via the roster.
+    expect(runner.run('employee hire role:surveyor').success).toBe(true);
+    const surveyor = state.employees.employees.slice(-1)[0]!;
+    expect(runner.run(`employee assign_skill ${surveyor.id} skill:geology level:3`).success).toBe(true);
+
+    // Centre on the surveyor so the survey needs no travel.
+    const cx = Math.round(surveyor.x);
+    const cz = Math.round(surveyor.z);
+    const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
+    expect(result.success, result.output).toBe(true);
+
+    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) runner.run('tick 1');
+    expect(state.surveyResults.length).toBeGreaterThan(0);
+
+    const survey = state.surveyResults[0]!;
+    expect(survey.method).toBe(method);
+    const densities = Object.values(survey.estimates).flatMap(col => Object.values(col));
+    expect(densities.some(d => d > 0), 'the report contains ore').toBe(true);
+  }, 60_000);
+});
