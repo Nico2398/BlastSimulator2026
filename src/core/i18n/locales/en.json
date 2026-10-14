@@ -3413,7 +3413,7 @@
   "sandbox.detail.ores": "Ores: {list} (depth {min}-{max} m)",
   "sandbox.detail.terrain": "Terrain: {terrain}",
   "sandbox.detail.cash": "Starting cash: ${cash}",
-  "sandbox.detail.opens_with": "Opens with - crew: {crew}; vehicles: {vehicles}; buildings: {buildings}",
+  "sandbox.detail.opens_with": "Opens with: crew: {crew}; vehicles: {vehicles}; buildings: {buildings}",
   "sandbox.detail.none": "none",
   "sandbox.terrain.flat": "flat",
   "sandbox.terrain.rolling": "rolling hills",

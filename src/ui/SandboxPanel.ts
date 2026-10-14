@@ -9,9 +9,9 @@
 // position breaks the moment a field is inserted.
 
 import { t } from '../core/i18n/I18n.js';
-import { getVehicleDefByTier } from '../core/entities/Vehicle.js';
-import { getBuildingDef, type BuildingTier, type BuildingType } from '../core/entities/Building.js';
-import type { VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
+import { getBuildingDef } from '../core/entities/Building.js';
+import { formatMoney } from '../core/economy/formatMoney.js';
+import { vehicleDisplayName } from './fleetDetailSections.js';
 import {
   SANDBOX_DEFAULTS,
   SANDBOX_FIELDS,
@@ -20,6 +20,7 @@ import {
   sandboxBiomeTraits,
   sandboxDifficultyDetails,
   type SandboxConfig,
+  type SandboxDifficultyId,
   type SandboxField,
 } from '../core/campaign/Sandbox.js';
 
@@ -230,35 +231,39 @@ export class SandboxPanel {
 
   private renderDetails(): void {
     const config = this.getConfig();
-    const biome = sandboxBiomeTraits(config.biome);
+    this.renderBiomeDetails(config.biome);
+    this.renderDifficultyDetails(config.difficulty);
+  }
+
+  private renderBiomeDetails(biomeId: string): void {
+    const biome = sandboxBiomeTraits(biomeId);
     const lines: [string, string][] = [
       ['desc', t(biome.descKey)],
       ['hardness', biome.hardnessTierMin === biome.hardnessTierMax
         ? t('sandbox.detail.hardness_single', { tier: biome.hardnessTierMin })
         : t('sandbox.detail.hardness', { min: biome.hardnessTierMin, max: biome.hardnessTierMax })],
-      ['terrain', t('sandbox.detail.terrain', { terrain: t(`sandbox.terrain.${biome.ruggedness}`) })],
     ];
     if (biome.ores.length > 0) {
-      lines.splice(2, 0, ['ores', t('sandbox.detail.ores', {
+      lines.push(['ores', t('sandbox.detail.ores', {
         list: biome.ores.map(o => t(o.nameKey)).join(', '),
         min: biome.oreDepthMin,
         max: biome.oreDepthMax,
       })]);
     }
+    lines.push(['terrain', t('sandbox.detail.terrain', { terrain: t(`sandbox.terrain.${biome.ruggedness}`) })]);
     this.biomeBlock.replaceChildren(...lines.map(([key, text]) => detailLine(`bs-sandbox-biome-${key}`, text)));
+  }
 
-    const diff = sandboxDifficultyDetails(config.difficulty);
-    const none = t('sandbox.detail.none');
-    const list = (items: string[]): string => items.length > 0 ? items.join(', ') : none;
+  private renderDifficultyDetails(difficulty: SandboxDifficultyId): void {
+    const diff = sandboxDifficultyDetails(difficulty);
+    const list = (items: string[]): string => items.length > 0 ? items.join(', ') : t('sandbox.detail.none');
     const opening = t('sandbox.detail.opens_with', {
       crew: list(diff.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
-      vehicles: list(diff.vehicles.map(v =>
-        `${v.count}× ${t(getVehicleDefByTier(v.role as VehicleRole, v.tier as VehicleTier).nameKey)}`)),
-      buildings: list(diff.buildings.map(b =>
-        `${b.count}× ${t(getBuildingDef(b.type as BuildingType, b.tier as BuildingTier).nameKey)}`)),
+      vehicles: list(diff.vehicles.map(v => `${v.count}× ${vehicleDisplayName(v.role, v.tier)}`)),
+      buildings: list(diff.buildings.map(b => `${b.count}× ${t(getBuildingDef(b.type, b.tier).nameKey)}`)),
     });
     this.difficultyBlock.replaceChildren(
-      detailLine('bs-sandbox-difficulty-cash', t('sandbox.detail.cash', { cash: diff.startingCash })),
+      detailLine('bs-sandbox-difficulty-cash', t('sandbox.detail.cash', { cash: formatMoney(diff.startingCash) })),
       detailLine('bs-sandbox-difficulty-opening', opening),
     );
   }

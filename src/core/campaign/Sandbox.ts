@@ -16,6 +16,9 @@ import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
+import type { EmployeeRole } from '../entities/Employee.js';
+import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
+import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { LevelDef } from './Level.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
@@ -216,9 +219,9 @@ interface SandboxDifficultyDetails {
   id: SandboxDifficultyId;
   labelKey: string;
   startingCash: number;
-  crew: readonly { role: string; count: number }[];
-  vehicles: readonly { role: string; tier: number; count: number }[];
-  buildings: readonly { type: string; tier: number; count: number }[];
+  crew: readonly { role: EmployeeRole; count: number }[];
+  vehicles: readonly { role: VehicleRole; tier: VehicleTier; count: number }[];
+  buildings: readonly { type: BuildingType; tier: BuildingTier; count: number }[];
 }
 
 /** Collapse a list of slots into one entry per distinct key, counting repeats in first-seen order. */
@@ -233,6 +236,10 @@ function groupSlots<S extends object>(slots: readonly S[], keyOf: (slot: S) => s
   return [...groups.values()];
 }
 
+/**
+ * What a difficulty hands the player at the start: cash plus its starting
+ * site's crew, vehicles and buildings, each grouped into counted entries.
+ */
 export function sandboxDifficultyDetails(id: SandboxDifficultyId): SandboxDifficultyDetails {
   const def = SANDBOX_DIFFICULTIES[id];
   const { employees, vehicles, buildings } = def.startingSite;

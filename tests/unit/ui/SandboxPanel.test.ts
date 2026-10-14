@@ -18,9 +18,12 @@ import type { SandboxConfig } from '../../../src/core/campaign/Sandbox.js';
 import {
   SANDBOX_DIFFICULTIES,
   sandboxBiomeTraits,
+  sandboxDifficultyDetails,
+  type SandboxDifficultyId,
 } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
 
 const REMOVED_FIELD_IDS = [
   'bs-sandbox-size',
@@ -342,6 +345,16 @@ describe('SandboxPanel', () => {
     expect(hard.trim()).not.toBe('');
     expect(easy.trim()).not.toBe('');
     expect(easy).not.toBe(hard);
+
+    // The easy kit adds a rock digger and a rock fragmenter over the hard kit.
+    const names = (id: SandboxDifficultyId) => sandboxDifficultyDetails(id).vehicles
+      .map(v => t(getVehicleDefByTier(v.role, v.tier).nameKey));
+    for (const name of names('hard')) expect(hard, name).toContain(name);
+    for (const name of names('easy')) expect(easy, name).toContain(name);
+    const hardOnly = new Set(names('hard'));
+    const extra = names('easy').filter(n => !hardOnly.has(n));
+    expect(extra.length).toBeGreaterThan(0);
+    for (const name of extra) expect(hard, name).not.toContain(name);
   });
 
   it('a biome change keeps the difficulty details, and vice versa', () => {
