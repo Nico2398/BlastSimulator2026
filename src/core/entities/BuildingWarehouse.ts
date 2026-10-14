@@ -17,61 +17,46 @@ export function getExplosivesCapacity(state: BuildingState): number {
   return total;
 }
 
-/** Total explosives currently stored (kg) across all active explosive warehouses. */
-export function getExplosivesInStock(state: BuildingState): number {
-  let total = 0;
-  for (const b of state.buildings) {
-    if (isOperating(b) && b.type === 'explosive_warehouse') {
-      total += b.storedExplosivesKg ?? 0;
-    }
-  }
-  return total;
+/** Explosives stored (kg) across active explosive warehouses: one explosive id, or all when omitted. */
+export function getExplosivesInStock(_state: BuildingState, _explosiveId?: string): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Stored explosives (kg) by explosive id across active explosive warehouses. */
+export function getExplosivesStockByType(_state: BuildingState): Record<string, number> {
+  // TODO: implement
+  return {};
+}
+
+/** Unused explosive storage (kg) across active explosive warehouses. */
+export function getExplosivesFreeCapacity(_state: BuildingState): number {
+  // TODO: implement
+  return 0;
 }
 
 /**
- * Store explosives in available warehouse space.
- * Distributes across warehouses in placement order.
+ * Store explosives of one id in available warehouse space.
  * @returns Amount actually stored (may be less than requested if capacity is full).
  */
-export function storeExplosives(state: BuildingState, amountKg: number): number {
-  let remaining = amountKg;
-  for (const b of state.buildings) {
-    if (!isOperating(b) || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
-    const def = getBuildingDef(b.type, b.tier);
-    const current = b.storedExplosivesKg ?? 0;
-    const available = def.capacity - current;
-    if (available <= 0) continue;
-    const toStore = Math.min(remaining, available);
-    b.storedExplosivesKg = current + toStore;
-    remaining -= toStore;
-  }
-  return amountKg - remaining;
+export function storeExplosives(_state: BuildingState, _explosiveId: string, _amountKg: number): number {
+  // TODO: implement
+  return 0;
 }
 
 /**
- * Consume explosives from warehouse(s).
+ * Consume explosives of one id from warehouse(s).
  * @returns true if sufficient stock was available and deducted; false otherwise (state unchanged).
  */
-export function consumeExplosives(state: BuildingState, amountKg: number): boolean {
-  if (getExplosivesInStock(state) < amountKg) return false;
-
-  let remaining = amountKg;
-  for (const b of state.buildings) {
-    if (!isOperating(b) || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
-    const current = b.storedExplosivesKg ?? 0;
-    if (current <= 0) continue;
-    const toConsume = Math.min(remaining, current);
-    b.storedExplosivesKg = current - toConsume;
-    remaining -= toConsume;
-  }
-  return true;
+export function consumeExplosives(_state: BuildingState, _explosiveId: string, _amountKg: number): boolean {
+  // TODO: implement
+  return false;
 }
 
 /** Returns true if at least one active explosive warehouse has stock > 0. */
-export function hasExplosivesForBlast(state: BuildingState): boolean {
-  return state.buildings.some(
-    b => isOperating(b) && b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0,
-  );
+export function hasExplosivesForBlast(_state: BuildingState): boolean {
+  // TODO: implement
+  return false;
 }
 
 // ── Freight Warehouse ────────────────────────────────────────────────────────

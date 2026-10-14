@@ -43,7 +43,7 @@ describe('buildDemolishConfirm (#1399)', () => {
   });
 
   it('explosive warehouse with stock warns with the kg lost', () => {
-    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosivesKg: 250 });
+    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosives: { anfo: 250 } });
     const cfg = buildDemolishConfirm(b, vi.fn());
     expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_explosives', { kg: 250 }));
     expect(cfg.body).toContain('250');
@@ -51,7 +51,7 @@ describe('buildDemolishConfirm (#1399)', () => {
   });
 
   it('explosive warehouse with zero stock has no warning', () => {
-    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosivesKg: 0 });
+    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosives: { anfo: 0 } });
     const cfg = buildDemolishConfirm(b, vi.fn());
     expect(cfg.body).not.toContain(t('ui.build.demolish_confirm_loses_explosives', { kg: 0 }));
   });

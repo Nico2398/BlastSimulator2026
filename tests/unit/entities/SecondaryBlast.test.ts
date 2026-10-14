@@ -215,7 +215,7 @@ describe('resolveSecondaryBlasts', () => {
     const w = makeWorld();
     placeBuilding(w.buildings, 'explosive_warehouse', 63, 60, GRID, GRID);
     const wh = w.buildings.buildings[0]!;
-    wh.storedExplosivesKg = 50;
+    wh.storedExplosives = { anfo: 50 };
     wh.hp = 1; // any blast damage destroys it
     const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
 
@@ -233,7 +233,7 @@ describe('resolveSecondaryBlasts', () => {
     const w = makeWorld();
     placeBuilding(w.buildings, 'explosive_warehouse', 63, 60, GRID, GRID);
     placeBuilding(w.buildings, 'explosive_warehouse', 66, 60, GRID, GRID);
-    for (const b of w.buildings.buildings) { b.storedExplosivesKg = 50; b.hp = 1; }
+    for (const b of w.buildings.buildings) { b.storedExplosives = { anfo: 50 }; b.hp = 1; }
     const ids = w.buildings.buildings.map(b => b.id);
     const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
 

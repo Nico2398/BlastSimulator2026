@@ -275,7 +275,7 @@ describe('executeBlast — secondary blast events', () => {
     const { cx, cz } = buildingCenter(placed.building!);
 
     // storedExplosivesKg triggers a secondary blast event when the building is destroyed.
-    (buildingState.buildings[0] as any).storedExplosivesKg = 200;
+    (buildingState.buildings[0] as any).storedExplosives = { anfo: 200 };
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 5, 5, 5, 0.15);
@@ -297,7 +297,7 @@ describe('executeBlast — secondary blast events', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
     placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
-    (buildingState.buildings[0] as any).storedExplosivesKg = 0;
+    (buildingState.buildings[0] as any).storedExplosives = { anfo: 0 };
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 5, 5, 5, 0.15);
@@ -430,7 +430,7 @@ describe('processProjections — secondary blast collector (#1394)', () => {
     const buildings = createBuildingState();
     placeBuilding(buildings, 'explosive_warehouse', 5, 5, 64, 64);
     const wh = buildings.buildings[0]!;
-    if (stock !== undefined) wh.storedExplosivesKg = stock;
+    if (stock !== undefined) wh.storedExplosives = { anfo: stock };
     wh.hp = 1;
     return { buildings, wh };
   }
@@ -526,7 +526,7 @@ function makeBlastContextWithWarehouse(kg: number) {
   const hole = state.drillHoles[0]!;
   placeBuilding(state.buildings, 'explosive_warehouse', Math.floor(hole.x), Math.floor(hole.z), 32, 32);
   const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-  wh.storedExplosivesKg = kg;
+  wh.storedExplosives = { anfo: kg };
   return { ctx, state, wh };
 }
 
@@ -563,7 +563,7 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32);
     const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-    wh.storedExplosivesKg = 80;
+    wh.storedExplosives = { anfo: 80 };
     state.cash = 1_000_000;
     const accidentsBefore = state.damage.accidents.length;
 

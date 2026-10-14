@@ -29,6 +29,8 @@ export interface CancelActionResult {
   action?: PendingAction;
   /** Amount refunded to state.cash, 0 when the action's type charges nothing at order time. */
   refunded?: number;
+  /** Explosive kg a cancelled charge order returned to warehouse stock instead of cash (#1678). */
+  refundedStockKg?: number;
   /** Footprint a cancelled place_building order freed (blocked since order time); the caller tells the nav grid. */
   freedFootprint?: FreedFootprint;
 }

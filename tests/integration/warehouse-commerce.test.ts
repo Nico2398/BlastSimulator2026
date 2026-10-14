@@ -227,14 +227,14 @@ describe('Explosive warehouse blast gating', () => {
 
   it('hasExplosivesForBlast becomes true after stocking a warehouse', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 0, 0, 64, 64, 1);
-    storeExplosives(buildingState, 100);
+    storeExplosives(buildingState, 'anfo', 100);
     expect(hasExplosivesForBlast(buildingState)).toBe(true);
   });
 
   it('hasExplosivesForBlast returns false again after all stock is consumed', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 0, 0, 64, 64, 1);
-    storeExplosives(buildingState, 100);
-    consumeExplosives(buildingState, 100);
+    storeExplosives(buildingState, 'anfo', 100);
+    consumeExplosives(buildingState, 'anfo', 100);
     expect(hasExplosivesForBlast(buildingState)).toBe(false);
   });
 
@@ -242,7 +242,7 @@ describe('Explosive warehouse blast gating', () => {
     // Two warehouses; only second gets stock
     placeBuilding(buildingState, 'explosive_warehouse', 0,  0, 64, 64, 1);
     placeBuilding(buildingState, 'explosive_warehouse', 10, 0, 64, 64, 1);
-    storeExplosives(buildingState, 1); // minimal — goes into first available slot
+    storeExplosives(buildingState, 'anfo', 1); // minimal — goes into first available slot
     expect(hasExplosivesForBlast(buildingState)).toBe(true);
   });
 
@@ -255,7 +255,7 @@ describe('Explosive warehouse blast gating', () => {
     expect(hasExplosivesForBlast(buildingState)).toBe(false);
 
     // Stock explosive warehouse → blast allowed
-    storeExplosives(buildingState, 50);
+    storeExplosives(buildingState, 'anfo', 50);
     expect(hasExplosivesForBlast(buildingState)).toBe(true);
 
     // Freight warehouse capacity should remain accessible and non-zero

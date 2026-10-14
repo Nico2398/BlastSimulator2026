@@ -8,7 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { factorFor } from '../events/ActiveModifiers.js';
+import { explosivePriceFactor } from './ExplosiveStock.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
 type AutoChargeOutcome = 'ordered' | 'awaiting_funds' | 'invalid' | 'skipped';
@@ -23,6 +23,8 @@ export interface ChargeHoleActionPayload {
   durationTicks: number;
   /** Cash charged at order time (costPerKg x kg); refunded on cancel (#1341). */
   orderCost: number;
+  /** Kg of the order drawn from warehouse stock at order time (#1678); returned on cancel. */
+  orderStock?: { explosiveId: string; kg: number };
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */
@@ -46,11 +48,6 @@ export function outstandingChargeBlockedReason(state: Pick<GameState, 'pendingAc
 export function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
   const action = findOutstandingChargeAction(state, holeId);
   if (action) cancelAction(state, action.id);
-}
-
-/** Price factor the live event modifiers put on explosives (#1414); 1 when none. */
-function explosivePriceFactor(state: GameState): number {
-  return factorFor(state.events.activeModifiers, 'explosive_price', state.tickCount);
 }
 
 /**

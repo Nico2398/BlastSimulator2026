@@ -23,6 +23,7 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
 import { evacuateZone } from '../../core/engine/Evacuation.js';
+import { warehouseStockKg } from '../../core/entities/Building.js';
 import { queueDemolition, isDemolitionOrdered } from '../../core/engine/BuildingDemolition.js';
 import { findBuildingApproachCell } from '../../core/nav/BuildingApproach.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
@@ -95,7 +96,7 @@ export function buildCommand(
       queueDemolition(state, toDestroy, { cost: demolishCost, rebuildOrderId: null, ...demolitionSite(ctx, toDestroy) });
       state.cash -= demolishCost;
       addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
-      const lostKg = toDestroy.type === 'explosive_warehouse' ? (toDestroy.storedExplosivesKg ?? 0) : 0;
+      const lostKg = toDestroy.type === 'explosive_warehouse' ? warehouseStockKg(toDestroy) : 0;
       const destroyOutput = t('entities.build_destroy_ordered', { id, cost: demolishCost });
       const lostOreKg = toDestroy.type === 'freight_warehouse' ? Math.round(warehouseStoredKg(state.logistics, id)) : 0;
       const lines = [destroyOutput];
