@@ -225,6 +225,8 @@ Two behaviours follow and are never special-cased:
 | Building removed | A building destroyed, demolished or replaced by an upgrade with people inside puts them out on its ring — `releaseOccupantsOfRemovedBuildings`, once per tick and after a console demolition. A projection that destroys it injures them first. |
 | Vehicle removed | A vehicle scrapped, blast-destroyed or destroyed by flying rock with riders puts them on foot where it stood — `releaseOccupantsOfRemovedVehicles`, once per tick and after a console scrap or blast clearing; dead riders included. A projection that destroys it injures them first (once only); scrap does not. |
 
+A ramp layer's work target follows the digger's reach (`retargetRampLayers`, see `gameplay-navmesh`): the lead queued layer is retargeted to the nearest column of its cells the driver's vehicle can reach, instead of staying `target_unreachable` on an unreachable band centre.
+
 The employee stays mounted while working — a digger digs from the cab. Alighting happens only when
 a plan needs them on foot, or when an interruption replans them.
 

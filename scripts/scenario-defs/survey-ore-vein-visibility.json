@@ -382,9 +382,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 4
         },
-        "note": "#928: surveyCount 1 -> 3 -- the single-gauge fatigue model means the surveyor's own needs interrupt work less often (#549's requeue-and-preserve behavior still applies, just triggers less), so throughput through this checkpoint (cumulative tick 77) is faster than the pre-#928 3-need model: 3 of the 4 queued seismic surveys have completed, not 1, direct-trace confirmed (command mode)."
+        "note": "#1709: surveyCount 3 -> 4 (the 20-tick SHIFT_DURATIONS_TICKS.shift_8h lets the surveyor finish all 4 seismic surveys before the first shift end, instead of resting after 8 worked ticks; direct-trace confirmed, command mode). Earlier history, #928: surveyCount 1 -> 3 -- the single-gauge fatigue model means the surveyor's own needs interrupt work less often (#549's requeue-and-preserve behavior still applies, just triggers less), so throughput through this checkpoint (cumulative tick 77) is faster than the pre-#928 3-need model: 3 of the 4 queued seismic surveys have completed, not 1, direct-trace confirmed (command mode)."
       }
     },
     {
@@ -432,7 +432,7 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 4
         }
       }
     },
@@ -447,9 +447,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 4
         },
-        "note": "#928: surveyCount 1 -> 3, matching step 21's own re-measurement -- core_sample queued, not yet completed; round 1's 3 completed so far stays put"
+        "note": "#1709: surveyCount 3 -> 4, matching step 21's own re-measurement -- core_sample queued, not yet completed; round 1's 3 completed so far stays put"
       }
     },
     {

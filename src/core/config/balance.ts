@@ -1884,10 +1884,23 @@ export const MAX_NEED_GAUGE = 100;
 
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
-/** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
+/**
+ * Shift duration in ticks of WORK for each policy mode (1 tick = 1 game-hour).
+ *
+ * "8h" and "12h" name the policy, not the tick count: working ticks are the
+ * game's coarse unit, one drill_hole job alone runs ~8-13 of them. #1709
+ * measured the old 8 / 12 against walk-to-rest: a shift shorter than one rig
+ * job sent the driller to the quarters after EVERY hole, so a 3x3 plan with
+ * quarters beside it took 208 ticks. A 20-tick shift (30 for the long one,
+ * same 2:3 ratio) lets a rig cover about two holes per rest and measures 140
+ * ticks beside the plan (target <= 150), with zero collapses at 12 m and 25 m
+ * (needs.integration.test.ts, #1709). Shorter shifts (16 -> 154, 12 -> 187)
+ * miss the target. The fatigue threshold (SITE_POLICY_DEFAULT_THRESHOLD) still
+ * sends a tired worker home sooner.
+ */
 export const SHIFT_DURATIONS_TICKS = {
-  shift_8h:  8,
-  shift_12h: 12,
+  shift_8h:  20,
+  shift_12h: 30,
 } as const;
 
 /**
@@ -2520,20 +2533,48 @@ export interface PitMaskShape {
   margin: number;
   /** Fraction of relief that survives at full compression, deep inside the rect. */
   reliefKeep: number;
+  /** Max landscape slope (m of height per m) outside the rect; absent = legacy blend only. */
+  envelopeSlope?: number;
+  /** Amplitude (m) of the outline wobble; the outline offset swings over [0, 2 * amplitude], so the peak is twice this value. Absent = straight outline. */
+  outlineWobble?: number;
+  /** Corner rounding radius (m) of the outline; absent = sharp corners. */
+  cornerRadius?: number;
 }
 
 /** Mask used by campaign levels and standalone worlds. */
 export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
 
+/** Outline wobble wavelengths (m) and unit-ish propagation directions (#1734); two incommensurate waves. */
+export const OUTLINE_WOBBLE_WAVELENGTH_A = 27;
+export const OUTLINE_WOBBLE_WAVELENGTH_B = 38;
+export const OUTLINE_WOBBLE_WAVE_A_DIR: readonly [number, number] = [0.8, 0.6];
+export const OUTLINE_WOBBLE_WAVE_B_DIR: readonly [number, number] = [-0.5, 0.866];
+
 /**
- * Sandbox mask (#1680): a tighter blend (14 m) that keeps only 5% of relief
- * inside the rect, so the sandbox start has room for flat 9x9 m pads while
- * mountains stay dramatic around and beyond the pit. Measured on 64x64 sites,
- * seeds 1/7/42, every biome: worst case ~32% flat pads (alpine, seed 42)
- * against the 25% target. A wider margin or lower keep alone fails, because
- * the blend ramp is the steep part.
+ * Sandbox mask (#1680, #1734): a 14 m flat core inset that keeps only 5% of
+ * relief, so the sandbox start has room for flat 9x9 m pads while mountains stay
+ * dramatic beyond the pit. Beyond the core a slope-limited envelope joins the
+ * flat area to the landscape without a cliff: terrain deviates from the flat
+ * level by at most envelopeSlope m per metre of distance. 0.25 (43% of
+ * NAV_MAX_SLOPE_RATIO tan30 = 0.577) was measured, not derived: 0.45 left a
+ * side of tropical/alpine seeds with no reachable drill-hole ring cells, because
+ * wobble gradient and residual relief on top of the cone push local slope past
+ * the climb limit. At 0.25 every side of every biome/seed (1/7/42) has reachable
+ * ring cells at 6/18/30 m, >= 73% of ring cells do at 6 m-30 m, flat 9x9 pads
+ * are >= 68%, and the blend never makes a step steeper than the landscape's own
+ * (on >= 80% of the perimeter lines), so drill holes just outside the grid stay
+ * reachable. A natural wall inside the cone is flattened (clamped to the envelope)
+ * but not erased: a pointwise mask cannot, so it stays a cliff. The outline wobbles
+ * (peak offset 6 m = 2 x outlineWobble 3, flat side only) and corners round (8 m) so the edge is not a
+ * visible rectangle.
  */
-export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 14, reliefKeep: 0.05 };
+export const SANDBOX_PIT_MASK: PitMaskShape = {
+  margin: 14,
+  reliefKeep: 0.05,
+  envelopeSlope: 0.25,
+  outlineWobble: 3,
+  cornerRadius: 8,
+};
 
 /** Target fraction of the sandbox start pad that must be flat. */
 export const SANDBOX_FLAT_PAD_TARGET = 0.25;

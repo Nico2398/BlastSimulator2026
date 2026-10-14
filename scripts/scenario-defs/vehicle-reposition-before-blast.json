@@ -182,15 +182,15 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:200",
-      "description": "Drains the charge order(s).",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
+      "description": "Drains the charge order(s). #1709: 400-tick bound, was 200 -- the 20-tick shift lets the one blaster work longer between rests, but the nine holes still take ~206 ticks here (the lone blaster rests in place between trips).",
       "timeout": 90,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 200,
+          "maxTicks": 400,
           "timeoutMs": 90000
         }
       ],

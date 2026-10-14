@@ -658,7 +658,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     employee.activeActionId = 111;
     // One tick before shift_8h - 1: this call's own increment brings
-    // ticksWorked to shift_8h - 1 (7), still below the 8-tick boundary.
+    // ticksWorked to shift_8h - 1 still below the shift boundary.
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 2;
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);

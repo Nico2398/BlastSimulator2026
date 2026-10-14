@@ -370,8 +370,8 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   // Continuous, not the shift_8h default: applying shift_8h this early interrupts the queued
-  // drilling/digging work before it can finish (SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter
-  // than a single drill_hole action). Resolution picks the LAST reachable stage, so Apply and the
+  // drilling/digging work before it can finish (a shift end can interrupt a drill_hole mid-cycle).
+  // Resolution picks the LAST reachable stage, so Apply and the
   // fatigue hint carry `reachableWhen`: each shows only when it is the next thing to do (#1632).
   // Apply is never in `also`: it must stay railed until it is applicable.
   'set-early-policy': [

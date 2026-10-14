@@ -1722,7 +1722,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 747518,
+          "cash": 747800,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1733,7 +1733,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged."
       }
     },
     {
@@ -1986,8 +1986,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 50,
-          "ecology": 49.7535685061019,
-          "nuisance": 49.383921265254735
+          "ecology": 49.7635685061019,
+          "nuisance": 49.40892126525473
         }
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
