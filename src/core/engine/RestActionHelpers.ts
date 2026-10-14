@@ -421,3 +421,17 @@ export function resolveRestDestination(
   const worthwhile = restRoundTripWorthwhile(state, emp, building, approach.x, approach.z);
   return { targetX: approach.x, targetZ: approach.z, buildingId: building.id, worthwhile };
 }
+
+/**
+ * Fatigue the employee would burn travelling to (targetX, targetZ), or null
+ * when no journey can be planned.
+ */
+export function restTripFatigueCost(
+  _state: GameState,
+  _emp: Employee,
+  _targetX: number,
+  _targetZ: number,
+): number | null {
+  // TODO: implement
+  return null;
+}

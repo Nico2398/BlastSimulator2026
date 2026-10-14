@@ -1715,6 +1715,12 @@ export const NEED_SOFT_THRESHOLDS: Record<NeedKey, number> = {
   fatigue: 25,
 };
 
+/** Fatigue a mounted worker must still hold on arrival at the rest building, beyond the trip's own drain. */
+export const NEED_REST_ARRIVAL_FATIGUE_FLOOR = 5;
+
+/** Extra fatigue headroom a mounted worker keeps before a vehicle job boundary forces rest. */
+export const NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE = 15;
+
 /** Hard threshold per gauge: at or below this, the employee collapses and rest is forced immediately — always 0, the gauge's own floor, never a tunable balance value. */
 export const NEED_HARD_THRESHOLDS: Record<NeedKey, number> = {
   fatigue: 0,
