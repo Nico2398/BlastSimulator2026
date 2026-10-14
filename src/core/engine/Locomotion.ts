@@ -814,8 +814,7 @@ function idleParkedVehicleOf(state: GameState, occupant: Occupant | null | undef
 /** The vehicle `occupant` is, when its driver is idle (nothing queued, not collapsing, not on the move) (#1709). */
 function idleDrivenVehicleOf(state: GameState, occupant: Occupant): Vehicle | undefined {
   const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
-  const driverId = vehicle ? vehicleDriverId(vehicle) : null;
-  const driver = driverId === null ? undefined : state.employees.employees.find(e => e.id === driverId);
+  const driver = controllingEmployee(state, occupant);
   if (!vehicle || !driver || driver.collapsing || employeeWorkState(driver) !== 'idle') return undefined;
   if (isVehicleCurrentlyDriving(vehicle, state.employees.employees)) return undefined;
   return vehicle;
@@ -1199,24 +1198,6 @@ function relocateIdleDestinationBlocker(
     occupancy.tryMove(occupant, freeCell.x, freeCell.z);
     teleportEmployeeTo(emp, freeCell.x, freeCell.z);
     result.moved.push(emp.id);
-    // A teleport, not a walked step — any route commitment/move-history left
-    // over from whatever this employee was doing right before it stood here
-    // idle (its own prior arrival, in the #1278 corridor-relocation case)
-    // must not survive the jump: `applyReroutedAdvance`'s own identical
-    // reset (elsewhere in this file) is why a genuine reroute never confuses
-    // `advanceAlongPath` this way, and a stale committed waypoint pointing at
-    // a destination this employee's OWN fresh return-itinerary (below) now
-    // ALSO targets silently stalled the return trip forever with no error,
-    // no stuck flag, and no wait-counter movement at all — confirmed live via
-    // this file's own "bounded-tick fairness" dense-grid reproduction.
-    // A fresh start at the new cell (#1283 follow-up): without this, a
-    // corridor blocker relocated more than once in a row (each relocation
-    // one more cell down a genuinely single-file corridor, #1283's own
-    // "nudge forward" case) carries its PREVIOUS spot's already-accumulated
-    // `vehicleWaitingTicks` into the new one, so a handful of relocations in
-    // a row reaches `MOVE_STUCK_ABANDON_TICKS` purely from counters this
-    // teleport itself never actually waited through — abandoning a return
-    // trip nobody outside this ladder ever asked to be time-boxed at all.
     if (returnAfterRelocate) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];

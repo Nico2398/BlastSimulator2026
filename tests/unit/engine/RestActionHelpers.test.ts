@@ -678,6 +678,48 @@ describe('beginRestTravel (#1118)', () => {
     expect(employee.pendingActionType).toBe('rest');
   });
 
+  // REST_IN_PLACE_RADIUS branch: a mounted worker resting where they stand has
+  // no trip to choose (no park-and-walk) — the vehicle is kept, and freed on
+  // arrival unless a same-role follow-up only they could claim is queued.
+  describe('mounted worker resting in place (target within REST_IN_PLACE_RADIUS)', () => {
+    function setup() {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+      vehicle.occupantIds = [employee.id];
+      employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      return { state, employee, vehicle };
+    }
+
+    it('keeps the vehicle and alights on arrival when no same-role follow-up is queued', () => {
+      const { state, employee, vehicle } = setup();
+
+      beginRestTravel(state, employee, employee.x + 0.5, employee.z);
+
+      expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(employee.pendingActionType).toBe('rest');
+      const legs = employee.itinerary!.legs;
+      expect(legs[legs.length - 1]!.onArrive).not.toEqual({ kind: 'none' });
+    });
+
+    it('keeps the vehicle on arrival too when a same-role follow-up only they could claim is queued', () => {
+      const { state, employee, vehicle } = setup();
+      state.pendingActions.push({
+        id: 901, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+        targetX: 5, targetZ: 5, targetY: 0, payload: {},
+        targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+      });
+
+      beginRestTravel(state, employee, employee.x + 0.5, employee.z);
+
+      expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(employee.pendingActionType).toBe('rest');
+      const legs = employee.itinerary!.legs;
+      expect(legs[legs.length - 1]!.onArrive).toEqual({ kind: 'none' });
+    });
+  });
+
   // #1204: when a buildingId is given, the walk must route through
   // moveTo(state, emp.id, {buildingId}, opts) — the same {kind:'enter_building'}
   // arrival step #1202/#1203 already give the training walk — rather than a

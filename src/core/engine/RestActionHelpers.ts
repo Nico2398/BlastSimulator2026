@@ -267,6 +267,16 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
 const REST_IN_PLACE_RADIUS = 1;
 
 /**
+ * Move `emp` to (x, z) (allowUnreachable, #1178). The vehicle is needed for the
+ * travel only, so the final leg alights on arrival unless this worker is the
+ * only one who could reclaim it anyway (hasClaimableSameRoleFollowUp, #1122).
+ */
+function moveToAndFreeVehicleOnArrival(state: GameState, emp: Employee, x: number, z: number, emitter?: EventEmitter): void {
+  const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
+  if (result.success && !hasClaimableSameRoleFollowUp(state, emp)) alightOnArrival(emp);
+}
+
+/**
  * Start `emp` travelling to (x, z) as a rest destination by the faster of
  * walking and driving (chooseRestTrip, #1709). An on-foot employee walks. A
  * MOUNTED employee whose vehicle is slower than walking (a drill rig crawls at
@@ -303,8 +313,7 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
   // no trip to choose: the mounted worker keeps the vehicle for the rest and
   // frees it on arrival, as before #1709.
   if (wasMounted && Math.hypot(x - emp.x, z - emp.z) < REST_IN_PLACE_RADIUS) {
-    const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
-    if (result.success && !hasClaimableSameRoleFollowUp(state, emp)) alightOnArrival(emp);
+    moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
     emp.pendingActionType = 'rest';
     return;
   }
@@ -319,13 +328,9 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
     ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true }, emitter)
     : undefined;
   if (!viaBuilding?.success) {
-    const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
-    // Driven trip (#1122): the vehicle is needed for the travel only, so the
-    // final leg alights on arrival unless this worker is the only one who
-    // could reclaim it anyway (hasClaimableSameRoleFollowUp).
-    if (result.success && isMounted(emp.locomotion) && !hasClaimableSameRoleFollowUp(state, emp)) {
-      alightOnArrival(emp);
-    }
+    // Driven trip (#1122): see moveToAndFreeVehicleOnArrival.
+    if (isMounted(emp.locomotion)) moveToAndFreeVehicleOnArrival(state, emp, x, z, emitter);
+    else moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
 }
