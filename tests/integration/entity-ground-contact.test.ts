@@ -133,7 +133,7 @@ function assertEveryEntityRestsOnTerrain(engine: RunnerWithContext, h: Harness):
 function tickUntilGone(engine: RunnerWithContext, actionId: number, maxTicks = 500): boolean {
   for (let i = 0; i < maxTicks; i++) {
     if (!engine.ctx.state!.pendingActions.some(a => a.id === actionId)) return true;
-    for (const emp of engine.ctx.state!.employees.employees) emp.fatigue = 100;
+    for (const emp of engine.ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
     runCommand(engine, 'tick 1');
   }
   return !engine.ctx.state!.pendingActions.some(a => a.id === actionId);
@@ -141,7 +141,7 @@ function tickUntilGone(engine: RunnerWithContext, actionId: number, maxTicks = 5
 
 function driveToCompletion(engine: RunnerWithContext, maxTicks = 300, condition: () => boolean = () => true): void {
   for (let i = 0; i < maxTicks && condition(); i++) {
-    for (const emp of engine.ctx.state!.employees.employees) emp.fatigue = 100;
+    for (const emp of engine.ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
     runCommand(engine, 'tick 1');
   }
 }

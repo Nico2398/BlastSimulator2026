@@ -22,6 +22,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
+import { restTripFatigueCost } from '../../../src/core/engine/RestActionHelpers.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 import type { ActionType, PendingAction } from '../../../src/core/state/GameState.js';
@@ -30,6 +31,7 @@ import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, SHIFT_DURATIONS_TICKS,
+  NEED_REST_ARRIVAL_FATIGUE_FLOOR, NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE,
 } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
@@ -1259,5 +1261,125 @@ describe('#1110: releases a taskQueue-held vehicle reservation on shift-rest int
     expect(gatedAction2.status).toBe('queued');
     expect(gatedAction2.holderId).toBeNull();
     expect(employee.taskQueue).not.toContain(gatedAction2.id);
+  });
+});
+
+// #1673: under the site policy, a worker doing vehicle-gated work used to defer
+// the forced rest (isMidVehicleGatedWork drive phase above fatigue 25,
+// hasClaimableSameRoleFollowUp at a job boundary) until tickCollapse's backstop
+// and then collapsed on the drive to the Living Quarters. The drive phase now
+// defers only while the worker can still reach the quarters with
+// NEED_REST_ARRIVAL_FATIGUE_FLOOR + NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE to spare;
+// an idle job boundary no longer defers a forced rest at all.
+describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budget (#1673)', () => {
+  const BUDGET = NEED_REST_ARRIVAL_FATIGUE_FLOOR + NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE;
+
+  /** Mounted driller on a drill_rig at (0,5) with a flat map and a tier-1 Living Quarters at (lqX,5). */
+  function mountedDrillerFixture(lqX: number) {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    Object.assign(state.sitePolicy, { shiftMode: 'shift_8h' });
+    state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(90, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5); // tier 1, speed 1
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', lqX, 5, 100, 100, 1);
+    return { state, employee, vehicle };
+  }
+
+  function claimDrillHole(state: GameState, employee: Employee, vehicleId: number, id: number): PendingAction {
+    const action = pushHeldAction(state, employee.id, id, 'drill_hole');
+    action.requiredVehicleRole = 'drill_rig';
+    reserveVehicle(state.vehicles, vehicleId, action.id);
+    employee.activeActionId = action.id;
+    return action;
+  }
+
+  function queueFollowUp(state: GameState, id: number): void {
+    state.pendingActions.push({
+      id, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+      targetX: 8, targetZ: 5, targetY: 0, payload: {},
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+  }
+
+  it('mid-drive to a drill_hole with the Living Quarters far: forced rest starts (fatigue minus trip cost is under floor + allowance)', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(25);
+    claimDrillHole(state, employee, vehicle.id, 1700);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 40; // above NEED_SOFT_THRESHOLDS.fatigue (25), so the old guard deferred
+
+    const tripCost = restTripFatigueCost(state, employee, 25, 5);
+    expect(tripCost).not.toBeNull();
+    expect(40 - tripCost!).toBeLessThan(BUDGET);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBe(1700);
+    expect(state.pendingActions.find(a => a.id === 1700)!.status).toBe('queued');
+  });
+
+  it('mid-drive to a drill_hole with the Living Quarters close: rest is still deferred (budget remains)', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(6);
+    claimDrillHole(state, employee, vehicle.id, 1701);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 40;
+
+    const tripCost = restTripFatigueCost(state, employee, 6, 5);
+    expect(tripCost).not.toBeNull();
+    expect(40 - tripCost!).toBeGreaterThanOrEqual(BUDGET);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1701);
+    expect(state.pendingActions.find(a => a.id === 1701)!.status).toBe('in_progress');
+  });
+
+  it('mid-execution of a drill_hole is never interrupted, however far the Living Quarters', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(25);
+    claimDrillHole(state, employee, vehicle.id, 1702);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.fatigue = 30;
+    employee.taskTicksRemaining = 3;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1702);
+    expect(employee.taskTicksRemaining).toBe(3);
+  });
+
+  it('idle at a job boundary, mounted, claimable same-role follow-up queued, shouldForceRest true: rests', () => {
+    const { state, employee } = mountedDrillerFixture(25);
+    queueFollowUp(state, 1703);
+    employee.activeActionId = null;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 50;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBeNull();
+    // The follow-up stays queued for whoever is free.
+    expect(state.pendingActions.find(a => a.id === 1703)!.status).toBe('queued');
+  });
+
+  it('idle at a job boundary with a follow-up queued, shouldForceRest false: no rest', () => {
+    const { state, employee } = mountedDrillerFixture(25);
+    queueFollowUp(state, 1704);
+    employee.activeActionId = null;
+    employee.ticksWorked = 2;
+    employee.fatigue = 90;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
   });
 });

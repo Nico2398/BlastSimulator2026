@@ -24,6 +24,7 @@ import { assignSkill } from '../../src/core/entities/Employee.js';
 import { purchaseVehicle, vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { board } from '../../src/core/engine/Mount.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
+import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
 import {
   NEED_SOFT_THRESHOLDS,
@@ -1335,5 +1336,87 @@ describe('#1669 — a collapse rest restarts the work clock: return to work, not
       expect(state.pendingActions.filter(a => a.type === 'rest')).toEqual([]);
       expect(state.pendingActions.some(a => a.payload.triggeredBy === 'shift_cycle_policy')).toBe(false);
     }
+  });
+});
+
+// #1673 — a driller chaining drill_hole jobs ~25 m from a tier-1 Living Quarters
+// used to defer every forced rest (mounted vehicle work), drain to the soft
+// threshold, then collapse on the drive there (trace: sandbox desert_badlands
+// seed 42, LQ (12,44), 3x3 plan at x 28-36 z 18-26, collapse at tick ~91, plan
+// finished ~tick 212). Under the fix the worker rests in time: no collapse and
+// no job started on a used-up shift. The plan does NOT finish sooner: the old
+// run reached 212 only by working through the shift and letting the collapse
+// floor do the resting, and honouring the shift at this distance costs a round
+// trip per ~8 worked ticks (measured finish: tick ~616), so the finish bound
+// below only proves the plan completes.
+describe('#1673 — a driller on a 3x3 plan far from the Living Quarters rests in time instead of collapsing', () => {
+  const HORIZON_TICKS = 900;
+  // A job is the approach drive plus one hole; the first one here is long (the
+  // rig is parked far from the Living Quarters), so the bound is per job: after
+  // a job ends with the shift used up, the next one may not start before a rest.
+  // The buggy run chained jobs to 73 worked ticks.
+  const SHIFT_TICKS = SHIFT_DURATIONS_TICKS.shift_8h;
+  // Measured finish ~616 ticks from the order; the bound catches a stall, not a slowdown.
+  const MAX_TICKS_TO_FINISH = 800;
+
+  it('no collapse, no job started on a used-up shift, all 9 holes drilled, invariants hold every tick', () => {
+    const engine = createGameEngine();
+    expect(runCommand(engine, 'sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true').success).toBe(true);
+    const state = engine.ctx.state!;
+    state.cash = 500_000;
+
+    expect(runCommand(engine, 'build living_quarters at:12,44').success).toBe(true);
+    {
+      let t = 0;
+      while (t < 300 && !state.buildings.buildings.some(b => b.type === 'living_quarters')) {
+        runCommand(engine, 'tick 1');
+        if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+        t++;
+      }
+    }
+    expect(state.buildings.buildings.some(b => b.type === 'living_quarters')).toBe(true);
+
+    const driller = state.employees.employees.find(e => e.role === 'driller');
+    if (!driller) throw new Error('Setup: staffed site has no driller');
+
+    const collapsedIds: number[] = [];
+    engine.ctx.emitter.on('employee:collapsed', (payload: unknown) => {
+      collapsedIds.push((payload as { employeeId: number }).employeeId);
+    });
+
+    expect(runCommand(engine, 'drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:28,18').success).toBe(true);
+    const holesBefore = state.drillHoles.length;
+
+    // Jobs that started with the shift already used up and no rest since.
+    let overrunJobs = 0;
+    let twAtLastJobEnd: number | null = null;
+    let restedSinceJobEnd = false;
+    let prevTw = driller.ticksWorked;
+    let holesSeen = holesBefore;
+    let finishedAt: number | null = null;
+    for (let tick = 1; tick <= HORIZON_TICKS; tick++) {
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+      if (state.isPaused) state.isPaused = false;
+      expectNoWorldInvariantViolations(state);
+      if (driller.ticksWorked < prevTw) restedSinceJobEnd = true;
+      prevTw = driller.ticksWorked;
+      if (state.drillHoles.length > holesSeen) {
+        holesSeen = state.drillHoles.length;
+        if (twAtLastJobEnd !== null && twAtLastJobEnd >= SHIFT_TICKS && !restedSinceJobEnd) overrunJobs++;
+        twAtLastJobEnd = driller.ticksWorked;
+        restedSinceJobEnd = false;
+      }
+      if (finishedAt === null && state.drillHoles.length - holesBefore >= 9) finishedAt = tick;
+      // The plan is done: an idle driller left to drain would collapse with nothing to do with vehicle work.
+      if (finishedAt !== null) break;
+    }
+
+    expect(collapsedIds).not.toContain(driller.id);
+    expect(driller.collapsing).toBe(false);
+    expect(overrunJobs).toBe(0);
+    expect(state.drillHoles.length - holesBefore).toBe(9);
+    expect(finishedAt).not.toBeNull();
+    expect(finishedAt!).toBeLessThan(MAX_TICKS_TO_FINISH);
   });
 });

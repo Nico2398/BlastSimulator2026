@@ -56,6 +56,9 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The crew rests at the shift length between jobs (#1673), so a long drive
+    // pays wages for longer than the starting cash covers; funding is not the point here.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     tickCommand(ctx, ['1'], {});
   }
   const driller = ctx.state!.employees.employees.find(e => e.id === 1);
@@ -90,6 +93,9 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 1500): void 
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The crew rests at the shift length between jobs (#1673), so a long drive
+    // pays wages for longer than the starting cash covers; funding is not the point here.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     tickCommand(ctx, ['1'], {});
   }
   // Weather ticks with the game (#1403); rain fizzles boomite. These tests are

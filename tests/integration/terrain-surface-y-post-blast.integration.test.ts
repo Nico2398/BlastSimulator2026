@@ -21,7 +21,7 @@ import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.fatigue = 100;
+      emp.fatigue = 100; emp.ticksWorked = 0;
     }
     runner.run('tick 1');
   }
@@ -31,7 +31,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
 function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.fatigue = 100;
+      emp.fatigue = 100; emp.ticksWorked = 0;
     }
     runner.run('tick 1');
   }

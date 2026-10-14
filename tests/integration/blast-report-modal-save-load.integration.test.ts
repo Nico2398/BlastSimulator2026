@@ -46,7 +46,7 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   expect(runner.run('drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:14,14').success).toBe(true);
   for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.fatigue = 100;
+      emp.fatigue = 100; emp.ticksWorked = 0;
     }
     runner.run('tick 1');
   }
@@ -61,7 +61,7 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
   for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
-      emp.fatigue = 100;
+      emp.fatigue = 100; emp.ticksWorked = 0;
     }
     runner.run('tick 1');
   }
