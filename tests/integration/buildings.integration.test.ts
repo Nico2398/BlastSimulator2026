@@ -431,22 +431,22 @@ describe('Buildings lifecycle', () => {
     expect(hasExplosivesForBlast(bs)).toBe(false);
 
     // Store explosives
-    const stored = storeExplosives(bs, 200);
+    const stored = storeExplosives(bs, 'anfo', 200);
     expect(stored).toBe(200);
     expect(hasExplosivesForBlast(bs)).toBe(true);
 
     // Consume part — still has stock
-    const consumed1 = consumeExplosives(bs, 80);
+    const consumed1 = consumeExplosives(bs, 'anfo', 80);
     expect(consumed1).toBe(true);
     expect(hasExplosivesForBlast(bs)).toBe(true);
 
     // Consume the remainder
-    const consumed2 = consumeExplosives(bs, 120);
+    const consumed2 = consumeExplosives(bs, 'anfo', 120);
     expect(consumed2).toBe(true);
     expect(hasExplosivesForBlast(bs)).toBe(false);
 
     // Over-consumption attempt returns false
-    const overConsume = consumeExplosives(bs, 50);
+    const overConsume = consumeExplosives(bs, 'anfo', 50);
     expect(overConsume).toBe(false);
     expect(hasExplosivesForBlast(bs)).toBe(false);
   });

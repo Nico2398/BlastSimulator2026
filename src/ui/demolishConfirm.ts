@@ -1,7 +1,7 @@
 // Demolish confirmation modal config (#1399).
 
 import type { Building } from '../core/entities/Building.js';
-import { getDemolishCost } from '../core/entities/Building.js';
+import { getDemolishCost, warehouseStockKg } from '../core/entities/Building.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import { t } from '../core/i18n/I18n.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -14,7 +14,7 @@ export function buildDemolishConfirm(b: Building, onConfirm: () => void): Confir
       cost: formatMoney(getDemolishCost(b)),
     }),
   ];
-  const kg = b.storedExplosivesKg ?? 0;
+  const kg = warehouseStockKg(b);
   if (kg > 0) lines.push(t('ui.build.demolish_confirm_loses_explosives', { kg }));
   return {
     icon: 'trash',

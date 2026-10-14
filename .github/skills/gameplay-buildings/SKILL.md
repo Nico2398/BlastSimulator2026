@@ -28,7 +28,7 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Geology Lab | "Rock Shed" | "Stone Science HQ" | "Institute of Expensive Rocks" | Trains survey techniques |
 | Research Center | "Think Tank Tent" | "Innovation Bunker" | "The Ivory Crater" | Unlocks higher tiers (paid research tasks) |
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
-| Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Stores explosives from supply contracts |
+| Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Bulk explosive stock, cheaper per kg |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
 | Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; unlimited capacity; no crew needed |
 
@@ -95,8 +95,13 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 ## Warehouses
 
 **Explosive Warehouse:**
-- Required to order and receive explosives; blasting impossible without it
-- Capacity scales with tier
+- Optional risk/reward store (#1678). `buy explosive:<id> kg:<n>` puts explosive into stock at the **bulk price** (catalog `costPerKg` x `EXPLOSIVE_BULK_PRICE_FACTOR` 0.7 x the live `explosive_price` event factor); `buyExplosiveStock` in `ExplosiveStock.ts`.
+- Stock is per explosive id (`Building.storedExplosives`, kg). Capacity (500 / 1,500 / 4,000 kg by tier) is shared across types and summed over operating warehouses; stores fill in placement order. Saves without the field load as empty.
+- Charge orders draw matching stock first, the remainder is paid in cash at the list price; stock is reserved at order time. No warehouse (or no matching stock) = today's flow and price, unchanged.
+- Cancelling a charge order refunds in the currency paid: stock goes back to the warehouses; kg that no longer fit are refunded as cash at the bulk price (booked as a `refund`).
+- Capacity scales with tier; an order for more kg than free space is refused entirely (whole-kg purchases only).
+- `plannedChargesCost` and UI cost previews stay at list price.
+- Decisions (#1678): bulk factor 0.7 applies together with the event price factor; a purchase over free capacity is refused whole, never partly filled; stock is reserved (consumed) at order time, not at loading; unrestockable kg on cancel are refunded as cash at the bulk price.
 - If destroyed by blast projection while containing explosives → **secondary blast event**
 
 **Freight Warehouse:**
@@ -179,7 +184,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 |----------|---------------|-----------------|
 | Living Quarters Tier 1 | Housing/feeding | Baseline well-being |
 | Living Quarters Tier 3 | Housing/feeding | High well-being → productivity ×1.10 |
-| Explosive Warehouse | Enables supply contracts | Secondary blast if destroyed with stock |
+| Explosive Warehouse | Bulk explosive stock at 0.7x price | Secondary blast if destroyed with stock |
 | Freight Warehouse | Enables ore sale contracts | Main income; throughput limited by distance |
 | Spoil Heap | Dumps barren rock off the freight pool | Without one, barren hauls are blocked |
 | Research Center | Unlocks building tiers | Occupied during each research task |
