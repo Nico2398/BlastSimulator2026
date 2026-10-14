@@ -53,12 +53,17 @@ export function applyRatingCaps(
   return { rating, cap };
 }
 
+/** Fraction (0..1) of `total` that is `part`; 0 when `total` is not positive. */
+function share(part: number, total: number): number {
+  return total > 0 ? part / total : 0;
+}
+
 /** Fraction (0..1) of fragments that are oversized; 0 when there are no fragments. */
 export function oversizeShare(oversized: number, total: number): number {
-  return total > 0 ? oversized / total : 0;
+  return share(oversized, total);
 }
 
 /** Fraction (0..1) of charged holes that fizzled; 0 when no holes were charged. */
 export function fizzleShare(fizzled: number, charged: number): number {
-  return charged > 0 ? fizzled / charged : 0;
+  return share(fizzled, charged);
 }
