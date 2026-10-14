@@ -14,6 +14,7 @@ import {
   returnFragmentToGround,
   storageRoomKg,
   inTransitMassKg,
+  onGroundMassKg,
   releaseBarrenStoredFragments,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
@@ -1319,5 +1320,32 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
     expect(releaseBarrenStoredFragments(state, {}, [heap])).toBe(0);
     expect(state.fragments).toHaveLength(2);
     expect(heap.storedSpoilKg).toBe(0);
+  });
+});
+
+describe('onGroundMassKg (#1691)', () => {
+  it('is 0 for an empty state', () => {
+    expect(onGroundMassKg(createLogisticsState())).toBe(0);
+  });
+
+  it('sums the mass of on_ground fragments', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 250)]);
+    expect(onGroundMassKg(state)).toBe(350);
+  });
+
+  it('ignores in_transit and stored fragments', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 250), makeFragment(3, 400)]);
+    state.fragments[1]!.state = 'in_transit';
+    state.fragments[2]!.state = 'stored';
+    expect(onGroundMassKg(state)).toBe(100);
+  });
+
+  it('is 0 when nothing lies on the ground', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100)]);
+    state.fragments[0]!.state = 'stored';
+    expect(onGroundMassKg(state)).toBe(0);
   });
 });

@@ -30,6 +30,7 @@ import { detectTrafficJam } from '../../../src/core/events/EventEngine.js';
 import { employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { planItinerary } from '../../../src/core/engine/PlanItinerary.js';
+import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 
 const SEED = 42;
@@ -2260,5 +2261,113 @@ describe('a vehicle-gated charge_hole is driven to the hole, never walked (#1649
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(Math.hypot(vehicle.x - 20, vehicle.z - 0)).toBeLessThan(3);
+  });
+});
+
+
+// #1687: a mover whose tick budget ends mid-hop stands over a rounded nav cell
+// that can be a sealed pit (every outward step exceeds NAV_MAX_SLOPE_RATIO).
+// Re-pathing from that cell found nothing, so the mover froze and its claim was
+// abandoned forever. The fix restarts the path from the committed hop origin.
+describe('tickLocomotion — mid-hop position over a sealed pit cell (#1687)', () => {
+  const A = { x: 1, z: 1 };
+  const B = { x: 2, z: 2 };
+  const PIT = { x: 2, z: 1 };
+  const DEST = { x: 6, z: 6 };
+
+  /** Flat 8x8 grid (surfaceY 0) with a 10 m spike at PIT: every step into/out of it is too steep, A and B stay legal and diagonally linked. */
+  function buildPitGrid(): NavGrid {
+    const grid = makeFlatNavGrid(8, 8);
+    for (let z = 0; z < 8; z++) {
+      for (let x = 0; x < 8; x++) grid.cells[z]![x]!.surfaceY = 0;
+    }
+    grid.cells[PIT.z]![PIT.x]!.surfaceY = 10;
+    return grid;
+  }
+
+  /** Mid-hop position over PIT: nearest cell (round) is PIT, but the committed hop is A -> B. */
+  const MID = { x: 1.6, z: 1.4 };
+
+  function commitHop(emp: { committedWaypointX?: number | null; [k: string]: unknown }): void {
+    Object.assign(emp, {
+      committedWaypointX: B.x, committedWaypointZ: B.z,
+      committedDestX: DEST.x, committedDestZ: DEST.z,
+      committedRemainingCost: 8, committedFromX: A.x, committedFromZ: A.z,
+      committedOriginX: A.x, committedOriginZ: A.z,
+    });
+  }
+
+  it('fixture: the rounded cell is a sealed pit and the hop endpoints are legal', () => {
+    const grid = buildPitGrid();
+    expect(grid.clampX(MID.x)).toBe(PIT.x);
+    expect(grid.clampZ(MID.z)).toBe(PIT.z);
+    expect(findPath(grid, { agentId: 1, fromX: PIT.x, fromZ: PIT.z, toX: DEST.x, toZ: DEST.z, avoidVehicles: false }).found).toBe(false);
+    expect(findPath(grid, { agentId: 1, fromX: A.x, fromZ: A.z, toX: DEST.x, toZ: DEST.z, avoidVehicles: false }).found).toBe(true);
+  });
+
+  it('a drive leg that stands mid-hop over the pit never goes stuck and reaches the destination', () => {
+    const state = buildFlatNavGridState(8, 8);
+    state.navGrid = buildPitGrid();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, MID.x, MID.z);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', MID.x, MID.z, 1);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    employee.x = MID.x; employee.z = MID.z;
+    commitHop(employee as never);
+    employee.itinerary = {
+      legs: [{ mode: 'drive', vehicleId: vehicle.id, destX: DEST.x, destZ: DEST.z, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 8 }],
+      goal: { kind: 'reposition', x: DEST.x, z: DEST.z },
+      workTicks: 0, estTotalTicks: 8,
+    } satisfies Itinerary;
+
+    for (let i = 0; i < 20 && employee.itinerary !== null; i++) {
+      tickLocomotion(state);
+      expect(employee.isMoveStuck).toBe(false);
+      expect(employee.moveConsecutiveFailures).toBe(0);
+      expect(vehicle.x).toBe(employee.x);
+      expect(vehicle.z).toBe(employee.z);
+    }
+    expect(employee.itinerary).toBeNull();
+    expect(Math.hypot(vehicle.x - DEST.x, vehicle.z - DEST.z)).toBeLessThan(1);
+  });
+
+  it('a foot leg that stands mid-hop over the pit never goes stuck and reaches the destination', () => {
+    const state = buildFlatNavGridState(8, 8);
+    state.navGrid = buildPitGrid();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, MID.x, MID.z);
+    employee.x = MID.x; employee.z = MID.z;
+    commitHop(employee as never);
+    employee.itinerary = {
+      legs: [{ mode: 'foot', vehicleId: null, destX: DEST.x, destZ: DEST.z, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 8 }],
+      goal: { kind: 'reposition', x: DEST.x, z: DEST.z },
+      workTicks: 0, estTotalTicks: 8,
+    } satisfies Itinerary;
+
+    for (let i = 0; i < 20 && employee.itinerary !== null; i++) {
+      tickLocomotion(state);
+      expect(employee.isMoveStuck).toBe(false);
+      expect(employee.moveConsecutiveFailures).toBe(0);
+    }
+    expect(employee.itinerary).toBeNull();
+    expect(Math.hypot(employee.x - DEST.x, employee.z - DEST.z)).toBeLessThan(1);
+  });
+
+  it('without an in-flight commitment the pit-rounded start still has no route (control: the guard is the commitment, not a global change)', () => {
+    const state = buildFlatNavGridState(8, 8);
+    state.navGrid = buildPitGrid();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, MID.x, MID.z);
+    employee.x = MID.x; employee.z = MID.z;
+    employee.itinerary = {
+      legs: [{ mode: 'foot', vehicleId: null, destX: DEST.x, destZ: DEST.z, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 8 }],
+      goal: { kind: 'reposition', x: DEST.x, z: DEST.z },
+      workTicks: 0, estTotalTicks: 8,
+    } satisfies Itinerary;
+
+    tickLocomotion(state);
+
+    expect(employee.moveConsecutiveFailures).toBeGreaterThan(0);
   });
 });

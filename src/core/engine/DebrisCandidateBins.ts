@@ -55,7 +55,12 @@ interface DebrisIndex {
  * bins tried nearest `employee` first, at most
  * `DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND` of each kind, each represented by
  * its member nearest `employee` (lowest id on a tie) that is among
- * `candidates` and that `allowed` accepts. At most
+ * `candidates`, that `reachable` accepts and that `allowed` accepts. A bin with
+ * no reachable candidate member is passed over before it is counted, so
+ * walled-off rock (a fresh crater's interior) spends neither
+ * `DEBRIS_SELECTION_MAX_BINS` nor the per-kind budget, and an unreachable
+ * member uses no probe; `reachable` is checked before `allowed`, which never
+ * runs on an unreachable member (#1722). `reachable` must be O(1). At most
  * `DEBRIS_SELECTION_BIN_PROBES` candidate members of a bin are tried, since
  * `allowed` holds the costly claim gates (vehicle, storage room) and a bin of
  * rock nobody can take right now is given up on quickly rather than checked
@@ -63,7 +68,7 @@ interface DebrisIndex {
  * (`carriesOre`: ore to a warehouse, barren rock to a spoil heap) and one
  * `DEBRIS_SELECTION_BIN_CELLS`-square of ground. A pool with at most
  * `DEBRIS_SELECTION_BINNING_MIN` debris candidates is simply filtered by
- * `allowed`, so ordinary play ranks exactly as before. Order is not preserved
+ * `allowed` (and, for debris, `reachable`), so ordinary play ranks exactly as before. Order is not preserved
  * — callers sort.
  */
 export function thinDebrisCandidates(
@@ -73,10 +78,13 @@ export function thinDebrisCandidates(
   isDebris: (action: PendingAction) => boolean,
   carriesOre: (action: PendingAction) => boolean,
   allowed: (action: PendingAction) => boolean,
+  reachable: (action: PendingAction) => boolean = () => true,
 ): PendingAction[] {
   let debris = 0;
   for (const action of candidates) if (isDebris(action)) debris++;
-  if (debris <= DEBRIS_SELECTION_BINNING_MIN) return candidates.filter(allowed);
+  if (debris <= DEBRIS_SELECTION_BINNING_MIN) {
+    return candidates.filter(action => (!isDebris(action) || reachable(action)) && allowed(action));
+  }
 
   const index = indexOf(pool, isDebris, carriesOre);
   const bins = index.bins;
@@ -103,7 +111,7 @@ export function thinDebrisCandidates(
     if (kept >= DEBRIS_SELECTION_MAX_BINS) break;
     const kind = bins[i]!.key & 3;
     if (tried[kind]! >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) continue;
-    const members = bins[i]!.members.filter(isCandidate);
+    const members = bins[i]!.members.filter(m => isCandidate(m) && reachable(m));
     if (members.length === 0) continue;
     tried[kind]!++;
     const near = members.map(member => ({ member, d: octileHeuristic(employee.x, employee.z, member.targetX, member.targetZ) }));

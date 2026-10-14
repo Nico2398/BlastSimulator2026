@@ -4,7 +4,7 @@
 
 import type { ScoreId } from '../entities/Building.js';
 import { getBuildingScoreEffects, type BuildingState } from '../entities/Building.js';
-import { SCORE_DECAY_RATE } from '../config/balance.js';
+import { ECOLOGY_DUST_MAX_PER_TICK, ECOLOGY_DUST_PER_TONNE_PER_TICK, SCORE_DECAY_RATE } from '../config/balance.js';
 
 // ── Score state ──
 
@@ -45,9 +45,17 @@ export interface ScoreInputs {
   maxRecentVibration: number;
   /** Number of employees. */
   employeeCount: number;
+  /** Mass of loose rock lying on the ground (kg). */
+  looseRockKg: number;
 }
 
 // ── Update logic ──
+
+/** Per-tick ecology loss from loose rubble on the ground, capped. */
+function dustEcologyLoss(kg: number): number {
+  if (!Number.isFinite(kg) || kg <= 0) return 0;
+  return Math.min(ECOLOGY_DUST_MAX_PER_TICK, (kg / 1000) * ECOLOGY_DUST_PER_TONNE_PER_TICK);
+}
 
 /**
  * Update scores based on current inputs. Mutates state.
@@ -70,9 +78,13 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   state.safety = clampScore(state.safety + sfDelta);
 
   // ── Ecology ──
-  // Neutral by default, worsened by blasting frequency
+  // Spoil heaps (waste management) raise it; vibration and dust from loose
+  // rubble on the ground lower it. At 0 it stays pinned (revolt / ecological
+  // shutdown counters rely on exact 0), so positive deltas cannot lift it.
   let ecDelta = buildingEffects.ecology * 0.1;
   ecDelta -= inputs.maxRecentVibration * 0.01; // Vibrations worsen ecology
+  ecDelta -= dustEcologyLoss(inputs.looseRockKg);
+  if (state.ecology <= 0) ecDelta = Math.min(ecDelta, 0);
   state.ecology = clampScore(state.ecology + ecDelta);
 
   // ── Neighbour relations (internal key: nuisance) ──

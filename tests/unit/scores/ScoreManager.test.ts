@@ -13,6 +13,11 @@ import {
   placeBuilding,
   getBuildingDef,
 } from '../../../src/core/entities/Building.js';
+import {
+  ECOLOGY_DUST_MAX_PER_TICK,
+  ECOLOGY_DUST_PER_TONNE_PER_TICK,
+  STAR_ECOLOGY_MIN,
+} from '../../../src/core/config/balance.js';
 
 function makeInputs(overrides: Partial<ScoreInputs> = {}): ScoreInputs {
   return {
@@ -22,6 +27,7 @@ function makeInputs(overrides: Partial<ScoreInputs> = {}): ScoreInputs {
     hasSafetyEquipment: false,
     maxRecentVibration: 0,
     employeeCount: 0,
+    looseRockKg: 0,
     ...overrides,
   };
 }
@@ -132,5 +138,104 @@ describe('clampScore', () => {
 
   it('clamps a fractional value just above the ceiling to 100', () => {
     expect(clampScore(100.0001)).toBe(100);
+  });
+});
+
+// ── Ecology levers (#1691) ────────────────────────────────────────────────
+describe('ecology responds to how the mine is run (#1691)', () => {
+  function withHeap(active = true) {
+    const buildings = createBuildingState();
+    placeBuilding(buildings, 'spoil_heap', 0, 0, 64, 64);
+    if (!active) {
+      const placed = buildings.buildings.find(x => x.type === 'spoil_heap')!;
+      placed.active = false;
+    }
+    return buildings;
+  }
+  const dust = (kg: number) => Math.min(ECOLOGY_DUST_MAX_PER_TICK, (kg / 1000) * ECOLOGY_DUST_PER_TONNE_PER_TICK);
+
+  it('an active spoil heap raises ecology above 50 (about +0.15 net after one call)', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ buildings: withHeap() }));
+    expect(state.ecology).toBeGreaterThan(50.1);
+    expect(state.ecology).toBeLessThan(50.25);
+  });
+
+  it('an inactive spoil heap gives no ecology', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ buildings: withHeap(false) }));
+    expect(state.ecology).toBe(50);
+  });
+
+  it('two heaps stack more than one', () => {
+    const one = createScoreState();
+    updateScores(one, makeInputs({ buildings: withHeap() }));
+    const buildings = withHeap();
+    placeBuilding(buildings, 'spoil_heap', 10, 10, 64, 64);
+    const two = createScoreState();
+    updateScores(two, makeInputs({ buildings }));
+    expect(two.ecology).toBeGreaterThan(one.ecology);
+  });
+
+  it('57 t of loose rock with no heap lowers ecology below 50', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ looseRockKg: 57_000 }));
+    expect(state.ecology).toBeLessThan(50);
+    expect(50 - state.ecology).toBeGreaterThanOrEqual(dust(57_000) - 0.06);
+  });
+
+  it('loose-rock loss never exceeds the per-tick cap, even for 1e9 kg', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ looseRockKg: 1e9 }));
+    expect(state.ecology).toBeLessThan(50);
+    expect(50 - state.ecology).toBeLessThanOrEqual(ECOLOGY_DUST_MAX_PER_TICK + 0.06);
+  });
+
+  it.each([0, -500, Number.NaN, Number.POSITIVE_INFINITY])('looseRockKg %s causes no dust loss and no NaN', (kg) => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ looseRockKg: kg }));
+    const ref = createScoreState();
+    updateScores(ref, makeInputs());
+    expect(Number.isNaN(state.ecology)).toBe(false);
+    expect(state.ecology).toBe(ref.ecology);
+  });
+
+  it('heap plus 10 t rises, heap plus 57 t falls', () => {
+    const ten = createScoreState();
+    const fifty7 = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(ten, makeInputs({ buildings: withHeap(), looseRockKg: 10_000 }));
+      updateScores(fifty7, makeInputs({ buildings: withHeap(), looseRockKg: 57_000 }));
+    }
+    expect(ten.ecology).toBeGreaterThan(50);
+    expect(fifty7.ecology).toBeLessThan(50);
+  });
+
+  it('heap with no rubble reaches the ecology star threshold within 100 ticks', () => {
+    const state = createScoreState();
+    const buildings = withHeap();
+    for (let i = 0; i < 100; i++) updateScores(state, makeInputs({ buildings }));
+    expect(state.ecology).toBeGreaterThanOrEqual(STAR_ECOLOGY_MIN);
+  });
+
+  it('ecology pinned at exactly 0 is not lifted by a heap', () => {
+    const state = createScoreState();
+    state.ecology = 0;
+    updateScores(state, makeInputs({ buildings: withHeap() }));
+    expect(state.ecology).toBe(0);
+  });
+
+  it('ecology at 0 stays 0 under dust', () => {
+    const state = createScoreState();
+    state.ecology = 0;
+    updateScores(state, makeInputs({ looseRockKg: 57_000 }));
+    expect(state.ecology).toBe(0);
+  });
+
+  it('ecology at 0.1 with a heap still rises', () => {
+    const state = createScoreState();
+    state.ecology = 0.1;
+    updateScores(state, makeInputs({ buildings: withHeap() }));
+    expect(state.ecology).toBeGreaterThan(0.1);
   });
 });

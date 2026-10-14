@@ -16,6 +16,9 @@ export interface OreType {
   readonly depthMax: number;
 }
 
+/** depthMax sentinel for an ore with no lower depth limit. */
+export const ORE_DEPTH_UNBOUNDED = 999;
+
 const ORES: readonly OreType[] = [
   {
     id: 'dirtite',
@@ -88,7 +91,7 @@ const ORES: readonly OreType[] = [
     valuePerKg: 2000,
     rarity: 'legendary',
     color: '#E0B0FF',       // Iridescent / mauve
-    depthMin: 32, depthMax: 999,
+    depthMin: 32, depthMax: ORE_DEPTH_UNBOUNDED,
   },
 ] as const;
 

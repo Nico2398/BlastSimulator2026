@@ -22,7 +22,9 @@ import {
   type SandboxDifficultyId,
 } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
-import { t } from '../../../src/core/i18n/I18n.js';
+import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
+import { ORE_DEPTH_UNBOUNDED, getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { vehicleDisplayName } from '../../../src/ui/fleetDetailSections.js';
 import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
 
 const REMOVED_FIELD_IDS = [
@@ -316,7 +318,81 @@ describe('SandboxPanel', () => {
       }
       const tr = sandboxBiomeTraits(id);
       expect(shown).toContain(String(tr.oreDepthMin));
-      expect(shown).toContain(String(tr.oreDepthMax));
+      if (tr.oreDepthMax >= ORE_DEPTH_UNBOUNDED) {
+        expect(shown, id).toContain(`from ${tr.oreDepthMin} m down`);
+      } else {
+        expect(shown, id).toContain(`depth ${tr.oreDepthMin}-${tr.oreDepthMax} m`);
+      }
+    }
+  });
+
+  it('open-ended ore depth reads "from N m down" and never leaks the sentinel (#1731)', () => {
+    panel.show();
+    for (const id of ['tropical_karst', 'volcanic_flats']) {
+      changeSelect('biome', id);
+      const shown = text('bs-sandbox-biome-ores');
+      const min = sandboxBiomeTraits(id).oreDepthMin;
+      expect(shown, id).toContain(`from ${min} m down`);
+      expect(shown, id).not.toContain('999');
+      expect(shown, id).not.toContain(`${min}-`);
+    }
+  });
+
+  it('biomes with a finite deepest ore keep the "depth min-max m" window (#1731)', () => {
+    panel.show();
+    let finite = 0;
+    for (const b of getAllBiomes()) {
+      const tr = sandboxBiomeTraits(b.id);
+      if (tr.ores.length === 0 || tr.oreDepthMax >= ORE_DEPTH_UNBOUNDED) continue;
+      finite++;
+      changeSelect('biome', b.id);
+      const shown = text('bs-sandbox-biome-ores');
+      expect(shown, b.id).toContain(`depth ${tr.oreDepthMin}-${tr.oreDepthMax} m`);
+      expect(shown, b.id).not.toContain('from');
+    }
+    expect(finite).toBeGreaterThan(0);
+  });
+
+  it('a biome with no ores shows no ores line (#1731)', () => {
+    panel.show();
+    for (const b of getAllBiomes()) {
+      changeSelect('biome', b.id);
+      const has = sandboxBiomeTraits(b.id).ores.length > 0;
+      expect(document.getElementById('bs-sandbox-biome-ores') !== null, b.id).toBe(has);
+    }
+  });
+
+  it('the unbounded depth sentinel equals the deepest ore depthMax (#1731)', () => {
+    const treranium = getAllOres().find(o => o.id === 'treranium')!;
+    expect(treranium.depthMax).toBe(ORE_DEPTH_UNBOUNDED);
+  });
+
+  it('opening line names each vehicle as "N× <type> (<model>)" (#1731)', () => {
+    panel.show();
+    changeSelect('difficulty', 'easy');
+    const shown = text('bs-sandbox-difficulty-opening');
+    expect(shown).toContain('1× Drill Rig (Pokey McPoke)');
+    for (const v of sandboxDifficultyDetails('easy').vehicles) {
+      expect(shown).toContain(`${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`);
+    }
+  });
+
+  it('opening line vehicle entries are localized in French (#1731)', () => {
+    const prev = getLocale();
+    setLocale('fr');
+    try {
+      document.body.innerHTML = '';
+      const c = document.createElement('div');
+      document.body.appendChild(c);
+      new SandboxPanel(c).show();
+      changeSelect('difficulty', 'easy');
+      const shown = text('bs-sandbox-difficulty-opening');
+      for (const v of sandboxDifficultyDetails('easy').vehicles) {
+        const type = t(`vehicle_type.${v.role}`);
+        expect(shown).toContain(`${v.count}× ${type} (${vehicleDisplayName(v.role, v.tier)})`);
+      }
+    } finally {
+      setLocale(prev);
     }
   });
 

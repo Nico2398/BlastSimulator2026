@@ -39,6 +39,9 @@ import { chargeCommand } from '../../src/console/commands/mining.js';
 import { addHole } from '../../src/core/mining/DrillPlan.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
+import { addBlastFragments } from '../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { STAR_ECOLOGY_MIN } from '../../src/core/config/balance.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, PLAYER_BLAST_VERB, type Run } from '../helpers/playthrough.js';
@@ -1218,4 +1221,59 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
     expect(commands.filter(c => !PLAYER_BLAST_VERB.test(c))).toEqual([]);
   }, 600_000);
+});
+
+// ── Ecology lever (#1691) ───────────────────────────────────────────────────
+describe('ecology responds to how the mine is run (#1691)', () => {
+  const ECOLOGY_RUN_TICKS = 400;
+
+  function rubble(id: number, massKg: number): FragmentData {
+    return {
+      id,
+      position: { x: 12 + (id % 5), y: 0, z: 12 + Math.floor(id / 5) },
+      volume: massKg / 2500,
+      mass: massKg,
+      rockId: 'sandite',
+      oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+      halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+      shapeSeed: 1,
+      origin: { x: 12, y: 0, z: 12 },
+    };
+  }
+
+  /** Same seed, same site; events off so only the player's choices move ecology. */
+  function runMine(opts: { heap: boolean; rubbleKg: number }) {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    state.events.eventFreqMultiplier = 0;
+    if (opts.heap) expect(run('build spoil_heap at:10,18').success).toBe(true);
+    const pieces = Math.max(1, Math.round(opts.rubbleKg / 1000));
+    if (opts.rubbleKg > 0) {
+      addBlastFragments(state.logistics, Array.from({ length: pieces }, (_, i) => rubble(i + 1, opts.rubbleKg / pieces)));
+    }
+    run('time resume');
+    for (let i = 0; i < ECOLOGY_RUN_TICKS; i++) run('tick 1');
+    return state;
+  }
+
+  it('a run with a spoil heap and little rubble passes the ecology star check', () => {
+    const state = runMine({ heap: true, rubbleKg: 5_000 });
+    expect(state.scores.ecology).toBeGreaterThanOrEqual(STAR_ECOLOGY_MIN);
+    const stats = createLevelStats();
+    snapshotStats(stats, state);
+    const rating = calculateStarRating(stats, 0);
+    expect(rating.details.ecologyPass).toBe(true);
+  });
+
+  it('a careless run on the same seed (rubble left, no heap) ends below the threshold', () => {
+    const state = runMine({ heap: false, rubbleKg: 57_000 });
+    expect(state.scores.ecology).toBeLessThan(STAR_ECOLOGY_MIN);
+    const stats = createLevelStats();
+    snapshotStats(stats, state);
+    expect(calculateStarRating(stats, 0).details.ecologyPass).toBe(false);
+  });
 });
