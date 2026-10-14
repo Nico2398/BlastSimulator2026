@@ -13,7 +13,7 @@ describe('weather reset on game start (#1459, #1403)', () => {
     runner.run('weather set heavy_rain');
     expect(ctx.state!.weather.current).toBe('heavy_rain');
     expect(runner.run('new_game seed:42').success).toBe(true);
-    expect(ctx.state!.weather).toEqual(createWeatherCycle(42));
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(42, undefined, 'desert_badlands'));
   });
 
   it('a different seed uses the new seed', () => {
@@ -21,7 +21,7 @@ describe('weather reset on game start (#1459, #1403)', () => {
     runner.run('new_game seed:42');
     runner.run('weather set storm');
     runner.run('new_game seed:7');
-    expect(ctx.state!.weather).toEqual(createWeatherCycle(7));
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(7, undefined, 'desert_badlands'));
   });
 
   it('first new_game defines a sunny cycle', () => {
@@ -39,8 +39,8 @@ describe('weather reset on game start (#1459, #1403)', () => {
     used.runner.run('tick 200');
     used.runner.run('new_game seed:42');
 
-    const expected = createWeatherCycle(42);
-    for (let i = 0; i < 200; i++) tickWeather(expected);
+    const expected = createWeatherCycle(42, undefined, 'desert_badlands');
+    for (let i = 0; i < 200; i++) tickWeather(expected, 'desert_badlands');
     fresh.runner.run('tick 200');
     used.runner.run('tick 200');
     expect(used.ctx.state!.weather).toEqual(expected);
@@ -52,7 +52,7 @@ describe('weather reset on game start (#1459, #1403)', () => {
     runner.run('new_game seed:42');
     runner.run('weather set heavy_rain');
     expect(runner.run('sandbox start seed:5').success).toBe(true);
-    expect(ctx.state!.weather).toEqual(createWeatherCycle(5));
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(5, undefined, ctx.state!.mineType));
   });
 
   it('campaign start resets weather with the new state seed', () => {
@@ -61,7 +61,7 @@ describe('weather reset on game start (#1459, #1403)', () => {
     runner.run('weather set heavy_rain');
     // dusty_hollow: unpinned, so its cycle derives from the new state seed.
     expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
-    expect(ctx.state!.weather).toEqual(createWeatherCycle(ctx.state!.seed));
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(ctx.state!.seed, undefined, ctx.state!.mineType));
   });
 
   it('campaign start on the tutorial pins the weather to sunny (#1585)', () => {
@@ -69,7 +69,7 @@ describe('weather reset on game start (#1459, #1403)', () => {
     runner.run('new_game seed:42');
     runner.run('weather set heavy_rain');
     expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
-    expect(ctx.state!.weather).toEqual(createWeatherCycle(ctx.state!.seed, 'sunny'));
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(ctx.state!.seed, 'sunny', ctx.state!.mineType));
     runner.run('tick 300');
     expect(ctx.state!.weather.current).toBe('sunny');
   });
@@ -81,5 +81,11 @@ describe('weather reset on game start (#1459, #1403)', () => {
     const before = structuredClone(ctx.state!.weather);
     expect(runner.run('new_game seed:42 staffed:maybe').success).toBe(false);
     expect(ctx.state!.weather).toEqual(before);
+  });
+
+  it('new_game mine_type:tropical_karst builds a tropical cycle', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('new_game seed:42 mine_type:tropical_karst');
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(42, undefined, 'tropical_karst'));
   });
 });

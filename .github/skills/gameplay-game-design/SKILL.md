@@ -193,6 +193,15 @@ Rain fills drill holes. Water-sensitive explosives fizzle in a wet hole. Tubing 
 **Tubing is watertight, not draining.** A tubed hole neither gains nor loses water; tubing never removes water already inside. It can be bought and installed at any time, rain or not (the Charge step offers it whenever untubed holes exist).
 **Draining.** `drain_hole hole:<id|*>` (Charge step: Drain button, plus one per hole row) sets a wet hole's level to 0 and costs `HOLE_DRAIN_COST_PER_HOLE`. Refused when the hole is dry, unknown, cash is short, or it is untubed in porous rock (`porosity >= HOLE_DRAIN_POROSITY_LIMIT`: the ground refills it at once; tube it first, then drain, or wait). `*` targets every wet hole: blocked ones are named, the rest still drain. Removing a hole, firing, or `resetPlanState` drops its water entry. `weather set <state>` (console override) changes the weather only; standing water stays and fades or seeps away on its own, so a scenario that needs dry holes waits on `wetHoleCount` reaching 0.
 Weather advances once per tick in `runTick` (`tickWeather`, right after time advances, before events read `weatherId`) and lives in `GameState.weather` (`WeatherCycleState`), persisted with the save (v30) with its own PRNG stream `rngState` (mulberry32 int32, seeded `seed + WEATHER_RNG_SEED_OFFSET`); history is capped at `WEATHER_HISTORY_MAX`. The TopBar forecast runs the same `tickWeather` primitive on a clone, so forecast day N equals the live weather after N days of ticks. `createGame` reseeds weather for every start (browser level swap, console `new_game`, sandbox, campaign); a refused start leaves the old state untouched. `weather advance` uses `forceAdvanceInState`.
+**Per-biome climates (#1688).** The weather follows the site's biome (`GameState.mineType`, a BiomeCatalog id). `WeatherClimates.ts` holds four climates (`transitions` + `durations`); `getWeatherClimate(biomeId)` maps `desert_badlands`/`red_canyon`/`volcanic_flats` to arid, `tropical_karst` to tropical, `alpine_granite` to alpine, `green_foothills` to temperate; undefined or unknown ids (including the `createGame` default `desert`) fall back to `WEATHER_FALLBACK_CLIMATE` (temperate, the original tables verbatim). The biome is passed in by each caller (`createWeatherCycle`, `tickWeather`, `forecast`, `forceAdvanceInState`, `setWeather`) and never stored in the cycle, so saves are unchanged and the RNG stream shape is identical. Initial state is always `sunny`; pinned weather is unaffected. Measured with `tickWeather`, 5 seeds x 6,000 ticks (wet = light rain + heavy rain + storm):
+
+| Climate | Wet | Heat wave | Cold snap | Storm | Median dry spell |
+|---------|-----|-----------|-----------|-------|------------------|
+| arid | 6.4% | 16.0% | 0.9% | 0.2% | 43 ticks |
+| tropical | 45.4% | 2.7% | 0.1% | 4.1% | 12 ticks |
+| temperate | 28.3% | 4.4% | 3.0% | 2.0% | 29 ticks |
+| alpine | 12.7% | 0.3% | 28.8% | 0.4% | 47 ticks |
+
 Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing a hole or firing the blast drops its tubing record with no refund; unused inventory persists.
 
 ## Safety & Projection Profiles
