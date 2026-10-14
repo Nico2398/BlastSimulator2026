@@ -1955,6 +1955,9 @@ export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
 /** Offset added to the game seed to derive the weather cycle's PRNG seed (#1403). */
 export const WEATHER_RNG_SEED_OFFSET = 1000;
 
+/** Biome whose weather climate a missing or unknown biome id falls back to (#1688). */
+export const WEATHER_FALLBACK_CLIMATE = 'temperate';
+
 /** Cap on weather history entries kept in GameState (#1403). */
 export const WEATHER_HISTORY_MAX = 32;
 

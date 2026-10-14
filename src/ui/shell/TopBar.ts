@@ -391,7 +391,7 @@ export class TopBar {
     }
 
     const cycle = state.weather;
-    const days = forecast(cycle, FORECAST_DAYS);
+    const days = forecast(cycle, FORECAST_DAYS, state.mineType);
     const advisory = computeWeatherAdvisory(state, cycle.current, days);
     const today = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
 

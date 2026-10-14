@@ -3,6 +3,7 @@
 // Uses seeded PRNG for deterministic sequences.
 
 import { Random } from '../math/Random.js';
+import { getWeatherClimate } from './WeatherClimates.js';
 import { TICKS_PER_DAY, WEATHER_RNG_SEED_OFFSET, WEATHER_HISTORY_MAX } from '../config/balance.js';
 
 // ── Weather states ──
@@ -19,34 +20,6 @@ export type WeatherState =
 export const ALL_WEATHER_STATES: readonly WeatherState[] = [
   'sunny', 'cloudy', 'light_rain', 'heavy_rain', 'storm', 'heat_wave', 'cold_snap',
 ];
-
-// ── Duration ranges (in game ticks) ──
-// 1 tick = 1 game-hour (TICKS_PER_DAY = 24, matches the TopBar day/clock).
-// Sunny: 8-20 ticks (under a day). Storm: 2-6 ticks (a few hours).
-
-const DURATION_RANGES: Record<WeatherState, [min: number, max: number]> = {
-  sunny: [8, 20],
-  cloudy: [6, 15],
-  light_rain: [4, 12],
-  heavy_rain: [3, 8],
-  storm: [2, 6],
-  heat_wave: [6, 16],
-  cold_snap: [4, 10],
-};
-
-// ── Transition probabilities ──
-// Each state maps to possible next states with weights.
-// Weights don't need to sum to 1 — they're normalized at runtime.
-
-const TRANSITIONS: Record<WeatherState, Array<[WeatherState, number]>> = {
-  sunny:      [['cloudy', 0.4], ['sunny', 0.3], ['heat_wave', 0.15], ['cold_snap', 0.1], ['light_rain', 0.05]],
-  cloudy:     [['light_rain', 0.35], ['sunny', 0.30], ['cloudy', 0.20], ['heavy_rain', 0.10], ['cold_snap', 0.05]],
-  light_rain: [['cloudy', 0.30], ['heavy_rain', 0.30], ['light_rain', 0.25], ['sunny', 0.15]],
-  heavy_rain: [['storm', 0.30], ['light_rain', 0.30], ['heavy_rain', 0.20], ['cloudy', 0.20]],
-  storm:      [['heavy_rain', 0.45], ['light_rain', 0.30], ['cloudy', 0.20], ['storm', 0.05]],
-  heat_wave:  [['sunny', 0.50], ['cloudy', 0.30], ['heat_wave', 0.15], ['storm', 0.05]],
-  cold_snap:  [['cloudy', 0.40], ['sunny', 0.30], ['cold_snap', 0.15], ['light_rain', 0.15]],
-};
 
 // ── Weather cycle data ──
 
@@ -66,14 +39,15 @@ export function isWeatherState(value: unknown): value is WeatherState {
 }
 
 /** Create initial weather cycle from seed. `pinned` (optional) fixes the weather to that state for the whole game. */
-export function createWeatherCycle(seed: number, pinned?: WeatherState, _biomeId?: string): WeatherCycleState {
+export function createWeatherCycle(seed: number, pinned?: WeatherState, biomeId?: string): WeatherCycleState {
   const rngState = (seed + WEATHER_RNG_SEED_OFFSET) | 0;
+  const { durations } = getWeatherClimate(biomeId);
   if (pinned) {
-    return { current: pinned, ticksRemaining: DURATION_RANGES[pinned][1], history: [pinned], rngState, pinned: true };
+    return { current: pinned, ticksRemaining: durations[pinned][1], history: [pinned], rngState, pinned: true };
   }
   const rng = new Random(rngState);
   const initial: WeatherState = 'sunny';
-  const duration = rng.nextInt(DURATION_RANGES[initial][0], DURATION_RANGES[initial][1]);
+  const duration = rng.nextInt(durations[initial][0], durations[initial][1]);
   return {
     current: initial,
     ticksRemaining: duration,
@@ -87,12 +61,13 @@ export function createWeatherCycle(seed: number, pinned?: WeatherState, _biomeId
  * When ticksRemaining hits 0, transition to next state.
  * Returns updated cycle state (mutates in place for efficiency).
  */
-export function advanceWeather(cycle: WeatherCycleState, rng: Random, _biomeId?: string): WeatherCycleState {
+export function advanceWeather(cycle: WeatherCycleState, rng: Random, biomeId?: string): WeatherCycleState {
   cycle.ticksRemaining--;
 
   if (cycle.ticksRemaining <= 0) {
-    const next = pickNextState(cycle.current, rng);
-    const range = DURATION_RANGES[next];
+    const climate = getWeatherClimate(biomeId);
+    const next = pickNextState(climate.transitions[cycle.current], rng);
+    const range = climate.durations[next];
     cycle.current = next;
     cycle.ticksRemaining = rng.nextInt(range[0], range[1]);
     pushHistory(cycle, next);
@@ -102,9 +77,9 @@ export function advanceWeather(cycle: WeatherCycleState, rng: Random, _biomeId?:
 }
 
 /** Force transition to next weather state (for testing/console). */
-export function forceAdvance(cycle: WeatherCycleState, rng: Random, _biomeId?: string): WeatherCycleState {
+export function forceAdvance(cycle: WeatherCycleState, rng: Random, biomeId?: string): WeatherCycleState {
   cycle.ticksRemaining = 0;
-  return advanceWeather(cycle, rng);
+  return advanceWeather(cycle, rng, biomeId);
 }
 
 /** Run `step` on the cycle's own persisted PRNG stream, then store the stream's new state. */
@@ -115,15 +90,15 @@ function withCycleRng(cycle: WeatherCycleState, step: (rng: Random) => void): vo
 }
 
 /** Advance the cycle one tick on its own persisted PRNG stream; returns the resulting weather. */
-export function tickWeather(cycle: WeatherCycleState, _biomeId?: string): WeatherState {
+export function tickWeather(cycle: WeatherCycleState, biomeId?: string): WeatherState {
   if (cycle.pinned) return cycle.current;
-  withCycleRng(cycle, rng => advanceWeather(cycle, rng));
+  withCycleRng(cycle, rng => advanceWeather(cycle, rng, biomeId));
   return cycle.current;
 }
 
 /** Force transition to the next weather state on the cycle's own PRNG stream (testing/console). */
-export function forceAdvanceInState(cycle: WeatherCycleState, _biomeId?: string): WeatherCycleState {
-  withCycleRng(cycle, rng => forceAdvance(cycle, rng));
+export function forceAdvanceInState(cycle: WeatherCycleState, biomeId?: string): WeatherCycleState {
+  withCycleRng(cycle, rng => forceAdvance(cycle, rng, biomeId));
   return cycle;
 }
 
@@ -133,9 +108,9 @@ export function forceAdvanceInState(cycle: WeatherCycleState, _biomeId?: string)
  * scenario that needs to demonstrate a specific state (or the full cycle in
  * order) has no other deterministic way to reach it (#408).
  */
-export function setWeather(cycle: WeatherCycleState, state: WeatherState): WeatherCycleState {
+export function setWeather(cycle: WeatherCycleState, state: WeatherState, biomeId?: string): WeatherCycleState {
   cycle.current = state;
-  cycle.ticksRemaining = DURATION_RANGES[state][1];
+  cycle.ticksRemaining = getWeatherClimate(biomeId).durations[state][1];
   pushHistory(cycle, state);
   return cycle;
 }
@@ -151,11 +126,11 @@ export function setWeather(cycle: WeatherCycleState, state: WeatherState): Weath
  * must read `cycle.current` directly rather than treating index 0 of this
  * result as today, so the two can never disagree.
  */
-export function forecast(cycle: WeatherCycleState, n = 14, _biomeId?: string): WeatherState[] {
+export function forecast(cycle: WeatherCycleState, n = 14, biomeId?: string): WeatherState[] {
   const sim: WeatherCycleState = { ...cycle, history: [] };
   const days: WeatherState[] = [];
   for (let day = 0; day < n; day++) {
-    for (let tick = 0; tick < TICKS_PER_DAY; tick++) tickWeather(sim);
+    for (let tick = 0; tick < TICKS_PER_DAY; tick++) tickWeather(sim, biomeId);
     days.push(sim.current);
   }
   return days;
@@ -171,8 +146,7 @@ function pushHistory(cycle: WeatherCycleState, state: WeatherState): void {
   }
 }
 
-function pickNextState(current: WeatherState, rng: Random): WeatherState {
-  const options = TRANSITIONS[current];
+function pickNextState(options: Array<[WeatherState, number]>, rng: Random): WeatherState {
   const totalWeight = options.reduce((s, [, w]) => s + w, 0);
   let roll = rng.nextFloat(0, totalWeight);
 
