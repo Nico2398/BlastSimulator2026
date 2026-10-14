@@ -94,6 +94,30 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 }
 
 /**
+ * Signed distance inward from rect's outline, with rounded corners and a
+ * wobbled edge; negative outside.
+ */
+export function pitDistance(
+  rect: Rect,
+  margin: number,
+  x: number,
+  z: number,
+  cornerRadius: number,
+  wobble: number,
+): number {
+  // TODO: implement
+  void rect; void margin; void x; void z; void cornerRadius; void wobble;
+  return 0;
+}
+
+/** Deterministic outline offset in [-amplitude, amplitude] metres at (x, z). */
+export function outlineWobbleAt(x: number, z: number, amplitude: number): number {
+  // TODO: implement
+  void x; void z; void amplitude;
+  return 0;
+}
+
+/**
  * Compress relief toward centerHeight within mask.margin metres inside
  * rect's edge, blending back to the untouched height outside it (negative
  * distanceInsideRect drives the smoothstep to 0 automatically — no separate

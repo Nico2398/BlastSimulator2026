@@ -2481,6 +2481,12 @@ export interface PitMaskShape {
   margin: number;
   /** Fraction of relief that survives at full compression, deep inside the rect. */
   reliefKeep: number;
+  /** Max landscape slope (m of height per m) outside the rect; absent = legacy blend only. */
+  envelopeSlope?: number;
+  /** Amplitude (m) of the noise wobble applied to the outline distance; absent = straight outline. */
+  outlineWobble?: number;
+  /** Corner rounding radius (m) of the outline; absent = sharp corners. */
+  cornerRadius?: number;
 }
 
 /** Mask used by campaign levels and standalone worlds. */
