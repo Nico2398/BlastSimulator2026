@@ -229,6 +229,7 @@ export function drillDepthRefusal(
 
 /** Lowest drill rig tier whose max depth (DRILL_RIG_MAX_DEPTH_M) reaches `depth`. */
 export function minDrillRigTier(depth: number): VehicleTier {
-  void depth; // TODO: implement
-  return 1;
+  if (!(depth > 0)) return 1;
+  const tiers: VehicleTier[] = [1, 2, 3];
+  return tiers.find(t => DRILL_RIG_MAX_DEPTH_M[t] >= depth) ?? 3;
 }

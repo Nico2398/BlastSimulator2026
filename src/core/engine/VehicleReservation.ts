@@ -30,6 +30,7 @@ import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, r
 import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { licenceLevelOf, canDriveTier } from '../entities/VehicleDriverAssignment.js';
+import { minDrillRigTier } from '../mining/DrillPlan.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
@@ -174,15 +175,15 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
 
 /** Lowest vehicle tier `action` can be done with (e.g. a drill_hole's rig must reach payload.depth). */
 export function minVehicleTierFor(action: Pick<PendingAction, 'type' | 'payload'>): VehicleTier {
-  void action; // TODO: implement
-  return 1;
+  if (action.type !== 'drill_hole') return 1;
+  const depth = action.payload['depth'];
+  return typeof depth === 'number' ? minDrillRigTier(depth) : 1;
 }
 
 /** Lowest tier among the fleet's vehicles of `role`, or null when it owns none (#1524). */
 export function lowestFleetTier(vehicles: readonly Vehicle[], role: VehicleRole, minTier: VehicleTier = 1): VehicleTier | null {
-  void minTier; // TODO: implement
   let lowest: VehicleTier | null = null;
-  for (const v of vehicles) if (v.type === role && (lowest === null || v.tier < lowest)) lowest = v.tier;
+  for (const v of vehicles) if (v.type === role && v.tier >= minTier && (lowest === null || v.tier < lowest)) lowest = v.tier;
   return lowest;
 }
 
@@ -279,13 +280,13 @@ export function withUnderRepairIndex<T>(state: GameState, fn: () => T): T {
  * null when none qualify.
  */
 export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee, minTier: VehicleTier = 1): Vehicle | null {
-  void minTier; // TODO: implement
   if (!isLicensedForRole(employee, role)) return null;
 
   const closed = outOfServiceIds(state.events.activeModifiers, 'vehicle', state.tickCount);
   const qualifying = state.vehicles.vehicles.filter(v =>
     v.type === role &&
     !closed.has(v.id) &&
+    v.tier >= minTier &&
     canDriveTier(employee, role, v.tier) &&
     v.hp > 0 &&
     getVehicleReservation(state.vehicles, v.id) === null &&
@@ -374,7 +375,7 @@ export function findVehicleForClaim(
     return { ok: true, vehicle: alreadyReserved };
   }
 
-  const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
+  const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee, minVehicleTierFor(action));
   return vehicle === null ? { ok: false } : { ok: true, vehicle };
 }
 
