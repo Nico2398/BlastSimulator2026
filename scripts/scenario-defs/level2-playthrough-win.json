@@ -3174,8 +3174,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -3199,8 +3199,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3221,8 +3221,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3242,52 +3242,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ],
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3309,8 +3265,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3330,8 +3286,52 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 11,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ],
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3358,8 +3358,8 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "rubbleDisposalOffered": true
@@ -3378,8 +3378,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3408,8 +3408,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -3449,8 +3449,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3471,14 +3471,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 41.74999999999969,
+          "wellBeing": 26.16230769230721,
           "safety": 0,
-          "ecology": 47.24501227977596,
-          "nuisance": 46.04236684455177
+          "ecology": 47.91501227977593,
+          "nuisance": 11.892366844551821
         },
         "changedBy": {
           "tickCount": 0
@@ -3497,8 +3497,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3519,8 +3519,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3665,8 +3665,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 18,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "orderedHoleCount": 4,
@@ -3719,8 +3719,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 19,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3741,8 +3741,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 19,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3763,8 +3763,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 19,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3850,8 +3850,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 19,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 4,
@@ -3941,8 +3941,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -3966,8 +3966,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3988,8 +3988,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4010,8 +4010,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4031,8 +4031,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4054,8 +4054,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4075,8 +4075,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4103,8 +4103,8 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "rubbleDisposalOffered": true
@@ -4122,8 +4122,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4145,8 +4145,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4175,8 +4175,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -4217,8 +4217,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4241,14 +4241,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 77.70848214285778,
+          "wellBeing": 61.43230769230722,
           "safety": 0,
-          "ecology": 31.44182210523175,
-          "nuisance": 45.70235992480058
+          "ecology": 46.78313276390423,
+          "nuisance": 11.8197267693525
         },
         "changedBy": {
           "tickCount": 0
@@ -4267,14 +4267,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
-          "employeeCount": 19,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 77.70848214285778,
+          "wellBeing": 61.43230769230722,
           "safety": 0,
-          "ecology": 31.44182210523175,
-          "nuisance": 45.70235992480058
+          "ecology": 46.78313276390423,
+          "nuisance": 11.8197267693525
         },
         "changedBy": {
           "tickCount": 0
@@ -4297,7 +4297,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "increased": [
           "cash"
@@ -4320,7 +4320,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "changedBy": {
           "cash": 0,
