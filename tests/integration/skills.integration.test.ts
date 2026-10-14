@@ -23,7 +23,10 @@ import { surveyCommand } from '../../src/console/commands/mining.js';
 import { tickEmployees } from '../../src/core/engine/GameLoop.js';
 import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuration.js';
 import { Random } from '../../src/core/math/Random.js';
-import { SURVEY_DURATION_TICKS, XP_THRESHOLDS, ROLE_STARTING_QUALIFICATIONS } from '../../src/core/config/balance.js';
+import {
+  SURVEY_DURATION_TICKS, XP_THRESHOLDS, ROLE_STARTING_QUALIFICATIONS, SURVEY_BASE_ERROR, SURVEY_SKILL_BONUS_PER_LEVEL,
+  TRAINING_LEVEL_FEE, QUALIFICATION_SALARY_BONUS,
+} from '../../src/core/config/balance.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
@@ -807,5 +810,80 @@ describe('charge_hole duration scales with blasting proficiency (#1384)', () => 
     const masterTicks = ticksToCharge(5);
 
     expect(masterTicks).toBeLessThan(rookieTicks);
+  });
+});
+
+// ── School tier brings a skill to its level (#1726) ─────────────────────────
+
+describe('Level courses through the console (#1726)', () => {
+  it('a tier-2 geology lab turns a geology-1 surveyor into geology-2, and the next survey uses level 2', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 200000;
+    const surveyorId = hireOne(ctx, 'surveyor');
+    const surveyor = () => state.employees.employees.find(e => e.id === surveyorId)!;
+    expect(surveyor().qualifications.find(q => q.category === 'geology')!.proficiencyLevel).toBe(1);
+    state.buildings.unlockedTiers['geology_lab'] = 2;
+    expect(placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 2).success).toBe(true);
+    const cashBefore = state.cash;
+    const salaryBefore = surveyor().salary;
+
+    const result = employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' });
+    expect(result.success, result.output).toBe(true);
+    expect(state.cash).toBe(cashBefore - TRAINING_LEVEL_FEE[2]);
+    tickUntilTrainingStarted(ctx, surveyorId);
+    tickCommand(ctx, [String(surveyor().trainingState!.ticksRemaining)], {});
+
+    const geology = surveyor().qualifications.find(q => q.category === 'geology')!;
+    expect(surveyor().trainingState).toBeNull();
+    expect(geology.proficiencyLevel).toBe(2);
+    expect(geology.xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[2]);
+    expect(surveyor().qualifications.filter(q => q.category === 'geology')).toHaveLength(1);
+    expect(surveyor().salary - salaryBefore).toBe(QUALIFICATION_SALARY_BONUS[2] - QUALIFICATION_SALARY_BONUS[1]);
+
+    surveyor().x = 16; surveyor().z = 16;
+    expect(surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' }).success).toBe(true);
+    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) tickCommand(ctx, ['1'], {});
+    expect(state.surveyResults).toHaveLength(1);
+    expect(state.surveyResults[0]!.confidence)
+      .toBeCloseTo(1 - SURVEY_BASE_ERROR.core_sample * (1 - SURVEY_SKILL_BONUS_PER_LEVEL), 10);
+  });
+
+  it('employee train refuses a held level at a school of the same tier, with no fee', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    const surveyorId = hireOne(ctx, 'surveyor');
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    const cashBefore = state.cash;
+    const result = employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' });
+    expect(result.success).toBe(false);
+    expect(state.cash).toBe(cashBefore);
+    expect(state.employees.employees.find(e => e.id === surveyorId)!.pendingTrainingState).toBeNull();
+  });
+
+  it('employee train picks the highest-tier school and charges its level fee', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 200000;
+    const surveyorId = hireOne(ctx, 'surveyor');
+    state.buildings.unlockedTiers['geology_lab'] = 3;
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    placeBuilding(state.buildings, 'geology_lab', 20, 20, 32, 32, 3);
+    const cashBefore = state.cash;
+    expect(employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' }).success).toBe(true);
+    expect(state.cash).toBe(cashBefore - TRAINING_LEVEL_FEE[3]);
+  });
+
+  it('a level-3 skill is refused with no fee at any school', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 200000;
+    const surveyorId = hireOne(ctx, 'surveyor');
+    assignSkill(state.employees, surveyorId, 'geology', 3);
+    state.buildings.unlockedTiers['geology_lab'] = 3;
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 3);
+    const cashBefore = state.cash;
+    expect(employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' }).success).toBe(false);
+    expect(state.cash).toBe(cashBefore);
   });
 });
