@@ -59,6 +59,8 @@ Generation: per-rock Simplex noise field + level bias, normalized. Feeds texture
 
 Ores not spread homogeneously. Each ore type has separate Simplex field with high threshold → elongated vein shapes. Surface veins visible as color tints. Sub-surface veins require survey to detect.
 
+**Biome ore progression (#1677).** Ore depth windows (`OreCatalog`) are global; biome coverage comes from which rocks host which ores (`RockCatalog.oreProbabilities`). Every biome has a sellable common ore (dirtite/rustite/blingite) in 0-8 m, rarer and richer ore deeper, and no biome is barren in any 8 m slab of 0-40 m. Over seeds 1, 7, 42 on the 64x64 sandbox, most interior 8x8x8 m blocks hold >= 2 t ore in both the 0-8 m and 24-32 m slabs, and mean ore depth rises with rarity tier. Desert and red-canyon shallow ore stays bit-identical; only deeper ore was added. To extend a biome, add ore entries to its rocks, not new depth windows. Generation stays pure in seed + position (`TERRAIN_GENERATOR_VERSION` unchanged).
+
 ## Ore Grade Reporting Post-Blast
 
 Post-blast report reads estimates at each fragment's `origin` (never landing `position`), floor-keyed column via `surveyColumnKey`/`findSurveyForColumn` in `SurveyColumn.ts`.
