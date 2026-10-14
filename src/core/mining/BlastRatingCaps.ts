@@ -3,7 +3,7 @@
  * Pure: takes plain facts, never GameState.
  */
 import type { BlastRating } from './BlastExecution.js';
-import { BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
+import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
 
 export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial';
 
@@ -30,7 +30,9 @@ interface CapRule {
 const CAP_RULES: readonly CapRule[] = [
   { id: 'death', applies: f => f.deaths > 0, ceiling: 'catastrophic' },
   { id: 'casualty_or_destruction', applies: f => f.injuries > 0 || f.destroyedBuildings > 0, ceiling: 'bad' },
-  { id: 'wet_holes', applies: f => f.wetHoleCount > 0, ceiling: 'good' },
+  { id: 'fizzled_failure', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_FAILURE, ceiling: 'bad' },
+  { id: 'fizzled_partial', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_PARTIAL, ceiling: 'mediocre' },
+  { id: 'wet_holes', applies: f => f.wetHoleCount > 0 && f.fizzledHoleCount > 0, ceiling: 'good' },
   { id: 'oversize', applies: f => oversizeShare(f.oversizedFragments, f.fragmentCount) > BLAST_OVERSIZE_SHARE_CAP, ceiling: 'good' },
 ];
 
@@ -57,7 +59,6 @@ export function oversizeShare(oversized: number, total: number): number {
 }
 
 /** Fraction (0..1) of charged holes that fizzled; 0 when no holes were charged. */
-export function fizzleShare(_fizzled: number, _charged: number): number {
-  // TODO: implement
-  return 0;
+export function fizzleShare(fizzled: number, charged: number): number {
+  return charged > 0 ? fizzled / charged : 0;
 }

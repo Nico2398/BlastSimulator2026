@@ -61,5 +61,5 @@ export function classifyWetChargedHoles(
     const explosive = getExplosive(charges[id]!.explosiveId);
     return explosive !== undefined && waterEffect(true, explosive.waterSensitive, false) < 1;
   });
-  return { wet, fizzled, chargedCount: 0 };
+  return { wet, fizzled, chargedCount: Object.keys(charges).length };
 }
