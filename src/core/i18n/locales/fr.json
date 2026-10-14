@@ -3425,7 +3425,7 @@
   "sandbox.difficulty.hard": "Difficile",
   "sandbox.detail.hardness": "Dureté de la roche : niveau {min}-{max}",
   "sandbox.detail.hardness_single": "Dureté de la roche : niveau {tier}",
-  "sandbox.detail.ores": "Minerais : {list} (profondeur {min}-{max} m)",
+  "sandbox.detail.ores": "Minerais : {list} ({depth})",
   "sandbox.detail.depth_range": "profondeur {min}-{max} m",
   "sandbox.detail.depth_open": "à partir de {min} m",
   "sandbox.detail.terrain": "Terrain : {terrain}",
