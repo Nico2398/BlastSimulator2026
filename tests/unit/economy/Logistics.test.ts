@@ -1178,16 +1178,17 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
 
   it('selling the last ore of a mixed fragment then releases the leftover', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
-    putInStorage(state, makeStoredFragment(1, 1000, 0.32, { oreA: 0.5, oreB: 0.5 }));
-    const collectedOre: Record<string, number> = { oreA: 400, oreB: 400 };
+    // 0.4 + 0.4 ore density leaves 0.2 of the fragment as rock (200 kg); each ore is 0.32 * 0.4 * 2500 = 320 kg.
+    putInStorage(state, makeStoredFragment(1, 1000, 0.32, { oreA: 0.4, oreB: 0.4 }));
+    const collectedOre: Record<string, number> = { oreA: 320, oreB: 320 };
     const heap = heapStub();
 
-    consumeStoredOre(state, collectedOre, 'oreA', 400, [heap]);
-    consumeStoredOre(state, collectedOre, 'oreB', 400, [heap]);
+    consumeStoredOre(state, collectedOre, 'oreA', 320, [heap]);
+    consumeStoredOre(state, collectedOre, 'oreB', 320, [heap]);
 
     expect(state.fragments).toHaveLength(0);
     expect(state.storedMassKg).toBeCloseTo(0, 6);
-    expect(heap.storedSpoilKg).toBeGreaterThan(0);
+    expect(heap.storedSpoilKg).toBeCloseTo(200, 6);
     expect(collectedOre.oreA).toBeCloseTo(0, 6);
     expect(collectedOre.oreB).toBeCloseTo(0, 6);
   });
