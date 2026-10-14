@@ -67,7 +67,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 40
+          "value": 12
         },
         {
           "type": "focusTile",
