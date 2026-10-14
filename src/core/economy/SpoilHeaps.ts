@@ -68,7 +68,8 @@ export function creditSpoilKg(heap: Pick<Building, 'storedSpoilKg'>, amountKg: n
  * Returns false, crediting nothing, when no heap exists.
  */
 export function creditFirstSpoilHeap(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], amountKg: number): boolean {
-  // TODO: implement
-  void buildings; void amountKg;
-  return false;
+  const heap = buildings.find(b => b.type === 'spoil_heap');
+  if (!heap) return false;
+  creditSpoilKg(heap, amountKg);
+  return true;
 }
