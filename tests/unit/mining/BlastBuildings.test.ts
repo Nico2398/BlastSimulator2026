@@ -39,6 +39,7 @@ import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
+import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 
 import {
@@ -554,6 +555,44 @@ describe('blast command — secondary blast from a stocked warehouse (#1394)', (
     expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
     expect(state.lastBlastReport!.secondaryBlasts ?? []).toEqual([]);
     expect(result.output).not.toContain('Secondary blast');
+  });
+});
+
+describe('blast command — warehouse stocked through purchases (#1678)', () => {
+  function stockedByPurchase(purchases: Array<[string, number]>) {
+    const { ctx, state, wh } = makeBlastContextWithWarehouse(0);
+    delete wh.storedExplosives;
+    state.cash = 1_000_000;
+    for (const [id, kg] of purchases) {
+      expect(buyExplosiveStock(state, id, kg).success).toBe(true);
+    }
+    return { ctx, state, wh };
+  }
+
+  it('detonates when the blast destroys it; explosivesKg is the total stock', () => {
+    const { ctx, state, wh } = stockedByPurchase([['boomite', 100]]);
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
+    const sec = state.lastBlastReport!.secondaryBlasts;
+    expect(sec).toHaveLength(1);
+    expect(sec![0]!.buildingId).toBe(wh.id);
+    expect(sec![0]!.explosivesKg).toBe(100);
+    expect(result.output).toContain('Secondary blast: 100 kg of stored explosives detonated');
+  });
+
+  it('sums every explosive type held into the secondary blast', () => {
+    const { ctx, state } = stockedByPurchase([['boomite', 100], ['krackle', 50]]);
+    blastCommand(ctx, [], {});
+    expect(state.lastBlastReport!.secondaryBlasts![0]!.explosivesKg).toBe(150);
+  });
+
+  it('adds no secondary blast once the purchased stock was fully drawn by charge orders', () => {
+    const { ctx, state, wh } = stockedByPurchase([['boomite', 5]]);
+    wh.storedExplosives = { boomite: 0 };
+    blastCommand(ctx, [], {});
+    expect(state.lastBlastReport!.secondaryBlasts ?? []).toEqual([]);
   });
 });
 

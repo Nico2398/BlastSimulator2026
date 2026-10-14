@@ -14,7 +14,12 @@ import {
   hasExplosivesForBlast,
   freightWarehouseHasRoom,
 } from '../../../src/core/entities/Building.js';
-import { freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
+import {
+  freightWarehouseSites, getExplosivesStockByType, getExplosivesFreeCapacity,
+} from '../../../src/core/entities/BuildingWarehouse.js';
+import { warehouseStockKg } from '../../../src/core/entities/Building.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import {
   createLogisticsState,
   syncLogisticsCapacity,
@@ -442,5 +447,91 @@ describe('freightWarehouseSites (#1372)', () => {
     placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
     placeBuilding(bs, 'freight_warehouse', 40, 10, 100, 100, 3);
     expect(freightWarehouseSites(bs).reduce((n, s) => n + s.capacityKg, 0)).toBe(getStorageCapacity(bs));
+  });
+});
+
+// ─── Per-explosive stock (#1678) ─────────────────────────────────────────────
+
+describe('per-type explosive stock (#1678)', () => {
+  let st: BuildingState;
+  beforeEach(() => { st = createBuildingState(); });
+
+  it('getExplosivesInStock filters by explosive id and sums all types when omitted', () => {
+    placeBuilding(st, 'explosive_warehouse', 0, 0, 64, 64, 1);
+    storeExplosives(st, 'boomite', 100);
+    storeExplosives(st, 'krackle', 40);
+    expect(getExplosivesInStock(st, 'boomite')).toBe(100);
+    expect(getExplosivesInStock(st, 'krackle')).toBe(40);
+    expect(getExplosivesInStock(st, 'pop_rock')).toBe(0);
+    expect(getExplosivesInStock(st)).toBe(140);
+  });
+
+  it('getExplosivesStockByType aggregates across warehouses', () => {
+    placeBuilding(st, 'explosive_warehouse', 0, 0, 64, 64, 1);
+    placeBuilding(st, 'explosive_warehouse', 10, 0, 64, 64, 1);
+    storeExplosives(st, 'boomite', 700);
+    storeExplosives(st, 'krackle', 50);
+    expect(getExplosivesStockByType(st)).toEqual({ boomite: 700, krackle: 50 });
+  });
+
+  it('getExplosivesStockByType is empty for no warehouse or no stock', () => {
+    expect(getExplosivesStockByType(st)).toEqual({});
+    placeBuilding(st, 'explosive_warehouse', 0, 0, 64, 64, 1);
+    expect(getExplosivesStockByType(st)).toEqual({});
+  });
+
+  it('capacity is shared across explosive types', () => {
+    placeBuilding(st, 'explosive_warehouse', 0, 0, 64, 64, 1);
+    expect(storeExplosives(st, 'boomite', 400)).toBe(400);
+    expect(storeExplosives(st, 'krackle', 200)).toBe(100);
+    expect(getExplosivesFreeCapacity(st)).toBe(0);
+  });
+
+  it('getExplosivesFreeCapacity is capacity minus all stock, and ignores inactive warehouses', () => {
+    placeBuilding(st, 'explosive_warehouse', 0, 0, 64, 64, 1);
+    placeBuilding(st, 'explosive_warehouse', 10, 0, 64, 64, 1);
+    storeExplosives(st, 'boomite', 300);
+    expect(getExplosivesFreeCapacity(st)).toBe(700);
+    st.buildings[1]!.active = false;
+    expect(getExplosivesFreeCapacity(st)).toBe(200);
+  });
+
+  it('getExplosivesFreeCapacity is 0 with no warehouse', () => {
+    expect(getExplosivesFreeCapacity(st)).toBe(0);
+  });
+
+  it('consumeExplosives draws only the named explosive', () => {
+    placeBuilding(st, 'explosive_warehouse', 0, 0, 64, 64, 1);
+    storeExplosives(st, 'boomite', 10);
+    storeExplosives(st, 'krackle', 100);
+    expect(consumeExplosives(st, 'boomite', 20)).toBe(false);
+    expect(getExplosivesInStock(st, 'krackle')).toBe(100);
+    expect(consumeExplosives(st, 'boomite', 10)).toBe(true);
+    expect(getExplosivesStockByType(st)['boomite'] ?? 0).toBe(0);
+    expect(getExplosivesInStock(st, 'krackle')).toBe(100);
+  });
+
+  it('warehouseStockKg totals every explosive in one building', () => {
+    expect(warehouseStockKg({})).toBe(0);
+    expect(warehouseStockKg({ storedExplosives: { boomite: 30, krackle: 12 } })).toBe(42);
+  });
+
+  it('a saved stocked warehouse round-trips its stock', () => {
+    const game = createGame({ seed: 42 });
+    placeBuilding(game.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
+    storeExplosives(game.buildings, 'boomite', 120);
+    const loaded = deserialize(serialize(game));
+    expect(getExplosivesStockByType(loaded.buildings)).toEqual({ boomite: 120 });
+  });
+
+  it('a save without storedExplosives loads as an empty warehouse', () => {
+    const game = createGame({ seed: 42 });
+    placeBuilding(game.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
+    const json = JSON.parse(serialize(game));
+    for (const b of json.buildings.buildings) delete b.storedExplosives;
+    const loaded = deserialize(JSON.stringify(json));
+    expect(getExplosivesInStock(loaded.buildings)).toBe(0);
+    expect(getExplosivesStockByType(loaded.buildings)).toEqual({});
+    expect(getExplosivesFreeCapacity(loaded.buildings)).toBe(500);
   });
 });

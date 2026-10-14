@@ -1,0 +1,185 @@
+{
+  "name": "explosive-warehouse-stock",
+  "description": "Explosive Warehouse earns its place (#1678): buy boomite into stock at the bulk price (0.7 x list), a refused over-capacity purchase changes nothing, and a charge order with matching stock spends stock instead of cash. Command-mode proof; the stock purchase has no UI control yet.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "buildingCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite kg:100",
+      "description": "No warehouse yet: the purchase is refused and cash does not move.",
+      "role": "bootstrap",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy explosive:boomite kg:100"
+        }
+      ]
+    },
+    {
+      "command": "build explosive_warehouse at:3,5",
+      "description": "Order the tier-1 warehouse (500 kg).",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build explosive_warehouse at:3,5"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the crew build it out.",
+      "timeout": 130,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 130000
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite kg:100",
+      "description": "100 kg x $12 x 0.7 = $840 into stock.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": -840
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy explosive:boomite kg:100"
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite kg:401",
+      "description": "400 kg free, 401 asked: refused, cash unchanged.",
+      "role": "bootstrap",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy explosive:boomite kg:401"
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite",
+      "description": "Missing kg: usage message, nothing bought.",
+      "role": "bootstrap",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy explosive:boomite"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:1 max_ticks:300",
+      "timeout": 90,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 1,
+          "orderedHoleCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "5 kg is drawn from the 100 kg stock: the order costs no cash.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedChargeCount": 1
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}
