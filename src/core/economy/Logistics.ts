@@ -521,6 +521,12 @@ export function inTransitMassKg(state: LogisticsState): number {
   return total;
 }
 
+/** Total mass of fragments lying on the ground (not in transit, not stored), in kg. */
+export function onGroundMassKg(_state: LogisticsState): number {
+  // TODO: implement
+  return 0;
+}
+
 /**
  * Move every stored barren fragment (isBarrenFragment) out of state.fragments onto
  * the first spoil heap: debits storedMassKg and any residual ore (decrementCollectedOre),

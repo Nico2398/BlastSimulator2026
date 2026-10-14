@@ -250,6 +250,7 @@ export function runTick(
     hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'management_office'),
     maxRecentVibration: recentVillageVibration(state),
     employeeCount: state.employees.employees.length,
+    looseRockKg: 0, // TODO: wire to onGroundMassKg
   };
   updateScores(state.scores, scoreInputs);
 

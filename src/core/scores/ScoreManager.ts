@@ -45,6 +45,8 @@ export interface ScoreInputs {
   maxRecentVibration: number;
   /** Number of employees. */
   employeeCount: number;
+  /** Mass of loose rock lying on the ground (kg). */
+  looseRockKg: number;
 }
 
 // ── Update logic ──
