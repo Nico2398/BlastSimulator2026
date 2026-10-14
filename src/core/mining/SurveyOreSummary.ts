@@ -74,7 +74,7 @@ export function summarizeSurveyOres(
   for (const [oreId, a] of acc) {
     const ore = getOre(oreId);
     if (!ore) continue;
-    const typicalGrade = a.sum / a.columns;
+    const typicalGrade = Math.min(a.peak, a.sum / a.columns); // clamp: float sum drift can exceed the peak
     // Mirrors BlastValueEstimate: volume x density x ORE_DENSITY_KG_M3 x valuePerKg x confidence,
     // with 1 m^2 per column and the method's scan depth as the volume.
     const estimatedTonnes = (a.columns * SURVEY_DEPTH_BELOW_SURFACE[survey.method] * typicalGrade * ORE_DENSITY_KG_M3) / 1000;

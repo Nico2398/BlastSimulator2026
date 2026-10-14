@@ -9,7 +9,7 @@ import type { OreAreaSummary } from '../../core/mining/SurveyOreSummary.js';
 import { oreDepthLabel } from './surveyDepthSection.js';
 
 /** Compact magnitude: "<1", "850", "1.2k", "3.4M", "2.0B". Never contains a thousands separator. */
-export function formatCompact(n: number): string {
+function formatCompact(n: number): string {
   if (!(n >= 1)) return '<1';
   if (n < 1000) return String(Math.round(n));
   const units: Array<[number, string]> = [[1e9, 'B'], [1e6, 'M'], [1e3, 'k']];

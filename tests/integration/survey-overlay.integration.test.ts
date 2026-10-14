@@ -730,7 +730,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     expect(mesh).toBeDefined();
     const colorAttr = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     expect(colorAttr.count).toBeGreaterThan(0);
-    for (let i = 0; i < colorAttr.count; i++) expect(colorAttr.getW(i)).toBeCloseTo(1, 2);
+    // confidence 0.8 → quad opacity 0.55 + 0.45 * 0.8 = 0.91
+    for (let i = 0; i < colorAttr.count; i++) expect(colorAttr.getW(i)).toBeCloseTo(0.91, 2);
     const mat = mesh.material as THREE.MeshBasicMaterial;
     expect(mat.transparent).toBe(true); // overlay always uses transparency
     overlay.dispose();

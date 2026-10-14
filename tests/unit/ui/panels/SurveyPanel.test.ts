@@ -235,15 +235,15 @@ describe('SurveyPanel', () => {
       const { panel } = makePanel();
       panel.update(makeState({ surveyResults: [makeSurveyResult({
         centerX: 21, centerZ: 21,
-        estimates: { '21,21': { sparkium: 0.6, grumpite: 0.3 } },
+        estimates: { '21,21': { sparkium: 0.6, rustite: 0.3 } },
         depthProfile: { '21,21': [
           { fromM: 5, toM: 10, ores: { sparkium: 0.4 } },
-          { fromM: 10, toM: 15, ores: { sparkium: 0.6, grumpite: 0.3 } },
+          { fromM: 10, toM: 15, ores: { sparkium: 0.6, rustite: 0.3 } },
         ] },
       })] }));
       const text = cardAt(panel, '(21, 21)');
       expect(text).toContain('5-15 m'); // sparkium: first band start to last band end
-      expect(text).toContain('10-15 m'); // grumpite
+      expect(text).toContain('10-15 m'); // rustite
     });
 
     it('aerial card says the ore is at the surface', () => {
@@ -360,7 +360,7 @@ describe('SurveyPanel', () => {
     });
 
     it('a survey without depthProfile still renders the summary', () => {
-      const { text } = renderCard({ depthProfile: undefined });
+      const { text } = renderCard({});
       expect(text).toContain('Typical grade');
       expect(text).not.toContain('Depth log');
     });
