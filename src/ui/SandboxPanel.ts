@@ -9,12 +9,18 @@
 // position breaks the moment a field is inserted.
 
 import { t } from '../core/i18n/I18n.js';
+import { getBuildingDef } from '../core/entities/Building.js';
+import { formatMoney } from '../core/economy/formatMoney.js';
+import { vehicleDisplayName } from './fleetDetailSections.js';
 import {
   SANDBOX_DEFAULTS,
   SANDBOX_FIELDS,
   clampSandboxConfig,
   randomSandboxSeed,
+  sandboxBiomeTraits,
+  sandboxDifficultyDetails,
   type SandboxConfig,
+  type SandboxDifficultyId,
   type SandboxField,
 } from '../core/campaign/Sandbox.js';
 
@@ -24,10 +30,15 @@ export type OnSandboxBack = () => void;
 const ROW_STYLE = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0';
 const LABEL_STYLE = 'font-size:12px;color:#c0a060;flex:1';
 const INPUT_STYLE = [
-  'width:120px;padding:4px 6px;font-size:12px;font-family:monospace',
-  'background:rgba(0,0,0,0.5);color:#ffe0a0',
-  'border:1px solid rgba(200,160,60,0.35);border-radius:4px',
+  'padding:4px 6px;font-size:12px;font-family:monospace',
+  // Order matters for jsdom's cssText parser: rgba background before rgba border drops the whole string.
+  'color:#ffe0a0;border:1px solid rgba(200,160,60,0.35);border-radius:4px',
+  'background:rgba(0,0,0,0.5)',
 ].join(';');
+const NUMBER_INPUT_STYLE = `width:120px;${INPUT_STYLE}`;
+// Choice labels ("Desert Badlands", French names) must fit unclipped at 1280x720.
+const SELECT_STYLE = `min-width:180px;width:auto;max-width:240px;${INPUT_STYLE}`;
+const DETAIL_BLOCK_STYLE = 'display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:11px;line-height:1.5;color:#c0a060;overflow-wrap:anywhere';
 
 export class SandboxPanel {
   private readonly overlay: HTMLElement;
@@ -37,6 +48,9 @@ export class SandboxPanel {
   private onBack?: OnSandboxBack;
   /** Live controls by config key, so randomising the seed can write back into its input. */
   private readonly inputs = new Map<string, HTMLInputElement>();
+  /** Biome and difficulty detail blocks, refreshed in place when a selection changes (#1686). */
+  private biomeBlock!: HTMLElement;
+  private difficultyBlock!: HTMLElement;
   /** Injectable RNG for the seed, so tests stay deterministic (#504). */
   private readonly rand: () => number;
 
@@ -108,6 +122,13 @@ export class SandboxPanel {
 
     for (const field of SANDBOX_FIELDS) this.body.appendChild(this.renderField(field));
 
+    this.biomeBlock = document.createElement('div');
+    this.biomeBlock.style.cssText = DETAIL_BLOCK_STYLE;
+    this.difficultyBlock = document.createElement('div');
+    this.difficultyBlock.style.cssText = DETAIL_BLOCK_STYLE;
+    this.body.append(this.biomeBlock, this.difficultyBlock);
+    this.renderDetails();
+
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;gap:8px;margin-top:14px';
 
@@ -174,7 +195,7 @@ export class SandboxPanel {
     const input = document.createElement('input');
     input.id = `bs-sandbox-${String(field.key)}`;
     input.type = 'number';
-    input.style.cssText = INPUT_STYLE;
+    input.style.cssText = NUMBER_INPUT_STYLE;
     if (field.min !== undefined) input.min = String(field.min);
     if (field.max !== undefined) input.max = String(field.max);
     if (field.step !== undefined) input.step = String(field.step);
@@ -193,7 +214,7 @@ export class SandboxPanel {
   private renderChoice(field: SandboxField): HTMLElement {
     const select = document.createElement('select');
     select.id = `bs-sandbox-${String(field.key)}`;
-    select.style.cssText = INPUT_STYLE;
+    select.style.cssText = SELECT_STYLE;
     for (const option of field.options?.() ?? []) {
       const el = document.createElement('option');
       el.value = option.id;
@@ -203,11 +224,58 @@ export class SandboxPanel {
     select.value = String(this.config[field.key]);
     select.addEventListener('change', () => {
       this.config = clampSandboxConfig({ ...this.config, [field.key]: select.value });
+      this.renderDetails();
     });
     return select;
+  }
+
+  private renderDetails(): void {
+    const config = this.getConfig();
+    this.renderBiomeDetails(config.biome);
+    this.renderDifficultyDetails(config.difficulty);
+  }
+
+  private renderBiomeDetails(biomeId: string): void {
+    const biome = sandboxBiomeTraits(biomeId);
+    const lines: [string, string][] = [
+      ['desc', t(biome.descKey)],
+      ['hardness', biome.hardnessTierMin === biome.hardnessTierMax
+        ? t('sandbox.detail.hardness_single', { tier: biome.hardnessTierMin })
+        : t('sandbox.detail.hardness', { min: biome.hardnessTierMin, max: biome.hardnessTierMax })],
+    ];
+    if (biome.ores.length > 0) {
+      lines.push(['ores', t('sandbox.detail.ores', {
+        list: biome.ores.map(o => t(o.nameKey)).join(', '),
+        min: biome.oreDepthMin,
+        max: biome.oreDepthMax,
+      })]);
+    }
+    lines.push(['terrain', t('sandbox.detail.terrain', { terrain: t(`sandbox.terrain.${biome.ruggedness}`) })]);
+    this.biomeBlock.replaceChildren(...lines.map(([key, text]) => detailLine(`bs-sandbox-biome-${key}`, text)));
+  }
+
+  private renderDifficultyDetails(difficulty: SandboxDifficultyId): void {
+    const diff = sandboxDifficultyDetails(difficulty);
+    const list = (items: string[]): string => items.length > 0 ? items.join(', ') : t('sandbox.detail.none');
+    const opening = t('sandbox.detail.opens_with', {
+      crew: list(diff.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
+      vehicles: list(diff.vehicles.map(v => `${v.count}× ${vehicleDisplayName(v.role, v.tier)}`)),
+      buildings: list(diff.buildings.map(b => `${b.count}× ${t(getBuildingDef(b.type, b.tier).nameKey)}`)),
+    });
+    this.difficultyBlock.replaceChildren(
+      detailLine('bs-sandbox-difficulty-cash', t('sandbox.detail.cash', { cash: formatMoney(diff.startingCash) })),
+      detailLine('bs-sandbox-difficulty-opening', opening),
+    );
   }
 
   // renderBoolean/renderExplosives removed (#504) — SandboxConfig no longer
   // carries a boolean or multi field (mixedRockHardness/availableExplosives
   // are gone), so SandboxFieldKind no longer has 'boolean'/'multi' variants.
+}
+
+function detailLine(id: string, text: string): HTMLElement {
+  const el = document.createElement('div');
+  el.id = id;
+  el.textContent = text;
+  return el;
 }
