@@ -76,7 +76,7 @@ function makeState(wall = true): GameState {
   return state;
 }
 
-function hire(state: GameState, at: { x: number; z: number }, skills: string[] = [], role: 'driver' | 'blaster' = 'driver') {
+function hire(state: GameState, at: { x: number; z: number }, skills: string[] = [], role: 'driver' | 'blaster' | 'driller' = 'driver') {
   const { employee } = hireEmployee(state.employees, role, new Random(42 + state.employees.nextId), at.x, at.z);
   for (const skill of skills) assignSkill(state.employees, employee.id, skill as never, 1);
   return employee;
@@ -355,10 +355,10 @@ describe('classifyQueuedOrders (#1306)', () => {
       expect(reasonOf(state)).toBe('no_vehicle_in_fleet');
     });
 
-    it('stamps no_licensed_driver when a blaster exists but nobody holds the truck licence', () => {
+    it('stamps no_licensed_driver when a blasting driller exists but nobody holds the truck licence', () => {
       const state = makeState();
-      // A 'driver' hire already holds driving.truck (the charging-truck licence); a blaster holds only blasting.
-      hire(state, IN_A, [], 'blaster');
+      // A driller holds blasting but no driving.truck licence (a blaster would hold both since #1667).
+      hire(state, IN_A, [], 'driller');
       purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
       order(state);
       classifyQueuedOrders(state);
@@ -367,7 +367,7 @@ describe('classifyQueuedOrders (#1306)', () => {
 
     it('stamps no_dual_qualified_employee when blasting and licence sit on different employees', () => {
       const state = makeState();
-      hire(state, IN_A, [], 'blaster');
+      hire(state, IN_A, [], 'driller');
       hire(state, IN_A, [licence]);
       purchaseVehicle(state.vehicles, 'charging_truck', 0, 0);
       order(state);

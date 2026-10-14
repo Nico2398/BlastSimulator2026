@@ -4,6 +4,7 @@
 // (seconds each), and vitest only parallelises across files.
 
 import { describe, it, expect, vi } from 'vitest';
+import * as THREE from 'three';
 import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
@@ -213,3 +214,123 @@ describe('GameRenderer — staged level load (#474)', () => {
 // (lastGhostRevisionSynced / terrainMeshRevisionCount / lastTerrainRevisionSynced)
 // and by spying on GhostMesh.prototype.sync directly — the same seam
 // GameRenderer's other tests already use for onBlast()/spawnFragments above.
+
+// ── Landscape material follows the per-level terrain material (#1674) ──
+//
+// Each level load rebuilds TerrainMesh/TerrainMaterial (biome-specific, the old
+// one disposed). The LandscapeMesh used to be created once, so later loads left
+// it pointing at the first level's disposed material.
+
+describe('GameRenderer — landscape material follows the terrain material across level loads (#1674)', () => {
+  const ctxFor = async (mineType: string): Promise<MiningContext> =>
+    makeGameContext({ mineType, seed: '42', size: '64' });
+
+  function stagedLoad(renderer: GameRenderer, ctx: MiningContext): void {
+    renderer.buildPlayableMesh(ctx);
+    renderer.buildLandscapeMesh(ctx);
+    renderer.buildAmbient(ctx);
+    renderer.finishLevelLoad(ctx);
+  }
+
+  /** Every Mesh/InstancedMesh material currently in the scene graph. */
+  function sceneMaterials(sm: ReturnType<typeof makeMockSceneManager>): Set<THREE.Material> {
+    const out = new Set<THREE.Material>();
+    sm.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (Array.isArray(m)) m.forEach((x) => out.add(x));
+      else if (m) out.add(m);
+    });
+    return out;
+  }
+
+  it('staged path: second load (other biome) leaves landscape on the new terrain material, not the first', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+
+    stagedLoad(renderer, await ctxFor('red_canyon'));
+    const firstMaterial = renderer.terrain!.sharedMaterial;
+    expect(renderer.landscape!.currentMaterial).toBe(firstMaterial);
+
+    const ctx2 = await ctxFor('green_foothills');
+    renderer.buildPlayableMesh(ctx2);
+    // buildPlayableMesh drops the old landscape; buildLandscapeMesh makes the next one.
+    expect(renderer.landscape).toBeNull();
+    renderer.buildLandscapeMesh(ctx2);
+    renderer.buildAmbient(ctx2);
+    renderer.finishLevelLoad(ctx2);
+
+    const secondMaterial = renderer.terrain!.sharedMaterial;
+    expect(secondMaterial).not.toBe(firstMaterial);
+    expect(renderer.landscape!.currentMaterial).toBe(secondMaterial);
+  });
+
+  it('syncFromContext: same seed, new grid, other biome rebuilds terrain and repoints landscape at its material', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await ctxFor('red_canyon'));
+    const firstTerrain = renderer.terrain!;
+    const firstMaterial = firstTerrain.sharedMaterial;
+
+    renderer.syncFromContext(await ctxFor('green_foothills'));
+
+    expect(renderer.terrain === firstTerrain).toBe(false);
+    expect(renderer.terrain!.biomeId).toBe('green_foothills');
+    expect(renderer.terrain!.sharedMaterial).not.toBe(firstMaterial);
+    expect(renderer.landscape!.currentMaterial).toBe(renderer.terrain!.sharedMaterial);
+    expect(renderer.landscape!.currentMaterial).not.toBe(firstMaterial);
+  });
+
+  it('syncFromContext: same seed, same biome, new grid keeps the terrain and landscape points at its material', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await ctxFor('green_foothills'));
+    const firstTerrain = renderer.terrain!;
+
+    renderer.syncFromContext(await ctxFor('green_foothills'));
+
+    expect(renderer.terrain === firstTerrain).toBe(true);
+    expect(renderer.landscape!.currentMaterial).toBe(firstTerrain.sharedMaterial);
+  });
+
+  it('after the second load no landscape chunk or fragment bucket uses the disposed first material', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    renderer.syncFromContext(await ctxFor('red_canyon'));
+    renderer.update(0.016);
+    renderer.flushLandscapeStreaming();
+    const firstMaterial = renderer.terrain!.sharedMaterial;
+
+    renderer.syncFromContext(await ctxFor('green_foothills'));
+    renderer.update(0.016);
+    renderer.flushLandscapeStreaming();
+
+    const secondMaterial = renderer.terrain!.sharedMaterial;
+    expect(secondMaterial).not.toBe(firstMaterial);
+    expect(renderer.landscape!.meshCount).toBeGreaterThan(0);
+    for (const mesh of renderer.landscape!.meshes) {
+      expect(mesh.material).toBe(secondMaterial);
+    }
+    // Fragment buckets are the scene's InstancedMeshes sharing terrain's material.
+    const instanced: THREE.InstancedMesh[] = [];
+    sm.scene.traverse((o) => { if ((o as THREE.InstancedMesh).isInstancedMesh) instanced.push(o as THREE.InstancedMesh); });
+    expect(instanced.some((m) => m.material === secondMaterial)).toBe(true);
+    // Whatever disposal happened, nothing still in the scene draws with the disposed material.
+    expect(sceneMaterials(sm).has(firstMaterial)).toBe(false);
+  });
+
+  it('buildLandscapeMesh reuse path (existing landscape, no buildPlayableMesh) repoints a stale material to terrain.sharedMaterial', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await ctxFor('green_foothills');
+    stagedLoad(renderer, ctx);
+    const landscape = renderer.landscape!;
+    const stale = new THREE.MeshBasicMaterial();
+    landscape.setMaterial(stale);
+    expect(landscape.currentMaterial).toBe(stale);
+
+    renderer.buildLandscapeMesh(ctx);
+
+    expect(renderer.landscape).toBe(landscape);
+    expect(landscape.currentMaterial).toBe(renderer.terrain!.sharedMaterial);
+  });
+});

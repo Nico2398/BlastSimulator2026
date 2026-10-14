@@ -42,8 +42,8 @@
         ],
         "equals": {
           "employeeCount": 1,
-          "qualificationCount": 1,
-          "proficiencyTotal": 2
+          "qualificationCount": 2,
+          "proficiencyTotal": 3
         }
       }
     },
@@ -67,8 +67,8 @@
         ],
         "equals": {
           "employeeCount": 2,
-          "qualificationCount": 3,
-          "proficiencyTotal": 4
+          "qualificationCount": 4,
+          "proficiencyTotal": 5
         }
       }
     },
@@ -86,9 +86,9 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 3
+          "proficiencyTotal": 4
         },
-        "note": "already level 1 from hiring's Rookie starting qualification -- this call is a same-level no-op, not the first level-up"
+        "note": "the Blaster now starts at blasting level 2 (ROLE_BLASTER_START_LEVEL) plus driving.truck 1 (#1667); this call lowers blasting to 1, so the roster total falls from 5 to 4"
       },
       "role": "bootstrap"
     },
@@ -106,7 +106,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 3
+          "proficiencyTotal": 4
         }
       },
       "role": "bootstrap"
@@ -323,7 +323,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "proficiencyTotal": 3
+          "proficiencyTotal": 4
         },
         "note": "no scalar exists for a single employee's XP/level within SerializableGameState -- only the roster-wide sum, which never crosses a level threshold across this file's 221-tick budget even though employee A genuinely works the whole time (confirmed via direct trace); the XP-bar-fill claim this file is named for is a screenshot-only assertion, not one this field can make"
       }

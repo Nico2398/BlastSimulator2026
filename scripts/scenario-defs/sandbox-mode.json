@@ -3,15 +3,53 @@
   "description": "Sandbox mode: a site built from biome/difficulty/seed starts from nothing, honours the seed, and is fully playable through to a blast (#504: 3-control setup).",
   "steps": [
     {
-      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true",
-      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #553: staffed:true (sandbox start supports the same flag as new_game, Sandbox.ts) hires a driller with blasting + drill_rig licence and buys an unmanned drill_rig for free — automatic drill dispatch needs both to ever land an ordered hole.",
+      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777",
+      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #1671: with no staffed: flag the difficulty opens on its free starting kit (crew, drill rig, charging truck, debris hauler, freight warehouse, spoil heap), so the full drill/charge/blast cycle needs no purchases. Interaction mode (#1671): a player opens the Sandbox panel from the main menu, picks biome, Hard and the seed, and clicks Start — no console command stands in.",
       "interaction": [
         {
-          "type": "command",
-          "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true"
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-sandbox-start"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-sandbox-biome",
+          "value": "alpine_granite"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-sandbox-difficulty",
+          "value": "hard"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-sandbox-seed",
+          "value": "777"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-sandbox-start"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]",
+          "timeoutMs": 90000
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "seed": 777,
+          "mineType": "alpine_granite"
+        }
+      }
     },
     {
       "command": "terrain_info",
