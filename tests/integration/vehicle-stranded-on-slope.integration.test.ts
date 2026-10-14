@@ -40,7 +40,8 @@ function startStaffed(): { run: (cmd: string) => { success: boolean; output: str
 function drivingRig(state: GameState) {
   for (const emp of state.employees.employees) {
     if (emp.locomotion.kind !== 'mounted') continue;
-    const vehicle = state.vehicles.vehicles.find(v => v.id === emp.locomotion.vehicleId);
+    const { vehicleId } = emp.locomotion;
+    const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
     if (vehicle?.type !== 'drill_rig') continue;
     if (emp.committedWaypointX == null || emp.committedOriginX == null) continue;
     if (emp.committedDestX == null || emp.committedDestZ == null) continue;

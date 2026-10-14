@@ -870,7 +870,8 @@ describe('inFlightHopOrigin (#1687)', () => {
 
   it('returns null when the origin is null', () => {
     expect(inFlightHopOrigin({ ...hop, originX: null, originZ: null }, 1.4, 1.4, 5, 5)).toBeNull();
-    expect(inFlightHopOrigin({ ...hop, originX: undefined, originZ: undefined }, 1.4, 1.4, 5, 5)).toBeNull();
+    const { originX: _ox, originZ: _oz, ...withoutOrigin } = hop;
+    expect(inFlightHopOrigin(withoutOrigin, 1.4, 1.4, 5, 5)).toBeNull();
   });
 
   it('returns null when the waypoint is null', () => {
