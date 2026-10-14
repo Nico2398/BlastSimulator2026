@@ -325,6 +325,19 @@ describe('SurveyPanel', () => {
       expect(Number(m![1])).toBeLessThan(100);
     });
 
+    it('a sparse patch (ore in ~10% of the disc) reads ~10% of area, not 100%', () => {
+      const estimates: Record<string, Record<string, number>> = {};
+      for (const key of Object.keys(discEstimates())) {
+        const [x, z] = key.split(',').map(Number) as [number, number];
+        if ((x * 7 + z * 3) % 10 === 0) estimates[key] = { rustite: 0.4 };
+      }
+      const { text } = renderCard({ estimates });
+      const m = /(\d+)% of area/.exec(text);
+      expect(m, 'a "N% of area" line').not.toBeNull();
+      expect(Number(m![1])).toBeGreaterThanOrEqual(5);
+      expect(Number(m![1])).toBeLessThanOrEqual(15);
+    });
+
     it('labels the 1.0 estimate as a peak', () => {
       const { text } = renderCard();
       expect(text).toContain('Peak grade 100%');

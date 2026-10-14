@@ -3,7 +3,8 @@
 // never reads ground-truth voxel data.
 
 import type { SurveyResult } from './SurveyCalc.js';
-import { parseColumnKey } from './SurveyColumn.js';
+import { isColumnInSurveyDisc } from './SurveyStaleness.js';
+import { oreValuePerM3 } from './BlastValueEstimate.js';
 import { getOre } from '../world/OreCatalog.js';
 import { ORE_DENSITY_KG_M3, SURVEY_COVERAGE_RADIUS, SURVEY_DEPTH_BELOW_SURFACE } from '../config/balance.js';
 
@@ -22,41 +23,41 @@ export interface OreAreaSummary {
   estimatedValue: number;
 }
 
+/** Kilograms per tonne. */
+const KG_PER_TONNE = 1000;
+
 /**
- * Surveyed column count. estimateSurveyResult omits ore-free columns, so the
- * estimates alone undercount the area. The survey centre is not part of the
- * input; it is taken as the midpoint of the estimates' bounding box, and the
- * surveyed area is the disc of SURVEY_COVERAGE_RADIUS[method] around it,
- * clipped to that box (which already excludes columns cut off by the world
- * edge). A core sample (radius 0) is exactly one column. Never fewer than the
- * columns that carry estimates, so coverage stays <= 1.
+ * Nominal surveyed column count: the columns inside the SURVEY_COVERAGE_RADIUS
+ * disc around the survey centre (the same test estimateSurveyResult applies).
+ * estimateSurveyResult omits ore-free columns, so the estimates alone cannot
+ * give the area. World-edge clipping is not modelled (the world size is not
+ * part of a SurveyResult), so a survey near the edge reads slightly low.
+ * A core sample (radius 0) is exactly one column. Never fewer than the columns
+ * that carry estimates, so coverage stays <= 1.
  */
-function surveyedColumnCount(method: SurveyResult['method'], columnKeys: readonly string[]): number {
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const key of columnKeys) {
-    const { x, z } = parseColumnKey(key);
-    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-    minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
-  }
-  const cx = (minX + maxX) / 2;
-  const cz = (minZ + maxZ) / 2;
-  const radius = SURVEY_COVERAGE_RADIUS[method];
+function surveyedColumnCount(
+  survey: Pick<SurveyResult, 'method' | 'centerX' | 'centerZ'>,
+  estimatedColumns: number,
+): number {
+  const radius = Math.ceil(SURVEY_COVERAGE_RADIUS[survey.method]);
+  const x0 = Math.floor(survey.centerX);
+  const z0 = Math.floor(survey.centerZ);
   let count = 0;
-  for (let x = minX; x <= maxX; x++) {
-    for (let z = minZ; z <= maxZ; z++) {
-      if (Math.hypot(x - cx, z - cz) <= radius) count++;
+  for (let x = x0 - radius; x <= x0 + radius; x++) {
+    for (let z = z0 - radius; z <= z0 + radius; z++) {
+      if (isColumnInSurveyDisc(survey, x, z)) count++;
     }
   }
-  return Math.max(count, columnKeys.length);
+  return Math.max(count, estimatedColumns);
 }
 
 /** Summarise a survey per ore, sorted by estimatedValue descending; unknown ore ids are skipped. */
 export function summarizeSurveyOres(
-  survey: Pick<SurveyResult, 'method' | 'estimates' | 'confidence'>,
+  survey: Pick<SurveyResult, 'method' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>,
 ): OreAreaSummary[] {
   const columnKeys = Object.keys(survey.estimates);
   if (columnKeys.length === 0) return [];
-  const surveyed = surveyedColumnCount(survey.method, columnKeys);
+  const surveyed = surveyedColumnCount(survey, columnKeys.length);
 
   const acc = new Map<string, { columns: number; sum: number; peak: number }>();
   for (const column of Object.values(survey.estimates)) {
@@ -75,16 +76,17 @@ export function summarizeSurveyOres(
     const ore = getOre(oreId);
     if (!ore) continue;
     const typicalGrade = Math.min(a.peak, a.sum / a.columns); // clamp: float sum drift can exceed the peak
-    // Mirrors BlastValueEstimate: volume x density x ORE_DENSITY_KG_M3 x valuePerKg x confidence,
+    // Mirrors BlastValueEstimate: volume x oreValuePerM3 x confidence,
     // with 1 m^2 per column and the method's scan depth as the volume.
-    const estimatedTonnes = (a.columns * SURVEY_DEPTH_BELOW_SURFACE[survey.method] * typicalGrade * ORE_DENSITY_KG_M3) / 1000;
+    const volume = a.columns * SURVEY_DEPTH_BELOW_SURFACE[survey.method];
+    const estimatedTonnes = (volume * typicalGrade * ORE_DENSITY_KG_M3) / KG_PER_TONNE;
     out.push({
       oreId,
       coverage: Math.min(1, a.columns / surveyed),
       typicalGrade,
       peakGrade: a.peak,
       estimatedTonnes,
-      estimatedValue: estimatedTonnes * 1000 * ore.valuePerKg * survey.confidence,
+      estimatedValue: volume * oreValuePerM3(typicalGrade, ore.valuePerKg) * survey.confidence,
     });
   }
   return out.sort((p, q) => q.estimatedValue - p.estimatedValue);
@@ -95,7 +97,7 @@ export function columnOreValuePerM3(columnEstimates: Readonly<Record<string, num
   let total = 0;
   for (const [oreId, density] of Object.entries(columnEstimates)) {
     const ore = getOre(oreId);
-    if (ore) total += density * ORE_DENSITY_KG_M3 * ore.valuePerKg;
+    if (ore) total += oreValuePerM3(density, ore.valuePerKg);
   }
   return total;
 }

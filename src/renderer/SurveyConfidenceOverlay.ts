@@ -6,16 +6,13 @@
 // Stale (expired) points = grey.
 
 import * as THREE from 'three';
-import { SURVEY_OVERLAY_VALUE_FLOOR, SURVEY_OVERLAY_VALUE_CEIL } from '../core/config/balance.js';
+import { SURVEY_OVERLAY_VALUE_FLOOR, SURVEY_OVERLAY_VALUE_CEIL, SURVEY_OVERLAY_QUAD_OPACITY_BASE } from '../core/config/balance.js';
 import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
 
 // ---------- Constants ----------
 
 /** Opacity multiplier for stale (expired) survey points. */
 const STALE_OPACITY = 0.6;
-
-/** Fresh quad opacity at confidence 0; rises linearly to 1 at confidence 1. */
-const QUAD_OPACITY_BASE = 0.55;
 
 /**
  * Z-fighting offset above terrain surface — this overlay's GroundTintLayer
@@ -134,7 +131,7 @@ export class SurveyConfidenceOverlay {
         quadOpacity = STALE_OPACITY;
       } else {
         color = pt.valuePerM3 !== undefined ? valueToColor(pt.valuePerM3) : confidenceToColor(pt.confidence);
-        quadOpacity = QUAD_OPACITY_BASE + (1 - QUAD_OPACITY_BASE) * Math.max(0, Math.min(1, pt.confidence));
+        quadOpacity = SURVEY_OVERLAY_QUAD_OPACITY_BASE + (1 - SURVEY_OVERLAY_QUAD_OPACITY_BASE) * Math.max(0, Math.min(1, pt.confidence));
       }
 
       if (this.fallbackSampler.usesFlatFallback) {

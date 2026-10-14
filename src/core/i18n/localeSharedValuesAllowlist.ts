@@ -37,6 +37,9 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is a cognate, embedded in a format string
   'ui.fleet.load_kg', // "{kg} / {cap} kg"
   'ui.survey.duration_ticks', // "{ticks}t"
+  'ui.survey.compact_lt1', // "<1" — symbol only
+  'ui.survey.compact_k', // SI prefix, identical in French
+  'ui.survey.compact_m', // SI prefix, identical in French
   'ui.survey.depth_range', // "{from}-{to} m"
   'shell.hovertag.depth_range', // "{from}-{to} m"
   'ui.survey.depth_surface', // "surface" — true cognate

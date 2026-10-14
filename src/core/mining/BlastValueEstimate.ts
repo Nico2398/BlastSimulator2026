@@ -16,6 +16,11 @@ import {
 import type { DrillHole } from './DrillPlan.js';
 import { VoxelGrid } from '../world/VoxelGrid.js';
 
+/** Market value ($) of one m³ of rock at the given ore density fraction: density × ORE_DENSITY_KG_M3 × valuePerKg. */
+export function oreValuePerM3(density: number, valuePerKg: number): number {
+  return density * ORE_DENSITY_KG_M3 * valuePerKg;
+}
+
 /**
  * Distinct 1 m columns (keyed `"x,z"` by floor) whose centre lies within
  * `radiusM` of any hole, each mapped to the deepest covering hole's depth.
@@ -74,8 +79,7 @@ export function estimateBlastOreValue(
       if (density <= 0) continue;
       const ore = getOre(oreId);
       if (!ore) continue;
-      const massKg = columnVolume * density * ORE_DENSITY_KG_M3;
-      value += massKg * ore.valuePerKg * survey.confidence;
+      value += columnVolume * oreValuePerM3(density, ore.valuePerKg) * survey.confidence;
     }
   }
 

@@ -2462,3 +2462,6 @@ export const SURVEY_OVERLAY_VALUE_FLOOR = 1000;
 
 /** Value-overlay colour ramp ceiling ($ per m³); log-scaled between floor and ceil. */
 export const SURVEY_OVERLAY_VALUE_CEIL = 1_000_000;
+
+/** Fresh survey-overlay quad opacity at confidence 0; rises linearly to 1 at confidence 1. */
+export const SURVEY_OVERLAY_QUAD_OPACITY_BASE = 0.55;

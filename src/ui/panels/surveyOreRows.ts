@@ -8,13 +8,13 @@ import type { SurveyResult } from '../../core/mining/SurveyCalc.js';
 import type { OreAreaSummary } from '../../core/mining/SurveyOreSummary.js';
 import { oreDepthLabel } from './surveyDepthSection.js';
 
-/** Compact magnitude: "<1", "850", "1.2k", "3.4M", "2.0B". Never contains a thousands separator. */
+/** Compact magnitude: "<1", "850", "1.2k", "3.4M", "2.0B" (suffixes per locale). Never contains a thousands separator. */
 function formatCompact(n: number): string {
-  if (!(n >= 1)) return '<1';
-  if (n < 1000) return String(Math.round(n));
-  const units: Array<[number, string]> = [[1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
-  for (const [size, suffix] of units) {
-    if (n >= size) return `${(n / size).toFixed(1)}${suffix}`;
+  if (!(n >= 1)) return t('ui.survey.compact_lt1');
+  if (n < 1e3) return String(Math.round(n));
+  const units: Array<[number, string]> = [[1e9, 'ui.survey.compact_b'], [1e6, 'ui.survey.compact_m'], [1e3, 'ui.survey.compact_k']];
+  for (const [size, key] of units) {
+    if (n >= size) return `${(n / size).toFixed(1)}${t(key)}`;
   }
   return String(Math.round(n));
 }
