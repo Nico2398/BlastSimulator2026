@@ -137,6 +137,11 @@ export function chargeOrderCost(explosiveId: string, amountKg: number): number {
   return explosive ? explosive.costPerKg * amountKg : 0;
 }
 
+/** Total list-price cost of every charge in a per-hole charge map (stock-blind). */
+export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): number {
+  return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
+}
+
 /** Cash/stock split of a set of charge orders (#1685). */
 interface ChargeCostSplit {
   /** Cash paid at list price for the kg not covered by stock. */
