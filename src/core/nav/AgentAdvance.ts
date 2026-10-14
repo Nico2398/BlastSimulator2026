@@ -768,3 +768,24 @@ function firstUnwalkedWaypoint(
   // climb check above (#1166).
   return isStepClimbable(standing?.surfaceY, target.surfaceY, Math.hypot(afterNext.x - standingX, afterNext.z - standingZ)) ? 2 : 1;
 }
+
+/**
+ * The committed hop's origin when the mover at (`x`, `z`) is strictly mid-hop
+ * of the committed origin -> waypoint segment toward the same leg destination
+ * (`destX`, `destZ`); otherwise null (#1687).
+ */
+export function inFlightHopOrigin(
+  committed: RouteCommitment,
+  x: number,
+  z: number,
+  destX: number,
+  destZ: number,
+): { x: number; z: number } | null {
+  const { originX, originZ, waypointX, waypointZ, destX: cDestX, destZ: cDestZ } = committed;
+  if (originX == null || originZ == null || waypointX == null || waypointZ == null || cDestX == null || cDestZ == null) return null;
+  if (cDestX !== destX || cDestZ !== destZ) return null;
+  const eps = 1e-6;
+  if (Math.hypot(x - waypointX, z - waypointZ) <= eps) return null;
+  if (Math.hypot(x - originX, z - originZ) > Math.hypot(waypointX - originX, waypointZ - originZ) + eps) return null;
+  return { x: originX, z: originZ };
+}
