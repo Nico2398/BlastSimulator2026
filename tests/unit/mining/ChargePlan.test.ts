@@ -4,7 +4,7 @@ import {
   chargeColumnM, maxChargeKgForHole, weakHoleSummary,
   stockAwareChargesCost, recordedChargesCost, plannedChargesCost,
 } from '../../../src/core/mining/ChargePlan.js';
-import type { PlannedCharge, ChargeCostSplit } from '../../../src/core/mining/ChargePlan.js';
+import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { VEHICLE_TIER_MULTIPLIERS, MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
 
@@ -478,7 +478,7 @@ describe('recordedChargesCost (#1685)', () => {
     });
     expect(r.cashCost).toBeCloseTo(60, 6);
     expect(r.stockValue).toBeCloseTo(60, 6);
-    const empty: ChargeCostSplit = { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 };
+    const empty: ReturnType<typeof recordedChargesCost> = { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 };
     expect(recordedChargesCost({})).toEqual(empty);
   });
 });
