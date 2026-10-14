@@ -2516,14 +2516,21 @@ export const PRODUCTION_ORE_PRICES: Record<string, number> = {
   treranium: 9.60,
 };
 
-/** Offer sizes (kg): about a day or two of one shot's ore per offer, so 3 offers per refresh absorb a shot (~340 t) in about 5 game days. */
-export const PRODUCTION_ORE_SALE_QTY_KG = { min: 30_000, max: 90_000 } as const;
+/**
+ * Ore-sale offer sizes (kg). Sized to what the opening kit can fill, not to a shot's
+ * ~340 t: with no ramp and no fragmenter, the debris hauler reaches only a few percent of a
+ * shot's fragments (measured, desert seed 42: 2-12 t stored, of which one ore type holds
+ * 0.7-1.7 t a few hundred ticks in, while 600+ fragments wait as debris_out_of_reach / no rock_fragmenter), and a
+ * Tier 1 warehouse holds 25 t. An offer above the stock of its ore can never be accepted
+ * in full, so larger offers would leave the opening kit with nothing to sell.
+ */
+export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
 /** Supply deals are bulk and recurring: bigger than a sale. */
 export const PRODUCTION_SUPPLY_QTY_KG = { min: 60_000, max: 200_000 } as const;
 /** Rubble is ~1,500 t per shot; disposal offers take a meaningful share of it. */
 export const PRODUCTION_RUBBLE_QTY_KG = { min: 100_000, max: 300_000 } as const;
 /** Rounding step (kg) of production offer sizes. */
-export const PRODUCTION_OFFER_QTY_STEP_KG = 1_000;
+export const PRODUCTION_OFFER_QTY_STEP_KG = 250;
 /** Ore sales pay close to base price; supply deals discount for volume. */
 export const PRODUCTION_ORE_SALE_PRICE_FACTOR = { min: 0.9, max: 1.1 } as const;
 export const PRODUCTION_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;

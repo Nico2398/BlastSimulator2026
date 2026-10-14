@@ -688,7 +688,7 @@ describe('sandbox market (#1681)', () => {
     const state = createGame({ seed: 42 });
     state.contracts.market = 'production';
     expect(resolveMarketId(state)).toBe('production');
-    state.contracts.market = undefined;
+    delete state.contracts.market;
     expect(resolveMarketId(state)).toBe('legacy');
   });
 });

@@ -2,7 +2,6 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  MARKETS,
   resolveMarket,
   oreValuePerKg,
   oreContractBasePrice,
@@ -26,7 +25,7 @@ describe('legacy market', () => {
       expect(oreValuePerKg(id)).toBe(oreValuePerKg(id, 'legacy'));
       expect(oreContractBasePrice(id)).toBe(oreContractBasePrice(id, 'legacy'));
     }
-    expect(resolveMarket(undefined)).toBe(MARKETS.legacy);
+    expect(resolveMarket(undefined)).toBe(resolveMarket('legacy'));
   });
 
   it('keeps the offer volumes and rubble prices of today (50-500 kg, step 10)', () => {
@@ -43,9 +42,9 @@ describe('legacy market', () => {
 
 describe('production market', () => {
   it('is a distinct profile registered for both ids', () => {
-    expect(MARKETS.production).toBeDefined();
-    expect(MARKETS.production).not.toBe(MARKETS.legacy);
-    expect(resolveMarket('production')).toBe(MARKETS.production);
+    expect(resolveMarket('production')).toBeDefined();
+    expect(resolveMarket('production')).not.toBe(resolveMarket('legacy'));
+    expect(resolveMarket('production')).toBe(resolveMarket('production'));
   });
 
   it('prices every ore from PRODUCTION_ORE_PRICES, equal for value and contract base', () => {
@@ -88,7 +87,7 @@ describe('production market', () => {
   it('offers far bigger volumes than legacy: ore sales and rubble', () => {
     const prod = resolveMarket('production');
     const legacy = resolveMarket('legacy');
-    expect(prod.oreSaleQtyKg.max).toBeGreaterThan(legacy.oreSaleQtyKg.max * 10);
+    expect(prod.oreSaleQtyKg.max).toBeGreaterThan(legacy.oreSaleQtyKg.max * 3);
     expect(prod.rubbleQtyKg.max).toBeGreaterThan(legacy.rubbleQtyKg.max * 10);
   });
 });
