@@ -8,7 +8,7 @@ import { placeStartingCrew, relocateVehiclesOffNarrowGround } from '../../core/s
 import { placeStartingBuildings, startingBuildingAnchor } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -19,7 +19,7 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE, type StartingBuildingSlot } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -110,12 +110,13 @@ function defaultDatumForSize(size: number): number {
  * generation": `regenerateGridParams` layers its own dimension validation on
  * top for a no-voxels load fallback.
  */
-function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; climateBias?: [number, number] } {
+function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] } {
   return {
     sizeX: world.baseSizeX,
     datum: world.datum,
     sizeZ: world.baseSizeZ,
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
+    ...(world.pitMask !== undefined ? { pitMask: world.pitMask } : {}),
     ...(world.climateBias ? { climateBias: world.climateBias } : {}),
   };
 }
@@ -149,6 +150,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
     datum: config.datum,
     sizeZ: config.sizeZ,
     ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
+    ...(config.pitMask !== undefined ? { pitMask: config.pitMask } : {}),
   };
 }
 
@@ -167,7 +169,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
  * turns that into a clean `world.terrain_save_corrupt` refusal and rolls
  * `ctx` back.
  */
-function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; climateBias?: [number, number] } {
+function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] } {
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, datum: defaultDatumForSize(DEFAULT_GRID_SIZE), sizeZ: DEFAULT_GRID_SIZE };
   }
@@ -177,6 +179,7 @@ function regenerateGridParams(state: GameState): { sizeX: number; datum: number;
     sizeX: requireValidGenDimension(base.sizeX, 'world.baseSizeX'),
     datum: requireValidGenDatum(base.datum, 'world.datum'),
     sizeZ: requireValidGenDimension(base.sizeZ, 'world.baseSizeZ'),
+    ...(base.pitMask !== undefined ? { pitMask: requireValidPitMask(base.pitMask, 'world.pitMask') } : {}),
   };
 }
 
@@ -227,6 +230,7 @@ export function regenerateGrid(
     seed: number; climateBias: readonly [number, number];
     sizeX: number; datum: number; sizeZ: number;
     mixedRockHardness?: boolean;
+    pitMask?: PitMaskShape;
     /**
      * True only where this grid is a game's first (`new_game`, a campaign
      * level start, `sandbox`): the starting crew is then laid out on real
@@ -240,11 +244,15 @@ export function regenerateGrid(
   },
 ): void {
   if (!ctx.state) return;
-  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness } = params;
+  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, pitMask } = params;
   const config: TerrainConfig = {
     sizeX, datum, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    ...(pitMask !== undefined ? { pitMask } : {}),
   };
+  if (ctx.state.world && pitMask !== undefined) {
+    ctx.state.world.pitMask = pitMask;
+  }
   if (ctx.state.world && mixedRockHardness !== undefined) {
     ctx.state.world.mixedRockHardness = mixedRockHardness;
   }
@@ -303,6 +311,7 @@ export function ensureLandscape(
     seed: number; climateBias: readonly [number, number];
     sizeX: number; datum: number; sizeZ: number;
     mixedRockHardness?: boolean;
+    pitMask?: PitMaskShape;
   },
 ): LandscapeHandle | null {
   if (!ctx.grid) return null;
@@ -411,10 +420,11 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     if (decodedGrid) {
       restoreGrid(ctx, decodedGrid);
     } else {
-      const { sizeX, datum, sizeZ, mixedRockHardness, climateBias } = regenerateGridParams(state);
+      const { sizeX, datum, sizeZ, mixedRockHardness, pitMask, climateBias } = regenerateGridParams(state);
       regenerateGrid(ctx, {
         seed: state.seed, climateBias: climateBias ?? biome.climateCenter, sizeX, datum, sizeZ,
         ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+        ...(pitMask !== undefined ? { pitMask } : {}),
       });
     }
   } catch {

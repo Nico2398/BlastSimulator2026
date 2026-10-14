@@ -9,7 +9,7 @@
 import type { PitMaskShape } from '../config/balance.js';
 import { VoxelGrid, clampAxis, isValidVoxelY, type VoxelRockComposition } from '../world/VoxelGrid.js';
 import type { EditSegment, EditBoundary } from '../world/TerrainEdits.js';
-import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, type TerrainConfig } from '../world/TerrainGen.js';
+import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, type TerrainConfig } from '../world/TerrainGen.js';
 
 /**
  * The complete generator identity a save's terrain is regenerated from —
@@ -150,6 +150,7 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
     seed: payload.gen.seed,
     climateBias: payload.gen.climateBias,
     ...(payload.gen.mixedRockHardness !== undefined ? { mixedRockHardness: payload.gen.mixedRockHardness } : {}),
+    ...(payload.gen.pitMask !== undefined ? { pitMask: requireValidPitMask(payload.gen.pitMask, 'gen.pitMask') } : {}),
   };
 
   // Empty at construction — every claimed chunk below is registered

@@ -2456,8 +2456,15 @@ export interface PitMaskShape {
 /** Mask used by campaign levels and standalone worlds. */
 export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
 
-/** Sandbox mask. TODO: implementation sets a flatter shape (14 / 0.05). */
-export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
+/**
+ * Sandbox mask (#1680): a tighter blend (14 m) that keeps only 5% of relief
+ * inside the rect, so the sandbox start has room for flat 9x9 m pads while
+ * mountains stay dramatic around and beyond the pit. Measured on 64x64 sites,
+ * seeds 1/7/42, every biome: worst case ~32% flat pads (alpine, seed 42)
+ * against the 25% target. A wider margin or lower keep alone fails, because
+ * the blend ramp is the steep part.
+ */
+export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 14, reliefKeep: 0.05 };
 
 /** Target fraction of the sandbox start pad that must be flat. */
 export const SANDBOX_FLAT_PAD_TARGET = 0.25;

@@ -106,11 +106,11 @@ export function applyPitMask(
   rect: Rect,
   x: number,
   z: number,
-  _mask: PitMaskShape = DEFAULT_PIT_MASK, // TODO: implement — currently ignored
+  mask: PitMaskShape = DEFAULT_PIT_MASK,
 ): number {
   const dIn = distanceInsideRect(rect, x, z);
-  const w = smoothstep(0, DEFAULT_PIT_MASK.margin, dIn);
-  const compressed = centerHeight + (height - centerHeight) * DEFAULT_PIT_MASK.reliefKeep;
+  const w = smoothstep(0, mask.margin, dIn);
+  const compressed = centerHeight + (height - centerHeight) * mask.reliefKeep;
   return height + w * (compressed - height);
 }
 
@@ -182,13 +182,13 @@ export function createWorldGenContext(
 /** Surface voxel Y for column (x, z), including the pit mask and vertical datum. */
 export function sampleSurfaceVoxelY(ctx: WorldGenContext, x: number, z: number): number {
   const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
-  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
+  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z, ctx.pitMask);
   return heightToVoxelY(masked, ctx.groundOffset);
 }
 
 /** Continuous (unrounded) surface Y for column (x, z) — the height the mesh should actually land on. */
 export function sampleSurfaceHeightY(ctx: WorldGenContext, x: number, z: number): number {
   const raw = sampleBaseHeight(ctx.fields, x, z, ctx.shapingAt(x, z));
-  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z);
+  const masked = applyPitMask(raw, ctx.centerHeight, ctx.playableRect, x, z, ctx.pitMask);
   return heightToVoxelYContinuous(masked, ctx.groundOffset);
 }

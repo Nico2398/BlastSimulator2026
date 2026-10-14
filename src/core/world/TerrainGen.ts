@@ -51,6 +51,18 @@ export function requireValidGenDimension(value: number, label: string): number {
 }
 
 /**
+ * The pit mask read from untrusted save JSON (#1680): margin finite and
+ * positive, reliefKeep finite in [0, 1]. Callers skip it when the mask is absent (default mask).
+ */
+export function requireValidPitMask(value: PitMaskShape, label: string): PitMaskShape {
+  const { margin, reliefKeep } = value ?? ({} as Partial<PitMaskShape>);
+  if (!Number.isFinite(margin) || margin <= 0 || !Number.isFinite(reliefKeep) || reliefKeep < 0 || reliefKeep > 1) {
+    throw new Error(`corrupt save: ${label} is not a valid pit mask`);
+  }
+  return { margin, reliefKeep };
+}
+
+/**
  * The datum read from untrusted save JSON. Unlike a size, a datum is a voxel
  * row, so zero and negative values are legitimate (`new_game size:1` yields
  * datum 0) — it only has to be an integer inside the grid's vertical range.
@@ -126,12 +138,12 @@ export function resolveGeneratedBiome(
  * which genuinely must be the same instance — see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
-  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness } = config;
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, pitMask } = config;
 
   const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
     return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
-  });
+  }, pitMask);
 
   const biome = centerBiome(worldGen.fields, sizeX, sizeZ, climateBias);
 

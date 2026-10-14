@@ -92,6 +92,7 @@ export function sandboxCommand(
     datum: level.datum,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
+    ...(level.pitMask ? { pitMask: level.pitMask } : {}),
     startingCrew: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
