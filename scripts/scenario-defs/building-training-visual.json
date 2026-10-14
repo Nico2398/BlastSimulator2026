@@ -379,9 +379,9 @@
       "expect": {
         "equals": {
           "trainingCount": 0,
-          "proficiencyTotal": 5
+          "proficiencyTotal": 6
         },
-        "note": "Course complete — driving.excavator gained (proficiencyTotal 2→3), training slot freed, employee left the building back onto its ring. Screenshot taken right after they reappear outside."
+        "note": "Course complete — driving.excavator gained (employee #1 +1; roster proficiencyTotal 5→6 -- driller 2 + blaster 3 [blasting 2 + driving.truck 1, #1667] before the course), training slot freed, employee left the building back onto its ring. Screenshot taken right after they reappear outside."
       }
     },
     {

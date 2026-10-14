@@ -159,11 +159,11 @@ describe('Employee — skill qualification fields (3.1)', () => {
     expect(ROLE_BLASTER_START_LEVEL).toBe(2);
   });
 
-  it('a hired blaster arrives with blasting at ROLE_BLASTER_START_LEVEL, xp at that level threshold, and nothing else (#1339)', () => {
+  it('a hired blaster arrives with blasting at ROLE_BLASTER_START_LEVEL, xp at that level threshold, plus the truck licence and no drill rig (#1339, #1667)', () => {
     const state = createEmployeeState();
     const { employee } = hireEmployee(state, 'blaster', rng);
 
-    expect(employee.qualifications).toHaveLength(1);
+    expect(employee.qualifications.map(x => x.category)).toEqual(['blasting', 'driving.truck']);
     const q = employee.qualifications[0]!;
     expect(q.category).toBe('blasting');
     expect(q.proficiencyLevel).toBe(ROLE_BLASTER_START_LEVEL);
@@ -229,7 +229,7 @@ describe('Employee — skill qualification fields (3.1)', () => {
     const cats = (role: 'driller' | 'blaster' | 'driver') =>
       hireEmployee(createEmployeeState(), role, new Random(7)).employee.qualifications.map(q => `${q.category}:${q.proficiencyLevel}`);
     expect(cats('driller')).toEqual(['blasting:1', 'driving.drill_rig:1']);
-    expect(cats('blaster')).toEqual(['blasting:2']);
+    expect(cats('blaster')).toEqual(['blasting:2', 'driving.truck:1']);
     expect(cats('driver')).toEqual(['driving.truck:1', 'driving.excavator:1']);
   });
 
@@ -567,6 +567,8 @@ describe('calculateSalary() (3.4)', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'blaster', rng);
+    // Clear the hire-granted qualifications so the salary measures the blasting level alone.
+    employee.qualifications = [];
     assignSkill(state, employee.id, 'blasting', 1);
     const salaryAtLevel1 = employee.salary;
 
