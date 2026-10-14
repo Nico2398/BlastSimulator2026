@@ -42,7 +42,7 @@ import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlan
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, PLAYER_BLAST_VERB, type Run } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1158,25 +1158,13 @@ describe.each(KIT_LEVELS)('campaign start level:%s opens with a starting site (#
   });
 
   it('keeps the level cash relative to Dusty Hollow: level 2 and 3 start with more cash than level 1', () => {
-    expect(getLevel(levelId)!.startingCash).toBeGreaterThanOrEqual(getLevel('dusty_hollow')!.startingCash);
+    expect(getLevel(levelId)!.startingCash).toBeGreaterThan(getLevel('dusty_hollow')!.startingCash);
   });
 });
 
 // A scripted first blast from the free kit alone, real level seeds, player verbs only.
 const KIT_CYCLE_TICK_CAP = 4000;
 const KIT_BUY_OR_HIRE = /^(employee hire|employee assign_skill|vehicle buy|vehicle purchase|build |hire |purchase |sandbox |new_game|campaign complete)/;
-const KIT_ALLOWED_VERB = /^(campaign start|time resume|tick|drill_plan|charge|sequence|blast|zone clear|zone status|contract accept|contract deliver|event choose)\b/;
-
-/** Order everyone out of the blast radius and wait until the zone reads clear. */
-function clearKitZone(run: Run, state: GameState): void {
-  const xs = state.drillHoles.map(h => h.x);
-  const zs = state.drillHoles.map(h => h.z);
-  if (xs.length === 0) return;
-  const m = 16;
-  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
-  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
-}
 
 describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit (#1672)', (levelId) => {
   it('drills, charges, sequences, fires, hauls and fills an ore contract with no hire, purchase or bootstrap, and never goes bankrupt', () => {
@@ -1210,7 +1198,7 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
       expect(run(`charge hole:* ${FIRST_BLAST[levelId].charge} stemming:2`).success).toBe(true);
       tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
-      clearKitZone(run, state);
+      clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);
       blasts++;
       expect(state.lastBlastReport, 'the shot produced a report').not.toBeNull();
@@ -1226,6 +1214,6 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
     expect(state.cash).toBeGreaterThan(0);
     expect(commands.filter(c => KIT_BUY_OR_HIRE.test(c))).toEqual([]);
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
-    expect(commands.filter(c => !KIT_ALLOWED_VERB.test(c))).toEqual([]);
+    expect(commands.filter(c => !PLAYER_BLAST_VERB.test(c))).toEqual([]);
   }, 600_000);
 });

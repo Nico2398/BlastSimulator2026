@@ -190,7 +190,7 @@ const LEVELS: readonly LevelDef[] = [
     gridZ: 128,
     // $210k (#1672): the free crew draws ~$230/tick of payroll and the mountainside spawn costs ~440 ticks of
     // walking and driving before the first hole is done, so the first sale lands ~tick 720 with cash ~$180k below
-    // the start. 75k went bankrupt before the first shot was charged.
+    // the start. The old $75k (no free crew then) cannot carry that payroll; $210k leaves ~$30k spare.
     startingCash: 210000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle', 'big_bada_boom', 'shatternite'],
     // Unlock threshold: $250k. Real mountain quarry margins are tighter.

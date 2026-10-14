@@ -22,7 +22,7 @@ import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 /**
  * Solid-voxel count inside a fixed height window around the sandbox datum — a
@@ -324,7 +324,7 @@ describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first
       run('charge hole:* explosive:boomite amount:5 stemming:2');
       tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
-      clearZone(run, state);
+      clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);
       for (let i = 0; i < 400 && !over() && !sold(); i++) {
         playContracts(run, state);
@@ -339,17 +339,6 @@ describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 });
-
-/** Order everyone out of the blast radius and wait until the zone reads clear. */
-function clearZone(run: Run, state: GameState): void {
-  const xs = state.drillHoles.map(h => h.x);
-  const zs = state.drillHoles.map(h => h.z);
-  if (xs.length === 0) return;
-  const m = 16;
-  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
-  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
-}
 
 describe('parseSandboxArgs', () => {
   it('leaves unmentioned keys alone so defaults survive', () => {

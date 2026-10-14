@@ -23,7 +23,7 @@ import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { getOperatingProfit } from '../../../src/core/economy/Finance.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, PLAYER_BLAST_VERB, type Run } from '../../helpers/playthrough.js';
 
 /** Cash credited to the bare site for the payroll of the extra ticks truck-worked charging takes (#1649). */
 const TRUCK_CHARGING_PAYROLL_HEADROOM = 15000;
@@ -98,9 +98,6 @@ const LEVEL1_PLAYTHROUGH_TICK_CAP = 6000;
 /** The profit target, read from the level, never a copy of it. */
 const LEVEL1_TARGET = getLevel('dusty_hollow')!.unlockThreshold;
 
-/** Every command verb the playthrough may use: what a player can do with controls enabled. */
-const ALLOWED_VERB = /^(campaign start|time resume|tick|drill_plan|charge|sequence|blast|zone clear|zone status|contract accept|contract deliver|event choose)\b/;
-
 interface PlayStyle {
   rows: number;
   cols: number;
@@ -109,20 +106,6 @@ interface PlayStyle {
   /** Where the first shot goes, relative to the drill rig, and how far each next shot steps. */
   offset: { x: number; z: number };
   step: { x: number; z: number };
-}
-
-/** Safety margin, in tiles, a careful player clears around a charged pattern before firing. */
-const BLAST_ZONE_MARGIN = 15;
-
-/** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
-function clearBlastZone(run: Run, state: GameState): void {
-  const xs = state.drillHoles.map((h) => h.x);
-  const zs = state.drillHoles.map((h) => h.z);
-  if (xs.length === 0) return;
-  const m = BLAST_ZONE_MARGIN + 1;
-  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
-  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
 }
 
 /** Ordinary mining: order a grid near the rig, wait for it, charge it, sequence it, fire it, sell what comes out. */
@@ -189,6 +172,6 @@ describe('Level 1 — real playthrough wins with no campaign complete (#1363)', 
     // Honesty: no cheat, no budget-balancing hack, nothing but ordinary player commands.
     expect(commandsRun.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
     expect(commandsRun.some((c) => c.startsWith('campaign complete'))).toBe(false);
-    expect(commandsRun.filter((c) => !ALLOWED_VERB.test(c))).toEqual([]);
+    expect(commandsRun.filter((c) => !PLAYER_BLAST_VERB.test(c))).toEqual([]);
   }, 600_000);
 });

@@ -29,20 +29,9 @@ import { isBarrenFragment } from '../../src/core/economy/SpoilHeaps.js';
 import { haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { playTick, tickUntil, type Run } from '../helpers/playthrough.js';
+import { playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 const cap = (tier: 1 | 2 | 3) => getBuildingDef('freight_warehouse', tier).capacity;
-
-/** Order everyone out of the blast radius and wait until the zone reads clear. */
-function clearBlastZone(run: Run, state: GameState): void {
-  const xs = state.drillHoles.map((h) => h.x);
-  const zs = state.drillHoles.map((h) => h.z);
-  if (xs.length === 0) return;
-  const m = 16;
-  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
-  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
-}
 
 interface Shot {
   run: Run;

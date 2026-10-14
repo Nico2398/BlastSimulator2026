@@ -1402,7 +1402,7 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }],
 };
 
-const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
+const DIGGER_KIT_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
   qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
 };
@@ -1416,7 +1416,7 @@ const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
  * startingCash (Level.ts) is sized to carry it to the first sale.
  */
 const DIGGER_STARTING_SITE: StartingSiteComposition = {
-  employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
+  employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER],
   vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
   buildings: DUSTY_HOLLOW_STARTING_SITE.buildings,
 };
@@ -1439,7 +1439,6 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
 /** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
 export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
 
-const SANDBOX_KIT_BUILDINGS: readonly StartingBuildingSlot[] = DUSTY_HOLLOW_STARTING_SITE.buildings;
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
   qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
@@ -1456,9 +1455,9 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
   hard: DUSTY_HOLLOW_STARTING_SITE,
   normal: DIGGER_STARTING_SITE,
   easy: {
-    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
+    employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
-    buildings: SANDBOX_KIT_BUILDINGS,
+    buildings: DIGGER_STARTING_SITE.buildings,
   },
 };
 
