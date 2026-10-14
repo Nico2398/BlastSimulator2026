@@ -1242,7 +1242,7 @@ describe('consumeStoredOre releases barren leftover rock to the spoil heap (#169
 
   it('never releases an in-transit barren fragment', () => {
     const { state, collectedOre } = singleOreStorage();
-    state.fragments.push({ fragment: makeStoredFragment(9, 300, 0.1, {}), state: 'in_transit', vehicleId: 3, warehouseId: 1 });
+    state.fragments.push({ fragment: makeStoredFragment(9, 300, 0.1, {}), state: 'in_transit', vehicleId: '3', warehouseId: 1 });
     const heap = heapStub();
 
     consumeStoredOre(state, collectedOre, 'oreA', 400, [heap]);
@@ -1313,7 +1313,7 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
   it('leaves on-ground and in-transit barren fragments alone', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     state.fragments.push({ fragment: makeStoredFragment(1, 400, 0.16, {}), state: 'on_ground', vehicleId: null, warehouseId: null });
-    state.fragments.push({ fragment: makeStoredFragment(2, 400, 0.16, {}), state: 'in_transit', vehicleId: 1, warehouseId: 1 });
+    state.fragments.push({ fragment: makeStoredFragment(2, 400, 0.16, {}), state: 'in_transit', vehicleId: '1', warehouseId: 1 });
     const heap = heapStub();
 
     expect(releaseBarrenStoredFragments(state, {}, [heap])).toBe(0);

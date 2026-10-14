@@ -10,6 +10,7 @@ import {
 } from '../../../src/core/economy/SpoilHeaps.js';
 import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import type { Building } from '../../../src/core/entities/Building.js';
 import { createBuildingState, placeBuilding } from '../../../src/core/entities/Building.js';
 import { nearestSite, spoilHeapSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import type { WarehouseSite } from '../../../src/core/entities/BuildingWarehouse.js';
@@ -244,8 +245,9 @@ describe('deliverToSpoilHeap', () => {
 });
 
 describe('creditFirstSpoilHeap (#1690)', () => {
-  const heap = (kg?: number) => ({ type: 'spoil_heap' as const, storedSpoilKg: kg });
-  const other = () => ({ type: 'freight_warehouse' as const, storedSpoilKg: undefined });
+  const heap = (kg?: number): Pick<Building, 'type' | 'storedSpoilKg'> =>
+    kg === undefined ? { type: 'spoil_heap' } : { type: 'spoil_heap', storedSpoilKg: kg };
+  const other = () => ({ type: 'freight_warehouse' as const }) as Pick<Building, 'type' | 'storedSpoilKg'>;
 
   it('credits the first heap in building order and returns true', () => {
     const [a, b] = [heap(10), heap(20)];

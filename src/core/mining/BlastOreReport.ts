@@ -98,6 +98,13 @@ export function decrementCollectedOre(
   return acc;
 }
 
+/** Floor every `collectedOre` entry at 0, absorbing float drift left by repeated decrements. */
+export function clampCollectedOre(collectedOre: Record<string, number>): void {
+  for (const oreId of Object.keys(collectedOre)) {
+    if (collectedOre[oreId]! < 0) collectedOre[oreId] = 0;
+  }
+}
+
 /**
  * True iff any entry in `oreDensities` is > 0 — i.e. the fragment carries
  * some amount of at least one ore type. Shared "does this fragment have any

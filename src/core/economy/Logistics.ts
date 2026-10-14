@@ -2,7 +2,7 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { accumulateOreMass, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
+import { accumulateOreMass, clampCollectedOre, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
@@ -540,9 +540,7 @@ export function releaseBarrenStoredFragments(
     decrementCollectedOre(collectedOre, tracked.fragment);
     releasedKg += tracked.fragment.mass;
   }
-  for (const [id, kg] of Object.entries(collectedOre)) {
-    if (kg < 0) collectedOre[id] = 0;
-  }
+  clampCollectedOre(collectedOre);
   const released = new Set(barren);
   state.fragments = state.fragments.filter(f => !released.has(f));
   state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
