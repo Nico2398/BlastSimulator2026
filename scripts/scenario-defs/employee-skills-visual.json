@@ -64,8 +64,8 @@
         ],
         "equals": {
           "employeeCount": 2,
-          "qualificationCount": 3,
-          "proficiencyTotal": 4
+          "qualificationCount": 4,
+          "proficiencyTotal": 5
         }
       }
     },
@@ -88,8 +88,8 @@
         ],
         "equals": {
           "employeeCount": 3,
-          "qualificationCount": 5,
-          "proficiencyTotal": 6
+          "qualificationCount": 6,
+          "proficiencyTotal": 7
         }
       }
     },
@@ -112,8 +112,8 @@
         ],
         "equals": {
           "employeeCount": 4,
-          "qualificationCount": 6,
-          "proficiencyTotal": 7
+          "qualificationCount": 7,
+          "proficiencyTotal": 8
         }
       }
     },
@@ -136,8 +136,8 @@
         ],
         "equals": {
           "employeeCount": 5,
-          "qualificationCount": 7,
-          "proficiencyTotal": 8
+          "qualificationCount": 8,
+          "proficiencyTotal": 9
         }
       }
     },
@@ -161,8 +161,8 @@
         ],
         "equals": {
           "employeeCount": 6,
-          "qualificationCount": 9,
-          "proficiencyTotal": 10
+          "qualificationCount": 10,
+          "proficiencyTotal": 11
         }
       }
     },
@@ -180,8 +180,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 10,
-          "proficiencyTotal": 13
+          "qualificationCount": 11,
+          "proficiencyTotal": 14
         },
         "note": "a new qualification (driller's own starting one is blasting, not driving.excavator) -- qualificationCount +1, proficiencyTotal +3 for the level"
       },
@@ -201,8 +201,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 11,
-          "proficiencyTotal": 15
+          "qualificationCount": 12,
+          "proficiencyTotal": 16
         },
         "note": "employee #1's third distinct qualification -- qualificationCount +1, proficiencyTotal +2"
       },
@@ -222,10 +222,10 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 11,
-          "proficiencyTotal": 17
+          "qualificationCount": 12,
+          "proficiencyTotal": 18
         },
-        "note": "raises the blaster's own starting qualification (blasting) from its Rookie level 1 to 4 -- qualificationCount unchanged, proficiencyTotal +3"
+        "note": "raises the blaster's own starting qualification (blasting) from its starting level 2 (ROLE_BLASTER_START_LEVEL) to 4 -- qualificationCount unchanged, proficiencyTotal +2"
       },
       "role": "bootstrap"
     },
@@ -243,8 +243,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 11,
-          "proficiencyTotal": 17
+          "qualificationCount": 12,
+          "proficiencyTotal": 18
         },
         "note": "the driver's starting qualification is already driving.truck at level 1 -- this call is a same-level no-op, unlike the others in this block"
       },
@@ -264,8 +264,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 11,
-          "proficiencyTotal": 21
+          "qualificationCount": 12,
+          "proficiencyTotal": 22
         },
         "note": "raises the surveyor's own starting qualification (geology) from level 1 to 5 -- proficiencyTotal +4"
       },
@@ -285,8 +285,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 11,
-          "proficiencyTotal": 22
+          "qualificationCount": 12,
+          "proficiencyTotal": 23
         },
         "note": "raises the manager's own starting qualification (management) from level 1 to 2 -- proficiencyTotal +1"
       },
@@ -316,8 +316,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 11,
-          "proficiencyTotal": 22
+          "qualificationCount": 12,
+          "proficiencyTotal": 23
         }
       }
     },
