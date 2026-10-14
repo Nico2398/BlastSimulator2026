@@ -24,6 +24,7 @@ import type { ColumnRock } from '../../core/mining/ExplosiveRockFit.js';
 import { ChargeStep } from './blastSteps/Charge.js';
 import { PreviewStep } from './blastSteps/Preview.js';
 import { FireStep } from './blastSteps/Fire.js';
+import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 
 export type StepId = 1 | 2 | 3 | 4;
@@ -112,6 +113,11 @@ export class BlastWorkshop extends PanelBase {
     this.setActiveStep(1, false);
   }
 
+
+  /** Passes the voxel-grid provider down to the sticky footer's estimate (#1703). */
+  setGridProvider(fn: () => VoxelGrid | null): void {
+    this.footer.setGridProvider(fn);
+  }
 
   setGameConsole(fn: GameConsoleFn): void {
     this.drillStep.setGameConsole(fn);

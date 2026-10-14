@@ -91,3 +91,18 @@ export function oreDepthSpan(
     toM: Math.max(...ranges.map((r) => r.toM)),
   };
 }
+
+/**
+ * Ore densities of the band containing `depthM` metres below the column surface.
+ * `undefined` when no band covers that depth (not scanned) or the profile is absent.
+ */
+export function bandOresAtDepth(
+  bands: readonly SurveyDepthBand[] | undefined,
+  depthM: number,
+): Record<string, number> | undefined {
+  if (!Array.isArray(bands) || !Number.isFinite(depthM) || depthM < 0) return undefined;
+  for (const band of bands) {
+    if (band && depthM >= band.fromM && depthM < band.toM) return band.ores ?? undefined;
+  }
+  return undefined;
+}
