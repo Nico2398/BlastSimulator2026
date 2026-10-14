@@ -3408,6 +3408,16 @@
   "sandbox.difficulty.easy": "Facile",
   "sandbox.difficulty.normal": "Normal",
   "sandbox.difficulty.hard": "Difficile",
+  "sandbox.detail.hardness": "Dureté de la roche : niveau {min}-{max}",
+  "sandbox.detail.hardness_single": "Dureté de la roche : niveau {tier}",
+  "sandbox.detail.ores": "Minerais : {list} (profondeur {min}-{max} m)",
+  "sandbox.detail.terrain": "Terrain : {terrain}",
+  "sandbox.detail.cash": "Trésorerie de départ : {cash} $",
+  "sandbox.detail.opens_with": "Départ avec : équipe : {crew} ; véhicules : {vehicles} ; bâtiments : {buildings}",
+  "sandbox.detail.none": "aucun",
+  "sandbox.terrain.flat": "plat",
+  "sandbox.terrain.rolling": "collines ondulées",
+  "sandbox.terrain.steep": "escarpé et accidenté",
   "loading.title": "Préparation du site",
   "loading.preparing": "Préparation…",
   "loading.terrain": "Génération du terrain",
@@ -3984,5 +3994,9 @@
   "entities.build_destroy_lost_ore": "Attention : {kg} kg de minerai et de roche stockés seront perdus avec cet entrepôt.",
   "mining.blast.warehouse_stock_lost": "Entrepôt de fret #{id} détruit : {kg} kg de stock perdus.",
   "notification.warehouse_stock_lost": "L'entrepôt de fret #{id} a été détruit. {kg} kg de stock sont perdus.",
-  "notification.title.warehouse_stock_lost": "Stock perdu"
+  "notification.title.warehouse_stock_lost": "Stock perdu",
+  "ui.fleet.tip.reach": "Trou le plus profond : {value} m",
+  "ui.fleet.card.reach": "Portée {value} m",
+  "ui.blast_workshop.drill.depth_reach": "Trou le plus profond que votre meilleure foreuse peut percer : {reach} m. Améliorez une foreuse pour aller plus profond.",
+  "mining.drill_plan.refused_depth": "Impossible de forer un trou de {depth} m : votre meilleure foreuse atteint {reach} m. Achetez ou améliorez une foreuse pour aller plus profond."
 }

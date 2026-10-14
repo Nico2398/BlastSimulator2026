@@ -3,7 +3,7 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import type { SavedBlastPlan } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
-import { addHole } from '../../../core/mining/DrillPlan.js';
+import { addHole, drillDepthRefusal } from '../../../core/mining/DrillPlan.js';
 import { createCharge, chargeOrderCost } from '../../../core/mining/ChargePlan.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction } from '../siteExpansion.js';
@@ -26,6 +26,11 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
   const skipped = saved.drillHoles.length - fresh.length;
   if (fresh.length === 0) {
     return { success: true, output: t('mining.blast_plan.load_nothing_new', { name }) };
+  }
+
+  for (const h of fresh) {
+    const tooDeep = drillDepthRefusal(h.depth, state.vehicles.vehicles);
+    if (tooDeep) return { success: false, output: `${h.id}: ${t(tooDeep.key, tooDeep.params)}` };
   }
 
   const chargeOrders: Array<{ oldHoleId: string; explosiveId: string; amountKg: number; stemmingM: number }> = [];

@@ -152,6 +152,9 @@ export const SCORE_DECAY_RATE = 0.05;
 export const DEFAULT_GRID_SIZE = 64;
 /** Fixed sandbox generation datum (voxel Y the site centre's surface lands on). Sandbox no longer exposes depth as a player control (#504). */
 export const SANDBOX_DATUM = 17;
+/** Sandbox biome ruggedness bands on pvAmplitude: flat below ROLLING, rolling below STEEP, else steep (#1686). */
+export const SANDBOX_RUGGEDNESS_ROLLING_PV = 20;
+export const SANDBOX_RUGGEDNESS_STEEP_PV = 40;
 
 /**
  * Largest number of intermediate chunks `PlayableArea.claimArea` will bridge
@@ -436,6 +439,10 @@ export const CHARGE_FIT_EPSILON = 1e-6;
 export const DRILL_HOLE_BASE_DURATION_TICKS = 6;
 /** Reference hole depth (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
 export const DRILL_HOLE_REFERENCE_DEPTH_M = 8;
+/** Max drillable hole depth (m) by drill rig tier (#1679). */
+export const DRILL_RIG_MAX_DEPTH_M: Record<VehicleTier, number> = { 1: 12, 2: 24, 3: 40 };
+/** Shallowest hole a drill plan may order (m) (#1679). */
+export const DRILL_HOLE_MIN_DEPTH_M = 1;
 /** Reference hole diameter (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
 export const DRILL_HOLE_REFERENCE_DIAMETER_M = 0.15;
 
@@ -1314,6 +1321,8 @@ export const TRANSPORT_ALIGHT_FINISH_WALK_CELLS = 1;
 export interface StartingSiteQualification {
   readonly category: SkillCategory;
   readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
+  /** Vehicle licence level held (defaults to 1): a tier-N vehicle needs level N. */
+  readonly licenceLevel?: 1 | 2 | 3;
 }
 
 export interface StartingSiteEmployeeSlot {
@@ -1440,7 +1449,19 @@ const DIGGER_STARTING_SITE: StartingSiteComposition = {
 
 export const GRUMPSTONE_RIDGE_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
 
-export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+/**
+ * Treranium ore sits 32 m down and the tier-1 rig reaches only 12 m
+ * (DRILL_RIG_MAX_DEPTH_M, #1679), so this kit swaps in a tier-2 rig (24 m reach,
+ * the 24 m holes the first sale needs) to stay a kit that reaches its own ore.
+ */
+export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = {
+  ...DIGGER_STARTING_SITE,
+  // The driller also holds the tier-2 rig licence (licenceLevel 2) its rig requires.
+  employees: DIGGER_STARTING_SITE.employees.map(e => (e.role === 'driller'
+    ? { ...e, qualifications: e.qualifications.map(q => (q.category === 'driving.drill_rig' ? { ...q, licenceLevel: 2 as const } : q)) }
+    : e)),
+  vehicles: DIGGER_STARTING_SITE.vehicles.map(v => (v.role === 'drill_rig' ? { ...v, tier: 2 } : v)),
+};
 
 /**
  * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet

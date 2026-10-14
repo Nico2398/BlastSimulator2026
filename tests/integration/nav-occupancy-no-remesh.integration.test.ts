@@ -111,7 +111,7 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     const ctx = makeCtx();
     const renderer = wireRenderer(ctx);
     const spy = vi.spyOn(renderer, 'remeshTerrainRegion');
-    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '12' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
