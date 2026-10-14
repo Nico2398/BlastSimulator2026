@@ -1702,6 +1702,50 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(everAbandoned).toHaveLength(0);
   });
 
+  it('#1709: relocates an idle rig WITH its idle driller aboard off a foot mover\'s destination, keeping rider and vehicle in the same cell', () => {
+    const state = buildFlatNavGridState(10, 10);
+    const rng = new Random(SEED);
+
+    const { employee: rider } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 2);
+    vehicle.occupantIds = [rider.id];
+    rider.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    expect(employeeWorkState(rider)).toBe('idle');
+
+    const { employee: mover } = hireEmployee(state.employees, 'blaster', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 10; i++) everAbandoned.push(...tickLocomotion(state).abandoned);
+
+    expect(vehicle.x === 4 && vehicle.z === 2, 'rig never left the destination cell').toBe(false);
+    expect(rider.x).toBe(vehicle.x);
+    expect(rider.z).toBe(vehicle.z);
+    expect(rider.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(mover.x).toBe(4);
+    expect(mover.z).toBe(2);
+    expect(everAbandoned).toHaveLength(0);
+  });
+
+  it('#1709: a rig whose driller is busy (active action) is not relocated', () => {
+    const state = buildFlatNavGridState(10, 10);
+    const rng = new Random(SEED);
+
+    const { employee: rider } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 2);
+    vehicle.occupantIds = [rider.id];
+    rider.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    rider.activeActionId = 99;
+
+    const { employee: mover } = hireEmployee(state.employees, 'blaster', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 3; i++) tickLocomotion(state);
+
+    expect(vehicle.x).toBe(4);
+    expect(vehicle.z).toBe(2);
+  });
+
   // ── #1278's own core reproduction: extreme density at 1m spacing ──────────
 
   /**

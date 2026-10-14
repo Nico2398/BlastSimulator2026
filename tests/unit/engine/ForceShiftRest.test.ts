@@ -318,13 +318,16 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
   // driving the vehicle they're in, rather than desyncing their position
   // from it (I2_mounted_position_mismatch) the way a plain destinationX/Z
   // field-write would.
-  it('#1118: a mounted employee forced into shift rest stays mounted, with a drive-leg itinerary installed toward the rest target, no forced alight', () => {
+  it('#1118/#1709: a speed-1 rig driller forced into shift rest parks the rig and walks to the quarters', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 50;
+    state.navGrid = makeFlatNavGrid(60, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 20, 5, 100, 100, 1);
 
     const prior = pushHeldAction(state, employee.id, 1130);
     employee.activeActionId = prior.id;
@@ -332,9 +335,34 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
 
     forceShiftRestIfNeeded(state, employee, [], []);
 
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(vehicle.x).toBe(0);
+    expect(employee.itinerary).not.toBeNull();
+    expect(employee.itinerary!.legs.every(l => l.mode === 'foot')).toBe(true);
+  });
+
+  it('#1118/#1709: a debris_hauler driver (faster than walking) forced into shift rest stays mounted, drive leg toward the quarters', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 50;
+    state.navGrid = makeFlatNavGrid(60, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 40, 5, 100, 100, 1);
+
+    const prior = pushHeldAction(state, employee.id, 1132);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
-    expect(employee.itinerary).not.toBeNull();
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg).toBeDefined();
     expect(driveLeg!.vehicleId).toBe(vehicle.id);
@@ -952,14 +980,17 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
   // #1118: mirrors the legacy forceShiftRestIfNeeded's own #1118 test above —
   // the policy-aware variant shares finishForceRest's tail, so a mounted
   // employee forced into a policy rest stays mounted too.
-  it('#1118: a mounted employee forced into a policy rest stays mounted, with a drive-leg itinerary installed toward the rest target, no forced alight', () => {
+  it('#1118/#1709: a speed-1 rig driller forced into a policy rest parks the rig and walks to the quarters', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 50;
+    state.navGrid = makeFlatNavGrid(60, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 20, 5, 100, 100, 1);
 
     const prior = pushHeldAction(state, employee.id, 1131);
     employee.activeActionId = prior.id;
@@ -967,9 +998,34 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     forceShiftRestIfNeededByPolicy(state, employee, [], []);
 
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(vehicle.x).toBe(0);
+    expect(employee.itinerary!.legs.every(l => l.mode === 'foot')).toBe(true);
+  });
+
+  it('#1118/#1709: a debris_hauler driver forced into a policy rest stays mounted, drive leg toward the quarters', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    employee.fatigue = 50;
+    state.navGrid = makeFlatNavGrid(60, 10);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 5);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    placeBuilding(state.buildings, 'living_quarters', 40, 5, 100, 100, 1);
+
+    const prior = pushHeldAction(state, employee.id, 1133);
+    employee.activeActionId = prior.id;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
     expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
-    expect(employee.itinerary).not.toBeNull();
     const driveLeg = employee.itinerary!.legs.find(l => l.mode === 'drive');
     expect(driveLeg).toBeDefined();
     expect(driveLeg!.vehicleId).toBe(vehicle.id);
@@ -1305,13 +1361,13 @@ describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budg
     });
   }
 
-  it('mid-drive to a drill_hole with the Living Quarters far: forced rest starts (fatigue minus trip cost is under floor + allowance)', () => {
-    const { state, employee, vehicle } = mountedDrillerFixture(25);
+  it('mid-drive to a drill_hole with the Living Quarters far: forced rest starts (fatigue minus the walk trip cost is under floor + allowance)', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(45);
     claimDrillHole(state, employee, vehicle.id, 1700);
     employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
     employee.fatigue = 40; // above NEED_SOFT_THRESHOLDS.fatigue (25), so the old guard deferred
 
-    const tripCost = restTripFatigueCost(state, employee, 25, 5);
+    const tripCost = restTripFatigueCost(state, employee, 45, 5);
     expect(tripCost).not.toBeNull();
     expect(40 - tripCost!).toBeLessThan(BUDGET);
 
@@ -1352,6 +1408,40 @@ describe('forceShiftRestIfNeededByPolicy — vehicle work and the rest-trip budg
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.activeActionId).toBe(1702);
     expect(employee.taskTicksRemaining).toBe(3);
+  });
+
+  // #1709: the trigger prices the trip actually taken. A rig is parked and the
+  // worker walks, so 25 m of quarters costs ~12 ticks, not the ~25 of a drive.
+  it('#1709: mid-drive with the Living Quarters 25 m away: the rest is deferred while fatigue covers the WALK trip', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(25);
+    claimDrillHole(state, employee, vehicle.id, 1710);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.fatigue = 40;
+
+    const tripCost = restTripFatigueCost(state, employee, 25, 5);
+    expect(tripCost).not.toBeNull();
+    expect(tripCost!).toBeLessThan(15); // walking, not the ~25 of a drive
+    expect(40 - tripCost!).toBeGreaterThanOrEqual(BUDGET);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(1710);
+  });
+
+  it('#1709: 25 m quarters, fatigue just under the walk budget: rest starts, rig parked, worker on foot with fatigue left to arrive', () => {
+    const { state, employee, vehicle } = mountedDrillerFixture(25);
+    claimDrillHole(state, employee, vehicle.id, 1711);
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    const tripCost = restTripFatigueCost(state, employee, 25, 5)!;
+    employee.fatigue = BUDGET + tripCost - 1;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(employee.fatigue - tripCost).toBeGreaterThan(NEED_REST_ARRIVAL_FATIGUE_FLOOR);
   });
 
   it('idle at a job boundary, mounted, claimable same-role follow-up queued, shouldForceRest true: rests', () => {

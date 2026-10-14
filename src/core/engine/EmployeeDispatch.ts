@@ -20,6 +20,7 @@ import { classifyQueuedOrders } from './OrderReachability.js';
 import { DEBRIS_CLASSIFY_PER_TICK } from '../config/balance.js';
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { alightIfMounted } from './Mount.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
 
@@ -55,7 +56,7 @@ import { getVehicleReservation } from '../entities/Vehicle.js';
  * left untouched. Actions already 'assigned' or 'in_progress' are skipped
  * entirely — not re-evaluated as claimable, not counted as still-waiting.
  */
-export function tickEmployees(state: GameState): TickEmployeesResult {
+export function tickEmployees(state: GameState, emitter?: EventEmitter): TickEmployeesResult {
   // One-shot cleanup: strip EVACUATION_HOLD_KEY from any action whose zone
   // has genuinely cleared, before this tick's claim filters (below, via
   // EmployeeDispatchSteps.ts's isEvacuationHoldActive) run — see
@@ -153,9 +154,9 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // predicate. Dispatch resumes for this employee the tick their rest
     // completes (RestActionHelpers.ts's completeRestForEmployee).
     if (isMidCollapseOrForcedRest(employee)) continue;
-    claimActionsTargetedAtEmployee(state, employee, result);
+    claimActionsTargetedAtEmployee(state, employee, result, emitter);
     if (employee.activeActionId === null) {
-      fillIdleEmployeeFromQueueOrPool(state, employee, result);
+      fillIdleEmployeeFromQueueOrPool(state, employee, result, emitter);
       // #1090 follow-up: still idle after this tick's own dispatch attempt
       // found nothing for them, but mounted — with no dismount-on-completion
       // any more, a driver whose own work ran out (no same-role follow-up

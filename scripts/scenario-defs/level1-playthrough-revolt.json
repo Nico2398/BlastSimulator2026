@@ -1,6 +1,6 @@
 {
   "name": "level1-playthrough-revolt",
-  "description": "Level 1 worker revolt scenario: an aggressive 16-hole krackle blast, then a 12-strong crew with no rest relief sinks wellBeing to its floor and the site revolts. #1431 (rebuilt after #1313 froze the mine at level end): the opening is funded ($1,050,000, solvent throughout) and two living quarters keep wellBeing up through the drill and the blast, so the blast fires at tick 800 (#1649: charging is truck-worked, so later than the original 478) while the level is still running (killing the idle crew near the pattern). wellBeing then falls to 0 and stays there for REVOLT_TICKS, and the worker revolt (levelEndReason 'worker_revolt', never bankruptcy) is the only end, at tick 862. Everything after it asserts the frozen state.",
+  "description": "Level 1 worker revolt scenario: an aggressive 9-hole krackle blast, then a 12-strong crew with no rest relief sinks wellBeing to its floor and the site revolts. #1431 (rebuilt after #1313 froze the mine at level end): the opening is funded ($1,050,000, solvent throughout) and two living quarters keep wellBeing up through the drill and the blast, so the blast fires well before the revolt (#1649: charging is truck-worked, so later than the original 478) while the level is still running (killing the idle crew near the pattern). wellBeing then falls to 0 and stays there for REVOLT_TICKS, and the worker revolt (levelEndReason 'worker_revolt', never bankruptcy) is the only end, at tick 717. #1709: the pattern is 3x3, not 4x4 -- crew rest trips now park the rig and walk to the quarters, which slows the 16-hole charging run past the 120-tick wellBeing-zero window, so the revolt landed before the blast; the 9-hole pattern charges and fires first again. Everything after it asserts the frozen state.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true cash:1050000",
@@ -557,7 +557,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:6,5",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:6,5",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -597,8 +597,8 @@
           "type": "dragTiles",
           "x1": 6,
           "z1": 5,
-          "x2": 15,
-          "z2": 14
+          "x2": 12,
+          "z2": 11
         },
         {
           "type": "screenshot"
@@ -611,11 +611,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 16,
+          "orderedHoleCount": 9,
           "holeCount": 0
         }
       },
-      "description": "#1151: shifted one cell east. Under the 30-degree slope gate (5,11) sits outside the crew's climb-reachable patch on dusty_hollow, so no driller could ever claim that hole and the pattern stalled at 15 of 16 forever. Measured by replaying this file's own steps to this point; start:6,5 is the nearest origin whose whole 4x4 grid is reachable."
+      "description": "#1709: 3x3 instead of 4x4 (see the file description). #1151: shifted one cell east. Under the 30-degree slope gate (5,11) sits outside the crew's climb-reachable patch on dusty_hollow, so no driller could ever claim that hole and the 4x4 pattern stalled at 15 of 16 forever. Measured by replaying this file's own steps to this point; start:6,5 is the nearest origin whose whole grid is reachable."
     },
     {
       "command": "tick 283",
@@ -655,22 +655,22 @@
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:holeCount equals:16 max_ticks:600",
+      "command": "wait_until field:holeCount equals:9 max_ticks:600",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "holeCount",
-          "equals": 16,
+          "equals": 9,
           "maxTicks": 600,
           "timeoutMs": 120000
         }
       ],
-      "description": "Wait for the crew to sink all 16 holes (the pattern drills in the field, not instantly).",
+      "description": "Wait for the crew to sink all 9 holes (the pattern drills in the field, not instantly).",
       "role": "setup",
       "timeout": 150,
       "expect": {
         "equals": {
-          "holeCount": 16,
+          "holeCount": 9,
           "orderedHoleCount": 0,
           "deathCount": 0,
           "bankrupt": false,
@@ -757,7 +757,7 @@
       "expect": {
         "equals": {
           "orderedChargeCount": 0,
-          "chargedCount": 16,
+          "chargedCount": 9,
           "deathCount": 0,
           "levelEnded": false
         }
@@ -793,17 +793,17 @@
           "timeout": 20000
         }
       ],
-      "description": "Fires the 16-hole krackle pattern while the level is still running: the blast comes first, the revolt after.",
+      "description": "Fires the 9-hole krackle pattern while the level is still running: the blast comes first, the revolt after.",
       "role": "player",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "deathCount": 7,
+          "deathCount": 8,
           "levelEnded": false,
           "bankrupt": false
         },
-        "note": "#1667: a hired blaster now arrives with the tier-1 truck licence, so the second hired blaster (#8) can work the charge orders from a truck and stands at the drill site when the pattern fires: deathCount re-measured 6 -> 7 (dead: #1-#6 and #8; driller #7, blaster #9, driver #10, surveyor #11 and manager #12 survive to carry wellBeing to the revolt). Real consequence of the licence, not a bug; the revolt end is unchanged."
+        "note": "#1667: a hired blaster now arrives with the tier-1 truck licence, so the second hired blaster (#8) can work the charge orders from a truck and stands at the drill site when the pattern fires: deathCount re-measured 6 -> 7 (dead: #1-#6 and #8; driller #7, blaster #9, driver #10, surveyor #11 and manager #12 survive to carry wellBeing to the revolt). Real consequence of the licence, not a bug; the revolt end is unchanged. #1709: deathCount re-measured 7 -> 8 for the 3x3 pattern (see the file description)."
       }
     },
     {
@@ -834,14 +834,14 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 862,
-          "deathCount": 7,
+          "tickCount": 717,
+          "deathCount": 8,
           "wellBeing": 0,
           "holeCount": 0,
           "employeeCount": 12,
           "vehicleCount": 0
         },
-        "note": "#1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+        "note": "#1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1709: tickCount re-measured 862 -> 717 for the 3x3 pattern."
       }
     },
     {
@@ -859,10 +859,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -890,7 +890,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -911,10 +911,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -942,7 +942,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -963,10 +963,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -994,7 +994,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1015,10 +1015,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1046,7 +1046,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1067,10 +1067,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1098,7 +1098,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1119,10 +1119,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1150,7 +1150,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1171,10 +1171,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1202,7 +1202,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1223,10 +1223,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1254,7 +1254,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1275,10 +1275,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1306,7 +1306,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1327,10 +1327,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1358,7 +1358,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1379,10 +1379,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1410,7 +1410,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1431,10 +1431,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1462,7 +1462,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1483,10 +1483,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1514,7 +1514,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1535,10 +1535,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1566,7 +1566,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1587,10 +1587,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1618,7 +1618,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1639,10 +1639,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1670,7 +1670,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1691,10 +1691,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1722,7 +1722,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1743,10 +1743,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1774,7 +1774,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1795,10 +1795,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 7
+          "deathCount": 8
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1826,7 +1826,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 862,
+          "tickCount": 717,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1844,7 +1844,7 @@
       "expect": {
         "equals": {
           "employeeCount": 12,
-          "deathCount": 7
+          "deathCount": 8
         }
       }
     },
@@ -1863,8 +1863,8 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 862,
-          "deathCount": 7,
+          "tickCount": 717,
+          "deathCount": 8,
           "wellBeing": 0,
           "employeeCount": 12
         }
@@ -1882,7 +1882,7 @@
       "expect": {
         "equals": {
           "bankrupt": false,
-          "tickCount": 862
+          "tickCount": 717
         }
       }
     },
@@ -1897,7 +1897,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 862,
+          "tickCount": 717,
           "employeeCount": 12
         }
       }
@@ -1917,8 +1917,8 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 862,
-          "deathCount": 7,
+          "tickCount": 717,
+          "deathCount": 8,
           "wellBeing": 0,
           "employeeCount": 12
         },

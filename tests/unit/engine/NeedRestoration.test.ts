@@ -321,11 +321,12 @@ describe('tickNeedRestoration (Task 3.11)', () => {
   // rather than desyncing their position from it (I2_mounted_position_mismatch)
   // the way a plain destinationX/Z field-write would.
   it('#1118: an idle mounted employee crossing the soft fatigue threshold stays mounted, with a drive-leg itinerary installed toward the rest building', () => {
+    // debris_hauler outpaces walking, so the drive is kept (#1709: a slower rig is parked instead).
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     employee.fatigue = 20; // below NEED_SOFT_THRESHOLDS.fatigue (25)
