@@ -21,6 +21,8 @@ import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
+import type { GameState } from '../../src/core/state/GameState.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
 
 /**
  * Solid-voxel count inside a fixed height window around the sandbox datum — a
@@ -138,6 +140,7 @@ describe('sandbox mode', () => {
     // 'blasting'-qualified employee and a drill_rig vehicle are needed for
     // any hole to actually land, same composition drill-plan-queueing.test.ts
     // uses for `new_game ... staffed:true`.
+    // Staffed explicitly: this test pins the global composition, not the level kit.
     runner.run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true');
     const before = solidCount(ctx.grid!);
 
@@ -201,18 +204,49 @@ describe('sandbox mode', () => {
       }
     }
 
-    it('defaults to an empty roster and fleet when staffed is omitted', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42');
-      expect(result.success).toBe(true);
-      expect(ctx.state!.employees.employees.length).toBe(0);
-      expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+    it.each(['easy', 'normal', 'hard'] as const)(
+      'defaults to the %s level kit: crew, fleet and buildings placed, cash untouched (#1671)',
+      (difficulty) => {
+        const result = runner.run(`sandbox start biome:desert_badlands difficulty:${difficulty} seed:42`);
+        expect(result.success).toBe(true);
+        const site = SANDBOX_DIFFICULTIES[difficulty].startingSite;
+        const st = ctx.state!;
+        expect(site.employees.length).toBeGreaterThan(0);
+        expect(st.employees.employees.length).toBe(site.employees.length);
+        expect(st.vehicles.vehicles.length).toBe(site.vehicles.length);
+        expect(st.buildings.buildings.length).toBe(site.buildings.length);
+        for (const slot of site.buildings) {
+          expect(st.buildings.buildings.some(b => b.type === slot.type && b.tier === slot.tier && b.active), `${slot.type} placed`).toBe(true);
+        }
+        for (const slot of site.vehicles) {
+          expect(st.vehicles.vehicles.some(v => v.type === slot.role && v.tier === slot.tier), `${slot.role} owned`).toBe(true);
+        }
+        expect(st.cash).toBe(SANDBOX_DIFFICULTIES[difficulty].startingCash);
+      },
+    );
+
+    it('default start places a freight warehouse and a spoil heap on the grid', () => {
+      runner.run('sandbox start biome:desert_badlands difficulty:hard seed:42');
+      const types = ctx.state!.buildings.buildings.map(b => b.type);
+      expect(types).toContain('freight_warehouse');
+      expect(types).toContain('spoil_heap');
     });
 
-    it('staffed:false behaves identically to the default (empty roster and fleet)', () => {
+    it('staffed:false opens a bare site: no crew, fleet or buildings (#1671)', () => {
       const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:false');
       expect(result.success).toBe(true);
       expect(ctx.state!.employees.employees.length).toBe(0);
       expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+      expect(ctx.state!.buildings.buildings.length).toBe(0);
+      expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES.normal.startingCash);
+    });
+
+    it('staffed:true places the global composition and no buildings, whatever the difficulty (#1671)', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:hard seed:42 staffed:true');
+      expect(result.success).toBe(true);
+      assertEmployeesMatchComposition(ctx.state!.employees.employees);
+      assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
+      expect(ctx.state!.buildings.buildings.length).toBe(0);
     });
 
     it('staffed:true hires and equips the STARTING_SITE_STAFFED_COMPOSITION roster and fleet', () => {
@@ -258,6 +292,64 @@ describe('sandbox mode', () => {
     });
   });
 });
+
+// #1671: each difficulty reaches its first sale from the free kit alone.
+const CYCLE_TICK_CAP = 4000;
+const CYCLE_BUY_OR_HIRE = /^(employee hire|vehicle buy|vehicle purchase|build |hire |purchase )/;
+
+describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first sale on %s (#1671)', (difficulty) => {
+  it('drills, charges, fires, hauls and fills an ore contract with no buying or hiring, and stays solvent', () => {
+    const { runner, ctx } = createRunner();
+    const commands: string[] = [];
+    const run: Run = (cmd) => { commands.push(cmd); return runner.run(cmd); };
+
+    expect(run(`sandbox start biome:desert_badlands seed:42 difficulty:${difficulty}`).success).toBe(true);
+    run('time resume');
+    const state = ctx.state!;
+    expect(state.employees.employees.length, 'the level opens staffed').toBeGreaterThan(0);
+    const rig = state.vehicles.vehicles.find(v => v.type === 'drill_rig');
+    expect(rig, 'the level opens with a drill rig').toBeDefined();
+
+    const start = state.tickCount;
+    const over = () => state.levelEnded || state.tickCount - start >= CYCLE_TICK_CAP;
+    const sold = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
+
+    let shot = 0;
+    while (!over() && !sold() && shot < 6) {
+      const x = Math.round(rig!.x) + 14;
+      const z = Math.round(rig!.z) + 13 + shot * 10;
+      shot++;
+      if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
+      tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
+      run('charge hole:* explosive:boomite amount:5 stemming:2');
+      tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
+      run('sequence auto');
+      clearZone(run, state);
+      expect(run('blast').success).toBe(true);
+      for (let i = 0; i < 400 && !over() && !sold(); i++) {
+        playContracts(run, state);
+        playTick(run, state);
+      }
+    }
+
+    expect(state.levelEndReason, `ended ${String(state.levelEndReason)}`).not.toBe('bankruptcy');
+    expect(sold(), 'an ore contract was filled').toBe(true);
+    expect(state.cash).toBeGreaterThan(0);
+    expect(commands.filter(c => CYCLE_BUY_OR_HIRE.test(c))).toEqual([]);
+    expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 600_000);
+});
+
+/** Order everyone out of the blast radius and wait until the zone reads clear. */
+function clearZone(run: Run, state: GameState): void {
+  const xs = state.drillHoles.map(h => h.x);
+  const zs = state.drillHoles.map(h => h.z);
+  if (xs.length === 0) return;
+  const m = 16;
+  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
+  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
+  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
+}
 
 describe('parseSandboxArgs', () => {
   it('leaves unmentioned keys alone so defaults survive', () => {

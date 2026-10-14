@@ -1418,6 +1418,40 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'spoil_heap', tier: 1 }],
 };
 
+/** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
+export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
+
+const SANDBOX_KIT_BUILDINGS: readonly StartingBuildingSlot[] = DUSTY_HOLLOW_STARTING_SITE.buildings;
+const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
+};
+const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
+};
+
+/**
+ * Free starting kit per sandbox difficulty (#1671): every difficulty can drill,
+ * charge, fire, haul and sell its first blast with no purchases. Hard is the
+ * Dusty Hollow kit; normal adds a rock digger (a ramp into the crater) and its
+ * excavator-licensed driver; easy adds a rock fragmenter and its licensed
+ * driver. Each kit is a superset of the smaller one.
+ */
+export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
+  hard: DUSTY_HOLLOW_STARTING_SITE,
+  normal: {
+    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
+    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
+    buildings: SANDBOX_KIT_BUILDINGS,
+  },
+  easy: {
+    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
+    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
+    buildings: SANDBOX_KIT_BUILDINGS,
+  },
+};
+
 /**
  * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
  * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
