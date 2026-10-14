@@ -676,7 +676,10 @@ function applyStaffedComposition(state: GameState, composition: StartingSiteComp
   composition.employees.forEach((slot, i) => {
     const { employee } = hireEmployee(state.employees, slot.role, rng, i * 2, 0, state.tickCount);
     // Staffing is free at game-open — hiringCost is intentionally not deducted from cash.
-    employee.qualifications = slot.qualifications.map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
+    employee.qualifications = slot.qualifications.map(q => {
+      const qualification = qualificationAtLevel(q.category, q.proficiencyLevel);
+      return q.licenceLevel ? { ...qualification, licenceLevel: q.licenceLevel } : qualification;
+    });
     employee.salary = calculateSalary(employee);
   });
 

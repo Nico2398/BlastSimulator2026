@@ -1318,6 +1318,8 @@ export const TRANSPORT_ALIGHT_FINISH_WALK_CELLS = 1;
 export interface StartingSiteQualification {
   readonly category: SkillCategory;
   readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
+  /** Vehicle licence level held (defaults to 1): a tier-N vehicle needs level N. */
+  readonly licenceLevel?: 1 | 2 | 3;
 }
 
 export interface StartingSiteEmployeeSlot {
@@ -1444,7 +1446,19 @@ const DIGGER_STARTING_SITE: StartingSiteComposition = {
 
 export const GRUMPSTONE_RIDGE_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
 
-export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+/**
+ * Treranium ore sits 32 m down and the tier-1 rig reaches only 12 m
+ * (DRILL_RIG_MAX_DEPTH_M, #1679), so this kit swaps in a tier-2 rig (24 m reach,
+ * the 24 m holes the first sale needs) to stay a kit that reaches its own ore.
+ */
+export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = {
+  ...DIGGER_STARTING_SITE,
+  // The driller also holds the tier-2 rig licence (licenceLevel 2) its rig requires.
+  employees: DIGGER_STARTING_SITE.employees.map(e => (e.role === 'driller'
+    ? { ...e, qualifications: e.qualifications.map(q => (q.category === 'driving.drill_rig' ? { ...q, licenceLevel: 2 as const } : q)) }
+    : e)),
+  vehicles: DIGGER_STARTING_SITE.vehicles.map(v => (v.role === 'drill_rig' ? { ...v, tier: 2 } : v)),
+};
 
 /**
  * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet

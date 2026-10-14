@@ -1129,10 +1129,11 @@ describe.each(KIT_LEVELS)('campaign start level:%s opens with a starting site (#
     })).toBe(true);
   });
 
-  it('has a drill rig, a debris hauler, a tier-1 charging truck and a tier-1 rock digger', () => {
+  it('has a drill rig, a debris hauler, a tier-1 charging truck and a tier-1 rock digger (Treranium: tier-2 rig for its deep ore, #1679)', () => {
     const { state } = startKitLevel(levelId);
+    const rigTier = levelId === 'treranium_depths' ? 2 : 1;
     expect(state.vehicles.vehicles.map(v => `${v.type}:${v.tier}`).sort()).toEqual(
-      ['charging_truck:1', 'debris_hauler:1', 'drill_rig:1', 'rock_digger:1'],
+      ['charging_truck:1', 'debris_hauler:1', `drill_rig:${rigTier}`, 'rock_digger:1'],
     );
   });
 
