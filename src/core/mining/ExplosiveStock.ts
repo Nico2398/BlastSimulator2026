@@ -47,12 +47,13 @@ export function buyStockBlockReason(
 /** Buy `kg` of an explosive into warehouse stock, paying bulk price. Refusals mutate nothing. */
 export function buyExplosiveStock(state: GameState, explosiveId: string, kg: number): BuyStockResult {
   const reason = buyStockBlockReason(state, explosiveId, kg);
+  if (reason === 'over_capacity') return { success: false, reason, freeKg: getExplosivesFreeCapacity(state.buildings) };
+  if (reason === 'insufficient_funds') return { success: false, reason, need: kg * bulkPricePerKg(explosiveId, explosivePriceFactor(state)) };
+  if (reason) return { success: false, reason };
+
   const capacityKg = getExplosivesCapacity(state.buildings);
   const pricePerKg = bulkPricePerKg(explosiveId, explosivePriceFactor(state));
   const cost = kg * pricePerKg;
-  if (reason === 'over_capacity') return { success: false, reason, freeKg: getExplosivesFreeCapacity(state.buildings) };
-  if (reason === 'insufficient_funds') return { success: false, reason, need: cost };
-  if (reason) return { success: false, reason };
 
   storeExplosives(state.buildings, explosiveId, kg);
   state.cash -= cost;
@@ -68,6 +69,17 @@ export function drawStockForOrder(
 ): { fromStockKg: number; fromCashKg: number } {
   const fromStockKg = Math.min(kg, Math.max(0, stock[explosiveId] ?? 0));
   return { fromStockKg, fromCashKg: kg - fromStockKg };
+}
+
+/** Like drawStockForOrder, but depletes `pool` in place so the next order in a batch sees what is left. */
+export function drawFromStockPool(
+  pool: Record<string, number>,
+  explosiveId: string,
+  kg: number,
+): { fromStockKg: number; fromCashKg: number } {
+  const draw = drawStockForOrder(pool, explosiveId, kg);
+  pool[explosiveId] = (pool[explosiveId] ?? 0) - draw.fromStockKg;
+  return draw;
 }
 
 /** Kg of a charge order served from warehouse stock at order time (#1678). */

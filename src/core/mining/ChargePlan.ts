@@ -4,7 +4,7 @@
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
-import { drawStockForOrder } from './ExplosiveStock.js';
+import { drawFromStockPool } from './ExplosiveStock.js';
 import { t } from '../i18n/I18n.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import {
@@ -160,8 +160,7 @@ export function stockAwareChargesCost(
   const pool = { ...stock };
   const split: ChargeCostSplit = { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 };
   for (const o of orders) {
-    const { fromStockKg, fromCashKg } = drawStockForOrder(pool, o.explosiveId, o.amountKg);
-    pool[o.explosiveId] = (pool[o.explosiveId] ?? 0) - fromStockKg;
+    const { fromStockKg, fromCashKg } = drawFromStockPool(pool, o.explosiveId, o.amountKg);
     addSplit(split, o.explosiveId, o.amountKg, fromStockKg, fromCashKg);
   }
   return split;

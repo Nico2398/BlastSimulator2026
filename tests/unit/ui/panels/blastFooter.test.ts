@@ -188,6 +188,7 @@ describe('BlastFooter cost net of stock (#1685)', () => {
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 5 };
     footer.update(state);
+    expect(footer.root.textContent).toContain('$0');
     expect(footer.root.textContent).not.toContain('$60');
   });
 });

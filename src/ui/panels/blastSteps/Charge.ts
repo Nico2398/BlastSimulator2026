@@ -27,7 +27,7 @@ import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, type HoleDrainView } from './ChargeHoleList.js';
 import { ChargeStockBlock, buildStockView } from './ChargeStock.js';
-import { stockAwareChargesCost, chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
+import { chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
@@ -37,7 +37,6 @@ import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
 import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
-import { getExplosivesStockByType } from '../../../core/entities/Building.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 
@@ -213,7 +212,7 @@ export class ChargeStep {
 
     this.renderProductList(wet.length > 0);
     this.stockBlock.render(stockView);
-    this.updateChargeLine(holes.length, getExplosivesStockByType(state.buildings));
+    this.updateChargeLine(holes.length, stockView.paidCash);
     this.updateFitLine(shallowest, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
     this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
@@ -275,13 +274,11 @@ export class ChargeStep {
     return card;
   }
 
-  private updateChargeLine(holeCount: number, stock: Readonly<Record<string, number>>): void {
+  private updateChargeLine(holeCount: number, cashCost: number): void {
     const explosive = getExplosive(this.selectedExplosiveId);
     const name = explosive ? t(explosive.nameKey) : this.selectedExplosiveId;
-    const orders = Array.from({ length: holeCount }, () => ({ explosiveId: this.selectedExplosiveId, amountKg: this.amountKg }));
-    const cost = stockAwareChargesCost(orders, stock).cashCost;
     this.chargeLineEl.textContent = t('ui.blast_workshop.charge.charge_line', {
-      count: holeCount, amount: this.amountKg, name, cost: `$${formatMoney(cost)}`,
+      count: holeCount, amount: this.amountKg, name, cost: `$${formatMoney(cashCost)}`,
     });
   }
 
