@@ -166,7 +166,7 @@
     },
     {
       "command": "build spoil_heap at:36,3",
-      "description": "#1691: heap 2 of 2. One heap's +0.2 ecology a tick only cancels half the dust the capped rubble costs (ECOLOGY_DUST_MAX_PER_TICK 0.4), and this file leaves ~1000 t of rubble lying unhauled after its large blasts; two heaps keep the site's ecology afloat, as a player running five blasts would need.",
+      "description": "#1691: heap 2 of 2. One heap's +0.2 ecology a tick carries ordinary play, but each large blast throws a fresh dust pulse (ECOLOGY_DUST_PER_TONNE_PER_TICK) and this file leaves ~1000 t of rubble lying unhauled after its large blasts; two heaps soften and shorten the dips, as a player running five blasts would need.",
       "interaction": [
         {
           "type": "ensurePanel",

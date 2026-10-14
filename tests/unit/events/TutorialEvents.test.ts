@@ -151,8 +151,8 @@ describe('tutorial event definitions', () => {
 
   it('weightCoeff returns a constant 0.5 regardless of scores', () => {
     const ev = getEventById('tutorial_synergy_consultant')!;
-    const highScores = { wellBeing: 100, safety: 100, ecology: 100, nuisance: 100, decayRate: 0.05 };
-    const lowScores = { wellBeing: 0, safety: 0, ecology: 0, nuisance: 0, decayRate: 0.05 };
+    const highScores = { wellBeing: 100, safety: 100, ecology: 100, nuisance: 100, decayRate: 0.05, freshDustKg: 0, lastLooseRockKg: 0 };
+    const lowScores = { wellBeing: 0, safety: 0, ecology: 0, nuisance: 0, decayRate: 0.05, freshDustKg: 0, lastLooseRockKg: 0 };
 
     expect(ev.weightCoeff(highScores)).toBe(0.5);
     expect(ev.weightCoeff(lowScores)).toBe(0.5);
@@ -162,7 +162,7 @@ describe('tutorial event definitions', () => {
     const ev = getEventById('tutorial_synergy_consultant')!;
     // Tutorial events should always be fireable
     const ctx = {
-      scores: { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate: 0.05 },
+      scores: { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate: 0.05, freshDustKg: 0, lastLooseRockKg: 0 },
       employeeCount: 0,
       deathCount: 0,
       corruptionLevel: 0,
