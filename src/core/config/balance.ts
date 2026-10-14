@@ -1889,6 +1889,12 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   core_sample: 40,
 } as const;
 
+/** Depth-band thickness in metres for depth-resolved survey results. Aerial surveys report none. */
+export const SURVEY_DEPTH_BAND_METRES = {
+  core_sample: 1,
+  seismic:     5,
+} as const;
+
 /** Error reduction applied per skill level above 1 (e.g. skill 3 → 2 × 0.12 = 0.24 reduction). */
 export const SURVEY_SKILL_BONUS_PER_LEVEL = 0.12;
 

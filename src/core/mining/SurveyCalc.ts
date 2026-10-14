@@ -15,6 +15,7 @@ import {
 import { factorFor, scaledCost, type ActiveModifier } from '../events/ActiveModifiers.js';
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
+import type { SurveyDepthBand } from './SurveyDepthProfile.js';
 import { surveyColumnKey } from './SurveyColumn.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
@@ -50,6 +51,8 @@ export interface SurveyResult {
   estimates: Record<string, Record<string, number>>;
   /** Confidence in the estimates, clamped to [0, 1]. */
   confidence: number;
+  /** Per-column depth bands keyed `"x,z"`. Absent for aerial surveys and legacy saves. */
+  depthProfile?: Record<string, SurveyDepthBand[]>;
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }
