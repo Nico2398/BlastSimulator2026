@@ -13,6 +13,7 @@
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { SCORE_DECAY_RATE, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
+import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { LevelDef } from './Level.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
@@ -122,9 +123,9 @@ export function randomSandboxSeed(rand: () => number = Math.random): number {
 /**
  * Build the LevelDef a sandbox site runs as.
  *
- * climateBias comes from the chosen biome's own climate centre, the same way
- * the authored levels set theirs, so the generator lands in the biome the
- * player picked instead of wherever the raw climate fields happen to fall.
+ * climateBias is solved per seed (climateBiasLandingOn) so the generator
+ * lands in the biome the player picked on every seed, not wherever the raw
+ * climate fields happen to fall.
  * Grid extents are fixed constants (#504) rather than player-configurable.
  */
 export function sandboxLevelDef(config: SandboxConfig): LevelDef {
@@ -136,7 +137,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     nameKey: 'sandbox.level.name',
     descKey: 'sandbox.level.desc',
     biome: clamped.biome,
-    climateBias: biome.climateCenter,
+    climateBias: climateBiasLandingOn(clamped.seed, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, biome),
     terrainSeed: clamped.seed,
     gridX: DEFAULT_GRID_SIZE,
     datum: SANDBOX_DATUM,

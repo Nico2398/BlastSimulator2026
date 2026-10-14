@@ -259,3 +259,22 @@ export function isInBorderZone(
   return x < borderWidth || x >= sizeX - borderWidth
     || z < borderWidth || z >= sizeZ - borderWidth;
 }
+
+/**
+ * Climate bias that makes the centre of a (seed, size) site generate `target`'s
+ * biome. Returns `target.climateCenter` when the seed already lands there.
+ */
+export function climateBiasLandingOn(
+  seed: number,
+  sizeX: number,
+  sizeZ: number,
+  target: BiomeDef,
+): readonly [number, number] {
+  const fields = new WorldNoiseFields(seed);
+  if (centerBiome(fields, sizeX, sizeZ, target.climateCenter).id === target.id) return target.climateCenter;
+  // Bias is added to the raw centre climate, so cancel it to land on the biome's centre.
+  return [
+    target.climateCenter[0] - fields.temperature(sizeX / 2, sizeZ / 2),
+    target.climateCenter[1] - fields.humidity(sizeX / 2, sizeZ / 2),
+  ];
+}
