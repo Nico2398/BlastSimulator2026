@@ -538,23 +538,23 @@
       "commandOutcome": "either"
     },
     {
-      "command": "employee dispatch 1 x:70 z:70",
-      "description": "#1649: the driller now stands at the holes in the charging truck and the blast zone is no longer empty of crew; the surveyor, needed for the later core_sample, walks clear of the blast zone first (employee dispatch has no UI button).",
+      "command": "employee dispatch 1 x:45 z:45",
+      "description": "#1649: the driller now stands at the holes in the charging truck and the blast zone is no longer empty of crew; the surveyor, needed for the later core_sample, walks clear of the blast zone first (employee dispatch has no UI button). #1676: waiting point moved from (70,70) to (45,45). The deeper survey reach (seismic 25, core 40) consumes more of the shared RNG stream, so the union_therapist event that used to land at tick 340 and lift morale no longer fires; the crew sat at morale 0 for 120 ticks and revolted (worker_revolt) at tick 355, 17 ticks into the 30-tick walk from (70,70) to the core_sample site. (45,45) is still outside the blast zone but only ~13 ticks from (30,30), so the re-survey completes well before any revolt window, independent of which events fire.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee dispatch 1 x:70 z:70"
+          "command": "employee dispatch 1 x:45 z:45"
         }
       ],
       "role": "bootstrap"
     },
     {
-      "command": "tick 60",
-      "description": "Let the surveyor walk clear of the danger zone before the blast; no state field exposes employee positions, so a fixed tick pad is the only wait available.",
+      "command": "tick 25",
+      "description": "Let the surveyor walk clear of the danger zone before the blast; no state field exposes employee positions, so a fixed tick pad is the only wait available. #1676: pad shortened 60 -> 25 with the nearer waiting point (45,45) above; 60 ticks outlasted the walk so the dispatched task completed and the following cancel found no action. Measured: the dispatch is still open after 25 ticks.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 60"
+          "command": "tick 25"
         }
       ],
       "role": "setup"

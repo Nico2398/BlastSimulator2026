@@ -130,7 +130,8 @@ function computeSeismicOreDensity(
  *
  * - Confidence = clamp(1 − finalError, 0, 1)  where finalError = BASE_ERROR × (1 − skillBonus).
  * - Coverage is a disc of COVERAGE_RADIUS[method] around (centerX, centerZ).
- * - Seismic: Y values grouped into consecutive triplets; group-average → column-average → add noise.
+ * - Each method samples SURVEY_DEPTH_BELOW_SURFACE[method] layers from the surface down.
+ * - Seismic: Y values grouped into consecutive triplets (a trailing group may be smaller); group-average → column-average → add noise.
  * - core_sample / aerial: plain average of sampled solid-voxel densities → add noise.
  * - Values are clamped to [0,1], rounded to nearest 0.05; zero estimates are omitted.
  */
@@ -159,20 +160,15 @@ export function estimateSurveyResult(
 
       if (!isColumnInSurveyDisc({ method, centerX, centerZ }, x, z)) continue;
 
-      // Determine which Y levels to sample
-      let yLevels: number[];
-      if (method === 'aerial') {
-        const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
-        // No ceiling to filter against any more — voxel storage has no
-        // vertical cap (#1183).
-        yLevels = [surfaceY, surfaceY - 1];
-      } else {
-        const topY = computeVoxelColumnSurfaceY(grid, x, z);
-        if (topY === null) continue; // no ground in this column, nothing to sample
-        const depth = SURVEY_DEPTH_BELOW_SURFACE[method];
-        yLevels = [];
-        for (let y = topY; y > topY - depth; y--) yLevels.push(y);
-      }
+      // Window: SURVEY_DEPTH_BELOW_SURFACE[method] layers, descending from the
+      // anchor. Aerial anchors on the first empty layer above ground (voxel
+      // storage has no vertical cap, #1183); the others on the top solid voxel.
+      const anchorY = method === 'aerial'
+        ? firstEmptyLayerAboveGround(grid, x, z)
+        : computeVoxelColumnSurfaceY(grid, x, z);
+      if (anchorY === null) continue; // no ground in this column, nothing to sample
+      const yLevels: number[] = [];
+      for (let y = anchorY; y > anchorY - SURVEY_DEPTH_BELOW_SURFACE[method]; y--) yLevels.push(y);
 
       // Collect ore IDs present in any solid voxel in the sampled range
       const allOreIds = new Set<string>();
