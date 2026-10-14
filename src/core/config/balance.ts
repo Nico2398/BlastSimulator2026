@@ -437,7 +437,7 @@ export const DRILL_HOLE_BASE_DURATION_TICKS = 6;
 /** Reference hole depth (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
 export const DRILL_HOLE_REFERENCE_DEPTH_M = 8;
 /** Max drillable hole depth (m) by drill rig tier (#1679). */
-export const DRILL_RIG_MAX_DEPTH_M = { 1: 12, 2: 24, 3: 40 } as const;
+export const DRILL_RIG_MAX_DEPTH_M: Record<VehicleTier, number> = { 1: 12, 2: 24, 3: 40 };
 /** Shallowest hole a drill plan may order (m) (#1679). */
 export const DRILL_HOLE_MIN_DEPTH_M = 1;
 /** Reference hole diameter (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */

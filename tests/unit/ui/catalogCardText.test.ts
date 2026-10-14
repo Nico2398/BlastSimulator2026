@@ -68,7 +68,8 @@ describe('vehicleCardLine', () => {
         const def = getVehicleDefByTier(role, tier);
         const perHour = Math.round(def.maintenanceCostPerTick + def.fuelCostPerTick);
         const line = vehicleCardLine(def);
-        expect(line).toBe(`${t(`vehicle.${role}.desc`)}${SEP}$${perHour}/h`);
+        const base = `${t(`vehicle.${role}.desc`)}${SEP}$${perHour}/h`;
+        expect(line).toBe(role === 'drill_rig' ? `${base}${SEP}${t('ui.fleet.card.reach', { value: DRILL_RIG_MAX_DEPTH_M[tier] })}` : base);
         expect(line).not.toContain('×');
         expect(line).not.toContain('1.0');
       });
@@ -81,6 +82,17 @@ describe('vehicleCardLine', () => {
     const line = vehicleCardLine(def);
     expect(line.startsWith(FR['vehicle.debris_hauler.desc']!)).toBe(true);
     expect(line).not.toContain(EN['vehicle.debris_hauler.desc']!);
+  });
+});
+
+describe('vehicleCardLine drill rig reach (#1679)', () => {
+  it('drill rig card states 12 / 24 / 40 m reach; other roles omit it', () => {
+    const expected = { 1: 12, 2: 24, 3: 40 } as const;
+    for (const tier of TIERS) {
+      expect(vehicleCardLine(getVehicleDefByTier('drill_rig', tier)))
+        .toContain(t('ui.fleet.card.reach', { value: expected[tier] }));
+    }
+    expect(vehicleCardLine(getVehicleDefByTier('debris_hauler', 1))).not.toContain(t('ui.fleet.card.reach', { value: 12 }));
   });
 });
 

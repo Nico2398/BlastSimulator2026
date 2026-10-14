@@ -206,11 +206,10 @@ type RigLike = Pick<Vehicle, 'type' | 'tier'>;
  * `drill_rig` vehicles. With no rig owned, falls back to the tier-1 value (#1679).
  */
 export function fleetDrillReachM(vehicles: ReadonlyArray<RigLike>): number {
-  let reach = DRILL_RIG_MAX_DEPTH_M[1] as number;
+  let reach = DRILL_RIG_MAX_DEPTH_M[1];
   for (const v of vehicles) {
     if (v.type !== 'drill_rig') continue;
-    const tierReach = DRILL_RIG_MAX_DEPTH_M[v.tier as 1 | 2 | 3];
-    if (tierReach !== undefined && tierReach > reach) reach = tierReach;
+    reach = Math.max(reach, DRILL_RIG_MAX_DEPTH_M[v.tier]);
   }
   return reach;
 }
