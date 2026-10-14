@@ -485,7 +485,9 @@ function selectWithinIndex(
   // spatial bin, not every piece (#1603, DebrisCandidateBins.ts).
   // Reachability (#953, #1722) is asked inside the thinning too, so a bin of
   // walled-off rock never takes a representative slot from reachable rock.
-  // Answered from the climb labelling the order pools share, O(1) per candidate (#1603).
+  // Answered from the climb labelling the order pools share, O(1) per candidate (#1603),
+  // so the thinning's cost stays O(debris candidates) per search, like its existing
+  // stamping pass: it asks every member of every bin it visits, with no pathfinding.
   const climbReach = employeeClimbReach(state);
   const navGrid = state.navGrid;
   const reachable = (a: PendingAction): boolean =>
@@ -508,11 +510,13 @@ function selectWithinIndex(
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
 
-  // Cheap, exact pre-filter (#953): a candidate outside the employee's own
-  // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
-  // interior) can never be reached by any real findExactPath, so it's skipped
-  // below without spending one of the bounded real-pathfind attempts — frees
-  // the budget for a farther candidate that might actually resolve.
+  // `reachable` (#953) is the cheap, exact pre-filter: a candidate outside the
+  // employee's climb-aware reachable set (e.g. inside a fresh blast crater's
+  // walled-off interior) can never be reached by any real findExactPath. It
+  // is skipped below without spending one of the bounded real-pathfind
+  // attempts, which stay free for a farther candidate that might resolve.
+  // Debris is already filtered by it inside the thinning; this loop still
+  // covers the non-debris candidates the thinning passes through.
 
   let best: SelectedAction | null = null;
   let bestAdjusted = Infinity;
