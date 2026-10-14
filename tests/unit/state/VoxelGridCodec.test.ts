@@ -253,6 +253,31 @@ describe('encodeVoxelGrid / decodeVoxelGrid — pitMask (#1680)', () => {
     expect(() => decodeVoxelGrid(tampered)).toThrow(/pit mask/);
   });
 
+  it('an envelope mask (slope, wobble, corner radius) round-trips to identical surface Y (#1734)', () => {
+    const mask = SANDBOX_PIT_MASK;
+    const gen = makeGen({ seed: 42, climateBias: [0.6, 0.7], sizeX: 64, datum: 24, sizeZ: 64, pitMask: mask });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.gen.pitMask).toEqual(mask);
+    const decoded = decodeVoxelGrid(JSON.parse(JSON.stringify(payload)));
+    expect(surfaceFingerprint(decoded, 64, 64)).toEqual(surfaceFingerprint(grid, 64, 64));
+  });
+
+  it.each([
+    ['NaN envelopeSlope', { envelopeSlope: NaN }],
+    ['zero envelopeSlope', { envelopeSlope: 0 }],
+    ['envelopeSlope above 1', { envelopeSlope: 1.5 }],
+    ['negative outlineWobble', { outlineWobble: -1 }],
+    ['NaN outlineWobble', { outlineWobble: NaN }],
+    ['negative cornerRadius', { cornerRadius: -2 }],
+    ['Infinity cornerRadius', { cornerRadius: Infinity }],
+  ])('an invalid envelope field (%s) is rejected (#1734)', (_label, extra) => {
+    const gen = sandboxGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const tampered: SerializedVoxels = { ...payload, gen: { ...payload.gen, pitMask: { margin: 14, reliefKeep: 0.05, ...extra } } };
+    expect(() => decodeVoxelGrid(tampered)).toThrow(/pit mask/);
+  });
+
   it('a non-object mask is rejected', () => {
     const gen = sandboxGen();
     const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);

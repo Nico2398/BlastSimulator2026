@@ -9,8 +9,11 @@
 // connects the pocket (here: a ramp).
 //
 // Fixture (empirically traced on tutorial_pit): a single-hole blast at (18,10)
-// (rows:1 cols:1 spacing:3 depth:6 diameter:0.089) with charge amount:3
-// stemming:2 leaves exactly 3 NavGrid cells — (18,9), (19,10), (18,10) —
+// (rows:1 cols:1 spacing:3 depth:6 diameter:0.089) with charge amount:5
+// stemming:2 leaves exactly 9 NavGrid cells (POCKET_CELLS in blastFixtures) —
+// amount:3 was used before the blast floored to grade (#1723): its extra
+// pit-floor debris then parked a fragmenter on the pocket's rim cell, so the
+// fixture moved to the 5 kg pocket, whose debris stays inside the pit —
 // climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's
 // approach cell, while most of the map stays reachable. The SAME site with
 // amount:1 leaves nothing disconnected (non-regression guard). A ramp
@@ -83,7 +86,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
     "stamps debris_out_of_reach (never target_unreachable) on exactly the pocket's debris, leaves it queued where physics put it, while the reachable majority is hauled",
     () => {
       // Generous cash: wages over the long wait must not bankrupt the mine, which freezes it (#1313).
-      const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
+      const { run, state } = drillChargeAndBlast(18, 10, 5, 5_000_000);
       const placedAtBlast = new Map(state.logistics.fragments.map(f => [f.fragment.id, { ...f.fragment.position }]));
       expect(placedAtBlast.size).toBeGreaterThan(0);
       crewHaulingAndBuildDepot(run, state);
@@ -138,7 +141,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
     'starts hauling stranded debris once a ramp connects the pocket, and the debris_out_of_reach stamp clears',
     () => {
       // Generous cash: wages over the long wait for the plateau must not starve the ramp order.
-      const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
+      const { run, state } = drillChargeAndBlast(18, 10, 5, 5_000_000);
       crewHaulingAndBuildDepot(run, state);
       crewRockDigger(run, state); // crewed up front; it has no work until the ramp is ordered
       tickUntilOnlyStrandedDebrisRemains(run, state);

@@ -77,7 +77,7 @@ Two derived readings matter downstream:
 
 ## Step 2 — What Breaks
 
-Three passes, in order:
+Four passes, in order:
 
 1. **Energy** — `effective >= FRAGMENTATION_MULTIPLIER × threshold` breaks. Between
    `CRACKED_VOXEL_ENERGY_RATIO` and that, the voxel survives but is weakened
@@ -86,7 +86,19 @@ Three passes, in order:
    zone, with air above it, lifts rather than being crushed. Without this a charge carves a sealed
    cavity under intact ground at *any* size and the player sees nothing happen. Thicker burden still
    holds, which is what makes an over-buried charge visibly fail to break out.
-3. **Unsupported rock** — flood-fill the survivors from the box shell; anything the fill never
+3. **Floor to grade (#1723)** — sub-drilling. `EnergyField.gradeY` is the world Y of the highest
+   charged hole bottom, plus `BLAST_GRADE_FLOOR_OFFSET_M` (null when nothing is charged; `seedEnergy`
+   sets it). In every footprint column (one with at least one voxel already broken), `floorToGrade`
+   breaks the standing rock below the column's topmost broken voxel down to `gradeY`, but never more
+   than `BLAST_GRADE_MAX_CUT_M` below that column's lowest broken voxel, so a deep outlier hole
+   cannot gouge the pit. It returns the voxels it added (`FragmentationResult.gradedCount`). The
+   marks join the mask, so fragments, cleared voxels, the pre-blast estimate and the ore report
+   follow the real broken volume; energy is untouched. Without it a pattern leaves pits under the
+   holes and 1-4 m ridges between them, steeper than `NAV_MAX_SLOPE_DEGREES`, and one ramp into the
+   crater reaches only its landing. A 3x3, spacing 4, 8 m krackle crater (sandbox `desert_badlands`
+   seed 42) ends as one flat floor; a ramp reaches over 90% of its columns. Pits of a light
+   charge that do not touch stay separate floors.
+4. **Unsupported rock** — flood-fill the survivors from the box shell; anything the fill never
    reaches was standing on nothing and comes down.
 
 ## Step 3 — Carving Fragments
@@ -149,6 +161,13 @@ rock is abandoned mid-arc.
 alone and is never adjusted, rejected or relocated for reachability. No reachability query lives in
 `src/core/mining` or fragment/physics code. Debris stranded outside the ground crew's reachable set
 belongs to the player: connect it (ramp, levelling, another blast) or leave it.
+
+**Levelling a crater (#1723).** A `level_ground` order's work target is the reachable column
+(`employeeClimbReach`) of its rectangle nearest the rect's min corner (`pickLevelWorkTarget`), so a
+rectangle the crew can partly reach starts instead of waiting `target_unreachable`; when none is
+reachable the target stays the corner and the order waits. The digger carves as it works
+(`carveLevelColumnsStep`, each tick's share of the columns left; the payload's `levelCursor` counts
+columns done), and completion carves the remainder.
 
 `MuckPileSummary.summariseMuckPile` reads the settled pile back: size and speed spread, and how
 much rock rests on nothing. Clearance is per column against **the pile beneath**, not the terrain —

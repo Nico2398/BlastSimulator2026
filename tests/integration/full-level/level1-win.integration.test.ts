@@ -145,9 +145,11 @@ describe('Level 1 — real playthrough wins with no campaign complete (#1363)', 
   // #1673: depth 7 (was 6). Contract draws are seeded by tick and the biome-following weather (#1688) shifts the
   // clock, so at 6 the first sale board paid too little and the crew revolted before the target; 7 m is inside
   // a tier-1 rig's reach (DRILL_RIG_MAX_DEPTH_M).
+  // #1723: depth 8 (was 7). The blast now floors the pit to grade, which moves the rock thrown clear of the crater and so
+  // the ore the first sale boards see; at 7 these two styles revolted before the target. Same lever, same bound.
   const STYLES: ReadonlyArray<{ label: string; style: PlayStyle }> = [
-    { label: 'seed 1138, 2x2 grids stepping south', style: { rows: 2, cols: 2, spacing: 3, depth: 7, offset: { x: 14, z: 13 }, step: { x: 0, z: 10 } } },
-    { label: 'seed 1138, 2x2 grids stepping east', style: { rows: 2, cols: 2, spacing: 3, depth: 7, offset: { x: 14, z: 13 }, step: { x: 10, z: 0 } } },
+    { label: 'seed 1138, 2x2 grids stepping south', style: { rows: 2, cols: 2, spacing: 3, depth: 8, offset: { x: 14, z: 13 }, step: { x: 0, z: 10 } } },
+    { label: 'seed 1138, 2x2 grids stepping east', style: { rows: 2, cols: 2, spacing: 3, depth: 8, offset: { x: 14, z: 13 }, step: { x: 10, z: 0 } } },
   ];
 
   it.each(STYLES)('wins within the tick cap and solvent — $label', ({ style }) => {
