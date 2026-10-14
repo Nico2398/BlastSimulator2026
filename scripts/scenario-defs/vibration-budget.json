@@ -854,7 +854,7 @@
     },
     {
       "command": "blast detonate",
-      "description": "Blast 2/3. #1362: the danger zone is already clear when DETONATE arms, so it fires at once -- no Fire anyway step.",
+      "description": "Blast 2/3. #1362: arms DETONATE. The zone is usually clear and it fires at once; #1673: a drill rig parked by a resting driver can keep it armed and waiting, so the report is closed in the next step, after any fire-anyway.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -874,22 +874,22 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]",
-          "timeout": 20000
         }
       ],
       "role": "player"
     },
     {
       "command": "blast",
-      "description": "#1673: fires anyway when DETONATE left the armed blast waiting (a rig stranded in the zone, which the shift rests can cause at some game speeds). Refused when blast 2/3 already fired at once.",
+      "description": "#1673: fires anyway when DETONATE left the armed blast waiting (a rig stranded in the zone, which the shift rests can cause at some game speeds), then closes the blast report either way. Refused when blast 2/3 already fired at once.",
       "interaction": [
         {
           "type": "clickIfPresent",
           "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
         }
       ],
       "role": "player",
