@@ -2285,3 +2285,40 @@ describe('serialize/deserialize — tax audit (#1409)', () => {
     expect(restored.mafia.smugglingVolume).toBe(0);
   });
 });
+
+describe('deserialize — stored barren fragments are released to the heap (#1690)', () => {
+  const frag = (id: number, mass: number, oreDensities: Record<string, number>) => ({
+    fragment: {
+      id, position: { x: 0, y: 0, z: 0 }, volume: mass / 2500, mass, rockId: 'sandite', oreDensities,
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, origin: { x: 0, y: 0, z: 0 },
+    },
+    state: 'stored', vehicleId: null, warehouseId: 1,
+  });
+
+  function legacySave(withHeap: boolean): string {
+    const state = createGame({ seed: 42 });
+    expect(placeBuilding(state.buildings, 'freight_warehouse', 20, 20, 64, 64).success).toBe(true);
+    if (withHeap) expect(placeBuilding(state.buildings, 'spoil_heap', 40, 40, 64, 64).success).toBe(true);
+    const parsed = JSON.parse(serialize(state)) as Record<string, any>;
+    parsed['logistics'].fragments = [frag(1, 800, {}), frag(2, 500, { dirtite: 0.5 })];
+    parsed['logistics'].storedMassKg = 1300;
+    parsed['collectedOre'] = { dirtite: 0.2 * 0.5 * 2500 };
+    return JSON.stringify(parsed);
+  }
+
+  it('a legacy save with a stored barren fragment releases it to the heap on load', () => {
+    const restored = deserialize(legacySave(true));
+    const heap = restored.buildings.buildings.find(b => b.type === 'spoil_heap')!;
+    expect(restored.logistics.fragments.map(f => f.fragment.id)).toEqual([2]);
+    expect(restored.logistics.storedMassKg).toBeCloseTo(500, 6);
+    expect(heap.storedSpoilKg).toBeCloseTo(800, 6);
+    expect(restored.collectedOre['dirtite']).toBeCloseTo(250, 6);
+  });
+
+  it('without a heap the barren fragment stays stored on load', () => {
+    const restored = deserialize(legacySave(false));
+    expect(restored.logistics.fragments).toHaveLength(2);
+    expect(restored.logistics.storedMassKg).toBeCloseTo(1300, 6);
+  });
+});

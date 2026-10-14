@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../../../src/core/config/balance.js';
 import {
-  creditSpoilKg, drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
+  creditFirstSpoilHeap, creditSpoilKg, drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
 import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
@@ -240,5 +240,36 @@ describe('deliverToSpoilHeap', () => {
     const l = inTransit(1, 500, {}, 99);
     expect(deliverToSpoilHeap(l, 1, [site(1, 40, 40), site(2, 3, 4)], 0, 0)).toEqual({ heapId: 2, massKg: 500 });
     expect(l.fragments).toHaveLength(0);
+  });
+});
+
+describe('creditFirstSpoilHeap (#1690)', () => {
+  const heap = (kg?: number) => ({ type: 'spoil_heap' as const, storedSpoilKg: kg });
+  const other = () => ({ type: 'freight_warehouse' as const, storedSpoilKg: undefined });
+
+  it('credits the first heap in building order and returns true', () => {
+    const [a, b] = [heap(10), heap(20)];
+    expect(creditFirstSpoilHeap([other(), a, b], 500)).toBe(true);
+    expect(a.storedSpoilKg).toBe(510);
+    expect(b.storedSpoilKg).toBe(20);
+  });
+
+  it('treats an unset storedSpoilKg as zero', () => {
+    const a = heap(undefined);
+    expect(creditFirstSpoilHeap([a], 75)).toBe(true);
+    expect(a.storedSpoilKg).toBe(75);
+  });
+
+  it('crediting zero kg succeeds and leaves the heap unchanged (boundary)', () => {
+    const a = heap(30);
+    expect(creditFirstSpoilHeap([a], 0)).toBe(true);
+    expect(a.storedSpoilKg).toBe(30);
+  });
+
+  it('returns false and credits nothing when there is no heap', () => {
+    const w = other();
+    expect(creditFirstSpoilHeap([w], 500)).toBe(false);
+    expect(w.storedSpoilKg).toBeUndefined();
+    expect(creditFirstSpoilHeap([], 500)).toBe(false);
   });
 });
