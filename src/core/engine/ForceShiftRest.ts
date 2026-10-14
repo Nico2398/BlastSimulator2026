@@ -208,7 +208,8 @@ function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
 }
 
 /**
- * True when the employee, riding whatever they ride now, reaches (destX, destZ)
+ * True when the employee, taking the rest trip they would actually take (the
+ * faster of walking and driving, chooseRestTrip #1709), reaches (destX, destZ)
  * still holding the arrival floor plus the job allowance. An unplannable trip
  * counts as covered: nothing to cost, so nothing to cut the job short for.
  */
@@ -338,7 +339,7 @@ export function forceShiftRestIfNeededByPolicy(
   // Execution stays unconditionally protected (isMidClaimedTaskExecution): a
   // bounded work stint is finished, never fragmented. The DRIVE phase defers
   // only while the gauge still covers the trip to the rest building in the
-  // current vehicle (fatigueCoversTripToRest, #1673) — or while the policy
+  // trip they would take, walk or drive (fatigueCoversTripToRest, #1673, #1709) — or while the policy
   // would not force a rest anyway — so the worker rests before fatigue runs
   // out instead of leaving the collapse floor to do it.
   const midVehicleWork = isMidVehicleGatedWork(state, emp);

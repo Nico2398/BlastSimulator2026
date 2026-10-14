@@ -14,7 +14,7 @@
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton, panelRoot, panelHeader, panelHeaderButton, panelBody } from '../dom.js';
+import { el, card, button, sectionHeader, emptyState, reasonLine, paintToggleButton, panelRoot, panelHeader, panelHeaderButton, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -25,7 +25,9 @@ import {
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
 import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
-import { oreDepthLabel, buildDepthLog } from './surveyDepthSection.js';
+import { buildDepthLog } from './surveyDepthSection.js';
+import { summarizeSurveyOres } from '../../core/mining/SurveyOreSummary.js';
+import { buildOreRows } from './surveyOreRows.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -37,6 +39,9 @@ const STATUS_HOLD_MS = 5000;
 
 /** Most recent surveys shown, newest first — matches the old panel's cap and the design's own sample count. */
 const MAX_RESULTS_SHOWN = 4;
+
+/** Ores listed per result card, richest by estimated value first. */
+const MAX_ORES_SHOWN = 4;
 
 /** Methods offered, cheapest first so the tutorial's default is affordable. */
 const METHOD_ORDER: SurveyMethod[] = ['core_sample', 'seismic', 'aerial'];
@@ -371,28 +376,11 @@ export class SurveyPanel extends PanelBase {
 
     if (stale) rows.push(reasonLine(t('ui.survey.stale_warning'), true));
 
-    const best = richestOrePerType(survey);
-    if (best.size === 0) {
+    const ores = summarizeSurveyOres(survey).slice(0, MAX_ORES_SHOWN);
+    if (ores.length === 0) {
       rows.push(el('span', { text: t('ui.survey.no_ore'), attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }));
     } else {
-      const oreRows = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px' } });
-      const ranked = [...best.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-      for (const [oreId, density] of ranked) {
-        const pct = Math.round(density * 100);
-        const bar = progressBar(pct, 'var(--bsx-ore)');
-        bar.style.flex = '1';
-        const depth = oreDepthLabel(survey, oreId);
-        oreRows.append(el('div', {
-          attrs: { style: 'display:flex;align-items:center;gap:8px' },
-          children: [
-            el('span', { text: t(`ore.${oreId}.name`), attrs: { style: 'width:62px;font-size:10px;color:var(--bsx-text-secondary)' } }),
-            bar,
-            ...(depth ? [el('span', { text: depth, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } })] : []),
-            el('span', { text: `${pct}%`, className: 'bsx-mono', attrs: { style: 'width:28px;text-align:right;font-size:10px;color:var(--bsx-text-muted)' } }),
-          ],
-        }));
-      }
-      rows.push(oreRows);
+      rows.push(buildOreRows(survey, ores));
       const depthLog = buildDepthLog(survey);
       if (depthLog) rows.push(depthLog);
     }
@@ -405,15 +393,4 @@ export class SurveyPanel extends PanelBase {
 
     return card(rows);
   }
-}
-
-/** Richest density per ore across every column the survey covered. */
-function richestOrePerType(survey: SurveyResult): Map<string, number> {
-  const best = new Map<string, number>();
-  for (const column of Object.values(survey.estimates)) {
-    for (const [oreId, density] of Object.entries(column)) {
-      if (density > (best.get(oreId) ?? 0)) best.set(oreId, density);
-    }
-  }
-  return best;
 }

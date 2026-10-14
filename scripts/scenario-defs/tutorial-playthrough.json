@@ -10,18 +10,18 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:300000",
+      "command": "campaign start level:tutorial_pit cash:400000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:300000"
+          "command": "campaign start level:tutorial_pit cash:400000"
         }
       ],
       "description": "#553: cash bumped from $80,000 to $188,648 -- drill_hole is now a queued, vehicle-gated action, so this file needs a drill_rig (tier-1 purchaseCost $35,000, VEHICLE_STATS in balance.ts) it never used to, and it needs a second one -- plus a second driller -- after the first blast kills its crew and destroys the rig standing among the holes it just drilled, plus the 190 ticks the two drillers spend sinking the two patterns ($37,648 of payroll, fuel and maintenance). The bump is exactly those four, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #555: bumped again to $260,000 -- dig_ramp_segment is now gated the same way, so this file also needs a rock_digger (tier-1 purchaseCost $50,000) it never used to, plus the extra payroll/fuel/maintenance drain of the real ticks the ramp order now spends actually digging instead of completing in the same tick it was ordered.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 300000
+          "cash": 400000
         }
       }
     },
@@ -1481,11 +1481,11 @@
       }
     },
     {
-      "command": "tick 5",
+      "command": "tick 40",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 5"
+          "command": "tick 40"
         }
       ],
       "role": "setup",
@@ -1496,7 +1496,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "confirmed via direct trace: cash drops from ongoing payroll/maintenance even with no active tasks (28000 -> 26130, shifted from the pre-#526 43000 -> 41130 by the freight_warehouse construction cost above), matching every other file's ordinary tick-drain pattern."
+        "note": "#1723: 40 ticks, not 5 -- the blasts floor to grade now and the run lands between payroll ticks, so 5 ticks can show no spend; the opening purse is 400000 for the same reason (a slower drill order drains 300000 before the second charging truck). Confirmed via direct trace: cash drops from ongoing payroll/maintenance even with no active tasks (28000 -> 26130, shifted from the pre-#526 43000 -> 41130 by the freight_warehouse construction cost above), matching every other file's ordinary tick-drain pattern."
       }
     },
     {

@@ -16,8 +16,9 @@ import type { GameState, PendingAction, BlockedOrderReason, GhostPreview } from 
 import { findById } from '../state/IdIndex.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
-import { lowestFleetTier } from './VehicleReservation.js';
+import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
+import { retargetRampLayers } from './RampLayerRetarget.js';
+import { lowestFleetTier, minVehicleTierFor } from './VehicleReservation.js';
 import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
@@ -39,10 +40,19 @@ interface OrderReachability {
   hasActor(key: OrderActorKey): boolean;
 }
 
-type ActorRequirements = Pick<PendingAction, 'requiredSkill' | 'requiredVehicleRole' | 'targetEmployeeId'>;
+/** `type`/`payload` are optional: without them the order has no tier floor (1). */
+type ActorRequirements = Pick<PendingAction, 'requiredSkill' | 'requiredVehicleRole' | 'targetEmployeeId'>
+  & Partial<Pick<PendingAction, 'type' | 'payload'>>;
+
+/** Lowest vehicle tier the order needs (1 without a vehicle role); the one place pools, verdicts and classification read it. */
+function orderTierFloor(req: ActorRequirements): VehicleTier {
+  if (req.requiredVehicleRole === null || req.type === undefined || req.payload === undefined) return 1;
+  return minVehicleTierFor({ type: req.type, payload: req.payload });
+}
 
 export function orderActorKey(action: ActorRequirements): OrderActorKey {
-  return `${action.requiredSkill ?? '-'}|${action.requiredVehicleRole ?? '-'}|${action.targetEmployeeId ?? '-'}`;
+  const floor = orderTierFloor(action);
+  return `${action.requiredSkill ?? '-'}|${action.requiredVehicleRole ?? '-'}|${action.targetEmployeeId ?? '-'}${floor > 1 ? `|t${floor}` : ''}`;
 }
 
 interface ActorPool {
@@ -56,7 +66,7 @@ const NO_ACTORS: ActorPool = { hasActor: false, reachable: null };
 function candidateEmployees(state: GameState, req: ActorRequirements): Employee[] {
   const role = req.requiredVehicleRole;
   // No fleet vehicle of the role: no actor either way (fillPool reports NO_ACTORS); level 1 keeps the pre-tier filter.
-  const neededTier = role === null ? 1 : (lowestFleetTier(state.vehicles.vehicles, role) ?? 1);
+  const neededTier = role === null ? 1 : (lowestFleetTier(state.vehicles.vehicles, role, orderTierFloor(req)) ?? 1);
   return state.employees.employees.filter(emp =>
     emp.alive
     && (req.targetEmployeeId === null || emp.id === req.targetEmployeeId)
@@ -112,7 +122,8 @@ function fillPool(
   if (role === null) return { hasActor: true, reachable: onFoot };
 
   const candidateIds = new Set(employees.map(e => e.id));
-  const vehicles = state.vehicles.vehicles.filter(v => v.type === role);
+  const floor = orderTierFloor(req);
+  const vehicles = state.vehicles.vehicles.filter(v => v.type === role && v.tier >= floor);
   if (vehicles.length === 0) return NO_ACTORS;
   // Best licence among the candidates: a vehicle above it has no one able to drive it, so it is no actor.
   const bestLevel = employees.reduce((best, e) => Math.max(best, licenceLevelOf(e, role)), 0);
@@ -252,17 +263,28 @@ export function judgeQueuedOrders(state: GameState): Map<number, OrderReachabili
 function availabilityReason(
   eligible: ReadonlyArray<Employee>,
   action: PendingAction,
-  neededTierOf: (role: VehicleRole) => VehicleTier | null,
+  neededTierOf: (role: VehicleRole, floor: VehicleTier) => VehicleTier | null,
+  vehicles: ReadonlyArray<Vehicle>,
 ): BlockedOrderReason | null {
   const holdsSkill = (emps: ReadonlyArray<Employee>): boolean =>
     emps.some(emp => holdsRequiredSkill(emp, action.requiredSkill));
   const role = action.requiredVehicleRole;
   if (role !== null) {
-    const needed = neededTierOf(role);
+    // Existing reasons win: nothing of the role owned, then nobody licensed at all; only then a missing reaching rig.
+    if (!vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
+    if (!eligible.some(emp => licenceLevelOf(emp, role) > 0)) return 'no_licensed_driver';
+    const floor = orderTierFloor(action);
+    if (floor > 1) {
+      // A rig tier the order needs: owned and drivable by an eligible employee, else no reaching vehicle.
+      const reaching = vehicles.some(v =>
+        v.type === role && v.tier >= floor && eligible.some(emp => canDriveTier(emp, role, v.tier)));
+      if (!reaching) return 'no_reaching_vehicle';
+    }
+    const needed = neededTierOf(role, floor);
     if (needed === null) return 'no_vehicle_in_fleet';
     const licensed = eligible.filter(emp => canDriveTier(emp, role, needed));
     if (licensed.length === 0) {
-      return eligible.some(emp => licenceLevelOf(emp, role) > 0) ? 'licence_level_too_low' : 'no_licensed_driver';
+      return 'licence_level_too_low';
     }
     if (holdsSkill(licensed)) return null;
     return holdsSkill(eligible) ? 'no_dual_qualified_employee' : 'no_qualified_employee';
@@ -276,10 +298,11 @@ const ghostIdOf = (ghost: GhostPreview): number => ghost.id;
 /** Stamp blockedReason and the ghost's red flag for `targets`; returns ids needing the unqualified modal. */
 function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<number> {
   const unqualifiedIds = new Set<number>();
-  const tierByRole = new Map<VehicleRole, VehicleTier | null>();
-  const neededTierOf = (role: VehicleRole): VehicleTier | null => {
-    if (!tierByRole.has(role)) tierByRole.set(role, lowestFleetTier(state.vehicles.vehicles, role));
-    return tierByRole.get(role) ?? null;
+  const tierByRole = new Map<string, VehicleTier | null>();
+  const neededTierOf = (role: VehicleRole, floor: VehicleTier): VehicleTier | null => {
+    const key = `${role}|${floor}`;
+    if (!tierByRole.has(key)) tierByRole.set(key, lowestFleetTier(state.vehicles.vehicles, role, floor));
+    return tierByRole.get(key) ?? null;
   };
   const eligible = state.employees.employees.filter(isEligibleForWork);
   const judgements = judgeActions(state, targets);
@@ -305,7 +328,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       action.blockedLicenceLevel = null;
       continue;
     }
-    const reason = availabilityReason(eligible, action, neededTierOf);
+    const reason = availabilityReason(eligible, action, neededTierOf, state.vehicles.vehicles);
     // Only a skill nobody alive holds raises the modal: a trainee or injured
     // holder is temporarily unavailable, not absent (gameplay-employee-skills rule 5).
     if (
@@ -318,8 +341,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       unqualifiedIds.add(action.id);
     }
     action.blockedReason = reason ?? haulBlockedReason(state, action, fragmentOf, fits);
-    action.blockedLicenceLevel = reason === 'licence_level_too_low' && action.requiredVehicleRole !== null
-      ? neededTierOf(action.requiredVehicleRole)
+    action.blockedLicenceLevel = action.requiredVehicleRole === null ? null
+      : reason === 'licence_level_too_low' ? neededTierOf(action.requiredVehicleRole, orderTierFloor(action))
+      : reason === 'no_reaching_vehicle' ? orderTierFloor(action)
       : null;
   }
   if (flipped) state.ghostPreviewsRevision++;
@@ -350,6 +374,19 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
 }
 
 /**
+ * A ramp layer's work target follows the digger's reach: a lead layer whose
+ * band centre sits on an unreachable fill cell moves to a reachable column of
+ * its own cells, so the verdict, ghost and dispatcher all read the same target.
+ */
+function retargetQueuedRampLayers(state: GameState): void {
+  if (state.navGrid === null || state.plannedRamps.length === 0) return;
+  const rampLayers = state.pendingActions.filter(a => a.status === 'queued' && a.type === 'dig_ramp_segment');
+  if (rampLayers.length === 0) return;
+  const reach = buildOrderReachability(state, rampLayers);
+  retargetRampLayers(state, (action, x, z) => reach.canReach(orderActorKey(action), x, z));
+}
+
+/**
  * Classify every queued, unclaimed action: stamp `blockedReason`, flip each
  * ghost's `unreachable` flag (bumping `ghostPreviewsRevision` only on a flip),
  * and report the actions no eligible employee could ever perform.
@@ -358,6 +395,7 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
  * `sliceDebris`.
  */
 export function classifyQueuedOrders(state: GameState, debrisPerCall = Infinity): { unqualifiedIds: Set<number> } {
+  retargetQueuedRampLayers(state);
   let flipped = false;
   for (const ghost of state.ghostPreviews) {
     if (ghost.claimed && ghost.unreachable === true) {

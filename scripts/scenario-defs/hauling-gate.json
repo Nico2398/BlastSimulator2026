@@ -434,7 +434,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: this blast leaves only barren rock, so the delivery shows up as spoil on the heap (storedSpoilKg), not in the warehouse (storedMassKg). #1649: the new hauler's driver now starts hauling later in the run (the charging crew and truck died in the blast), so the first delivery lands in the 60-tick block below, not this one.",
+      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: this blast leaves only barren rock, so the delivery shows up as spoil on the heap (storedSpoilKg), not in the warehouse (storedMassKg). #1649: the new hauler's driver now starts hauling later in the run (the charging crew and truck died in the blast), so the first delivery lands in the 60-tick block below, not this one. #1723 merged with #1691/#1722: blasts now break the crater floor down to grade, so the muck pile lies on different, more reachable cells and the hauler's first pick is a nearby barren fragment: the first spoil delivery lands inside this block again (tick ~223), so it is asserted here.",
       "interaction": [
         {
           "type": "command",
@@ -445,6 +445,9 @@
       "expect": {
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "storedSpoilKg"
         ]
       }
     },
@@ -461,7 +464,7 @@
     },
     {
       "command": "tick 60",
-      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable on every seed/timing here, and the first delivery of spoil to the heap lands inside this block (#1649: moved here from the 20-tick block above).",
+      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable on every seed/timing here, and the first delivery to a depot lands inside this block (#1649). #1722: ore (to the warehouse) and spoil (to the heap) are different orders and which lands first depends on which reachable rock bin the hauler weighs first; reachable bins are now picked ahead of walled-off ones, so ore arrives first here and the first spoil delivery moves to the 40-tick block below. Asserting stored ore keeps this step about 'hauling delivers' rather than which kind of rock was nearest. #1723: still holds after the crater-floor grading; the ore deliveries begin inside this block (tick ~248).",
       "interaction": [
         {
           "type": "command",
@@ -474,7 +477,7 @@
           "cash"
         ],
         "increased": [
-          "storedSpoilKg"
+          "storedMassKg"
         ]
       }
     },
@@ -511,14 +514,19 @@
     },
     {
       "command": "tick 40",
-      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke.",
+      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke. #1722 put the first spoil delivery inside this block; #1723 (crater floor graded, merged with #1691/#1722) moved it back to the tick 20 block above, and this block is the ore run that follows it, the hauler filling the warehouse (~9.6t to ~20.5t) before it returns to the heap (tick ~358). Asserting stored ore keeps this step about 'hauling keeps delivering', not about which kind of rock was nearest. #1709: workers due a rest during vehicle work now park a slow vehicle and walk to the rest building (chooseRestTrip), which shifts delivery timing; this step asserts storedMassKg increased, not storedSpoilKg.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 40"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedMassKg"
+        ]
+      }
     },
     {
       "command": "fragments",

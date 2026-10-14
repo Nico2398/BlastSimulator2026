@@ -145,6 +145,28 @@ export const BRIBERY_COSTS = {
 
 /** Score decay rate per tick (0–100 scale). All scores trend toward 50 without input. */
 export const SCORE_DECAY_RATE = 0.05;
+/**
+ * Ecology loss per tonne of FRESH loose rock (the pulse a blast just threw onto the ground), per
+ * tick. Fresh dust decays with `ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS`. Measured against ordinary play:
+ * one spoil heap (+0.2/tick), a ~2,344 t pile left lying and a blast about every 600 ticks. At
+ * 0.0002 the pulse costs ~0.47/tick at its peak, so ecology dips to the mid 30s and recovers
+ * before the next blast, rather than falling off a cliff (#1733). It is also high enough that a pile
+ * left lying with no heap drains 50 to 0 in ~240 ticks (0.00015 never got there: the 0.05/tick pull
+ * toward 50 won against the settled term).
+ */
+export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.0002;
+/**
+ * Ecology loss per tonne of SETTLED loose rock (lying past the fresh pulse), per tick. 0.000004
+ * puts the same 2,344 t pile at ~0.0094/tick, well under one heap's +0.2, so one heap carries
+ * ordinary play while rubble left lying and never hauled still bleeds ecology slowly (#1733).
+ */
+export const ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK = 0.000004;
+/**
+ * Ticks for fresh dust to halve as it settles. 150 ticks keeps a blast's pulse mostly spent inside
+ * the 600-tick blast cycle measured for one heap and 2,344 t, while a pulse every 100 ticks (3
+ * heaps, no hauling) keeps the fresh term stacked and still reaches 0 within 3000 ticks (#1733).
+ */
+export const ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS = 150;
 
 // ─── World / Sandbox ────────────────────────────────────────────────────────────
 
@@ -555,16 +577,12 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
 
-/** Pre-fire estimate: horizontal radius (m) around a hole within which columns are
- *  assumed to break. Calibrated with BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR (#1354). */
-export const BLAST_ESTIMATE_BREAK_RADIUS_M = 4;
-
-/** Pre-fire estimate: fraction of the deepest covering hole's depth assumed to break
- *  in a column within the break radius. Calibration (#1354): 3x3 grid, spacing 4,
- *  depth 8, boomite, uniform 0.2 blingite survey over a 40x40 grid, executeBlast
- *  realises ~$5.06M; radius 4 + factor 0.2 estimates ~0.96x of that. Across spacing
- *  3-5 and depth 6-10 the estimate stays within 0.55x..1.55x of realised. */
-export const BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR = 0.2;
+/** Pre-fire estimate accuracy target (#1703): with a fresh seismic/core survey covering
+ *  the pattern, an ordinary blast's EST. ORE VALUE lands within +-35% of the actual ore
+ *  value. Working target, not a guarantee (seed 42: desert_badlands (32,22) boomite 8kg,
+ *  green_foothills (32,32) krackle 8kg, alpine_granite (36,16) shatternite 4kg; 3x3
+ *  pattern, spacing 4, depth 8). */
+export const BLAST_ESTIMATE_TOLERANCE = 0.35;
 
 // ─── Fragment generation (blast step 3) ────────────────────────────────────────
 
@@ -1841,10 +1859,23 @@ export const MAX_NEED_GAUGE = 100;
 
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
-/** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
+/**
+ * Shift duration in ticks of WORK for each policy mode (1 tick = 1 game-hour).
+ *
+ * "8h" and "12h" name the policy, not the tick count: working ticks are the
+ * game's coarse unit, one drill_hole job alone runs ~8-13 of them. #1709
+ * measured the old 8 / 12 against walk-to-rest: a shift shorter than one rig
+ * job sent the driller to the quarters after EVERY hole, so a 3x3 plan with
+ * quarters beside it took 208 ticks. A 20-tick shift (30 for the long one,
+ * same 2:3 ratio) lets a rig cover about two holes per rest and measures 140
+ * ticks beside the plan (target <= 150), with zero collapses at 12 m and 25 m
+ * (needs.integration.test.ts, #1709). Shorter shifts (16 -> 154, 12 -> 187)
+ * miss the target. The fatigue threshold (SITE_POLICY_DEFAULT_THRESHOLD) still
+ * sends a tired worker home sooner.
+ */
 export const SHIFT_DURATIONS_TICKS = {
-  shift_8h:  8,
-  shift_12h: 12,
+  shift_8h:  20,
+  shift_12h: 30,
 } as const;
 
 /**
@@ -1900,6 +1931,9 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   seismic:     25,
   core_sample: 40,
 } as const;
+
+/** Voxels of partial-density rock that cap a column's top solid voxel (the survey anchor). */
+export const SURVEY_CAP_VOXELS = 1;
 
 /** Depth-band thickness in metres for depth-resolved survey results. Aerial surveys report none. */
 export const SURVEY_DEPTH_BAND_METRES = {
@@ -2452,6 +2486,20 @@ export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
 /** Rendered seconds after which the blast report opens even if some debris is still moving. */
 export const BLAST_REPORT_MAX_PLAYBACK_S = 8;
 
+/**
+ * Value-overlay colour ramp floor ($ per m³ of rock column). Ore value per m³ =
+ * density × ORE_DENSITY_KG_M3 × valuePerKg; ores span 2–2000 $/kg, so one m³ at
+ * full density is worth 5 000 (dirtite) to 5 000 000 (treranium). Floor sits at
+ * a lean dirtite column (~20% density).
+ */
+export const SURVEY_OVERLAY_VALUE_FLOOR = 1000;
+
+/** Value-overlay colour ramp ceiling ($ per m³); log-scaled between floor and ceil. */
+export const SURVEY_OVERLAY_VALUE_CEIL = 1_000_000;
+
+/** Fresh survey-overlay quad opacity at confidence 0; rises linearly to 1 at confidence 1. */
+export const SURVEY_OVERLAY_QUAD_OPACITY_BASE = 0.55;
+
 // ─── Pit mask shape (#1680) ──────────────────────────────────────────────────
 
 /** How the pit-suitability mask flattens relief inside a playable rect. */
@@ -2460,20 +2508,48 @@ export interface PitMaskShape {
   margin: number;
   /** Fraction of relief that survives at full compression, deep inside the rect. */
   reliefKeep: number;
+  /** Max landscape slope (m of height per m) outside the rect; absent = legacy blend only. */
+  envelopeSlope?: number;
+  /** Amplitude (m) of the outline wobble; the outline offset swings over [0, 2 * amplitude], so the peak is twice this value. Absent = straight outline. */
+  outlineWobble?: number;
+  /** Corner rounding radius (m) of the outline; absent = sharp corners. */
+  cornerRadius?: number;
 }
 
 /** Mask used by campaign levels and standalone worlds. */
 export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
 
+/** Outline wobble wavelengths (m) and unit-ish propagation directions (#1734); two incommensurate waves. */
+export const OUTLINE_WOBBLE_WAVELENGTH_A = 27;
+export const OUTLINE_WOBBLE_WAVELENGTH_B = 38;
+export const OUTLINE_WOBBLE_WAVE_A_DIR: readonly [number, number] = [0.8, 0.6];
+export const OUTLINE_WOBBLE_WAVE_B_DIR: readonly [number, number] = [-0.5, 0.866];
+
 /**
- * Sandbox mask (#1680): a tighter blend (14 m) that keeps only 5% of relief
- * inside the rect, so the sandbox start has room for flat 9x9 m pads while
- * mountains stay dramatic around and beyond the pit. Measured on 64x64 sites,
- * seeds 1/7/42, every biome: worst case ~32% flat pads (alpine, seed 42)
- * against the 25% target. A wider margin or lower keep alone fails, because
- * the blend ramp is the steep part.
+ * Sandbox mask (#1680, #1734): a 14 m flat core inset that keeps only 5% of
+ * relief, so the sandbox start has room for flat 9x9 m pads while mountains stay
+ * dramatic beyond the pit. Beyond the core a slope-limited envelope joins the
+ * flat area to the landscape without a cliff: terrain deviates from the flat
+ * level by at most envelopeSlope m per metre of distance. 0.25 (43% of
+ * NAV_MAX_SLOPE_RATIO tan30 = 0.577) was measured, not derived: 0.45 left a
+ * side of tropical/alpine seeds with no reachable drill-hole ring cells, because
+ * wobble gradient and residual relief on top of the cone push local slope past
+ * the climb limit. At 0.25 every side of every biome/seed (1/7/42) has reachable
+ * ring cells at 6/18/30 m, >= 73% of ring cells do at 6 m-30 m, flat 9x9 pads
+ * are >= 68%, and the blend never makes a step steeper than the landscape's own
+ * (on >= 80% of the perimeter lines), so drill holes just outside the grid stay
+ * reachable. A natural wall inside the cone is flattened (clamped to the envelope)
+ * but not erased: a pointwise mask cannot, so it stays a cliff. The outline wobbles
+ * (peak offset 6 m = 2 x outlineWobble 3, flat side only) and corners round (8 m) so the edge is not a
+ * visible rectangle.
  */
-export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 14, reliefKeep: 0.05 };
+export const SANDBOX_PIT_MASK: PitMaskShape = {
+  margin: 14,
+  reliefKeep: 0.05,
+  envelopeSlope: 0.25,
+  outlineWobble: 3,
+  cornerRadius: 8,
+};
 
 /** Target fraction of the sandbox start pad that must be flat. */
 export const SANDBOX_FLAT_PAD_TARGET = 0.25;
@@ -2548,3 +2624,27 @@ export const SANDBOX_REFERENCE_CREW_COST_PER_TICK = 250;
 export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 580;
 /** Richest biome/depth may pay at most this multiple of desert surface rock per m3. */
 export const SANDBOX_MAX_RICHNESS_RATIO = 10;
+
+// Ore deposits on sandbox sites (#1682): each ore gets a low-frequency horizontal
+// deposit field; vein density is zero below its rarity cutoff and ramps up to
+// CORE_GAIN over EDGE_WIDTH above it, so ore clusters in discrete deposits.
+/** Frequency of the low-frequency deposit field that gates where an ore may appear. */
+export const ORE_DEPOSIT_FREQ = 0.03;
+/** Deposit-field cutoff per OreCatalog rarity tier: higher = rarer (smaller coverage). */
+export const ORE_DEPOSIT_RARITY_COVERAGE: Readonly<Record<string, number>> = {
+  common: 0.44,
+  uncommon: 0.52,
+  rare: 0.58,
+  very_rare: 0.65,
+  legendary: 0.72,
+};
+/** Multiplier boosting vein density at a deposit core. */
+export const ORE_DEPOSIT_CORE_GAIN = 3;
+/** Width of the soft falloff at a deposit edge, in deposit-field units. */
+export const ORE_DEPOSIT_EDGE_WIDTH = 0.4;
+
+/** Offset in metres of the floored grade plane from the lowest charged-hole bottom; 0 = flush with it. */
+export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
+
+/** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
+export const BLAST_GRADE_MAX_CUT_M = 4;

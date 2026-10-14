@@ -226,6 +226,29 @@ export function carveLevelColumns(
 }
 
 /**
+ * Carve at most `maxColumns` of `columns` down to `targetY`, in list order,
+ * skipping columns already at it; emits `terrain:updated` for the affected
+ * region only when something was carved. Returns the columns carved.
+ */
+export function carveLevelColumnsStep(
+  grid: VoxelGrid,
+  columns: { x: number; z: number }[],
+  targetY: number,
+  maxColumns: number,
+  emitter?: EventEmitter,
+): number {
+  const batch: { x: number; z: number }[] = [];
+  for (const column of columns) {
+    if (batch.length >= maxColumns) break;
+    if (getSmoothTerrainSurfaceY(grid, column.x, column.z) - targetY <= LEVEL_EPSILON) continue;
+    batch.push(column);
+  }
+  if (batch.length === 0) return 0;
+  carveLevelColumns(grid, batch, targetY, emitter);
+  return batch.length;
+}
+
+/**
  * Level `rect` in one shot: compute its target Y, carve every column above
  * it, and emit `terrain:updated` — the compute/carve dance
  * `validateLevelOrder` + `carveLevelColumns` split across order time and

@@ -10,10 +10,10 @@ import { el } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
-import { resolveMarketId } from '../../core/campaign/Level.js';
-import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
+import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
 export class BlastFooter {
@@ -24,6 +24,8 @@ export class BlastFooter {
   private readonly fireBtn: HTMLButtonElement;
   private readonly reasonEl: HTMLElement;
   private onFireRequested?: () => void;
+  private gridProvider: () => VoxelGrid | null = () => null;
+  private readonly estimateMemo = new OreEstimateMemo();
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -80,6 +82,9 @@ export class BlastFooter {
 
   get root(): HTMLElement { return this.el; }
 
+  /** Supplies the voxel grid the pre-blast estimate reads geometry from (#1703). */
+  setGridProvider(fn: () => VoxelGrid | null): void { this.gridProvider = fn; }
+
   setFireRequestedHandler(cb: () => void): void { this.onFireRequested = cb; }
 
   update(state: GameState): void {
@@ -89,7 +94,7 @@ export class BlastFooter {
     const fireOk = hasHoles && errors.length === 0;
 
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
-    const estValue = estimateBlastOreValue(plan, state.surveyResults, resolveMarketId(state));
+    const estValue = this.estimateMemo.get(state, plan, this.gridProvider());
     const margin = estValue - planCost;
 
     // Undrilled (ordered, not yet landed) holes are a PreflightModal warning

@@ -45,7 +45,7 @@ describe('en.json / fr.json — key-set parity', () => {
   });
 
   it('both locale files declare exactly the same key count, pinned to the current key-complete baseline', () => {
-    // Baseline is 3241 (up from 3235): the Saved Plans block in the Drill step
+    // Before that, baseline was 3241 (up from 3235): the Saved Plans block in the Drill step
     // (gap G6, `blast_plan save|load` had no UI at all) added 6 new
     // `ui.blast_workshop.drill.*` keys — saved_section, save_plan, plan_name,
     // load_plan, saved_plan_summary, no_saved_plans — all translated in
@@ -493,8 +493,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1648: +3 keys (tutorial buy-charging-truck step): 3976.
     // #1662: +1 key (ui.settings.audio.credits): 3977.
     // #1675: +4 keys (rating_cap_fizzled_failure / _fizzled_partial in ui.blast_workshop.report and mining.blast): 3981.
-    // #1676: depth_full + depth_surface removed, depth_metres added, net -1: 3980. #1678: +6 explosive-stock keys: 3986. #1679: +4 drill-reach keys: 3990. #1686: +10 sandbox keys: 4000. #1683: +4 survey-depth keys: 4004. #1683: +1 depth-log row key: 4005. #1685: +14 explosive-stock UI keys: 4019.
-    expect(Object.keys(en).length).toBe(4019);
+    // #1676: depth_full + depth_surface removed, depth_metres added, net -1: 3980. #1678: +6 explosive-stock keys: 3986. #1679: +4 drill-reach keys: 3990. #1686: +10 sandbox keys: 4000. #1683: +4 survey-depth keys: 4004. #1683: +1 depth-log row key: 4005. #1685: +14 explosive-stock UI keys: 4019. #1684: +5 survey ore-row keys: 4024. #1684: +4 compact-number keys (ui.survey.compact_lt1/k/m/b): 4028. #1714: +1 order-blocked key: 4029. #1731: +2 sandbox detail depth keys: 4031.
+    expect(Object.keys(en).length).toBe(4031);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

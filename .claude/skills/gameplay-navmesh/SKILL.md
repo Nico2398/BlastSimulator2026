@@ -70,6 +70,8 @@ Multi-level path planning:
 
 A ramp connection (`findRampConnections`) requires `isStepClimbable` steps from the ramp cell to BOTH its upper and lower neighbour; a cliff-adjacent `ramp` cell is omitted (#1305). The ordinary search distinguishes an empty open set (genuine wall: straight to the multi-level fallback) from an exhausted node budget: on exhaustion it retries once with `pathfindingRetryNodeBudget` (full grid area, `PATHFINDING_RETRY_BUDGET_AREA_DIVISOR`) before the ramp fallback, so a long switchback is routed ordinarily.
 
+**Ramp-layer work target follows the digger's reach.** A `dig_ramp_segment` layer is ordered with its band centre as work target, which on a ramp crossing a crater can be a fill cell above nothing the digger can stand next to. Each reachability pass (`classifyQueuedOrders`, via `retargetRampLayers` in `src/core/engine/RampLayerRetarget.ts`) moves the lead, still-queued layer of every planned ramp onto the nearest reachable column of its own cells (`pickReachableColumn`, `src/core/mining/WorkTarget.ts`), so the verdict, ghost, `blockedReason` and dispatcher all read one target. A reachable centre is left alone; a claimed layer is never moved.
+
 A pit floor is therefore only workable once a ramp reaches it: dispatch queues haul/charge actions against fragments the crew cannot climb down to, and they sit unclaimed until one is dug. Level scripts and scenarios that blast a bench and then expect it hauled out have to build that ramp first (`level2-playthrough-win.json` does, at the rim, before its first blast).
 
 ## Dynamic NavGrid Updates
@@ -119,3 +121,5 @@ Agents move at most `walkSpeed` cells/tick toward next waypoint. Next waypoint b
 - Emits `agent_stuck` event
 - Resumes when path clears
 
+
+A mover mid-hop paths from its committed hop origin (`inFlightHopOrigin`), not the rounded cell of its fractional position, which can be a sealed pit (#1687).

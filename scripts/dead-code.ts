@@ -58,6 +58,8 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Floor-to-grade pass (#1723): the unit-tested contract of the grading rule; production runs it inside identifyFragmentedVoxelsSteps.
+  'src/core/mining/VoxelFragmentation.ts:floorToGrade',
   // Bulk explosive price (#1678): the unit-tested pricing contract; production composes it inside buyExplosiveStock/returnOrderStock.
   'src/core/mining/ExplosiveStock.ts:bulkPricePerKg',
   // Tutorial rail whitelist (#1595): the per-step whitelist test reads the single always-allowed list and the policy range; production uses them inside their modules.

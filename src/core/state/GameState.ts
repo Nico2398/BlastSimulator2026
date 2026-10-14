@@ -232,7 +232,7 @@ export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
  * Why a PendingAction currently has nobody able to perform it — surfaced as a
  * non-blocking player warning rather than cancelling the order (#1061).
  */
-export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full' | 'licence_level_too_low' | 'no_spoil_heap';
+export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full' | 'licence_level_too_low' | 'no_spoil_heap' | 'no_reaching_vehicle';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {
@@ -291,7 +291,7 @@ export interface PendingAction {
    * or SAVE_VERSION bump applies. Always read with `!= null` (loose), not `!==`.
    */
   blockedReason?: BlockedOrderReason | null;
-  /** Licence level the blocking vehicle tier needs when `blockedReason` is 'licence_level_too_low' (#1524). Optional like `blockedReason`. */
+  /** Licence level the blocking vehicle tier needs when `blockedReason` is 'licence_level_too_low' (#1524); for 'no_reaching_vehicle' it carries the required vehicle tier. Optional like `blockedReason`. */
   blockedLicenceLevel?: LicenceLevel | null;
   /**
    * Tick after which this action becomes claimable again, stamped when a
@@ -565,6 +565,8 @@ export interface WorldState {
   voxels?: SerializedVoxels;
   /** Interleaved hard/soft rock strata (#458 D4/T1.3/A11), persisted so a no-voxels regeneration fallback matches the level's original generation (#1181). */
   mixedRockHardness?: boolean;
+  /** Ore deposits mode the terrain was generated with; absent = legacy veins (#1682). */
+  oreDeposits?: boolean;
   /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
 }

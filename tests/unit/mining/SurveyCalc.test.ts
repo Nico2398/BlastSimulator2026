@@ -1282,3 +1282,207 @@ describe('SurveyCalc — depthProfile (#1683)', () => {
     expect(at('aerial').estimates).toEqual({});
   });
 });
+
+// ── #1703: surfaceYs and the depth-aware ore report ───────────────────────────
+
+describe('SurveyCalc — surfaceYs (#1703)', () => {
+  const TOP = 60;
+  const params = (method: SurveyMethod): EstimateSurveyParams => ({
+    id: 1, method, centerX: 5, centerZ: 5, surveyorId: 1, skillLevel: 3, completedTick: 9,
+  });
+  function oreGrid(): VoxelGrid {
+    const grid = new VoxelGrid(11, 11);
+    for (let y = 30; y <= TOP; y++) {
+      grid.setVoxel(5, y, 5, {
+        composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+        density: 1,
+        oreDensities: { gold: 0.5 },
+        fractureModifier: 1.0,
+      });
+    }
+    return grid;
+  }
+  const run = (method: SurveyMethod) => estimateSurveyResult(oreGrid(), params(method), new Random(7));
+
+  it('core sample records the top solid voxel as the column surface', () => {
+    expect(run('core_sample').surfaceYs).toEqual({ '5,5': TOP });
+  });
+
+  it('seismic records the top solid voxel as the column surface', () => {
+    expect(run('seismic').surfaceYs).toEqual({ '5,5': TOP });
+  });
+
+  it('aerial records its anchor, the first empty layer above ground', () => {
+    const r = run('aerial');
+    expect(r.depthProfile).toBeUndefined();
+    expect(r.surfaceYs).toEqual({ '5,5': TOP + 1 });
+  });
+
+  it('has a surface for every column that has estimates, for every method', () => {
+    for (const method of SURVEY_METHODS) {
+      const r = run(method);
+      expect(Object.keys(r.estimates).length).toBeGreaterThan(0);
+      expect(Object.keys(r.surfaceYs ?? {}).sort()).toEqual(Object.keys(r.estimates).sort());
+    }
+  });
+
+  it('leaves estimates and confidence exactly as before for the same seed', () => {
+    for (const method of SURVEY_METHODS) {
+      const a = run(method);
+      const { surfaceYs: _ignored, ...rest } = a;
+      void _ignored;
+      expect(rest.estimates).toEqual(run(method).estimates);
+      expect(a.confidence).toBe(run(method).confidence);
+    }
+  });
+
+  it('is deterministic: the same seed gives the same surfaceYs', () => {
+    expect(run('seismic').surfaceYs).toEqual(run('seismic').surfaceYs);
+  });
+});
+
+describe('SurveyCalc — computeBlastOreReport follows fragment origin depth (#1703)', () => {
+  const SURFACE = 60;
+  const KEY = '12,8';
+
+  function frag(id: number, originY: number, volume: number, ores: Record<string, number>): FragmentData {
+    const origin = vec3(12.5, originY, 8.5);
+    return {
+      id, position: vec3(40, 1, 40), volume, mass: 1000, rockId: 'granite', oreDensities: ores,
+      initialVelocity: vec3(0, 0, 0), isProjection: false, halfExtents: vec3(0.25, 0.25, 0.25),
+      shapeSeed: 0, origin,
+    };
+  }
+
+  /** Seismic survey: grumpite 0.4 at depth 0-5, nothing at 5-10 (scanned), 0.8 at 10-15; window 25. */
+  function seismicSurvey(extra: Partial<SurveyResult> = {}): SurveyResult {
+    return {
+      id: 1, method: 'seismic', centerX: 12, centerZ: 8, completedTick: 10, surveyorId: 1, confidence: 0.9,
+      estimates: { [KEY]: { grumpite: 0.6 } },
+      depthProfile: {
+        [KEY]: [
+          { fromM: 0, toM: 5, ores: { grumpite: 0.4 } },
+          { fromM: 10, toM: 15, ores: { grumpite: 0.8 } },
+        ],
+      },
+      surfaceYs: { [KEY]: SURFACE },
+      ...extra,
+    };
+  }
+
+  const kg = (volume: number, density: number) => volume * density * ORE_DENSITY_KG_M3;
+
+  it('estimates a shallow fragment from the shallow band', () => {
+    const r = computeBlastOreReport([frag(1, 58.5, 2, { grumpite: 0.4 })], [seismicSurvey()]);
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.4), 6);
+    expect(r.yieldRatio).toBeCloseTo(1, 6);
+  });
+
+  it('estimates a deeper fragment from the band at its own depth, not the column average', () => {
+    const r = computeBlastOreReport([frag(1, 48.5, 2, { grumpite: 0.8 })], [seismicSurvey()]);
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.8), 6);
+    expect(r.yieldRatio).toBeCloseTo(1, 6);
+  });
+
+  it('floors the origin height to find the voxel level (depth = surface - floor(y))', () => {
+    // y 55.9 -> level 55 -> depth 5: the gap between bands, scanned with no ore.
+    const gap = computeBlastOreReport([frag(1, 55.9, 2, { grumpite: 0.4 })], [seismicSurvey()]);
+    expect(gap.estimatedYieldKg).toBe(0);
+    // y 55.0 -> level 55 -> depth 5: same voxel.
+    const same = computeBlastOreReport([frag(1, 55.0, 2, { grumpite: 0.4 })], [seismicSurvey()]);
+    expect(same.estimatedYieldKg).toBe(0);
+    // y 56.0 -> level 56 -> depth 4: shallow band.
+    const shallow = computeBlastOreReport([frag(1, 56.0, 2, { grumpite: 0.4 })], [seismicSurvey()]);
+    expect(shallow.estimatedYieldKg).toBeCloseTo(kg(2, 0.4), 6);
+  });
+
+  it('a fragment below the survey window adds no estimate and is left out of the ratio', () => {
+    const scanned = frag(1, 58.5, 2, { grumpite: 0.4 });
+    const deep = frag(2, 20.5, 5, { grumpite: 0.9 }); // depth 40 > seismic window 25
+    const r = computeBlastOreReport([scanned, deep], [seismicSurvey()]);
+
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.4), 6);
+    expect(r.yieldRatio).toBeCloseTo(1, 6); // numerator is the scanned fragment's ore only
+    expect(r.totalYieldKg).toBeCloseTo(kg(2, 0.4) + kg(5, 0.9), 6); // all-inclusive
+    expect(r.oreYields['grumpite']).toBeCloseTo(kg(2, 0.4) + kg(5, 0.9), 6);
+  });
+
+  it('yieldRatio is 1.0 when every fragment sits below the window, yields stay all-inclusive', () => {
+    const deep = frag(1, 20.5, 5, { grumpite: 0.9 });
+    const r = computeBlastOreReport([deep], [seismicSurvey()]);
+
+    expect(r.estimatedYieldKg).toBe(0);
+    expect(r.yieldRatio).toBe(1.0);
+    expect(r.totalYieldKg).toBeCloseTo(kg(5, 0.9), 6);
+  });
+
+  it('ore below the window never makes an ordinary blast read Lucky (no false Lucky Strike)', () => {
+    const r = computeBlastOreReport(
+      [frag(1, 58.5, 2, { grumpite: 0.4 }), frag(2, 20.5, 50, { grumpite: 0.9 })],
+      [seismicSurvey()],
+    );
+    expect(r.yieldRatio).toBeLessThanOrEqual(1.2);
+  });
+
+  it('a scanned depth with no reported ore estimates 0 but its actual ore counts against the estimate', () => {
+    const gapFragment = frag(1, 55.5, 2, { grumpite: 0.4 }); // depth 5, scanned gap
+    const scanned = frag(2, 58.5, 2, { grumpite: 0.4 });
+    const r = computeBlastOreReport([gapFragment, scanned], [seismicSurvey()]);
+
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.4), 6);
+    expect(r.yieldRatio).toBeCloseTo((kg(2, 0.4) + kg(2, 0.4)) / kg(2, 0.4), 6);
+  });
+
+  it('a barren-looking scanned fragment still lowers the ratio', () => {
+    const r = computeBlastOreReport([frag(1, 58.5, 2, { grumpite: 0.1 })], [seismicSurvey()]);
+    expect(r.yieldRatio).toBeCloseTo(0.1 / 0.4, 6);
+  });
+
+  it('an aerial survey estimates only fragments in its top 2 m', () => {
+    const aerial: SurveyResult = {
+      id: 2, method: 'aerial', centerX: 12, centerZ: 8, completedTick: 10, surveyorId: 1, confidence: 0.5,
+      estimates: { [KEY]: { grumpite: 0.3 } },
+      surfaceYs: { [KEY]: SURFACE + 1 }, // anchor is the empty layer above ground
+    };
+    const top = frag(1, 60.5, 2, { grumpite: 0.3 });   // level 60 -> depth 1
+    const deep = frag(2, 54.5, 20, { grumpite: 0.9 });  // level 54 -> depth 7
+    const r = computeBlastOreReport([top, deep], [aerial]);
+
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.3), 6);
+    expect(r.yieldRatio).toBeCloseTo(1, 6);
+    expect(r.totalYieldKg).toBeCloseTo(kg(2, 0.3) + kg(20, 0.9), 6);
+  });
+
+  it('an aerial survey does not turn an ordinary deep blast into a Lucky Strike', () => {
+    const aerial: SurveyResult = {
+      id: 2, method: 'aerial', centerX: 12, centerZ: 8, completedTick: 10, surveyorId: 1, confidence: 0.5,
+      estimates: { [KEY]: { grumpite: 0.1 } },
+      surfaceYs: { [KEY]: SURFACE + 1 },
+    };
+    const r = computeBlastOreReport([frag(1, 60.5, 1, { grumpite: 0.1 }), frag(2, 52.5, 40, { grumpite: 0.9 })], [aerial]);
+    expect(r.yieldRatio).toBeLessThanOrEqual(1.2);
+  });
+
+  it('a legacy survey with no depth data still estimates from the column figure', () => {
+    const legacy: SurveyResult = {
+      id: 3, method: 'seismic', centerX: 12, centerZ: 8, completedTick: 10, surveyorId: 1, confidence: 0.9,
+      estimates: { [KEY]: { grumpite: 0.5 } },
+    };
+    const r = computeBlastOreReport([frag(1, 10.5, 2, { grumpite: 0.5 })], [legacy]);
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.5), 6);
+  });
+
+  it('stale surveys still give no estimate', () => {
+    const r = computeBlastOreReport([frag(1, 58.5, 2, { grumpite: 0.4 })], [seismicSurvey({ stale: true })]);
+    expect(r.estimatedYieldKg).toBe(0);
+    expect(r.yieldRatio).toBe(1.0);
+  });
+
+  it('sums the estimate over several fragments at different depths', () => {
+    const r = computeBlastOreReport(
+      [frag(1, 58.5, 2, { grumpite: 0.4 }), frag(2, 48.5, 3, { grumpite: 0.8 })],
+      [seismicSurvey()],
+    );
+    expect(r.estimatedYieldKg).toBeCloseTo(kg(2, 0.4) + kg(3, 0.8), 6);
+  });
+});

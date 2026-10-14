@@ -84,6 +84,16 @@ describe('Level definition system (7.1)', () => {
     expect(level1.mixedRockHardness).toBe(false);
   });
 
+  it('authored campaign levels keep legacy veins: oreDeposits is undefined (#1682)', () => {
+    for (const level of getAllLevels()) {
+      expect(level.oreDeposits, level.id).toBeUndefined();
+    }
+  });
+
+  it('the sandbox level opts in to oreDeposits (#1682)', () => {
+    expect(sandboxLevelDef(SANDBOX_DEFAULTS).oreDeposits).toBe(true);
+  });
+
   it('getLevel returns undefined for unknown id', () => {
     expect(getLevel('nonexistent_mine')).toBeUndefined();
   });

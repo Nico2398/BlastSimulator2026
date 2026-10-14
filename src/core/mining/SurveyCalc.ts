@@ -54,6 +54,8 @@ export interface SurveyResult {
   confidence: number;
   /** Per-column depth bands keyed `"x,z"`. Absent for aerial surveys and legacy saves. */
   depthProfile?: Record<string, SurveyDepthBand[]>;
+  /** Surface Y (anchorY) each column was sampled from, keyed `"x,z"`. Every method, aerial included. Absent in legacy saves. */
+  surfaceYs?: Record<string, number>;
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }
@@ -122,6 +124,7 @@ export function estimateSurveyResult(
 
   const radius = SURVEY_COVERAGE_RADIUS[method];
   const estimates: Record<string, Record<string, number>> = {};
+  const surfaceYs: Record<string, number> = {};
   const windows: Array<{ x: number; z: number; yLevels: number[] }> = [];
 
   const xMin = Math.max(grid.minX, Math.floor(centerX - radius));
@@ -168,22 +171,23 @@ export function estimateSurveyResult(
         if (rounded > 0) colEstimates[oreId] = rounded;
       }
 
-      if (Object.keys(colEstimates).length > 0) {
-        estimates[surveyColumnKey(x, z)] = colEstimates;
-        windows.push({ x, z, yLevels });
-      }
+      if (Object.keys(colEstimates).length > 0) estimates[surveyColumnKey(x, z)] = colEstimates;
+      // Covered even when the whole-window average rounded away: ore concentrated in a
+      // thin band still shows in the depth profile, and a blast reading that band must find it (#1703).
+      surfaceYs[surveyColumnKey(x, z)] = anchorY;
+      windows.push({ x, z, yLevels });
     }
   }
 
   if (method === 'aerial') {
-    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, surfaceYs };
   }
   const depthProfile: Record<string, SurveyDepthBand[]> = {};
   for (const { x, z, yLevels } of windows) {
     const bands = buildDepthProfile(grid, x, z, yLevels, SURVEY_DEPTH_BAND_METRES[method], finalError, rng);
     if (bands.length > 0) depthProfile[surveyColumnKey(x, z)] = bands;
   }
-  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile };
+  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile, surfaceYs };
 }
 
 export {

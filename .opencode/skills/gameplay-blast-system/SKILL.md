@@ -77,7 +77,7 @@ Two derived readings matter downstream:
 
 ## Step 2 — What Breaks
 
-Three passes, in order:
+Four passes, in order:
 
 1. **Energy** — `effective >= FRAGMENTATION_MULTIPLIER × threshold` breaks. Between
    `CRACKED_VOXEL_ENERGY_RATIO` and that, the voxel survives but is weakened
@@ -86,7 +86,19 @@ Three passes, in order:
    zone, with air above it, lifts rather than being crushed. Without this a charge carves a sealed
    cavity under intact ground at *any* size and the player sees nothing happen. Thicker burden still
    holds, which is what makes an over-buried charge visibly fail to break out.
-3. **Unsupported rock** — flood-fill the survivors from the box shell; anything the fill never
+3. **Floor to grade (#1723)** — sub-drilling. `EnergyField.gradeY` is the world Y of the highest
+   charged hole bottom, plus `BLAST_GRADE_FLOOR_OFFSET_M` (null when nothing is charged; `seedEnergy`
+   sets it). In every footprint column (one with at least one voxel already broken), `floorToGrade`
+   breaks the standing rock below the column's topmost broken voxel down to `gradeY`, but never more
+   than `BLAST_GRADE_MAX_CUT_M` below that column's lowest broken voxel, so a deep outlier hole
+   cannot gouge the pit. It returns the voxels it added (`FragmentationResult.gradedCount`). The
+   marks join the mask, so fragments, cleared voxels, the pre-blast estimate and the ore report
+   follow the real broken volume; energy is untouched. Without it a pattern leaves pits under the
+   holes and 1-4 m ridges between them, steeper than `NAV_MAX_SLOPE_DEGREES`, and one ramp into the
+   crater reaches only its landing. A 3x3, spacing 4, 8 m krackle crater (sandbox `desert_badlands`
+   seed 42) ends as one flat floor; a ramp reaches over 90% of its columns. Pits of a light
+   charge that do not touch stay separate floors.
+4. **Unsupported rock** — flood-fill the survivors from the box shell; anything the fill never
    reaches was standing on nothing and comes down.
 
 ## Step 3 — Carving Fragments
@@ -149,6 +161,13 @@ rock is abandoned mid-arc.
 alone and is never adjusted, rejected or relocated for reachability. No reachability query lives in
 `src/core/mining` or fragment/physics code. Debris stranded outside the ground crew's reachable set
 belongs to the player: connect it (ramp, levelling, another blast) or leave it.
+
+**Levelling a crater (#1723).** A `level_ground` order's work target is the reachable column
+(`employeeClimbReach`) of its rectangle nearest the rect's min corner (`pickReachableColumn`), so a
+rectangle the crew can partly reach starts instead of waiting `target_unreachable`; when none is
+reachable the target stays the corner and the order waits. The digger carves as it works
+(`carveLevelColumnsStep`, each tick's share of the columns left; the payload's `levelCursor` counts
+columns done), and completion carves the remainder.
 
 `MuckPileSummary.summariseMuckPile` reads the settled pile back: size and speed spread, and how
 much rock rests on nothing. Clearance is per column against **the pile beneath**, not the terrain —
@@ -305,3 +324,9 @@ points for an ordinary blast and ~5 for an oversized one.
 ## Charge cost: cash vs stock (#1685)
 
 A charge order records `fromStockKg` (the part drawn from warehouse stock at order time) on `plannedChargesByHole`, carried into `chargesByHole` on loading. Every cost shown to the player is the cash part at list price (`recordedChargesCost`; forward preview `stockAwareChargesCost`). `BlastReport.spent` = cash, `BlastReport.spentFromStock` = list value of the stock kg. Detail in `gameplay-buildings`.
+
+## EST. ORE VALUE (#1703)
+
+`estimateBlastOreValue(plan, surveys, grid, wetHoleIds)` (`BlastValueEstimate.ts`) values the ore the blast will actually break. It runs the blast's own propagation (`buildPlanEnergyField` + `identifyFragmentedVoxels`, the same code the preview and `executeBlast` use), so the broken volume matches; wet holes are treated as the blast treats them. Each broken 1 m voxel is read from the newest fresh survey covering its column at the voxel's own depth (`oresSurveyedAt`, see `gameplay-survey-system`): value += density x `ORE_DENSITY_KG_M3` x catalog `valuePerKg` x survey `confidence`. Ore a survey did not locate at that depth counts for nothing (aerial counts its top 2 m only). The grid supplies rock geometry only, never ore. Uncharged holes or an empty plan give 0. The footer and preflight modal memoise it (`oreEstimateMemo.ts`) on holes, charges, wet holes, survey ids/stale flags and the grid's dirty-chunk count.
+
+`BLAST_ESTIMATE_TOLERANCE` (0.35) is the working accuracy target: with a fresh seismic survey (or core samples on every column) covering the pattern, the estimate lands within +-35% of the actual ore value (seed 42, 3x3, spacing 4, depth 8: desert_badlands (32,22) boomite 8 kg, green_foothills (32,32) krackle 8 kg, alpine_granite (36,16) shatternite 4 kg). Measured: seismic 0.86/0.84/0.78; core samples 0.68/0.67/0.40 (alpine misses: dilute rustite rounds out of 1 m core bands); aerial about 0.2-0.26 by design.

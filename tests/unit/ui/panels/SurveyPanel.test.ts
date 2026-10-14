@@ -235,15 +235,15 @@ describe('SurveyPanel', () => {
       const { panel } = makePanel();
       panel.update(makeState({ surveyResults: [makeSurveyResult({
         centerX: 21, centerZ: 21,
-        estimates: { '21,21': { sparkium: 0.6, grumpite: 0.3 } },
+        estimates: { '21,21': { sparkium: 0.6, rustite: 0.3 } },
         depthProfile: { '21,21': [
           { fromM: 5, toM: 10, ores: { sparkium: 0.4 } },
-          { fromM: 10, toM: 15, ores: { sparkium: 0.6, grumpite: 0.3 } },
+          { fromM: 10, toM: 15, ores: { sparkium: 0.6, rustite: 0.3 } },
         ] },
       })] }));
       const text = cardAt(panel, '(21, 21)');
       expect(text).toContain('5-15 m'); // sparkium: first band start to last band end
-      expect(text).toContain('10-15 m'); // grumpite
+      expect(text).toContain('10-15 m'); // rustite
     });
 
     it('aerial card says the ore is at the surface', () => {
@@ -277,6 +277,118 @@ describe('SurveyPanel', () => {
       expect(text).toContain('50%');
       expect(text).not.toContain('Depth log');
       expect(text).not.toMatch(/\d+-\d+ m/);
+    });
+  });
+
+  describe('ore area summary on the result card (#1684)', () => {
+    /**
+     * Seismic disc (radius 20) around (32,32): dirtite 0.15 in every column,
+     * 1.0 in the centre one, and every 10th column carries rustite only, so
+     * dirtite covers ~90% of the area and "100% of area" never appears.
+     */
+    function discEstimates(): Record<string, Record<string, number>> {
+      const estimates: Record<string, Record<string, number>> = {};
+      let i = 0;
+      for (let x = 12; x <= 52; x++) {
+        for (let z = 12; z <= 52; z++) {
+          if (Math.hypot(x - 32, z - 32) > 20) continue;
+          i++;
+          estimates[`${x},${z}`] = i % 10 === 0 ? { rustite: 0.3 } : { dirtite: 0.15 };
+        }
+      }
+      estimates['32,32'] = { dirtite: 1.0 };
+      return estimates;
+    }
+
+    function renderCard(overrides: Partial<SurveyResult> = {}): { text: string; card: Element } {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult({
+        centerX: 32, centerZ: 32, confidence: 0.85, estimates: discEstimates(), ...overrides,
+      })] }));
+      const card = [...panel.root.querySelectorAll('.bsx-card')].find(c => c.textContent?.includes('(32, 32)'))!;
+      expect(card).toBeDefined();
+      return { text: card.textContent!, card };
+    }
+
+    it('shows a typical grade near the common value, not the peak', () => {
+      const { text } = renderCard();
+      const m = /Typical grade (\d+)%/.exec(text);
+      expect(m, 'a "Typical grade N%" line').not.toBeNull();
+      expect(Math.abs(Number(m![1]) - 15)).toBeLessThanOrEqual(2);
+    });
+
+    it('shows coverage as a share of the area', () => {
+      const { text } = renderCard();
+      const m = /(\d+)% of area/.exec(text);
+      expect(m, 'a "N% of area" line').not.toBeNull();
+      expect(Number(m![1])).toBeGreaterThanOrEqual(80);
+      expect(Number(m![1])).toBeLessThan(100);
+    });
+
+    it('a sparse patch (ore in ~10% of the disc) reads ~10% of area, not 100%', () => {
+      const estimates: Record<string, Record<string, number>> = {};
+      for (const key of Object.keys(discEstimates())) {
+        const [x, z] = key.split(',').map(Number) as [number, number];
+        if ((x * 7 + z * 3) % 10 === 0) estimates[key] = { rustite: 0.4 };
+      }
+      const { text } = renderCard({ estimates });
+      const m = /(\d+)% of area/.exec(text);
+      expect(m, 'a "N% of area" line').not.toBeNull();
+      expect(Number(m![1])).toBeGreaterThanOrEqual(5);
+      expect(Number(m![1])).toBeLessThanOrEqual(15);
+    });
+
+    it('labels the 1.0 estimate as a peak', () => {
+      const { text } = renderCard();
+      expect(text).toContain('Peak grade 100%');
+    });
+
+    it('never shows an unlabelled 100%', () => {
+      const { text } = renderCard();
+      const bare = [...text.matchAll(/100%/g)].filter(m => !text.slice(0, m.index).endsWith('Peak grade '));
+      expect(bare).toHaveLength(0);
+    });
+
+    it('draws each ore bar at its typical grade, not its peak', () => {
+      const { card } = renderCard();
+      const widths = [...card.querySelectorAll<HTMLElement>('.bsx-progress-fill')].map(f => parseFloat(f.style.width));
+      expect(widths.some(w => Math.abs(w - 15) <= 2)).toBe(true);
+      expect(widths.some(w => w >= 99)).toBe(false);
+    });
+
+    it('shows tonnes, value and the estimates note', () => {
+      const { text } = renderCard();
+      expect(text).toMatch(/~[^,]+ t, ~\$/);
+      expect(text).toContain('Estimates only');
+    });
+
+    it('lists ores by estimated value, richer-priced ore first', () => {
+      // Rustite ($8/kg) outweighs dirtite ($2/kg) even though dirtite covers more ground.
+      const { text } = renderCard({
+        estimates: { '32,32': { dirtite: 0.2, rustite: 0.2 } },
+        method: 'core_sample',
+      });
+      expect(text.indexOf('Rustite')).toBeGreaterThanOrEqual(0);
+      expect(text.indexOf('Rustite')).toBeLessThan(text.indexOf('Dirtite'));
+    });
+
+    it('a survey without depthProfile still renders the summary', () => {
+      const { text } = renderCard({});
+      expect(text).toContain('Typical grade');
+      expect(text).not.toContain('Depth log');
+    });
+
+    it('a core sample card reports its single column as full coverage', () => {
+      const { text } = renderCard({ method: 'core_sample', estimates: { '32,32': { rustite: 0.2 } } });
+      expect(text).toContain('100% of area');
+      expect(text).toContain('Typical grade 20%');
+    });
+
+    it('empty estimates still show "No ore detected" and no summary lines', () => {
+      const { text } = renderCard({ estimates: {} });
+      expect(text).toContain('No ore detected');
+      expect(text).not.toContain('Typical grade');
+      expect(text).not.toContain('Estimates only');
     });
   });
 

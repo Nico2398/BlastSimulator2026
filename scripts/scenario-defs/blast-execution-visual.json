@@ -122,6 +122,92 @@
       }
     },
     {
+      "command": "build spoil_heap at:30,3",
+      "description": "#1691: heap 1 of 2 (see the second heap's note). Loose rubble on the ground costs ecology every tick (ECOLOGY_DUST_PER_TONNE_PER_TICK) and a standing spoil heap earns it back. Placed before the first drill cycle, clear of every hole grid, the living quarters and the vehicle spawn cluster.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"spoil_heap\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 30.5,
+          "z": 3.5,
+          "distance": 25
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 3
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -2000,
+          "buildingCount": 1
+        },
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build spoil_heap at:36,3",
+      "description": "#1691: heap 2 of 2. One heap's +0.2 ecology a tick carries ordinary play, but each large blast throws a fresh dust pulse (ECOLOGY_DUST_PER_TONNE_PER_TICK) and this file leaves ~1000 t of rubble lying unhauled after its large blasts; two heaps soften and shorten the dips, as a player running five blasts would need.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"spoil_heap\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 36.5,
+          "z": 3.5,
+          "distance": 25
+        },
+        {
+          "type": "pickTile",
+          "x": 36,
+          "z": 3
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -2000,
+          "buildingCount": 1
+        },
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {

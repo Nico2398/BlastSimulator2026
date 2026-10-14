@@ -126,9 +126,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // The policy rest path (forceShiftRestIfNeededByPolicy, ForceShiftRest.ts)
   // is always in force with the default policy (#1379); applying one here
   // swaps it for the player's choice (revision counts those edits only).
-  // 'continuous', not 'shift_8h': SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks,
-  // shorter than a single drill_hole action plus its walk, so applying it
-  // this early forces a shift-end interruption before the queued
+  // 'continuous', not 'shift_8h': a shift end can interrupt a drill_hole mid-cycle,
+  // so applying it this early could force a shift-end interruption before the queued
   // vehicle-gated work below could ever finish landing a hole (confirmed
   // live pre-#700). 'continuous' has no shift-length cap (getShiftDurationTicks
   // returns Infinity) but shouldForceRest's fatigue-threshold check

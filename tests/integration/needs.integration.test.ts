@@ -34,6 +34,7 @@ import {
   NEED_DRAIN_RATES,
   MAX_NEED_GAUGE,
   SHIFT_DURATIONS_TICKS,
+  NEED_REST_NO_BUILDING_CAP,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -1155,7 +1156,8 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     emp.x = 0;
     emp.z = 0;
 
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', emp.x, emp.z);
+    // debris_hauler outpaces walking, so the drive is kept (#1709: a slower rig is parked and walked instead).
     vehicle.occupantIds = [empId];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     emp.activeActionId = null; // idle
@@ -1211,7 +1213,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     // to claim (the same eligibility test findFreeVehicleForRole itself uses:
     // vehicleDriverId(v) === null), exactly like the hard-collapse release.
     const otherEmpId = hireOne(ctx, 'driller');
-    assignSkill(state.employees, otherEmpId, 'driving.drill_rig', 1);
+    assignSkill(state.employees, otherEmpId, 'driving.truck', 1);
     const otherEmp = getEmployee(ctx, otherEmpId);
     otherEmp.x = vehicle.x;
     otherEmp.z = vehicle.z;
@@ -1418,5 +1420,126 @@ describe('#1673 — a driller on a 3x3 plan far from the Living Quarters rests i
     expect(state.drillHoles.length - holesBefore).toBe(9);
     expect(finishedAt).not.toBeNull();
     expect(finishedAt!).toBeLessThan(MAX_TICKS_TO_FINISH);
+  });
+});
+
+// #1709 — the rest trip itself. A rig moves 1 m/tick, walking 2, so a rig worker
+// due a rest parks the rig and walks to the quarters. Owner decision: collapse
+// only when quarters cannot be reached; a longer cycle with distance is the
+// player's layout problem; an optimised layout (quarters beside the plan) must
+// stay within ~150 ticks (112 before #1708, 246 with the rig commuting).
+// Measured bare sandbox desert_badlands seed 42: one driller, tier-1 rig,
+// tier-1 Living Quarters, 3x3 plan at x 28-36 z 18-26, 8 m holes.
+describe('#1709 — park the rig and walk to rest: no collapse at any distance, short cycle beside the plan', () => {
+  const HORIZON_TICKS = 1200;
+  const BESIDE_PLAN_MAX_TICKS = 150;
+  const SITE_CENTRE_XZ = 32;
+
+  interface Run { ticksToFinish: number | null; collapses: number; holesDrilled: number; maxFatigue: number; quartersEntered: boolean }
+
+  /** Bare sandbox with one driller + tier-1 rig, optionally a tier-1 Living Quarters at `quartersAt`; runs a 3x3 plan to completion. */
+  function runLayout(quartersAt: string | null, walledOff = false): Run {
+    const engine = createGameEngine();
+    expect(runCommand(engine, 'sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:false').success).toBe(true);
+    const state = engine.ctx.state!;
+    state.cash = 500_000;
+
+    expect(runCommand(engine, 'employee hire role:driller').success).toBe(true);
+    expect(runCommand(engine, 'vehicle buy drill_rig').success).toBe(true);
+    const driller = state.employees.employees.find(e => e.role === 'driller');
+    if (!driller) throw new Error('Setup: no driller hired');
+    // The spawn snap prefers the corner anchor's bench level, so since the sandbox
+    // site blends into the landscape (#1734) hires and vehicles land ~22 m west of
+    // the pit core. That initial commute is not the rest cycle this suite measures:
+    // start both at the site centre, where they spawned when this bound was set.
+    const rigAtSpawn = state.vehicles.vehicles[0]!;
+    for (const body of [driller, rigAtSpawn]) { body.x = SITE_CENTRE_XZ; body.z = SITE_CENTRE_XZ; }
+
+    if (quartersAt !== null) {
+      // A builder is only needed to raise the quarters; fatigue topped up so it never rests mid-build.
+      expect(runCommand(engine, 'employee hire role:manager').success).toBe(true);
+      expect(runCommand(engine, `build living_quarters at:${quartersAt} tier:1`).success).toBe(true);
+      for (let t = 0; t < 400 && !state.buildings.buildings.some(b => b.type === 'living_quarters'); t++) {
+        for (const e of state.employees.employees) e.fatigue = 100;
+        runCommand(engine, 'tick 1');
+        if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+      }
+      expect(state.buildings.buildings.some(b => b.type === 'living_quarters')).toBe(true);
+    }
+    if (walledOff) {
+      // Quarters exist but no route leads to them: a hollow ring of blocked ground (3..5 cells out)
+      // around the building, with the driller standing outside it, beside the rig.
+      const lq = state.buildings.buildings.find(b => b.type === 'living_quarters')!;
+      const grid = state.navGrid!;
+      for (let z = Math.floor(lq.z) - 5; z <= Math.floor(lq.z) + 5; z++) {
+        for (let x = Math.floor(lq.x) - 5; x <= Math.floor(lq.x) + 5; x++) {
+          const ring = Math.max(Math.abs(x - Math.floor(lq.x)), Math.abs(z - Math.floor(lq.z)));
+          if (ring >= 3 && grid.cells[z]?.[x]) grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+        }
+      }
+      const rig = state.vehicles.vehicles[0]!;
+      driller.x = rig.x;
+      driller.z = rig.z - 1;
+    }
+    driller.fatigue = 100;
+    driller.ticksWorked = 0;
+
+    let collapses = 0;
+    engine.ctx.emitter.on('employee:collapsed', (payload: unknown) => {
+      if ((payload as { employeeId: number }).employeeId === driller.id) collapses++;
+    });
+
+    expect(runCommand(engine, 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:28,18').success).toBe(true);
+    const holesBefore = state.drillHoles.length;
+    let ticksToFinish: number | null = null;
+    let maxFatigue = 0;
+    let drained = false;
+    let quartersEntered = false;
+    for (let tick = 1; tick <= HORIZON_TICKS; tick++) {
+      runCommand(engine, 'tick 1');
+      if (state.events.pendingEvent) runCommand(engine, 'event choose 0');
+      if (state.isPaused) state.isPaused = false;
+      expect(assertWorldInvariants(state)).toEqual([]);
+      // Recovery ceiling: the highest gauge seen once the worker has first drained below 50.
+      if (driller.fatigue < 50) drained = true;
+      if (drained) maxFatigue = Math.max(maxFatigue, driller.fatigue);
+      if (state.buildings.buildings.some(b => b.type === 'living_quarters' && b.occupantIds.includes(driller.id))) quartersEntered = true;
+      if (state.drillHoles.length - holesBefore >= 9) { ticksToFinish = tick; break; }
+    }
+    return { ticksToFinish, collapses, holesDrilled: state.drillHoles.length - holesBefore, maxFatigue, quartersEntered };
+  }
+
+  it('quarters beside the plan (24,28): all 9 holes drilled within 150 ticks, no collapse', () => {
+    const run = runLayout('24,28');
+    expect(run.collapses).toBe(0);
+    expect(run.holesDrilled).toBe(9);
+    expect(run.ticksToFinish).not.toBeNull();
+    expect(run.ticksToFinish!).toBeLessThanOrEqual(BESIDE_PLAN_MAX_TICKS);
+  });
+
+  it('quarters ~12 m (18,34) and ~25 m (12,44) away: no collapse, and the cycle gets longer with distance', () => {
+    const near = runLayout('24,28');
+    const mid = runLayout('18,34');
+    const far = runLayout('12,44');
+
+    expect(mid.collapses).toBe(0);
+    expect(far.collapses).toBe(0);
+    expect(mid.ticksToFinish).not.toBeNull();
+    expect(far.ticksToFinish).not.toBeNull();
+    expect(near.ticksToFinish).not.toBeNull();
+    expect(mid.ticksToFinish!).toBeGreaterThan(near.ticksToFinish!);
+    expect(far.ticksToFinish!).toBeGreaterThan(mid.ticksToFinish!);
+  });
+
+  // Owner: collapse stays for workers who cannot reach quarters. Measured on the
+  // pre-fix code the walled-off worker does NOT hit the collapse floor inside the
+  // horizon (it stalls mid-walk with a frozen gauge), so this pins what must hold
+  // either way: the unreachable quarters never fully restore the worker (rest-in-place
+  // caps at NEED_REST_NO_BUILDING_CAP) and nobody gets inside them. Park-and-walk must
+  // not make the quarters reachable by any other route (e.g. by driving through the wall).
+  it('a worker whose quarters cannot be reached is never restored by them (walled-off Living Quarters)', () => {
+    const run = runLayout('12,44', true);
+    expect(run.quartersEntered).toBe(false);
+    expect(run.maxFatigue).toBeLessThanOrEqual(NEED_REST_NO_BUILDING_CAP + 0.01);
   });
 });

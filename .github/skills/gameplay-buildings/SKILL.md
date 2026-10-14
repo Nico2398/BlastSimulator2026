@@ -145,6 +145,9 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
   nearest heap (`pickSpoilHeap`: squared distance, tie lowest id), ore fragments to warehouses. On
   delivery the fragment leaves `logistics.fragments` and its mass is added to the heap building's
   `storedSpoilKg`; `storedMassKg` and `collectedOre` are untouched. A batch never mixes barren and ore.
+- Ecology +2 (`scoreEffects`, +0.2/tick per active heap; inactive gives none). One heap carries ordinary play against
+  the settling dust from a blast (a ~2,344 t pile, blast every ~600 ticks); extra heaps shorten and soften
+  the dips. Hauling rock off the ground shrinks the settled loss and the next fresh dust pulse.
 - With no heap placed, barren hauls are blocked as `no_spoil_heap` ("place a spoil heap"), never
   `storage_full`. Rubble-disposal contracts draw on heap stock first, then storage.
 - **Starting heap (#1574):** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial

@@ -11,6 +11,10 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
+import { buildPlanEnergyField } from '../../src/core/mining/BlastExecution.js';
+import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
+import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
@@ -759,4 +763,140 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(res.success).toBe(false);
     expect(ctx.state!.pendingDetonation).toBeNull();
   });
+});
+
+// ── #1723: a blast breaks its floor down to grade, so the crater is drivable ──
+
+/** Sandbox desert_badlands seed 42, a 3x3 spacing-S 8 m grid at (28,18), krackle `kg` kg, stemming 2.5 — the issue's measured pattern. */
+function sandboxCraterBlast(kg: number, spacing: number) {
+  const { runner, ctx } = createRunner();
+  expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
+  const grid = ctx.grid!;
+  const counter = { nextHoleId: 1 };
+  const holes = createGridPlan(counter, { x: 28, z: 18 }, 3, 3, spacing, 8, 0.15);
+  const depths: Record<string, number> = {};
+  for (const h of holes) depths[h.id] = h.depth;
+  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, 2.5);
+  const plan = assembleBlastPlan(holes, charges);
+
+  const before = new Map<string, number>();
+  for (let z = 10; z < 40; z++) for (let x = 18; x < 50; x++) before.set(`${x},${z}`, getSmoothTerrainSurfaceY(grid, x, z));
+  const field = buildPlanEnergyField(plan, grid);
+  const estimatedBroken = field ? identifyFragmentedVoxels(field, grid, false).fragmented.length : 0;
+  const result = executeBlast(plan, grid, []);
+  expect(result, 'blast plan was rejected').not.toBeNull();
+
+  const crater: Array<{ x: number; z: number }> = [];
+  for (const [key, h0] of before) {
+    const [x, z] = key.split(',').map(Number) as [number, number];
+    if (h0 - getSmoothTerrainSurfaceY(grid, x, z) > 0.5) crater.push({ x, z });
+  }
+  return { grid, result: result!, crater, estimatedBroken };
+}
+
+/** Size of the largest group of `crater` columns joined (8-neighbour) by steps within the slope limit on the smooth surface. */
+function largestDrivablePatch(grid: VoxelGrid, crater: Array<{ x: number; z: number }>): number {
+  const key = (x: number, z: number) => `${x},${z}`;
+  const cols = new Set(crater.map(c => key(c.x, c.z)));
+  const seen = new Set<string>();
+  let best = 0;
+  for (const start of crater) {
+    if (seen.has(key(start.x, start.z))) continue;
+    let size = 0;
+    const stack = [start];
+    seen.add(key(start.x, start.z));
+    while (stack.length > 0) {
+      const c = stack.pop()!;
+      size++;
+      const h = getSmoothTerrainSurfaceY(grid, c.x, c.z);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dz === 0) continue;
+        const nx = c.x + dx, nz = c.z + dz;
+        const k = key(nx, nz);
+        if (!cols.has(k) || seen.has(k)) continue;
+        const run = Math.hypot(dx, dz);
+        if (Math.abs(getSmoothTerrainSurfaceY(grid, nx, nz) - h) / run > NAV_MAX_SLOPE_RATIO) continue;
+        seen.add(k);
+        stack.push({ x: nx, z: nz });
+      }
+    }
+    best = Math.max(best, size);
+  }
+  return best;
+}
+
+describe('Blast execution — floor broken to grade (#1723)', () => {
+  // 6 kg at spacing 4 is not covered: it leaves nine separate pits with intact
+  // rock between the holes (issue #1723's table), so no grade makes them one
+  // drivable patch. The measured patterns are 8 kg and 10 kg.
+  for (const kg of [8, 10]) {
+    it(`krackle ${kg} kg, spacing 4: at least 80% of the crater's columns are one slope-connected patch`, () => {
+      const { grid, crater } = sandboxCraterBlast(kg, 4);
+      expect(crater.length).toBeGreaterThan(20);
+      expect(largestDrivablePatch(grid, crater) / crater.length).toBeGreaterThanOrEqual(0.8);
+    });
+  }
+
+  it('krackle 8 kg: the pre-blast estimate breaks exactly the voxels the blast clears', () => {
+    const { result, estimatedBroken } = sandboxCraterBlast(8, 4);
+    expect(estimatedBroken).toBeGreaterThan(0);
+    expect(estimatedBroken).toBe(result.clearedVoxels);
+  });
+
+  it('krackle 8 kg: the fragments carry every cleared voxel (volume conserved)', () => {
+    const { result } = sandboxCraterBlast(8, 4);
+    const volume = result.fragments.reduce((sum, f) => sum + f.volume, 0);
+    expect(volume).toBeCloseTo(result.clearedVoxels, 0);
+  });
+});
+
+describe('Blast execution — haulers keep hauling reachable debris past a crater (#1722)', () => {
+  it('desert_badlands easy: while a reachable haul order is queued the truck driver is not left idle, and reachable orders drain', () => {
+    const engine = createRunner();
+    const { runner, ctx } = engine;
+    const run = (cmd: string) => runner.run(cmd);
+    const state = () => ctx.state!;
+    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42').success).toBe(true);
+
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:28,18').success).toBe(true);
+    tickFunded(run, state(), () => state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9, 1500);
+    expect(state().drillHoles.length).toBeGreaterThanOrEqual(9);
+    expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5').success).toBe(true);
+    tickFunded(run, state(), () => Object.keys(state().plannedChargesByHole).length === 0, 2500);
+    expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
+
+    expect(run('blast detonate').success).toBe(true);
+    tickFunded(run, state(), () => state().damage.blastCount > 0, 600);
+    expect(state().damage.blastCount).toBe(1);
+    // The fragments' haul orders are queued by the dispatcher a tick or so after the shot.
+    tickFunded(run, state(), () => state().pendingActions.filter(a => a.type === 'haul_debris').length > 0, 20);
+    expect(state().pendingActions.filter(a => a.type === 'haul_debris').length).toBeGreaterThan(128);
+
+    const isTruckDriver = (e: { alive: boolean; qualifications: { category: string }[] }) =>
+      e.alive && e.qualifications.some(q => q.category === 'driving.truck');
+    const reachableQueued = () => state().pendingActions.filter(a =>
+      a.type === 'haul_debris' && a.status === 'queued' && a.holderId === null && !a.blockedReason).length;
+
+    const WINDOW = 400;
+    const start = state().tickCount;
+    let idleWhileReachable = 0;
+    let midpointQueued = -1;
+    for (let i = 0; i < WINDOW; i++) {
+      state().cash = Math.max(state().cash, 100000);
+      for (const e of state().employees.employees) e.fatigue = 100;
+      run('tick 1');
+      if (i === 150) midpointQueued = reachableQueued();
+      if (reachableQueued() === 0) continue;
+      const drivers = state().employees.employees.filter(isTruckDriver);
+      expect(drivers.length).toBeGreaterThan(0);
+      // Some truck driver is working (or walking to work), not idle with reachable rock waiting.
+      if (drivers.every(e => e.activeActionId === null && e.restTicksRemaining === null)) idleWhileReachable++;
+    }
+    expect(state().tickCount - start).toBe(WINDOW);
+
+    // Before the fix the crew idled for ~250 of the 400 ticks with reachable orders still queued.
+    expect(idleWhileReachable).toBeLessThan(WINDOW / 10);
+    // Reachable orders left at the midpoint keep draining afterwards (stranded ones carry a blockedReason and are not counted).
+    if (midpointQueued > 0) expect(reachableQueued()).toBeLessThan(midpointQueued);
+  }, 240_000);
 });

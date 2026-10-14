@@ -52,14 +52,28 @@ export function requireValidGenDimension(value: number, label: string): number {
 
 /**
  * The pit mask read from untrusted save JSON (#1680): margin finite and
- * positive, reliefKeep finite in [0, 1]. Callers skip it when the mask is absent (default mask).
+ * positive, reliefKeep finite in [0, 1]; optional envelopeSlope in (0, 1], outlineWobble and
+ * cornerRadius >= 0 (#1734). Callers skip it when the mask is absent (default mask).
  */
 export function requireValidPitMask(value: PitMaskShape, label: string): PitMaskShape {
-  const { margin, reliefKeep } = value ?? ({} as Partial<PitMaskShape>);
-  if (!Number.isFinite(margin) || margin <= 0 || !Number.isFinite(reliefKeep) || reliefKeep < 0 || reliefKeep > 1) {
+  const { margin, reliefKeep, envelopeSlope, outlineWobble, cornerRadius } = value ?? ({} as Partial<PitMaskShape>);
+  const badOptional = (v: number | undefined, ok: (n: number) => boolean) =>
+    v !== undefined && !(Number.isFinite(v) && ok(v));
+  if (
+    !Number.isFinite(margin) || margin <= 0 || !Number.isFinite(reliefKeep) || reliefKeep < 0 || reliefKeep > 1 ||
+    badOptional(envelopeSlope, (n) => n > 0 && n <= 1) ||
+    badOptional(outlineWobble, (n) => n >= 0) ||
+    badOptional(cornerRadius, (n) => n >= 0)
+  ) {
     throw new Error(`corrupt save: ${label} is not a valid pit mask`);
   }
-  return { margin, reliefKeep };
+  return {
+    margin,
+    reliefKeep,
+    ...(envelopeSlope !== undefined ? { envelopeSlope } : {}),
+    ...(outlineWobble !== undefined ? { outlineWobble } : {}),
+    ...(cornerRadius !== undefined ? { cornerRadius } : {}),
+  };
 }
 
 /**
@@ -94,6 +108,8 @@ export interface TerrainConfig {
    * and hardest dominant rock (#458 D4/T1.3/A11).
    */
   mixedRockHardness?: boolean;
+  /** Gate ore veins to discrete rarity-sized deposits when true; off = legacy veins (#1682). */
+  oreDeposits?: boolean;
   /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
 }
@@ -138,7 +154,7 @@ export function resolveGeneratedBiome(
  * which genuinely must be the same instance — see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
-  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, pitMask } = config;
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness, oreDeposits, pitMask } = config;
 
   const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
@@ -151,7 +167,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
     ? buildMixedHardnessStrata(biome.dominantRocks)
     : buildStrataProfile(biome.dominantRocks);
   const strata = new StrataSampler(seed, profile);
-  const oreVeins = new OreVeinSampler(seed);
+  const oreVeins = new OreVeinSampler(seed, { deposits: oreDeposits === true });
 
   return { worldGen, biome, strata, oreVeins };
 }

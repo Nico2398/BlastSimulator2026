@@ -20,12 +20,13 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { actionBlocked } from '../events/ActiveModifiers.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { alightIfMounted } from './Mount.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { moveTo } from './MoveTo.js';
@@ -44,7 +45,7 @@ export interface TickEmployeesResult {
  * order. The first one claimed while the employee is still idle is promoted
  * straight to active; any further ones go onto taskQueue.
  */
-export function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, result: TickEmployeesResult): void {
+export function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, result: TickEmployeesResult, emitter?: EventEmitter): void {
   // One id → fragment index for this whole pass, never a linear scan per
   // action — see createFragmentLookup's own doc comment (HaulDispatch.ts).
   const fragmentOf = createFragmentLookup(state);
@@ -100,7 +101,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
     result.claimed.push(action.id);
 
     if (employee.activeActionId === null) {
-      promoteActionToActive(state, employee, action);
+      promoteActionToActive(state, employee, action, emitter);
     } else {
       employee.taskQueue.push(action.id);
     }
@@ -120,7 +121,7 @@ function isRestActive(state: GameState, employee: Employee): boolean {
  * exactly one candidate from the open pool (targetEmployeeId === null).
  * Never both in the same tick.
  */
-export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult): void {
+export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult, emitter?: EventEmitter): void {
   // Computed once, up front, so both the taskQueue-resume branch below and
   // the empty/all-unreachable-taskQueue fallback further down can check it —
   // see promoteStarved's own call site below for why an ordinary (non-rest)
@@ -131,7 +132,7 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
     const claimedStarved = claimPendingAction(state, starved.action.id, employee.id);
     if (claimedStarved === null) return false;
     result.claimed.push(claimedStarved.id);
-    promoteActionToActive(state, employee, claimedStarved);
+    promoteActionToActive(state, employee, claimedStarved, emitter);
     return true;
   };
 
@@ -160,7 +161,7 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       const restCandidate = candidates.find(a => a.type === 'rest');
       const restSelection = restCandidate !== undefined ? selectBestActionForEmployee(state, employee, [restCandidate]) : null;
       if (restSelection !== null) {
-        promoteActionToActive(state, employee, restSelection.action);
+        promoteActionToActive(state, employee, restSelection.action, emitter);
         employee.taskQueue = employee.taskQueue.filter(id => id !== restSelection.action.id);
         return;
       }
@@ -190,7 +191,7 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // Nothing starved to prefer — fall back to ranking the full queue.
       const selection = selectBestActionForEmployee(state, employee, candidates);
       if (selection !== null) {
-        promoteActionToActive(state, employee, selection.action);
+        promoteActionToActive(state, employee, selection.action, emitter);
         employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
         return;
       }
@@ -270,7 +271,7 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
   if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
 
   result.claimed.push(selection.action.id);
-  promoteActionToActive(state, employee, selection.action);
+  promoteActionToActive(state, employee, selection.action, emitter);
 }
 
 /**
@@ -433,7 +434,7 @@ export function claimOnePoolCandidate(
 function hasIdleLicensedAlternative(state: GameState, candidate: PendingAction, employee: Employee): boolean {
   const role = candidate.requiredVehicleRole;
   if (role === null) return false;
-  const lowestTier = lowestFleetTier(state.vehicles.vehicles, role);
+  const lowestTier = lowestFleetTier(state.vehicles.vehicles, role, minVehicleTierFor(candidate));
   if (lowestTier === null) return false;
   return state.employees.employees.some(other =>
     other.id !== employee.id
@@ -531,7 +532,7 @@ export function releaseUnboardedTaskQueueVehicleReservations(state: GameState, e
  * pendingRestDuration/pendingRestNeedKey (rest) or pendingTaskDuration/
  * activeTaskSkill/pendingActionType/pendingActionPayload (everything else).
  */
-export function promoteActionToActive(state: GameState, employee: Employee, action: PendingAction): void {
+export function promoteActionToActive(state: GameState, employee: Employee, action: PendingAction, emitter?: EventEmitter): void {
   employee.activeActionId = action.id;
 
   if (action.requiredVehicleRole !== null) {
@@ -581,7 +582,7 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     const [targetX, targetZ] = action.payload['buildingId'] === undefined
       ? [employee.x, employee.z]
       : [action.targetX, action.targetZ];
-    beginRestTravel(state, employee, targetX, targetZ, resolveRestBuildingId(action.payload));
+    beginRestTravel(state, employee, targetX, targetZ, resolveRestBuildingId(action.payload), emitter);
     if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
       if (needKey !== null) {
@@ -616,7 +617,7 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
   // violation for the rest of the walk. Mirrors the identical
   // alight-before-boarding-elsewhere fix in PlanItinerary.ts's own
   // vehicle-gated branch.
-  alightIfMounted(state, employee);
+  alightIfMounted(state, employee, emitter);
 
   // #1090: every other on-foot action walks via moveTo — the only entry
   // point that starts movement — rather than setting destinationX/Z

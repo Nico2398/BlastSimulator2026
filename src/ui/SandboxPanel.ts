@@ -10,6 +10,7 @@
 
 import { t } from '../core/i18n/I18n.js';
 import { getBuildingDef } from '../core/entities/Building.js';
+import { ORE_DEPTH_UNBOUNDED } from '../core/world/OreCatalog.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import { vehicleDisplayName } from './fleetDetailSections.js';
 import {
@@ -246,8 +247,7 @@ export class SandboxPanel {
     if (biome.ores.length > 0) {
       lines.push(['ores', t('sandbox.detail.ores', {
         list: biome.ores.map(o => t(o.nameKey)).join(', '),
-        min: biome.oreDepthMin,
-        max: biome.oreDepthMax,
+        depth: oreDepthWindow(biome.oreDepthMin, biome.oreDepthMax),
       })]);
     }
     lines.push(['terrain', t('sandbox.detail.terrain', { terrain: t(`sandbox.terrain.${biome.ruggedness}`) })]);
@@ -259,7 +259,7 @@ export class SandboxPanel {
     const list = (items: string[]): string => items.length > 0 ? items.join(', ') : t('sandbox.detail.none');
     const opening = t('sandbox.detail.opens_with', {
       crew: list(diff.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
-      vehicles: list(diff.vehicles.map(v => `${v.count}× ${vehicleDisplayName(v.role, v.tier)}`)),
+      vehicles: list(diff.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
       buildings: list(diff.buildings.map(b => `${b.count}× ${t(getBuildingDef(b.type, b.tier).nameKey)}`)),
     });
     this.difficultyBlock.replaceChildren(
@@ -278,4 +278,11 @@ function detailLine(id: string, text: string): HTMLElement {
   el.id = id;
   el.textContent = text;
   return el;
+}
+
+/** Player-facing ore depth window; open-ended windows read "from N m down". */
+function oreDepthWindow(min: number, max: number): string {
+  return max >= ORE_DEPTH_UNBOUNDED
+    ? t('sandbox.detail.depth_open', { min })
+    : t('sandbox.detail.depth_range', { min, max });
 }

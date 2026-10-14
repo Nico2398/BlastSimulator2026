@@ -1,85 +1,64 @@
 // BlastSimulator2026 — Pre-blast ore value estimate
 // Counterpart to BlastOreReport.ts's post-blast actuals: before a blast fires,
 // the sticky footer's EST. ORE VALUE needs a number derived only from what the
-// player already knows (survey estimates), never from ground-truth voxel data.
+// player already knows (survey estimates), never from ground-truth ore data.
+// The grid supplies rock geometry only (what breaks), never ore content.
 
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
 import { freshSurveys } from './SurveyStaleness.js';
-import { findSurveyForColumn } from './SurveyColumn.js';
+import { findSurveyForColumn, oresSurveyedAt } from './SurveyColumn.js';
+import { buildPlanEnergyField } from './BlastExecution.js';
+import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
 import { getOre } from '../world/OreCatalog.js';
-import {
-  ORE_DENSITY_KG_M3,
-  BLAST_ESTIMATE_BREAK_RADIUS_M,
-  BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR,
-} from '../config/balance.js';
-import type { DrillHole } from './DrillPlan.js';
-import { VoxelGrid } from '../world/VoxelGrid.js';
+import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 
-/**
- * Distinct 1 m columns (keyed `"x,z"` by floor) whose centre lies within
- * `radiusM` of any hole, each mapped to the deepest covering hole's depth.
- * A column covered by several holes is therefore counted once.
- */
-function coveredColumns(
-  holes: readonly DrillHole[],
-  radiusM: number,
-): Map<string, number> {
-  const columns = new Map<string, number>();
-  const reach = Math.ceil(radiusM);
-  for (const hole of holes) {
-    const cx = Math.floor(hole.x);
-    const cz = Math.floor(hole.z);
-    for (let dz = -reach; dz <= reach; dz++) {
-      for (let dx = -reach; dx <= reach; dx++) {
-        const colX = cx + dx;
-        const colZ = cz + dz;
-        if (Math.hypot(colX + 0.5 - hole.x, colZ + 0.5 - hole.z) > radiusM) continue;
-        const key = `${colX},${colZ}`;
-        columns.set(key, Math.max(columns.get(key) ?? 0, hole.depth));
-      }
-    }
+/** Market value ($) of one m³ of rock at the given ore density fraction: density × ORE_DENSITY_KG_M3 × valuePerKg. */
+export function oreValuePerM3(density: number, valuePerKg: number): number {
+  return density * ORE_DENSITY_KG_M3 * valuePerKg;
+}
+
+/** Estimated ore value ($ per m³) of rock at the given densities, priced in `marketId` (#1681); unknown ore ids and non-positive densities are ignored. */
+export function columnOreValuePerM3(densities: Readonly<Record<string, number>>, marketId?: MarketId): number {
+  let value = 0;
+  for (const [oreId, density] of Object.entries(densities)) {
+    if (!(density > 0)) continue;
+    const ore = getOre(oreId);
+    if (ore) value += oreValuePerM3(density, oreValuePerKg(oreId, marketId));
   }
-  return columns;
+  return value;
 }
 
 /**
- * Estimate the total ore value (game dollars) a blast plan will yield, using
- * only surveyed density estimates — never the real grid.
+ * Estimate the total ore value (game dollars) a blast plan will yield (#1703).
  *
- * A hole breaks more than its own column: every column within
- * `BLAST_ESTIMATE_BREAK_RADIUS_M` of a hole is assumed to break to
- * `BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR` × the deepest covering hole's depth.
- * Each such column is valued from the most recent fresh (non-stale) survey covering it:
- * `volume × density × ORE_DENSITY_KG_M3 × oreValuePerKg(oreId, market) × confidence`
- * (a low-confidence aerial pass counts for less than a core sample).
- * Columns with no covering survey, no ore, or an unknown ore id contribute 0.
+ * The broken volume comes from the blast's own propagation (the same energy
+ * field the preview and `executeBlast` use; wet holes in `wetHoleIds` are
+ * treated as the blast would). Each broken 1 m voxel is valued from the newest
+ * fresh survey covering its column, read at the voxel's own depth
+ * (`oresSurveyedAt`): ore a survey did not locate at that depth counts for
+ * nothing, so an aerial reading values its top 2 m only. Value =
+ * density x ORE_DENSITY_KG_M3 x oreValuePerKg(ore, marketId) x survey confidence.
  */
 export function estimateBlastOreValue(
   plan: BlastPlan,
   surveyResults: readonly SurveyResult[],
+  grid: VoxelGrid,
+  wetHoleIds: ReadonlySet<string> = new Set(),
   marketId?: MarketId,
 ): number {
-  let value = 0;
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
+  if (!field) return 0;
   const surveys = freshSurveys(surveyResults);
-  const columnArea = VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE;
-
-  for (const [colKey, maxDepth] of coveredColumns(plan.holes, BLAST_ESTIMATE_BREAK_RADIUS_M)) {
-    const [colX, colZ] = colKey.split(',');
-    const survey = findSurveyForColumn(surveys, Number(colX), Number(colZ));
-    const colEstimates = survey?.estimates[colKey];
-    if (!survey || !colEstimates) continue;
-
-    const columnVolume = BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR * maxDepth * columnArea;
-    for (const [oreId, density] of Object.entries(colEstimates)) {
-      if (density <= 0) continue;
-      const ore = getOre(oreId);
-      if (!ore) continue;
-      const massKg = columnVolume * density * ORE_DENSITY_KG_M3;
-      value += massKg * oreValuePerKg(oreId, marketId) * survey.confidence;
-    }
+  if (surveys.length === 0) return 0;
+  let value = 0;
+  for (const { x, y, z } of identifyFragmentedVoxels(field, grid, false).fragmented) {
+    const survey = findSurveyForColumn(surveys, x, z);
+    if (!survey) continue;
+    const densities = oresSurveyedAt(survey, x, z, y);
+    if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
   }
-
   return value;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
-  requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION,
+  requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION,
   climateBiasLandingOn, resolveGeneratedBiome,
   isInBorderZone, TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
@@ -588,6 +588,43 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
     expect(TERRAIN_GENERATOR_VERSION).toBe(1);
   });
 
+  describe('oreDeposits switch (#1682)', () => {
+    const cfg = { sizeX: 64, datum: 24, sizeZ: 64, seed: 42, climateBias: [0.6, 0.7] as [number, number] };
+    const oreSignature = (grid: ReturnType<typeof generateTerrain>): string => {
+      const parts: string[] = [];
+      for (let x = 0; x < 64; x += 2) for (let z = 0; z < 64; z += 2) for (let y = 0; y < 40; y++) {
+        const ores = grid.oresAt(x, y, z);
+        if (ores && Object.keys(ores).length > 0) parts.push(`${x},${y},${z}:${JSON.stringify(ores)}`);
+      }
+      return parts.join('|');
+    };
+
+    it('absent and false generate identical ore', () => {
+      expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: false }))).toBe(oreSignature(generateTerrain(cfg)));
+    });
+
+    it('true generates different ore than absent, but identical rock', () => {
+      const on = generateTerrain({ ...cfg, oreDeposits: true });
+      const off = generateTerrain(cfg);
+      expect(oreSignature(on)).not.toBe(oreSignature(off));
+      for (let x = 0; x < 64; x += 4) for (let z = 0; z < 64; z += 4) for (let y = 0; y < 40; y += 3) {
+        expect(on.dominantRockAt(x, y, z)).toBe(off.dominantRockAt(x, y, z));
+      }
+    });
+
+    it('is deterministic, and buildTerrainContext hands the sampler the switch', () => {
+      expect(oreSignature(generateTerrain({ ...cfg, oreDeposits: true }))).toBe(oreSignature(generateTerrain({ ...cfg, oreDeposits: true })));
+      const on = buildTerrainContext({ ...cfg, oreDeposits: true });
+      const off = buildTerrainContext(cfg);
+      const comp = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+      let differs = false;
+      for (let x = 0; x < 64 && !differs; x++) for (let z = 0; z < 64; z += 3) {
+        if (JSON.stringify(on.oreVeins.densitiesAt(x, 0, z, 5, comp, 1)) !== JSON.stringify(off.oreVeins.densitiesAt(x, 0, z, 5, comp, 1))) { differs = true; break; }
+      }
+      expect(differs).toBe(true);
+    });
+  });
+
   it('has ore in ground east, west and north of the rectangle', () => {
     const grid = generateTerrain(big());
     claimOutside(grid);
@@ -630,5 +667,154 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
         if (v.density > 0) expect(Object.keys(v.oreDensities).length).toBe(0);
       }
     }
+  });
+});
+
+// ── Sandbox site joins the landscape (#1734) ───────────────────────────────
+
+import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
+import { sampleBaseHeight as sampleRawHeight } from '../../../src/core/world/WorldGen.js';
+import { SANDBOX_FLAT_PAD_TARGET, SANDBOX_PIT_MASK, type PitMaskShape } from '../../../src/core/config/balance.js';
+import { sandboxTerrainConfig, flatPadShare } from '../../helpers/sandboxSite.js';
+
+describe('sandbox site blend (#1734)', () => {
+  const SITE = 64;
+  const CORE = SANDBOX_PIT_MASK.margin;
+  const REACH = 30;
+  const BIOMES = getAllBiomes().map(b => b.id);
+  const RUGGED = ['alpine_granite', 'tropical_karst', 'red_canyon'];
+
+  /**
+   * Share of perimeter lines (every 4 m along each side, 1 m steps outwards from the core edge for `band` m)
+   * whose every step passes `stepOk`. `natural` is the landscape without the mask, for comparison.
+   */
+  function perimeterLineShare(
+    biome: string,
+    seed: number,
+    band: number,
+    stepOk: (h: (x: number, z: number) => number, natural: (x: number, z: number) => number, a: [number, number], b: [number, number]) => boolean,
+  ): number {
+    const ctx = buildTerrainContext(sandboxTerrainConfig(biome, seed)).worldGen;
+    const h = (x: number, z: number): number => sampleSurfaceHeightY(ctx, x, z);
+    const natural = (x: number, z: number): number =>
+      sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset;
+    let ok = 0, total = 0;
+    for (let along = 4; along < SITE; along += 4) {
+      const lines: Array<(t: number) => [number, number]> = [
+        t => [CORE - t, along], t => [SITE - CORE + t, along],
+        t => [along, CORE - t], t => [along, SITE - CORE + t],
+      ];
+      for (const at of lines) {
+        let good = true;
+        for (let t = 0; t < band; t++) {
+          if (!stepOk(h, natural, at(t), at(t + 1))) { good = false; break; }
+        }
+        total++;
+        if (good) ok++;
+      }
+    }
+    return ok / total;
+  }
+
+  /**
+   * A step the blend made steeper than the landscape's own and that is not climbable fails; a cliff the
+   * landscape has on its own, inside the cone, is not the blend's doing (the mask flattens, never erases).
+   */
+  const blendKeepsStepClimbable: Parameters<typeof perimeterLineShare>[3] = (h, natural, [x0, z0], [x1, z1]) => {
+    const steepened = Math.abs(h(x1, z1) - h(x0, z0)) > Math.abs(natural(x1, z1) - natural(x0, z0)) + 0.05;
+    return !steepened || isStepClimbable(h(x0, z0), h(x1, z1), 1);
+  };
+
+  /** Every step is climbable, natural cliffs included. */
+  const stepIsClimbable: Parameters<typeof perimeterLineShare>[3] = (h, _natural, [x0, z0], [x1, z1]) =>
+    isStepClimbable(h(x0, z0), h(x1, z1), 1);
+
+  /** Metres from the core edge that the absolute climbability check covers (measured: the cone's reach). */
+  const BLEND_BAND = 6;
+
+  describe.each(BIOMES)('%s', (biome) => {
+    it.each([1, 7, 42])('seed %i: blend never steepens the landscape on >= 80% of perimeter lines', (seed) => {
+      expect(perimeterLineShare(biome, seed, CORE + REACH, blendKeepsStepClimbable)).toBeGreaterThanOrEqual(0.8);
+    });
+
+    // Absolute check, deliberately lenient: natural cliffs survive the pointwise mask, so only the first
+    // BLEND_BAND metres are held to it. Measured worst case over all biomes and seeds 1/7/42: 70%.
+    it.each([1, 7, 42])('seed %i: >= 60% of perimeter lines are fully climbable within the blend band', (seed) => {
+      expect(perimeterLineShare(biome, seed, BLEND_BAND, stepIsClimbable)).toBeGreaterThanOrEqual(0.6);
+    });
+
+    it.each([1, 7, 42])(`seed %i: at least ${SANDBOX_FLAT_PAD_TARGET * 100}% flat 9x9 pads survive`, (seed) => {
+      expect(flatPadShare(generateTerrain(sandboxTerrainConfig(biome, seed)))).toBeGreaterThanOrEqual(SANDBOX_FLAT_PAD_TARGET);
+    });
+
+    it('generation is deterministic', () => {
+      const a = buildTerrainContext(sandboxTerrainConfig(biome, 42)).worldGen;
+      const b = buildTerrainContext(sandboxTerrainConfig(biome, 42)).worldGen;
+      for (let x = -30; x <= 94; x += 13) for (let z = -30; z <= 94; z += 17) {
+        expect(sampleSurfaceHeightY(a, x, z)).toBe(sampleSurfaceHeightY(b, x, z));
+      }
+    });
+  });
+
+  it.each(RUGGED)('%s: the flat outline is not a square slab (rounded, wobbling corners differ from a sharp rectangle)', (biome) => {
+    for (const seed of [1, 7, 42]) {
+      const config = sandboxTerrainConfig(biome, seed);
+      const shaped = buildTerrainContext(config).worldGen;
+      const { outlineWobble: _w, cornerRadius: _c, ...sharpMask } = SANDBOX_PIT_MASK satisfies PitMaskShape;
+      const sharp = buildTerrainContext({ ...config, pitMask: sharpMask }).worldGen;
+      const corners: Array<[number, number]> = [[0, 0], [SITE, 0], [0, SITE], [SITE, SITE]];
+      let cornersDiffering = 0;
+      for (const [cx, cz] of corners) {
+        let maxDiff = 0;
+        for (let dx = -20; dx <= 20; dx += 2) for (let dz = -20; dz <= 20; dz += 2) {
+          maxDiff = Math.max(maxDiff, Math.abs(sampleSurfaceHeightY(shaped, cx + dx, cz + dz) - sampleSurfaceHeightY(sharp, cx + dx, cz + dz)));
+        }
+        if (maxDiff > 0.25) cornersDiffering++;
+      }
+      expect(cornersDiffering, `${biome} seed ${seed}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('the surface beyond the site still follows natural terrain once inside the cone', () => {
+    const ctx = buildTerrainContext(sandboxTerrainConfig('alpine_granite', 42)).worldGen;
+    let natural = 0, total = 0;
+    for (let x = -200; x <= 264; x += 8) for (let z = -200; z <= 264; z += 8) {
+      if (x > -60 && x < SITE + 60 && z > -60 && z < SITE + 60) continue;
+      total++;
+      const raw = sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset;
+      if (Math.abs(sampleSurfaceHeightY(ctx, x, z) - raw) < 1e-6) natural++;
+    }
+    expect(natural / total).toBeGreaterThan(0.5);
+  });
+});
+
+describe('requireValidPitMask — envelope fields (#1734)', () => {
+  const full: PitMaskShape = { margin: 14, reliefKeep: 0.05, envelopeSlope: 0.45, outlineWobble: 3, cornerRadius: 8 };
+
+  it('preserves envelopeSlope, outlineWobble and cornerRadius', () => {
+    expect(requireValidPitMask(full, 'm')).toEqual(full);
+    expect(requireValidPitMask(JSON.parse(JSON.stringify(full)), 'm')).toEqual(full);
+  });
+
+  it('a legacy two-field mask stays two fields', () => {
+    expect(requireValidPitMask({ margin: 14, reliefKeep: 0.05 }, 'm')).toEqual({ margin: 14, reliefKeep: 0.05 });
+  });
+
+  it('accepts the boundaries: slope 1, wobble 0, radius 0', () => {
+    const edge = { ...full, envelopeSlope: 1, outlineWobble: 0, cornerRadius: 0 };
+    expect(requireValidPitMask(edge, 'm')).toEqual(edge);
+  });
+
+  it.each([
+    ['NaN envelopeSlope', { envelopeSlope: NaN }],
+    ['zero envelopeSlope', { envelopeSlope: 0 }],
+    ['negative envelopeSlope', { envelopeSlope: -0.2 }],
+    ['envelopeSlope above 1', { envelopeSlope: 1.01 }],
+    ['NaN outlineWobble', { outlineWobble: NaN }],
+    ['negative outlineWobble', { outlineWobble: -0.5 }],
+    ['NaN cornerRadius', { cornerRadius: NaN }],
+    ['negative cornerRadius', { cornerRadius: -3 }],
+  ])('rejects %s with the corrupt-save error', (_label, extra) => {
+    expect(() => requireValidPitMask({ ...full, ...extra }, 'world.pitMask')).toThrow(/corrupt save: world\.pitMask is not a valid pit mask/);
   });
 });

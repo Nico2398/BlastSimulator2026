@@ -46,6 +46,7 @@ import {
   employeeWorkState,
   BASE_TICK_MS,
 } from './GameLoop.js';
+import { onGroundMassKg } from '../economy/Logistics.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
@@ -250,6 +251,7 @@ export function runTick(
     hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'management_office'),
     maxRecentVibration: recentVillageVibration(state),
     employeeCount: state.employees.employees.length,
+    looseRockKg: onGroundMassKg(state.logistics),
   };
   updateScores(state.scores, scoreInputs);
 
@@ -333,7 +335,7 @@ export function runTick(
   releaseInjuredEmployeesQueues(state);
   // Claims held by the dead go back to the pool so OrderReachability re-stamps them (#1660).
   releaseDeadHoldersActions(state, emitter);
-  const dispatchResult = tickEmployees(state);
+  const dispatchResult = tickEmployees(state, emitter);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
   // 8e. Task duration progress + XP/level-up reporting. taskTicksRemaining

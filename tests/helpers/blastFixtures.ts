@@ -4,6 +4,7 @@
 import { expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
 /** Keeps every living employee's fatigue topped up so a long drill/haul run is never derailed by a needs collapse mid-drive (mirrors blast-report-modal-save-load.integration.test.ts's fireBlast helper). */
 function refreshFatigue(state: GameState): void {
@@ -28,8 +29,8 @@ export function hireDriver(run: (cmd: string) => unknown, state: GameState): voi
   expect(run('employee hire role:driver')).toMatchObject({ success: true });
 }
 
-/** The 3 tutorial_pit NavGrid cells this file's own direct trace confirmed permanently climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's approach cell, for the (18,10) amount:3 blast below. */
-export const POCKET_CELLS: ReadonlySet<string> = new Set(['18,9', '19,10', '18,10']);
+/** The tutorial_pit NavGrid cells a direct trace confirmed permanently climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's approach cell, for the (18,10) amount:5 blast (#1723). */
+export const POCKET_CELLS: ReadonlySet<string> = new Set(['18,8', '17,9', '18,9', '19,9', '17,10', '18,10', '19,10', '18,11', '19,11']);
 export function isPocketCell(x: number, z: number): boolean {
   return POCKET_CELLS.has(`${x},${z}`);
 }
@@ -87,4 +88,21 @@ export function crewRockDigger(run: (cmd: string) => unknown, state: GameState):
   expect(run('vehicle buy rock_digger')).toMatchObject({ success: true });
   const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger')!;
   expect(run(`vehicle driver ${digger.id} ${diggerDriver.id}`)).toMatchObject({ success: true });
+}
+
+/** A sandite rubble fragment of `massKg` resting beside `origin`, for fixtures that inject muck without firing a blast. */
+export function makeRubbleFragment(id: number, massKg: number, origin: { x: number; y: number; z: number }): FragmentData {
+  return {
+    id,
+    position: { x: origin.x + (id % 5), y: origin.y, z: origin.z + Math.floor(id / 5) },
+    volume: massKg / 2500,
+    mass: massKg,
+    rockId: 'sandite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+    origin,
+  };
 }

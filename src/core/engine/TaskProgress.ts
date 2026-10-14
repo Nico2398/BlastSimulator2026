@@ -15,6 +15,7 @@ import { deductExpense } from '../economy/Finance.js';
 import { workRate } from '../events/ActiveModifiers.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
+import { carveLevelColumnsStep } from '../mining/LevelGround.js';
 
 /** One skill category's level-up, reported when a single tick's XP gain crosses a proficiency threshold. */
 export interface TaskProgressLevelUp {
@@ -68,6 +69,21 @@ function takeWholeWorkTicks(emp: Employee, rate: number): number {
   const whole = Math.floor(total + 1e-9);
   emp.workProgressCarry = Math.max(0, total - whole);
   return whole;
+}
+
+/**
+ * One tick of levelling work (#1723): carve this tick's share of the order's
+ * columns. `levelCursor` in the action payload counts columns carved so far
+ * (plain number, so it saves with the order).
+ */
+function tickLevelWork(state: GameState, emp: Employee, ticksRemaining: number, grid: VoxelGrid, emitter: EventEmitter | undefined): void {
+  const payload = state.pendingActions.find(a => a.id === emp.activeActionId)?.payload;
+  if (payload === undefined) return;
+  const columns = payload['columns'] as { x: number; z: number }[];
+  const cursor = (payload['levelCursor'] as number | undefined) ?? 0;
+  const share = Math.ceil((columns.length - cursor) / (ticksRemaining + 1));
+  if (share <= 0) return;
+  payload['levelCursor'] = cursor + carveLevelColumnsStep(grid, columns, payload['targetY'] as number, share, emitter);
 }
 
 /**
@@ -137,6 +153,13 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
         tracker.carvedCount = target;
       }
     }
+  }
+
+  // Progressive levelling (#1723): the columns left are spread over the ticks
+  // left, so the ground shows the work as it goes and completion only carves
+  // what a skipped or interrupted tick left behind.
+  if (grid && emp.pendingActionType === 'level_ground' && emp.taskTicksRemaining > 0) {
+    tickLevelWork(state, emp, emp.taskTicksRemaining, grid, emitter);
   }
 
   const action = state.pendingActions.find(a => a.id === emp.activeActionId);

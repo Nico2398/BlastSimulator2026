@@ -22,7 +22,7 @@ import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { SANDBOX_PIT_MASK, SANDBOX_FLAT_PAD_SIZE } from '../../src/core/config/balance.js';
+import { SANDBOX_PIT_MASK, SANDBOX_FLAT_PAD_SIZE, SURVEY_DEPTH_BELOW_SURFACE } from '../../src/core/config/balance.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
@@ -302,6 +302,36 @@ describe('sandbox mode', () => {
 const CYCLE_TICK_CAP = 4000;
 const CYCLE_BUY_OR_HIRE = /^(employee hire|vehicle buy|vehicle purchase|build |hire |purchase )/;
 
+/** Ore in the 8x8 footprint a 3x3 spacing-4 grid drills, to 6 m below the surface. */
+function footprintOre(grid: VoxelGrid, x0: number, z0: number): number {
+  let total = 0;
+  for (let x = x0; x < x0 + 9; x += 2) {
+    for (let z = z0; z < z0 + 9; z += 2) {
+      const top = computeVoxelColumnSurfaceY(grid, x, z);
+      if (top === null) continue;
+      for (let d = 0; d < 6; d++) {
+        for (const v of Object.values(grid.getVoxel(x, top - d, z)?.oreDensities ?? {})) total += v;
+      }
+    }
+  }
+  return total;
+}
+
+/** Drill starts richest in ore first, at least 10 m apart (ore forms deposits, not blanket cover — #1682). */
+function richDrillStarts(grid: VoxelGrid, count: number): Array<[number, number]> {
+  const scored: Array<{ x: number; z: number; ore: number }> = [];
+  for (let x = 8; x <= grid.sizeX - 17; x += 2) {
+    for (let z = 8; z <= grid.sizeZ - 17; z += 2) scored.push({ x, z, ore: footprintOre(grid, x, z) });
+  }
+  scored.sort((a, b) => b.ore - a.ore);
+  const picked: Array<[number, number]> = [];
+  for (const c of scored) {
+    if (picked.length >= count) break;
+    if (picked.every(([px, pz]) => Math.abs(px - c.x) >= 10 || Math.abs(pz - c.z) >= 10)) picked.push([c.x, c.z]);
+  }
+  return picked;
+}
+
 describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first sale on %s (#1671)', (difficulty) => {
   it('drills, charges, fires, hauls and fills an ore contract with no buying or hiring, and stays solvent', () => {
     const { runner, ctx } = createRunner();
@@ -319,10 +349,10 @@ describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first
     const over = () => state.levelEnded || state.tickCount - start >= CYCLE_TICK_CAP;
     const sold = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
 
+    const starts = richDrillStarts(ctx.grid!, 6);
     let shot = 0;
-    while (!over() && !sold() && shot < 6) {
-      const x = Math.round(rig!.x) + 14;
-      const z = Math.round(rig!.z) + 13 + shot * 10;
+    while (!over() && !sold() && shot < starts.length) {
+      const [x, z] = starts[shot]!;
       shot++;
       if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
       tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
@@ -589,9 +619,34 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const surveyor = state.employees.employees.slice(-1)[0]!;
     expect(runner.run(`employee assign_skill ${surveyor.id} skill:geology level:3`).success).toBe(true);
 
-    // Centre on the surveyor so the survey needs no travel.
-    const cx = Math.round(surveyor.x);
-    const cz = Math.round(surveyor.z);
+    // Centre on the surveyor so the survey needs no travel. A core sample reads one column
+    // only (radius 0), so a player coring blind may hit barren rock: aim it at the richest
+    // column within 10 m, as a player reading the aerial overlay would.
+    let cx = Math.round(surveyor.x);
+    let cz = Math.round(surveyor.z);
+    if (method === 'core_sample') {
+      const grid = ctx.grid!;
+      // Window-mean ore density of a column: what the report's estimate is built from.
+      const oreMass = (x: number, z: number): number => {
+        const top = computeVoxelColumnSurfaceY(grid, x, z);
+        if (top === null) return 0;
+        let sum = 0;
+        for (let y = top; y > top - SURVEY_DEPTH_BELOW_SURFACE.core_sample; y--) {
+          if (grid.densityAt(x, y, z) <= 0) continue;
+          for (const d of Object.values(grid.oresAt(x, y, z) ?? {})) sum += d;
+        }
+        return sum / SURVEY_DEPTH_BELOW_SURFACE.core_sample;
+      };
+      let best: { x: number; z: number; mass: number } | null = null;
+      for (let x = cx - 10; x <= cx + 10; x++) for (let z = cz - 10; z <= cz + 10; z++) {
+        if (!grid.containsColumn(x, z)) continue;
+        const mass = oreMass(x, z);
+        if (mass > 0 && (!best || mass > best.mass)) best = { x, z, mass };
+      }
+      expect(best, 'ore within 10 m of the surveyor').not.toBeNull();
+      cx = best!.x;
+      cz = best!.z;
+    }
     const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
     expect(result.success, result.output).toBe(true);
 
