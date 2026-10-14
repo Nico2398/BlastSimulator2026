@@ -142,7 +142,7 @@
           "command": "weather set heavy_rain"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "tick 5",
