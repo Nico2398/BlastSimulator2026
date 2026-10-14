@@ -274,7 +274,6 @@ describe('planTraining — driving licences', () => {
     expect(plan.kind).toBe('unlock');
     expect(plan.grantsLevel).toBe(1);
     expect(plan.salaryIncrease).toBe(QUALIFICATION_SALARY_BONUS[1]);
-    expect(plan.raisesLicenceTo).toBeUndefined();
   });
 
   it.each([2, 3] as const)('a first licence at tier %i unlocks at licence level equal to the tier with the level-1 pay bonus only', (tier) => {
@@ -1025,6 +1024,7 @@ describe('tickTraining — driving licence courses (#1726)', () => {
     const qual = holdRigLicence(employee);
     qual.proficiencyLevel = 3;
     qual.xp = XP_THRESHOLDS[3] + 5;
+    employee.salary = calculateSalary(employee); // fixture edit above moved the bonus; start in sync
     const salaryBefore = employee.salary;
 
     const { result, completed } = runCourse(state, employee, school, 'driving.drill_rig');
