@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { applyRatingCaps, oversizeShare, type RatingCapFacts } from '../../../src/core/mining/BlastRatingCaps.js';
+import { applyRatingCaps, fizzleShare, oversizeShare, type RatingCapFacts } from '../../../src/core/mining/BlastRatingCaps.js';
 import { buildBlastReport, type BlastResult, type BlastRating } from '../../../src/core/mining/BlastExecution.js';
 import type { AccidentRecord } from '../../../src/core/entities/Damage.js';
-import { BLAST_OVERSIZE_SHARE_CAP } from '../../../src/core/config/balance.js';
+import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../../../src/core/config/balance.js';
 
 const NONE: RatingCapFacts = {
-  deaths: 0, injuries: 0, destroyedBuildings: 0, wetHoleCount: 0, oversizedFragments: 0, fragmentCount: 100,
+  deaths: 0, injuries: 0, destroyedBuildings: 0, wetHoleCount: 0, fizzledHoleCount: 0, chargedHoleCount: 0,
+  oversizedFragments: 0, fragmentCount: 100,
 };
 const facts = (o: Partial<RatingCapFacts> = {}): RatingCapFacts => ({ ...NONE, ...o });
 
@@ -20,6 +21,67 @@ describe('oversizeShare', () => {
   });
   it('is 1 when every fragment is oversized', () => {
     expect(oversizeShare(7, 7)).toBe(1);
+  });
+});
+
+describe('fizzleShare (#1675)', () => {
+  it('is the fizzled fraction of charged holes', () => {
+    expect(fizzleShare(1, 4)).toBe(0.25);
+    expect(fizzleShare(9, 9)).toBe(1);
+  });
+  it('is 0 with no charged holes, never NaN', () => {
+    expect(fizzleShare(0, 0)).toBe(0);
+    expect(Number.isNaN(fizzleShare(3, 0))).toBe(false);
+  });
+  it('is 0 when nothing fizzled', () => {
+    expect(fizzleShare(0, 6)).toBe(0);
+  });
+});
+
+describe('applyRatingCaps fizzle share (#1675)', () => {
+  const fz = (fizzled: number, charged: number, o: Partial<RatingCapFacts> = {}) =>
+    facts({ wetHoleCount: fizzled, fizzledHoleCount: fizzled, chargedHoleCount: charged, ...o });
+
+  it('thresholds are 0.75 and 0.25', () => {
+    expect(BLAST_FIZZLE_SHARE_FAILURE).toBe(0.75);
+    expect(BLAST_FIZZLE_SHARE_PARTIAL).toBe(0.25);
+  });
+  it('all charges fizzled caps a perfect blast at bad', () => {
+    expect(applyRatingCaps('perfect', fz(9, 9))).toEqual({ rating: 'bad', cap: 'fizzled_failure' });
+  });
+  it('share exactly at the failure threshold caps at bad', () => {
+    expect(applyRatingCaps('perfect', fz(3, 4))).toEqual({ rating: 'bad', cap: 'fizzled_failure' });
+  });
+  it('half fizzled caps at mediocre', () => {
+    expect(applyRatingCaps('perfect', fz(2, 4))).toEqual({ rating: 'mediocre', cap: 'fizzled_partial' });
+  });
+  it('share exactly at the partial threshold caps at mediocre', () => {
+    expect(applyRatingCaps('perfect', fz(1, 4))).toEqual({ rating: 'mediocre', cap: 'fizzled_partial' });
+  });
+  it('below the partial threshold falls back to the wet_holes good cap', () => {
+    expect(applyRatingCaps('perfect', fz(1, 5))).toEqual({ rating: 'good', cap: 'wet_holes' });
+  });
+  it('failure share on a good base is capped at bad', () => {
+    expect(applyRatingCaps('good', fz(4, 4))).toEqual({ rating: 'bad', cap: 'fizzled_failure' });
+  });
+  it('partial cap leaves a bad base alone', () => {
+    expect(applyRatingCaps('bad', fz(2, 4))).toEqual({ rating: 'bad', cap: null });
+  });
+  it('caps only lower: bad and catastrophic bases stay with a total fizzle', () => {
+    expect(applyRatingCaps('bad', fz(9, 9))).toEqual({ rating: 'bad', cap: null });
+    expect(applyRatingCaps('catastrophic', fz(9, 9))).toEqual({ rating: 'catastrophic', cap: null });
+  });
+  it('death still wins over a total fizzle', () => {
+    expect(applyRatingCaps('perfect', fz(9, 9, { deaths: 1 }))).toEqual({ rating: 'catastrophic', cap: 'death' });
+  });
+  it('injuries are reported before a partial fizzle', () => {
+    expect(applyRatingCaps('perfect', fz(2, 4, { injuries: 1 }))).toEqual({ rating: 'bad', cap: 'casualty_or_destruction' });
+  });
+  it('a total fizzle is reported before wet holes and oversize', () => {
+    expect(applyRatingCaps('perfect', fz(4, 4, { oversizedFragments: 90 }))).toEqual({ rating: 'bad', cap: 'fizzled_failure' });
+  });
+  it('zero charged holes never trigger a fizzle cap', () => {
+    expect(applyRatingCaps('perfect', facts({ fizzledHoleCount: 0, chargedHoleCount: 0 }))).toEqual({ rating: 'perfect', cap: null });
   });
 });
 
@@ -56,13 +118,20 @@ describe('applyRatingCaps', () => {
     expect(applyRatingCaps('bad', facts({ injuries: 1 }))).toEqual({ rating: 'bad', cap: null });
   });
 
-  it('wet holes cap at good', () => {
-    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 2 }))).toEqual({ rating: 'good', cap: 'wet_holes' });
+  it('wet holes with a fizzled charge cap at good', () => {
+    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 2, fizzledHoleCount: 1, chargedHoleCount: 10 })))
+      .toEqual({ rating: 'good', cap: 'wet_holes' });
   });
 
-  it('wet holes leave good and worse untouched, cap null', () => {
-    expect(applyRatingCaps('good', facts({ wetHoleCount: 1 }))).toEqual({ rating: 'good', cap: null });
-    expect(applyRatingCaps('mediocre', facts({ wetHoleCount: 1 }))).toEqual({ rating: 'mediocre', cap: null });
+  it('wet holes with a fizzled charge leave good and worse untouched, cap null', () => {
+    const f = { wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 10 };
+    expect(applyRatingCaps('good', facts(f))).toEqual({ rating: 'good', cap: null });
+    expect(applyRatingCaps('mediocre', facts(f))).toEqual({ rating: 'mediocre', cap: null });
+  });
+
+  it('wet holes with nothing fizzled do not cap (#1675)', () => {
+    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 9, fizzledHoleCount: 0, chargedHoleCount: 9 })))
+      .toEqual({ rating: 'perfect', cap: null });
   });
 
   it('oversize share above the limit caps at good', () => {
@@ -83,21 +152,21 @@ describe('applyRatingCaps', () => {
   });
 
   it('death outranks wet holes, injuries and oversize', () => {
-    expect(applyRatingCaps('perfect', facts({ deaths: 1, wetHoleCount: 2, injuries: 1, oversizedFragments: 90 })))
+    expect(applyRatingCaps('perfect', facts({ deaths: 1, wetHoleCount: 2, fizzledHoleCount: 2, chargedHoleCount: 2, injuries: 1, oversizedFragments: 90 })))
       .toEqual({ rating: 'catastrophic', cap: 'death' });
   });
 
   it('casualty cap is reported before wet holes when both apply', () => {
-    expect(applyRatingCaps('perfect', facts({ injuries: 1, wetHoleCount: 1 })))
+    expect(applyRatingCaps('perfect', facts({ injuries: 1, wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 4 })))
       .toEqual({ rating: 'bad', cap: 'casualty_or_destruction' });
   });
 
   it('bad base with injury and wet holes stays bad, no cap', () => {
-    expect(applyRatingCaps('bad', facts({ injuries: 1, wetHoleCount: 1 }))).toEqual({ rating: 'bad', cap: null });
+    expect(applyRatingCaps('bad', facts({ injuries: 1, wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 4 }))).toEqual({ rating: 'bad', cap: null });
   });
 
   it('wet holes reported before oversize when both lower the rating', () => {
-    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 1, oversizedFragments: 50, fragmentCount: 100 })))
+    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 4, oversizedFragments: 50, fragmentCount: 100 })))
       .toEqual({ rating: 'good', cap: 'wet_holes' });
   });
 });
@@ -155,10 +224,29 @@ describe('buildBlastReport rating caps (#1349)', () => {
     expect(r.ratingCap).toBeUndefined();
   });
 
-  it('wet holes cap a perfect blast at good', () => {
-    const r = buildBlastReport(emptyResult(), 0, 0, [], { wet: ['H1'], fizzled: [] });
+  it('wet holes with a minority fizzled cap a perfect blast at good', () => {
+    const r = buildBlastReport(emptyResult(), 0, 0, [], { wet: ['H1'], fizzled: ['H1'], chargedCount: 5 });
     expect(r.rating).toBe('good');
     expect(r.ratingCap).toBe('wet_holes');
+  });
+
+  it('wet holes with nothing fizzled do not cap (#1675)', () => {
+    const r = buildBlastReport(emptyResult(), 0, 0, [], { wet: ['H1', 'H2'], fizzled: [], chargedCount: 2 });
+    expect(r.rating).toBe('perfect');
+    expect(r.ratingCap).toBeUndefined();
+  });
+
+  it('every charge fizzled rates bad with ratingCap fizzled_failure (#1675)', () => {
+    const r = buildBlastReport(emptyResult(), 0, 0, [], { wet: ['H1', 'H2'], fizzled: ['H1', 'H2'], chargedCount: 2 });
+    expect(r.rating).toBe('bad');
+    expect(r.baseRating).toBe('perfect');
+    expect(r.ratingCap).toBe('fizzled_failure');
+  });
+
+  it('half the charges fizzled rates mediocre with ratingCap fizzled_partial (#1675)', () => {
+    const r = buildBlastReport(emptyResult(), 0, 0, [], { wet: ['H1'], fizzled: ['H1'], chargedCount: 2 });
+    expect(r.rating).toBe('mediocre');
+    expect(r.ratingCap).toBe('fizzled_partial');
   });
 
   it('too many oversized fragments cap at good', () => {
@@ -174,7 +262,7 @@ describe('buildBlastReport rating caps (#1349)', () => {
   });
 
   it('a mediocre base is not raised or capped by wet holes', () => {
-    const r = buildBlastReport(emptyResult({ rating: 'mediocre' }), 0, 0, [], { wet: ['H1'], fizzled: [] });
+    const r = buildBlastReport(emptyResult({ rating: 'mediocre' }), 0, 0, [], { wet: ['H1'], fizzled: [], chargedCount: 1 });
     expect(r.rating).toBe('mediocre');
     expect(r.ratingCap).toBeUndefined();
   });
