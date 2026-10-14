@@ -20,7 +20,7 @@ import {
 } from '../../../src/core/world/VoxelGrid.js';
 import {
   computeLevelTargetY, computeLevelColumns, computeLevelVolume, computeLevelRegion,
-  validateLevelOrder, carveLevelColumns, pickLevelWorkTarget, carveLevelColumnsStep, levelGroundRect, computeLevelGroundDurationTicks,
+  validateLevelOrder, carveLevelColumns, carveLevelColumnsStep, levelGroundRect, computeLevelGroundDurationTicks,
   type LevelOrderDef,
 } from '../../../src/core/mining/LevelGround.js';
 import {
@@ -570,40 +570,7 @@ describe('cost and duration scale linearly with volume', () => {
   });
 });
 
-// ── #1723: reachable work target, column-by-column progress ──
-
-describe('pickLevelWorkTarget', () => {
-  const rect: LevelOrderDef = { minX: 10, maxX: 14, minZ: 20, maxZ: 24 };
-  const all = (): { x: number; z: number }[] => {
-    const cols: { x: number; z: number }[] = [];
-    for (let z = rect.minZ; z <= rect.maxZ; z++) for (let x = rect.minX; x <= rect.maxX; x++) cols.push({ x, z });
-    return cols;
-  };
-
-  it('returns the rect corner when every column is reachable', () => {
-    expect(pickLevelWorkTarget(all(), rect, () => true)).toEqual({ x: 10, z: 20 });
-  });
-
-  it('returns the reachable column nearest the rect corner when the corner is not reachable', () => {
-    const reachable = (x: number, z: number) => x >= 12 && z >= 22;
-    expect(pickLevelWorkTarget(all(), rect, reachable)).toEqual({ x: 12, z: 22 });
-  });
-
-  it('ignores reachable columns that are not in the order\'s columns list', () => {
-    const columns = all().filter(c => c.x !== 10 || c.z !== 20);
-    const target = pickLevelWorkTarget(columns, rect, () => true);
-    expect(target).not.toEqual({ x: 10, z: 20 });
-    expect(target).not.toBeNull();
-  });
-
-  it('returns null when no column is reachable', () => {
-    expect(pickLevelWorkTarget(all(), rect, () => false)).toBeNull();
-  });
-
-  it('returns null for an empty column list', () => {
-    expect(pickLevelWorkTarget([], rect, () => true)).toBeNull();
-  });
-});
+// ── #1723: column-by-column carve progress ──
 
 describe('carveLevelColumnsStep', () => {
   it('carves at most maxColumns, nearest the first column first, and returns how many it carved', () => {

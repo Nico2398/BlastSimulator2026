@@ -226,31 +226,6 @@ export function carveLevelColumns(
 }
 
 /**
- * The column of `columns` a digger should drive to: the reachable one nearest
- * the rect's (minX, minZ) corner, ties broken by list order; null when none
- * is reachable.
- */
-export function pickLevelWorkTarget(
-  columns: { x: number; z: number }[],
-  rect: LevelOrderDef,
-  isReachable: (x: number, z: number) => boolean,
-): { x: number; z: number } | null {
-  let best: { x: number; z: number } | null = null;
-  let bestDistSq = Infinity;
-  for (const column of columns) {
-    if (!isReachable(column.x, column.z)) continue;
-    const dx = column.x - rect.minX;
-    const dz = column.z - rect.minZ;
-    const distSq = dx * dx + dz * dz;
-    if (distSq < bestDistSq) {
-      best = column;
-      bestDistSq = distSq;
-    }
-  }
-  return best === null ? null : { x: best.x, z: best.z };
-}
-
-/**
  * Carve at most `maxColumns` of `columns` down to `targetY`, in list order,
  * skipping columns already at it; emits `terrain:updated` for the affected
  * region only when something was carved. Returns the columns carved.
