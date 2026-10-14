@@ -7,17 +7,18 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getAllVehicleRoles, getVehicleDefByTier, type VehicleRole } from '../../../src/core/entities/Vehicle.js';
+import { assertWorldInvariants } from '../../../src/core/state/WorldInvariants.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
-  restTripFatigueCost, deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestTravel,
+  restTripFatigueCost, chooseRestTrip, deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestTravel,
   createRestPendingAction, isMidClaimedTaskExecution, restRoundTripWorthwhile, resolveRestDestination,
   resolveBuildingApproach, isRestBuildingFull, resolveRestBuildingId,
 } from '../../../src/core/engine/RestActionHelpers.js';
 import { getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import {
   NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE,
-  BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS, AGENT_WALK_SPEED,
+  BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS, AGENT_WALK_SPEED, NEED_DRAIN_RATES,
 } from '../../../src/core/config/balance.js';
 
 const DEDUCT_SEED = 42;
@@ -523,7 +524,7 @@ describe('beginRestTravel (#1118)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -558,7 +559,7 @@ describe('beginRestTravel (#1118)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -584,7 +585,7 @@ describe('beginRestTravel (#1118)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
 
@@ -654,14 +655,14 @@ describe('beginRestTravel (#1118)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    // Untargeted queued drill_hole action of the same role (drill_rig) — the
+    // Untargeted queued drill_hole action of the same role (debris_hauler) — the
     // only employee who could ever claim it (nobody else is set up here),
     // matching hasQueuedActionForVehicleRole's own claimability test.
     state.pendingActions.push({
-      id: 900, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'drill_rig',
+      id: 900, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
       targetX: 5, targetZ: 5, targetY: 0, payload: {},
       targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
     });
@@ -675,6 +676,48 @@ describe('beginRestTravel (#1118)', () => {
     expect(finalLeg.mode).toBe('drive');
     expect(finalLeg.onArrive).toEqual({ kind: 'none' });
     expect(employee.pendingActionType).toBe('rest');
+  });
+
+  // REST_IN_PLACE_RADIUS branch: a mounted worker resting where they stand has
+  // no trip to choose (no park-and-walk) — the vehicle is kept, and freed on
+  // arrival unless a same-role follow-up only they could claim is queued.
+  describe('mounted worker resting in place (target within REST_IN_PLACE_RADIUS)', () => {
+    function setup() {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+      vehicle.occupantIds = [employee.id];
+      employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      return { state, employee, vehicle };
+    }
+
+    it('keeps the vehicle and alights on arrival when no same-role follow-up is queued', () => {
+      const { state, employee, vehicle } = setup();
+
+      beginRestTravel(state, employee, employee.x + 0.5, employee.z);
+
+      expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(employee.pendingActionType).toBe('rest');
+      const legs = employee.itinerary!.legs;
+      expect(legs[legs.length - 1]!.onArrive).not.toEqual({ kind: 'none' });
+    });
+
+    it('keeps the vehicle on arrival too when a same-role follow-up only they could claim is queued', () => {
+      const { state, employee, vehicle } = setup();
+      state.pendingActions.push({
+        id: 901, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+        targetX: 5, targetZ: 5, targetY: 0, payload: {},
+        targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+      });
+
+      beginRestTravel(state, employee, employee.x + 0.5, employee.z);
+
+      expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(employee.pendingActionType).toBe('rest');
+      const legs = employee.itinerary!.legs;
+      expect(legs[legs.length - 1]!.onArrive).toEqual({ kind: 'none' });
+    });
   });
 
   // #1204: when a buildingId is given, the walk must route through
@@ -771,15 +814,12 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
-    state.navGrid = makeFlatNavGrid(50, 10);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5); // tier 1, speed 1
-    vehicle.occupantIds = [employee.id];
-    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeFlatNavGrid(80, 10);
     const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
     expect(placed.success).toBe(true);
 
-    // One-way 40 cells at speed 1: round trip = 2*40/1 = 80 > 64.
-    const result = restRoundTripWorthwhile(state, employee, placed.building!, 40, 5);
+    // One-way 70 cells on foot (speed 2): round trip = 2*70/2 = 70 > 64.
+    const result = restRoundTripWorthwhile(state, employee, placed.building!, 70, 5);
 
     expect(result).toBe(false);
   });
@@ -795,12 +835,14 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     expect(result).toBe(true);
   });
 
-  it('mounted (speed 1) vs on-foot (speed 2) over the identical route distance: mounted is not worthwhile, on-foot is', () => {
+  // #1709: a speed-1 rig is parked and the worker walks, so the round trip is
+  // priced at the walking time (2 * chosen estTicks), not at the rig's speed.
+  it('mounted in a speed-1 rig is priced at the walk trip: worthwhile exactly like on foot over the same route (#1709)', () => {
     const buildFixture = () => {
       const state = createGame({ seed: SEED });
       const rng = new Random(SEED);
       const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
-      employee.fatigue = 0; // full headroom — this compares travel cost against the tier cap, not headroom
+      employee.fatigue = 0;
       state.navGrid = makeFlatNavGrid(50, 10);
       const placed = placeBuilding(state.buildings, 'living_quarters', 90, 90, 100, 100, 1);
       expect(placed.success).toBe(true);
@@ -811,10 +853,10 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     const { vehicle } = purchaseVehicle(mountedFixture.state.vehicles, 'drill_rig', 0, 5);
     vehicle.occupantIds = [mountedFixture.employee.id];
     mountedFixture.employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    expect(restRoundTripWorthwhile(mountedFixture.state, mountedFixture.employee, mountedFixture.building, 40, 5)).toBe(false);
+    // Old drive pricing: 2*40/1 = 80 > 64 (false). Walk pricing: 2*40/2 = 40 <= 64.
+    expect(restRoundTripWorthwhile(mountedFixture.state, mountedFixture.employee, mountedFixture.building, 40, 5)).toBe(true);
 
     const onFootFixture = buildFixture();
-    expect(onFootFixture.employee.locomotion).toEqual({ kind: 'on_foot' });
     expect(restRoundTripWorthwhile(onFootFixture.state, onFootFixture.employee, onFootFixture.building, 40, 5)).toBe(true);
   });
 
@@ -851,24 +893,19 @@ describe('restRoundTripWorthwhile (#1170)', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
     employee.fatigue = 0; // full headroom (100) — enough to clear tier 3's cap for this distance
-    state.navGrid = makeFlatNavGrid(50, 10);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 5);
-    vehicle.occupantIds = [employee.id];
-    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.navGrid = makeFlatNavGrid(80, 10);
 
-    // Round trip = 80 ticks (40 cells one-way at speed 1) — exceeds tier 1's
-    // 64 max recovery, but not tier 3's 160 (headroom, at MAX_NEED_GAUGE 100, is
-    // the binding cap here since it's below 160 — still comfortably above 80).
-    expect(TIER3_MAX_RECOVERY).toBeGreaterThan(80);
-
+    // On foot, 70 cells one-way: round trip = 70 ticks — exceeds tier 1's 64
+    // max recovery, but not tier 3's (160, capped by headroom 100).
     const tier1 = placeBuilding(state.buildings, 'living_quarters', 90, 5, 100, 100, 1);
     expect(tier1.success).toBe(true);
-    expect(restRoundTripWorthwhile(state, employee, tier1.building!, 40, 5)).toBe(false);
+    expect(restRoundTripWorthwhile(state, employee, tier1.building!, 70, 5)).toBe(false);
 
     state.buildings.unlockedTiers.living_quarters = 3;
     const tier3 = placeBuilding(state.buildings, 'living_quarters', 5, 90, 100, 100, 3);
     expect(tier3.success).toBe(true);
-    expect(restRoundTripWorthwhile(state, employee, tier3.building!, 40, 5)).toBe(true);
+    expect(TIER3_MAX_RECOVERY).toBeGreaterThan(70);
+    expect(restRoundTripWorthwhile(state, employee, tier3.building!, 70, 5)).toBe(true);
   });
 });
 
@@ -937,7 +974,7 @@ describe('restTripFatigueCost (#1673)', () => {
     expect(cost!).toBeGreaterThan(0);
   });
 
-  it('mounted in a speed-1 vehicle costs more than on foot over the same route', () => {
+  it('mounted in a speed-1 vehicle costs the walk trip, not the slower drive (#1709)', () => {
     const foot = fixture();
     const onFoot = restTripFatigueCost(foot.state, foot.employee, 30, 5);
 
@@ -945,11 +982,27 @@ describe('restTripFatigueCost (#1673)', () => {
     const { vehicle } = purchaseVehicle(mounted.state.vehicles, 'drill_rig', 0, 5);
     vehicle.occupantIds = [mounted.employee.id];
     mounted.employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
-    const driving = restTripFatigueCost(mounted.state, mounted.employee, 30, 5);
+    const parkAndWalk = restTripFatigueCost(mounted.state, mounted.employee, 30, 5);
 
     expect(onFoot).not.toBeNull();
+    expect(parkAndWalk).not.toBeNull();
+    expect(parkAndWalk!).toBeCloseTo(onFoot!, 6);
+    // Old drive cost would be ~30 ticks at speed 1 vs ~15 on foot.
+    expect(parkAndWalk!).toBeLessThan(25 * NEED_DRAIN_RATES.fatigue.traveling);
+  });
+
+  it('mounted in a vehicle faster than walking costs the (cheaper) drive trip (#1709)', () => {
+    const foot = fixture();
+    const onFoot = restTripFatigueCost(foot.state, foot.employee, 30, 5);
+
+    const mounted = fixture();
+    const { vehicle } = purchaseVehicle(mounted.state.vehicles, 'debris_hauler', 0, 5);
+    vehicle.occupantIds = [mounted.employee.id];
+    mounted.employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const driving = restTripFatigueCost(mounted.state, mounted.employee, 30, 5);
+
     expect(driving).not.toBeNull();
-    expect(driving!).toBeGreaterThan(onFoot!);
+    expect(driving!).toBeLessThan(onFoot!);
   });
 
   it('boundary: a target at the employee\'s own position costs next to nothing', () => {
@@ -970,5 +1023,168 @@ describe('restTripFatigueCost (#1673)', () => {
     const walled = restTripFatigueCost(state, employee, 40, 5);
     expect(walled).not.toBeNull();
     expect(walled).toBe(open);
+  });
+});
+
+// ── #1709: park a slow vehicle and walk to rest ─────────────────────────────
+
+/** Mounted employee of `role` on a flat grid; vehicle at (0,5). */
+function mountedFixture(role: VehicleRole, tier: 1 | 2 | 3 = 1) {
+  const state = createGame({ seed: 42 });
+  const rng = new Random(42);
+  const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+  state.navGrid = makeFlatNavGrid(80, 12);
+  const { vehicle } = purchaseVehicle(state.vehicles, role, tier, 5);
+  vehicle.x = 0; vehicle.z = 5;
+  vehicle.occupantIds = [employee.id];
+  employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+  return { state, employee, vehicle };
+}
+
+describe('chooseRestTrip (#1709)', () => {
+  it('unmounted employee: walk', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 0, 5);
+    state.navGrid = makeFlatNavGrid(80, 12);
+    const trip = chooseRestTrip(state, employee, 30, 5);
+    expect(trip).not.toBeNull();
+    expect(trip!.mode).toBe('walk');
+    expect(trip!.estTicks).toBeGreaterThan(0);
+  });
+
+  it('mounted in a speed-1 drill rig: walk, at the walking estimate', () => {
+    const { state, employee } = mountedFixture('drill_rig');
+    const foot = createGame({ seed: 42 });
+    const { employee: walker } = hireEmployee(foot.employees, 'driller', new Random(42), 0, 5);
+    foot.navGrid = makeFlatNavGrid(80, 12);
+
+    const trip = chooseRestTrip(state, employee, 30, 5);
+    const walk = chooseRestTrip(foot, walker, 30, 5);
+
+    expect(trip!.mode).toBe('walk');
+    expect(trip!.estTicks).toBeCloseTo(walk!.estTicks, 6);
+  });
+
+  it('mounted vehicle exactly as fast as walking: tie goes to walk', () => {
+    const { state, employee } = mountedFixture('charging_truck');
+    expect(getVehicleDefByTier('charging_truck', 1).speed).toBe(AGENT_WALK_SPEED);
+    expect(chooseRestTrip(state, employee, 30, 5)!.mode).toBe('walk');
+  });
+
+  it('mounted vehicle strictly faster than walking: drive, with fewer ticks than walking', () => {
+    const { state, employee } = mountedFixture('debris_hauler');
+    expect(getVehicleDefByTier('debris_hauler', 1).speed).toBeGreaterThan(AGENT_WALK_SPEED);
+    const trip = chooseRestTrip(state, employee, 60, 5);
+    expect(trip!.mode).toBe('drive');
+    expect(trip!.estTicks).toBeLessThan(60 / AGENT_WALK_SPEED);
+  });
+
+  it('alighting refused (loaded hauler mid-haul): drive even though walking would be as quick', () => {
+    const { state, employee, vehicle } = mountedFixture('debris_hauler');
+    vehicle.cargo = [{ fragmentId: 1, massKg: 500 } as never];
+    state.pendingActions.push({
+      id: 901, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'assigned', holderId: employee.id, queuedAtTick: 0,
+    });
+    employee.activeActionId = 901;
+    // Short hop where walking is not slower than driving.
+    const trip = chooseRestTrip(state, employee, 2, 5);
+    expect(trip).not.toBeNull();
+    expect(trip!.mode).toBe('drive');
+  });
+
+  it('unplannable trip (no NavGrid route either way): null', () => {
+    const { state, employee } = mountedFixture('drill_rig');
+    for (let z = 0; z < state.navGrid!.height; z++) {
+      state.navGrid!.cells[z]![15] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+    // Planner in 'estimate' fidelity never reports a missing route (see
+    // restTripFatigueCost); null is only for a trip the planner cannot plan.
+    const trip = chooseRestTrip(state, employee, 40, 5);
+    const cost = restTripFatigueCost(state, employee, 40, 5);
+    expect(trip === null).toBe(cost === null);
+  });
+
+  it.each(getAllVehicleRoles())('role %s: mode follows speed vs AGENT_WALK_SPEED', (role) => {
+    const { state, employee, vehicle } = mountedFixture(role);
+    const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
+    const trip = chooseRestTrip(state, employee, 60, 5);
+    expect(trip).not.toBeNull();
+    expect(trip!.mode).toBe(speed > AGENT_WALK_SPEED ? 'drive' : 'walk');
+  });
+});
+
+describe('beginRestTravel — park the vehicle and walk (#1709)', () => {
+  const slowRoles = getAllVehicleRoles().filter(r => getVehicleDefByTier(r, 1).speed <= AGENT_WALK_SPEED);
+  const fastRoles = getAllVehicleRoles().filter(r => getVehicleDefByTier(r, 1).speed > AGENT_WALK_SPEED);
+
+  it('catalog has both slow and fast vehicle roles', () => {
+    expect(slowRoles.length).toBeGreaterThan(0);
+    expect(fastRoles.length).toBeGreaterThan(0);
+  });
+
+  it.each(slowRoles)('%s: worker ends on foot, vehicle empty and parked, single foot leg into the quarters', (role) => {
+    const { state, employee, vehicle } = mountedFixture(role);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 40, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const target = resolveBuildingApproach(state, building, employee.x, employee.z);
+
+    beginRestTravel(state, employee, target.x, target.z, building.id);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(vehicle.x).toBe(0);
+    expect(vehicle.z).toBe(5);
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs).toHaveLength(1);
+    expect(legs[0]!.mode).toBe('foot');
+    expect(legs[0]!.onArrive).toEqual({ kind: 'enter_building', buildingId: building.id });
+    expect(employee.pendingActionType).toBe('rest');
+    expect(assertWorldInvariants(state)).toEqual([]);
+  });
+
+  it.each(slowRoles)('%s: parks and walks even with a same-role follow-up queued', (role) => {
+    const { state, employee, vehicle } = mountedFixture(role);
+    state.pendingActions.push({
+      id: 902, type: 'drill_hole', requiredSkill: null, requiredVehicleRole: role,
+      targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+
+    beginRestTravel(state, employee, 30, 5);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(employee.itinerary!.legs.every(l => l.mode === 'foot')).toBe(true);
+  });
+
+  it.each(fastRoles)('%s: faster than walking keeps drive + alight on arrival', (role) => {
+    const { state, employee, vehicle } = mountedFixture(role);
+
+    beginRestTravel(state, employee, 60, 5);
+
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    const legs = employee.itinerary!.legs;
+    const last = legs[legs.length - 1]!;
+    expect(last.mode).toBe('drive');
+    expect(last.onArrive).toEqual({ kind: 'alight' });
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  it('parked-and-walked worker with no building target: foot leg to the plain (x, z)', () => {
+    const { state, employee, vehicle } = mountedFixture('drill_rig');
+
+    beginRestTravel(state, employee, 30, 5);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(vehicle.occupantIds).toEqual([]);
+    const last = employee.itinerary!.legs.at(-1)!;
+    expect(last.mode).toBe('foot');
+    expect(last.destX).toBe(30);
+    expect(last.destZ).toBe(5);
+    expect(assertWorldInvariants(state)).toEqual([]);
   });
 });

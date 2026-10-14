@@ -59,18 +59,17 @@ describe('createSitePolicy() (3.12)', () => {
 
 describe('getShiftDurationTicks() (3.12)', () => {
   // ── Test 5 ──────────────────────────────────────────────────────────────────
-  it("getShiftDurationTicks('shift_8h') returns 8 (matches SHIFT_DURATIONS_TICKS.shift_8h)", () => {
+  it("getShiftDurationTicks('shift_8h') matches SHIFT_DURATIONS_TICKS.shift_8h", () => {
     const result = getShiftDurationTicks('shift_8h');
 
-    expect(result).toBe(8);
     expect(result).toBe(SHIFT_DURATIONS_TICKS.shift_8h);
   });
 
   // ── Test 6 ──────────────────────────────────────────────────────────────────
-  it("getShiftDurationTicks('shift_12h') returns 12 (matches SHIFT_DURATIONS_TICKS.shift_12h)", () => {
+  it("getShiftDurationTicks('shift_12h') matches SHIFT_DURATIONS_TICKS.shift_12h and outlasts shift_8h", () => {
     const result = getShiftDurationTicks('shift_12h');
 
-    expect(result).toBe(12);
+    expect(result).toBeGreaterThan(SHIFT_DURATIONS_TICKS.shift_8h);
     expect(result).toBe(SHIFT_DURATIONS_TICKS.shift_12h);
   });
 
@@ -89,7 +88,7 @@ describe('shouldForceRest() — shift-duration enforcement (3.12)', () => {
   it('returns true when ticksWorked equals the shift_8h shift duration', () => {
     const policy = createSitePolicy('shift_8h');
     // Employee is just above the threshold so only the shift boundary triggers rest
-    const employee = { fatigue: 80, ticksWorked: 8 };
+    const employee = { fatigue: 80, ticksWorked: SHIFT_DURATIONS_TICKS.shift_8h };
 
     const result = shouldForceRest(policy, employee, true);
 
@@ -99,7 +98,7 @@ describe('shouldForceRest() — shift-duration enforcement (3.12)', () => {
   // ── Test 10 ──────────────────────────────────────────────────────────────────
   it('returns true when ticksWorked exceeds the shift_8h shift duration', () => {
     const policy = createSitePolicy('shift_8h');
-    const employee = { fatigue: 80, ticksWorked: 10 };
+    const employee = { fatigue: 80, ticksWorked: SHIFT_DURATIONS_TICKS.shift_8h + 2 };
 
     const result = shouldForceRest(policy, employee, true);
 
@@ -109,8 +108,8 @@ describe('shouldForceRest() — shift-duration enforcement (3.12)', () => {
   // ── Test 11 ──────────────────────────────────────────────────────────────────
   it('returns false when ticksWorked is below the shift_8h shift duration and fatigue is healthy', () => {
     const policy = createSitePolicy('shift_8h');
-    // ticksWorked=5 < 8, and fatigue well above threshold
-    const employee = { fatigue: 80, ticksWorked: 5 };
+    // ticksWorked below the shift duration, and fatigue well above threshold
+    const employee = { fatigue: 80, ticksWorked: SHIFT_DURATIONS_TICKS.shift_8h - 3 };
 
     const result = shouldForceRest(policy, employee, true);
 
@@ -132,7 +131,7 @@ describe('shouldForceRest() — shift-duration enforcement (3.12)', () => {
   it('returns false for shift_8h when the employee is not currently working', () => {
     const policy = createSitePolicy('shift_8h');
     // ticksWorked ≥ shift duration but employee is already resting
-    const employee = { fatigue: 80, ticksWorked: 8 };
+    const employee = { fatigue: 80, ticksWorked: SHIFT_DURATIONS_TICKS.shift_8h };
 
     const result = shouldForceRest(policy, employee, false);
 
@@ -157,7 +156,7 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   // ── Test 15 ──────────────────────────────────────────────────────────────────
   it('returns false when fatigue is above its threshold and ticksWorked < shift duration', () => {
     const policy = createSitePolicy('shift_8h');
-    // fatigue (70) > 60, ticksWorked (3) < 8 → no rest needed
+    // fatigue (70) > 60, ticksWorked (3) < shift duration → no rest needed
     const employee = { fatigue: 70, ticksWorked: 3 };
 
     const result = shouldForceRest(policy, employee, true);
