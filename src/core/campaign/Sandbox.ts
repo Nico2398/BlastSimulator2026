@@ -12,14 +12,14 @@
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { LevelDef } from './Level.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
 
-export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
+export type { SandboxDifficultyId };
 
 export interface SandboxDifficultyDef {
   id: SandboxDifficultyId;

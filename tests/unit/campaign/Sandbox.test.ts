@@ -210,6 +210,8 @@ describe('sandboxLevelDef', () => {
     expect(levels.hard.startingCash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
 
     // startingSite is the one other field allowed to differ (#1671); every other key is shared.
+    expect(levels.easy.startingSite).not.toEqual(levels.normal.startingSite);
+    expect(levels.normal.startingSite).not.toEqual(levels.hard.startingSite);
     // Cash presets must actually differ, or the "varies only cash" claim is vacuous.
     expect(levels.easy.startingCash).not.toBe(levels.normal.startingCash);
     expect(levels.normal.startingCash).not.toBe(levels.hard.startingCash);

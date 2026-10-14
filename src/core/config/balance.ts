@@ -1407,8 +1407,8 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'spoil_heap', tier: 1 }],
 };
 
-/** Sandbox difficulty ids a starting kit is keyed by (#1671). */
-export type SandboxStartingSiteId = 'easy' | 'normal' | 'hard';
+/** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
+export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
 
 const SANDBOX_KIT_BUILDINGS: readonly StartingBuildingSlot[] = DUSTY_HOLLOW_STARTING_SITE.buildings;
 const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
@@ -1427,7 +1427,7 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  * excavator-licensed driver; easy adds a rock fragmenter and its licensed
  * driver. Each kit is a superset of the smaller one.
  */
-export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxStartingSiteId, StartingSiteComposition>> = {
+export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
   hard: DUSTY_HOLLOW_STARTING_SITE,
   normal: {
     employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
