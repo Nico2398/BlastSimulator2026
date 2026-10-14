@@ -6,7 +6,8 @@
 // EmployeeDispatch.test.ts) — this file is the mirrored-path direct coverage
 // core-purity.md requires for every exported src/core/ function.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -22,9 +23,10 @@ import {
   type TickEmployeesResult,
 } from '../../../src/core/engine/EmployeeDispatchSteps.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
-import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH, NEED_REST_DURATIONS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
+import { actionRankTier, MAX_EMPLOYEE_TASK_QUEUE_DEPTH, NEED_REST_DURATIONS, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { computeEmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
 
 const SEED = 42;
@@ -1462,5 +1464,107 @@ describe('promoteActionToActive', () => {
     // independent legacy write of its own.
     expect(employee.destinationX).toBe(employee.itinerary!.legs[0]!.destX);
     expect(employee.destinationZ).toBe(employee.itinerary!.legs[0]!.destZ);
+  });
+});
+
+describe('charge orders outrank reserved-ahead debris hauling (#1742)', () => {
+  // A debris itinerary needs fragments and a depot; the dispatch order is what is under test, so a
+  // haul_debris order is planned as the plain on-foot order it stands in for.
+  const planItinerary = PlanItineraryModule.planItinerary;
+  vi.spyOn(PlanItineraryModule, 'planItinerary').mockImplementation((state, employee, goal, fidelity, opts) => (
+    planItinerary(state, employee, goal, fidelity, opts?.action?.type === 'haul_debris'
+      ? { ...opts, action: { ...opts.action, type: 'general_work' } } : opts)
+  ));
+  afterEach(() => { vi.mocked(PlanItineraryModule.planItinerary).mockClear(); });
+
+  /** A blaster (blasting + driving.truck) with a charging truck, a near haul reserved ahead in its taskQueue and a far charge order in the pool. */
+  function blasterWithReservedHaul() {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 40);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
+    purchaseVehicle(state.vehicles, 'charging_truck', 1, 1);
+
+    const haul = makeAction({ id: 1, type: 'haul_debris', targetX: 2, targetZ: 0, status: 'assigned', holderId: employee.id });
+    const charge = makeAction({
+      id: 2, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: 'charging_truck',
+      targetX: 30, targetZ: 30, payload: { holeId: 'h1' },
+    });
+    state.pendingActions.push(haul, charge);
+    employee.taskQueue = [1];
+    return { state, employee, haul, charge };
+  }
+
+  it('promotes a claimable pool charge_hole within one tick and keeps the reserved haul queued', () => {
+    const { state, employee, haul, charge } = blasterWithReservedHaul();
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, makeResult());
+
+    expect(employee.activeActionId).toBe(charge.id);
+    expect(charge.holderId).toBe(employee.id);
+    expect(employee.taskQueue).toEqual([haul.id]);
+    expect(haul.status).toBe('assigned');
+    expectNoWorldInvariantViolations(state);
+  });
+
+  it('resumes the reserved haul when the pool charge_hole is not claimable (hole still planned)', () => {
+    const { state, employee, haul, charge } = blasterWithReservedHaul();
+    state.plannedDrillHoles.push({ id: 'h1' } as GameState['plannedDrillHoles'][number]);
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, makeResult());
+
+    expect(employee.activeActionId).toBe(haul.id);
+    expect(charge.status).toBe('queued');
+    expectNoWorldInvariantViolations(state);
+  });
+
+  it('resumes the reserved haul when the only pool entry is the same tier (no outranking)', () => {
+    const { state, employee, haul, charge } = blasterWithReservedHaul();
+    charge.type = 'general_work';
+    charge.requiredSkill = null;
+    charge.requiredVehicleRole = null;
+    charge.targetX = 1;
+    charge.targetZ = 1;
+
+    fillIdleEmployeeFromQueueOrPool(state, employee, makeResult());
+
+    expect(employee.activeActionId).toBe(haul.id);
+    expect(charge.status).toBe('queued');
+    expectNoWorldInvariantViolations(state);
+  });
+
+  it('claimOnePoolCandidate honours minExclusiveTier: a tier-equal candidate is not claimed', () => {
+    const { state, employee, charge } = blasterWithReservedHaul();
+    const tier = actionRankTier('charge_hole');
+
+    expect(claimOnePoolCandidate(state, employee, false, false, tier)).toBeNull();
+    expect(charge.status).toBe('queued');
+    expect(claimOnePoolCandidate(state, employee, false, false, tier - 1)!.action.id).toBe(charge.id);
+  });
+
+  it('hasIdleLicensedAlternative: an idle driver without blasting does not defer a charge_hole from the blaster', () => {
+    const { state, employee, charge } = blasterWithReservedHaul();
+    employee.taskQueue = [];
+    state.pendingActions = state.pendingActions.filter(a => a.id !== 1);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    assignSkill(state.employees, driver.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
+
+    const selection = claimOnePoolCandidate(state, employee, false, true);
+
+    expect(selection).not.toBeNull();
+    expect(selection!.action.id).toBe(charge.id);
+  });
+
+  it('hasIdleLicensedAlternative: an idle driver who also holds blasting still defers the claim', () => {
+    const { state, employee } = blasterWithReservedHaul();
+    employee.taskQueue = [];
+    state.pendingActions = state.pendingActions.filter(a => a.id !== 1);
+    const { employee: other } = hireEmployee(state.employees, 'blaster', new Random(SEED), 2, 2);
+    assignSkill(state.employees, other.id, 'blasting', 1);
+    assignSkill(state.employees, other.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
+
+    expect(claimOnePoolCandidate(state, employee, false, true)).toBeNull();
   });
 });
