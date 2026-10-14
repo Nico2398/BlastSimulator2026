@@ -14,7 +14,10 @@ import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 const SEED = 42;
-const SHOT_START = '30,-4';
+// Ore on the desert seed 42 site sits in discrete deposits (#1682); (30,-4) is
+// barren, so a shot there can never feed storage or the ore tally. This one
+// opens the deposit centred near (40,33).
+const SHOT_START = '36,30';
 const RAMP_SETUP_TICKS = 600;
 const HAUL_WINDOW_TICKS = 800;
 const MIN_HAULED_SHARE = 0.3;
@@ -53,8 +56,10 @@ function openingKitHaul(side: 'west' | 'east') {
   const haulable = state.logistics.fragments.filter(f => !isOversized(f.fragment.volume));
   const haulableMass = haulable.reduce((a, f) => a + f.fragment.mass, 0);
 
-  const ramp = side === 'west' ? 'start:16,0 end:30,0' : 'start:52,0 end:38,0';
-  expect(run(`build_ramp ${ramp} depth:6`)).toMatchObject({ success: true });
+  // Ramp depth is measured from the start surface and must land on the crater
+  // floor (~9.5 m): the west start sits near 16.5 m, the east one near 13.4 m (floor 10.5).
+  const ramp = side === 'west' ? 'start:12,34 end:34,34 depth:6' : 'start:62,34 end:46,34 depth:3';
+  expect(run(`build_ramp ${ramp}`)).toMatchObject({ success: true });
   const stuck = new Map<number, number>();
   let maxStuck = 0;
   const sample = () => {
