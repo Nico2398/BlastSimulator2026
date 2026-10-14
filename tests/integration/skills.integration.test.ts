@@ -210,7 +210,7 @@ describe('Employee skills', () => {
       ctx.state!.employees,
       empId,
       building.id,
-      'driving.truck',
+      'driving.excavator',
       3,
       300,
     );
@@ -221,7 +221,7 @@ describe('Employee skills', () => {
     // Tick 1 → 2 remaining
     tickTraining(ctx.state!);
     expect(getEmp().trainingState!.ticksRemaining).toBe(2);
-    expect(getEmp().qualifications.find(q => q.category === 'driving.truck')).toBeUndefined();
+    expect(getEmp().qualifications.find(q => q.category === 'driving.excavator')).toBeUndefined();
 
     // Tick 2 → 1 remaining
     tickTraining(ctx.state!);
@@ -231,7 +231,7 @@ describe('Employee skills', () => {
     tickTraining(ctx.state!);
     expect(getEmp().trainingState).toBeNull();
 
-    const qual = getEmp().qualifications.find(q => q.category === 'driving.truck');
+    const qual = getEmp().qualifications.find(q => q.category === 'driving.excavator');
     expect(qual).toBeDefined();
     expect(qual!.proficiencyLevel).toBe(1);
     expect(qual!.xp).toBe(0);
@@ -287,8 +287,8 @@ describe('Employee skills', () => {
 
   it('a hired blaster arrives holding blasting at its higher starting level', () => {
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
-    expect(emp.qualifications).toHaveLength(1);
-    expect(emp.qualifications[0]!.category).toBe('blasting');
+    // Blasting at the higher level, plus the truck licence (#1667) — no drill rig.
+    expect(emp.qualifications.map(q => q.category)).toEqual(['blasting', 'driving.truck']);
     expect(emp.qualifications[0]!.proficiencyLevel).toBe(ROLE_STARTING_QUALIFICATIONS.blaster[0]!.proficiencyLevel);
   });
 

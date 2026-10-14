@@ -46,8 +46,9 @@ const SEED = 42;
 function makeStateWithOne(role: 'driller' | 'blaster' = 'blaster'): { state: EmployeeState; empId: number } {
   const state = createEmployeeState();
   const rng = new Random(SEED);
-  // A blaster arrives holding 'blasting' alone, so the assignSkill cases below stay exact.
   const { employee } = hireEmployee(state, role, rng);
+  // A blaster also arrives with the truck licence (#1667); keep 'blasting' alone so the assignSkill cases below stay exact.
+  if (role === 'blaster') employee.qualifications = employee.qualifications.filter(q => q.category === 'blasting');
   return { state, empId: employee.id };
 }
 

@@ -84,6 +84,20 @@ function makeOverlayOptions(
   };
 }
 
+describe('TerrainMesh.biomeId (#1674)', () => {
+  it('returns the biome id given at construction', () => {
+    const tm = new TerrainMesh(makeScene(), new VoxelGrid(4, 4), 'red_canyon');
+    expect(tm.biomeId).toBe('red_canyon');
+    tm.dispose();
+  });
+
+  it('is undefined when no biome id was given', () => {
+    const tm = new TerrainMesh(makeScene(), new VoxelGrid(4, 4));
+    expect(tm.biomeId).toBeUndefined();
+    tm.dispose();
+  });
+});
+
 describe('TerrainMesh', () => {
   it('buildAll on empty grid adds no meshes', () => {
     const scene = makeScene();
