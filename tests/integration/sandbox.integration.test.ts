@@ -9,7 +9,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
-import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES, SANDBOX_FIXED_ORE_DEPOSITS } from '../../src/core/campaign/Sandbox.js';
+import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES } from '../../src/core/campaign/Sandbox.js';
 import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import { addIncome } from '../../src/core/economy/Finance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
@@ -301,15 +301,6 @@ describe('sandbox mode', () => {
 // #1671: each difficulty reaches its first sale from the free kit alone.
 const CYCLE_TICK_CAP = 4000;
 const CYCLE_BUY_OR_HIRE = /^(employee hire|vehicle buy|vehicle purchase|build |hire |purchase )/;
-
-describe('sandbox ore deposits (#1682)', () => {
-  it('the sandbox level generates ore as deposits and persists the mode on the world', () => {
-    const { runner, ctx } = createRunner();
-    expect(runner.run('sandbox start biome:desert_badlands seed:42 difficulty:normal').success).toBe(true);
-    expect(SANDBOX_FIXED_ORE_DEPOSITS).toBe(true);
-    expect(ctx.state!.world!.oreDeposits).toBe(true);
-  });
-});
 
 /** Ore in the 8x8 footprint a 3x3 spacing-4 grid drills, to 6 m below the surface. */
 function footprintOre(grid: VoxelGrid, x0: number, z0: number): number {

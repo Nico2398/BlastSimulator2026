@@ -12,6 +12,11 @@ import { claimForAction } from '../../src/console/commands/siteExpansion.js';
 import { sandboxLevelDef, SANDBOX_DEFAULTS } from '../../src/core/campaign/Sandbox.js';
 import type { TerrainConfig } from '../../src/core/world/TerrainGen.js';
 import { MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { estimateSurveyResult } from '../../src/core/mining/SurveyCalc.js';
+import { surveyColumnKey } from '../../src/core/mining/SurveyColumn.js';
+import { SURVEY_DEPTH_BELOW_SURFACE } from '../../src/core/config/balance.js';
+import { Random } from '../../src/core/math/Random.js';
+import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { fingerprintTerrainConfig } from '../helpers/terrainFingerprint.js';
 
 const BIOME = 'green_foothills';
@@ -110,5 +115,45 @@ describe('sandbox ore deposits (#1682)', () => {
       if (JSON.stringify(live.grid!.oresAt(x, y, z)) !== JSON.stringify(legacy.grid!.oresAt(x, y, z))) { differs = true; break; }
     }
     expect(differs).toBe(true);
+  }, 60000);
+});
+
+/** Peak true ore density in the core-sample window of one column (0 when barren). */
+function peakOreInWindow(grid: VoxelGrid, x: number, z: number): number {
+  const top = computeVoxelColumnSurfaceY(grid, x, z);
+  if (top === null) return -1;
+  let peak = 0;
+  for (let y = top; y > top - SURVEY_DEPTH_BELOW_SURFACE.core_sample; y--) {
+    if (grid.densityAt(x, y, z) <= 0) continue;
+    for (const d of Object.values(grid.oresAt(x, y, z) ?? {})) peak = Math.max(peak, d);
+  }
+  return peak;
+}
+
+function coreSampleAt(grid: VoxelGrid, x: number, z: number) {
+  return estimateSurveyResult(
+    grid,
+    { id: 1, method: 'core_sample', centerX: x, centerZ: z, surveyorId: 1, skillLevel: 5, completedTick: 0 },
+    new Random(1),
+  );
+}
+
+describe('sandbox ore deposits are visible to a survey (#1682)', () => {
+  it('a core sample reports no ore over barren ground and reports ore over a deposit', () => {
+    const grid = startSandbox().grid!;
+    let barren: { x: number; z: number } | null = null;
+    let rich: { x: number; z: number; peak: number } | null = null;
+    for (let x = 8; x < 56; x++) for (let z = 8; z < 56; z++) {
+      const peak = peakOreInWindow(grid, x, z);
+      if (peak === 0 && !barren) barren = { x, z };
+      if (peak > 0 && (!rich || peak > rich.peak)) rich = { x, z, peak };
+    }
+    expect(barren, 'the site has a barren column').not.toBeNull();
+    expect(rich, 'the site has a deposit column').not.toBeNull();
+
+    expect(coreSampleAt(grid, barren!.x, barren!.z).estimates).toEqual({});
+    const found = coreSampleAt(grid, rich!.x, rich!.z).estimates[surveyColumnKey(rich!.x, rich!.z)];
+    expect(found, 'the deposit column reports ore').toBeDefined();
+    expect(Object.keys(found!).length).toBeGreaterThan(0);
   }, 60000);
 });

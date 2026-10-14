@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
 import type { VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
-import { getOre } from '../../../src/core/world/OreCatalog.js';
+import { getOre, getAllOres } from '../../../src/core/world/OreCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 import { SEEDS, BLOCK, MAX_DEPTH, sampleSite, blockIndexOf, shareBelow, richestDecileOverMedian, argmax, peakBlockByOre, type SiteOre } from '../../helpers/oreSite.js';
+import { ORE_DEPOSIT_RARITY_COVERAGE } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
@@ -254,6 +255,14 @@ function crewStartColumn(biomeId: string, seed: number): { x: number; z: number 
   };
 }
 
+describe('ore deposit rarity coverage (#1682)', () => {
+  it('every rarity in the ore catalog has a deposit coverage entry', () => {
+    for (const ore of getAllOres()) {
+      expect(ORE_DEPOSIT_RARITY_COVERAGE[ore.rarity], `${ore.id} (${ore.rarity})`).toBeTypeOf('number');
+    }
+  });
+});
+
 describe('ore deposits on sandbox sites, every biome (#1682)', () => {
   const SLABS = [0, 1] as const; // 0-8 m and 8-16 m
   for (const biome of getAllBiomes()) {
@@ -266,7 +275,7 @@ describe('ore deposits on sandbox sites, every biome (#1682)', () => {
             expect(shareBelow(blocks, 1000)).toBeGreaterThanOrEqual(0.3);
           });
 
-          it(`${label}: the richest decile averages at least 5x the median block`, () => {
+          it(`${label}: the richest decile averages at least 5x the median block (median floored at 1 t)`, () => {
             const blocks = sampleSite(biome, seed, { oreDeposits: true }).blockMass[slab]!;
             expect(richestDecileOverMedian(blocks)).toBeGreaterThanOrEqual(5);
           });
@@ -302,7 +311,7 @@ describe('ore deposits on sandbox sites, every biome (#1682)', () => {
 
   it('the legacy veins fail the distribution the deposits must meet (the helper has teeth)', () => {
     const desert = getAllBiomes().find(b => b.id === 'desert_badlands')!;
-    const blocks = sampleSite(desert, 42, { oreDeposits: undefined }).blockMass[0]!;
+    const blocks = sampleSite(desert, 42).blockMass[0]!;
     expect(shareBelow(blocks, 1000)).toBeLessThan(0.3);
   });
 });

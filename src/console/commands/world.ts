@@ -231,12 +231,8 @@ function gridDirtyRegion(grid: VoxelGrid): {
  */
 export function regenerateGrid(
   ctx: GameContext,
-  params: {
+  params: Omit<GenerationFields, 'climateBias'> & {
     seed: number; climateBias: readonly [number, number];
-    sizeX: number; datum: number; sizeZ: number;
-    mixedRockHardness?: boolean;
-    oreDeposits?: boolean;
-    pitMask?: PitMaskShape;
     /**
      * True only where this grid is a game's first (`new_game`, a campaign
      * level start, `sandbox`): the starting crew is then laid out on real
@@ -319,13 +315,7 @@ export function regenerateGrid(
  */
 export function ensureLandscape(
   ctx: GameContext,
-  params: {
-    seed: number; climateBias: readonly [number, number];
-    sizeX: number; datum: number; sizeZ: number;
-    mixedRockHardness?: boolean;
-    oreDeposits?: boolean;
-    pitMask?: PitMaskShape;
-  },
+  params: Omit<GenerationFields, 'climateBias'> & { seed: number; climateBias: readonly [number, number] },
 ): LandscapeHandle | null {
   if (!ctx.grid) return null;
   if (ctx.landscape) return ctx.landscape;
