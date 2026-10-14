@@ -5,6 +5,7 @@
 import type { SurveyResult } from './SurveyCalc.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { oreValuePerM3 } from './BlastValueEstimate.js';
+import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import { getOre } from '../world/OreCatalog.js';
 import { ORE_DENSITY_KG_M3, SURVEY_COVERAGE_RADIUS, SURVEY_DEPTH_BELOW_SURFACE } from '../config/balance.js';
 
@@ -51,9 +52,10 @@ function surveyedColumnCount(
   return Math.max(count, estimatedColumns);
 }
 
-/** Summarise a survey per ore, sorted by estimatedValue descending; unknown ore ids are skipped. */
+/** Summarise a survey per ore, valued in `marketId` (#1681), sorted by estimatedValue descending; unknown ore ids are skipped. */
 export function summarizeSurveyOres(
   survey: Pick<SurveyResult, 'method' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>,
+  marketId: MarketId,
 ): OreAreaSummary[] {
   const columnKeys = Object.keys(survey.estimates);
   if (columnKeys.length === 0) return [];
@@ -86,7 +88,7 @@ export function summarizeSurveyOres(
       typicalGrade,
       peakGrade: a.peak,
       estimatedTonnes,
-      estimatedValue: volume * oreValuePerM3(typicalGrade, ore.valuePerKg) * survey.confidence,
+      estimatedValue: volume * oreValuePerM3(typicalGrade, oreValuePerKg(oreId, marketId)) * survey.confidence,
     });
   }
   return out.sort((p, q) => q.estimatedValue - p.estimatedValue);

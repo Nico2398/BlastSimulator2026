@@ -127,9 +127,19 @@ describe('buildSurveyOverlayOptions()', () => {
     const rich = options.points.find(p => p.x === 5 && p.z === 5)!;
     const poor = options.points.find(p => p.x === 6 && p.z === 5)!;
 
-    expect(rich.valuePerM3).toBeCloseTo(columnOreValuePerM3({ sparkium: 0.4 }), 3);
-    expect(poor.valuePerM3).toBeCloseTo(columnOreValuePerM3({ dirtite: 0.1 }), 3);
+    expect(rich.valuePerM3).toBeCloseTo(columnOreValuePerM3({ sparkium: 0.4 }, 'legacy'), 3);
+    expect(poor.valuePerM3).toBeCloseTo(columnOreValuePerM3({ dirtite: 0.1 }, 'legacy'), 3);
     expect(rich.valuePerM3!).toBeGreaterThan(poor.valuePerM3!);
+  });
+
+  it('prices columns in the level market (#1681)', () => {
+    const grid = new VoxelGrid(20, 20);
+    grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
+    const state = makeState([makeSurveyResult({ estimates: { '5,5': { sparkium: 0.4 } } })]);
+    state.contracts.market = 'production';
+    const options = buildSurveyOverlayOptions(state, grid)!;
+    const rich = options.points.find(p => p.x === 5 && p.z === 5)!;
+    expect(rich.valuePerM3).toBeCloseTo(columnOreValuePerM3({ sparkium: 0.4 }, 'production'), 3);
   });
 
   it('keeps valuePerM3 on stale-survey points too, so the overlay can decide the grey (#1684)', () => {

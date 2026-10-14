@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Contract system
 // Contracts define material delivery requirements with deadlines, payments, and penalties.
 
+import { oreContractBasePrice, resolveMarket, type MarketId, type MarketRange } from './Market.js';
 import { Random } from '../math/Random.js';
 import type { ScriptedOreSaleOffer } from '../config/balance.js';
 import {
@@ -8,9 +9,7 @@ import {
   CONTRACTS_PER_REFRESH,
   MAX_AVAILABLE_CONTRACTS,
   NEGOTIATION_EARLY_BONUS_RATE,
-  ORE_PRICES,
   CONTRACT_PENALTY_RATE,
-  RUBBLE_DISPOSAL_PRICE_RANGE,
   SUPPLY_COMMON_ORE_COUNT,
 } from '../config/balance.js';
 
@@ -79,6 +78,8 @@ export interface ContractState {
   lastRefreshTick: number;
   /** Outcome of the most recent negotiate attempt, so the panel can show it inline on the right card. Null until the first attempt. */
   lastNegotiation: { contractId: number; success: boolean; changes: NegotiationChange[] } | null;
+  /** Market pricing this contract board; absent = 'legacy' (#1681). */
+  market?: MarketId;
 }
 
 export function createContractState(): ContractState {
@@ -91,8 +92,6 @@ export function createContractState(): ContractState {
     lastNegotiation: null,
   };
 }
-
-const ORE_BASE_PRICES: Record<string, number> = ORE_PRICES;
 
 // ── Generation ──
 
@@ -130,13 +129,15 @@ export function offerSpecialContract(
 }
 
 /** The cheapest SUPPLY_COMMON_ORE_COUNT of the given ores, by base price. */
-function commonOres(ores: readonly string[]): string[] {
+function commonOres(ores: readonly string[], market: MarketId | undefined): string[] {
   return [...ores]
-    .sort((a, b) => (ORE_BASE_PRICES[a] ?? 10) - (ORE_BASE_PRICES[b] ?? 10))
+    .sort((a, b) => oreContractBasePrice(a, market) - oreContractBasePrice(b, market))
     .slice(0, SUPPLY_COMMON_ORE_COUNT);
 }
 
 function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[]): Contract {
+  const market = state.market;
+  const profile = resolveMarket(market);
   const typeRoll = rng.nextFloat(0, 1);
   // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
   const rubbleOnly = availableOres.length === 0;
@@ -144,24 +145,28 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   let materialId: string;
   let basePricePerKg: number;
   let description: string;
+  let qtyRange: MarketRange;
 
   if (!rubbleOnly && typeRoll < 0.5) {
     // Ore sale contract
     type = 'ore_sale';
     materialId = rng.pick(availableOres);
-    basePricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
+    basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.oreSalePriceFactor.min, profile.oreSalePriceFactor.max);
+    qtyRange = profile.oreSaleQtyKg;
     description = `Deliver ${materialId} ore`;
   } else if (rubbleOnly || typeRoll < 0.8) {
     // Rubble disposal
     type = 'rubble_disposal';
     materialId = '';
-    basePricePerKg = rng.nextFloat(RUBBLE_DISPOSAL_PRICE_RANGE.min, RUBBLE_DISPOSAL_PRICE_RANGE.max);
+    basePricePerKg = rng.nextFloat(profile.rubblePricePerKg.min, profile.rubblePricePerKg.max);
+    qtyRange = profile.rubbleQtyKg;
     description = 'Dispose of rubble';
   } else {
     // Supply contract (recurring, higher quantity, lower price)
     type = 'supply';
-    materialId = rng.pick(commonOres(availableOres)); // Only the site's cheapest ores for supply
-    basePricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
+    materialId = rng.pick(commonOres(availableOres, market)); // Only the site's cheapest ores for supply
+    basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.supplyPriceFactor.min, profile.supplyPriceFactor.max);
+    qtyRange = profile.supplyQtyKg;
     description = `Supply ${materialId} (bulk)`;
   }
 
@@ -175,7 +180,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   // 500kg gloomium contract nobody can fill would fine a $340,000 mine
   // $250,000 for the mistake the tutorial exists to let a player make.
 
-  const quantityKg = Math.round(rng.nextFloat(50, 500) / 10) * 10;
+  const quantityKg = Math.round(rng.nextFloat(qtyRange.min, qtyRange.max) / profile.qtyStepKg) * profile.qtyStepKg;
   const deadlineTicks = rng.nextInt(30, 100);
   return buildOffer(state, type, materialId, description, quantityKg, deadlineTicks, basePricePerKg, priceMultiplier);
 }
@@ -503,6 +508,6 @@ export function ensureScriptedOreSale(
   state.available.push(buildOffer(
     state, 'ore_sale', offer.materialId, `Deliver ${offer.materialId} ore`,
     offer.quantityKg, offer.deadlineTicks,
-    (ORE_BASE_PRICES[offer.materialId] ?? 10) * offer.priceFactor, priceMultiplier,
+    oreContractBasePrice(offer.materialId, state.market) * offer.priceFactor, priceMultiplier,
   ));
 }

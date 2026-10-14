@@ -2,12 +2,16 @@
 // Per-ore digest of a survey's estimates: coverage, typical grade, peak, tonnes, value.
 
 import { describe, it, expect } from 'vitest';
-import { summarizeSurveyOres } from '../../../src/core/mining/SurveyOreSummary.js';
-import { columnOreValuePerM3 } from '../../../src/core/mining/BlastValueEstimate.js';
+import { summarizeSurveyOres as summarizeInMarket } from '../../../src/core/mining/SurveyOreSummary.js';
+import { columnOreValuePerM3 as columnValueInMarket } from '../../../src/core/mining/BlastValueEstimate.js';
+import { oreValuePerKg, type MarketId } from '../../../src/core/economy/Market.js';
 import { ORE_DENSITY_KG_M3, SURVEY_COVERAGE_RADIUS, SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 
 type Input = Pick<SurveyResult, 'method' | 'estimates' | 'confidence' | 'centerX' | 'centerZ'>;
+
+const summarizeSurveyOres = (survey: Input, market: MarketId = 'legacy') => summarizeInMarket(survey, market);
+const columnOreValuePerM3 = (d: Record<string, number>, market: MarketId = 'legacy') => columnValueInMarket(d, market);
 
 const SPARKIUM_PER_KG = 150;
 const RUSTITE_PER_KG = 8;
@@ -215,5 +219,30 @@ describe('columnOreValuePerM3', () => {
     expect(columnOreValuePerM3({ not_a_real_ore: 0.9 })).toBe(0);
     expect(columnOreValuePerM3({ not_a_real_ore: 0.9, rustite: 0.5 }))
       .toBeCloseTo(0.5 * ORE_DENSITY_KG_M3 * RUSTITE_PER_KG, 3);
+  });
+});
+
+describe('summarizeSurveyOres — market pricing (#1681)', () => {
+  const estimates = { '20,20': { sparkium: 0.2, rustite: 0.5 } };
+  const core: Input = { method: 'core_sample', centerX: 20, centerZ: 20, confidence: 1, estimates };
+
+  it('estimatedValue follows the market price of each ore', () => {
+    for (const market of ['legacy', 'production'] as const) {
+      const volume = SURVEY_DEPTH_BELOW_SURFACE.core_sample;
+      for (const s of summarizeSurveyOres(core, market)) {
+        const grade = estimates['20,20'][s.oreId as 'sparkium' | 'rustite'];
+        expect(s.estimatedValue).toBeCloseTo(volume * grade * ORE_DENSITY_KG_M3 * oreValuePerKg(s.oreId, market), 3);
+      }
+    }
+  });
+
+  it('sandbox (production) and legacy surveys of the same ground disagree on value', () => {
+    const total = (m: MarketId) => summarizeSurveyOres(core, m).reduce((a, s) => a + s.estimatedValue, 0);
+    expect(total('production')).not.toBeCloseTo(total('legacy'), 1);
+  });
+
+  it('columnOreValuePerM3 prices in the given market', () => {
+    expect(columnOreValuePerM3({ rustite: 0.5 }, 'production'))
+      .toBeCloseTo(0.5 * ORE_DENSITY_KG_M3 * oreValuePerKg('rustite', 'production'), 3);
   });
 });

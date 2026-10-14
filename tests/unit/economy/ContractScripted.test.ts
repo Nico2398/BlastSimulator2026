@@ -8,6 +8,7 @@ import {
   type Contract,
   type ContractState,
 } from '../../../src/core/economy/Contract.js';
+import { oreContractBasePrice } from '../../../src/core/economy/Market.js';
 import {
   MAX_AVAILABLE_CONTRACTS,
   ORE_PRICES,
@@ -68,6 +69,13 @@ describe('ensureScriptedOreSale (#1600)', () => {
     expect(c.expired).toBe(false);
     expect(hasFillableOreSaleOffer(s.available, { rustite: 400 })).toBe(true);
     expect(hasFillableOreSaleOffer(s.available, { rustite: 399 })).toBe(false);
+  });
+
+  it('prices from the board\'s own market (#1681)', () => {
+    const s = createContractState();
+    s.market = 'production';
+    ensureScriptedOreSale(s, OFFER, 1);
+    expect(s.available[0]!.pricePerKg).toBeCloseTo(oreContractBasePrice('rustite', 'production') * OFFER.priceFactor, 6);
   });
 
   it('prices at ORE_PRICES[material] * priceFactor * multiplier', () => {
