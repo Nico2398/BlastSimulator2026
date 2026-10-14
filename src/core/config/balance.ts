@@ -2442,3 +2442,26 @@ export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
 
 /** Rendered seconds after which the blast report opens even if some debris is still moving. */
 export const BLAST_REPORT_MAX_PLAYBACK_S = 8;
+
+// ─── Pit mask shape (#1680) ──────────────────────────────────────────────────
+
+/** How the pit-suitability mask flattens relief inside a playable rect. */
+export interface PitMaskShape {
+  /** Metres of blend measured inward from the rect's edge. */
+  margin: number;
+  /** Fraction of relief that survives at full compression, deep inside the rect. */
+  reliefKeep: number;
+}
+
+/** Mask used by campaign levels and standalone worlds. */
+export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
+
+/** Sandbox mask. TODO: implementation sets a flatter shape (14 / 0.05). */
+export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
+
+/** Target fraction of the sandbox start pad that must be flat. */
+export const SANDBOX_FLAT_PAD_TARGET = 0.25;
+/** Max height spread (voxels) across the flat pad. */
+export const SANDBOX_FLAT_PAD_MAX_SPREAD = 2;
+/** Side length (voxels) of the flat pad. */
+export const SANDBOX_FLAT_PAD_SIZE = 9;

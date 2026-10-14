@@ -6,6 +6,7 @@
 // generator identity, then replays the edit record on top — reproducing the
 // live grid voxel for voxel without saving every voxel's full state (#1181).
 
+import type { PitMaskShape } from '../config/balance.js';
 import { VoxelGrid, clampAxis, isValidVoxelY, type VoxelRockComposition } from '../world/VoxelGrid.js';
 import type { EditSegment, EditBoundary } from '../world/TerrainEdits.js';
 import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, type TerrainConfig } from '../world/TerrainGen.js';
@@ -19,6 +20,7 @@ import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requ
  * against the same world the first chunk did.
  */
 export interface SerializedTerrainGen {
+  pitMask?: PitMaskShape;
   version: number;
   seed: number;
   climateBias: [number, number];

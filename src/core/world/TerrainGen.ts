@@ -6,6 +6,7 @@
 import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
+import type { PitMaskShape } from '../config/balance.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
@@ -62,6 +63,8 @@ export function requireValidGenDatum(value: number, label: string): number {
 }
 
 export interface TerrainConfig {
+  /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
   sizeX: number;
   /** The voxel Y the site centre's surface lands on. */
   datum: number;

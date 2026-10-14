@@ -20,6 +20,7 @@ import {
   type Spline,
 } from './HeightSpline.js';
 import { smoothstep } from '../math/Smoothstep.js';
+import { DEFAULT_PIT_MASK, type PitMaskShape } from '../config/balance.js';
 
 export interface HeightShapingParams {
   baseSpline: Spline;
@@ -85,10 +86,6 @@ export interface Rect {
   maxZ: number;
 }
 
-/** Metres of blend measured inward from a playable rect's edge (#458 A5). */
-const PIT_MASK_MARGIN = 24;
-/** Fraction of relief that survives at full compression, deep inside the rect. */
-const PIT_RELIEF_KEEP = 0.3;
 
 /** Distance from (x, z) to the nearest edge of rect, measured inward — negative outside. */
 function distanceInsideRect(rect: Rect, x: number, z: number): number {
@@ -98,7 +95,7 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 }
 
 /**
- * Compress relief toward centerHeight within PIT_MASK_MARGIN metres inside
+ * Compress relief toward centerHeight within mask.margin metres inside
  * rect's edge, blending back to the untouched height outside it (negative
  * distanceInsideRect drives the smoothstep to 0 automatically — no separate
  * outside-the-rect branch needed).
@@ -109,10 +106,11 @@ export function applyPitMask(
   rect: Rect,
   x: number,
   z: number,
+  _mask: PitMaskShape = DEFAULT_PIT_MASK, // TODO: implement — currently ignored
 ): number {
   const dIn = distanceInsideRect(rect, x, z);
-  const w = smoothstep(0, PIT_MASK_MARGIN, dIn);
-  const compressed = centerHeight + (height - centerHeight) * PIT_RELIEF_KEEP;
+  const w = smoothstep(0, DEFAULT_PIT_MASK.margin, dIn);
+  const compressed = centerHeight + (height - centerHeight) * DEFAULT_PIT_MASK.reliefKeep;
   return height + w * (compressed - height);
 }
 
@@ -150,6 +148,7 @@ export interface WorldGenContext {
   readonly playableRect: Rect;
   readonly centerHeight: number;
   readonly groundOffset: number;
+  readonly pitMask: PitMaskShape;
 }
 
 /**
@@ -170,13 +169,14 @@ export function createWorldGenContext(
   datum: number,
   sizeZ: number,
   makeShapingAt: (fields: WorldNoiseFields) => ShapingAtFn = () => () => DEFAULT_SHAPING,
+  pitMask: PitMaskShape = DEFAULT_PIT_MASK,
 ): WorldGenContext {
   const fields = new WorldNoiseFields(seed);
   const shapingAt = makeShapingAt(fields);
   const playableRect: Rect = { minX: 0, minZ: 0, maxX: sizeX, maxZ: sizeZ };
   const centerHeight = sampleBaseHeight(fields, sizeX / 2, sizeZ / 2, shapingAt(sizeX / 2, sizeZ / 2));
   const groundOffset = computeGroundOffset(centerHeight, datum);
-  return { fields, shapingAt, playableRect, centerHeight, groundOffset };
+  return { fields, shapingAt, playableRect, centerHeight, groundOffset, pitMask };
 }
 
 /** Surface voxel Y for column (x, z), including the pit mask and vertical datum. */

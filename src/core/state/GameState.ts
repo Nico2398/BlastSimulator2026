@@ -68,7 +68,7 @@ import { createHiringPool, type HiringPoolState } from '../entities/HiringPool.j
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
-import type { RampWidth } from '../config/balance.js';
+import type { RampWidth, PitMaskShape } from '../config/balance.js';
 
 /** Save format version — increment when GameState shape changes. */
 // v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
@@ -524,6 +524,8 @@ export interface GameState {
 }
 
 export interface WorldState {
+  /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
   /**
    * Width of the site's live bounding box, NOT an upper bound on x: the site
    * grows as the player claims chunks (#473), so iterate `minX .. minX+sizeX`
