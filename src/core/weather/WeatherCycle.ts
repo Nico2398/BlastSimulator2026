@@ -66,7 +66,7 @@ export function isWeatherState(value: unknown): value is WeatherState {
 }
 
 /** Create initial weather cycle from seed. `pinned` (optional) fixes the weather to that state for the whole game. */
-export function createWeatherCycle(seed: number, pinned?: WeatherState): WeatherCycleState {
+export function createWeatherCycle(seed: number, pinned?: WeatherState, _biomeId?: string): WeatherCycleState {
   const rngState = (seed + WEATHER_RNG_SEED_OFFSET) | 0;
   if (pinned) {
     return { current: pinned, ticksRemaining: DURATION_RANGES[pinned][1], history: [pinned], rngState, pinned: true };
@@ -87,7 +87,7 @@ export function createWeatherCycle(seed: number, pinned?: WeatherState): Weather
  * When ticksRemaining hits 0, transition to next state.
  * Returns updated cycle state (mutates in place for efficiency).
  */
-export function advanceWeather(cycle: WeatherCycleState, rng: Random): WeatherCycleState {
+export function advanceWeather(cycle: WeatherCycleState, rng: Random, _biomeId?: string): WeatherCycleState {
   cycle.ticksRemaining--;
 
   if (cycle.ticksRemaining <= 0) {
@@ -102,7 +102,7 @@ export function advanceWeather(cycle: WeatherCycleState, rng: Random): WeatherCy
 }
 
 /** Force transition to next weather state (for testing/console). */
-export function forceAdvance(cycle: WeatherCycleState, rng: Random): WeatherCycleState {
+export function forceAdvance(cycle: WeatherCycleState, rng: Random, _biomeId?: string): WeatherCycleState {
   cycle.ticksRemaining = 0;
   return advanceWeather(cycle, rng);
 }
@@ -115,14 +115,14 @@ function withCycleRng(cycle: WeatherCycleState, step: (rng: Random) => void): vo
 }
 
 /** Advance the cycle one tick on its own persisted PRNG stream; returns the resulting weather. */
-export function tickWeather(cycle: WeatherCycleState): WeatherState {
+export function tickWeather(cycle: WeatherCycleState, _biomeId?: string): WeatherState {
   if (cycle.pinned) return cycle.current;
   withCycleRng(cycle, rng => advanceWeather(cycle, rng));
   return cycle.current;
 }
 
 /** Force transition to the next weather state on the cycle's own PRNG stream (testing/console). */
-export function forceAdvanceInState(cycle: WeatherCycleState): WeatherCycleState {
+export function forceAdvanceInState(cycle: WeatherCycleState, _biomeId?: string): WeatherCycleState {
   withCycleRng(cycle, rng => forceAdvance(cycle, rng));
   return cycle;
 }
@@ -151,7 +151,7 @@ export function setWeather(cycle: WeatherCycleState, state: WeatherState): Weath
  * must read `cycle.current` directly rather than treating index 0 of this
  * result as today, so the two can never disagree.
  */
-export function forecast(cycle: WeatherCycleState, n = 14): WeatherState[] {
+export function forecast(cycle: WeatherCycleState, n = 14, _biomeId?: string): WeatherState[] {
   const sim: WeatherCycleState = { ...cycle, history: [] };
   const days: WeatherState[] = [];
   for (let day = 0; day < n; day++) {
