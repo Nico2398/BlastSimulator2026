@@ -1065,12 +1065,18 @@ export const EVACUATION_DRIVER_MAX_PATH_ATTEMPTS = 5;
 // nearby plain one rather than winning unconditionally regardless of distance.
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 
-/** Rank tier per action type: lower tier wins before cost is compared. Unlisted types are tier 0. */
-export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = {};
+/**
+ * Rank tier per action type: a HIGHER tier is considered before any lower one,
+ * and cost only orders candidates within a tier (#1742). Without it a cheap
+ * haul_debris trip chain starves a dearer charge_hole that gates the next
+ * shot. Unlisted types are tier 0. A new time-critical order type is one
+ * entry here; no ranking code changes.
+ */
+export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = { charge_hole: 1 };
 
 /** Rank tier of an action type (see ACTION_RANK_TIER). */
-export function actionRankTier(_type: ActionType): number {
-  return 0; // TODO: implement
+export function actionRankTier(type: ActionType): number {
+  return ACTION_RANK_TIER[type] ?? 0;
 }
 
 /**

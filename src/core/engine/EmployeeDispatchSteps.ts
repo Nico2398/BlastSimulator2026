@@ -25,7 +25,7 @@ import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { actionBlocked } from '../events/ActiveModifiers.js';
-import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
+import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH, actionRankTier } from '../config/balance.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { alightIfMounted } from './Mount.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
@@ -188,6 +188,17 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       // tick, the same as any other reachable-but-not-yet-claimed candidate.
       if (promoteStarved()) return;
 
+      // #1742: a pool action of a strictly higher rank tier than anything
+      // queued (a charge_hole behind a reserved haul_debris) wins over the
+      // reservation, which stays queued for the next idle tick.
+      const queuedTier = Math.max(...candidates.map(a => actionRankTier(a.type)));
+      const outranking = claimOnePoolCandidate(state, employee, false, false, queuedTier);
+      if (outranking !== null) {
+        result.claimed.push(outranking.action.id);
+        promoteActionToActive(state, employee, outranking.action, emitter);
+        return;
+      }
+
       // Nothing starved to prefer — fall back to ranking the full queue.
       const selection = selectBestActionForEmployee(state, employee, candidates);
       if (selection !== null) {
@@ -336,6 +347,9 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
  * which promotes taskQueue entries through the ordinary, role-agnostic path
  * (fillIdleEmployeeFromQueueOrPool) instead.
  *
+ * `minExclusiveTier` (#1742): only pool actions whose actionRankTier is
+ * strictly above it are offered; the default admits every tier.
+ *
  * `deferVehicleGatedToIdleAlternative` (#1002): when true, a vehicle-gated
  * candidate is skipped if a DIFFERENT employee — alive, not injured, not in
  * training, genuinely idle (activeActionId === null), not resting, and
@@ -360,7 +374,7 @@ export function claimOnePoolCandidate(
   employee: Employee,
   excludeOnFootActions = false,
   deferVehicleGatedToIdleAlternative = false,
-  _minExclusiveTier = -Infinity,
+  minExclusiveTier = -Infinity,
 ): SelectedAction | null {
   // Built once per pass: the pool holds one action per on-ground fragment
   // after a blast, and a per-action scan over the fragments made this filter
@@ -384,6 +398,7 @@ export function claimOnePoolCandidate(
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
     (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
+    actionRankTier(a.type) > minExclusiveTier &&
     holdsRequiredSkill(employee, a.requiredSkill) &&
     mayDrive(a) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
@@ -444,6 +459,7 @@ function hasIdleLicensedAlternative(state: GameState, candidate: PendingAction, 
     && other.trainingState === null
     && other.activeActionId === null
     && other.restTicksRemaining === null
+    && holdsRequiredSkill(other, candidate.requiredSkill)
     && canDriveTier(other, role, lowestTier),
   );
 }
