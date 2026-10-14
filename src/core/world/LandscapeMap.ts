@@ -79,7 +79,7 @@ export function sampleLandscapeColumn(
 
   const shapingInput = weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
   const raw = sampleBaseHeight(worldGen.fields, x, z, shapingInput);
-  const masked = applyPitMask(raw, worldGen.centerHeight, worldGen.playableRect, x, z);
+  const masked = applyPitMask(raw, worldGen.centerHeight, worldGen.playableRect, x, z, worldGen.pitMask);
   const overlaid = applyOverlays(structureSet, x, z, masked);
   // Same offset the playable grid's own columns land at — site and landscape
   // read the same unclamped height directly, so the two agree with no band

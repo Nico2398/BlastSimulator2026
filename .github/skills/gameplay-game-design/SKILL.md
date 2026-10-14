@@ -168,6 +168,10 @@ Expansion is **never implicit**: a claim answers with success or a refusal the p
 
 Claiming is currently free. A land price per chunk would fit the satire and is an open design question, not a technical one.
 
+### Pit mask shape (#1680)
+
+The pit-suitability mask compresses relief toward the site's centre height inside the playable rect and blends back to raw height outside it. Its shape is `PitMaskShape { margin, reliefKeep }` (`balance.ts`). Campaign levels and standalone worlds use `DEFAULT_PIT_MASK` (24 m, keep 0.3), unchanged. Sandbox starts use `SANDBOX_PIT_MASK` (14 m, keep 0.05) so at least `SANDBOX_FLAT_PAD_TARGET` (25%) of interior 9x9 m pads (origin step 3) have a surface spread of at most `SANDBOX_FLAT_PAD_MAX_SPREAD` (2 m); measured worst case ~32% (alpine, seed 42, 64x64). Wider margin or lower keep alone fails, because the blend ramp is the steep part; mountains stay dramatic beyond the rim. The mask rides `LevelDef.pitMask` -> `WorldState.pitMask` -> `SerializedTerrainGen.pitMask`, validated on load (`requireValidPitMask`), absent meaning the default. `TERRAIN_GENERATOR_VERSION` and `SAVE_VERSION` are not bumped (unreleased game policy).
+
 ## Material Catalogs
 
 ### Rocks (fictional, humorous names)

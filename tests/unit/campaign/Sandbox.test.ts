@@ -554,3 +554,110 @@ describe('sandboxDifficultyDetails (#1686)', () => {
     expect(easy.startingCash).toBeGreaterThan(normal.startingCash);
   });
 });
+
+// ─── #1680: sandbox sites carry a stronger pit mask so flat ground exists ───
+import {
+  SANDBOX_PIT_MASK,
+  DEFAULT_PIT_MASK,
+  SANDBOX_FLAT_PAD_TARGET,
+  SANDBOX_FLAT_PAD_MAX_SPREAD,
+  SANDBOX_FLAT_PAD_SIZE,
+} from '../../../src/core/config/balance.js';
+import { getAllLevels } from '../../../src/core/campaign/Level.js';
+import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
+import { computeVoxelColumnSurfaceY, CompositionPalette, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
+import { sampleLandscapeColumn } from '../../../src/core/world/LandscapeMap.js';
+import { type StructureSet } from '../../../src/core/world/Structures.js';
+
+/** The terrain config the game builds for a sandbox site (sandbox start -> regenerateGrid). */
+function sandboxTerrainConfig(biome: string, seed: number): TerrainConfig {
+  const level = sandboxLevelDef({ ...SANDBOX_DEFAULTS, biome, seed });
+  return {
+    seed: level.terrainSeed,
+    climateBias: level.climateBias,
+    sizeX: level.gridX,
+    datum: level.datum,
+    sizeZ: level.gridZ,
+    mixedRockHardness: level.mixedRockHardness,
+    ...(level.pitMask ? { pitMask: level.pitMask } : {}),
+  };
+}
+
+/** Share of SIZE x SIZE pads (origin step 3, fully inside the grid) whose surface spread is within the cap. */
+function flatPadShare(grid: VoxelGrid): number {
+  const size = SANDBOX_FLAT_PAD_SIZE;
+  let flat = 0, total = 0;
+  for (let x0 = 0; x0 + size <= grid.sizeX; x0 += 3) {
+    for (let z0 = 0; z0 + size <= grid.sizeZ; z0 += 3) {
+      let lo = Infinity, hi = -Infinity;
+      for (let x = x0; x < x0 + size; x++) for (let z = z0; z < z0 + size; z++) {
+        const y = computeVoxelColumnSurfaceY(grid, x, z)!;
+        lo = Math.min(lo, y); hi = Math.max(hi, y);
+      }
+      total++;
+      if (hi - lo <= SANDBOX_FLAT_PAD_MAX_SPREAD) flat++;
+    }
+  }
+  return flat / total;
+}
+
+describe('sandbox pit mask (#1680)', () => {
+  it('sandboxLevelDef carries SANDBOX_PIT_MASK', () => {
+    expect(sandboxLevelDef(SANDBOX_DEFAULTS).pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  it('SANDBOX_PIT_MASK is stronger than the default: shorter ramp, less relief kept', () => {
+    expect(SANDBOX_PIT_MASK.margin).toBeLessThan(DEFAULT_PIT_MASK.margin);
+    expect(SANDBOX_PIT_MASK.reliefKeep).toBeLessThan(DEFAULT_PIT_MASK.reliefKeep);
+    expect(SANDBOX_PIT_MASK).toEqual({ margin: 14, reliefKeep: 0.05 });
+  });
+
+  it('every campaign level leaves pitMask undefined (default mask)', () => {
+    for (const level of getAllLevels()) expect(level.pitMask, level.id).toBeUndefined();
+  });
+
+  it('the sandbox terrain config reaches the generator context', () => {
+    const { worldGen } = buildTerrainContext(sandboxTerrainConfig('alpine_granite', 42));
+    expect(worldGen.pitMask).toEqual(SANDBOX_PIT_MASK);
+  });
+
+  describe.each(getAllBiomes().map(b => b.id))('flat pads in %s', (biome) => {
+    it.each([1, 7, 42])(`seed %i: at least ${SANDBOX_FLAT_PAD_TARGET * 100}% of pads are flat`, (seed) => {
+      const grid = generateTerrain(sandboxTerrainConfig(biome, seed));
+      expect(grid.sizeX).toBe(DEFAULT_GRID_SIZE);
+      expect(flatPadShare(grid)).toBeGreaterThanOrEqual(SANDBOX_FLAT_PAD_TARGET);
+    });
+  });
+
+  it('relief beyond the rim stays dramatic for alpine seed 42', () => {
+    const masked = buildTerrainContext(sandboxTerrainConfig('alpine_granite', 42)).worldGen;
+    const unmasked = buildTerrainContext({ ...sandboxTerrainConfig('alpine_granite', 42), pitMask: { margin: 1e-6, reliefKeep: 1 } }).worldGen;
+    const relief = (ctx: typeof masked, inside: boolean): number => {
+      let lo = Infinity, hi = -Infinity;
+      for (let x = -200; x <= 264; x += 8) for (let z = -200; z <= 264; z += 8) {
+        const within = x >= 0 && x <= 64 && z >= 0 && z <= 64;
+        if (within !== inside) continue;
+        const y = sampleSurfaceHeightY(ctx, x, z);
+        lo = Math.min(lo, y); hi = Math.max(hi, y);
+      }
+      return hi - lo;
+    };
+    expect(relief(masked, false)).toBeGreaterThanOrEqual(relief(unmasked, false));
+    // ...while inside the playable rect the mask flattens it.
+    expect(relief(masked, true)).toBeLessThan(relief(unmasked, true));
+  });
+
+  it('landscape columns agree with the playable grid under the sandbox mask', () => {
+    const config = sandboxTerrainConfig('alpine_granite', 42);
+    const grid = generateTerrain(config);
+    const { worldGen, strata } = buildTerrainContext(config);
+    const empty: StructureSet = { overlays: [], spatialIndex: new Map(), rivers: [], villages: [], trees: [], landmarks: [] };
+    const palette = new CompositionPalette();
+    for (const [x, z] of [[0, 32], [5, 32], [10, 40], [32, 32]] as const) {
+      const landscape = sampleLandscapeColumn(worldGen, config.climateBias, empty, strata, palette, x, z);
+      expect(landscape.height, `(${x},${z})`).toBeCloseTo(sampleSurfaceHeightY(worldGen, x, z), 6);
+      expect(Math.abs(landscape.height - computeVoxelColumnSurfaceY(grid, x, z)!), `grid (${x},${z})`).toBeLessThanOrEqual(1);
+    }
+  });
+});
