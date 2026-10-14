@@ -2666,3 +2666,22 @@ export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
 
 /** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
 export const BLAST_GRADE_MAX_CUT_M = 4;
+
+// ── Well-being score drivers (#1692) ──
+
+/** Well-being gained per tick per unit of building effect (living quarters etc.). */
+export const WB_BUILDING_GAIN = 0.1;
+/** Well-being gain per morale point above neutral, per tick. */
+export const WB_MORALE_GAIN_PER_POINT = 0.005;
+/** Well-being loss per morale point below neutral, per tick; losses bite harder than gains. */
+export const WB_MORALE_LOSS_PER_POINT = 0.02;
+/** Score distance from the cap over which gains taper off (headroom damping). */
+export const WB_HEADROOM_SPAN = 50;
+/** Fatigue gauge level at or above which a worker feels no overwork strain. */
+export const WB_FATIGUE_COMFORT = 70;
+/** Max well-being drag from a fully fatigued crew. */
+export const WB_OVERWORK_DRAG_MAX = 0.6;
+/** Max well-being drag from crew exceeding bed capacity. */
+export const WB_CROWDING_DRAG_MAX = 0.8;
+/** Well-being drag per recent accident. */
+export const WB_ACCIDENT_DRAG = 0.5;

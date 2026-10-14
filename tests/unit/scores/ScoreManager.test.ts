@@ -29,6 +29,8 @@ function makeInputs(overrides: Partial<ScoreInputs> = {}): ScoreInputs {
     maxRecentVibration: 0,
     employeeCount: 0,
     looseRockKg: 0,
+    bedCapacity: 0,
+    crewFatigueStrain: 0,
     ...overrides,
   };
 }

@@ -56,6 +56,10 @@ export interface ScoreInputs {
   employeeCount: number;
   /** Mass of loose rock lying on the ground (kg). */
   looseRockKg: number;
+  /** Total beds across operating living quarters. */
+  bedCapacity: number;
+  /** Mean fatigue strain (0-1) of living, non-injured crew. */
+  crewFatigueStrain: number;
 }
 
 // ── Update logic ──

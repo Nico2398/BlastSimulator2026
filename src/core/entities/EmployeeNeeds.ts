@@ -167,3 +167,14 @@ export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState)
     employee[gauge] = Math.max(0, employee[gauge] - actualDrain);
   }
 }
+
+/**
+ * Mean fatigue strain (0-1) over living, non-injured crew; 0 for an empty crew.
+ * Per employee: clamp((WB_FATIGUE_COMFORT - fatigue) / WB_FATIGUE_COMFORT, 0, 1).
+ */
+export function computeCrewFatigueStrain(
+  _crew: readonly Pick<Employee, 'alive' | 'injured' | 'fatigue'>[],
+): number {
+  // TODO: implement
+  return 0;
+}

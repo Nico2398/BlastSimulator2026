@@ -48,3 +48,12 @@ export function getLivingQuartersWellbeingMultiplier(
 
   return multiplier;
 }
+
+/**
+ * Total beds across all operating living quarters (sum of def.capacity).
+ * Shared by the overcapacity penalty and the well-being crowding drag.
+ */
+export function getBedCapacity(_state: BuildingState): number {
+  // TODO: implement
+  return 0;
+}
