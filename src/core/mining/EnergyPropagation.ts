@@ -112,6 +112,8 @@ export interface EnergyField {
   readonly loss: Float32Array;
   /** Metres from each voxel to the nearest free face; 0 for air itself. */
   readonly distAir: Float32Array;
+  /** World Y of the highest charged-hole bottom (the blast's grade); null when nothing is charged. */
+  readonly gradeY: number | null;
   /** Total energy handed to `seedEnergy`. */
   seeded: number;
   /** Energy lost to damping, vented into air, or stranded at the iteration cap. */
@@ -314,6 +316,7 @@ export function* createEnergyFieldSteps(
     air: new Uint8Array(count),
     loss: new Float32Array(count),
     distAir: new Float32Array(count),
+    gradeY: null, // TODO: implement
     seeded: 0,
     dissipated: 0,
     iterations: 0,

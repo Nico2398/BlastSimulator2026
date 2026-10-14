@@ -226,6 +226,34 @@ export function carveLevelColumns(
 }
 
 /**
+ * Pick the next column of `columns` a digger should work on: one inside `rect`
+ * that `isReachable` accepts, or null when none is left.
+ */
+export function pickLevelWorkTarget(
+  _columns: { x: number; z: number }[],
+  _rect: LevelOrderDef,
+  _isReachable: (x: number, z: number) => boolean,
+): { x: number; z: number } | null {
+  // TODO: implement
+  return null;
+}
+
+/**
+ * Carve at most `maxColumns` of `columns` down to `targetY`, emitting
+ * `terrain:updated` for the affected region; returns the columns carved.
+ */
+export function carveLevelColumnsStep(
+  _grid: VoxelGrid,
+  _columns: { x: number; z: number }[],
+  _targetY: number,
+  _maxColumns: number,
+  _emitter?: EventEmitter,
+): number {
+  // TODO: implement
+  return 0;
+}
+
+/**
  * Level `rect` in one shot: compute its target Y, carve every column above
  * it, and emit `terrain:updated` — the compute/carve dance
  * `validateLevelOrder` + `carveLevelColumns` split across order time and

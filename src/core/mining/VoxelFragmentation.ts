@@ -34,6 +34,8 @@ export interface FragmentationResult {
   readonly detachedCount: number;
   /** How many were undermined burden that lifted rather than being crushed. */
   readonly liftedCount: number;
+  /** How many voxels were floored to grade (rock left standing below the charge). */
+  readonly gradedCount: number;
 }
 
 /** True when the field cell at these coordinates is marked fragmented. */
@@ -95,6 +97,9 @@ export function* identifyFragmentedVoxelsSteps(
   // ── Pass 2: burden that has been undermined ───────────────────────────────
   const liftedCount = yield* liftUnderminedBurden(field, mask);
 
+  // ── Pass 2b: floor to grade ───────────────────────────────────────────────
+  const gradedCount = floorToGrade(field, mask);
+
   // ── Pass 3: rock left with nothing under it ───────────────────────────────
   yield;
   const detached = yield* collectUnsupported(field, mask);
@@ -119,7 +124,17 @@ export function* identifyFragmentedVoxelsSteps(
     grid.scaleFractureAt(x, y, z, CRACKED_VOXEL_WEAKENING);
   }
 
-  return { fragmented, mask, cracked, detachedCount: detached.length, liftedCount };
+  return { fragmented, mask, cracked, detachedCount: detached.length, liftedCount, gradedCount };
+}
+
+/**
+ * Floor the blast to grade: mark rock between the grade plane and the charge
+ * bottoms as fragmented, and report how many voxels it took. Runs before the
+ * unsupported-rock pass.
+ */
+export function floorToGrade(_field: EnergyField, _mask: Uint8Array): number {
+  // TODO: implement
+  return 0;
 }
 
 /**
