@@ -3,6 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import { UNQUALIFIED_TASK_EFFECTS } from '../../../src/core/events/UnqualifiedTaskEffects.js';
 import { UNQUALIFIED_CONTRACTOR_FEE } from '../../../src/core/config/balance.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { planTraining } from '../../../src/core/entities/EmployeeTraining.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -186,6 +188,43 @@ describe('train_employee', () => {
     s.driver!.injured = true;
     const outcome = UNQUALIFIED_TASK_EFFECTS['train_employee']!([s.actionId], s.world, TICK);
     expect(outcome.resultKeySuffix).toBe('_alt');
+    expect(s.driver!.pendingTrainingState ?? null).toBeNull();
+  });
+});
+
+describe('train_employee — unlocks only (#1726)', () => {
+  it('books an employee lacking the skill at a tier-2 school at the level-2 fee', () => {
+    const s = setupUnqualified({ school: true });
+    s.state.buildings.buildings.find(b => b.type === 'geology_lab')!.tier = 2;
+    const plan = planTraining(s.driver!, 'geology', 2)!;
+    expect(plan.kind).toBe('unlock');
+    const outcome = UNQUALIFIED_TASK_EFFECTS['train_employee']!([s.actionId], s.world, TICK);
+    expect(outcome.resultKeySuffix).toBe('');
+    expect(totalDebit(s.cashAfterOrder, s.state, outcome)).toBe(5000);
+    expect(outcome.effects.join(' ')).toContain('(level 2)');
+    expect((s.driver!.pendingTrainingState ?? s.driver!.trainingState)!.grantsLevel).toBe(2);
+  });
+
+  it('never books an employee who already holds the skill, even if a higher school could upgrade them', () => {
+    const s = setupUnqualified({ school: true });
+    s.state.buildings.buildings.find(b => b.type === 'geology_lab')!.tier = 2;
+    s.driver!.qualifications.push({ category: 'geology', proficiencyLevel: 1, xp: 0 });
+    expect(planTraining(s.driver!, 'geology', 2)!.kind).toBe('upgrade');
+    const outcome = UNQUALIFIED_TASK_EFFECTS['train_employee']!([s.actionId], s.world, TICK);
+    expect(outcome.resultKeySuffix).toBe('_alt');
+    expect(s.driver!.pendingTrainingState ?? null).toBeNull();
+    expect(s.driver!.trainingState).toBeNull();
+    expect(s.state.cash + outcome.cashChange).toBe(s.cashAfterOrder);
+  });
+
+  it('skips the holder and books the next employee who lacks the skill', () => {
+    const s = setupUnqualified({ school: true });
+    s.state.buildings.buildings.find(b => b.type === 'geology_lab')!.tier = 2;
+    s.driver!.qualifications.push({ category: 'geology', proficiencyLevel: 1, xp: 0 });
+    const { employee: other } = hireEmployee(s.state.employees, 'driver', new Random(3), 9.5, 9.5);
+    const outcome = UNQUALIFIED_TASK_EFFECTS['train_employee']!([s.actionId], s.world, TICK);
+    expect(outcome.resultKeySuffix).toBe('');
+    expect((other.pendingTrainingState ?? other.trainingState)?.skill).toBe('geology');
     expect(s.driver!.pendingTrainingState ?? null).toBeNull();
   });
 });

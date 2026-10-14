@@ -12,7 +12,7 @@ description: >
 Buildings are player's infrastructure layer. Gate actions behind qualified employees + physical capacity.
 
 - **Every action requires qualified employee.** No qualified employee → immediate error, not silent queue.
-- **Training buildings** upskill employees for time + fee. Hiring pre-qualified staff generally cheaper.
+- **Training buildings** upskill employees for time + fee. A course at a tier-N school brings a skill to level N, so a higher tier teaches higher levels, at a higher fee and longer course (still multiplied by the tier's faster speed). Hiring is not a cheaper route to a high level: only schools and work raise one.
 - **Research Center** prerequisite for unlocking higher tiers of all other buildings — a placed Research Center building is required before any research task can be queued, not just implied by the unlock fiction.
 - **Placement tradeoff:** Far-from-pit reduces projection damage risk but increases travel time (productivity loss).
 
@@ -60,7 +60,7 @@ Demolish is confirmed (#1399) from the Build menu row and the selection bar via 
 | Management Office | HR and commercial operations |
 | Geology Lab | Survey techniques and rock analysis |
 
-Employee travels to building, stays for fixed ticks (unavailable + paid salary). Training costs direct fee.
+Employee travels to building, stays for fixed ticks (unavailable + paid salary). Training costs direct fee. **Tier = level taught:** a tier-N school brings a skill to level N (never above its tier). Fee `TRAINING_LEVEL_FEE` (base fee x level) and duration `TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[tier] * TRAINING_LEVEL_TICKS_MULT[tier]`; a held skill at or above N is refused (`trainingRefusal`).
 
 ## People Inside a Building
 
