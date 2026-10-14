@@ -164,7 +164,7 @@ describe('ecology responds to how the mine is run (#1691)', () => {
   it('an inactive spoil heap gives no ecology', () => {
     const state = createScoreState();
     updateScores(state, makeInputs({ buildings: withHeap(false) }));
-    expect(state.ecology).toBeLessThanOrEqual(50);
+    expect(state.ecology).toBe(50);
   });
 
   it('two heaps stack more than one', () => {
@@ -196,10 +196,7 @@ describe('ecology responds to how the mine is run (#1691)', () => {
     updateScores(state, makeInputs({ looseRockKg: kg }));
     const ref = createScoreState();
     updateScores(ref, makeInputs());
-    if (kg === Number.POSITIVE_INFINITY) {
-      expect(Number.isNaN(state.ecology)).toBe(false);
-      return;
-    }
+    expect(Number.isNaN(state.ecology)).toBe(false);
     expect(state.ecology).toBe(ref.ecology);
   });
 

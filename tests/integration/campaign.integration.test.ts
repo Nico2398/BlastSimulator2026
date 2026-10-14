@@ -1260,7 +1260,7 @@ describe('ecology responds to how the mine is run (#1691)', () => {
     return state;
   }
 
-  it('a run with a spoil heap and little rubble ends at or above the ecology star threshold', () => {
+  it('a run with a spoil heap and little rubble passes the ecology star check', () => {
     const state = runMine({ heap: true, rubbleKg: 5_000 });
     expect(state.scores.ecology).toBeGreaterThanOrEqual(STAR_ECOLOGY_MIN);
     const stats = createLevelStats();
