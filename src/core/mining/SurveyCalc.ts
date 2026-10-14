@@ -171,11 +171,11 @@ export function estimateSurveyResult(
         if (rounded > 0) colEstimates[oreId] = rounded;
       }
 
-      if (Object.keys(colEstimates).length > 0) {
-        estimates[surveyColumnKey(x, z)] = colEstimates;
-        surfaceYs[surveyColumnKey(x, z)] = anchorY;
-        windows.push({ x, z, yLevels });
-      }
+      if (Object.keys(colEstimates).length > 0) estimates[surveyColumnKey(x, z)] = colEstimates;
+      // Covered even when the whole-window average rounded away: ore concentrated in a
+      // thin band still shows in the depth profile, and a blast reading that band must find it (#1703).
+      surfaceYs[surveyColumnKey(x, z)] = anchorY;
+      windows.push({ x, z, yLevels });
     }
   }
 

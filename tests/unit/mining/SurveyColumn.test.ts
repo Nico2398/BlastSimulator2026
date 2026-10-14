@@ -133,9 +133,13 @@ describe('oresSurveyedAt (#1703)', () => {
     expect(oresSurveyedAt(depthSurvey(), 12, 8, SURFACE - depth)).toBeUndefined();
   });
 
-  it('returns undefined above the surface (negative depth)', () => {
-    expect(oresSurveyedAt(depthSurvey(), 12, 8, SURFACE + 1)).toBeUndefined();
+  it('returns undefined above the surface cap (negative depth)', () => {
+    expect(oresSurveyedAt(depthSurvey(), 12, 8, SURFACE + 2)).toBeUndefined();
     expect(oresSurveyedAt(depthSurvey(), 12, 8, SURFACE + 10)).toBeUndefined();
+  });
+
+  it('reads the one-voxel cap above the top solid voxel as the top band (#1703)', () => {
+    expect(oresSurveyedAt(depthSurvey(), 12, 8, SURFACE + 1)).toEqual({ grumpite: 0.4 });
   });
 
   describe('aerial', () => {

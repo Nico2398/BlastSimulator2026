@@ -99,7 +99,7 @@ function expectedValue(
 ): number {
   const field = buildPlanEnergyField(plan, grid, wet);
   if (!field) return 0;
-  const frag = identifyFragmentedVoxels(field, grid);
+  const frag = identifyFragmentedVoxels(field, grid, false);
   let value = 0;
   const { box } = field;
   for (let z = box.minZ; z < box.maxZ; z++) {
@@ -214,7 +214,7 @@ describe('estimateBlastOreValue — broken voxels valued at their depth (#1703)'
     const grid = makeGrid();
     const survey = makeSurvey();
     const small = estimateBlastOreValue(chargedPlan([HOLE], 2), [survey], grid);
-    const large = estimateBlastOreValue(chargedPlan([HOLE], 12), [survey], grid);
+    const large = estimateBlastOreValue(chargedPlan([HOLE], 8), [survey], grid);
 
     expect(large).toBeGreaterThan(small);
   });

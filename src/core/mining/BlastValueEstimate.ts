@@ -48,7 +48,7 @@ export function estimateBlastOreValue(
   const surveys = freshSurveys(surveyResults);
   if (surveys.length === 0) return 0;
   let value = 0;
-  for (const { x, y, z } of identifyFragmentedVoxels(field, grid).fragmented) {
+  for (const { x, y, z } of identifyFragmentedVoxels(field, grid, false).fragmented) {
     const survey = findSurveyForColumn(surveys, x, z);
     if (!survey) continue;
     const densities = oresSurveyedAt(survey, x, z, y);
