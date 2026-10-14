@@ -1433,6 +1433,7 @@ describe('#1673 — a driller on a 3x3 plan far from the Living Quarters rests i
 describe('#1709 — park the rig and walk to rest: no collapse at any distance, short cycle beside the plan', () => {
   const HORIZON_TICKS = 1200;
   const BESIDE_PLAN_MAX_TICKS = 150;
+  const SITE_CENTRE_XZ = 32;
 
   interface Run { ticksToFinish: number | null; collapses: number; holesDrilled: number; maxFatigue: number; quartersEntered: boolean }
 
@@ -1447,6 +1448,12 @@ describe('#1709 — park the rig and walk to rest: no collapse at any distance, 
     expect(runCommand(engine, 'vehicle buy drill_rig').success).toBe(true);
     const driller = state.employees.employees.find(e => e.role === 'driller');
     if (!driller) throw new Error('Setup: no driller hired');
+    // The spawn snap prefers the corner anchor's bench level, so since the sandbox
+    // site blends into the landscape (#1734) hires and vehicles land ~22 m west of
+    // the pit core. That initial commute is not the rest cycle this suite measures:
+    // start both at the site centre, where they spawned when this bound was set.
+    const rigAtSpawn = state.vehicles.vehicles[0]!;
+    for (const body of [driller, rigAtSpawn]) { body.x = SITE_CENTRE_XZ; body.z = SITE_CENTRE_XZ; }
 
     if (quartersAt !== null) {
       // A builder is only needed to raise the quarters; fatigue topped up so it never rests mid-build.
