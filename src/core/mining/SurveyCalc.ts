@@ -11,11 +11,12 @@ import {
   SURVEY_COSTS,
   SURVEY_DURATION_TICKS,
   SURVEY_DEPTH_BELOW_SURFACE,
+  SURVEY_DEPTH_BAND_METRES,
 } from '../config/balance.js';
 import { factorFor, scaledCost, type ActiveModifier } from '../events/ActiveModifiers.js';
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
-import type { SurveyDepthBand } from './SurveyDepthProfile.js';
+import { buildDepthProfile, type SurveyDepthBand } from './SurveyDepthProfile.js';
 import { surveyColumnKey } from './SurveyColumn.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
@@ -71,12 +72,12 @@ export interface EstimateSurveyParams {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-function clamp(val: number, lo: number, hi: number): number {
+export function clamp(val: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, val));
 }
 
 /** Round a value to the nearest SURVEY_ESTIMATE_STEP (0.05). */
-function roundToEstimateStep(val: number): number {
+export function roundToEstimateStep(val: number): number {
   return Math.round(val / SURVEY_ESTIMATE_STEP) * SURVEY_ESTIMATE_STEP;
 }
 
@@ -86,7 +87,7 @@ function roundToEstimateStep(val: number): number {
  *
  * Accepts an optional `start` / `end` range into `yLevels` to avoid slicing.
  */
-function averageSolidOreDensity(
+export function averageSolidOreDensity(
   grid: VoxelGrid,
   x: number,
   z: number,
@@ -137,6 +138,9 @@ function computeSeismicOreDensity(
  * - Seismic: Y values grouped into consecutive triplets (a trailing group may be smaller); group-average → column-average → add noise.
  * - core_sample / aerial: plain average of sampled solid-voxel densities → add noise.
  * - Values are clamped to [0,1], rounded to nearest 0.05; zero estimates are omitted.
+ * - core_sample (1 m bands) and seismic (5 m bands) also get `depthProfile`, built in a
+ *   second pass after the column loop so estimate/confidence RNG draws are unchanged.
+ *   Depth is metres below the column's surface anchor. Aerial gets none.
  */
 export function estimateSurveyResult(
   grid: VoxelGrid,
@@ -151,6 +155,7 @@ export function estimateSurveyResult(
 
   const radius = SURVEY_COVERAGE_RADIUS[method];
   const estimates: Record<string, Record<string, number>> = {};
+  const windows: Array<{ x: number; z: number; yLevels: number[] }> = [];
 
   const xMin = Math.max(grid.minX, Math.floor(centerX - radius));
   const xMax = Math.min(grid.maxX - 1, Math.ceil(centerX + radius));
@@ -198,11 +203,20 @@ export function estimateSurveyResult(
 
       if (Object.keys(colEstimates).length > 0) {
         estimates[surveyColumnKey(x, z)] = colEstimates;
+        windows.push({ x, z, yLevels });
       }
     }
   }
 
-  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
+  if (method === 'aerial') {
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
+  }
+  const depthProfile: Record<string, SurveyDepthBand[]> = {};
+  for (const { x, z, yLevels } of windows) {
+    const bands = buildDepthProfile(grid, x, z, yLevels, SURVEY_DEPTH_BAND_METRES[method], finalError, rng);
+    if (bands.length > 0) depthProfile[surveyColumnKey(x, z)] = bands;
+  }
+  return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence, depthProfile };
 }
 
 export {
