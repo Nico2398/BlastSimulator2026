@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
@@ -10,6 +10,7 @@ import {
   DRILL_HOLE_BASE_DURATION_TICKS,
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
+  DRILL_RIG_MAX_DEPTH_M,
 } from '../../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -432,5 +433,61 @@ describe('maxHoleNumericId (#1352)', () => {
     expect(maxHoleNumericId(set)).toBe(5);
     expect(maxHoleNumericId(set)).toBe(5);
     expect(set.size).toBe(2);
+  });
+});
+
+// ── Drill rig reach by tier (#1679) ──
+
+const rig = (tier: 1 | 2 | 3) => ({ type: 'drill_rig' as const, tier });
+
+describe('fleetDrillReachM (#1679)', () => {
+  it('is the tier value of a single rig: 12 / 24 / 40 m', () => {
+    expect(fleetDrillReachM([rig(1)])).toBe(12);
+    expect(fleetDrillReachM([rig(2)])).toBe(24);
+    expect(fleetDrillReachM([rig(3)])).toBe(40);
+    expect(fleetDrillReachM([rig(3)])).toBe(DRILL_RIG_MAX_DEPTH_M[3]);
+  });
+
+  it('takes the best rig in the fleet', () => {
+    expect(fleetDrillReachM([rig(1), rig(2), rig(1)])).toBe(24);
+    expect(fleetDrillReachM([rig(3), rig(1)])).toBe(40);
+  });
+
+  it('ignores vehicles that are not drill rigs', () => {
+    expect(fleetDrillReachM([rig(1), { type: 'rock_digger', tier: 3 }, { type: 'debris_hauler', tier: 3 }])).toBe(12);
+  });
+
+  it('boundary: with no rig owned (empty or only other vehicles) falls back to the tier-1 reach', () => {
+    expect(fleetDrillReachM([])).toBe(12);
+    expect(fleetDrillReachM([{ type: 'rock_digger', tier: 3 }])).toBe(12);
+  });
+});
+
+describe('drillDepthRefusal (#1679)', () => {
+  it('refuses a 20 m hole with only a tier-1 rig, naming depth and reach', () => {
+    expect(drillDepthRefusal(20, [rig(1)])).toEqual({
+      key: 'mining.drill_plan.refused_depth',
+      params: { depth: 20, reach: 12 },
+    });
+  });
+
+  it('accepts a 20 m hole with a tier-2 rig', () => {
+    expect(drillDepthRefusal(20, [rig(2)])).toBeNull();
+  });
+
+  it('boundary: depth equal to reach is accepted, just past it is refused', () => {
+    expect(drillDepthRefusal(12, [rig(1)])).toBeNull();
+    expect(drillDepthRefusal(12.5, [rig(1)])).not.toBeNull();
+    expect(drillDepthRefusal(40, [rig(3)])).toBeNull();
+    expect(drillDepthRefusal(41, [rig(3)])).not.toBeNull();
+  });
+
+  it('a non-rig vehicle does not extend the reach', () => {
+    expect(drillDepthRefusal(20, [rig(1), { type: 'rock_digger', tier: 3 }])).not.toBeNull();
+  });
+
+  it('openings that drill 6-8 m holes are never refused, even with no rig', () => {
+    expect(drillDepthRefusal(6, [])).toBeNull();
+    expect(drillDepthRefusal(8, [rig(1)])).toBeNull();
   });
 });

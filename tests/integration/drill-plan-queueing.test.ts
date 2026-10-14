@@ -903,3 +903,104 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
     expect(occupancyEvents).toHaveLength(0);
   });
 });
+
+describe('drill rig reach by tier (#1679)', () => {
+  function staffed() {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    const rig = state.vehicles.vehicles.find(v => v.type === 'drill_rig')!;
+    return { run, state, rig };
+  }
+
+  it('drill_plan add refuses a 20 m hole with a tier-1 rig, with the localized reason, and mutates nothing', () => {
+    const { run, state, rig } = staffed();
+    expect(rig.tier).toBe(1);
+    const actionsBefore = state.pendingActions.length;
+    const cashBefore = state.cash;
+
+    const result = run('drill_plan add x:14 z:14 depth:20');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.drill_plan.refused_depth', { depth: 20, reach: 12 }));
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(actionsBefore);
+    expect(state.cash).toBe(cashBefore);
+  });
+
+  it('drill_plan grid refuses a 20 m hole, orders nothing', () => {
+    const { run, state } = staffed();
+    const result = run('drill_plan grid rows:2 cols:2 spacing:5 depth:20 start:14,14');
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.drill_plan.refused_depth', { depth: 20, reach: 12 }));
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+  });
+
+  it('a refused grid leaves the existing plan intact', () => {
+    const { run, state } = staffed();
+    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    const idsBefore = state.plannedDrillHoles.map(h => h.id);
+    const actionsBefore = state.pendingActions.filter(a => a.type === 'drill_hole').length;
+    expect(idsBefore).toHaveLength(2);
+
+    const result = run('drill_plan grid rows:2 cols:2 spacing:5 depth:20 start:14,20 confirm:true');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('mining.drill_plan.refused_depth', { depth: 20, reach: 12 }));
+    expect(state.plannedDrillHoles.map(h => h.id)).toEqual(idsBefore);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(actionsBefore);
+  });
+
+  it('boundary: exactly 12 m is accepted with a tier-1 rig', () => {
+    const { run, state } = staffed();
+    expect(run('drill_plan add x:14 z:14 depth:12').success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(1);
+  });
+
+  it('upgrading the rig to tier 2 lets the previously refused 20 m hole be ordered', () => {
+    const { run, state, rig } = staffed();
+    state.cash = Math.max(state.cash, 500_000);
+    expect(run('drill_plan add x:14 z:14 depth:20').success).toBe(false);
+
+    const up = run(`vehicle upgrade ${rig.id}`);
+    expect(up.success).toBe(true);
+    expect(rig.tier).toBe(2);
+
+    const retry = run('drill_plan add x:14 z:14 depth:20');
+    expect(retry.success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(1);
+    expect(state.plannedDrillHoles[0]!.depth).toBe(20);
+    // Tier 2 reaches 24 m, not 40.
+    const tooDeep = run('drill_plan add x:18 z:18 depth:30');
+    expect(tooDeep.success).toBe(false);
+    expect(tooDeep.output).toBe(t('mining.drill_plan.refused_depth', { depth: 30, reach: 24 }));
+  });
+
+  it('upgrading to tier 3 reaches 40 m', () => {
+    const { run, state, rig } = staffed();
+    state.cash = Math.max(state.cash, 2_000_000);
+    expect(run(`vehicle upgrade ${rig.id}`).success).toBe(true);
+    expect(run(`vehicle upgrade ${rig.id}`).success).toBe(true);
+    expect(rig.tier).toBe(3);
+    expect(run('drill_plan add x:14 z:14 depth:40').success).toBe(true);
+  });
+
+  it('blast_plan load refuses a saved plan holding a hole deeper than the fleet reach, queuing nothing', () => {
+    const { run, state } = staffed();
+    state.savedPlans['default'] = {
+      drillHoles: [{ id: 'H1', x: 14, z: 14, depth: 20, diameter: 0.15 }],
+      chargesByHole: {},
+    };
+    const cashBefore = state.cash;
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain(t('mining.drill_plan.refused_depth', { depth: 20, reach: 12 }));
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+    expect(state.cash).toBe(cashBefore);
+  });
+});
