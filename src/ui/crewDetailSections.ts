@@ -12,7 +12,7 @@ import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, isSchoolFull } from '../core/entities/EmployeeTraining.js';
+import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, heldCourseLevel, isLicenceSkill } from '../core/entities/EmployeeTraining.js';
 import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
@@ -313,7 +313,10 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     const title = t(`course.${skill}`);
 
     if (!plan) {
-      row.append(trainingInfoBlock(title, t('ui.crew.training_qualified')));
+      const refusal = trainingRefusal(e, skill, building.tier);
+      row.append(trainingInfoBlock(title, refusal.kind === 'top_level'
+        ? t('ui.crew.training_top_level')
+        : t('ui.crew.training_needs_higher_school', { level: heldCourseLevel(e.qualifications, skill) })));
     } else if (isSchoolFull(state, building)) {
       row.append(
         trainingInfoBlock(title, t('ui.crew.training_school_full')),
@@ -323,9 +326,9 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
       anyOffered = true;
       const info = trainingInfoBlock(
         title,
-        plan.raisesLicenceTo !== undefined
-          ? t('ui.crew.training_licence_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, level: plan.raisesLicenceTo })
-          : t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
+        isLicenceSkill(skill)
+          ? t('ui.crew.training_licence_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, level: plan.grantsLevel })
+          : t(plan.kind === 'unlock' ? 'ui.crew.training_offer_unlock' : 'ui.crew.training_offer_upgrade', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, level: plan.grantsLevel, raise: perHour(plan.salaryIncrease) }),
       );
       const trainBtn = button('warn', t('ui.crew.train'), { disabled: state.cash < plan.fee || e.injured });
       trainBtn.classList.add('bs-train-btn');

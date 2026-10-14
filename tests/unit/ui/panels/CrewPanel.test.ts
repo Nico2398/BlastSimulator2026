@@ -283,6 +283,24 @@ describe('CrewPanel', () => {
     expect(calls).toContain('employee train 5 skill:geology building:9');
   });
 
+  it('repaints the training offers when a licence level changes (#1726: signature includes licenceLevel)', () => {
+    const { panel } = makePanel();
+    const emp = makeEmployee({ id: 5, qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0, licenceLevel: 1 }] });
+    const state = makeState([emp], [], [makeBuilding({ id: 9, type: 'driving_center', tier: 2 })]);
+    state.cash = 50000;
+    panel.update(state);
+    toggle(panel, 5);
+    const btn = () => panel.root.querySelector<HTMLButtonElement>('.bs-train-btn[data-skill="driving.drill_rig"]');
+    expect(btn()).not.toBeNull();
+    expect(btn()!.disabled).toBe(false);
+
+    // A tier-2 school cannot take a level-2 licence further: only a repaint shows that.
+    emp.qualifications[0]!.licenceLevel = 2;
+    panel.update(state);
+    const after = btn();
+    expect(after === null || after.disabled).toBe(true);
+  });
+
   it('training button is disabled when the fee is unaffordable', () => {
     const { panel } = makePanel();
     const state = makeState([makeEmployee({ id: 5 })], [], [makeBuilding({ id: 9, type: 'geology_lab', tier: 1 })]);
