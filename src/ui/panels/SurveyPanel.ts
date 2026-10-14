@@ -106,6 +106,9 @@ export class SurveyPanel extends PanelBase {
       sectionHeader(t('ui.survey.results')),
       this.resultsEl,
     );
+    // The body is the scroll region: its children keep their natural height
+    // rather than flex-shrinking (a squashed button, clipped result cards).
+    for (const child of Array.from(this.bodyEl.children)) (child as HTMLElement).style.flexShrink = '0';
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
