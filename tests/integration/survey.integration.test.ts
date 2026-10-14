@@ -33,6 +33,15 @@ import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { findSurveyForColumn } from '../../src/core/mining/SurveyColumn.js';
 import { oreDepthSpan } from '../../src/core/mining/SurveyDepthProfile.js';
+import { estimateBlastOreValue } from '../../src/core/mining/BlastValueEstimate.js';
+import { createRunner } from '../../src/console/createRunner.js';
+import { createEventSystemState } from '../../src/core/events/EventSystem.js';
+import { detectOreReport } from '../../src/core/events/EventEngine.js';
+import {
+  BLAST_ESTIMATE_TOLERANCE,
+  ORE_REPORT_BARREN_RATIO,
+  ORE_REPORT_LUCKY_RATIO,
+} from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -1015,5 +1024,137 @@ describe('Survey system — depth profile and legacy saves (#1683)', () => {
     expect(results.find(r => r.method === 'aerial')!.depthProfile).toBeUndefined();
     const core = results.find(r => r.method === 'core_sample')!;
     expect(Object.keys(core.depthProfile ?? {})).toEqual(Object.keys(core.estimates));
+  });
+});
+
+// ── #1703: EST. ORE VALUE and the ore report against a real blast ───────────
+
+describe('Survey system — blast estimate vs actual ore (#1703)', () => {
+  interface Site {
+    biome: string;
+    /** Pattern centre (x, z). */
+    centre: { x: number; z: number };
+    explosive: string;
+    kg: number;
+  }
+  const SITES: Site[] = [
+    { biome: 'desert_badlands', centre: { x: 32, z: 22 }, explosive: 'boomite', kg: 8 },
+    { biome: 'green_foothills', centre: { x: 32, z: 32 }, explosive: 'krackle', kg: 8 },
+    { biome: 'alpine_granite', centre: { x: 36, z: 16 }, explosive: 'shatternite', kg: 4 },
+  ];
+
+  /** Fresh sandbox, seed 42, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */
+  function setup(site: Site) {
+    const { runner, ctx } = createRunner();
+    expect(runner.run(`sandbox start biome:${site.biome} seed:42`).success).toBe(true);
+    const grid = ctx.grid!;
+    const counter = { nextHoleId: 1 };
+    const holes = createGridPlan(counter, { x: site.centre.x - 4, z: site.centre.z - 4 }, 3, 3, 4, 8, 0.15);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), depths, site.explosive, site.kg, 2);
+    return { grid, plan: assembleBlastPlan(holes, charges) };
+  }
+
+  const params = (method: SurveyMethod, x: number, z: number, id = 1): EstimateSurveyParams => ({
+    id, method, centerX: x, centerZ: z, surveyorId: 1, skillLevel: 1, completedTick: 10,
+  });
+
+  function seismic(grid: VoxelGrid, site: Site): SurveyResult[] {
+    return [estimateSurveyResult(grid, params('seismic', site.centre.x, site.centre.z), new Random(42))];
+  }
+
+  /** Core samples are single-column, so cover the pattern and its break margin column by column. */
+  function coreSamples(grid: VoxelGrid, site: Site): SurveyResult[] {
+    const out: SurveyResult[] = [];
+    let id = 1;
+    for (let x = site.centre.x - 12; x <= site.centre.x + 12; x++) {
+      for (let z = site.centre.z - 12; z <= site.centre.z + 12; z++) {
+        out.push(estimateSurveyResult(grid, params('core_sample', x, z, id++), new Random(42 + id)));
+      }
+    }
+    return out;
+  }
+
+  function blastAndReport(plan: ReturnType<typeof setup>['plan'], grid: VoxelGrid, surveys: SurveyResult[]) {
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+    const report = computeBlastOreReport(result!.fragments, surveys);
+    const fired = detectOreReport(report, createEventSystemState(1), 100);
+    return { result: result!, report, fired };
+  }
+
+  for (const site of SITES) {
+    describe(`${site.biome} (${site.centre.x},${site.centre.z}) ${site.explosive} ${site.kg} kg`, () => {
+      for (const [label, build] of [['seismic survey', seismic], ['core samples', coreSamples]] as const) {
+        it(`${label}: EST. ORE VALUE lands within the tolerance of the actual ore value`, () => {
+          const { grid, plan } = setup(site);
+          const surveys = build(grid, site);
+          const estimate = estimateBlastOreValue(plan, surveys, grid);
+          const { result } = blastAndReport(plan, grid, surveys);
+
+          expect(result.totalOreValue).toBeGreaterThan(0);
+          const ratio = estimate / result.totalOreValue;
+          expect(Math.abs(ratio - 1)).toBeLessThanOrEqual(BLAST_ESTIMATE_TOLERANCE);
+        });
+
+        it(`${label}: the ore report sits between Barren and Lucky and fires no ore event`, () => {
+          const { grid, plan } = setup(site);
+          const surveys = build(grid, site);
+          const { report, fired } = blastAndReport(plan, grid, surveys);
+
+          expect(report.estimatedYieldKg).toBeGreaterThan(0);
+          expect(report.yieldRatio).toBeGreaterThanOrEqual(ORE_REPORT_BARREN_RATIO);
+          expect(report.yieldRatio).toBeLessThanOrEqual(ORE_REPORT_LUCKY_RATIO);
+          expect(fired?.eventId).not.toBe('lucky_strike');
+          expect(fired?.eventId).not.toBe('barren_blast');
+        });
+      }
+
+      it('the estimate does not change when the real ore under the pattern changes (no ground-truth read)', () => {
+        const a = setup(site);
+        const b = setup(site);
+        const surveys = seismic(a.grid, site);
+        const before = estimateBlastOreValue(a.plan, surveys, a.grid);
+        // Strip every ore from the second grid's blast zone; the survey it is compared with is unchanged.
+        for (let y = 0; y < 128; y++) {
+          for (let x = site.centre.x - 12; x <= site.centre.x + 12; x++) {
+            for (let z = site.centre.z - 12; z <= site.centre.z + 12; z++) {
+              const v = b.grid.getVoxel(x, y, z);
+              if (v && v.density > 0) b.grid.setVoxel(x, y, z, { ...v, oreDensities: {} });
+            }
+          }
+        }
+        expect(estimateBlastOreValue(b.plan, surveys, b.grid)).toBe(before);
+      });
+    });
+  }
+
+  it('an aerial survey of the desert site does not turn the ordinary blast into a Lucky Strike', () => {
+    const site = SITES[0]!;
+    const { grid, plan } = setup(site);
+    const aerial = [estimateSurveyResult(grid, params('aerial', site.centre.x, site.centre.z), new Random(42))];
+    const { fired } = blastAndReport(plan, grid, aerial);
+
+    expect(fired?.eventId).not.toBe('lucky_strike');
+  });
+
+  it('a stale survey gives no estimate, a fresh one does', () => {
+    const site = SITES[0]!;
+    const { grid, plan } = setup(site);
+    const [fresh] = seismic(grid, site);
+
+    expect(estimateBlastOreValue(plan, [fresh!], grid)).toBeGreaterThan(0);
+    expect(estimateBlastOreValue(plan, [{ ...fresh!, stale: true }], grid)).toBe(0);
+  });
+
+  it('a legacy survey result (no depth data) still yields an estimate', () => {
+    const site = SITES[0]!;
+    const { grid, plan } = setup(site);
+    const [fresh] = seismic(grid, site);
+    const { depthProfile: _d, surfaceYs: _s, ...legacy } = fresh!;
+    void _d; void _s;
+
+    expect(estimateBlastOreValue(plan, [legacy], grid)).toBeGreaterThan(0);
   });
 });
