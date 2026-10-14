@@ -374,8 +374,11 @@ function canDriveAroundVehicles(navGrid: NavGrid, from: Cell, to: Cell, blockers
  * vehicle separation. The generic ground snap can land a vehicle on such a
  * cell; it is connected to the site on a fresh grid, but one building corner
  * seals it and the vehicle can then never drive out. Run after the snap.
- * With `fleetMustStayMobile` (the sandbox, #1680) a vehicle boxed in by the
- * rest of the fleet moves too, to a cell from which it can drive to the site's
+ * The sealed-pocket fallback (#1680) is not gated: a vehicle on a pocket cut
+ * off from the site's middle may move onto the main ground, since it could never
+ * drive out. Only the fleet-mobility check is gated: with
+ * `fleetMustStayMobile` (the sandbox) a vehicle boxed in by the rest of the
+ * fleet moves too, to a cell from which it can drive to the site's
  * middle around the others. Off by default: a campaign level's opening layout
  * is authored, and its first shot is aimed from where the rig stands.
  * Returns whether anything moved.

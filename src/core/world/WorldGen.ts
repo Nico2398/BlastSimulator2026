@@ -86,7 +86,6 @@ export interface Rect {
   maxZ: number;
 }
 
-
 /** Distance from (x, z) to the nearest edge of rect, measured inward — negative outside. */
 function distanceInsideRect(rect: Rect, x: number, z: number): number {
   const dx = Math.min(x - rect.minX, rect.maxX - x);

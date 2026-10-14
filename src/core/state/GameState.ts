@@ -524,8 +524,6 @@ export interface GameState {
 }
 
 export interface WorldState {
-  /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
-  pitMask?: PitMaskShape;
   /**
    * Width of the site's live bounding box, NOT an upper bound on x: the site
    * grows as the player claims chunks (#473), so iterate `minX .. minX+sizeX`
@@ -567,6 +565,8 @@ export interface WorldState {
   voxels?: SerializedVoxels;
   /** Interleaved hard/soft rock strata (#458 D4/T1.3/A11), persisted so a no-voxels regeneration fallback matches the level's original generation (#1181). */
   mixedRockHardness?: boolean;
+  /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
 }
 
 export interface SavedBlastPlan {

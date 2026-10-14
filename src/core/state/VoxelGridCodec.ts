@@ -20,7 +20,6 @@ import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requ
  * against the same world the first chunk did.
  */
 export interface SerializedTerrainGen {
-  pitMask?: PitMaskShape;
   version: number;
   seed: number;
   climateBias: [number, number];
@@ -28,6 +27,7 @@ export interface SerializedTerrainGen {
   datum: number;
   sizeZ: number;
   mixedRockHardness?: boolean;
+  pitMask?: PitMaskShape;
 }
 
 export interface SerializedVoxels {

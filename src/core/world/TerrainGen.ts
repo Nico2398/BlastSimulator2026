@@ -75,8 +75,6 @@ export function requireValidGenDatum(value: number, label: string): number {
 }
 
 export interface TerrainConfig {
-  /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
-  pitMask?: PitMaskShape;
   sizeX: number;
   /** The voxel Y the site centre's surface lands on. */
   datum: number;
@@ -96,6 +94,8 @@ export interface TerrainConfig {
    * and hardest dominant rock (#458 D4/T1.3/A11).
    */
   mixedRockHardness?: boolean;
+  /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
 }
 
 export interface TerrainContext {

@@ -245,32 +245,18 @@ describe('encodeVoxelGrid / decodeVoxelGrid — pitMask (#1680)', () => {
     ['NaN reliefKeep', { margin: 14, reliefKeep: NaN }],
     ['reliefKeep below 0', { margin: 14, reliefKeep: -0.5 }],
     ['reliefKeep above 1', { margin: 14, reliefKeep: 3 }],
-  ])('an invalid mask (%s) is rejected or clamped, never producing a broken grid', (_label, mask) => {
+  ])('an invalid mask (%s) is rejected', (_label, mask) => {
     const gen = sandboxGen();
     const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
     const tampered: SerializedVoxels = { ...payload, gen: { ...payload.gen, pitMask: mask } };
-    let grid: VoxelGrid | undefined;
-    try {
-      grid = decodeVoxelGrid(tampered);
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-      return;
-    }
-    for (const y of surfaceFingerprint(grid, 64, 64)) {
-      expect(Number.isFinite(y)).toBe(true);
-    }
+    expect(() => decodeVoxelGrid(tampered)).toThrow(/pit mask/);
   });
 
-  it('a non-object mask is rejected or ignored', () => {
+  it('a non-object mask is rejected', () => {
     const gen = sandboxGen();
     const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
     const tampered = { ...payload, gen: { ...payload.gen, pitMask: 'strong' as unknown as typeof SANDBOX_PIT_MASK } };
-    try {
-      const grid = decodeVoxelGrid(tampered);
-      for (const y of surfaceFingerprint(grid, 64, 64)) expect(Number.isFinite(y)).toBe(true);
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-    }
+    expect(() => decodeVoxelGrid(tampered)).toThrow(/pit mask/);
   });
 });
 

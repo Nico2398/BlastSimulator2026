@@ -15,8 +15,6 @@ import { oresYieldedByRocks } from '../world/RockCatalog.js';
 // ── Types ──
 
 export interface LevelDef {
-  /** Pit mask shape; absent means DEFAULT_PIT_MASK (#1680). */
-  pitMask?: PitMaskShape;
   /** Unique identifier. */
   id: string;
   /** i18n key for the level name. */
@@ -64,6 +62,8 @@ export interface LevelDef {
    * making projection management more complex.
    */
   mixedRockHardness: boolean;
+  /** Pit mask shape; absent means DEFAULT_PIT_MASK (#1680). */
+  pitMask?: PitMaskShape;
   /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
   /** Fixed hiring pool; omitted = seeded random candidates (#1600). */

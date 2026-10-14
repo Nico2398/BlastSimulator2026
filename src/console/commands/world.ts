@@ -399,6 +399,16 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     return `Save has unknown mine type "${state.mineType}".`;
   }
 
+  // world.pitMask feeds restoreGrid/PlayableArea/landscape on every path, so
+  // check it before any of them runs (the voxels branch included).
+  if (state.world?.pitMask !== undefined) {
+    try {
+      requireValidPitMask(state.world.pitMask, 'world.pitMask');
+    } catch {
+      return t('world.terrain_save_corrupt');
+    }
+  }
+
   if (state.world?.voxels) {
     const mismatch = terrainVersionMismatch(state.world.voxels);
     if (mismatch) return mismatch;
