@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks, fleetDrillReachM, drillDepthRefusal, minDrillRigTier } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
@@ -489,5 +489,35 @@ describe('drillDepthRefusal (#1679)', () => {
   it('openings that drill 6-8 m holes are never refused, even with no rig', () => {
     expect(drillDepthRefusal(6, [])).toBeNull();
     expect(drillDepthRefusal(8, [rig(1)])).toBeNull();
+  });
+});
+
+describe('minDrillRigTier (#1714)', () => {
+  it('maps a depth to the lowest rig tier that reaches it', () => {
+    expect(minDrillRigTier(6)).toBe(1);
+    expect(minDrillRigTier(12)).toBe(1);
+    expect(minDrillRigTier(20)).toBe(2);
+    expect(minDrillRigTier(30)).toBe(3);
+  });
+
+  it('boundary: exact tier reach stays on that tier, just past it steps up', () => {
+    expect(minDrillRigTier(DRILL_RIG_MAX_DEPTH_M[1])).toBe(1);
+    expect(minDrillRigTier(12.1)).toBe(2);
+    expect(minDrillRigTier(DRILL_RIG_MAX_DEPTH_M[2])).toBe(2);
+    expect(minDrillRigTier(24.1)).toBe(3);
+    expect(minDrillRigTier(DRILL_RIG_MAX_DEPTH_M[3])).toBe(3);
+  });
+
+  it('rejection: degenerate (0, NaN) falls back to tier 1; beyond the deepest rig clamps to tier 3', () => {
+    expect(minDrillRigTier(0)).toBe(1);
+    expect(minDrillRigTier(NaN)).toBe(1);
+    expect(minDrillRigTier(41)).toBe(3);
+    expect(minDrillRigTier(1000)).toBe(3);
+  });
+
+  it('agrees with drillDepthRefusal: a rig of the returned tier always accepts the depth', () => {
+    for (const depth of [1, 12, 12.1, 18, 24, 24.1, 40]) {
+      expect(drillDepthRefusal(depth, [rig(minDrillRigTier(depth))])).toBeNull();
+    }
   });
 });
