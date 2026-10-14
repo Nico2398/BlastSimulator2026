@@ -19,7 +19,7 @@ import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVeh
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult } from '../nav/Pathfinding.js';
 import { isStepClimbable, type NavGrid } from '../nav/NavGrid.js';
-import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
+import { advanceAlongPath, inFlightHopOrigin, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
 import {
   AGENT_WALK_SPEED,
@@ -397,8 +397,11 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // clampToGrid floors instead, which can choose a start cell up to a full
   // diagonal away from the agent's true nearest cell — see this file's own
   // NavGrid.clampX/clampZ usage throughout AgentAdvance.ts for the same fix.
-  const driveFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
-  const driveFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
+  // A mover mid-hop paths from its committed hop origin instead: the rounded
+  // cell of a fractional diagonal position can be a sealed pit (#1687).
+  const hopOrigin = inFlightHopOrigin(readCommitted(emp), emp.x, emp.z, leg.destX, leg.destZ);
+  const driveFromX = hopOrigin ? hopOrigin.x : state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
+  const driveFromZ = hopOrigin ? hopOrigin.z : state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
 
   // #1206: AgentOccupancy — via advanceAlongPath's own per-hop check
   // (mover/occupancy threaded in below) and handleAgentOccupancyBlock's

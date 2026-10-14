@@ -781,7 +781,11 @@ export function inFlightHopOrigin(
   destX: number,
   destZ: number,
 ): { x: number; z: number } | null {
-  void committed; void x; void z; void destX; void destZ;
-  // TODO: implement
-  return null;
+  const { originX, originZ, waypointX, waypointZ, destX: cDestX, destZ: cDestZ } = committed;
+  if (originX == null || originZ == null || waypointX == null || waypointZ == null || cDestX == null || cDestZ == null) return null;
+  if (cDestX !== destX || cDestZ !== destZ) return null;
+  const eps = 1e-6;
+  if (Math.hypot(x - waypointX, z - waypointZ) <= eps) return null;
+  if (Math.hypot(x - originX, z - originZ) > Math.hypot(waypointX - originX, waypointZ - originZ) + eps) return null;
+  return { x: originX, z: originZ };
 }
