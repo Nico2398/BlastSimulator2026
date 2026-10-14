@@ -51,3 +51,20 @@ export function playContracts(run: Run, state: GameState): void {
     if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
   }
 }
+
+/** Every command verb a first-blast playthrough may use: what a player can do with controls enabled. */
+export const PLAYER_BLAST_VERB = /^(campaign start|time resume|tick|drill_plan|charge|sequence|blast|zone clear|zone status|contract accept|contract deliver|event choose)\b/;
+
+/** Tiles a careful player clears around a charged pattern before firing. */
+const BLAST_ZONE_CLEAR_MARGIN = 16;
+
+/** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
+export function clearBlastZone(run: Run, state: GameState): void {
+  const xs = state.drillHoles.map((h) => h.x);
+  const zs = state.drillHoles.map((h) => h.z);
+  if (xs.length === 0) return;
+  const m = BLAST_ZONE_CLEAR_MARGIN;
+  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
+  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
+  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
+}
