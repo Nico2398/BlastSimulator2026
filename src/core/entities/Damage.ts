@@ -243,6 +243,20 @@ export function recordEmployeeDeath(state: EmployeeState, damage: DamageState, e
   damage.deathCount++;
 }
 
+/** Kill an employee as a workplace death: books lawsuit + deathCount (recordEmployeeDeath) and returns the 'death' AccidentRecord for the caller to log. */
+export function bookEmployeeDeath(
+  employees: EmployeeState,
+  damage: DamageState,
+  employeeId: number,
+  tick: number,
+  fragmentId = -1,
+  kineticEnergy = 0,
+): AccidentRecord {
+  void [employees, damage, employeeId, tick, fragmentId, kineticEnergy];
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 function kineticEnergy(massKg: number, velocityMs: number): number {
   return 0.5 * massKg * velocityMs * velocityMs;
 }
