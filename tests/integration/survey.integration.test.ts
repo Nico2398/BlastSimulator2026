@@ -1036,17 +1036,19 @@ describe('Survey system — blast estimate vs actual ore (#1703)', () => {
     centre: { x: number; z: number };
     explosive: string;
     kg: number;
+    /** Sandbox seed; deposits (#1682) leave some seed/biome sites barren, so each is chosen on ore. */
+    seed: number;
   }
   const SITES: Site[] = [
-    { biome: 'desert_badlands', centre: { x: 32, z: 22 }, explosive: 'boomite', kg: 8 },
-    { biome: 'green_foothills', centre: { x: 32, z: 32 }, explosive: 'krackle', kg: 8 },
-    { biome: 'alpine_granite', centre: { x: 36, z: 16 }, explosive: 'shatternite', kg: 4 },
+    { biome: 'desert_badlands', centre: { x: 36, z: 32 }, explosive: 'boomite', kg: 8, seed: 42 },
+    { biome: 'green_foothills', centre: { x: 32, z: 32 }, explosive: 'krackle', kg: 8, seed: 42 },
+    { biome: 'alpine_granite', centre: { x: 36, z: 32 }, explosive: 'shatternite', kg: 4, seed: 7 },
   ];
 
-  /** Fresh sandbox, seed 42, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */
+  /** Fresh sandbox, the site seed, plus the 3x3 / spacing 4 / depth 8 pattern centred on the site. */
   function setup(site: Site) {
     const { runner, ctx } = createRunner();
-    expect(runner.run(`sandbox start biome:${site.biome} seed:42`).success).toBe(true);
+    expect(runner.run(`sandbox start biome:${site.biome} seed:${site.seed}`).success).toBe(true);
     const grid = ctx.grid!;
     const counter = { nextHoleId: 1 };
     const holes = createGridPlan(counter, { x: site.centre.x - 4, z: site.centre.z - 4 }, 3, 3, 4, 8, 0.15);
