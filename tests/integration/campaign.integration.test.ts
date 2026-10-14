@@ -1094,11 +1094,13 @@ const KIT_LEVELS = ['grumpstone_ridge', 'treranium_depths'] as const;
 /**
  * What a careful player drills and loads for each level's rock and ore (level 3 is hardness 4-5: boomite/krackle
  * break nothing there). Grumpstone Ridge carries ore at the surface, so a shallow hole finds it. Treranium Depths'
- * ore starts ~12 m below the surface, so its holes go deep and take the explosive's 20 kg per-hole maximum.
+ * ore starts ~12 m below the surface, so its holes go deep. Its charge is dynatomics, not obliviax: deep holes
+ * flood with the weather, and a wet hole fizzles a water-sensitive charge (obliviax) into a bankrupting dud,
+ * while dynatomics is water-resistant. 16 kg per hole matches obliviax's 20 kg of energy at $12.8k of explosives.
  */
 const FIRST_BLAST: Readonly<Record<(typeof KIT_LEVELS)[number], { depth: number; charge: string }>> = {
   grumpstone_ridge: { depth: 6, charge: 'explosive:krackle amount:8' },
-  treranium_depths: { depth: 24, charge: 'explosive:obliviax amount:20' },
+  treranium_depths: { depth: 24, charge: 'explosive:dynatomics amount:16' },
 };
 
 // The shot is aimed this far from the rig, out of the blast radius of the free warehouse and spoil heap beside the
