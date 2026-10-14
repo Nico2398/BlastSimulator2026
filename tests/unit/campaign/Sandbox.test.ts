@@ -191,7 +191,7 @@ describe('sandboxLevelDef', () => {
     expect(sandboxLevelDef(SANDBOX_DEFAULTS).difficultyTier).toBe(0);
   });
 
-  it('varies only startingCash across difficulty presets, holding biome and seed fixed', () => {
+  it('varies only startingCash and startingSite across difficulty presets, holding biome and seed fixed (#1671)', () => {
     const levels: Record<SandboxDifficultyId, ReturnType<typeof sandboxLevelDef>> =
       Object.fromEntries(SANDBOX_DIFFICULTY_ORDER.map(id => [
         id,
@@ -209,6 +209,7 @@ describe('sandboxLevelDef', () => {
     expect(levels.normal.startingCash).toBe(SANDBOX_DIFFICULTIES.normal.startingCash);
     expect(levels.hard.startingCash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
 
+    // startingSite is the one other field allowed to differ (#1671); every other key is shared.
     // Cash presets must actually differ, or the "varies only cash" claim is vacuous.
     expect(levels.easy.startingCash).not.toBe(levels.normal.startingCash);
     expect(levels.normal.startingCash).not.toBe(levels.hard.startingCash);
@@ -314,5 +315,83 @@ describe('sandboxLevelDef — generated biome equals the picked biome (#1668)', 
     const level = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', seed: 29 }));
     expect(level.climateBias[0]).toBeCloseTo(centre[0] - rawT, 6);
     expect(level.climateBias[1]).toBeCloseTo(centre[1] - rawH, 6);
+  });
+});
+
+// #1671: every difficulty opens on a free starting kit able to drill, charge, fire and haul.
+describe('sandbox starting site per difficulty (#1671)', () => {
+  const siteOf = (id: SandboxDifficultyId) =>
+    sandboxLevelDef(clampSandboxConfig({ difficulty: id, biome: 'desert_badlands', seed: 42 })).startingSite;
+
+  /** Every qualification category held by any employee in the kit. */
+  const skillsOf = (id: SandboxDifficultyId) =>
+    new Set(siteOf(id)!.employees.flatMap(e => e.qualifications.map(q => q.category)));
+
+  /** One key per slot, so a kit compares as a multiset. */
+  const slotKeys = (id: SandboxDifficultyId): string[] => {
+    const site = siteOf(id)!;
+    return [
+      ...site.employees.map(e => `e:${e.role}:${e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).sort().join('+')}`),
+      ...site.vehicles.map(v => `v:${v.role}:${v.tier}`),
+      ...site.buildings.map(b => `b:${b.type}:${b.tier}`),
+    ];
+  };
+
+  const isSubMultiset = (small: string[], big: string[]): boolean => {
+    const pool = [...big];
+    for (const k of small) {
+      const i = pool.indexOf(k);
+      if (i < 0) return false;
+      pool.splice(i, 1);
+    }
+    return true;
+  };
+
+  it.each(SANDBOX_DIFFICULTY_ORDER)('%s level defines a startingSite', (id) => {
+    expect(siteOf(id)).toBeDefined();
+    expect(SANDBOX_DIFFICULTIES[id].startingSite).toBe(siteOf(id));
+  });
+
+  it.each(SANDBOX_DIFFICULTY_ORDER)('%s crew covers blasting, drill rig and truck driving, plus a hauler driver', (id) => {
+    const skills = skillsOf(id);
+    expect(skills.has('blasting')).toBe(true);
+    expect(skills.has('driving.drill_rig')).toBe(true);
+    expect(skills.has('driving.truck')).toBe(true);
+    // The charging truck and the debris hauler both need a truck-licensed hand,
+    // and the blaster is busy charging: at least two truck licences in the crew.
+    const truckHolders = siteOf(id)!.employees.filter(e => e.qualifications.some(q => q.category === 'driving.truck'));
+    expect(truckHolders.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it.each(SANDBOX_DIFFICULTY_ORDER)('%s fleet has a drill rig, debris hauler and charging truck', (id) => {
+    const roles = siteOf(id)!.vehicles.map(v => v.role);
+    expect(roles).toContain('drill_rig');
+    expect(roles).toContain('debris_hauler');
+    expect(roles).toContain('charging_truck');
+  });
+
+  it.each(SANDBOX_DIFFICULTY_ORDER)('%s buildings include a freight warehouse and a spoil heap', (id) => {
+    const types = siteOf(id)!.buildings.map(b => b.type);
+    expect(types).toContain('freight_warehouse');
+    expect(types).toContain('spoil_heap');
+  });
+
+  it('hard kit is a subset of normal, normal of easy, so size never decreases with ease', () => {
+    expect(isSubMultiset(slotKeys('hard'), slotKeys('normal'))).toBe(true);
+    expect(isSubMultiset(slotKeys('normal'), slotKeys('easy'))).toBe(true);
+    expect(slotKeys('hard').length).toBeLessThanOrEqual(slotKeys('normal').length);
+    expect(slotKeys('normal').length).toBeLessThanOrEqual(slotKeys('easy').length);
+  });
+
+  it('keeps cash at 250k / 100k / 50k alongside the kit', () => {
+    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'easy' })).startingCash).toBe(250_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'normal' })).startingCash).toBe(100_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(50_000);
+  });
+
+  it('a hostile difficulty falls back to the default difficulty kit', () => {
+    const level = sandboxLevelDef({ biome: 'not_a_biome', difficulty: 'legendary' as SandboxDifficultyId, seed: -5 });
+    expect(level.startingSite).toEqual(SANDBOX_DIFFICULTIES[SANDBOX_DEFAULTS.difficulty].startingSite);
+    expect(level.startingSite!.vehicles.length).toBeGreaterThan(0);
   });
 });
