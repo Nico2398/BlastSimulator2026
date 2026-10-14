@@ -803,12 +803,12 @@
       }
     },
     {
-      "command": "tick 150",
-      "description": "With the ramp built and the haul crew in place, the debris is hauled with no further order -- the debris that sat in the pocket is reachable now (#1302). storedMassKg grows from 0.",
+      "command": "tick 300",
+      "description": "With the ramp built and the haul crew in place, the debris is hauled with no further order -- the debris that sat in the pocket is reachable now (#1302). storedMassKg grows from 0. Tick budget 150 -> 300 (#1673): the haul crew rests at the shift length between jobs, so the same hauling takes longer.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 150"
+          "command": "tick 300"
         }
       ],
       "role": "setup",

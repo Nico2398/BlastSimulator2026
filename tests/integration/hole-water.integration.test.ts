@@ -33,7 +33,7 @@ afterEach(() => setLocale('en'));
 
 function drive(runner: ConsoleRunner, ctx: GameContext, done: () => boolean, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && !done(); i++) {
-    for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+    for (const emp of ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
     runner.run('tick 1');
   }
 }
@@ -54,7 +54,7 @@ function drilledGame() {
 /** Pin `weather` and tick `n` times (weather set gives a fresh duration, but re-pin each tick to be safe). */
 function weatherTicks(game: ReturnType<typeof drilledGame>, weather: string, n: number): void {
   for (let i = 0; i < n; i++) {
-    for (const emp of game.ctx.state!.employees.employees) emp.fatigue = 100;
+    for (const emp of game.ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
     game.runner.run(`weather set ${weather}`);
     game.runner.run('tick 1');
   }

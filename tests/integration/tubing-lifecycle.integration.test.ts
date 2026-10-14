@@ -11,7 +11,7 @@ const GRID = 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12';
 
 function drive(runner: ConsoleRunner, ctx: GameContext, done: () => boolean, maxTicks = 300): void {
   for (let i = 0; i < maxTicks && !done(); i++) {
-    for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+    for (const emp of ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
     runner.run('tick 1');
   }
 }
