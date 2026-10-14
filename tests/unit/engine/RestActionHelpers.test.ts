@@ -10,7 +10,7 @@ import { defineZone } from '../../../src/core/entities/Zone.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
-  deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestTravel,
+  restTripFatigueCost, deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestTravel,
   createRestPendingAction, isMidClaimedTaskExecution, restRoundTripWorthwhile, resolveRestDestination,
   resolveBuildingApproach, isRestBuildingFull, resolveRestBuildingId,
 } from '../../../src/core/engine/RestActionHelpers.js';
@@ -916,5 +916,52 @@ describe('resolveRestDestination (#1170)', () => {
     expect(result.buildingId).toBe(building.id);
     expect(result.targetX).toBe(expectedApproach.x);
     expect(result.targetZ).toBe(expectedApproach.z);
+  });
+});
+
+describe('restTripFatigueCost (#1673)', () => {
+  const SEED = 42;
+
+  function fixture() {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    state.navGrid = makeFlatNavGrid(60, 10);
+    return { state, employee };
+  }
+
+  it('on foot: cost is a positive fatigue amount for a reachable target', () => {
+    const { state, employee } = fixture();
+    const cost = restTripFatigueCost(state, employee, 30, 5);
+    expect(cost).not.toBeNull();
+    expect(cost!).toBeGreaterThan(0);
+  });
+
+  it('mounted in a speed-1 vehicle costs more than on foot over the same route', () => {
+    const foot = fixture();
+    const onFoot = restTripFatigueCost(foot.state, foot.employee, 30, 5);
+
+    const mounted = fixture();
+    const { vehicle } = purchaseVehicle(mounted.state.vehicles, 'drill_rig', 0, 5);
+    vehicle.occupantIds = [mounted.employee.id];
+    mounted.employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const driving = restTripFatigueCost(mounted.state, mounted.employee, 30, 5);
+
+    expect(onFoot).not.toBeNull();
+    expect(driving).not.toBeNull();
+    expect(driving!).toBeGreaterThan(onFoot!);
+  });
+
+  it('boundary: a target at the employee\'s own position costs next to nothing', () => {
+    const { state, employee } = fixture();
+    const cost = restTripFatigueCost(state, employee, employee.x, employee.z);
+    expect(cost).not.toBeNull();
+    expect(cost!).toBeLessThan(1);
+  });
+
+  it('unreachable target (walled off) returns null', () => {
+    const { state, employee } = fixture();
+    blockColumn(state.navGrid!, 20);
+    expect(restTripFatigueCost(state, employee, 40, 5)).toBeNull();
   });
 });
