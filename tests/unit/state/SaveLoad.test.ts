@@ -2323,3 +2323,40 @@ describe('deserialize — stored barren fragments are released to the heap (#169
     expect(restored.logistics.storedMassKg).toBeCloseTo(1300, 6);
   });
 });
+
+describe('deserialize — ScoreState dust fields absent from an old save (#1733)', () => {
+  it('a save without freshDustKg/lastLooseRockKg loads and the first tick over a standing pile makes no phantom pulse', () => {
+    const state = createGame({ seed: 42 });
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    const scoresRaw = parsed['scores'] as Record<string, unknown>;
+    delete scoresRaw['freshDustKg'];
+    delete scoresRaw['lastLooseRockKg'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+    const before = restored.scores.ecology;
+    updateScores(restored.scores, {
+      buildings: createBuildingState(),
+      avgMorale: 50,
+      recentAccidents: 0,
+      hasSafetyEquipment: false,
+      maxRecentVibration: 0,
+      employeeCount: 0,
+      looseRockKg: 2_000_000,
+    });
+
+    expect(Number.isNaN(restored.scores.ecology)).toBe(false);
+    expect(Number.isFinite(restored.scores.freshDustKg)).toBe(true);
+    expect(restored.scores.freshDustKg).toBe(0);
+    // A phantom pulse of 2,000 t would cost ~0.3 in one tick; settled rubble costs under 0.05.
+    expect(before - restored.scores.ecology).toBeLessThan(0.05);
+  });
+
+  it('serialize/deserialize round-trips the dust fields', () => {
+    const state = createGame({ seed: 42 });
+    state.scores.freshDustKg = 1234;
+    state.scores.lastLooseRockKg = 5678;
+    const restored = deserialize(serialize(state));
+    expect(restored.scores.freshDustKg).toBe(1234);
+    expect(restored.scores.lastLooseRockKg).toBe(5678);
+  });
+});
