@@ -107,7 +107,9 @@ const ALPINE: WeatherClimate = {
   },
 };
 
-const CLIMATES: Record<string, WeatherClimate> = {
+type ClimateName = 'arid' | 'tropical' | 'temperate' | 'alpine';
+
+const CLIMATES: Record<ClimateName, WeatherClimate> = {
   arid: ARID,
   tropical: TROPICAL,
   temperate: TEMPERATE,
@@ -115,7 +117,7 @@ const CLIMATES: Record<string, WeatherClimate> = {
 };
 
 /** BiomeCatalog id -> climate name. */
-const BIOME_CLIMATE: Record<string, string> = {
+const BIOME_CLIMATE: Record<string, ClimateName> = {
   desert_badlands: 'arid',
   red_canyon: 'arid',
   volcanic_flats: 'arid',
@@ -124,8 +126,14 @@ const BIOME_CLIMATE: Record<string, string> = {
   green_foothills: 'temperate',
 };
 
-/** Climate for a biome id; unknown or undefined ids get the fallback (temperate) climate. */
+/**
+ * Climate for a biome id; unknown or undefined ids get the fallback (temperate) climate.
+ * Own-property lookup: ids like 'constructor' or '__proto__' must not hit inherited members.
+ */
 export function getWeatherClimate(biomeId: string | undefined): WeatherClimate {
-  const name = (biomeId !== undefined ? BIOME_CLIMATE[biomeId] : undefined) ?? WEATHER_FALLBACK_CLIMATE;
-  return CLIMATES[name]!;
+  const name: ClimateName =
+    biomeId !== undefined && Object.hasOwn(BIOME_CLIMATE, biomeId)
+      ? BIOME_CLIMATE[biomeId]!
+      : WEATHER_FALLBACK_CLIMATE;
+  return CLIMATES[name];
 }

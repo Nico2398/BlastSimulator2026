@@ -429,7 +429,7 @@
     },
     {
       "command": "tick 2",
-      "description": "#1350: wetness is per-hole water state, not 'is it raining right now' -- the rain has to fall on the holes. Four heavy_rain ticks (0.7 intensity x HOLE_RAIN_FILL_RATE per tick) push every untubed hole past HOLE_WET_THRESHOLD; the weather pinned just above lasts up to 8 ticks, so it stays heavy_rain throughout. (#1688: split in two ticks of 2 around a re-pin because arid heavy_rain lasts only 2-4 ticks.)",
+      "description": "#1350: wetness is per-hole water state, not 'is it raining right now' -- the rain has to fall on the holes. Four heavy_rain ticks (0.7 intensity x HOLE_RAIN_FILL_RATE per tick) push every untubed hole past HOLE_WET_THRESHOLD; the weather re-pinned just above lasts 2-4 ticks in the arid default climate, enough to cover this second half, so it stays heavy_rain throughout. (#1688: split in two ticks of 2 around a re-pin because arid heavy_rain lasts only 2-4 ticks.)",
       "interaction": [
         {
           "type": "command",

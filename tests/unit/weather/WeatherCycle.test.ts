@@ -535,8 +535,11 @@ describe('WeatherCycle per-biome climates (#1688)', () => {
 
   it('setWeather and forceAdvanceInState work with a biome', () => {
     const c = createWeatherCycle(5, undefined, 'tropical_karst');
-    setWeather(c, 'heat_wave');
+    setWeather(c, 'heat_wave', 'tropical_karst');
     expect(c.current).toBe('heat_wave');
+    // tropical heat_wave max (10) differs from temperate (16)
+    expect(c.ticksRemaining).toBe(getWeatherClimate('tropical_karst').durations.heat_wave[1]);
+    expect(c.ticksRemaining).not.toBe(getWeatherClimate(undefined).durations.heat_wave[1]);
     forceAdvanceInState(c, 'tropical_karst');
     expect(ALL_WEATHER_STATES).toContain(c.current);
     expect(c.ticksRemaining).toBeGreaterThan(0);
@@ -549,14 +552,18 @@ describe('WeatherCycle per-biome climates (#1688)', () => {
     for (const b of BIOMES) {
       const { durations } = getWeatherClimate(b);
       const c = createWeatherCycle(11, undefined, b);
+      let transitions = 0;
       for (let i = 0; i < 2000; i++) {
-        const before = c.history.length;
-        const last = c.current;
+        const willTransition = c.ticksRemaining <= 1;
         tickWeather(c, b);
-        if (c.history.length !== before || c.current !== last || c.ticksRemaining > 0) {
-          expect(c.ticksRemaining).toBeLessThanOrEqual(durations[c.current][1]);
+        if (willTransition) {
+          transitions++;
+          const [min, max] = durations[c.current];
+          expect(c.ticksRemaining).toBeGreaterThanOrEqual(min);
+          expect(c.ticksRemaining).toBeLessThanOrEqual(max);
         }
       }
+      expect(transitions).toBeGreaterThan(10);
     }
   });
 });

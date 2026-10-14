@@ -69,7 +69,7 @@ function census(biome: string | undefined): Census {
 
 describe('getWeatherClimate (#1688)', () => {
   it('temperate fallback for undefined, "desert" and unknown ids equals the pre-change tables', () => {
-    for (const id of [undefined, 'desert', 'no_such_biome', '']) {
+    for (const id of [undefined, 'desert', 'no_such_biome', '', 'constructor', '__proto__', 'toString', 'hasOwnProperty']) {
       const c = getWeatherClimate(id);
       expect(c.transitions).toEqual(OLD_TRANSITIONS);
       expect(c.durations).toEqual(OLD_DURATIONS);
@@ -82,14 +82,29 @@ describe('getWeatherClimate (#1688)', () => {
     expect(c.durations).toEqual(OLD_DURATIONS);
   });
 
-  it('every catalog biome id maps to a climate', () => {
-    const biomes = getAllBiomes();
-    expect(biomes.length).toBe(6);
-    for (const b of biomes) {
-      const c = getWeatherClimate(b.id);
-      expect(c).toBeDefined();
-      expect(Object.keys(c.transitions).sort()).toEqual([...ALL_WEATHER_STATES].sort());
+  it('every catalog biome id maps to its intended explicit climate', () => {
+    const expected: Record<string, string> = {
+      desert_badlands: 'arid',
+      red_canyon: 'arid',
+      volcanic_flats: 'arid',
+      tropical_karst: 'tropical',
+      alpine_granite: 'alpine',
+      green_foothills: 'temperate',
+    };
+    const reference: Record<string, unknown> = {
+      arid: getWeatherClimate('desert_badlands'),
+      tropical: getWeatherClimate('tropical_karst'),
+      alpine: getWeatherClimate('alpine_granite'),
+      temperate: getWeatherClimate('green_foothills'),
+    };
+    for (const b of getAllBiomes()) {
+      // A catalog biome absent from BIOME_CLIMATE would silently fall back to temperate.
+      expect(expected[b.id], `catalog biome ${b.id} has no expected climate`).toBeDefined();
+      expect(getWeatherClimate(b.id)).toBe(reference[expected[b.id]!]);
     }
+    expect(reference.arid).not.toBe(reference.temperate);
+    expect(reference.tropical).not.toBe(reference.temperate);
+    expect(reference.alpine).not.toBe(reference.temperate);
   });
 
   it('arid biomes share one climate, distinct from temperate', () => {
