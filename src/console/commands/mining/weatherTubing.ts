@@ -10,6 +10,7 @@ import {
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
+import { buyExplosiveCommand } from './buyExplosive.js';
 import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -115,4 +116,14 @@ export function drainHoleCommand(
     return { success: result.drained.length > 0, output: t('mining.drain.batch_blocked', summary) };
   }
   return { success: true, output: t('mining.drain.success', summary) };
+}
+
+/** `buy` dispatcher: `explosive:<id>` buys warehouse stock, anything else buys tubing. */
+export function buyCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  if (named['explosive'] !== undefined) return buyExplosiveCommand(ctx, named);
+  return tubingCommand(ctx, ['buy'], named);
 }

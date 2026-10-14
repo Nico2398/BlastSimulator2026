@@ -2,7 +2,7 @@
 // A destroyed explosive warehouse holding stock detonates, hurting what is near it.
 
 import { recordEmployeeDeath, type AccidentRecord, type DamageState } from './Damage.js';
-import { buildingCenter, destroyBuilding, getBuildingDef, type Building, type BuildingState } from './Building.js';
+import { buildingCenter, destroyBuilding, getBuildingDef, warehouseStockKg, type Building, type BuildingState } from './Building.js';
 import { destroyVehicle, getVehicleDefByTier, type VehicleState } from './Vehicle.js';
 import { injureEmployee, type EmployeeState } from './Employee.js';
 import {
@@ -23,9 +23,9 @@ export interface SecondaryBlastEvent {
 
 /** Event for a building whose destruction detonates stored explosives, else null. Centred on its footprint. */
 export function secondaryBlastEventFor(b: Building): SecondaryBlastEvent | null {
-  if (b.type !== 'explosive_warehouse' || (b.storedExplosivesKg ?? 0) <= 0) return null;
+  if (b.type !== 'explosive_warehouse' || warehouseStockKg(b) <= 0) return null;
   const { cx, cz } = buildingCenter(b);
-  return { buildingId: b.id, x: cx, z: cz, explosivesKg: b.storedExplosivesKg! };
+  return { buildingId: b.id, x: cx, z: cz, explosivesKg: warehouseStockKg(b) };
 }
 
 function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {

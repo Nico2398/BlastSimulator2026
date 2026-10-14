@@ -58,6 +58,8 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Bulk explosive price (#1678): the unit-tested pricing contract; production composes it inside buyExplosiveStock/returnOrderStock.
+  'src/core/mining/ExplosiveStock.ts:bulkPricePerKg',
   // Tutorial rail whitelist (#1595): the per-step whitelist test reads the single always-allowed list and the policy range; production uses them inside their modules.
   'src/ui/tutorialRails.ts:BASE_PERMANENTLY_ALLOWED',
   'src/ui/tutorialStages.ts:TUTORIAL_POLICY_FATIGUE_MAX',

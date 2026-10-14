@@ -190,4 +190,11 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'buy tubing',
   'install_tubing',
   'drain_hole',
+  // explosive-warehouse-stock.json (#1678): buying explosive into warehouse
+  // stock has no UI control yet, and the scenario's warehouse/hole/charge
+  // setup exists only to give that purchase something to act on.
+  'buy explosive:boomite',
+  'build explosive_warehouse at:3,5',
+  'drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15',
+  'charge hole:* explosive:boomite amount:5 stemming:2',
 ];

@@ -184,7 +184,8 @@ export interface Building {
   active: boolean;
   /** Closed by an out_of_service event modifier (#1568); derived each tick, never the player's `active` choice. */
   outOfService?: boolean;
-  storedExplosivesKg?: number;
+  /** Explosives held by an explosive warehouse, kg by explosive id (#1678). */
+  storedExplosives?: Record<string, number>;
   /** Barren rock dumped here (#1530); spoil heaps only. Never counts toward freight storage. */
   storedSpoilKg?: number;
   /**
@@ -619,6 +620,13 @@ export function checkFootprintPlacement(
   return { valid: true };
 }
 
+/** Total kg of explosives held in one building, across all explosive ids (#1678). */
+export function warehouseStockKg(b: Pick<Building, 'storedExplosives'>): number {
+  let total = 0;
+  for (const kg of Object.values(b.storedExplosives ?? {})) total += kg;
+  return total;
+}
+
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
 
 export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
@@ -629,7 +637,7 @@ export {
 } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {
-  getExplosivesCapacity, getExplosivesInStock,
+  getExplosivesCapacity, getExplosivesInStock, getExplosivesStockByType, getExplosivesFreeCapacity,
   storeExplosives, consumeExplosives, hasExplosivesForBlast, freightWarehouseHasRoom,
 } from './BuildingWarehouse.js';
 export {
