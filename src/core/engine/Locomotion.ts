@@ -796,6 +796,16 @@ function idleParkedVehicleOf(state: GameState, occupant: Occupant | null | undef
   return vehicle !== undefined && isIdleParkedVehicle(vehicle, state.employees.employees) ? vehicle : undefined;
 }
 
+/** The vehicle `occupant` is plus its driver, when that driver is idle (nothing queued, not collapsing, not on the move) (#1709). */
+function idleDrivenVehicleOf(state: GameState, occupant: Occupant): { vehicle: Vehicle; driver: Employee } | undefined {
+  const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
+  const driverId = vehicle ? vehicleDriverId(vehicle) : null;
+  const driver = driverId === null ? undefined : state.employees.employees.find(e => e.id === driverId);
+  if (!vehicle || !driver || driver.collapsing || employeeWorkState(driver) !== 'idle') return undefined;
+  if (isVehicleCurrentlyDriving(vehicle, state.employees.employees)) return undefined;
+  return { vehicle, driver };
+}
+
 function handleAgentOccupancyBlock(
   state: GameState,
   emp: Employee,
@@ -1212,11 +1222,29 @@ function relocateIdleDestinationBlocker(
   }
 
   // occupant.kind === 'vehicle'
-  const vehicle = idleParkedVehicleOf(state, occupant);
+  const parked = idleParkedVehicleOf(state, occupant);
+  // #1709: a rig an idle driller still sits in (waiting out the shift, nothing
+  // queued) is as inert as a driverless one — it must not wall off a work cell
+  // (a charging truck's hole) for the rest of the shift. Driver and vehicle
+  // move together so the mount stays position-consistent (I2).
+  const idleDriven = parked === undefined ? idleDrivenVehicleOf(state, occupant) : undefined;
+  const vehicle = parked ?? idleDriven?.vehicle;
   if (!vehicle) return false;
 
   const freeCell = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
   if (!freeCell) return false;
+  if (idleDriven) {
+    for (const riderId of vehicle.occupantIds) {
+      const rider = state.employees.employees.find(e => e.id === riderId);
+      if (!rider) continue;
+      rider.x = freeCell.x;
+      rider.z = freeCell.z;
+      writeCommitted(rider, NULL_ROUTE_COMMITMENT);
+      writeMoveHistory(rider, null, null);
+      resetStuckTracking(rider);
+      result.moved.push(rider.id);
+    }
+  }
 
   // AgentOccupancy first (findNearestFreeCellForAgent already read against
   // it), then the vehicle's own position/NavCell bookkeeping — mirrors the

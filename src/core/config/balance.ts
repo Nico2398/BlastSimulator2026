@@ -1837,10 +1837,23 @@ export const MAX_NEED_GAUGE = 100;
 
 // ─── Shift / Rest Scheduling ────────────────────────────────────────────────
 
-/** Shift duration in ticks for each policy mode. 1 tick = 1 game-hour. */
+/**
+ * Shift duration in ticks of WORK for each policy mode (1 tick = 1 game-hour).
+ *
+ * "8h" and "12h" name the policy, not the tick count: working ticks are the
+ * game's coarse unit, one drill_hole job alone runs ~8-13 of them. #1709
+ * measured the old 8 / 12 against walk-to-rest: a shift shorter than one rig
+ * job sent the driller to the quarters after EVERY hole, so a 3x3 plan with
+ * quarters beside it took 208 ticks. A 20-tick shift (30 for the long one,
+ * same 2:3 ratio) lets a rig cover about two holes per rest and measures 140
+ * ticks beside the plan (target <= 150), with zero collapses at 12 m and 25 m
+ * (needs.integration.test.ts, #1709). Shorter shifts (16 -> 154, 12 -> 187)
+ * miss the target. The fatigue threshold (SITE_POLICY_DEFAULT_THRESHOLD) still
+ * sends a tired worker home sooner.
+ */
 export const SHIFT_DURATIONS_TICKS = {
-  shift_8h:  8,
-  shift_12h: 12,
+  shift_8h:  20,
+  shift_12h: 30,
 } as const;
 
 /**

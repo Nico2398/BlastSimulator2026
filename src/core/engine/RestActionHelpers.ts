@@ -316,7 +316,13 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
     ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true }, emitter)
     : undefined;
   if (!viaBuilding?.success) {
-    moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
+    const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
+    // Driven trip (#1122): the vehicle is needed for the travel only, so the
+    // final leg alights on arrival unless this worker is the only one who
+    // could reclaim it anyway (hasClaimableSameRoleFollowUp).
+    if (result.success && isMounted(emp.locomotion) && !hasClaimableSameRoleFollowUp(state, emp)) {
+      alightOnArrival(emp);
+    }
   }
   emp.pendingActionType = 'rest';
 }

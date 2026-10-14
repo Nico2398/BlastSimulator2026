@@ -1156,7 +1156,8 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     emp.x = 0;
     emp.z = 0;
 
-    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', emp.x, emp.z);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', emp.x, emp.z);
+    // debris_hauler outpaces walking, so the drive is kept (#1709: a slower rig is parked and walked instead).
     vehicle.occupantIds = [empId];
     emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     emp.activeActionId = null; // idle
@@ -1212,7 +1213,7 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     // to claim (the same eligibility test findFreeVehicleForRole itself uses:
     // vehicleDriverId(v) === null), exactly like the hard-collapse release.
     const otherEmpId = hireOne(ctx, 'driller');
-    assignSkill(state.employees, otherEmpId, 'driving.drill_rig', 1);
+    assignSkill(state.employees, otherEmpId, 'driving.truck', 1);
     const otherEmp = getEmployee(ctx, otherEmpId);
     otherEmp.x = vehicle.x;
     otherEmp.z = vehicle.z;
