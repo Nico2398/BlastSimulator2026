@@ -1675,7 +1675,8 @@ describe('SurveyConfidenceOverlay', () => {
     overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5)], opacity: 0.6 }));
     const { colors } = pointVertices(scene, 0);
     expect(colors.length).toBeGreaterThan(0);
-    for (const [, , , a] of colors) expect(a).toBeCloseTo(0.6, 1);
+    // confidence 0.8 (default) → quad opacity 0.55 + 0.45 * 0.8 = 0.91
+    for (const [, , , a] of colors) expect(a).toBeCloseTo(0.6 * 0.91, 2);
     overlay.dispose();
   });
 
@@ -1763,7 +1764,7 @@ describe('SurveyConfidenceOverlay', () => {
   it('stale point has opacity multiplied by STALE_OPACITY (0.6)', () => {
     const scene = makeScene();
     const overlay = new SurveyConfidenceOverlay(scene);
-    // Fresh point with opacity 0.6 → per-vertex alpha = 0.6 * 1.0 = 0.6
+    // Fresh point: alpha = opacity * (0.55 + 0.45 * confidence)
     overlay.show(makeOverlayOptions({
       points: [makeConfidencePoint(5, 5, { fresh: true, confidence: 0.5 })],
       opacity: 0.6,
@@ -1778,9 +1779,9 @@ describe('SurveyConfidenceOverlay', () => {
     const staleAlpha = pointVertices(scene, 0).colors[0]![3];
 
     // Stale opacity should be 0.6x the fresh opacity
-    // Fresh: 0.6 * 1.0 = 0.6
+    // Fresh: 0.6 * (0.55 + 0.45 * 0.5) = 0.465
     // Stale: 0.6 * 0.6 = 0.36
-    expect(freshAlpha).toBeCloseTo(0.6, 2);
+    expect(freshAlpha).toBeCloseTo(0.465, 2);
     expect(staleAlpha).toBeCloseTo(0.36, 2);
     overlay.dispose();
   });
