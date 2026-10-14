@@ -649,7 +649,7 @@ export function createGame(config: GameConfig): GameState {
     nextHoleId: 1,
     plannedBuildings: [],
     nextPlannedBuildingId: 1,
-    weather: createWeatherCycle(config.seed, config.fixedWeather),
+    weather: createWeatherCycle(config.seed, config.fixedWeather, config.mineType),
   };
 
   if (config.startingSite) {
