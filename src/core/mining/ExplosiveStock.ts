@@ -16,7 +16,7 @@ export function explosivePriceFactor(state: Pick<GameState, 'events' | 'tickCoun
 }
 
 /** Bulk price per kg of an explosive: catalog cost x EXPLOSIVE_BULK_PRICE_FACTOR x priceFactor. */
-export function bulkPricePerKg(explosiveId: string, priceFactor: number): number {
+function bulkPricePerKg(explosiveId: string, priceFactor: number): number {
   const explosive = getExplosive(explosiveId);
   return explosive ? explosive.costPerKg * EXPLOSIVE_BULK_PRICE_FACTOR * priceFactor : 0;
 }
@@ -25,7 +25,7 @@ export type BuyStockFailure =
   | 'invalid_amount' | 'unknown_explosive' | 'not_available'
   | 'no_warehouse' | 'over_capacity' | 'insufficient_funds';
 
-export type BuyStockResult =
+type BuyStockResult =
   | { success: true; kg: number; cost: number; pricePerKg: number; stockKg: number; capacityKg: number }
   | { success: false; reason: BuyStockFailure; freeKg?: number; need?: number };
 
