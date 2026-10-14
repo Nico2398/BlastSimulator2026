@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
+  bandOresAtDepth,
   buildDepthProfile,
   oreDepthSpan,
   type SurveyDepthBand,
@@ -268,5 +269,52 @@ describe('estimateSurveyResult depthProfile (#1683)', () => {
       expect(r.estimates).toEqual({});
       expect(r.confidence).toBeCloseTo(0.81, 12);
     });
+  });
+});
+
+describe('bandOresAtDepth (#1703)', () => {
+  const bands: SurveyDepthBand[] = [
+    { fromM: 0, toM: 5, ores: { gold: 0.4 } },
+    { fromM: 10, toM: 15, ores: { gold: 0.8, iron: 0.2 } },
+  ];
+
+  it('returns the ores of the band containing the depth', () => {
+    expect(bandOresAtDepth(bands, 2)).toEqual({ gold: 0.4 });
+    expect(bandOresAtDepth(bands, 12)).toEqual({ gold: 0.8, iron: 0.2 });
+  });
+
+  it('includes the band start and excludes its end', () => {
+    expect(bandOresAtDepth(bands, 0)).toEqual({ gold: 0.4 });
+    expect(bandOresAtDepth(bands, 4.99)).toEqual({ gold: 0.4 });
+    expect(bandOresAtDepth(bands, 5)).toBeUndefined();
+    expect(bandOresAtDepth(bands, 10)).toEqual({ gold: 0.8, iron: 0.2 });
+    expect(bandOresAtDepth(bands, 15)).toBeUndefined();
+  });
+
+  it('returns undefined between bands and beyond the last band', () => {
+    expect(bandOresAtDepth(bands, 7)).toBeUndefined();
+    expect(bandOresAtDepth(bands, 100)).toBeUndefined();
+  });
+
+  it('returns undefined for a negative depth', () => {
+    expect(bandOresAtDepth(bands, -1)).toBeUndefined();
+  });
+
+  it('returns undefined for an absent or empty profile', () => {
+    expect(bandOresAtDepth(undefined, 2)).toBeUndefined();
+    expect(bandOresAtDepth([], 2)).toBeUndefined();
+  });
+
+  it('tolerates a malformed saved profile without throwing', () => {
+    expect(() => bandOresAtDepth('nope' as unknown as SurveyDepthBand[], 2)).not.toThrow();
+    expect(bandOresAtDepth('nope' as unknown as SurveyDepthBand[], 2)).toBeUndefined();
+    const broken = [null, { fromM: 0, toM: 5 }, { fromM: 0, toM: 5, ores: { gold: 0.4 } }] as unknown as SurveyDepthBand[];
+    expect(() => bandOresAtDepth(broken, 2)).not.toThrow();
+  });
+
+  it('reads back the bands a real core sample produced', () => {
+    const profile = survey(deepSeam(), 'core_sample').depthProfile!['5,5']!;
+    expect(bandOresAtDepth(profile, 10.5)?.['gold']).toBeGreaterThan(0);
+    expect(bandOresAtDepth(profile, 3)).toBeUndefined();
   });
 });
