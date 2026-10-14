@@ -94,6 +94,7 @@ export function sandboxCommand(
     mixedRockHardness: level.mixedRockHardness,
     ...(level.pitMask ? { pitMask: level.pitMask } : {}),
     startingCrew: true,
+    fleetMustStayMobile: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 

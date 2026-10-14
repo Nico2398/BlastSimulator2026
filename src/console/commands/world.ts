@@ -239,6 +239,8 @@ export function regenerateGrid(
      * mid-route, wherever the player left them — and must never be regrouped.
      */
     startingCrew?: boolean;
+    /** With `startingCrew`: no starting vehicle may block another's way to the site's middle (the sandbox, #1680). */
+    fleetMustStayMobile?: boolean;
     /** Buildings to place near the crew on a game's first grid (#1363). */
     startingBuildings?: readonly StartingBuildingSlot[];
   },
@@ -290,7 +292,7 @@ export function regenerateGrid(
     }
   }
   snapAgentsToNavigableGround(ctx.state);
-  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state)) {
+  if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state, { fleetMustStayMobile: params.fleetMustStayMobile === true })) {
     buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   refreshOrderReachability(ctx.state);

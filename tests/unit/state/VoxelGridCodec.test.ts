@@ -219,7 +219,8 @@ describe('encodeVoxelGrid / decodeVoxelGrid — pitMask (#1680)', () => {
   it('the mask genuinely reaches generation: sandbox surface differs from the default-mask surface', () => {
     const gen = sandboxGen();
     const masked = generateTerrain(genToConfig(gen));
-    const plain = generateTerrain(genToConfig({ ...gen, pitMask: undefined }));
+    const { pitMask: _mask, ...unmasked } = gen;
+    const plain = generateTerrain(genToConfig(unmasked));
     expect(surfaceFingerprint(masked, 64, 64)).not.toEqual(surfaceFingerprint(plain, 64, 64));
   });
 

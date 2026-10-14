@@ -342,15 +342,45 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
 }
 
 /**
+ * Whether a vehicle standing on `from` can drive to `to` with a parked vehicle
+ * on each of `blockers` (#1680). The generic route checks above ignore parked
+ * vehicles, so on a one-lane steep rim they pass a fleet whose members sit in
+ * each other's way: the rig queues behind the truck it must drive past and
+ * the pit is never reached. `vehicleOccupied` is marked for the search only.
+ */
+function canDriveAroundVehicles(navGrid: NavGrid, from: Cell, to: Cell, blockers: ReadonlyArray<Cell>): boolean {
+  const marked = blockers
+    .filter(b => b.x !== to.x || b.z !== to.z) // a vehicle parked on the goal does not wall it off
+    .map(b => navGrid.cellAt(b.x, b.z))
+    .filter((cell): cell is NavCell => cell !== undefined && !cell.vehicleOccupied);
+  for (const cell of marked) cell.vehicleOccupied = true;
+  try {
+    return findPath(navGrid, {
+      agentId: 0,
+      fromX: from.x, fromZ: from.z,
+      toX: to.x, toZ: to.z,
+      avoidVehicles: true,
+      requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS,
+    }).found;
+  } finally {
+    for (const cell of marked) cell.vehicleOccupied = false;
+  }
+}
+
+/**
  * One-time fixup (#1648): move a starting vehicle off a thin ridge or trench
  * (fewer than CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS legal-step neighbours at
  * vehicle clearance) onto the nearest roomier spawnable cell, keeping the
  * vehicle separation. The generic ground snap can land a vehicle on such a
  * cell; it is connected to the site on a fresh grid, but one building corner
  * seals it and the vehicle can then never drive out. Run after the snap.
+ * With `fleetMustStayMobile` (the sandbox, #1680) a vehicle boxed in by the
+ * rest of the fleet moves too, to a cell from which it can drive to the site's
+ * middle around the others. Off by default: a campaign level's opening layout
+ * is authored, and its first shot is aimed from where the rig stands.
  * Returns whether anything moved.
  */
-export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
+export function relocateVehiclesOffNarrowGround(state: GameState, options: { fleetMustStayMobile?: boolean } = {}): boolean {
   const navGrid = state.navGrid;
   if (!navGrid) return false;
   const employees = state.employees.employees;
@@ -369,6 +399,11 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
   );
   const reachable = (a: Cell, b: Cell): boolean =>
     (components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS)).canReach(a.x, a.z, b.x, b.z);
+  // Every vehicle that can reach the site's middle at all can drive there
+  // around the rest of the fleet (#1680).
+  const fleetCanDrive = (cells: ReadonlyArray<Cell>): boolean => options.fleetMustStayMobile !== true || cells.every((cell, i) =>
+    !reachable(cell, centre)
+    || canDriveAroundVehicles(navGrid, cell, centre, cells.filter((_, j) => j !== i)));
   const occupied = new Set<string>([
     ...employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
     ...vehicles.map(v => key({ x: Math.round(v.x), z: Math.round(v.z) })),
@@ -377,8 +412,8 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
 
   for (const vehicle of vehicles) {
     const from = { x: Math.round(vehicle.x), z: Math.round(vehicle.z) };
-    if (open(from) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS) continue;
     const others = vehicles.filter(o => o !== vehicle).map(o => ({ x: Math.round(o.x), z: Math.round(o.z) }));
+    if (open(from) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS && fleetCanDrive([from, ...others])) continue;
     let target: Cell | null = null;
     for (let radius = 1; radius <= CREW_SPAWN_SEARCH_RADIUS && target === null; radius++) {
       target = [...ringCells(from, radius)].find(c =>
@@ -386,7 +421,8 @@ export function relocateVehiclesOffNarrowGround(state: GameState): boolean {
         && isSpawnable(navGrid.cellAt(c.x, c.z))
         && open(c) >= CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS
         && (reachable(from, c) || (!reachable(from, centre) && reachable(centre, c)))
-        && others.every(o => chebyshev(o, c) >= CREW_SPAWN_VEHICLE_SEPARATION),
+        && others.every(o => chebyshev(o, c) >= CREW_SPAWN_VEHICLE_SEPARATION)
+        && fleetCanDrive([c, ...others]),
       ) ?? null;
     }
     if (target === null) continue;
