@@ -1080,11 +1080,12 @@
           "employeeCount": 12,
           "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 44.78180423260124,
+          "ecology": 36.781804232601196,
           "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null
-        }
+        },
+        "note": "#1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (ECOLOGY_DUST_PER_TONNE_PER_TICK, capped by ECOLOGY_DUST_MAX_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged."
       },
       "commandOutcome": "either"
     },
@@ -1125,7 +1126,7 @@
           "employeeCount": 12,
           "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 44.78180423260124,
+          "ecology": 36.781804232601196,
           "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null
@@ -1149,7 +1150,7 @@
           "employeeCount": 12,
           "wellBeing": 58.30700000000027,
           "safety": 0,
-          "ecology": 44.78180423260124,
+          "ecology": 36.781804232601196,
           "nuisance": 35.857925484585905,
           "levelEnded": false,
           "levelEndReason": null,

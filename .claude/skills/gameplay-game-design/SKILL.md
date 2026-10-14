@@ -78,7 +78,7 @@ Unionized employees cannot be fired. Affected by well-being score.
 |-------|------------|
 | **Worker Well-being** | Quarters quality, breaks, overwork, raises, accidents |
 | **Safety** | Equipment investment, accident rate, evacuation, PPE |
-| **Ecology** | Dust, water contamination, waste management, restoration |
+| **Ecology** | Waste management: each active spoil heap +0.2/tick (inactive none). Dust: loose rubble on the ground costs `ECOLOGY_DUST_PER_TONNE_PER_TICK` per tonne per tick, capped at `ECOLOGY_DUST_MAX_PER_TICK`, so hauling rock away keeps it up. Blast vibration/projections and events lower it. Pinned at 0 (positive deltas cannot lift it). The ecology star is earned by play, not neutral drift. |
 | **Neighbour Relations** | High = good. Lowered by blast vibrations, noise, dust, projections, traffic, failed bribes; raised by events that please the village |
 
 ## Event System

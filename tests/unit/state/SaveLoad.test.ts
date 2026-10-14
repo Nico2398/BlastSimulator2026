@@ -725,6 +725,7 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate (#555)', 
       hasSafetyEquipment: false,
       maxRecentVibration: 0,
       employeeCount: 0,
+      looseRockKg: 0,
     });
 
     expect(Number.isNaN(restored.scores.wellBeing)).toBe(false);
