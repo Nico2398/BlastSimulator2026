@@ -2451,3 +2451,33 @@ export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
 
 /** Rendered seconds after which the blast report opens even if some debris is still moving. */
 export const BLAST_REPORT_MAX_PLAYBACK_S = 8;
+
+// ─── Pit mask shape (#1680) ──────────────────────────────────────────────────
+
+/** How the pit-suitability mask flattens relief inside a playable rect. */
+export interface PitMaskShape {
+  /** Metres of blend measured inward from the rect's edge. */
+  margin: number;
+  /** Fraction of relief that survives at full compression, deep inside the rect. */
+  reliefKeep: number;
+}
+
+/** Mask used by campaign levels and standalone worlds. */
+export const DEFAULT_PIT_MASK: PitMaskShape = { margin: 24, reliefKeep: 0.3 };
+
+/**
+ * Sandbox mask (#1680): a tighter blend (14 m) that keeps only 5% of relief
+ * inside the rect, so the sandbox start has room for flat 9x9 m pads while
+ * mountains stay dramatic around and beyond the pit. Measured on 64x64 sites,
+ * seeds 1/7/42, every biome: worst case ~32% flat pads (alpine, seed 42)
+ * against the 25% target. A wider margin or lower keep alone fails, because
+ * the blend ramp is the steep part.
+ */
+export const SANDBOX_PIT_MASK: PitMaskShape = { margin: 14, reliefKeep: 0.05 };
+
+/** Target fraction of the sandbox start pad that must be flat. */
+export const SANDBOX_FLAT_PAD_TARGET = 0.25;
+/** Max height spread (voxels) across the flat pad. */
+export const SANDBOX_FLAT_PAD_MAX_SPREAD = 2;
+/** Side length (voxels) of the flat pad. */
+export const SANDBOX_FLAT_PAD_SIZE = 9;

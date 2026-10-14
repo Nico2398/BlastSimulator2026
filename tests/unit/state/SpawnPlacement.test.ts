@@ -398,6 +398,35 @@ function makeSealedTrenchGrid(size: number): VoxelGrid {
   return grid;
 }
 
+/**
+ * A walled room (x 1..9) whose only exit is a one-cell neck at z=9 (x 10..18).
+ * A vehicle parked at the neck mouth boxes in a vehicle standing in the room
+ * (#1680): the room has space, so it is not narrow ground, yet it cannot drive out.
+ */
+function makeNeckRoomGrid(size: number): VoxelGrid {
+  const grid = new VoxelGrid(size, size);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const isWall = ((z === 3 || z === 15) && x <= 18) || (x >= 10 && x <= 18 && z !== 9 && z > 3 && z < 15) || (x === 0 && z > 3 && z < 15);
+      for (let y = 0; y <= (isWall ? 12 : 1); y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
+function boxedInByParkedVehicle(): { state: ReturnType<typeof createGame>; boxed: Vehicle } {
+  const state = createGame({ seed: 42, staffed: true });
+  buildGameNavGrid(state, makeNeckRoomGrid(32), [], []);
+  const vehicles = state.vehicles.vehicles;
+  vehicles.forEach((v, i) => { v.x = 22 + i * CREW_SPAWN_VEHICLE_SEPARATION; v.z = 24; });
+  const boxed = vehicles[0]!;
+  const blocker = vehicles[1]!;
+  boxed.x = 3; boxed.z = 9;
+  blocker.x = 10; blocker.z = 9;
+  state.employees.employees.forEach((e, i) => { e.x = 20 + i * CREW_SPAWN_AGENT_SEPARATION; e.z = 28; });
+  return { state, boxed };
+}
+
 describe('relocateVehiclesOffNarrowGround (#1648)', () => {
   it('leaves a vehicle on open ground exactly where it stands', () => {
     const state = createGame({ seed: 42, staffed: true });
@@ -425,7 +454,7 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     expect(components.canReach(4, 5, hauler.x, hauler.z)).toBe(true);
   });
 
-  it('leaves a vehicle sealed in a pocket where the only roomier cells lie outside its climb component', () => {
+  it('moves a vehicle sealed in a pocket cut off from the site centre onto the main ground (#1680)', () => {
     const state = createGame({ seed: 42, staffed: true });
     buildGameNavGrid(state, makeSealedTrenchGrid(32), [], []);
     const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
@@ -437,8 +466,13 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     expect(countLegalStepNeighbours(navGrid, 4, 2, NAV_CLEARANCE_VEHICLE_CELLS)).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_MIN_OPEN_NEIGHBOURS);
     expect(computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS).canReach(4, 5, 4, 2)).toBe(false);
 
-    expect(relocateVehiclesOffNarrowGround(state)).toBe(false);
-    expect([hauler.x, hauler.z]).toEqual([4, 5]);
+    // Its own component holds no roomier cell and never reaches the site: the
+    // vehicle could never drive out, so it moves to ground that does (#1680).
+    const components = computeClimbComponents(navGrid, NAV_CLEARANCE_VEHICLE_CELLS);
+    expect(components.canReach(4, 5, 16, 16)).toBe(false);
+    expect(relocateVehiclesOffNarrowGround(state)).toBe(true);
+    expect([hauler.x, hauler.z]).not.toEqual([4, 5]);
+    expect(components.canReach(hauler.x, hauler.z, 16, 16)).toBe(true);
   });
 
   it('keeps the vehicle separation from every other vehicle when it moves one', () => {
@@ -454,6 +488,22 @@ describe('relocateVehiclesOffNarrowGround (#1648)', () => {
     for (const other of vehicles.filter(v => v !== hauler)) {
       expect(Math.max(Math.abs(other.x - hauler.x), Math.abs(other.z - hauler.z))).toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_SEPARATION);
     }
+  });
+
+  it('relocates a vehicle boxed in by another parked vehicle when fleetMustStayMobile is on (#1680)', () => {
+    const { state, boxed } = boxedInByParkedVehicle();
+
+    relocateVehiclesOffNarrowGround(state, { fleetMustStayMobile: true });
+
+    expect([boxed.x, boxed.z]).not.toEqual([3, 9]);
+  });
+
+  it('leaves a vehicle boxed in by another parked vehicle where it stands when fleetMustStayMobile is off', () => {
+    const { state, boxed } = boxedInByParkedVehicle();
+
+    relocateVehiclesOffNarrowGround(state);
+
+    expect([boxed.x, boxed.z]).toEqual([3, 9]);
   });
 
   it('is a no-op without a nav grid', () => {
