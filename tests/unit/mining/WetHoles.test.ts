@@ -195,22 +195,22 @@ describe('classifyWetChargedHoles (#1348)', () => {
 
   it('flags a wet boomite hole as wet and fizzled', () => {
     const r = classifyWetChargedHoles({ H1: charge('boomite') }, new Set(['H1']));
-    expect(r).toEqual({ wet: ['H1'], fizzled: ['H1'] });
+    expect(r).toEqual({ wet: ['H1'], fizzled: ['H1'], chargedCount: 1 });
   });
 
   it('flags a wet krackle (emulsion) hole as wet only', () => {
     const r = classifyWetChargedHoles({ H1: charge('krackle') }, new Set(['H1']));
-    expect(r).toEqual({ wet: ['H1'], fizzled: [] });
+    expect(r).toEqual({ wet: ['H1'], fizzled: [], chargedCount: 1 });
   });
 
   it('ignores wet holes that carry no charge', () => {
     const r = classifyWetChargedHoles({ H1: charge('boomite') }, new Set(['H1', 'H2']));
-    expect(r).toEqual({ wet: ['H1'], fizzled: ['H1'] });
+    expect(r).toEqual({ wet: ['H1'], fizzled: ['H1'], chargedCount: 1 });
   });
 
   it('ignores charged holes that are dry', () => {
     const r = classifyWetChargedHoles({ H1: charge('boomite'), H2: charge('boomite') }, new Set(['H2']));
-    expect(r).toEqual({ wet: ['H2'], fizzled: ['H2'] });
+    expect(r).toEqual({ wet: ['H2'], fizzled: ['H2'], chargedCount: 2 });
   });
 
   it('splits a mixed blast and sorts ids', () => {
@@ -223,13 +223,22 @@ describe('classifyWetChargedHoles (#1348)', () => {
   });
 
   it('returns empty lists for no wet holes or no charges', () => {
-    expect(classifyWetChargedHoles({ H1: charge('boomite') }, new Set())).toEqual({ wet: [], fizzled: [] });
-    expect(classifyWetChargedHoles({}, new Set(['H1']))).toEqual({ wet: [], fizzled: [] });
+    expect(classifyWetChargedHoles({ H1: charge('boomite') }, new Set())).toEqual({ wet: [], fizzled: [], chargedCount: 1 });
+    expect(classifyWetChargedHoles({}, new Set(['H1']))).toEqual({ wet: [], fizzled: [], chargedCount: 0 });
   });
 
   it('treats an unknown explosive as wet but not fizzled, without throwing', () => {
-    let r: { wet: string[]; fizzled: string[] } | undefined;
+    let r: { wet: string[]; fizzled: string[]; chargedCount: number } | undefined;
     expect(() => { r = classifyWetChargedHoles({ H1: charge('no_such_explosive') }, new Set(['H1'])); }).not.toThrow();
-    expect(r).toEqual({ wet: ['H1'], fizzled: [] });
+    expect(r).toEqual({ wet: ['H1'], fizzled: [], chargedCount: 1 });
+  });
+
+  it('chargedCount counts every charged hole, wet or dry (#1675)', () => {
+    const r = classifyWetChargedHoles(
+      { H1: charge('boomite'), H2: charge('krackle'), H3: charge('boomite'), H4: charge('boomite') },
+      new Set(['H1', 'H9']),
+    );
+    expect(r.chargedCount).toBe(4);
+    expect(r.fizzled).toEqual(['H1']);
   });
 });
