@@ -172,15 +172,12 @@ describe('outlineWobbleAt (#1734)', () => {
 describe('pitDistance (#1734)', () => {
   const rect: Rect = { minX: 0, minZ: 0, maxX: 200, maxZ: 200 };
 
-  it('is finite, symmetric across the rect and strictly monotone from the centre outwards', () => {
-    expect(pitDistance(rect, 14, 100, 100, 0, 0)).toBeCloseTo(pitDistance(rect, 14, 100, 100, 0, 0), 12);
-    const along: number[] = [];
-    for (let x = 100; x >= -40; x -= 10) along.push(pitDistance(rect, 14, x, 60, 0, 0));
-    for (const v of along) expect(Number.isFinite(v)).toBe(true);
-    const diffs = along.slice(1).map((v, i) => v - along[i]!);
-    // Inside the core the distance may plateau; beyond the core edge (x < 14) it must keep moving the same way.
-    const outside = diffs.slice(diffs.length - 5);
-    expect(outside.every(d => d > 0) || outside.every(d => d < 0)).toBe(true);
+  it('is finite, symmetric across the rect and strictly increasing outwards past the core edge', () => {
+    // Inside the core the distance plateaus at 0; from the core edge (x = 14) outwards it must grow every step.
+    const outwards: number[] = [];
+    for (let x = 10; x >= -40; x -= 10) outwards.push(pitDistance(rect, 14, x, 60, 0, 0));
+    for (const v of outwards) expect(Number.isFinite(v)).toBe(true);
+    for (let i = 1; i < outwards.length; i++) expect(outwards[i]!).toBeGreaterThan(outwards[i - 1]!);
     expect(pitDistance(rect, 14, 30, 60, 0, 0)).toBeCloseTo(pitDistance(rect, 14, 170, 60, 0, 0), 9);
     expect(pitDistance(rect, 14, 60, 30, 0, 0)).toBeCloseTo(pitDistance(rect, 14, 60, 170, 0, 0), 9);
   });

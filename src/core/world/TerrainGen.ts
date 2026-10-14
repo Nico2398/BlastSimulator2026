@@ -52,7 +52,8 @@ export function requireValidGenDimension(value: number, label: string): number {
 
 /**
  * The pit mask read from untrusted save JSON (#1680): margin finite and
- * positive, reliefKeep finite in [0, 1]; optional envelopeSlope in (0, 1], outlineWobble and cornerRadius >= 0 (#1734). Callers skip it when the mask is absent (default mask).
+ * positive, reliefKeep finite in [0, 1]; optional envelopeSlope in (0, 1], outlineWobble and
+ * cornerRadius >= 0 (#1734). Callers skip it when the mask is absent (default mask).
  */
 export function requireValidPitMask(value: PitMaskShape, label: string): PitMaskShape {
   const { margin, reliefKeep, envelopeSlope, outlineWobble, cornerRadius } = value ?? ({} as Partial<PitMaskShape>);

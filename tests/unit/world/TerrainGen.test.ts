@@ -685,21 +685,19 @@ describe('sandbox site blend (#1734)', () => {
   const RUGGED = ['alpine_granite', 'tropical_karst', 'red_canyon'];
 
   /**
-   * Share of perimeter lines (every 4 m along each side, 1 m steps from the core edge outwards to 30 m past
-   * the grid edge) whose blend is walkable. Only steps the mask made steeper than the landscape's own count:
-   * a cliff the landscape has on its own, inside the cone, is not the blend's doing.
+   * Share of perimeter lines (every 4 m along each side, 1 m steps outwards from the core edge for `band` m)
+   * whose every step passes `stepOk`. `natural` is the landscape without the mask, for comparison.
    */
-  function walkableShare(biome: string, seed: number): number {
+  function perimeterLineShare(
+    biome: string,
+    seed: number,
+    band: number,
+    stepOk: (h: (x: number, z: number) => number, natural: (x: number, z: number) => number, a: [number, number], b: [number, number]) => boolean,
+  ): number {
     const ctx = buildTerrainContext(sandboxTerrainConfig(biome, seed)).worldGen;
     const h = (x: number, z: number): number => sampleSurfaceHeightY(ctx, x, z);
     const natural = (x: number, z: number): number =>
       sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset;
-    /**
-     * The blend made this step steeper than the landscape's own: a cliff the landscape has on its own, inside
-     * the cone, is not the blend's doing (the mask only flattens; it cannot erase a natural wall).
-     */
-    const blendSteepened = (x0: number, z0: number, x1: number, z1: number): boolean =>
-      Math.abs(h(x1, z1) - h(x0, z0)) > Math.abs(natural(x1, z1) - natural(x0, z0)) + 0.05;
     let ok = 0, total = 0;
     for (let along = 4; along < SITE; along += 4) {
       const lines: Array<(t: number) => [number, number]> = [
@@ -707,22 +705,42 @@ describe('sandbox site blend (#1734)', () => {
         t => [along, CORE - t], t => [along, SITE - CORE + t],
       ];
       for (const at of lines) {
-        let climbable = true;
-        for (let t = 0; t < CORE + REACH; t++) {
-          const [x0, z0] = at(t);
-          const [x1, z1] = at(t + 1);
-          if (blendSteepened(x0, z0, x1, z1) && !isStepClimbable(h(x0, z0), h(x1, z1), 1)) { climbable = false; break; }
+        let good = true;
+        for (let t = 0; t < band; t++) {
+          if (!stepOk(h, natural, at(t), at(t + 1))) { good = false; break; }
         }
         total++;
-        if (climbable) ok++;
+        if (good) ok++;
       }
     }
     return ok / total;
   }
 
+  /**
+   * A step the blend made steeper than the landscape's own and that is not climbable fails; a cliff the
+   * landscape has on its own, inside the cone, is not the blend's doing (the mask flattens, never erases).
+   */
+  const blendKeepsStepClimbable: Parameters<typeof perimeterLineShare>[3] = (h, natural, [x0, z0], [x1, z1]) => {
+    const steepened = Math.abs(h(x1, z1) - h(x0, z0)) > Math.abs(natural(x1, z1) - natural(x0, z0)) + 0.05;
+    return !steepened || isStepClimbable(h(x0, z0), h(x1, z1), 1);
+  };
+
+  /** Every step is climbable, natural cliffs included. */
+  const stepIsClimbable: Parameters<typeof perimeterLineShare>[3] = (h, _natural, [x0, z0], [x1, z1]) =>
+    isStepClimbable(h(x0, z0), h(x1, z1), 1);
+
+  /** Metres from the core edge that the absolute climbability check covers (measured: the cone's reach). */
+  const BLEND_BAND = 6;
+
   describe.each(BIOMES)('%s', (biome) => {
-    it.each([1, 7, 42])('seed %i: >= 80% of the perimeter is a walkable slope from the core edge to 30 m out', (seed) => {
-      expect(walkableShare(biome, seed)).toBeGreaterThanOrEqual(0.8);
+    it.each([1, 7, 42])('seed %i: blend never steepens the landscape on >= 80% of perimeter lines', (seed) => {
+      expect(perimeterLineShare(biome, seed, CORE + REACH, blendKeepsStepClimbable)).toBeGreaterThanOrEqual(0.8);
+    });
+
+    // Absolute check, deliberately lenient: natural cliffs survive the pointwise mask, so only the first
+    // BLEND_BAND metres are held to it. Measured worst case over all biomes and seeds 1/7/42: 70%.
+    it.each([1, 7, 42])('seed %i: >= 60% of perimeter lines are fully climbable within the blend band', (seed) => {
+      expect(perimeterLineShare(biome, seed, BLEND_BAND, stepIsClimbable)).toBeGreaterThanOrEqual(0.6);
     });
 
     it.each([1, 7, 42])(`seed %i: at least ${SANDBOX_FLAT_PAD_TARGET * 100}% flat 9x9 pads survive`, (seed) => {
@@ -742,7 +760,7 @@ describe('sandbox site blend (#1734)', () => {
     for (const seed of [1, 7, 42]) {
       const config = sandboxTerrainConfig(biome, seed);
       const shaped = buildTerrainContext(config).worldGen;
-      const sharpMask: PitMaskShape = { margin: CORE, reliefKeep: SANDBOX_PIT_MASK.reliefKeep, envelopeSlope: SANDBOX_PIT_MASK.envelopeSlope };
+      const { outlineWobble: _w, cornerRadius: _c, ...sharpMask } = SANDBOX_PIT_MASK satisfies PitMaskShape;
       const sharp = buildTerrainContext({ ...config, pitMask: sharpMask }).worldGen;
       const corners: Array<[number, number]> = [[0, 0], [SITE, 0], [0, SITE], [SITE, SITE]];
       let cornersDiffering = 0;

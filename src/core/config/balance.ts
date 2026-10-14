@@ -2483,7 +2483,7 @@ export interface PitMaskShape {
   reliefKeep: number;
   /** Max landscape slope (m of height per m) outside the rect; absent = legacy blend only. */
   envelopeSlope?: number;
-  /** Amplitude (m) of the noise wobble applied to the outline distance; absent = straight outline. */
+  /** Amplitude (m) of the outline wobble; the outline offset swings over [0, 2 * amplitude], so the peak is twice this value. Absent = straight outline. */
   outlineWobble?: number;
   /** Corner rounding radius (m) of the outline; absent = sharp corners. */
   cornerRadius?: number;
@@ -2513,7 +2513,7 @@ export const OUTLINE_WOBBLE_WAVE_B_DIR: readonly [number, number] = [-0.5, 0.866
  * (on >= 80% of the perimeter lines), so drill holes just outside the grid stay
  * reachable. A natural wall inside the cone is flattened (clamped to the envelope)
  * but not erased: a pointwise mask cannot, so it stays a cliff. The outline wobbles
- * (up to 6 m, flat side only) and corners round (8 m) so the edge is not a
+ * (peak offset 6 m = 2 x outlineWobble 3, flat side only) and corners round (8 m) so the edge is not a
  * visible rectangle.
  */
 export const SANDBOX_PIT_MASK: PitMaskShape = {

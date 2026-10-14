@@ -254,7 +254,7 @@ describe('encodeVoxelGrid / decodeVoxelGrid — pitMask (#1680)', () => {
   });
 
   it('an envelope mask (slope, wobble, corner radius) round-trips to identical surface Y (#1734)', () => {
-    const mask = { margin: 14, reliefKeep: 0.05, envelopeSlope: 0.45, outlineWobble: 3, cornerRadius: 8 };
+    const mask = SANDBOX_PIT_MASK;
     const gen = makeGen({ seed: 42, climateBias: [0.6, 0.7], sizeX: 64, datum: 24, sizeZ: 64, pitMask: mask });
     const grid = generateTerrain(genToConfig(gen));
     const payload = encodeVoxelGrid(grid, gen);
