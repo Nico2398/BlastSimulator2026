@@ -151,6 +151,7 @@ export function decodeVoxelGrid(payload: SerializedVoxels): VoxelGrid {
     seed: payload.gen.seed,
     climateBias: payload.gen.climateBias,
     ...(payload.gen.mixedRockHardness !== undefined ? { mixedRockHardness: payload.gen.mixedRockHardness } : {}),
+    ...(payload.gen.oreDeposits !== undefined ? { oreDeposits: payload.gen.oreDeposits } : {}),
     ...(payload.gen.pitMask !== undefined ? { pitMask: requireValidPitMask(payload.gen.pitMask, 'gen.pitMask') } : {}),
   };
 

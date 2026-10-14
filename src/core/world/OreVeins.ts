@@ -8,9 +8,12 @@
 // old scheme only approximated.
 
 import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
+import {
+  ORE_DEPOSIT_CORE_GAIN, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
+} from '../config/balance.js';
 import { Random } from '../math/Random.js';
 import { subSeed, cellRand } from '../math/Hash.js';
-import { getAllOres } from './OreCatalog.js';
+import { getAllOres, type OreType } from './OreCatalog.js';
 import { getRock } from './RockCatalog.js';
 import type { VoxelRockComposition } from './VoxelGrid.js';
 
@@ -27,6 +30,10 @@ interface OreField {
   /** cos/sin of -strikeAngle, precomputed once so densitiesAt never recomputes trig per voxel. */
   readonly cosAngle: number;
   readonly sinAngle: number;
+  /** Horizontal low-frequency field deciding where this ore has a deposit; absent when deposits are off (#1682). */
+  readonly deposit?: NoiseFunction3D;
+  /** Deposit-field value below which this ore's rarity tier has no deposit. */
+  readonly depositCutoff: number;
 }
 
 /** Σ coefficient_i * rock_i.oreProbabilities[oreId] — how strongly this voxel's rock blend hosts oreId. */
@@ -40,8 +47,24 @@ function hostRockAffinity(composition: VoxelRockComposition, oreId: string): num
   return sum;
 }
 
+/** 0 below the rarity cutoff, smoothstepping up to ORE_DEPOSIT_CORE_GAIN over ORE_DEPOSIT_EDGE_WIDTH above it (#1682). */
+function depositGain(depositValue: number, cutoff: number): number {
+  const t = Math.min(1, (depositValue - cutoff) / ORE_DEPOSIT_EDGE_WIDTH);
+  if (t <= 0) return 0;
+  return ORE_DEPOSIT_CORE_GAIN * t * t * (3 - 2 * t);
+}
+
+/** The per-ore deposit field and its rarity cutoff; each ore's deposits are independent (own noise). */
+function depositLayer(seed: number, ore: OreType): Pick<OreField, 'deposit' | 'depositCutoff'> {
+  const rng = new Random(subSeed(seed, `ore-deposit:${ore.id}`));
+  return {
+    deposit: createNoise3D(() => rng.next()),
+    depositCutoff: ORE_DEPOSIT_RARITY_COVERAGE[ore.rarity] ?? 0,
+  };
+}
+
 /** Sampler options (#1682). */
-export interface OreVeinOptions {
+interface OreVeinOptions {
   /** Gate veins to discrete deposits by rarity tier; off keeps the legacy continuous veins. */
   readonly deposits?: boolean;
 }
@@ -50,12 +73,13 @@ export interface OreVeinOptions {
 export class OreVeinSampler {
   private readonly fields = new Map<string, OreField>();
 
-  constructor(seed: number, _options: OreVeinOptions = {}) {
+  constructor(seed: number, options: OreVeinOptions = {}) {
     for (const ore of getAllOres()) {
       const rng = new Random(subSeed(seed, `ore:${ore.id}`));
       const noise = createNoise3D(() => rng.next());
       const angle = cellRand(seed, 0, 0, subSeed(0, ore.id)) * Math.PI * 2;
-      this.fields.set(ore.id, { noise, cosAngle: Math.cos(-angle), sinAngle: Math.sin(-angle) });
+      const field = { noise, cosAngle: Math.cos(-angle), sinAngle: Math.sin(-angle), depositCutoff: 0 };
+      this.fields.set(ore.id, options.deposits ? { ...field, ...depositLayer(seed, ore) } : field);
     }
   }
 
@@ -76,11 +100,15 @@ export class OreVeinSampler {
 
       const field = this.fields.get(ore.id);
       if (!field) continue;
+      const gain = field.deposit
+        ? depositGain(field.deposit(x * ORE_DEPOSIT_FREQ, 0, z * ORE_DEPOSIT_FREQ), field.depositCutoff)
+        : 1;
+      if (gain <= 0) continue;
       const u = x * field.cosAngle - z * field.sinAngle;
       const v = x * field.sinAngle + z * field.cosAngle;
       const n = 1 - Math.abs(field.noise(u * STRIKE_FREQ, y * CROSS_FREQ, v * CROSS_FREQ));
 
-      const threshold = 1 - affinity * oreRichness * RICHNESS_WEIGHT;
+      const threshold = 1 - affinity * oreRichness * gain * RICHNESS_WEIGHT;
       if (n > threshold) {
         const density = Math.min(1, (n - threshold) * DENSITY_GAIN);
         if (density > MIN_STORED_DENSITY) {

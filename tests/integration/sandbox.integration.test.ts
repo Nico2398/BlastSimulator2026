@@ -9,7 +9,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
-import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES } from '../../src/core/campaign/Sandbox.js';
+import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES, SANDBOX_FIXED_ORE_DEPOSITS } from '../../src/core/campaign/Sandbox.js';
 import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import { addIncome } from '../../src/core/economy/Finance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
@@ -302,6 +302,45 @@ describe('sandbox mode', () => {
 const CYCLE_TICK_CAP = 4000;
 const CYCLE_BUY_OR_HIRE = /^(employee hire|vehicle buy|vehicle purchase|build |hire |purchase )/;
 
+describe('sandbox ore deposits (#1682)', () => {
+  it('the sandbox level generates ore as deposits and persists the mode on the world', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands seed:42 difficulty:normal').success).toBe(true);
+    expect(SANDBOX_FIXED_ORE_DEPOSITS).toBe(true);
+    expect(ctx.state!.world!.oreDeposits).toBe(true);
+  });
+});
+
+/** Ore in the 8x8 footprint a 3x3 spacing-4 grid drills, to 6 m below the surface. */
+function footprintOre(grid: VoxelGrid, x0: number, z0: number): number {
+  let total = 0;
+  for (let x = x0; x < x0 + 9; x += 2) {
+    for (let z = z0; z < z0 + 9; z += 2) {
+      const top = computeVoxelColumnSurfaceY(grid, x, z);
+      if (top === null) continue;
+      for (let d = 0; d < 6; d++) {
+        for (const v of Object.values(grid.getVoxel(x, top - d, z)?.oreDensities ?? {})) total += v;
+      }
+    }
+  }
+  return total;
+}
+
+/** Drill starts richest in ore first, at least 10 m apart (ore forms deposits, not blanket cover — #1682). */
+function richDrillStarts(grid: VoxelGrid, count: number): Array<[number, number]> {
+  const scored: Array<{ x: number; z: number; ore: number }> = [];
+  for (let x = 8; x <= grid.sizeX - 17; x += 2) {
+    for (let z = 8; z <= grid.sizeZ - 17; z += 2) scored.push({ x, z, ore: footprintOre(grid, x, z) });
+  }
+  scored.sort((a, b) => b.ore - a.ore);
+  const picked: Array<[number, number]> = [];
+  for (const c of scored) {
+    if (picked.length >= count) break;
+    if (picked.every(([px, pz]) => Math.abs(px - c.x) >= 10 || Math.abs(pz - c.z) >= 10)) picked.push([c.x, c.z]);
+  }
+  return picked;
+}
+
 describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first sale on %s (#1671)', (difficulty) => {
   it('drills, charges, fires, hauls and fills an ore contract with no buying or hiring, and stays solvent', () => {
     const { runner, ctx } = createRunner();
@@ -319,10 +358,10 @@ describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first
     const over = () => state.levelEnded || state.tickCount - start >= CYCLE_TICK_CAP;
     const sold = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
 
+    const starts = richDrillStarts(ctx.grid!, 6);
     let shot = 0;
-    while (!over() && !sold() && shot < 6) {
-      const x = Math.round(rig!.x) + 14;
-      const z = Math.round(rig!.z) + 13 + shot * 10;
+    while (!over() && !sold() && shot < starts.length) {
+      const [x, z] = starts[shot]!;
       shot++;
       if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
       tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);

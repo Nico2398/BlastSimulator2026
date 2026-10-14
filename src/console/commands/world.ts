@@ -102,6 +102,9 @@ function defaultDatumForSize(size: number): number {
   return Math.floor(size * 0.55);
 }
 
+/** Size, hardness and ore-mode fields terrain generation reads off a world. */
+interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] }
+
 /**
  * The base (level-original) size + hardness fields generation reads off a
  * `WorldState` — takes only the `WorldState` slice it reads, not the whole
@@ -110,12 +113,13 @@ function defaultDatumForSize(size: number): number {
  * generation": `regenerateGridParams` layers its own dimension validation on
  * top for a no-voxels load fallback.
  */
-function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] } {
+function worldGenerationFields(world: WorldState): GenerationFields {
   return {
     sizeX: world.baseSizeX,
     datum: world.datum,
     sizeZ: world.baseSizeZ,
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
+    ...(world.oreDeposits !== undefined ? { oreDeposits: world.oreDeposits } : {}),
     ...(world.pitMask !== undefined ? { pitMask: world.pitMask } : {}),
     ...(world.climateBias ? { climateBias: world.climateBias } : {}),
   };
@@ -150,6 +154,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
     datum: config.datum,
     sizeZ: config.sizeZ,
     ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
+    ...(config.oreDeposits !== undefined ? { oreDeposits: config.oreDeposits } : {}),
     ...(config.pitMask !== undefined ? { pitMask: config.pitMask } : {}),
   };
 }
@@ -169,7 +174,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
  * turns that into a clean `world.terrain_save_corrupt` refusal and rolls
  * `ctx` back.
  */
-function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] } {
+function regenerateGridParams(state: GameState): GenerationFields {
   if (!state.world) {
     return { sizeX: DEFAULT_GRID_SIZE, datum: defaultDatumForSize(DEFAULT_GRID_SIZE), sizeZ: DEFAULT_GRID_SIZE };
   }
@@ -230,6 +235,7 @@ export function regenerateGrid(
     seed: number; climateBias: readonly [number, number];
     sizeX: number; datum: number; sizeZ: number;
     mixedRockHardness?: boolean;
+    oreDeposits?: boolean;
     pitMask?: PitMaskShape;
     /**
      * True only where this grid is a game's first (`new_game`, a campaign
@@ -246,10 +252,11 @@ export function regenerateGrid(
   },
 ): void {
   if (!ctx.state) return;
-  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, pitMask } = params;
+  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask } = params;
   const config: TerrainConfig = {
     sizeX, datum, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+    ...(oreDeposits !== undefined ? { oreDeposits } : {}),
     ...(pitMask !== undefined ? { pitMask } : {}),
   };
   if (ctx.state.world && pitMask !== undefined) {
@@ -257,6 +264,9 @@ export function regenerateGrid(
   }
   if (ctx.state.world && mixedRockHardness !== undefined) {
     ctx.state.world.mixedRockHardness = mixedRockHardness;
+  }
+  if (ctx.state.world && oreDeposits !== undefined) {
+    ctx.state.world.oreDeposits = oreDeposits;
   }
   if (ctx.state.world) {
     // Persist only a bias that differs from the biome centre (sandbox seeds the raw climate misses).
@@ -313,6 +323,7 @@ export function ensureLandscape(
     seed: number; climateBias: readonly [number, number];
     sizeX: number; datum: number; sizeZ: number;
     mixedRockHardness?: boolean;
+    oreDeposits?: boolean;
     pitMask?: PitMaskShape;
   },
 ): LandscapeHandle | null {
@@ -432,10 +443,11 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     if (decodedGrid) {
       restoreGrid(ctx, decodedGrid);
     } else {
-      const { sizeX, datum, sizeZ, mixedRockHardness, pitMask, climateBias } = regenerateGridParams(state);
+      const { sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask, climateBias } = regenerateGridParams(state);
       regenerateGrid(ctx, {
         seed: state.seed, climateBias: climateBias ?? biome.climateCenter, sizeX, datum, sizeZ,
         ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
+        ...(oreDeposits !== undefined ? { oreDeposits } : {}),
         ...(pitMask !== undefined ? { pitMask } : {}),
       });
     }
