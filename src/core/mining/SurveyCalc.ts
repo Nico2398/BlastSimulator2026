@@ -54,6 +54,8 @@ export interface SurveyResult {
   confidence: number;
   /** Per-column depth bands keyed `"x,z"`. Absent for aerial surveys and legacy saves. */
   depthProfile?: Record<string, SurveyDepthBand[]>;
+  /** Surface Y (anchorY) each column was sampled from, keyed `"x,z"`. Every method, aerial included. Absent in legacy saves. */
+  surfaceYs?: Record<string, number>;
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }

@@ -566,6 +566,13 @@ export const BLAST_ESTIMATE_BREAK_RADIUS_M = 4;
  *  3-5 and depth 6-10 the estimate stays within 0.55x..1.55x of realised. */
 export const BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR = 0.2;
 
+/** Pre-fire estimate accuracy target (#1703): with a fresh seismic/core survey covering
+ *  the pattern, an ordinary blast's EST. ORE VALUE lands within +-35% of the actual ore
+ *  value. Working target, not a guarantee (seed 42: desert_badlands (32,22) boomite 8kg,
+ *  green_foothills (32,32) krackle 8kg, alpine_granite (36,16) shatternite 4kg; 3x3
+ *  pattern, spacing 4, depth 8). */
+export const BLAST_ESTIMATE_TOLERANCE = 0.35;
+
 // ─── Fragment generation (blast step 3) ────────────────────────────────────────
 
 /** How many pieces each axis of a broken voxel is diced into before fragments are

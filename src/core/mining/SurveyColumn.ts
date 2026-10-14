@@ -34,3 +34,18 @@ export function findSurveyForColumn(
   }
   return best;
 }
+
+/**
+ * Ore densities the survey located at voxel level `y` of column `(x, z)`.
+ * `undefined` when that depth was not scanned; `{}` when scanned with no ore.
+ * Legacy surveys without `depthProfile`/`surfaceYs` fall back to the whole-window column estimate.
+ */
+export function oresSurveyedAt(
+  survey: SurveyResult,
+  x: number,
+  z: number,
+  y: number,
+): Record<string, number> | undefined {
+  void survey; void x; void z; void y;
+  return undefined; // TODO: implement
+}

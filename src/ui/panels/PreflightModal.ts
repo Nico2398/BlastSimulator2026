@@ -21,11 +21,12 @@ import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '.
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
-import { wetHoles } from '../../core/mining/WetHoles.js';
+import { wetHoleIdsFor, wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
+import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -49,8 +50,12 @@ export class PreflightModal {
   private open = false;
   /** True once DETONATE was pressed: the modal closes when the sequence ends (#1362). */
   private awaitingDetonation = false;
+  private gridProvider: () => VoxelGrid | null = () => null;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
+
+  /** Supplies the voxel grid the pre-blast estimate reads geometry from (#1703). */
+  setGridProvider(fn: () => VoxelGrid | null): void { this.gridProvider = fn; }
 
   constructor(container: HTMLElement) {
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
@@ -151,7 +156,8 @@ export class PreflightModal {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
-    const estValue = estimateBlastOreValue(plan, state.surveyResults);
+    const grid = this.gridProvider();
+    const estValue = grid ? estimateBlastOreValue(plan, state.surveyResults, grid, wetHoleIdsFor(state)) : 0;
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
