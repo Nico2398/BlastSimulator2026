@@ -263,6 +263,9 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
   leaveBuildingIfInside(state, emp, emitter);
 }
 
+/** A rest target closer than this (world units) to the worker counts as resting in place. */
+const REST_IN_PLACE_RADIUS = 1;
+
 /**
  * Start `emp` travelling to (x, z) as a rest destination by the faster of
  * walking and driving (chooseRestTrip, #1709). An on-foot employee walks. A
@@ -299,7 +302,7 @@ export function beginRestTravel(state: GameState, emp: Employee, x: number, z: n
   // Resting in place (no quarters; the target is where they already stand) has
   // no trip to choose: the mounted worker keeps the vehicle for the rest and
   // frees it on arrival, as before #1709.
-  if (wasMounted && Math.hypot(x - emp.x, z - emp.z) < 1) {
+  if (wasMounted && Math.hypot(x - emp.x, z - emp.z) < REST_IN_PLACE_RADIUS) {
     const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
     if (result.success && !hasClaimableSameRoleFollowUp(state, emp)) alightOnArrival(emp);
     emp.pendingActionType = 'rest';

@@ -1510,7 +1510,7 @@ describe('#1709 — park the rig and walk to rest: no collapse at any distance, 
     expect(run.ticksToFinish!).toBeLessThanOrEqual(BESIDE_PLAN_MAX_TICKS);
   });
 
-  it('quarters ~12 m (18,34) and ~25 m (12,44) away: no collapse, and the cycle never gets shorter with distance', () => {
+  it('quarters ~12 m (18,34) and ~25 m (12,44) away: no collapse, and the cycle gets longer with distance', () => {
     const near = runLayout('24,28');
     const mid = runLayout('18,34');
     const far = runLayout('12,44');
@@ -1520,8 +1520,8 @@ describe('#1709 — park the rig and walk to rest: no collapse at any distance, 
     expect(mid.ticksToFinish).not.toBeNull();
     expect(far.ticksToFinish).not.toBeNull();
     expect(near.ticksToFinish).not.toBeNull();
-    expect(mid.ticksToFinish!).toBeGreaterThanOrEqual(near.ticksToFinish!);
-    expect(far.ticksToFinish!).toBeGreaterThanOrEqual(mid.ticksToFinish!);
+    expect(mid.ticksToFinish!).toBeGreaterThan(near.ticksToFinish!);
+    expect(far.ticksToFinish!).toBeGreaterThan(mid.ticksToFinish!);
   });
 
   // Owner: collapse stays for workers who cannot reach quarters. Measured on the
@@ -1533,6 +1533,6 @@ describe('#1709 — park the rig and walk to rest: no collapse at any distance, 
   it('a worker whose quarters cannot be reached is never restored by them (walled-off Living Quarters)', () => {
     const run = runLayout('12,44', true);
     expect(run.quartersEntered).toBe(false);
-        expect(run.maxFatigue).toBeLessThanOrEqual(NEED_REST_NO_BUILDING_CAP + 0.01);
+    expect(run.maxFatigue).toBeLessThanOrEqual(NEED_REST_NO_BUILDING_CAP + 0.01);
   });
 });

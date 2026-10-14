@@ -655,6 +655,21 @@ function resetStuckTracking(emp: Employee): void {
 }
 
 /**
+ * Jumps `emp` to (x, z) outside the normal step-by-step advance: a teleport,
+ * not a walked step, so the route commitment and move history of the old
+ * cell must not survive (a stale committed waypoint silently stalls the next
+ * itinerary), and neither must its stuck counters. Occupancy bookkeeping and
+ * any mounted vehicle's position stay with the caller.
+ */
+function teleportEmployeeTo(emp: Employee, x: number, z: number): void {
+  emp.x = x;
+  emp.z = z;
+  writeCommitted(emp, NULL_ROUTE_COMMITMENT);
+  writeMoveHistory(emp, null, null);
+  resetStuckTracking(emp);
+}
+
+/**
  * True while `emp`'s current leg is `relocateIdleDestinationBlocker`'s own
  * `returnAfterRelocate` return trip (#1283 follow-up) — walking back to a
  * cell it was displaced from, with no real claim on it any more
@@ -796,14 +811,14 @@ function idleParkedVehicleOf(state: GameState, occupant: Occupant | null | undef
   return vehicle !== undefined && isIdleParkedVehicle(vehicle, state.employees.employees) ? vehicle : undefined;
 }
 
-/** The vehicle `occupant` is plus its driver, when that driver is idle (nothing queued, not collapsing, not on the move) (#1709). */
-function idleDrivenVehicleOf(state: GameState, occupant: Occupant): { vehicle: Vehicle; driver: Employee } | undefined {
+/** The vehicle `occupant` is, when its driver is idle (nothing queued, not collapsing, not on the move) (#1709). */
+function idleDrivenVehicleOf(state: GameState, occupant: Occupant): Vehicle | undefined {
   const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
   const driverId = vehicle ? vehicleDriverId(vehicle) : null;
   const driver = driverId === null ? undefined : state.employees.employees.find(e => e.id === driverId);
   if (!vehicle || !driver || driver.collapsing || employeeWorkState(driver) !== 'idle') return undefined;
   if (isVehicleCurrentlyDriving(vehicle, state.employees.employees)) return undefined;
-  return { vehicle, driver };
+  return vehicle;
 }
 
 function handleAgentOccupancyBlock(
@@ -956,12 +971,8 @@ function handleAgentOccupancyBlock(
       if (freeCell) {
         const fromX = emp.x;
         const fromZ = emp.z;
-        emp.x = freeCell.x;
-        emp.z = freeCell.z;
+        teleportEmployeeTo(emp, freeCell.x, freeCell.z);
         occupancy.tryMove(mover, freeCell.x, freeCell.z);
-        resetStuckTracking(emp);
-        writeCommitted(emp, NULL_ROUTE_COMMITMENT);
-        writeMoveHistory(emp, null, null);
         if (isDrive) writeVehiclePosition(state, vehicle!, freeCell.x, freeCell.z, true);
         recordWalk(emp, vehicle, fromX, fromZ, [{ x: freeCell.x, z: freeCell.z }]);
         result.moved.push(emp.id);
@@ -1185,9 +1196,8 @@ function relocateIdleDestinationBlocker(
     const freeCell = findNearestFreeCellForAgent(state, occupant, emp.x, emp.z);
     if (!freeCell) return false;
 
-    emp.x = freeCell.x;
-    emp.z = freeCell.z;
     occupancy.tryMove(occupant, freeCell.x, freeCell.z);
+    teleportEmployeeTo(emp, freeCell.x, freeCell.z);
     result.moved.push(emp.id);
     // A teleport, not a walked step — any route commitment/move-history left
     // over from whatever this employee was doing right before it stood here
@@ -1199,8 +1209,6 @@ function relocateIdleDestinationBlocker(
     // ALSO targets silently stalled the return trip forever with no error,
     // no stuck flag, and no wait-counter movement at all — confirmed live via
     // this file's own "bounded-tick fairness" dense-grid reproduction.
-    writeCommitted(emp, NULL_ROUTE_COMMITMENT);
-    writeMoveHistory(emp, null, null);
     // A fresh start at the new cell (#1283 follow-up): without this, a
     // corridor blocker relocated more than once in a row (each relocation
     // one more cell down a genuinely single-file corridor, #1283's own
@@ -1209,7 +1217,6 @@ function relocateIdleDestinationBlocker(
     // a row reaches `MOVE_STUCK_ABANDON_TICKS` purely from counters this
     // teleport itself never actually waited through — abandoning a return
     // trip nobody outside this ladder ever asked to be time-boxed at all.
-    resetStuckTracking(emp);
     if (returnAfterRelocate) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
@@ -1228,7 +1235,7 @@ function relocateIdleDestinationBlocker(
   // (a charging truck's hole) for the rest of the shift. Driver and vehicle
   // move together so the mount stays position-consistent (I2).
   const idleDriven = parked === undefined ? idleDrivenVehicleOf(state, occupant) : undefined;
-  const vehicle = parked ?? idleDriven?.vehicle;
+  const vehicle = parked ?? idleDriven;
   if (!vehicle) return false;
 
   const freeCell = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
@@ -1237,11 +1244,7 @@ function relocateIdleDestinationBlocker(
     for (const riderId of vehicle.occupantIds) {
       const rider = state.employees.employees.find(e => e.id === riderId);
       if (!rider) continue;
-      rider.x = freeCell.x;
-      rider.z = freeCell.z;
-      writeCommitted(rider, NULL_ROUTE_COMMITMENT);
-      writeMoveHistory(rider, null, null);
-      resetStuckTracking(rider);
+      teleportEmployeeTo(rider, freeCell.x, freeCell.z);
       result.moved.push(rider.id);
     }
   }
