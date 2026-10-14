@@ -21,7 +21,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { surveyCostFor, type SurveyMethod, type SurveyResult } from '../../core/mining/SurveyCalc.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import {
-  SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
+  SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS, SURVEY_DEPTH_BELOW_SURFACE,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
 import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
@@ -39,13 +39,6 @@ const MAX_RESULTS_SHOWN = 4;
 
 /** Methods offered, cheapest first so the tutorial's default is affordable. */
 const METHOD_ORDER: SurveyMethod[] = ['core_sample', 'seismic', 'aerial'];
-
-/** Every method except core_sample surveys a disc; core_sample is point-only (radius 0). */
-const DEPTH_KIND: Record<SurveyMethod, 'full' | 'surface'> = {
-  core_sample: 'full',
-  seismic: 'full',
-  aerial: 'surface',
-};
 
 export class SurveyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -281,7 +274,7 @@ export class SurveyPanel extends PanelBase {
     meta.append(
       el('span', { text: t('ui.survey.method_accuracy', { pct: accuracy }) }),
       el('span', { text: radius > 0 ? t('ui.survey.radius_cells', { radius }) : t('ui.survey.radius_point') }),
-      el('span', { text: DEPTH_KIND[method] === 'full' ? t('ui.survey.depth_full') : t('ui.survey.depth_surface') }),
+      el('span', { text: t('ui.survey.depth_metres', { depth: SURVEY_DEPTH_BELOW_SURFACE[method] }) }),
       el('span', { text: t('ui.survey.duration_ticks', { ticks: SURVEY_DURATION_TICKS[method] }) }),
     );
 
