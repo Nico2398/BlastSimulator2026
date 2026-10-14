@@ -22,6 +22,10 @@ import {
 } from '../../../src/core/config/balance.js';
 import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../../../src/core/config/balance.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { board } from '../../../src/core/engine/Mount.js';
 
 const EMPLOYEE_DEFAULTS = {
   activeActionId: null, fatigue: 100,
@@ -224,5 +228,89 @@ describe('Mafia exposure decay (#1411)', () => {
     startFraming(mafia, employees, emp.id, 10);
     completeFrame(mafia, stateOf(employees), emp.id, 10 + FRAME_TICKS, new Random(1));
     expect(mafia.lastActivityTick).toBe(10 + FRAME_TICKS);
+  });
+});
+
+describe('Arranged accident is booked as a workplace death (#1700)', () => {
+  function attempt(wantSuccess: boolean) {
+    for (let seed = 0; seed < 200; seed++) {
+      const mafia = createMafiaState();
+      const employees = createEmployeeState();
+      const emp = addTestEmployee(employees);
+      const state = stateOf(employees);
+      state.tickCount = 37;
+      const result = arrangeAccident(mafia, state, createCorruptionState(), emp.id, new Random(seed));
+      if (result.success === wantSuccess) return { mafia, state, emp, result };
+    }
+    throw new Error('no seed produced the wanted outcome');
+  }
+
+  it('a successful accident counts in damage.deathCount and sets lawsuitPending', () => {
+    const { state } = attempt(true);
+    expect(state.damage.deathCount).toBe(1);
+    expect(state.damage.lawsuitPending).toBe(true);
+  });
+
+  it('a successful accident logs exactly one death record for the target at the current tick', () => {
+    const { state, emp } = attempt(true);
+    const deaths = state.damage.accidents.filter(a => a.type === 'death');
+    expect(deaths).toHaveLength(1);
+    expect(deaths[0]!.entityId).toBe(emp.id);
+    expect(deaths[0]!.tick).toBe(37);
+    expect(state.damage.accidents).toHaveLength(1);
+  });
+
+  it('a failed accident kills nobody and books nothing', () => {
+    const { state, emp } = attempt(false);
+    expect(emp.alive).toBe(true);
+    expect(state.damage.deathCount).toBe(0);
+    expect(state.damage.lawsuitPending).toBe(false);
+    expect(state.damage.accidents).toEqual([]);
+  });
+
+  it('an unknown target books nothing', () => {
+    const state = stateOf(createEmployeeState());
+    arrangeAccident(createMafiaState(), state, createCorruptionState(), 999, new Random(1));
+    expect(state.damage.deathCount).toBe(0);
+    expect(state.damage.lawsuitPending).toBe(false);
+    expect(state.damage.accidents).toEqual([]);
+  });
+
+  it('an already-dead target is not counted twice', () => {
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees);
+    emp.alive = false;
+    const state = stateOf(employees);
+    for (let seed = 0; seed < 20; seed++) {
+      arrangeAccident(createMafiaState(), state, createCorruptionState(), emp.id, new Random(seed));
+    }
+    expect(state.damage.deathCount).toBe(0);
+    expect(state.damage.accidents).toEqual([]);
+  });
+
+  it('exposure amounts are unchanged by booking the death', () => {
+    const ok = attempt(true);
+    expect(ok.mafia.exposureRisk).toBeCloseTo(ACCIDENT_EXPOSURE, 10);
+    const bad = attempt(false);
+    expect(bad.mafia.exposureRisk).toBeCloseTo(ACCIDENT_EXPOSURE + ACCIDENT_FAILURE_EXPOSURE_EXTRA, 10);
+  });
+
+  it('the dead employee still leaves the vehicle they were driving', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const state = createGame({ seed: 42 });
+      state.employees = createEmployeeState();
+      const driver = hireEmployee(state.employees, 'driver', new Random(42), 5, 5).employee;
+      assignSkill(state.employees, driver.id, 'driving.truck', 1);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+      expect(board(state, vehicle.id, driver.id).success).toBe(true);
+      const result = arrangeAccident(createMafiaState(), state, createCorruptionState(), driver.id, new Random(seed));
+      if (!result.success) continue;
+      expect(driver.alive).toBe(false);
+      expect(vehicle.occupantIds).toEqual([]);
+      expect(driver.locomotion).toEqual({ kind: 'on_foot' });
+      expect(state.damage.deathCount).toBe(1);
+      return;
+    }
+    expect.unreachable('No successful accident in 200 seeds');
   });
 });
