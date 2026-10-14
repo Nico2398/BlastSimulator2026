@@ -145,6 +145,14 @@ export const BRIBERY_COSTS = {
 
 /** Score decay rate per tick (0–100 scale). All scores trend toward 50 without input. */
 export const SCORE_DECAY_RATE = 0.05;
+/** Ecology loss per tonne of loose rock on the ground, per tick. */
+export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.005;
+/**
+ * Cap on ecology loss from dust in a single tick. Set to two spoil heaps' gain (2 x 0.2):
+ * a real blast leaves thousands of tonnes lying for hundreds of ticks, so an uncapped or
+ * higher loss makes any mine that blasts at scale unwinnable (#1691).
+ */
+export const ECOLOGY_DUST_MAX_PER_TICK = 0.4;
 
 // ─── World / Sandbox ────────────────────────────────────────────────────────────
 

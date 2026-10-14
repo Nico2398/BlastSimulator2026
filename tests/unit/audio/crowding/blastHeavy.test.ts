@@ -62,10 +62,10 @@ describe(`${SCENARIO} at 8x`, () => {
   });
 
   it('keeps the world to 5 sounds a second, 17 in ten seconds and 38 in thirty', () => {
-    // Measured 4, 13 and 32. vehicle_start reaches 7, drill_done 10 and charge_loaded 9 (#1673: the crew rests at the shift length between jobs, so holes land in bursts after each rest), because the scripted player buys 19 vehicles back
+    // Measured 4, 13 and 32. vehicle_start reaches 7, drill_done 10 and charge_loaded 10 (#1691: the two spoil heaps this scenario now builds first shift the crew's rest timing by one burst; #1673: the crew rests at the shift length between jobs, so holes land in bursts after each rest), because the scripted player buys 19 vehicles back
     // to back (each one starts its engine, the director's answer to a purchase), drills and charges holes in bulk (blasters now hold the truck licence, #1667, so the second pattern is drilled and charged sooner after the first shot); vehicle_scrap
     // reaches 4 because flyrock destroys vehicles in two shots 27 s apart, two scrap cues from each (the blast plan's cap).
-    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 17, per30s: 38 }, { drill_done: 10, charge_loaded: 9, vehicle_scrap: 4 });
+    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 17, per30s: 38 }, { drill_done: 10, charge_loaded: 10, vehicle_scrap: 4 });
   });
 
   it('plays under 97 sounds a minute, a scripted player hiring 28 people included', () => {

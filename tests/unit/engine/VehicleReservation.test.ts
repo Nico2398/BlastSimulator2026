@@ -27,6 +27,9 @@ import { purchaseVehicle, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleRese
 import {
   isLicensedForRole,
   findFreeVehicleForRole,
+  findVehicleForClaim,
+  minVehicleTierFor,
+  lowestFleetTier,
   reserveVehicle,
   releaseVehicleReservation,
   releaseVehicleOnCompletion,
@@ -128,6 +131,106 @@ describe('findFreeVehicleForRole — licence tier (#1524)', () => {
     const { state, employee } = setup(2);
     purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 3);
     expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
+  });
+});
+
+describe('drill_hole depth gates the rig tier (#1714)', () => {
+  function setup(level: 1 | 2 | 3) {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    employee.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED.drill_rig)!.licenceLevel = level;
+    return { state, employee };
+  }
+  const holeAction = (state: GameState, depth: number) =>
+    makeAction(state, { id: 1, type: 'drill_hole', requiredVehicleRole: 'drill_rig', payload: { depth } });
+
+  describe('minVehicleTierFor', () => {
+    it('is 1 for a non-drill_hole action whatever its payload depth', () => {
+      expect(minVehicleTierFor({ type: 'general_work', payload: { depth: 30 } })).toBe(1);
+      expect(minVehicleTierFor({ type: 'charge_hole', payload: {} })).toBe(1);
+    });
+
+    it('follows minDrillRigTier(payload.depth) for a drill_hole', () => {
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 12 } })).toBe(1);
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 20 } })).toBe(2);
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: { depth: 24.1 } })).toBe(3);
+    });
+
+    it('rejection: a drill_hole without a numeric depth needs only tier 1', () => {
+      expect(minVehicleTierFor({ type: 'drill_hole', payload: {} })).toBe(1);
+    });
+  });
+
+  describe('lowestFleetTier with minTier', () => {
+    it('ignores vehicles below minTier', () => {
+      const { state } = setup(3);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 3);
+      expect(lowestFleetTier(state.vehicles.vehicles, 'drill_rig')).toBe(1);
+      expect(lowestFleetTier(state.vehicles.vehicles, 'drill_rig', 2)).toBe(3);
+    });
+
+    it('is null when no vehicle of the role reaches minTier', () => {
+      const { state } = setup(3);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      expect(lowestFleetTier(state.vehicles.vehicles, 'drill_rig', 2)).toBeNull();
+    });
+  });
+
+  describe('findFreeVehicleForRole with minTier', () => {
+    it('never returns a vehicle below minTier', () => {
+      const { state, employee } = setup(3);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      expect(findFreeVehicleForRole(state, 'drill_rig', employee, 2)).toBeNull();
+      const { vehicle: t2 } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20, 2);
+      expect(findFreeVehicleForRole(state, 'drill_rig', employee, 2)?.id).toBe(t2.id);
+    });
+  });
+
+  describe('findVehicleForClaim', () => {
+    it('a 20 m hole is not assigned to a tier-1 rig when no tier-2 rig is owned', () => {
+      const { state, employee } = setup(2);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      expect(findVehicleForClaim(state, holeAction(state, 20), employee)).toEqual({ ok: false });
+    });
+
+    it('a 20 m hole is not assigned to a tier-1 rig when the driver is only level 1, even with a tier-2 rig owned', () => {
+      const { state, employee } = setup(1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 5, 5, 2);
+      expect(findVehicleForClaim(state, holeAction(state, 20), employee)).toEqual({ ok: false });
+    });
+
+    it('a 12 m hole still gets the tier-1 rig for a level-1 driver', () => {
+      const { state, employee } = setup(1);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const claim = findVehicleForClaim(state, holeAction(state, 12), employee);
+      expect(claim.ok).toBe(true);
+      expect(claim.ok && claim.vehicle?.id).toBe(vehicle.id);
+    });
+
+    it('a level-2 driver gets the tier-2 rig for a 20 m hole, preferred over a nearer free tier-1 rig', () => {
+      const { state, employee } = setup(2);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const { vehicle: t2 } = purchaseVehicle(state.vehicles, 'drill_rig', 25, 25, 2);
+      const claim = findVehicleForClaim(state, holeAction(state, 20), employee);
+      expect(claim.ok).toBe(true);
+      expect(claim.ok && claim.vehicle?.id).toBe(t2.id);
+    });
+
+    it('a 30 m hole needs a tier-3 rig: a level-3 driver skips tier-2, a level-2 driver gets nothing', () => {
+      const a = setup(3);
+      purchaseVehicle(a.state.vehicles, 'drill_rig', 0, 0, 2);
+      const { vehicle: t3 } = purchaseVehicle(a.state.vehicles, 'drill_rig', 9, 9, 3);
+      const claim = findVehicleForClaim(a.state, holeAction(a.state, 30), a.employee);
+      expect(claim.ok && claim.vehicle?.id).toBe(t3.id);
+
+      const b = setup(2);
+      purchaseVehicle(b.state.vehicles, 'drill_rig', 0, 0, 2);
+      purchaseVehicle(b.state.vehicles, 'drill_rig', 9, 9, 3);
+      expect(findVehicleForClaim(b.state, holeAction(b.state, 30), b.employee)).toEqual({ ok: false });
+    });
   });
 });
 

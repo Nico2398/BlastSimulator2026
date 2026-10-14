@@ -333,6 +333,79 @@ describe('classifyQueuedOrders (#1306)', () => {
     });
   });
 
+  describe('drill_hole depth needs a reaching rig (#1714)', () => {
+    const DRILL = { requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig' } as const;
+    const licence = ROLE_LICENCE_REQUIRED.drill_rig;
+    const blockedOf = (state: GameState, id: number) => state.pendingActions.find(a => a.id === id)!;
+    const hireDriller = (state: GameState, level: 1 | 2 | 3) => {
+      const e = hire(state, IN_A, ['blasting', licence]);
+      e.qualifications.find(q => q.category === licence)!.licenceLevel = level;
+      return e;
+    };
+
+    it('stamps no_reaching_vehicle with tier 2 when a 20 m hole has only a tier-1 rig', () => {
+      const state = makeState();
+      hireDriller(state, 2);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason).toBe('no_reaching_vehicle');
+      expect(blockedOf(state, id).blockedLicenceLevel).toBe(2);
+    });
+
+    it('stamps no_reaching_vehicle when a tier-2 rig is owned but the only driller is level 1', () => {
+      const state = makeState();
+      hireDriller(state, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason).toBe('no_reaching_vehicle');
+      expect(blockedOf(state, id).blockedLicenceLevel).toBe(2);
+    });
+
+    it('clears once a level-2 licensed driller exists', () => {
+      const state = makeState();
+      hireDriller(state, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason).toBe('no_reaching_vehicle');
+      hireDriller(state, 2);
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason ?? null).toBeNull();
+      expect(blockedOf(state, id).blockedLicenceLevel ?? null).toBeNull();
+    });
+
+    it('blocks only the 20 m hole when a 12 m and a 20 m hole queue with just a tier-1 rig', () => {
+      const state = makeState();
+      hireDriller(state, 2);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const shallow = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 12 } });
+      const deep = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, shallow).blockedReason ?? null).toBeNull();
+      expect(blockedOf(state, deep).blockedReason).toBe('no_reaching_vehicle');
+    });
+
+    it('reports no_vehicle_in_fleet for a 20 m hole when no rig is owned at all', () => {
+      const state = makeState();
+      hireDriller(state, 2);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason).toBe('no_vehicle_in_fleet');
+    });
+
+    it('a 12 m hole is unaffected: tier-1 rig and level-1 driller, no reason', () => {
+      const state = makeState();
+      hireDriller(state, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 12 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason ?? null).toBeNull();
+    });
+  });
+
   describe('availability reasons for a charge_hole order (#1649)', () => {
     const licence = ROLE_LICENCE_REQUIRED.charging_truck;
     const reasonOf = (state: GameState) => state.pendingActions.find(a => a.type === 'charge_hole')!.blockedReason;

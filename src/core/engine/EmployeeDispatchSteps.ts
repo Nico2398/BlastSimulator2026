@@ -20,7 +20,7 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, lowestFleetTier, isLicensedForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
@@ -434,7 +434,7 @@ export function claimOnePoolCandidate(
 function hasIdleLicensedAlternative(state: GameState, candidate: PendingAction, employee: Employee): boolean {
   const role = candidate.requiredVehicleRole;
   if (role === null) return false;
-  const lowestTier = lowestFleetTier(state.vehicles.vehicles, role);
+  const lowestTier = lowestFleetTier(state.vehicles.vehicles, role, minVehicleTierFor(candidate));
   if (lowestTier === null) return false;
   return state.employees.employees.some(other =>
     other.id !== employee.id
