@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getOre, getAllOres } from '../../../src/core/world/OreCatalog.js';
 import { getAllRocks, getRock } from '../../../src/core/world/RockCatalog.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
+import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 
 describe('OreCatalog', () => {
   it('getOre returns valid data for treranium', () => {
@@ -40,8 +41,6 @@ describe('OreCatalog', () => {
 
   // --- depth-window invariants the biome ore progression relies on (#1677) ---
 
-  const TIERS = ['common', 'uncommon', 'rare', 'very_rare', 'legendary'];
-
   it('every ore has a non-empty depth window (depthMin < depthMax)', () => {
     for (const ore of getAllOres()) {
       expect(ore.depthMin, ore.id).toBeLessThan(ore.depthMax);
@@ -49,11 +48,11 @@ describe('OreCatalog', () => {
   });
 
   it('every ore rarity is a known tier', () => {
-    for (const ore of getAllOres()) expect(TIERS, ore.id).toContain(ore.rarity);
+    for (const ore of getAllOres()) expect(ORE_RARITY_TIERS, ore.id).toContain(ore.rarity);
   });
 
   it('the shallowest depthMin of a tier never decreases as rarity rises', () => {
-    const minByTier = TIERS.map(t => {
+    const minByTier = ORE_RARITY_TIERS.map(t => {
       const mins = getAllOres().filter(o => o.rarity === t).map(o => o.depthMin);
       return mins.length ? Math.min(...mins) : undefined;
     });

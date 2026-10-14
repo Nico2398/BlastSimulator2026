@@ -6,6 +6,7 @@ import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
 import { getAllBiomes, type BiomeDef } from '../../../src/core/world/BiomeCatalog.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
 import { ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
+import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
 const CRUITE_COMPOSITION: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
@@ -109,7 +110,6 @@ const MAX_DEPTH = 40;
 const STRIDE = 2;
 const SAMPLE_VOLUME_M3 = STRIDE * STRIDE * STRIDE;
 const MIN_BLOCK_ORE_KG = 2000;
-const TIER_ORDER = ['common', 'uncommon', 'rare', 'very_rare', 'legendary'] as const;
 
 interface SiteOre {
   /** blockMass[slab][bx * 6 + bz] = ore kg in that 8x8x8 block. slab = floor(depth / 8). */
@@ -203,7 +203,7 @@ describe('ore progression by depth, every biome (#1677)', () => {
               depthMoment.set(tier, (depthMoment.get(tier) ?? 0) + kg * depth);
             }
           });
-          const means = TIER_ORDER.filter(t => (mass.get(t) ?? 0) > 0).map(t => ({ tier: t, mean: depthMoment.get(t)! / mass.get(t)! }));
+          const means = ORE_RARITY_TIERS.filter(t => (mass.get(t) ?? 0) > 0).map(t => ({ tier: t, mean: depthMoment.get(t)! / mass.get(t)! }));
           // Every biome must offer at least a common and one deeper tier to climb.
           expect(means.length).toBeGreaterThanOrEqual(2);
           for (let i = 1; i < means.length; i++) {
