@@ -473,8 +473,10 @@ describe('VoxelFragmentation — floorToGrade', () => {
 
     const grid2 = solidGrid(SIZE);
     const field2 = createEnergyField(grid2, wholeGrid(grid2, SIZE));
-    (field2 as { gradeY: number | null }).gradeY = 2;
     seedEnergy(field2, [{ x: 6, y: 10, z: 6, energy: CRUITE * 10 }]);
+    // seedEnergy derives gradeY from the charge bottoms; override it afterwards
+    // to put the grade plane below the broken zone.
+    (field2 as { gradeY: number | null }).gradeY = 2;
     const result = identifyFragmentedVoxels(field2, grid2, false);
     expect(result.gradedCount).toBeGreaterThan(0);
     expect(result.gradedCount).toBeLessThanOrEqual(result.fragmented.length);

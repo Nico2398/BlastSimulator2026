@@ -826,7 +826,10 @@ function largestDrivablePatch(grid: VoxelGrid, crater: Array<{ x: number; z: num
 }
 
 describe('Blast execution — floor broken to grade (#1723)', () => {
-  for (const kg of [6, 8, 10]) {
+  // 6 kg at spacing 4 is not covered: it leaves nine separate pits with intact
+  // rock between the holes (issue #1723's table), so no grade makes them one
+  // drivable patch. The measured patterns are 8 kg and 10 kg.
+  for (const kg of [8, 10]) {
     it(`krackle ${kg} kg, spacing 4: at least 80% of the crater's columns are one slope-connected patch`, () => {
       const { grid, crater } = sandboxCraterBlast(kg, 4);
       expect(crater.length).toBeGreaterThan(20);
