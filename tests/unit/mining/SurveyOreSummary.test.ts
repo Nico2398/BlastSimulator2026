@@ -2,10 +2,8 @@
 // Per-ore digest of a survey's estimates: coverage, typical grade, peak, tonnes, value.
 
 import { describe, it, expect } from 'vitest';
-import {
-  summarizeSurveyOres,
-  columnOreValuePerM3,
-} from '../../../src/core/mining/SurveyOreSummary.js';
+import { summarizeSurveyOres } from '../../../src/core/mining/SurveyOreSummary.js';
+import { columnOreValuePerM3 } from '../../../src/core/mining/BlastValueEstimate.js';
 import { ORE_DENSITY_KG_M3, SURVEY_COVERAGE_RADIUS, SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 

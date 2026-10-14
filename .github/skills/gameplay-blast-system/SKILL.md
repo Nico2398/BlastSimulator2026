@@ -305,3 +305,9 @@ points for an ordinary blast and ~5 for an oversized one.
 ## Charge cost: cash vs stock (#1685)
 
 A charge order records `fromStockKg` (the part drawn from warehouse stock at order time) on `plannedChargesByHole`, carried into `chargesByHole` on loading. Every cost shown to the player is the cash part at list price (`recordedChargesCost`; forward preview `stockAwareChargesCost`). `BlastReport.spent` = cash, `BlastReport.spentFromStock` = list value of the stock kg. Detail in `gameplay-buildings`.
+
+## EST. ORE VALUE (#1703)
+
+`estimateBlastOreValue(plan, surveys, grid, wetHoleIds)` (`BlastValueEstimate.ts`) values the ore the blast will actually break. It runs the blast's own propagation (`buildPlanEnergyField` + `identifyFragmentedVoxels`, the same code the preview and `executeBlast` use), so the broken volume matches; wet holes are treated as the blast treats them. Each broken 1 m voxel is read from the newest fresh survey covering its column at the voxel's own depth (`oresSurveyedAt`, see `gameplay-survey-system`): value += density x `ORE_DENSITY_KG_M3` x catalog `valuePerKg` x survey `confidence`. Ore a survey did not locate at that depth counts for nothing (aerial counts its top 2 m only). The grid supplies rock geometry only, never ore. Uncharged holes or an empty plan give 0. The footer and preflight modal memoise it (`oreEstimateMemo.ts`) on holes, charges, wet holes, survey ids/stale flags and the grid's dirty-chunk count.
+
+`BLAST_ESTIMATE_TOLERANCE` (0.35) is the working accuracy target: with a fresh seismic survey (or core samples on every column) covering the pattern, the estimate lands within +-35% of the actual ore value (seed 42, 3x3, spacing 4, depth 8: desert_badlands (32,22) boomite 8 kg, green_foothills (32,32) krackle 8 kg, alpine_granite (36,16) shatternite 4 kg). Measured: seismic 0.86/0.84/0.78; core samples 0.68/0.67/0.40 (alpine misses: dilute rustite rounds out of 1 m core bands); aerial about 0.2-0.26 by design.

@@ -53,12 +53,20 @@ export function isFragmented(result: FragmentationResult, field: EnergyField, x:
  * beyond it, which is the conservative reading — the alternative, seeding from
  * the ground plane, would drop every overhang the blast never touched.
  */
-export function identifyFragmentedVoxels(field: EnergyField, grid: VoxelGrid): FragmentationResult {
-  return drain(identifyFragmentedVoxelsSteps(field, grid));
+export function identifyFragmentedVoxels(
+  field: EnergyField,
+  grid: VoxelGrid,
+  weakenCracked = true,
+): FragmentationResult {
+  return drain(identifyFragmentedVoxelsSteps(field, grid, weakenCracked));
 }
 
 /** `identifyFragmentedVoxels`, yielding between slabs of the box (#1603). */
-export function* identifyFragmentedVoxelsSteps(field: EnergyField, grid: VoxelGrid): Steps<FragmentationResult> {
+export function* identifyFragmentedVoxelsSteps(
+  field: EnergyField,
+  grid: VoxelGrid,
+  weakenCracked = true,
+): Steps<FragmentationResult> {
   const { box } = field;
   const mask = new Uint8Array(field.effective.length);
   const cracked: VoxelCoord[] = [];
@@ -103,8 +111,9 @@ export function* identifyFragmentedVoxelsSteps(field: EnergyField, grid: VoxelGr
     }
   }
 
-  // Cracked rock is weaker next time somebody blasts here.
-  for (let c = 0; c < cracked.length; c++) {
+  // Cracked rock is weaker next time somebody blasts here. A read-only caller
+  // (a pre-blast estimate) passes `weakenCracked = false` so it leaves the grid alone.
+  for (let c = 0; weakenCracked && c < cracked.length; c++) {
     if ((c & (BLAST_SLICE_CELLS - 1)) === 0) yield;
     const { x, y, z } = cracked[c]!;
     grid.scaleFractureAt(x, y, z, CRACKED_VOXEL_WEAKENING);

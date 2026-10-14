@@ -218,6 +218,7 @@ uiManager.setPlacementKit({ controller: placementController, overlay: selectionO
 // truth checkFootprintPlacement does — the raw voxel surface, not a
 // smoothed/rendered height — so the strip and the console never disagree.
 uiManager.setBuildSurfaceSampler((x, z) => ctx.grid ? getSurfaceY(ctx.grid, x, z) : 0);
+uiManager.setEstimateGridProvider(() => ctx.grid ?? null);
 uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) : null);
 
 // Survey confidence overlay's player-facing visibility toggle (#496): the

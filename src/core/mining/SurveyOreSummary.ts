@@ -91,13 +91,3 @@ export function summarizeSurveyOres(
   }
   return out.sort((p, q) => q.estimatedValue - p.estimatedValue);
 }
-
-/** Estimated ore value ($ per m³) of one column's estimates; unknown ore ids are ignored. */
-export function columnOreValuePerM3(columnEstimates: Readonly<Record<string, number>>): number {
-  let total = 0;
-  for (const [oreId, density] of Object.entries(columnEstimates)) {
-    const ore = getOre(oreId);
-    if (ore) total += oreValuePerM3(density, ore.valuePerKg);
-  }
-  return total;
-}
