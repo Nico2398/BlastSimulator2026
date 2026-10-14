@@ -39,11 +39,14 @@ interface OrderReachability {
   hasActor(key: OrderActorKey): boolean;
 }
 
-type ActorRequirements = Pick<PendingAction, 'type' | 'payload' | 'requiredSkill' | 'requiredVehicleRole' | 'targetEmployeeId'>;
+/** `type`/`payload` are optional: without them the order has no tier floor (1). */
+type ActorRequirements = Pick<PendingAction, 'requiredSkill' | 'requiredVehicleRole' | 'targetEmployeeId'>
+  & Partial<Pick<PendingAction, 'type' | 'payload'>>;
 
 /** Lowest vehicle tier the order needs (1 without a vehicle role); the one place pools, verdicts and classification read it. */
 function orderTierFloor(req: ActorRequirements): VehicleTier {
-  return req.requiredVehicleRole === null ? 1 : minVehicleTierFor(req);
+  if (req.requiredVehicleRole === null || req.type === undefined || req.payload === undefined) return 1;
+  return minVehicleTierFor({ type: req.type, payload: req.payload });
 }
 
 export function orderActorKey(action: ActorRequirements): OrderActorKey {

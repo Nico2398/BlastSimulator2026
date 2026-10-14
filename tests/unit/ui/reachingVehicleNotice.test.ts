@@ -8,7 +8,7 @@ import type { PendingAction } from '../../../src/core/state/GameState.js';
 
 function drillAction(): PendingAction {
   return {
-    id: 1, type: 'drill_hole', requiredSkill: 'drilling', requiredVehicleRole: 'drill_rig',
+    id: 1, type: 'drill_hole', requiredSkill: 'driving.drill_rig', requiredVehicleRole: 'drill_rig',
     targetX: 3, targetZ: 3, targetY: 0, payload: { depth: 20 }, targetEmployeeId: null,
     status: 'queued', holderId: null, queuedAtTick: 0,
     blockedReason: 'no_reaching_vehicle', blockedLicenceLevel: 2,
