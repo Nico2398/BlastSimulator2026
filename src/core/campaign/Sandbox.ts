@@ -11,8 +11,10 @@
 // at once.
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
+import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
+import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { LevelDef } from './Level.js';
 
@@ -167,7 +169,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
   };
 }
 
-export type SandboxRuggedness = 'flat' | 'rolling' | 'steep';
+type SandboxRuggedness = 'flat' | 'rolling' | 'steep';
 
 /** Player-facing traits of a biome, shown in the sandbox picker (#1686). */
 export interface SandboxBiomeTraits {
@@ -184,8 +186,29 @@ export interface SandboxBiomeTraits {
 }
 
 /** Traits for a biome id; an unknown id resolves to the default biome. */
-export function sandboxBiomeTraits(_biomeId: string): SandboxBiomeTraits {
-  throw new Error('not implemented');
+export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
+  const biome = getBiome(biomeId) ?? getBiome(SANDBOX_DEFAULTS.biome)!;
+
+  const tiers = biome.dominantRocks.flatMap(id => getRock(id)?.hardnessTier ?? []);
+  const ores = oresYieldedByRocks(biome.dominantRocks).flatMap(id => {
+    const ore = getOre(id);
+    return ore ? [{ oreId: id, nameKey: ore.nameKey, depthMin: ore.depthMin, depthMax: ore.depthMax }] : [];
+  });
+
+  const ruggedness: SandboxRuggedness =
+    biome.pvAmplitude < SANDBOX_RUGGEDNESS_ROLLING_PV ? 'flat'
+      : biome.pvAmplitude < SANDBOX_RUGGEDNESS_STEEP_PV ? 'rolling' : 'steep';
+
+  return {
+    descKey: biome.descKey,
+    hardnessTierMin: tiers.length ? Math.min(...tiers) : 0,
+    hardnessTierMax: tiers.length ? Math.max(...tiers) : 0,
+    ores,
+    oreDepthMin: ores.length ? Math.min(...ores.map(o => o.depthMin)) : 0,
+    oreDepthMax: ores.length ? Math.max(...ores.map(o => o.depthMax)) : 0,
+    ruggedness,
+    pvAmplitude: biome.pvAmplitude,
+  };
 }
 
 /** What a difficulty hands the player at the start (#1686). */
@@ -198,6 +221,27 @@ export interface SandboxDifficultyDetails {
   buildings: readonly { type: string; tier: number; count: number }[];
 }
 
-export function sandboxDifficultyDetails(_id: SandboxDifficultyId): SandboxDifficultyDetails {
-  throw new Error('not implemented');
+/** Collapse a list of slots into one entry per distinct key, counting repeats in first-seen order. */
+function groupSlots<S extends object>(slots: readonly S[], keyOf: (slot: S) => string): (S & { count: number })[] {
+  const groups = new Map<string, S & { count: number }>();
+  for (const slot of slots) {
+    const key = keyOf(slot);
+    const existing = groups.get(key);
+    if (existing) existing.count++;
+    else groups.set(key, { ...slot, count: 1 });
+  }
+  return [...groups.values()];
+}
+
+export function sandboxDifficultyDetails(id: SandboxDifficultyId): SandboxDifficultyDetails {
+  const def = SANDBOX_DIFFICULTIES[id];
+  const { employees, vehicles, buildings } = def.startingSite;
+  return {
+    id: def.id,
+    labelKey: def.labelKey,
+    startingCash: def.startingCash,
+    crew: groupSlots(employees.map(e => ({ role: e.role })), e => e.role),
+    vehicles: groupSlots(vehicles.map(v => ({ role: v.role, tier: v.tier })), v => `${v.role}:${v.tier}`),
+    buildings: groupSlots(buildings.map(b => ({ type: b.type, tier: b.tier })), b => `${b.type}:${b.tier}`),
+  };
 }
