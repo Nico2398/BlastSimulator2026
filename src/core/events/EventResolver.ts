@@ -202,7 +202,7 @@ function applyConsequence(
     for (const [key, val] of Object.entries(c.scoreDelta)) {
       const k = key as keyof ScoreState;
       const v = val as number;
-      scores[k] = clampScore(scores[k] + v);
+      scores[k] = clampScore((scores[k] ?? 0) + v);
       scoreChanges[k] = v;
       const dir = v > 0 ? '+' : '';
       effects.push(`${k} ${dir}${v}`);

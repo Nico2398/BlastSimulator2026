@@ -23,11 +23,15 @@ export interface ScoreState {
    * definition declared (#555 tutorial worker-revolt fix).
    */
   decayRate: number;
+  /** Airborne dust from loose rock that has not yet settled (kg-equivalent). Stub: unused until #1733 lands. */
+  freshDustKg: number;
+  /** Loose-rock mass seen on the previous tick; undefined (old save) means no pulse. Stub: unused until #1733 lands. */
+  lastLooseRockKg: number | undefined;
 }
 
 /** Starting scores — neutral. `decayRate` defaults to the global constant when the caller has no level-specific override. */
 export function createScoreState(decayRate: number = SCORE_DECAY_RATE): ScoreState {
-  return { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate };
+  return { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate, freshDustKg: 0, lastLooseRockKg: 0 };
 }
 
 // ── Score inputs ──

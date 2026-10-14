@@ -153,6 +153,10 @@ export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.005;
  * higher loss makes any mine that blasts at scale unwinnable (#1691).
  */
 export const ECOLOGY_DUST_MAX_PER_TICK = 0.4;
+/** Ecology loss per tonne of settled loose rock, per tick (#1733 settling dust model). */
+export const ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK = 0.000004;
+/** Ticks for fresh dust to halve as it settles (#1733 settling dust model). */
+export const ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS = 150;
 
 // ─── World / Sandbox ────────────────────────────────────────────────────────────
 
