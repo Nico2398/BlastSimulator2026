@@ -21,8 +21,8 @@ describe('Level 2 — Win', () => {
 
   it('starts level 2 with correct initial state', () => {
     expect(ctx.state).not.toBeNull();
-    // Level 2 starting cash is $75,000
-    expect(ctx.state!.cash).toBe(75000);
+    // Level 2 starting cash is $210,000 (#1672: sized to carry the free crew to its first sale)
+    expect(ctx.state!.cash).toBe(210000);
     expect(ctx.state!.campaign.activeLevelId).toBe('grumpstone_ridge');
     expect(ctx.grid).not.toBeNull();
     // Verify grid dimensions: grumpstone_ridge = 128x56x128 (#458 T6.1/D13)
@@ -46,7 +46,8 @@ describe('Level 2 — Win', () => {
     fundChargingTruck(ctx);
 
     // Perform a blast at (15,15) — offset from origin to avoid center
-    const blastOutput = performBlast(ctx, 15, 15);
+    // The free crew walks round a cliff to reach its rig (~460 ticks on this seed), so allow it the time.
+    const blastOutput = performBlast(ctx, 15, 15, 1200);
     expect(blastOutput).toContain('BLAST REPORT');
     tickWithEvents(ctx, 5);
 

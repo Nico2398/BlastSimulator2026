@@ -219,9 +219,11 @@ export function fundChargingTruck(ctx: GameContext): void {
  * @param ctx The game context (cast to MiningContext internally for command compatibility).
  * @param originX X-coordinate of the drill grid origin.
  * @param originZ Z-coordinate of the drill grid origin.
+ * @param driveTicks Tick budget for drilling and for charging (each); a crew walled in by a steep
+ *   site (grumpstone_ridge) needs a longer one than the default.
  * @returns The blast command output text.
  */
-export function performBlast(ctx: GameContext, originX: number, originZ: number): string {
+export function performBlast(ctx: GameContext, originX: number, originZ: number, driveTicks = 400): string {
   ensureDrillRigCrew(ctx);
   ensureChargingTruckCrew(ctx);
   drillPlanCommand(ctx as any, ['grid'], {
@@ -232,14 +234,14 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
     depth: '8',
   });
   // Holes must be drilled and charged before FIRE has anything to blast (#1345).
-  driveDrillPlanToCompletion(ctx);
+  driveDrillPlanToCompletion(ctx, driveTicks);
   chargeCommand(ctx as any, [], {
     hole: '*',
     explosive: 'boomite',
     amount: '5kg',
     stemming: '2m',
   });
-  driveChargePlanToCompletion(ctx);
+  driveChargePlanToCompletion(ctx, driveTicks);
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }

@@ -7,6 +7,7 @@ import {
   makeCampaignCtxWithUnlock,
   tickWithEvents,
 } from './helpers.js';
+import { getLevel } from '../../../src/core/campaign/Level.js';
 import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 
 describe('Level 2 — Lose — Bankruptcy', () => {
@@ -17,13 +18,16 @@ describe('Level 2 — Lose — Bankruptcy', () => {
   });
 
   it('starts level 2 with correct cash', () => {
-    expect(ctx.state!.cash).toBe(75000);
+    expect(ctx.state!.cash).toBe(getLevel('grumpstone_ridge')!.startingCash);
     expect(ctx.state!.bankruptcy.bankrupt).toBe(false);
   });
 
   it('triggers bankruptcy when cash stays below $5,000 for 100 ticks', () => {
     // Spend down to below $5,000
-    // Starting cash: $75,000
+    // Calibrated on $75,000. Level 2 opens with more (#1672: its free crew's payroll needs it),
+    // so drop the cash to the figure the spend-down below adds up to.
+    ctx.state!.cash = 75000;
+    ctx.state!.finances.cash = 75000;
     // Hire 5 drillers: 5 x $1,000 = $5,000
     for (let i = 0; i < 5; i++) {
       employeeCommand(ctx, ['hire'], { role: 'driller' });

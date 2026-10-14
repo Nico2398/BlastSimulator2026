@@ -18,7 +18,7 @@ import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult } from '../nav/Pathfinding.js';
-import type { NavGrid } from '../nav/NavGrid.js';
+import { isStepClimbable, type NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
 import {
@@ -1240,7 +1240,8 @@ function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number
  * Nearest walkable cell (ring search: immediate neighbours first, then two
  * cells out) around (originX, originZ) that `isBlocked` reports free — shared
  * core `findNearestFreeCellForAgent` (below) builds its AgentOccupancy
- * freedom check on top of. Returns null when nothing within
+ * freedom check on top of. Only cells a slope-limited step can reach from
+ * the origin qualify. Returns null when nothing within
  * `AGENT_FREE_CELL_SEARCH_MAX_RADIUS` cells qualifies, or there is no NavGrid
  * yet.
  */
@@ -1254,6 +1255,7 @@ function findNearestFreeCell(
 
   const bx = Math.floor(originX);
   const bz = Math.floor(originZ);
+  const originY = grid.cellAt(bx, bz)?.surfaceY;
   let best: { x: number; z: number } | null = null;
   let bestDistSq = Infinity;
 
@@ -1269,6 +1271,8 @@ function findNearestFreeCell(
         if (isBlocked(x, z)) continue;
 
         const distSq = (x - bx) ** 2 + (z - bz) ** 2;
+        // A cell across a cliff is no sidestep: the mover could never climb back (strands a crew member on a steep site).
+        if (!isStepClimbable(originY, cell.surfaceY, Math.sqrt(distSq))) continue;
         if (distSq < bestDistSq) {
           bestDistSq = distSq;
           best = { x, z };

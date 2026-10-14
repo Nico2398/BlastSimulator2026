@@ -188,7 +188,10 @@ const LEVELS: readonly LevelDef[] = [
     gridX: 128,
     datum: 30,
     gridZ: 128,
-    startingCash: 75000,
+    // $210k (#1672): the free crew draws ~$230/tick of payroll and the mountainside spawn costs ~440 ticks of
+    // walking and driving before the first hole is done, so the first sale lands ~tick 720 with cash ~$180k below
+    // the start. 75k went bankrupt before the first shot was charged.
+    startingCash: 210000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle', 'big_bada_boom', 'shatternite'],
     // Unlock threshold: $250k. Real mountain quarry margins are tighter.
     unlockThreshold: 250000,
@@ -217,7 +220,9 @@ const LEVELS: readonly LevelDef[] = [
     gridX: 160,
     datum: 35,
     gridZ: 160,
-    startingCash: 100000,
+    // $125k (#1672): first sale lands ~tick 420 (deep ore needs 24 m holes of obliviax), ~$104k below the start;
+    // 100k dipped under zero just before the sale. The margin is the ~$21k a fumbled first shot costs.
+    startingCash: 125000,
     availableExplosives: [
       'pop_rock', 'boomite', 'krackle',
       'big_bada_boom', 'shatternite', 'rumblox',

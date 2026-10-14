@@ -1412,8 +1412,8 @@ const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
  * Treranium Depths openings (#1672): the Dusty Hollow kit plus a rock digger
  * (a ramp into the crater) and its excavator-licensed driver. Each opens able
  * to drill, charge, fire, haul and fill an ore contract with no purchases.
- * Starting cash stays at the level's own value: the kit is free, and the
- * explosives for a first blast are well inside $75k / $100k.
+ * The kit is free, but its payroll (~$230/tick) is not: each level's own
+ * startingCash (Level.ts) is sized to carry it to the first sale.
  */
 const DIGGER_STARTING_SITE: StartingSiteComposition = {
   employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],

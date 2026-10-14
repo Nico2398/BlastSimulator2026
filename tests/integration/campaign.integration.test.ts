@@ -138,12 +138,12 @@ describe('Campaign', () => {
 
     expect(all[2]!.id).toBe('grumpstone_ridge');
     expect(all[2]!.difficultyTier).toBe(2);
-    expect(all[2]!.startingCash).toBe(75000);
+    expect(all[2]!.startingCash).toBe(210000);
     expect(all[2]!.unlockThreshold).toBe(250000);
 
     expect(all[3]!.id).toBe('treranium_depths');
     expect(all[3]!.difficultyTier).toBe(3);
-    expect(all[3]!.startingCash).toBe(100000);
+    expect(all[3]!.startingCash).toBe(125000);
     expect(all[3]!.unlockThreshold).toBe(800000);
 
     // Verify progressive difficulty
@@ -1092,11 +1092,20 @@ describe('Campaign star persistence (#1311)', () => {
 
 const KIT_LEVELS = ['grumpstone_ridge', 'treranium_depths'] as const;
 
-/** The explosive and per-hole charge a careful player picks for each level's rock (level 3 is hardness 4-5: boomite/krackle break nothing there). */
-const FIRST_BLAST_CHARGE: Readonly<Record<(typeof KIT_LEVELS)[number], string>> = {
-  grumpstone_ridge: 'explosive:boomite amount:5',
-  treranium_depths: 'explosive:obliviax amount:10',
+/**
+ * What a careful player drills and loads for each level's rock and ore (level 3 is hardness 4-5: boomite/krackle
+ * break nothing there). Grumpstone Ridge carries ore at the surface, so a shallow hole finds it. Treranium Depths'
+ * ore starts ~12 m below the surface, so its holes go deep and take the explosive's 20 kg per-hole maximum.
+ */
+const FIRST_BLAST: Readonly<Record<(typeof KIT_LEVELS)[number], { depth: number; charge: string }>> = {
+  grumpstone_ridge: { depth: 6, charge: 'explosive:krackle amount:8' },
+  treranium_depths: { depth: 24, charge: 'explosive:obliviax amount:20' },
 };
+
+// The shot is aimed this far from the rig, out of the blast radius of the free warehouse and spoil heap beside the
+// crew (a nearer shot destroys both and leaves the debris nowhere to go).
+const KIT_SHOT_OFFSET_X = 34;
+const KIT_SHOT_OFFSET_Z = 33;
 
 function startKitLevel(levelId: string, args = '') {
   const { runner, ctx } = createRunner();
@@ -1192,13 +1201,13 @@ describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit
     let shot = 0;
     let blasts = 0;
     while (!over() && !sold() && shot < 6) {
-      const x = Math.round(rig!.x) + 14;
-      const z = Math.round(rig!.z) + 13 + shot * 10;
+      const x = Math.round(rig!.x) + KIT_SHOT_OFFSET_X;
+      const z = Math.round(rig!.z) + KIT_SHOT_OFFSET_Z + shot * 10;
       shot++;
-      if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
+      if (!run(`drill_plan grid rows:2 cols:2 spacing:4 depth:${FIRST_BLAST[levelId].depth} start:${x},${z}`).success) continue;
       tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
       expect(state.drillHoles.length, 'the crew drilled the holes').toBeGreaterThan(0);
-      expect(run(`charge hole:* ${FIRST_BLAST_CHARGE[levelId]} stemming:2`).success).toBe(true);
+      expect(run(`charge hole:* ${FIRST_BLAST[levelId].charge} stemming:2`).success).toBe(true);
       tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
       clearKitZone(run, state);

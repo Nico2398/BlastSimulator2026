@@ -22,8 +22,8 @@ describe('Level 3 — Win', () => {
 
   it('starts level 3 with correct initial state', () => {
     expect(ctx.state).not.toBeNull();
-    // Level 3 starting cash is $100,000
-    expect(ctx.state!.cash).toBe(100000);
+    // Level 3 starting cash is $125,000 (#1672: sized to carry the free crew to its first sale)
+    expect(ctx.state!.cash).toBe(125000);
     expect(ctx.state!.campaign.activeLevelId).toBe('treranium_depths');
     expect(ctx.grid).not.toBeNull();
     // Verify grid dimensions: treranium_depths = 160x64x160 (#458 T6.1/D13)
