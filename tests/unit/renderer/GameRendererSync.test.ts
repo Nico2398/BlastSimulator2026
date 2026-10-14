@@ -20,7 +20,7 @@ import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
-import { columnOreValuePerM3 } from '../../../src/core/mining/SurveyOreSummary.js';
+import { columnOreValuePerM3 } from '../../../src/core/mining/BlastValueEstimate.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { RampArrowLayer } from '../../../src/renderer/RampArrow.js';

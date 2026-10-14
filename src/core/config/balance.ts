@@ -563,16 +563,12 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
 
-/** Pre-fire estimate: horizontal radius (m) around a hole within which columns are
- *  assumed to break. Calibrated with BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR (#1354). */
-export const BLAST_ESTIMATE_BREAK_RADIUS_M = 4;
-
-/** Pre-fire estimate: fraction of the deepest covering hole's depth assumed to break
- *  in a column within the break radius. Calibration (#1354): 3x3 grid, spacing 4,
- *  depth 8, boomite, uniform 0.2 blingite survey over a 40x40 grid, executeBlast
- *  realises ~$5.06M; radius 4 + factor 0.2 estimates ~0.96x of that. Across spacing
- *  3-5 and depth 6-10 the estimate stays within 0.55x..1.55x of realised. */
-export const BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR = 0.2;
+/** Pre-fire estimate accuracy target (#1703): with a fresh seismic/core survey covering
+ *  the pattern, an ordinary blast's EST. ORE VALUE lands within +-35% of the actual ore
+ *  value. Working target, not a guarantee (seed 42: desert_badlands (32,22) boomite 8kg,
+ *  green_foothills (32,32) krackle 8kg, alpine_granite (36,16) shatternite 4kg; 3x3
+ *  pattern, spacing 4, depth 8). */
+export const BLAST_ESTIMATE_TOLERANCE = 0.35;
 
 // ─── Fragment generation (blast step 3) ────────────────────────────────────────
 
@@ -1908,6 +1904,9 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   seismic:     25,
   core_sample: 40,
 } as const;
+
+/** Voxels of partial-density rock that cap a column's top solid voxel (the survey anchor). */
+export const SURVEY_CAP_VOXELS = 1;
 
 /** Depth-band thickness in metres for depth-resolved survey results. Aerial surveys report none. */
 export const SURVEY_DEPTH_BAND_METRES = {

@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  advanceAlongPath, NULL_ROUTE_COMMITMENT, type AdvanceAlongPathInput, type RouteCommitment,
+  advanceAlongPath, inFlightHopOrigin, NULL_ROUTE_COMMITMENT, type AdvanceAlongPathInput, type RouteCommitment,
 } from '../../../src/core/nav/AgentAdvance.js';
 import { AGENT_WALK_SPEED, STUCK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -834,5 +834,60 @@ describe('advanceAlongPath — trail of hops walked this tick (#1199)', () => {
   it('is empty when no path was found — the agent did not move', () => {
     const result = advanceAlongPath(baseInput({ path: { found: false, waypoints: [] } }));
     expect(result.trail).toEqual([]);
+  });
+});
+
+
+// #1687: a mover that ends a tick mid-hop must restart its path from the hop's
+// committed origin, not from the rounded cell it happens to be standing over.
+describe('inFlightHopOrigin (#1687)', () => {
+  const hop: RouteCommitment = {
+    ...NULL_ROUTE_COMMITMENT,
+    waypointX: 2, waypointZ: 2, destX: 5, destZ: 5,
+    originX: 1, originZ: 1,
+  };
+
+  it('returns the committed origin when strictly inside the hop', () => {
+    expect(inFlightHopOrigin(hop, 1.4, 1.4, 5, 5)).toEqual({ x: 1, z: 1 });
+  });
+
+  it('returns the origin for an off-segment drifted position still within the hop length', () => {
+    expect(inFlightHopOrigin(hop, 1.6, 1.4, 5, 5)).toEqual({ x: 1, z: 1 });
+  });
+
+  it('returns the origin when standing exactly on the origin', () => {
+    expect(inFlightHopOrigin(hop, 1, 1, 5, 5)).toEqual({ x: 1, z: 1 });
+  });
+
+  it('returns null when the mover stands on the committed waypoint', () => {
+    expect(inFlightHopOrigin(hop, 2, 2, 5, 5)).toBeNull();
+  });
+
+  it('returns null when the committed destination differs from the leg destination', () => {
+    expect(inFlightHopOrigin(hop, 1.4, 1.4, 6, 5)).toBeNull();
+    expect(inFlightHopOrigin(hop, 1.4, 1.4, 5, 6)).toBeNull();
+  });
+
+  it('returns null when the origin is null', () => {
+    expect(inFlightHopOrigin({ ...hop, originX: null, originZ: null }, 1.4, 1.4, 5, 5)).toBeNull();
+    const { originX: _ox, originZ: _oz, ...withoutOrigin } = hop;
+    expect(inFlightHopOrigin(withoutOrigin, 1.4, 1.4, 5, 5)).toBeNull();
+  });
+
+  it('returns null when the waypoint is null', () => {
+    expect(inFlightHopOrigin({ ...hop, waypointX: null, waypointZ: null }, 1.4, 1.4, 5, 5)).toBeNull();
+  });
+
+  it('returns null when the destination is null', () => {
+    expect(inFlightHopOrigin({ ...hop, destX: null, destZ: null }, 1.4, 1.4, 5, 5)).toBeNull();
+  });
+
+  it('returns null for the empty commitment', () => {
+    expect(inFlightHopOrigin(NULL_ROUTE_COMMITMENT, 1.4, 1.4, 5, 5)).toBeNull();
+  });
+
+  it('returns null when the position is farther from the origin than the hop is long', () => {
+    expect(inFlightHopOrigin(hop, 3, 3, 5, 5)).toBeNull();
+    expect(inFlightHopOrigin(hop, 4, 1, 5, 5)).toBeNull();
   });
 });

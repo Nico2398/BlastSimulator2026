@@ -73,7 +73,9 @@ Ores not spread homogeneously. Each ore type has separate Simplex field with hig
 
 ## Ore Grade Reporting Post-Blast
 
-Post-blast report reads estimates at each fragment's `origin` (never landing `position`), floor-keyed column via `surveyColumnKey`/`findSurveyForColumn` in `SurveyColumn.ts`.
+Post-blast report reads each fragment at its `origin` (never landing `position`): floor-keyed column via `surveyColumnKey`/`findSurveyForColumn`, and the survey's reading at the origin's **depth** via `oresSurveyedAt(survey, x, z, floor(origin.y))` in `SurveyColumn.ts` (#1703). A fragment at a depth the survey did not scan (past the method's `SURVEY_DEPTH_BELOW_SURFACE` window, more than one voxel above the surface anchor, a one-voxel cap whose top band holds no ore, or outside aerial's top 2 m) adds 0 estimate and its actual ore is left out of the `yieldRatio` numerator; `totalYieldKg` and `oreYields` stay all-inclusive; ratio is 1.0 when no fragment was scanned.
+
+`SurveyResult.surfaceYs` (`"x,z"` -> anchorY the column was sampled from; every method, aerial included; every column holding ore in its window, even when the whole-window average rounds away) is the datum for depth: `depth = surfaceYs[key] - y`. `oresSurveyedAt` resolves it through `bandOresAtDepth` (band `fromM` inclusive, `toM` exclusive): `undefined` = unscanned, `{}` = scanned with no ore. Aerial has no profile, so it returns the column estimate inside its top window and `undefined` below. Legacy surveys without `depthProfile`/`surfaceYs` fall back to the whole-window column estimate. A column whose whole-window average rounds to 0 gets no `estimates` entry but still gets `surfaceYs` and a profile, so `findSurveyForColumn` covers it. The partial-density cap voxel one above the anchor reads as the top band. `identifyFragmentedVoxels(field, grid, false)` skips the cracked-rock weakening so the pre-blast estimate leaves the grid untouched.
 
 After a blast, `computeBlastOreReport()` calculates actual ore yield from destroyed voxels and compares to pre-blast survey estimate:
 
