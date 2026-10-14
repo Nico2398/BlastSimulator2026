@@ -22,7 +22,7 @@ import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { SANDBOX_PIT_MASK, SANDBOX_FLAT_PAD_SIZE } from '../../src/core/config/balance.js';
+import { SANDBOX_PIT_MASK, SANDBOX_FLAT_PAD_SIZE, SURVEY_DEPTH_BELOW_SURFACE } from '../../src/core/config/balance.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
@@ -619,9 +619,34 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const surveyor = state.employees.employees.slice(-1)[0]!;
     expect(runner.run(`employee assign_skill ${surveyor.id} skill:geology level:3`).success).toBe(true);
 
-    // Centre on the surveyor so the survey needs no travel.
-    const cx = Math.round(surveyor.x);
-    const cz = Math.round(surveyor.z);
+    // Centre on the surveyor so the survey needs no travel. A core sample reads one column
+    // only (radius 0), so a player coring blind may hit barren rock: aim it at the richest
+    // column within 10 m, as a player reading the aerial overlay would.
+    let cx = Math.round(surveyor.x);
+    let cz = Math.round(surveyor.z);
+    if (method === 'core_sample') {
+      const grid = ctx.grid!;
+      // Window-mean ore density of a column: what the report's estimate is built from.
+      const oreMass = (x: number, z: number): number => {
+        const top = computeVoxelColumnSurfaceY(grid, x, z);
+        if (top === null) return 0;
+        let sum = 0;
+        for (let y = top; y > top - SURVEY_DEPTH_BELOW_SURFACE.core_sample; y--) {
+          if (grid.densityAt(x, y, z) <= 0) continue;
+          for (const d of Object.values(grid.oresAt(x, y, z) ?? {})) sum += d;
+        }
+        return sum / SURVEY_DEPTH_BELOW_SURFACE.core_sample;
+      };
+      let best: { x: number; z: number; mass: number } | null = null;
+      for (let x = cx - 10; x <= cx + 10; x++) for (let z = cz - 10; z <= cz + 10; z++) {
+        if (!grid.containsColumn(x, z)) continue;
+        const mass = oreMass(x, z);
+        if (mass > 0 && (!best || mass > best.mass)) best = { x, z, mass };
+      }
+      expect(best, 'ore within 10 m of the surveyor').not.toBeNull();
+      cx = best!.x;
+      cz = best!.z;
+    }
     const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
     expect(result.success, result.output).toBe(true);
 
