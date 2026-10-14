@@ -176,7 +176,7 @@ export function runTick(
 
   // 0. Weather — own persisted rng stream, advanced before events read it; a forced
   // weather overrides the result without drawing from that stream
-  tickWeather(state.weather);
+  tickWeather(state.weather, state.mineType);
   holdForcedWeather(state.weather, state.events.activeModifiers, state.tickCount);
   tickHoleWater(state, state.weather.current, hole => {
     const rock = grid ? dominantRockUnderHole(grid, hole) : null;

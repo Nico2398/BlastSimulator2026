@@ -417,12 +417,34 @@
       }
     },
     {
-      "command": "tick 4",
-      "description": "#1350: wetness is per-hole water state, not 'is it raining right now' -- the rain has to fall on the holes. Four heavy_rain ticks (0.7 intensity x HOLE_RAIN_FILL_RATE per tick) push every untubed hole past HOLE_WET_THRESHOLD; the weather pinned just above lasts up to 8 ticks, so it stays heavy_rain throughout.",
+      "command": "tick 2",
+      "description": "First half of the four-tick soak (#1688: arid biomes hold heavy_rain only 2-4 ticks, so the rain is re-pinned midway to cover all four ticks).",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 4"
+          "command": "tick 2"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "weather set heavy_rain",
+      "description": "#1688: the default desert_badlands climate is arid and heavy_rain lasts 2-4 ticks there, so re-pin the rain midway through the soak. Bootstrap: weather has no UI control.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set heavy_rain"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 2",
+      "description": "#1350: wetness is per-hole water state, not 'is it raining right now' -- the rain has to fall on the holes. Four heavy_rain ticks (0.7 intensity x HOLE_RAIN_FILL_RATE per tick) push every untubed hole past HOLE_WET_THRESHOLD; the weather re-pinned just above lasts 2-4 ticks in the arid default climate, enough to cover this second half, so it stays heavy_rain throughout. (#1688: split in two ticks of 2 around a re-pin because arid heavy_rain lasts only 2-4 ticks.)",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 2"
         }
       ],
       "role": "setup",

@@ -78,6 +78,11 @@ describe('a full-screen menu', () => {
   beforeAll(() => {
     // A busy game, 60 real seconds in (the crew's shift rests slow the opening, #1673), then the main menu comes up over it.
     sim = playScenario('vibration-budget', { speed: 8, maxRealS: 60 });
+    // Pin the sky to cloudy (wind bed 0.16) and let the wind bed follow, so the menu always has a louder wind to ease
+    // down. Left to the site's climate, the sky can sit in a heat wave whose wind (0.05) is within the bed epsilon of
+    // the menu level (0.06) and no bed change is ever recorded.
+    sim.command('weather set cloudy');
+    sim.seconds(7);
     playsBefore = sim.recorder.plays.length;
     bedsBefore = sim.recorder.beds.length;
     sim.menuUp = true;

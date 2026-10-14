@@ -29,7 +29,7 @@ export function weatherCommand(
   const weather = ctx.state!.weather;
 
   if (args[0] === 'advance') {
-    forceAdvanceInState(weather);
+    forceAdvanceInState(weather, ctx.state!.mineType);
     return { success: true, output: `Weather: ${weather.current}` };
   }
 
@@ -41,7 +41,7 @@ export function weatherCommand(
         output: t('mining.weather.set_usage', { valid: ALL_WEATHER_STATES.join(', ') }),
       };
     }
-    setWeather(weather, target);
+    setWeather(weather, target, ctx.state!.mineType);
     return { success: true, output: `Weather: ${weather.current}` };
   }
 

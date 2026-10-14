@@ -28,8 +28,8 @@ function step(state: GameState, emitter = new EventEmitter()): void {
   runTick(state, null, new Random(state.seed + state.tickCount), emitter, { checkInvariants: false });
 }
 
-function quietGame(seed = SEED): GameState {
-  const state = createGame({ seed });
+function quietGame(seed = SEED, mineType?: string): GameState {
+  const state = createGame({ seed, ...(mineType !== undefined ? { mineType } : {}) });
   state.events.eventFreqMultiplier = 0; // pending events would halt console `tick`; weather is what is under test
   return state;
 }
@@ -96,7 +96,7 @@ describe('forecast agrees with the live cycle (#1403)', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game seed:42');
     ctx.state!.events.eventFreqMultiplier = 0;
-    const predicted = forecast(ctx.state!.weather, 14);
+    const predicted = forecast(ctx.state!.weather, 14, ctx.state!.mineType);
     const batches = [[5, 19], [24], [1, 1, 22], [10, 14]];
     for (let day = 1; day <= 14; day++) {
       for (const size of batches[day % batches.length]!) {
@@ -112,7 +112,7 @@ describe('forecast agrees with the live cycle (#1403)', () => {
     runner.run('new_game seed:42');
     ctx.state!.events.eventFreqMultiplier = 0;
     runner.run('tick 100');
-    const direct = quietGame();
+    const direct = quietGame(SEED, ctx.state!.mineType);
     for (let i = 0; i < 100; i++) step(direct);
     expect(ctx.state!.weather).toEqual(direct.weather);
   });
