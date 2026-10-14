@@ -11,9 +11,14 @@
 // at once.
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
+import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
+import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
+import type { EmployeeRole } from '../entities/Employee.js';
+import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
+import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { LevelDef } from './Level.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
@@ -164,5 +169,86 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     mixedRockHardness: SANDBOX_FIXED_MIXED_ROCK_HARDNESS,
     // Tier 0 keeps it off the campaign world map, which lists tier > 0 only.
     difficultyTier: 0,
+  };
+}
+
+type SandboxRuggedness = 'flat' | 'rolling' | 'steep';
+
+/** Player-facing traits of a biome, shown in the sandbox picker (#1686). */
+interface SandboxBiomeTraits {
+  descKey: string;
+  /** Hardness tier range over the biome's dominant rocks. */
+  hardnessTierMin: number;
+  hardnessTierMax: number;
+  /** Ores the biome's dominant rocks can yield. */
+  ores: readonly { oreId: string; nameKey: string; depthMin: number; depthMax: number }[];
+  oreDepthMin: number;
+  oreDepthMax: number;
+  ruggedness: SandboxRuggedness;
+  pvAmplitude: number;
+}
+
+/** Traits for a biome id; an unknown id resolves to the default biome. */
+export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
+  const biome = getBiome(biomeId) ?? getBiome(SANDBOX_DEFAULTS.biome)!;
+
+  const tiers = biome.dominantRocks.flatMap(id => getRock(id)?.hardnessTier ?? []);
+  const ores = oresYieldedByRocks(biome.dominantRocks).flatMap(id => {
+    const ore = getOre(id);
+    return ore ? [{ oreId: id, nameKey: ore.nameKey, depthMin: ore.depthMin, depthMax: ore.depthMax }] : [];
+  });
+
+  const ruggedness: SandboxRuggedness =
+    biome.pvAmplitude < SANDBOX_RUGGEDNESS_ROLLING_PV ? 'flat'
+      : biome.pvAmplitude < SANDBOX_RUGGEDNESS_STEEP_PV ? 'rolling' : 'steep';
+
+  return {
+    descKey: biome.descKey,
+    hardnessTierMin: tiers.length ? Math.min(...tiers) : 0,
+    hardnessTierMax: tiers.length ? Math.max(...tiers) : 0,
+    ores,
+    oreDepthMin: ores.length ? Math.min(...ores.map(o => o.depthMin)) : 0,
+    oreDepthMax: ores.length ? Math.max(...ores.map(o => o.depthMax)) : 0,
+    ruggedness,
+    pvAmplitude: biome.pvAmplitude,
+  };
+}
+
+/** What a difficulty hands the player at the start (#1686). */
+interface SandboxDifficultyDetails {
+  id: SandboxDifficultyId;
+  labelKey: string;
+  startingCash: number;
+  crew: readonly { role: EmployeeRole; count: number }[];
+  vehicles: readonly { role: VehicleRole; tier: VehicleTier; count: number }[];
+  buildings: readonly { type: BuildingType; tier: BuildingTier; count: number }[];
+}
+
+/** Collapse a list of slots into one entry per distinct key, counting repeats in first-seen order. */
+function groupSlots<S extends object>(slots: readonly S[], keyOf: (slot: S) => string): (S & { count: number })[] {
+  const groups = new Map<string, S & { count: number }>();
+  for (const slot of slots) {
+    const key = keyOf(slot);
+    const existing = groups.get(key);
+    if (existing) existing.count++;
+    else groups.set(key, { ...slot, count: 1 });
+  }
+  return [...groups.values()];
+}
+
+/**
+ * What a difficulty hands the player at the start: cash plus its starting
+ * site's crew, vehicles and buildings, each grouped into counted entries.
+ */
+export function sandboxDifficultyDetails(id: SandboxDifficultyId): SandboxDifficultyDetails {
+  const def = SANDBOX_DIFFICULTIES[id];
+  const { employees, vehicles, buildings } = def.startingSite;
+  return {
+    id: def.id,
+    labelKey: def.labelKey,
+    startingCash: def.startingCash,
+    crew: groupSlots(employees.map(e => ({ role: e.role })), e => e.role),
+    vehicles: groupSlots(vehicles.map(v => ({ role: v.role, tier: v.tier })), v => `${v.role}:${v.tier}`),
+    buildings: groupSlots(buildings.map(b => ({ type: b.type, tier: b.tier })), b => `${b.type}:${b.tier}`),
   };
 }

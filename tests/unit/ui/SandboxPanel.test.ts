@@ -15,6 +15,15 @@ import {
   randomSandboxSeed,
 } from '../../../src/core/campaign/Sandbox.js';
 import type { SandboxConfig } from '../../../src/core/campaign/Sandbox.js';
+import {
+  SANDBOX_DIFFICULTIES,
+  sandboxBiomeTraits,
+  sandboxDifficultyDetails,
+  type SandboxDifficultyId,
+} from '../../../src/core/campaign/Sandbox.js';
+import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
+import { t } from '../../../src/core/i18n/I18n.js';
+import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
 
 const REMOVED_FIELD_IDS = [
   'bs-sandbox-size',
@@ -242,5 +251,163 @@ describe('SandboxPanel', () => {
     expect(document.getElementById('bs-sandbox-panel')).toBeTruthy();
     panel.dispose();
     expect(document.getElementById('bs-sandbox-panel')).toBeNull();
+  });
+
+  // ---- #1686: biome and difficulty details ----
+
+  const text = (id: string) => document.getElementById(id)?.textContent ?? '';
+  const digits = (s: string) => s.replace(/\D/g, '');
+  const changeSelect = (key: string, value: string) => {
+    const sel = control(key) as HTMLSelectElement;
+    sel.value = value;
+    sel.dispatchEvent(new Event('change'));
+  };
+
+  it('renders every detail element with a stable id', () => {
+    panel.show();
+    for (const id of [
+      'bs-sandbox-biome-desc', 'bs-sandbox-biome-hardness', 'bs-sandbox-biome-ores',
+      'bs-sandbox-biome-terrain', 'bs-sandbox-difficulty-cash', 'bs-sandbox-difficulty-opening',
+    ]) {
+      expect(document.getElementById(id), id).toBeTruthy();
+    }
+  });
+
+  it('shows the details for the default selection as soon as the panel opens', () => {
+    panel.show();
+    const biome = getBiome(SANDBOX_DEFAULTS.biome)!;
+    expect(text('bs-sandbox-biome-desc')).toBe(t(biome.descKey));
+    expect(text('bs-sandbox-biome-hardness').trim()).not.toBe('');
+    expect(digits(text('bs-sandbox-difficulty-cash'))).toContain(String(SANDBOX_DIFFICULTIES[SANDBOX_DEFAULTS.difficulty].startingCash));
+    expect(text('bs-sandbox-difficulty-opening').trim()).not.toBe('');
+  });
+
+  it('changing the biome swaps in that biome description', () => {
+    panel.show();
+    for (const b of getAllBiomes()) {
+      changeSelect('biome', b.id);
+      expect(text('bs-sandbox-biome-desc'), b.id).toBe(t(b.descKey));
+    }
+  });
+
+  it('changing the biome updates the hardness text with the catalog tier range', () => {
+    panel.show();
+    changeSelect('biome', 'desert_badlands');
+    const desert = text('bs-sandbox-biome-hardness');
+    const dt = sandboxBiomeTraits('desert_badlands');
+    expect(desert).toContain(String(dt.hardnessTierMin));
+    expect(desert).toContain(String(dt.hardnessTierMax));
+
+    changeSelect('biome', 'volcanic_flats');
+    const volcanic = text('bs-sandbox-biome-hardness');
+    const vt = sandboxBiomeTraits('volcanic_flats');
+    expect(volcanic).toContain(String(vt.hardnessTierMin));
+    expect(volcanic).toContain(String(vt.hardnessTierMax));
+    expect(volcanic).not.toBe(desert);
+  });
+
+  it('changing the biome updates the ores text with each ore name and depth window', () => {
+    panel.show();
+    for (const id of ['desert_badlands', 'volcanic_flats', 'alpine_granite']) {
+      changeSelect('biome', id);
+      const shown = text('bs-sandbox-biome-ores');
+      for (const ore of sandboxBiomeTraits(id).ores) {
+        expect(shown, `${id}/${ore.oreId}`).toContain(t(ore.nameKey));
+      }
+      const tr = sandboxBiomeTraits(id);
+      expect(shown).toContain(String(tr.oreDepthMin));
+      expect(shown).toContain(String(tr.oreDepthMax));
+    }
+  });
+
+  it('shows the terrain ruggedness label for the biome', () => {
+    panel.show();
+    for (const b of getAllBiomes()) {
+      changeSelect('biome', b.id);
+      expect(text('bs-sandbox-biome-terrain'), b.id).toContain(t(`sandbox.terrain.${sandboxBiomeTraits(b.id).ruggedness}`));
+    }
+  });
+
+  it('changing the difficulty updates the starting cash', () => {
+    panel.show();
+    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+      changeSelect('difficulty', id);
+      expect(digits(text('bs-sandbox-difficulty-cash')), id).toContain(String(SANDBOX_DIFFICULTIES[id].startingCash));
+    }
+  });
+
+  it('changing the difficulty updates the opening text', () => {
+    panel.show();
+    changeSelect('difficulty', 'hard');
+    const hard = text('bs-sandbox-difficulty-opening');
+    changeSelect('difficulty', 'easy');
+    const easy = text('bs-sandbox-difficulty-opening');
+    expect(hard.trim()).not.toBe('');
+    expect(easy.trim()).not.toBe('');
+    expect(easy).not.toBe(hard);
+
+    // The easy kit adds a rock digger and a rock fragmenter over the hard kit.
+    const names = (id: SandboxDifficultyId) => sandboxDifficultyDetails(id).vehicles
+      .map(v => t(getVehicleDefByTier(v.role, v.tier).nameKey));
+    for (const name of names('hard')) expect(hard, name).toContain(name);
+    for (const name of names('easy')) expect(easy, name).toContain(name);
+    const hardOnly = new Set(names('hard'));
+    const extra = names('easy').filter(n => !hardOnly.has(n));
+    expect(extra.length).toBeGreaterThan(0);
+    for (const name of extra) expect(hard, name).not.toContain(name);
+  });
+
+  it('a biome change keeps the difficulty details, and vice versa', () => {
+    panel.show();
+    changeSelect('difficulty', 'easy');
+    const cash = text('bs-sandbox-difficulty-cash');
+    const opening = text('bs-sandbox-difficulty-opening');
+    changeSelect('biome', 'volcanic_flats');
+    expect(text('bs-sandbox-difficulty-cash')).toBe(cash);
+    expect(text('bs-sandbox-difficulty-opening')).toBe(opening);
+
+    const desc = text('bs-sandbox-biome-desc');
+    changeSelect('difficulty', 'hard');
+    expect(text('bs-sandbox-biome-desc')).toBe(desc);
+  });
+
+  it('renders details for a retained selection when re-shown', () => {
+    panel.show();
+    selectBiomeAndDifficulty('volcanic_flats', 'easy');
+    panel.hide();
+    panel.show();
+    expect(text('bs-sandbox-biome-desc')).toBe(t(getBiome('volcanic_flats')!.descKey));
+    expect(digits(text('bs-sandbox-difficulty-cash'))).toContain(String(SANDBOX_DIFFICULTIES.easy.startingCash));
+  });
+
+  it('changing selections retains the seed value and the other selection', () => {
+    panel.show();
+    const seed = control('seed') as HTMLInputElement;
+    seed.value = '4242';
+    seed.dispatchEvent(new Event('input'));
+    changeSelect('difficulty', 'hard');
+    changeSelect('biome', 'volcanic_flats');
+    expect((control('seed') as HTMLInputElement).value).toBe('4242');
+    expect((control('difficulty') as HTMLSelectElement).value).toBe('hard');
+    expect(panel.getConfig()).toEqual({ biome: 'volcanic_flats', difficulty: 'hard', seed: 4242 });
+  });
+
+  it('biome select option text is the full translated name, never shortened', () => {
+    panel.show();
+    const select = control('biome') as HTMLSelectElement;
+    for (const opt of Array.from(select.options)) {
+      const b = getBiome(opt.value)!;
+      expect(opt.textContent).toBe(t(b.nameKey));
+    }
+  });
+
+  it('biome select has no fixed width and a min-width of at least 180px', () => {
+    panel.show();
+    const select = control('biome') as HTMLSelectElement;
+    // 'auto' sizes to content; any px/% width would be a fixed width.
+    expect(['', 'auto']).toContain(select.style.width);
+    expect(select.style.cssText).not.toMatch(/(^|;)\s*width\s*:(?!\s*auto)/);
+    expect(parseInt(select.style.maxWidth, 10)).toBeGreaterThanOrEqual(180);
+    expect(parseInt(select.style.minWidth, 10)).toBeGreaterThanOrEqual(180);
   });
 });

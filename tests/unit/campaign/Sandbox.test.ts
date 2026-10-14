@@ -397,3 +397,160 @@ describe('sandbox starting site per difficulty (#1671)', () => {
     expect(level.startingSite!.vehicles.length).toBeGreaterThan(0);
   });
 });
+
+// ─── #1686: biome traits and difficulty details ─────────────────────────────
+
+import {
+  sandboxBiomeTraits,
+  sandboxDifficultyDetails,
+} from '../../../src/core/campaign/Sandbox.js';
+import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
+import { getOre } from '../../../src/core/world/OreCatalog.js';
+import {
+  SANDBOX_STARTING_SITES,
+  SANDBOX_RUGGEDNESS_ROLLING_PV,
+  SANDBOX_RUGGEDNESS_STEEP_PV,
+} from '../../../src/core/config/balance.js';
+
+describe('sandboxBiomeTraits (#1686)', () => {
+  it('returns the biome descKey for every catalog biome', () => {
+    for (const b of getAllBiomes()) {
+      expect(sandboxBiomeTraits(b.id).descKey).toBe(b.descKey);
+    }
+  });
+
+  it('hardness range is min/max of the dominant rocks hardness tiers, for every biome', () => {
+    for (const b of getAllBiomes()) {
+      const tiers = b.dominantRocks.map(id => getRock(id)?.hardnessTier).filter((x): x is number => x !== undefined);
+      const traits = sandboxBiomeTraits(b.id);
+      expect(traits.hardnessTierMin, b.id).toBe(Math.min(...tiers));
+      expect(traits.hardnessTierMax, b.id).toBe(Math.max(...tiers));
+      expect(traits.hardnessTierMin).toBeLessThanOrEqual(traits.hardnessTierMax);
+    }
+  });
+
+  it('sanity: desert is soft (tier 1-2), volcanic and tropical are hard (tier 4-5)', () => {
+    const desert = sandboxBiomeTraits('desert_badlands');
+    expect(desert.hardnessTierMin).toBe(1);
+    expect(desert.hardnessTierMax).toBe(2);
+    for (const id of ['volcanic_flats', 'tropical_karst']) {
+      const tr = sandboxBiomeTraits(id);
+      expect(tr.hardnessTierMin, id).toBeGreaterThanOrEqual(4);
+      expect(tr.hardnessTierMax, id).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('ores are exactly those the dominant rocks yield, with the global ore depth windows', () => {
+    for (const b of getAllBiomes()) {
+      const expected = oresYieldedByRocks(b.dominantRocks);
+      const ores = sandboxBiomeTraits(b.id).ores;
+      expect(ores.map(o => o.oreId), b.id).toEqual(expected);
+      for (const o of ores) {
+        const def = getOre(o.oreId)!;
+        expect(o.nameKey).toBe(def.nameKey);
+        expect(o.depthMin).toBe(def.depthMin);
+        expect(o.depthMax).toBe(def.depthMax);
+      }
+    }
+  });
+
+  it('aggregate ore depth spans the shallowest min to the deepest max', () => {
+    for (const b of getAllBiomes()) {
+      const traits = sandboxBiomeTraits(b.id);
+      expect(traits.ores.length, b.id).toBeGreaterThan(0);
+      expect(traits.oreDepthMin).toBe(Math.min(...traits.ores.map(o => o.depthMin)));
+      expect(traits.oreDepthMax).toBe(Math.max(...traits.ores.map(o => o.depthMax)));
+    }
+  });
+
+  it('pvAmplitude is copied from the biome and ruggedness follows the balance thresholds', () => {
+    for (const b of getAllBiomes()) {
+      const traits = sandboxBiomeTraits(b.id);
+      expect(traits.pvAmplitude).toBe(b.pvAmplitude);
+      const expected = b.pvAmplitude < SANDBOX_RUGGEDNESS_ROLLING_PV ? 'flat'
+        : b.pvAmplitude < SANDBOX_RUGGEDNESS_STEEP_PV ? 'rolling' : 'steep';
+      expect(traits.ruggedness, b.id).toBe(expected);
+    }
+  });
+
+  it('ruggedness uses all three buckets across the catalog (flat < 20 <= rolling < 40 <= steep)', () => {
+    expect(SANDBOX_RUGGEDNESS_ROLLING_PV).toBe(20);
+    expect(SANDBOX_RUGGEDNESS_STEEP_PV).toBe(40);
+    const kinds = new Set(getAllBiomes().map(b => sandboxBiomeTraits(b.id).ruggedness));
+    expect(kinds).toEqual(new Set(['flat', 'rolling', 'steep']));
+  });
+
+  it('an unknown biome id resolves to the default biome traits', () => {
+    expect(sandboxBiomeTraits('no_such_biome')).toEqual(sandboxBiomeTraits(SANDBOX_DEFAULTS.biome));
+    expect(sandboxBiomeTraits('')).toEqual(sandboxBiomeTraits(SANDBOX_DEFAULTS.biome));
+  });
+});
+
+describe('sandboxDifficultyDetails (#1686)', () => {
+  const count = <T>(items: readonly T[], keyOf: (x: T) => string): Map<string, number> => {
+    const m = new Map<string, number>();
+    for (const i of items) m.set(keyOf(i), (m.get(keyOf(i)) ?? 0) + 1);
+    return m;
+  };
+
+  it('carries id, labelKey and the difficulty starting cash', () => {
+    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+      const d = sandboxDifficultyDetails(id);
+      expect(d.id).toBe(id);
+      expect(d.labelKey).toBe(SANDBOX_DIFFICULTIES[id].labelKey);
+      expect(d.startingCash).toBe(SANDBOX_DIFFICULTIES[id].startingCash);
+    }
+  });
+
+  it('crew counts per role match the starting site employees', () => {
+    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+      const site = SANDBOX_STARTING_SITES[id];
+      const expected = count(site.employees, e => e.role);
+      const got = sandboxDifficultyDetails(id).crew;
+      expect(got.length, id).toBe(expected.size);
+      for (const g of got) expect(g.count, `${id}/${g.role}`).toBe(expected.get(g.role));
+    }
+  });
+
+  it('vehicle counts per role and tier match the starting site vehicles', () => {
+    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+      const expected = count(SANDBOX_STARTING_SITES[id].vehicles, v => `${v.role}|${v.tier}`);
+      const got = sandboxDifficultyDetails(id).vehicles;
+      expect(got.length, id).toBe(expected.size);
+      for (const g of got) expect(g.count).toBe(expected.get(`${g.role}|${g.tier}`));
+    }
+  });
+
+  it('building counts per type and tier match the starting site buildings', () => {
+    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+      const expected = count(SANDBOX_STARTING_SITES[id].buildings, b => `${b.type}|${b.tier}`);
+      const got = sandboxDifficultyDetails(id).buildings;
+      expect(got.length, id).toBe(expected.size);
+      for (const g of got) expect(g.count).toBe(expected.get(`${g.type}|${g.tier}`));
+    }
+  });
+
+  it('every grouped count is a positive integer and totals match the site', () => {
+    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+      const d = sandboxDifficultyDetails(id);
+      const site = SANDBOX_STARTING_SITES[id];
+      expect(d.crew.reduce((s, c) => s + c.count, 0)).toBe(site.employees.length);
+      expect(d.vehicles.reduce((s, c) => s + c.count, 0)).toBe(site.vehicles.length);
+      expect(d.buildings.reduce((s, c) => s + c.count, 0)).toBe(site.buildings.length);
+      for (const c of [...d.crew, ...d.vehicles, ...d.buildings]) {
+        expect(Number.isInteger(c.count) && c.count > 0).toBe(true);
+      }
+    }
+  });
+
+  it('easy opens with at least everything normal does', () => {
+    const easy = sandboxDifficultyDetails('easy');
+    const normal = sandboxDifficultyDetails('normal');
+    const covers = <T extends { count: number }>(big: readonly T[], small: readonly T[], k: (x: T) => string) =>
+      small.every(s => (big.find(b => k(b) === k(s))?.count ?? 0) >= s.count);
+    expect(covers(easy.crew, normal.crew, c => (c as { role: string }).role)).toBe(true);
+    expect(covers(easy.vehicles, normal.vehicles, c => { const v = c as { role: string; tier: number }; return `${v.role}|${v.tier}`; })).toBe(true);
+    expect(covers(easy.buildings, normal.buildings, c => { const v = c as { type: string; tier: number }; return `${v.type}|${v.tier}`; })).toBe(true);
+    expect(easy.startingCash).toBeGreaterThan(normal.startingCash);
+  });
+});

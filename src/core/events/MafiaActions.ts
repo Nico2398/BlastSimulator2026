@@ -7,7 +7,7 @@ import { queueFollowUp, type EventSystemState } from './EventSystem.js';
 import type { CorruptionState } from '../economy/Corruption.js';
 import type { GameState } from '../state/GameState.js';
 import type { EmployeeState } from '../entities/Employee.js';
-import { killEmployee } from '../entities/Employee.js';
+import { bookEmployeeDeath } from '../entities/Damage.js';
 import { releaseEmployeeFromWorld, fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import {
   ACCIDENT_EXPOSURE,
@@ -96,7 +96,7 @@ export function arrangeAccident(
 
   if (succeeded) {
     const exposureIncrease = applyExposure(mafia, ACCIDENT_EXPOSURE);
-    killEmployee(employees, targetId);
+    state.damage.accidents.push(bookEmployeeDeath(employees, state.damage, targetId, state.tickCount));
     releaseEmployeeFromWorld(state, targetId);
     return {
       success: true, cost: ACCIDENT_COST, exposureIncrease,
