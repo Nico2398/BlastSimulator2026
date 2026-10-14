@@ -93,20 +93,20 @@ describe('sandboxCommand — unknown difficulty', () => {
 // ── start-success message ─────────────────────────────────────────────────
 // SANDBOX_DEFAULTS (biome: desert_badlands, difficulty: normal, seed: 12345)
 // produce the level def sandboxLevelDef(config) resolves to: 64x64 grid
-// (datum SANDBOX_DATUM), $100,000 starting cash — captured directly off a
+// (datum SANDBOX_DATUM), $150,000 starting cash — captured directly off a
 // real sandboxCommand run (#861), not re-derived from Sandbox.ts's config
 // tables by hand. #1191 dropped the message's `{gridY}x` segment entirely.
 
 describe('sandboxCommand — start-success message', () => {
   const SUCCESS_UNSTAFFED_EN =
-    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $100,000.';
+    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $150,000.';
   const SUCCESS_STAFFED_EN =
-    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $100,000. Staffed.';
+    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $150,000. Staffed.';
 
   describe('unstaffed', () => {
-    it('matches the exact English literal by default', () => {
+    it('matches the exact English literal with staffed:false', () => {
       const ctx = freshCtx();
-      const result = sandboxCommand(ctx, ['start'], {});
+      const result = sandboxCommand(ctx, ['start'], { staffed: 'false' });
       expect(result.success).toBe(true);
       expect(result.output).toBe(SUCCESS_UNSTAFFED_EN);
     });
@@ -114,9 +114,18 @@ describe('sandboxCommand — start-success message', () => {
     it('differs from the English literal under locale fr', () => {
       const ctx = freshCtx();
       setLocale('fr');
-      const result = sandboxCommand(ctx, ['start'], {});
+      const result = sandboxCommand(ctx, ['start'], { staffed: 'false' });
       expect(result.success).toBe(true);
       expect(result.output).not.toBe(SUCCESS_UNSTAFFED_EN);
+    });
+  });
+
+  describe('default opening', () => {
+    it('carries the level kit by default (staffed suffix)', () => {
+      const ctx = freshCtx();
+      const result = sandboxCommand(ctx, ['start'], {});
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(SUCCESS_STAFFED_EN);
     });
   });
 

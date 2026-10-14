@@ -1453,7 +1453,7 @@
         }
       ],
       "role": "bootstrap",
-      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence. A hired blaster arrives with blasting only; this grants the licence (player path: `employee train` at a driving_center)."
+      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence. A hired blaster arrived with blasting only; since #1667 it also arrives with the tier-1 truck licence, so this grant is a redundant no-op kept to pin the licence explicitly."
     },
     {
       "command": "employee assign_skill 13 skill:driving.truck level:1",
@@ -1464,7 +1464,7 @@
         }
       ],
       "role": "bootstrap",
-      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence. A hired blaster arrives with blasting only; this grants the licence (player path: `employee train` at a driving_center)."
+      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence. A hired blaster arrived with blasting only; since #1667 it also arrives with the tier-1 truck licence, so this grant is a redundant no-op kept to pin the licence explicitly."
     },
     {
       "command": "employee assign_skill 14 skill:driving.truck level:1",
@@ -1475,7 +1475,7 @@
         }
       ],
       "role": "bootstrap",
-      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence. A hired blaster arrives with blasting only; this grants the licence (player path: `employee train` at a driving_center)."
+      "description": "#1649: charging is worked from a charging truck by an employee holding blasting + the truck licence. A hired blaster arrived with blasting only; since #1667 it also arrives with the tier-1 truck licence, so this grant is a redundant no-op kept to pin the licence explicitly."
     },
     {
       "command": "vehicle buy charging_truck",
@@ -3124,9 +3124,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "ecology": 0,
-          "deathCount": 8
+          "deathCount": 9
         },
-        "note": " #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false). #1649: charging is truck-worked (4 charging trucks, 4 dual-qualified blasters incl. the starting one), so the blast lands later and kills 8 (re-measured); the other temporary crew are away from the drill site."
+        "note": " #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false). #1649: charging is truck-worked (4 charging trucks, 4 dual-qualified blasters incl. the starting one), so the blast lands later and kills 8 (re-measured); the other temporary crew are away from the drill site. #1667: every hired blaster now arrives with the tier-1 truck licence, so later-wave temporary blasters can also take charging-truck work; one more of them is at the drill site at the blast, deathCount re-measured 8 -> 9 (a real consequence of the licence, not a bug: the charges still land and the level still ends in ecological_shutdown)."
       }
     },
     {

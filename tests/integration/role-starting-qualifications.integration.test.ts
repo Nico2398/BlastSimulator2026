@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
+import { outstandingChargeBlockedReason } from '../../src/core/mining/ChargeOrder.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
 function newSite() {
@@ -43,6 +44,59 @@ describe('role starting qualifications — gameplay flows (#1339)', () => {
     const cats = state.employees.employees[0]!.qualifications.map(q => q.category);
     expect(cats).toContain('blasting');
     expect(cats).not.toContain('driving.drill_rig');
+  });
+
+  it('a freshly hired Blaster holds blasting first, then a level-1 truck licence (#1667)', () => {
+    const { state, run } = newSite();
+    expect(run('employee hire role:blaster').success).toBe(true);
+    const quals = state.employees.employees[0]!.qualifications;
+    expect(quals.map(q => q.category)).toEqual(['blasting', 'driving.truck']);
+    expect(quals.find(q => q.category === 'driving.truck')!.proficiencyLevel).toBe(1);
+  });
+
+  it('a freshly hired Driller + Blaster charge a drilled hole from a tier-1 charging truck with no course (#1667)', () => {
+    const { run, state } = newSite();
+    expect(run('employee hire role:driller').success).toBe(true);
+    expect(run('employee hire role:blaster').success).toBe(true);
+    expect(run('vehicle buy drill_rig tier:1').success).toBe(true);
+    expect(run('vehicle buy charging_truck tier:1').success).toBe(true);
+    expect(state.employees.employees).toHaveLength(2);
+
+    const plan = run('drill_plan grid rows:1 cols:1 spacing:5 depth:8 start:14,14');
+    expect(plan.success, plan.output).toBe(true);
+    tickUntil(run, () => state.drillHoles.length === 1, 600);
+    expect(state.drillHoles).toHaveLength(1);
+
+    const holeId = state.drillHoles[0]!.id;
+    const charge = run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`);
+    expect(charge.success, charge.output).toBe(true);
+    expect(state.pendingActions.some(a => a.type === 'charge_hole')).toBe(true);
+
+    run('tick 1');
+    expect(outstandingChargeBlockedReason(state)).toBeNull();
+    for (const a of state.pendingActions.filter(x => x.type === 'charge_hole')) {
+      expect(a.blockedReason).toBeNull();
+    }
+
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 1, 1500);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(1);
+    expect(outstandingChargeBlockedReason(state)).toBeNull();
+  });
+
+  it('a freshly hired Blaster still lacks the licence level for a tier-2 charging truck (#1667)', () => {
+    const { run, state } = newSite();
+    expect(run('employee hire role:driller').success).toBe(true);
+    expect(run('employee hire role:blaster').success).toBe(true);
+    expect(run('vehicle buy drill_rig tier:1').success).toBe(true);
+    expect(run('vehicle buy charging_truck tier:2').success).toBe(true);
+
+    expect(run('drill_plan grid rows:1 cols:1 spacing:5 depth:8 start:14,14').success).toBe(true);
+    tickUntil(run, () => state.drillHoles.length === 1, 600);
+    expect(state.drillHoles).toHaveLength(1);
+
+    run(`charge hole:${state.drillHoles[0]!.id} explosive:boomite amount:5 stemming:2`);
+    run('tick 1');
+    expect(outstandingChargeBlockedReason(state)).toBe('licence_level_too_low');
   });
 
   it('a freshly hired Driver can board a rock_digger', () => {

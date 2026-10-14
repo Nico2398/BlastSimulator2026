@@ -20,7 +20,8 @@ import { generateContracts } from '../../core/economy/Contract.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
-import { staffedSuffix, parseStaffedFlag } from './commandUtils.js';
+import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
+import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
@@ -64,13 +65,15 @@ export function sandboxCommand(
     return { success: false, output: t('sandbox.unknown_difficulty', { difficulty: requested.difficulty, valid }) };
   }
 
-  const flags = parseStaffedFlag(named['staffed']);
+  const flags = parseOptionalStaffedFlag(named['staffed']);
   if (flags.error) {
     return { success: false, output: flags.error };
   }
 
   const config = clampSandboxConfig(requested);
   const level = sandboxLevelDef(config);
+  // Absent: the difficulty's free kit. true: the global staffed roster, no buildings. false: bare.
+  const startingSite = resolveStartingSite(level.startingSite, flags.staffed);
 
   ctx.state = createGame({
     seed: config.seed,
@@ -78,7 +81,7 @@ export function sandboxCommand(
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
-    ...(flags.staffed ? { staffed: true } : {}),
+    ...(startingSite ? { startingSite } : {}),
   });
   ctx.state.world = createWorldState(level.gridX, level.datum, level.gridZ, true);
 
@@ -90,6 +93,7 @@ export function sandboxCommand(
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
     startingCrew: true,
+    ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
@@ -104,7 +108,7 @@ export function sandboxCommand(
       difficulty: config.difficulty,
       seed: config.seed,
       cash: level.startingCash.toLocaleString('en-US'),
-      staffedSuffix: staffedSuffix(flags.staffed),
+      staffedSuffix: staffedSuffix(isStaffedComposition(startingSite)),
     }),
   };
 }

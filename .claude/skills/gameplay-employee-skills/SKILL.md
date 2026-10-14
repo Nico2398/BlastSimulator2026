@@ -35,7 +35,7 @@ Every role arrives able to do its own job, with no per-employee course (`ROLE_ST
 | Role | Arrives with |
 |------|--------------|
 | Driller | `blasting` 1, `driving.drill_rig` 1 |
-| Blaster | `blasting` at `ROLE_BLASTER_START_LEVEL` (2) — the higher level justifies the higher price |
+| Blaster | `blasting` at `ROLE_BLASTER_START_LEVEL` (2) — the higher level justifies the higher price — plus `driving.truck` 1, the charging-truck licence (#1667); higher truck tiers still need Driving Center courses |
 | Driver | `driving.truck` 1, `driving.excavator` 1 |
 | Surveyor | `geology` 1 |
 | Manager | `management` 1 |
