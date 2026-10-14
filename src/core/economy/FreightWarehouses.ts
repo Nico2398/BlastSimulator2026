@@ -2,7 +2,7 @@
 
 import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import type { LogisticsState, TrackedFragment } from './Logistics.js';
-import { accumulateOreMass, decrementCollectedOre } from '../mining/BlastOreReport.js';
+import { accumulateOreMass, clampCollectedOre, decrementCollectedOre } from '../mining/BlastOreReport.js';
 
 export type { WarehouseSite };
 
@@ -86,8 +86,6 @@ export function loseOrphanedStock(
   }
   if (losses.size === 0) return [];
   l.fragments = kept;
-  for (const oreId of Object.keys(collectedOre)) {
-    if (collectedOre[oreId]! < 0) collectedOre[oreId] = 0;
-  }
+  clampCollectedOre(collectedOre);
   return [...losses.values()].sort((a, b) => a.buildingId - b.buildingId);
 }

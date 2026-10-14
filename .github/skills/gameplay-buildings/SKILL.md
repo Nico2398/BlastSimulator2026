@@ -153,6 +153,11 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
   `place_building` action, works with an empty roster.
 - **Single tier** (`isSingleTierType`): tiers 2/3 alias tier 1; no upgrade or research UI and
   `build upgrade` is refused. The Build menu shows no capacity line.
+- **Leftover rock (#1690):** once an ore sale leaves a stored fragment barren, it leaves the warehouse
+  at once (`releaseBarrenStoredFragments`, `Logistics.ts`): removed from `fragments`, debited from
+  `storedMassKg` and any residual `collectedOre`, credited to the first heap (`creditFirstSpoilHeap`).
+  Rubble contracts still pay for it via the heap. With no heap it stays stored until a heap exists;
+  the release also runs at the start of every ore sale and when a save loads.
 - Destroying a heap loses its spoil silently. A save with no `storedSpoilKg` reads as 0. No Blender
   model yet: renders as a stand-in box (#1572).
 
