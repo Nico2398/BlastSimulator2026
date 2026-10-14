@@ -483,8 +483,18 @@ function selectWithinIndex(
     !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role) && isClaimable(a);
   // A post-blast pool holds thousands of debris orders: gate and cost one per
   // spatial bin, not every piece (#1603, DebrisCandidateBins.ts).
+  // Reachability (#953, #1722) is asked inside the thinning too, so a bin of
+  // walled-off rock never takes a representative slot from reachable rock.
+  // Answered from the climb labelling the order pools share, O(1) per candidate (#1603),
+  // so the thinning's cost stays O(debris candidates) per search, like its existing
+  // stamping pass: it asks every member of every bin it visits, with no pathfinding.
+  const climbReach = employeeClimbReach(state);
+  const navGrid = state.navGrid;
+  const reachable = (a: PendingAction): boolean =>
+    climbReach === null || navGrid === null
+    || climbReach.canReach(employee.x, employee.z, navGrid.clampX(a.targetX), navGrid.clampZ(a.targetZ));
   const claimable = thinDebrisCandidates(
-    state, employee, candidates, a => isAutoDebrisAction(a.type), a => haulActionCarriesOre(state, a, fragmentOf), allowed,
+    state, employee, candidates, a => isAutoDebrisAction(a.type), a => haulActionCarriesOre(state, a, fragmentOf), allowed, reachable,
   );
   if (claimable.length === 0) return null;
 
@@ -500,13 +510,13 @@ function selectWithinIndex(
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
 
-  // Cheap, exact pre-filter (#953): a candidate outside the employee's own
-  // climb-aware reachable set (e.g. inside a fresh blast crater's walled-off
-  // interior) can never be reached by any real findExactPath, so it's skipped
-  // below without spending one of the bounded real-pathfind attempts — frees
-  // the budget for a farther candidate that might actually resolve. Answered
-  // from the climb labelling the order pools share, O(1) per candidate (#1603).
-  const climbReach = employeeClimbReach(state);
+  // `reachable` (#953) is the cheap, exact pre-filter: a candidate outside the
+  // employee's climb-aware reachable set (e.g. inside a fresh blast crater's
+  // walled-off interior) can never be reached by any real findExactPath. It
+  // is skipped below without spending one of the bounded real-pathfind
+  // attempts, which stay free for a farther candidate that might resolve.
+  // Debris is already filtered by it inside the thinning; this loop still
+  // covers the non-debris candidates the thinning passes through.
 
   let best: SelectedAction | null = null;
   let bestAdjusted = Infinity;
@@ -517,11 +527,7 @@ function selectWithinIndex(
     // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
     if (best !== null && estimate >= bestAdjusted) break;
 
-    if (climbReach !== null && state.navGrid !== null) {
-      const cx = state.navGrid.clampX(candidate.targetX);
-      const cz = state.navGrid.clampZ(candidate.targetZ);
-      if (!climbReach.canReach(employee.x, employee.z, cx, cz)) continue;
-    }
+    if (!reachable(candidate)) continue;
 
     attemptsSpent++;
     const resolved = resolveActionCost(state, employee, candidate);
