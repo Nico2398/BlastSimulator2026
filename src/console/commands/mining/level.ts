@@ -7,7 +7,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import {
-  validateLevelOrder,
+  validateLevelOrder, pickLevelWorkTarget,
   type LevelOrderDef, type LevelOrderValidation,
 } from '../../../core/mining/LevelGround.js';
 import { rectOverlapsOccupants } from '../../../core/entities/Building.js';
@@ -16,6 +16,7 @@ import { LEVEL_GROUND_COST_PER_VOXEL } from '../../../core/config/balance.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
+import { employeeClimbReach } from '../../../core/engine/OrderReachability.js';
 import { claimForAction, cellsInRect } from '../siteExpansion.js';
 
 /** Payload carried by a queued `level_ground` PendingAction. */
@@ -104,6 +105,18 @@ export function levelGroundCommand(
 
   const actionId = ctx.state!.nextPendingActionId++;
 
+  // The digger works from a column the crew can reach, not blindly from the
+  // rect's corner, which may sit inside a pit (#1723). Nothing reachable
+  // falls back to the corner: the order then waits as target_unreachable.
+  const reach = employeeClimbReach(ctx.state!);
+  const crew = ctx.state!.employees.employees.filter(e => e.alive);
+  const reachable = reach?.reachableFrom(crew);
+  const workTarget = reachable
+    ? pickLevelWorkTarget(columns, rect, (x, z) => reachable.has(x, z))
+    : null;
+  const targetX = workTarget?.x ?? rect.minX;
+  const targetZ = workTarget?.z ?? rect.minZ;
+
   // skipQualificationCheck (mirrors dig_ramp_segment/drill_hole/charge_hole,
   // #555/#553/#554): a level-ground order must queue silently even when
   // nobody on the roster currently holds driving.excavator or a rock_digger
@@ -113,14 +126,22 @@ export function levelGroundCommand(
     type: 'level_ground',
     requiredSkill: 'driving.excavator',
     requiredVehicleRole: 'rock_digger',
-    targetX: rect.minX,
-    targetZ: rect.minZ,
+    targetX,
+    targetZ,
     targetY,
     payload: {
       rect, targetY, columns, region, orderCost: validation.cost, footprint,
     } satisfies LevelGroundActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
+
+  // The ghost outlines the whole rectangle from its corner (footprint offsets
+  // are relative to it), whatever column the digger walks to.
+  const ghost = ctx.state!.ghostPreviews.find(g => g.id === actionId);
+  if (ghost) {
+    ghost.targetX = rect.minX;
+    ghost.targetZ = rect.minZ;
+  }
 
   // validation.cost is Math.ceil(volume) * LEVEL_GROUND_COST_PER_VOXEL
   // (LevelGround.ts) — dividing back out reports the continuous voxel

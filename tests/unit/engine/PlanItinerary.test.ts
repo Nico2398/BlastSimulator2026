@@ -173,6 +173,42 @@ describe('planItinerary', () => {
       expect(itinerary).toBeNull();
     });
 
+    // #1723 merge: a driver sitting in a loaded hauler cannot alight (canReleaseDriver's
+    // mid-haul guard), so a plan whose first leg alights them aborts on the tick it is
+    // claimed. Planning it let that driver claim and drop every other-vehicle action.
+    function mountInLoadedHauler(state: GameState, employee: Employee, cargoKg: number): void {
+      const { vehicle: hauler } = purchaseVehicle(state.vehicles, 'debris_hauler', employee.x, employee.z);
+      employee.locomotion = { kind: 'mounted', vehicleId: hauler.id };
+      hauler.occupantIds = [employee.id];
+      if (cargoKg > 0) hauler.cargo = [{ fragmentId: 1, massKg: cargoKg }];
+    }
+
+    it('vehicle-gated goal for a driver locked into a loaded vehicle of another role', () => {
+      const state = makeState();
+      const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+      mountInLoadedHauler(state, employee, 500);
+      purchaseVehicle(state.vehicles, 'drill_rig', 5, 0);
+      const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: 20, targetZ: 0 });
+      state.pendingActions.push(action);
+
+      expect(planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact')).toBeNull();
+      expect(planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'estimate')).toBeNull();
+    });
+
+    it('boundary: the same driver in an empty vehicle still alights and boards', () => {
+      const state = makeState();
+      const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+      mountInLoadedHauler(state, employee, 0);
+      const { vehicle: rig } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 0);
+      const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: 20, targetZ: 0 });
+      state.pendingActions.push(action);
+
+      const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+      expect(itinerary).not.toBeNull();
+      expect(itinerary!.legs[0]!.onArrive).toEqual({ kind: 'alight' });
+      expect(itinerary!.legs[1]!.onArrive).toEqual({ kind: 'board', vehicleId: rig.id });
+    });
+
     it('geometrically unreachable target: reposition goal boxed in by blocked cells on all 8 neighbours returns null (real findPath failure, not entity-resolution failure)', () => {
       const state = makeState();
       const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);

@@ -2562,3 +2562,9 @@ export const ORE_DEPOSIT_RARITY_COVERAGE: Readonly<Record<string, number>> = {
 export const ORE_DEPOSIT_CORE_GAIN = 3;
 /** Width of the soft falloff at a deposit edge, in deposit-field units. */
 export const ORE_DEPOSIT_EDGE_WIDTH = 0.4;
+
+/** Offset in metres of the floored grade plane from the lowest charged-hole bottom; 0 = flush with it. */
+export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
+
+/** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
+export const BLAST_GRADE_MAX_CUT_M = 4;

@@ -1109,7 +1109,7 @@ const FIRST_BLAST: Readonly<Record<(typeof KIT_LEVELS)[number], { depth: number;
 // The shot is aimed this far from the rig, out of the blast radius of the free warehouse and spoil heap beside the
 // crew (a nearer shot destroys both and leaves the debris nowhere to go).
 const KIT_SHOT_OFFSET_X = 34;
-const KIT_SHOT_OFFSET_Z = 33;
+const KIT_SHOT_OFFSET_Z = 31;
 
 function startKitLevel(levelId: string, args = '') {
   const { runner, ctx } = createRunner();
