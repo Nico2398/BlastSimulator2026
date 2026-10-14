@@ -953,11 +953,14 @@ describe('Blast execution — a charge too deep to break out (#1724)', () => {
   it('the measured 4 kg pattern leaves no fragment resting above the pre-blast surface of its column', () => {
     const { result, before } = sandboxBlast(4, 8, 4, 2.5);
     expect(result.flights.length).toBeGreaterThan(0);
+    let checked = 0;
     for (const fl of result.flights) {
       const surface = before.get(`${Math.floor(fl.to.x)},${Math.floor(fl.to.z)}`);
       if (surface === undefined) continue;
+      checked++;
       expect(fl.to.y, `fragment ${fl.fragmentId} came to rest on top of intact ground`).toBeLessThanOrEqual(surface);
     }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it('the measured 4 kg pattern throws nothing: every flight is a drop', () => {

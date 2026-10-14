@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
-import { executeBlastSteps, emitRegionInStrips, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
+import { executeBlastSteps, emitRegionInStrips, buildBlastReport, didNotBreakOut, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -352,7 +352,7 @@ export function* fireBlastSteps(
       ...(report.ratingCap
         ? [t(`mining.blast.rating_cap_${report.ratingCap}`, { base: report.baseRating?.toUpperCase() ?? '' })]
         : []),
-      ...(result.clearedVoxels > 0 && result.brokeOut === false ? [t('mining.blast.no_breakout')] : []),
+      ...(didNotBreakOut(result) ? [t('mining.blast.no_breakout')] : []),
       `Cleared voxels: ${result.clearedVoxels}`,
       `Cracked voxels: ${result.crackedVoxels}`,
       `Fragments: ${result.fragmentCount}`,

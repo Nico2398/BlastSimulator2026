@@ -192,6 +192,11 @@ export interface SecondaryBlastReport {
   destroyedIds: number[];
 }
 
+/** True when the blast cleared rock but never broke out of its sealed void (#1724). */
+export function didNotBreakOut(result: Pick<BlastResult, 'clearedVoxels' | 'brokeOut'>): boolean {
+  return result.clearedVoxels > 0 && result.brokeOut === false;
+}
+
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
 export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = [], spentFromStock = 0): BlastReport {
   const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
@@ -205,7 +210,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     chargedHoleCount: wetHoles.chargedCount,
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
-    noBreakout: result.clearedVoxels > 0 && result.brokeOut === false,
+    noBreakout: didNotBreakOut(result),
   });
   return {
     tick,

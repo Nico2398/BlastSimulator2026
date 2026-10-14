@@ -203,7 +203,7 @@ class PileHeights {
   }
 
   /** Highest solid voxel at or below `y` in a column, or null when none within reach. */
-  surfaceBelow(x: number, z: number, y: number): number | null {
+  private surfaceBelow(x: number, z: number, y: number): number | null {
     const start = Math.floor(y);
     for (let j = start; j > start - PILE_VOID_SCAN_MAX_LAYERS; j--) {
       if (this.grid.isSolidAt(x, j, z)) return j;
@@ -212,7 +212,7 @@ class PileHeights {
   }
 
   /** Lowest solid voxel at or above `y` in a column, as the height of its underside; Infinity when none. */
-  ceilingAbove(x: number, z: number, y: number): number {
+  private ceilingAbove(x: number, z: number, y: number): number {
     const top = computeVoxelColumnSurfaceY(this.grid, x, z);
     if (top === null) return Infinity;
     for (let j = Math.floor(y); j <= top; j++) {
@@ -255,38 +255,13 @@ class PileHeights {
 
   /** `spillTarget` for a sealed void: neighbours must hold the same layer, and a column full to the ceiling sheds too. */
   private voidSpillTarget(startX: number, startZ: number, layer: { floor: number; ceiling: number }): { x: number; z: number } {
-    const heightAt = (x: number, z: number): number => this.voidHeights.get(this.voidKey(x, z, layer.floor)) ?? layer.floor;
-    let x = startX;
-    let z = startZ;
-
-    for (let step = 0; step < PILE_SPILL_STEPS; step++) {
-      const here = heightAt(x, z);
-      if (here <= layer.floor) break;
-      const full = here >= layer.ceiling;
-      let bestX = x;
-      let bestZ = z;
-      let bestHeight = full ? here : here - PILE_REPOSE_STEP;
-
-      for (let dz = -1; dz <= 1; dz++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dz === 0) continue;
-          const nx = x + dx, nz = z + dz;
-          if (!this.inVoidLayer(nx, nz, layer.floor)) continue;
-          const height = heightAt(nx, nz);
-          if (height < bestHeight) {
-            bestHeight = height;
-            bestX = nx;
-            bestZ = nz;
-          }
-        }
-      }
-
-      if (bestX === x && bestZ === z) break;
-      x = bestX;
-      z = bestZ;
-    }
-
-    return { x, z };
+    return this.walkDownhill(startX, startZ, {
+      heightAt: (x, z) => this.voidHeights.get(this.voidKey(x, z, layer.floor)) ?? layer.floor,
+      isCandidate: (x, z) => this.inVoidLayer(x, z, layer.floor),
+      sheds: (_x, _z, here) => here > layer.floor,
+      // A column full to the ceiling sheds to any lower neighbour, not only one a repose step lower.
+      threshold: here => (here >= layer.ceiling ? here : here - PILE_REPOSE_STEP),
+    });
   }
 
   private voidKey(x: number, z: number, floor: number): string {
@@ -309,22 +284,41 @@ class PileHeights {
    * and where it actually landed is the whole reason flyrock is dangerous.
    */
   private spillTarget(startX: number, startZ: number): { x: number; z: number } {
+    return this.walkDownhill(startX, startZ, {
+      heightAt: (x, z) => this.surfaceAt(x, z),
+      isCandidate: (x, z) => this.grid.containsColumn(x, z),
+      sheds: (x, z) => this.heights.has(this.key(x, z)),
+      threshold: here => here - PILE_REPOSE_STEP,
+    });
+  }
+
+  /**
+   * Roll from a column to the lowest neighbouring candidate, repeatedly, until
+   * nothing beside it is lower than `threshold(here)` or the step budget ends.
+   * `sheds` says whether the current column may shed at all.
+   */
+  private walkDownhill(startX: number, startZ: number, walk: {
+    heightAt: (x: number, z: number) => number;
+    isCandidate: (x: number, z: number) => boolean;
+    sheds: (x: number, z: number, here: number) => boolean;
+    threshold: (here: number) => number;
+  }): { x: number; z: number } {
     let x = startX;
     let z = startZ;
 
     for (let step = 0; step < PILE_SPILL_STEPS; step++) {
-      if (!this.heights.has(this.key(x, z))) break;
-      const here = this.surfaceAt(x, z);
+      const here = walk.heightAt(x, z);
+      if (!walk.sheds(x, z, here)) break;
       let bestX = x;
       let bestZ = z;
-      let bestHeight = here - PILE_REPOSE_STEP;
+      let bestHeight = walk.threshold(here);
 
       for (let dz = -1; dz <= 1; dz++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dz === 0) continue;
           const nx = x + dx, nz = z + dz;
-          if (!this.grid.containsColumn(nx, nz)) continue;
-          const height = this.surfaceAt(nx, nz);
+          if (!walk.isCandidate(nx, nz)) continue;
+          const height = walk.heightAt(nx, nz);
           if (height < bestHeight) {
             bestHeight = height;
             bestX = nx;
