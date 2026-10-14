@@ -94,6 +94,8 @@ export interface TerrainConfig {
    * and hardest dominant rock (#458 D4/T1.3/A11).
    */
   mixedRockHardness?: boolean;
+  /** Gate ore veins to discrete rarity-sized deposits when true; off = legacy veins (#1682). */
+  oreDeposits?: boolean;
   /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
 }

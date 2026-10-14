@@ -62,6 +62,8 @@ export interface LevelDef {
    * making projection management more complex.
    */
   mixedRockHardness: boolean;
+  /** Ore appears only in discrete deposits sized by rarity; absent/false = legacy veins (#1682). */
+  oreDeposits?: boolean;
   /** Pit mask shape; absent means DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
   /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */

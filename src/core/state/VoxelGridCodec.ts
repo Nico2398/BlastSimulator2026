@@ -27,6 +27,7 @@ export interface SerializedTerrainGen {
   datum: number;
   sizeZ: number;
   mixedRockHardness?: boolean;
+  oreDeposits?: boolean;
   pitMask?: PitMaskShape;
 }
 

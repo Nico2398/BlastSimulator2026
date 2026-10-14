@@ -40,11 +40,17 @@ function hostRockAffinity(composition: VoxelRockComposition, oreId: string): num
   return sum;
 }
 
+/** Sampler options (#1682). */
+export interface OreVeinOptions {
+  /** Gate veins to discrete deposits by rarity tier; off keeps the legacy continuous veins. */
+  readonly deposits?: boolean;
+}
+
 /** Samples per-ore anisotropic vein density from rock composition + a depth window (#458 A12). */
 export class OreVeinSampler {
   private readonly fields = new Map<string, OreField>();
 
-  constructor(seed: number) {
+  constructor(seed: number, _options: OreVeinOptions = {}) {
     for (const ore of getAllOres()) {
       const rng = new Random(subSeed(seed, `ore:${ore.id}`));
       const noise = createNoise3D(() => rng.next());
