@@ -227,9 +227,12 @@ export function drillDepthRefusal(
   return { key: 'mining.drill_plan.refused_depth', params: { depth, reach } };
 }
 
+const DRILL_RIG_TIERS_ASC = Object.keys(DRILL_RIG_MAX_DEPTH_M).map(Number).sort((a, b) => a - b) as VehicleTier[];
+
 /** Lowest drill rig tier whose max depth (DRILL_RIG_MAX_DEPTH_M) reaches `depth`. */
 export function minDrillRigTier(depth: number): VehicleTier {
   if (!(depth > 0)) return 1;
-  const tiers: VehicleTier[] = [1, 2, 3];
-  return tiers.find(t => DRILL_RIG_MAX_DEPTH_M[t] >= depth) ?? 3;
+  const tiers = DRILL_RIG_TIERS_ASC;
+  // Beyond the deepest rig: clamp to it; drillDepthRefusal already blocks such a hole at order time.
+  return tiers.find(t => DRILL_RIG_MAX_DEPTH_M[t] >= depth) ?? tiers[tiers.length - 1]!;
 }

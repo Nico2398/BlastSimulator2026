@@ -11,9 +11,9 @@ import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_BATCH_MAX_ITEMS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
-import { findFreeVehicleForRole } from './VehicleReservation.js';
+import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, type Vehicle, type VehicleRole } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -273,7 +273,8 @@ export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
  * Resolves which vehicle a vehicle-gated goal drives: an explicit `via` hint
  * names it outright (must still have a free seat); absent that, reuse the
  * reservation already made for `reservedActionId`, if any, otherwise the
- * cheapest free vehicle of `role`. Shared by planItinerary's own generic
+ * cheapest free vehicle of `role` at or above `minTier` (the action's rig
+ * floor, so cost and ETA use a rig that can reach). Shared by planItinerary's own generic
  * vehicle-gated branch and planFragmentTaskItinerary below — both resolve a
  * goal's vehicle identically, differing only in what they build the
  * itinerary out of once they have it (#1091).
@@ -284,6 +285,7 @@ function resolveVehicleForGoal(
   role: VehicleRole,
   via: number | undefined,
   reservedActionId: number | null,
+  minTier: VehicleTier = 1,
 ): Vehicle | null {
   if (via !== undefined) {
     const vehicle = state.vehicles.vehicles.find(v => v.id === via);
@@ -293,7 +295,7 @@ function resolveVehicleForGoal(
   const reserved = reservedActionId !== null
     ? findVehicleReservedForAction(state.vehicles, reservedActionId)
     : null;
-  return reserved ?? findFreeVehicleForRole(state, role, employee) ?? null;
+  return reserved ?? findFreeVehicleForRole(state, role, employee, minTier) ?? null;
 }
 
 /**
@@ -505,7 +507,7 @@ function planFragmentTaskItinerary(
   const role = action.requiredVehicleRole;
   if (role === null) return null; // defensive — both action types always carry a role
 
-  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id);
+  const vehicle = resolveVehicleForGoal(state, employee, role, opts?.via, action.id, minVehicleTierFor(action));
   if (!vehicle) return null;
 
   const fragmentId = action.payload['fragmentId'];
@@ -865,16 +867,16 @@ export function planItinerary(
 
   // Vehicle-gated: an explicit `via` hint names the vehicle outright; absent
   // that, reuse the reservation already made for this action, if any,
-  // otherwise the cheapest free vehicle of the required role — same lookup
-  // resolveVehicleGatedWalkTarget (ActionSelection.ts, deleted along with
-  // this whole function) used. #1090: unlike a "defensive" fallback to a
+  // otherwise the cheapest free vehicle of the required role at the action's
+  // tier floor — the lookup findVehicleForClaim does at dispatch. #1090: unlike a "defensive" fallback to a
   // plain on-foot walk when no vehicle is reserved or free, planItinerary
   // reports this goal genuinely unresolvable — a vehicle-gated action has no
   // valid on-foot substitute, so a route that doesn't actually exist in the
   // real dispatch (no vehicle to drive) must not be costed as though it
   // does. Matches findVehicleForClaim's own real dispatch-time refusal in
   // this state.
-  const vehicle = resolveVehicleForGoal(state, employee, role!, via, resolved.actionId);
+  const gatedAction = opts?.action ?? state.pendingActions.find(a => a.id === resolved.actionId);
+  const vehicle = resolveVehicleForGoal(state, employee, role!, via, resolved.actionId, gatedAction === undefined ? 1 : minVehicleTierFor(gatedAction));
   if (!vehicle) return null;
 
   const mount = buildMountLegs(state, employee, vehicle, fidelity);

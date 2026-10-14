@@ -266,18 +266,21 @@ function availabilityReason(
     emps.some(emp => holdsRequiredSkill(emp, action.requiredSkill));
   const role = action.requiredVehicleRole;
   if (role !== null) {
+    // Existing reasons win: nothing of the role owned, then nobody licensed at all; only then a missing reaching rig.
+    if (!vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
+    if (!eligible.some(emp => licenceLevelOf(emp, role) > 0)) return 'no_licensed_driver';
     const floor = orderTierFloor(action);
-    const needed = neededTierOf(role, floor);
     if (floor > 1) {
       // A rig tier the order needs: owned and drivable by an eligible employee, else no reaching vehicle.
       const reaching = vehicles.some(v =>
         v.type === role && v.tier >= floor && eligible.some(emp => canDriveTier(emp, role, v.tier)));
       if (!reaching) return 'no_reaching_vehicle';
     }
+    const needed = neededTierOf(role, floor);
     if (needed === null) return 'no_vehicle_in_fleet';
     const licensed = eligible.filter(emp => canDriveTier(emp, role, needed));
     if (licensed.length === 0) {
-      return eligible.some(emp => licenceLevelOf(emp, role) > 0) ? 'licence_level_too_low' : 'no_licensed_driver';
+      return 'licence_level_too_low';
     }
     if (holdsSkill(licensed)) return null;
     return holdsSkill(eligible) ? 'no_dual_qualified_employee' : 'no_qualified_employee';

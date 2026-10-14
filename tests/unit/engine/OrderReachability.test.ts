@@ -377,6 +377,25 @@ describe('classifyQueuedOrders (#1306)', () => {
       expect(blockedOf(state, id).blockedLicenceLevel ?? null).toBeNull();
     });
 
+    it('blocks only the 20 m hole when a 12 m and a 20 m hole queue with just a tier-1 rig', () => {
+      const state = makeState();
+      hireDriller(state, 2);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 1);
+      const shallow = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 12 } });
+      const deep = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, shallow).blockedReason ?? null).toBeNull();
+      expect(blockedOf(state, deep).blockedReason).toBe('no_reaching_vehicle');
+    });
+
+    it('reports no_vehicle_in_fleet for a 20 m hole when no rig is owned at all', () => {
+      const state = makeState();
+      hireDriller(state, 2);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, { ...DRILL, payload: { depth: 20 } });
+      classifyQueuedOrders(state);
+      expect(blockedOf(state, id).blockedReason).toBe('no_vehicle_in_fleet');
+    });
+
     it('a 12 m hole is unaffected: tier-1 rig and level-1 driller, no reason', () => {
       const state = makeState();
       hireDriller(state, 1);
