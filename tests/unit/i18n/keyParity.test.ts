@@ -492,7 +492,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1647: +3 keys (ui.level_end.keep_playing, campaign.keep_playing_success, campaign.keep_playing_refused): 3973.
     // #1648: +3 keys (tutorial buy-charging-truck step): 3976.
     // #1662: +1 key (ui.settings.audio.credits): 3977.
-    expect(Object.keys(en).length).toBe(3977);
+    // #1675: +4 keys (rating_cap_fizzled_failure / _fizzled_partial in ui.blast_workshop.report and mining.blast): 3981.
+    expect(Object.keys(en).length).toBe(3981);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

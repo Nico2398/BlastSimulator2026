@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
   requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION,
+  climateBiasLandingOn, resolveGeneratedBiome,
+  isInBorderZone, TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
 } from '../../../src/core/world/TerrainGen.js';
-import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
+import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
+import { getBiome, getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { VoxelGrid, chunkIndexOf, CHUNK_SIZE, getDominantRockId, MAX_VOXEL_ABS_Y } from '../../../src/core/world/VoxelGrid.js';
 import { sampleSurfaceHeightY, sampleSurfaceVoxelY, applyPitMask, sampleBaseHeight, type WorldGenContext } from '../../../src/core/world/WorldGen.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
@@ -488,4 +491,144 @@ describe('TerrainGen — unclamped columns across every campaign level (#1189)',
       }
     });
   }
+});
+
+describe('climateBiasLandingOn (#1668)', () => {
+  const SIZE = 64;
+  const SEEDS = Array.from({ length: 300 }, (_, i) => i).concat([28, 29, 34, 39, 60, 72, 106]);
+
+  function rawAtCentre(seed: number): [number, number] {
+    const f = new WorldNoiseFields(seed);
+    return [f.temperature(SIZE / 2, SIZE / 2), f.humidity(SIZE / 2, SIZE / 2)];
+  }
+
+  it.each(getAllBiomes().map(b => b.id))('%s: the returned bias lands the site centre on that biome for every seed', (id) => {
+    const target = getBiome(id)!;
+    const misses = SEEDS.filter(seed =>
+      resolveGeneratedBiome(seed, SIZE, SIZE, climateBiasLandingOn(seed, SIZE, SIZE, target)).id !== id);
+    expect(misses).toEqual([]);
+  });
+
+  it('returns the biome climate centre unchanged when the seed already lands there', () => {
+    const target = getBiome('desert_badlands')!;
+    const seed = SEEDS.find(s => resolveGeneratedBiome(s, SIZE, SIZE, target.climateCenter).id === target.id)!;
+    expect([...climateBiasLandingOn(seed, SIZE, SIZE, target)]).toEqual([...target.climateCenter]);
+  });
+
+  it('offsets the centre by the seed raw climate when the seed does not land there', () => {
+    const target = getBiome('desert_badlands')!;
+    expect(resolveGeneratedBiome(29, SIZE, SIZE, target.climateCenter).id).not.toBe(target.id);
+    const [rawT, rawH] = rawAtCentre(29);
+    const bias = climateBiasLandingOn(29, SIZE, SIZE, target);
+    expect(bias[0]).toBeCloseTo(target.climateCenter[0] - rawT, 9);
+    expect(bias[1]).toBeCloseTo(target.climateCenter[1] - rawH, 9);
+  });
+
+  it('lands on the target even for the seeds with the most extreme raw climate', () => {
+    const ranked = Array.from({ length: 3000 }, (_, seed) => {
+      const [t, h] = rawAtCentre(seed);
+      return { seed, extremity: Math.max(Math.abs(t), Math.abs(h)) };
+    }).sort((a, b) => b.extremity - a.extremity).slice(0, 5);
+    for (const { seed } of ranked) {
+      for (const target of getAllBiomes()) {
+        const bias = climateBiasLandingOn(seed, SIZE, SIZE, target);
+        expect(resolveGeneratedBiome(seed, SIZE, SIZE, bias).id, `seed ${seed} -> ${target.id}`).toBe(target.id);
+      }
+    }
+  });
+
+  it('is deterministic and depends on the site size only through the centre sample', () => {
+    const target = getBiome('red_canyon')!;
+    expect([...climateBiasLandingOn(77, SIZE, SIZE, target)]).toEqual([...climateBiasLandingOn(77, SIZE, SIZE, target)]);
+    const bias = climateBiasLandingOn(77, 96, 40, target);
+    expect(resolveGeneratedBiome(77, 96, 40, bias).id).toBe('red_canyon');
+  });
+});
+
+
+// #1670: ground outside the original site rectangle must carry ore, not be neutral border.
+describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
+  const big = (): TerrainConfig => ({
+    ...makeConfig(42, 'alpine_granite'), sizeX: 64, datum: Math.floor(64 * 0.55), sizeZ: 64,
+  });
+
+  /** Claim chunk (cx,cz) of a fresh grid and report ore stats over its solid voxels. */
+  function oreStats(grid: VoxelGrid, xs: number[], zs: number[]): { solid: number; ore: number } {
+    let solid = 0;
+    let ore = 0;
+    for (const x of xs) {
+      for (const z of zs) {
+        for (let y = 0; y < 30; y += 2) {
+          const v = grid.getVoxel(x, y, z);
+          if (!v || v.density <= 0) continue;
+          solid++;
+          if (Object.keys(v.oreDensities).length > 0) ore++;
+        }
+      }
+    }
+    return { solid, ore };
+  }
+
+  const range = (a: number, b: number): number[] => Array.from({ length: b - a }, (_, i) => a + i);
+
+  function claimOutside(grid: VoxelGrid): void {
+    for (const [cx, cz] of [[6, 1], [6, 2], [-2, 1], [-2, 2], [1, -2], [2, -2]] as const) grid.addChunk(cx, cz);
+  }
+
+  it('isInBorderZone is false outside the rectangle and true in the ring just inside', () => {
+    expect(isInBorderZone(-1, 10, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(100, 10, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(10, -3, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(10, 64, 64, 64, 5)).toBe(false);
+    expect(isInBorderZone(2, 10, 64, 64, 5)).toBe(true);
+    expect(isInBorderZone(61, 10, 64, 64, 5)).toBe(true);
+  });
+
+  it('generator version stays 1', () => {
+    expect(TERRAIN_GENERATOR_VERSION).toBe(1);
+  });
+
+  it('has ore in ground east, west and north of the rectangle', () => {
+    const grid = generateTerrain(big());
+    claimOutside(grid);
+    const east = oreStats(grid, range(100, 108), range(16, 48));
+    const west = oreStats(grid, range(-30, -22), range(16, 48));
+    const north = oreStats(grid, range(16, 48), range(-30, -22));
+    for (const s of [east, west, north]) {
+      expect(s.solid).toBeGreaterThan(0);
+      expect(s.ore).toBeGreaterThan(0);
+    }
+  });
+
+  it('outside ore rate is at least half the interior rate', () => {
+    const grid = generateTerrain(big());
+    claimOutside(grid);
+    const interior = oreStats(grid, range(10, 54), range(10, 54));
+    const outside = oreStats(grid, range(96, 112), range(16, 48));
+    expect(interior.ore).toBeGreaterThan(0);
+    expect(outside.solid).toBeGreaterThan(0);
+    expect(outside.ore / outside.solid).toBeGreaterThanOrEqual(0.5 * (interior.ore / interior.solid));
+  });
+
+  it('outside ore is deterministic across fresh generations', () => {
+    const a = generateTerrain(big());
+    const b = generateTerrain(big());
+    claimOutside(a);
+    claimOutside(b);
+    for (const [x, z] of [[100, 20], [101, 33], [-25, 20], [30, -25]] as const) {
+      for (let y = 0; y < 30; y += 3) {
+        expect(a.getVoxel(x, y, z)!.oreDensities).toEqual(b.getVoxel(x, y, z)!.oreDensities);
+      }
+    }
+  });
+
+  it('ore stays absent in the ring just inside the rectangle', () => {
+    const grid = generateTerrain(big());
+    for (const [x, z] of [[0, 0], [63, 63], [2, 30], [30, 61]] as const) {
+      for (let y = 0; y < 20; y++) {
+        const v = grid.getVoxel(x, y, z)!;
+        if (v.density > 0) expect(Object.keys(v.oreDensities).length).toBe(0);
+      }
+    }
+  });
 });

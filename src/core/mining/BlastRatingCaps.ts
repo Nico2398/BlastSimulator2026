@@ -3,15 +3,17 @@
  * Pure: takes plain facts, never GameState.
  */
 import type { BlastRating } from './BlastExecution.js';
-import { BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
+import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
 
-export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize';
+export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial';
 
 export interface RatingCapFacts {
   deaths: number;
   injuries: number;
   destroyedBuildings: number;
   wetHoleCount: number;
+  fizzledHoleCount: number;
+  chargedHoleCount: number;
   oversizedFragments: number;
   fragmentCount: number;
 }
@@ -28,7 +30,9 @@ interface CapRule {
 const CAP_RULES: readonly CapRule[] = [
   { id: 'death', applies: f => f.deaths > 0, ceiling: 'catastrophic' },
   { id: 'casualty_or_destruction', applies: f => f.injuries > 0 || f.destroyedBuildings > 0, ceiling: 'bad' },
-  { id: 'wet_holes', applies: f => f.wetHoleCount > 0, ceiling: 'good' },
+  { id: 'fizzled_failure', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_FAILURE, ceiling: 'bad' },
+  { id: 'fizzled_partial', applies: f => fizzleShare(f.fizzledHoleCount, f.chargedHoleCount) >= BLAST_FIZZLE_SHARE_PARTIAL, ceiling: 'mediocre' },
+  { id: 'wet_holes', applies: f => f.wetHoleCount > 0 && f.fizzledHoleCount > 0, ceiling: 'good' },
   { id: 'oversize', applies: f => oversizeShare(f.oversizedFragments, f.fragmentCount) > BLAST_OVERSIZE_SHARE_CAP, ceiling: 'good' },
 ];
 
@@ -49,7 +53,17 @@ export function applyRatingCaps(
   return { rating, cap };
 }
 
+/** Fraction (0..1) of `total` that is `part`; 0 when `total` is not positive. */
+function share(part: number, total: number): number {
+  return total > 0 ? part / total : 0;
+}
+
 /** Fraction (0..1) of fragments that are oversized; 0 when there are no fragments. */
 export function oversizeShare(oversized: number, total: number): number {
-  return total > 0 ? oversized / total : 0;
+  return share(oversized, total);
+}
+
+/** Fraction (0..1) of charged holes that fizzled; 0 when no holes were charged. */
+export function fizzleShare(fizzled: number, charged: number): number {
+  return share(fizzled, charged);
 }

@@ -193,7 +193,8 @@ function generateColumnRange(
  *      at their shared boundary.
  *   2. Fill voxels below surface from a depth-stratified rock profile (Strata.ts, #458 T1.3/A11)
  *   3. Distribute ore veins using per-ore anisotropic noise (OreVeins.ts, #458 T1.3/A12)
- *   4. Clear border zone of ores (neutral zone)
+ *   4. Clear ores in the neutral border ring just inside the starting rectangle's edge
+ *      (ground claimed outside that rectangle gets ore by the same rules as steps 2-3)
  *
  * Height blends every biome's shaping by climate weight, evaluated per
  * column — a real gradient at a climate transition, not a seam. Rock/ore
@@ -242,7 +243,9 @@ export function createChunkSource(terrain: TerrainContext, config: TerrainConfig
 }
 
 /**
- * Check if a position is in the neutral border zone. Exported so
+ * Check if a position is in the neutral border zone: a column inside
+ * `[0, sizeX) x [0, sizeZ)` within `borderWidth` of the rectangle's edge. Columns
+ * outside the rectangle (expansion-claimed ground, #1670) are never in it. Exported so
  * `tests/helpers/terrainFingerprint.ts`'s fingerprint can classify a sampled
  * column the same way generation itself does, rather than reimplementing
  * this predicate a second time (#1190 review).
@@ -252,6 +255,26 @@ export function isInBorderZone(
   sizeX: number, sizeZ: number,
   borderWidth: number,
 ): boolean {
+  if (x < 0 || x >= sizeX || z < 0 || z >= sizeZ) return false;
   return x < borderWidth || x >= sizeX - borderWidth
     || z < borderWidth || z >= sizeZ - borderWidth;
+}
+
+/**
+ * Climate bias that makes the centre of a (seed, size) site generate `target`'s
+ * biome. Returns `target.climateCenter` when the seed already lands there.
+ */
+export function climateBiasLandingOn(
+  seed: number,
+  sizeX: number,
+  sizeZ: number,
+  target: BiomeDef,
+): readonly [number, number] {
+  const fields = new WorldNoiseFields(seed);
+  if (centerBiome(fields, sizeX, sizeZ, target.climateCenter).id === target.id) return target.climateCenter;
+  // Bias is added to the raw centre climate, so cancel it to land on the biome's centre.
+  return [
+    target.climateCenter[0] - fields.temperature(sizeX / 2, sizeZ / 2),
+    target.climateCenter[1] - fields.humidity(sizeX / 2, sizeZ / 2),
+  ];
 }

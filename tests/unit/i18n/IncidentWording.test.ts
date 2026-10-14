@@ -21,7 +21,7 @@ describe('incident wording (#1349)', () => {
     expect(L(en)['ui.operations.incident_seismic_destroyed']).toContain('seismic survey shockwave');
     expect(L(en)['ui.operations.incident_seismic_damage']).toContain('seismic survey shockwave');
   });
-  for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize']) {
+  for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize', 'fizzled_failure', 'fizzled_partial']) {
     it(`rating cap key ${cap} exists in en and fr`, () => {
       const key = `ui.blast_workshop.report.rating_cap_${cap}`;
       expect(L(en)[key]).toBeTruthy();

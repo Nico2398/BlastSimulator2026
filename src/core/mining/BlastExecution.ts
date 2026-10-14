@@ -187,7 +187,7 @@ export interface SecondaryBlastReport {
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [] }, secondaryBlasts: SecondaryBlastReport[] = []): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [], chargedCount: 0 }, secondaryBlasts: SecondaryBlastReport[] = []): BlastReport {
   const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
   for (const a of accidents) if (a.type === 'building_destroyed') destroyedIds.add(a.entityId);
   const { rating, cap } = applyRatingCaps(result.rating, {
@@ -195,6 +195,8 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     injuries: accidents.filter(a => a.type === 'injury').length,
     destroyedBuildings: destroyedIds.size,
     wetHoleCount: wetHoles.wet.length,
+    fizzledHoleCount: wetHoles.fizzled.length,
+    chargedHoleCount: wetHoles.chargedCount,
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
   });

@@ -21,6 +21,8 @@ import {
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../../../src/core/config/balance.js';
+import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
+import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
 const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
   'unlockThreshold',
@@ -156,10 +158,11 @@ describe('sandboxLevelDef', () => {
     expect(level.startingCash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
   });
 
-  it('takes climateBias from the chosen biome so terrain lands in that biome', () => {
+  it('solves climateBias per seed so terrain lands in the chosen biome', () => {
     for (const biome of getAllBiomes()) {
       const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id }));
-      expect(level.climateBias).toEqual(getBiome(biome.id)!.climateCenter);
+      const landed = resolveGeneratedBiome(level.terrainSeed, level.gridX, level.gridZ, level.climateBias);
+      expect(landed.id).toBe(biome.id);
     }
   });
 
@@ -252,5 +255,64 @@ describe('SANDBOX_FIELDS', () => {
     const field = SANDBOX_FIELDS.find(f => f.key === 'difficulty')!;
     const ids = (field.options?.() ?? []).map(o => o.id);
     expect(ids).toEqual(SANDBOX_DIFFICULTY_ORDER);
+  });
+});
+
+// #1668: the generated biome is the picked one on every seed, not just the ~75-97% whose
+// raw climate happens to sit near the picked biome's climate centre.
+describe('sandboxLevelDef — generated biome equals the picked biome (#1668)', () => {
+  const SEEDS = [...Array.from({ length: 1000 }, (_, i) => i), 28, 29, 34, 39, 60, 72, 106];
+  const biomeField = SANDBOX_FIELDS.find(f => f.key === 'biome')!;
+  const pickable = (biomeField.kind === 'choice' ? biomeField.options?.() ?? [] : []).map(o => o.id);
+
+  it('offers all six biomes', () => {
+    expect(pickable).toHaveLength(6);
+  });
+
+  it.each(pickable)('%s: resolveGeneratedBiome lands on the picked biome for every seed', (picked) => {
+    const misses: string[] = [];
+    for (const seed of SEEDS) {
+      const level = sandboxLevelDef(clampSandboxConfig({ biome: picked, difficulty: 'normal', seed }));
+      const generated = resolveGeneratedBiome(seed, level.gridX, level.gridZ, level.climateBias);
+      if (generated.id !== picked) misses.push(`${seed}->${generated.id}`);
+    }
+    expect(misses.slice(0, 10)).toEqual([]);
+  });
+
+  it('is deterministic across calls and across difficulties', () => {
+    for (const seed of [29, 34, 106, 4242]) {
+      const first = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', difficulty: 'normal', seed }));
+      const again = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', difficulty: 'normal', seed }));
+      expect(again.climateBias).toEqual(first.climateBias);
+      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
+        const other = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', difficulty, seed }));
+        expect(other.climateBias).toEqual(first.climateBias);
+      }
+    }
+  });
+
+  it('keeps the biome climate centre exactly for a seed that already lands on it', () => {
+    const centre = getBiome('desert_badlands')!.climateCenter;
+    const seed = SEEDS.find(s =>
+      resolveGeneratedBiome(s, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, centre).id === 'desert_badlands')!;
+    const level = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', seed }));
+    expect([...level.climateBias]).toEqual([...centre]);
+  });
+
+  it('shifts the bias off the climate centre for desert seed 29, which drifts to volcanic', () => {
+    const centre = getBiome('desert_badlands')!.climateCenter;
+    expect(resolveGeneratedBiome(29, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, centre).id).not.toBe('desert_badlands');
+    const level = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', seed: 29 }));
+    expect([...level.climateBias]).not.toEqual([...centre]);
+  });
+
+  it('cancels the seed raw climate at the site centre when it shifts the bias', () => {
+    const centre = getBiome('desert_badlands')!.climateCenter;
+    const fields = new WorldNoiseFields(29);
+    const rawT = fields.temperature(DEFAULT_GRID_SIZE / 2, DEFAULT_GRID_SIZE / 2);
+    const rawH = fields.humidity(DEFAULT_GRID_SIZE / 2, DEFAULT_GRID_SIZE / 2);
+    const level = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', seed: 29 }));
+    expect(level.climateBias[0]).toBeCloseTo(centre[0] - rawT, 6);
+    expect(level.climateBias[1]).toBeCloseTo(centre[1] - rawH, 6);
   });
 });
