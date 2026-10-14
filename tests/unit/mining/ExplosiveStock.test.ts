@@ -108,8 +108,12 @@ describe('buyExplosiveStock', () => {
   });
 
   it('accepts a purchase that costs exactly the cash on hand (boundary)', () => {
-    const state = makeState(840.0000001);
+    const state = makeState();
+    const cost = 100 * bulkPricePerKg('boomite', explosivePriceFactor(state));
+    state.cash = cost;
+    state.finances.cash = cost;
     expect(buyExplosiveStock(state, 'boomite', 100).success).toBe(true);
+    expect(state.cash).toBe(0);
   });
 
   it('refuses beyond capacity, naming the free kg, without mutation', () => {
@@ -195,21 +199,24 @@ describe('buyExplosiveStock', () => {
 describe('returnOrderStock', () => {
   it('restocks kg that fit and returns 0 cash', () => {
     const state = makeState();
-    expect(returnOrderStock(state, 'boomite', 5)).toBe(0);
+    expect(returnOrderStock(state, 'boomite', 5)).toEqual({ restockedKg: 5, cashRefund: 0 });
     expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(5);
   });
 
   it('returns the bulk-price value in cash for kg that no warehouse can hold', () => {
     const state = makeState(100_000, 0);
-    expect(returnOrderStock(state, 'boomite', 5)).toBeCloseTo(5 * 8.4, 6);
+    const r = returnOrderStock(state, 'boomite', 5);
+    expect(r.restockedKg).toBe(0);
+    expect(r.cashRefund).toBeCloseTo(5 * 8.4, 6);
   });
 
   it('restocks the part that fits and returns cash for the remainder', () => {
     const state = makeState(1_000_000);
     const cap = getBuildingDef('explosive_warehouse', 1).capacity;
     buyExplosiveStock(state, 'krackle', cap - 2);
-    const cash = returnOrderStock(state, 'boomite', 5);
+    const r = returnOrderStock(state, 'boomite', 5);
     expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(2);
-    expect(cash).toBeCloseTo(3 * 8.4, 6);
+    expect(r.restockedKg).toBe(2);
+    expect(r.cashRefund).toBeCloseTo(3 * 8.4, 6);
   });
 });

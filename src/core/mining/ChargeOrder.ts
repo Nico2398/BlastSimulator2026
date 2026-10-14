@@ -8,7 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor, drawStockForOrder } from './ExplosiveStock.js';
+import { explosivePriceFactor, drawStockForOrder, readOrderStock, type OrderStockDraw } from './ExplosiveStock.js';
 import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
@@ -25,7 +25,7 @@ export interface ChargeHoleActionPayload {
   /** Cash charged at order time (costPerKg x kg); refunded on cancel (#1341). */
   orderCost: number;
   /** Kg of the order drawn from warehouse stock at order time (#1678); returned on cancel. */
-  orderStock?: { explosiveId: string; kg: number };
+  orderStock?: OrderStockDraw;
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */
@@ -117,7 +117,7 @@ export function chargeFundsFailureAmount(
     const outstanding = findOutstandingChargeAction(state, o.holeId);
     if (outstanding) {
       need -= (outstanding.payload['orderCost'] as number) ?? 0;
-      const held = outstanding.payload['orderStock'] as ChargeHoleActionPayload['orderStock'];
+      const held = readOrderStock(outstanding);
       if (held) stock[held.explosiveId] = (stock[held.explosiveId] ?? 0) + held.kg;
     }
     const { fromStockKg, fromCashKg } = drawStockForOrder(stock, o.explosiveId, o.amountKg);

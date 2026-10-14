@@ -257,12 +257,12 @@ describe('executeBlast — building destruction', () => {
 
 // ── 3. executeBlast — secondary blast events ──────────────────────────────────
 //
-// When an explosive_warehouse with storedExplosivesKg > 0 is destroyed by a blast,
+// When an explosive_warehouse with storedExplosives > 0 is destroyed by a blast,
 // executeBlast emits a secondaryBlastEvent in result.secondaryBlastEvents:
 //   { buildingId: number; x: number; z: number; explosivesKg: number }
 //
 // No event is emitted when:
-//   • storedExplosivesKg is 0 or absent
+//   • storedExplosives is 0 or absent
 //   • The destroyed building is not an explosive_warehouse
 
 describe('executeBlast — secondary blast events', () => {
@@ -275,7 +275,7 @@ describe('executeBlast — secondary blast events', () => {
     const buildingId = placed.building!.id;
     const { cx, cz } = buildingCenter(placed.building!);
 
-    // storedExplosivesKg triggers a secondary blast event when the building is destroyed.
+    // storedExplosives triggers a secondary blast event when the building is destroyed.
     (buildingState.buildings[0] as any).storedExplosives = { anfo: 200 };
 
     const holes: DrillHole[] = [];
@@ -294,7 +294,7 @@ describe('executeBlast — secondary blast events', () => {
     expect(events[0].z).toBe(cz);
   });
 
-  it('emits no secondaryBlastEvent when storedExplosivesKg is 0', () => {
+  it('emits no secondaryBlastEvent when storedExplosives is 0', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
     placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
@@ -312,10 +312,10 @@ describe('executeBlast — secondary blast events', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('emits no secondaryBlastEvent when storedExplosivesKg is absent (undefined)', () => {
+  it('emits no secondaryBlastEvent when storedExplosives is absent (undefined)', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
-    // No storedExplosivesKg set at all — field will be undefined.
+    // No storedExplosives set at all — field will be undefined.
     placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
 
     const holes: DrillHole[] = [];

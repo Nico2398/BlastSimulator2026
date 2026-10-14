@@ -19,7 +19,7 @@ import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import { releasePlannedOrderForCancelledAction, type FreedFootprint } from './CancelledOrderCleanup.js';
-import { returnOrderStock } from '../mining/ExplosiveStock.js';
+import { returnOrderStock, readOrderStock } from '../mining/ExplosiveStock.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
 export interface CancelActionResult {
@@ -28,7 +28,7 @@ export interface CancelActionResult {
   error?: 'not-found' | 'not-cancellable';
   /** The removed action, present on success. */
   action?: PendingAction;
-  /** Amount refunded to state.cash, 0 when the action's type charges nothing at order time. */
+  /** Amount refunded to state.cash (including cash for stock kg that no longer fit a warehouse), 0 when the action's type charges nothing at order time. */
   refunded?: number;
   /** Explosive kg a cancelled charge order returned to warehouse stock instead of cash (#1678). */
   refundedStockKg?: number;
@@ -89,12 +89,13 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
   // this action id, so no need to gate the call on requiredVehicleRole here.
   releaseVehicleReservation(state, action.id);
 
-  const refunded = actionOrderCost(action);
+  let refunded = actionOrderCost(action);
   if (refunded > 0) {
     state.cash += refunded;
     addIncome(state.finances, refunded, 'refund', `Cancelled ${action.type} action`, state.tickCount);
   }
-  const refundedStockKg = refundOrderStock(state, action);
+  const stock = refundOrderStock(state, action);
+  refunded += stock.cashRefund;
 
   completePendingAction(state, actionId);
 
@@ -103,18 +104,19 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
   const freed = releasePlannedOrderForCancelledAction(state, action);
 
   const result: CancelActionResult = { success: true, action, refunded };
-  if (refundedStockKg > 0) result.refundedStockKg = refundedStockKg;
+  if (stock.restockedKg > 0) result.refundedStockKg = stock.restockedKg;
   if (freed) result.freedFootprint = freed;
   return result;
 }
 
-/** Restock the explosive a cancelled charge order drew from warehouses (#1678); returns the kg drawn, 0 for legacy or cash-only orders. */
-function refundOrderStock(state: GameState, action: PendingAction): number {
-  if (action.type !== 'charge_hole') return 0;
-  const drawn = action.payload['orderStock'] as { explosiveId: string; kg: number } | undefined;
-  if (!drawn) return 0;
-  returnOrderStock(state, drawn.explosiveId, drawn.kg);
-  return drawn.kg;
+/**
+ * Restock the explosive a cancelled charge order drew from warehouses (#1678). Kg that no
+ * longer fits is refunded in cash (already credited to state.cash); legacy or cash-only orders return zeros.
+ */
+function refundOrderStock(state: GameState, action: PendingAction): { restockedKg: number; cashRefund: number } {
+  const drawn = action.type === 'charge_hole' ? readOrderStock(action) : undefined;
+  if (!drawn) return { restockedKg: 0, cashRefund: 0 };
+  return returnOrderStock(state, drawn.explosiveId, drawn.kg);
 }
 
 /**

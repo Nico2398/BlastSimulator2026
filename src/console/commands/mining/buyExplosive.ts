@@ -45,7 +45,7 @@ export function buyExplosiveCommand(
       ?? { success: false, output: t('mining.buy.unknown_explosive') };
   }
   if (result.reason === 'over_capacity') {
-    return { success: false, output: t('mining.buy.over_capacity', { free: result.freeKg ?? 0, kg: named['kg'] ?? '' }) };
+    return { success: false, output: t('mining.buy.over_capacity', { free: result.freeKg ?? 0, kg: Number(named['kg']) }) };
   }
   if (result.reason === 'insufficient_funds') {
     return {

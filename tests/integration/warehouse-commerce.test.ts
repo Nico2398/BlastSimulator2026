@@ -459,9 +459,11 @@ describe('Cancelling a charge order refunds in the currency paid', () => {
     buyExplosiveStock(state, 'boomite', 3);
     const cash = state.cash;
     const [action] = order(state, 1, 5);
-    cancelAction(state, action!.id);
+    const r = cancelAction(state, action!.id);
     expect(state.cash).toBeCloseTo(cash, 6);
     expect(getExplosivesInStock(state.buildings, 'boomite')).toBe(3);
+    expect(r.refundedStockKg).toBe(3);
+    expect(r.refunded).toBeGreaterThan(0);
   });
 
   it('stock that no warehouse can take back is refunded as cash at the bulk price', () => {
@@ -470,8 +472,23 @@ describe('Cancelling a charge order refunds in the currency paid', () => {
     const [action] = order(state, 1, 5);
     const cash = state.cash;
     state.buildings.buildings = [];
-    cancelAction(state, action!.id);
+    const r = cancelAction(state, action!.id);
     expect(state.cash).toBeCloseTo(cash + 5 * BOOMITE_BULK, 6);
+    expect(r.refunded).toBeCloseTo(5 * BOOMITE_BULK, 6);
+    expect(r.refundedStockKg).toBeUndefined();
+  });
+
+  it('a partly storable return restocks what fits and reports the rest as refunded cash', () => {
+    const state = makeSite(1_000_000);
+    buyExplosiveStock(state, 'boomite', 100);
+    const [action] = order(state, 1, 5);
+    const cap = getBuildingDef('explosive_warehouse', 1).capacity;
+    buyExplosiveStock(state, 'boomite', cap - 2 - getExplosivesInStock(state.buildings));
+    const cash = state.cash;
+    const r = cancelAction(state, action!.id);
+    expect(r.refundedStockKg).toBe(2);
+    expect(r.refunded).toBeCloseTo(3 * BOOMITE_BULK, 6);
+    expect(state.cash).toBeCloseTo(cash + 3 * BOOMITE_BULK, 6);
   });
 
   it('a cash-only order refunds exactly its cost, as before', () => {

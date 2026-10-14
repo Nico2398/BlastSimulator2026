@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Bulk explosive stock: buying into warehouses, drawing for charge orders (#1678)
 
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PendingAction } from '../state/GameState.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
@@ -58,15 +58,30 @@ export function drawStockForOrder(
   return { fromStockKg, fromCashKg: kg - fromStockKg };
 }
 
-/** Return a cancelled order's stock-drawn kg to warehouses; returns cash refunded for the part that does not fit. */
-export function returnOrderStock(state: GameState, explosiveId: string, kg: number): number {
-  const stored = storeExplosives(state.buildings, explosiveId, kg);
-  const lost = kg - stored;
-  if (lost <= 0) return 0;
-  const refund = lost * bulkPricePerKg(explosiveId, explosivePriceFactor(state));
-  if (refund > 0) {
-    state.cash += refund;
-    addIncome(state.finances, refund, 'refund', `Unstorable ${explosiveId} ${lost}kg`, state.tickCount);
+/** Kg of a charge order served from warehouse stock at order time (#1678). */
+export interface OrderStockDraw { explosiveId: string; kg: number }
+
+/** The stock draw recorded on a `charge_hole` action's payload, if any. */
+export function readOrderStock(action: Pick<PendingAction, 'payload'>): OrderStockDraw | undefined {
+  return action.payload['orderStock'] as OrderStockDraw | undefined;
+}
+
+/**
+ * Return a cancelled order's stock-drawn kg to warehouses. Kg that no longer fits
+ * is refunded in cash at the bulk price instead.
+ */
+export function returnOrderStock(
+  state: GameState,
+  explosiveId: string,
+  kg: number,
+): { restockedKg: number; cashRefund: number } {
+  const restockedKg = storeExplosives(state.buildings, explosiveId, kg);
+  const lost = kg - restockedKg;
+  if (lost <= 0) return { restockedKg, cashRefund: 0 };
+  const cashRefund = lost * bulkPricePerKg(explosiveId, explosivePriceFactor(state));
+  if (cashRefund > 0) {
+    state.cash += cashRefund;
+    addIncome(state.finances, cashRefund, 'refund', `Unstorable ${explosiveId} ${lost}kg`, state.tickCount);
   }
-  return refund;
+  return { restockedKg, cashRefund };
 }

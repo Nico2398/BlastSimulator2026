@@ -105,9 +105,9 @@ describe('getExplosivesInStock', () => {
     expect(getExplosivesInStock(state)).toBe(0);
   });
 
-  it('returns 0 when a warehouse has no storedExplosivesKg set (undefined treated as 0)', () => {
+  it('returns 0 when a warehouse has no storedExplosives set (undefined treated as 0)', () => {
     placeBuilding(state, 'explosive_warehouse', 0, 0, 64, 64, 1);
-    // storedExplosivesKg is undefined after placement
+    // storedExplosives is undefined after placement
     expect(state.buildings[0]!.storedExplosives).toBeUndefined();
     expect(getExplosivesInStock(state)).toBe(0);
   });
@@ -118,13 +118,13 @@ describe('getExplosivesInStock', () => {
     expect(getExplosivesInStock(state)).toBe(0);
   });
 
-  it('returns storedExplosivesKg for a single warehouse', () => {
+  it('returns storedExplosives for a single warehouse', () => {
     placeBuilding(state, 'explosive_warehouse', 0, 0, 64, 64, 1);
     state.buildings[0]!.storedExplosives = { anfo: 250 };
     expect(getExplosivesInStock(state)).toBe(250);
   });
 
-  it('sums storedExplosivesKg across multiple active warehouses', () => {
+  it('sums storedExplosives across multiple active warehouses', () => {
     placeBuilding(state, 'explosive_warehouse', 0,  0, 64, 64, 1);
     placeBuilding(state, 'explosive_warehouse', 10, 0, 64, 64, 1);
     state.buildings[0]!.storedExplosives = { anfo: 100 };
@@ -269,19 +269,19 @@ describe('hasExplosivesForBlast', () => {
     expect(hasExplosivesForBlast(state)).toBe(false);
   });
 
-  it('returns false when a warehouse exists but storedExplosivesKg is undefined', () => {
+  it('returns false when a warehouse exists but storedExplosives is undefined', () => {
     placeBuilding(state, 'explosive_warehouse', 0, 0, 64, 64, 1);
     expect(state.buildings[0]!.storedExplosives).toBeUndefined();
     expect(hasExplosivesForBlast(state)).toBe(false);
   });
 
-  it('returns false when warehouse storedExplosivesKg is explicitly 0', () => {
+  it('returns false when warehouse storedExplosives is explicitly 0', () => {
     placeBuilding(state, 'explosive_warehouse', 0, 0, 64, 64, 1);
     state.buildings[0]!.storedExplosives = { anfo: 0 };
     expect(hasExplosivesForBlast(state)).toBe(false);
   });
 
-  it('returns true when at least one active warehouse has storedExplosivesKg > 0', () => {
+  it('returns true when at least one active warehouse has storedExplosives > 0', () => {
     placeBuilding(state, 'explosive_warehouse', 0, 0, 64, 64, 1);
     storeExplosives(state, 'anfo', 1); // minimal stock
     expect(hasExplosivesForBlast(state)).toBe(true);
