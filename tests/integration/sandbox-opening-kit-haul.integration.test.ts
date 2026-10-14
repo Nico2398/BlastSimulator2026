@@ -11,6 +11,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
+import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 
 const SEED = 42;
@@ -23,6 +25,11 @@ const HAUL_WINDOW_TICKS = 800;
 const MIN_HAULED_SHARE = 0.3;
 const MIN_ORDERED_SHARE = 0.8;
 const MAX_STUCK_TICKS = 25;
+/** The opening kit's tier-1 freight warehouse is what binds the haul: ore stops once it is full. */
+const KIT_STORAGE_KG = FREIGHT_WAREHOUSE_CAPACITY_KG[1];
+const MIN_STORAGE_FILL_SHARE = 0.8;
+/** Upper end of what the kit stored before the fix (2-12 t); delivered ore must beat it. */
+const OLD_STUCK_BASELINE_KG = 12_000;
 
 function refresh(state: GameState): void {
   state.cash = Math.max(state.cash, 1_000_000);
@@ -35,6 +42,7 @@ function tickWhile(run: (c: string) => unknown, state: GameState, until: () => b
   return n;
 }
 
+/** Ore mass delivered to storage. Barren rock goes to the spoil heap and never counts; stored ore is this same tally, so nothing is added twice. */
 const oreKg = (state: GameState): number =>
   Object.values(state.collectedOre).reduce((a, b) => a + b, 0);
 
@@ -54,7 +62,9 @@ function openingKitHaul(side: 'west' | 'east') {
   expect(state.lastBlastReport).not.toBeNull();
 
   const haulable = state.logistics.fragments.filter(f => !isOversized(f.fragment.volume));
-  const haulableMass = haulable.reduce((a, f) => a + f.fragment.mass, 0);
+  const haulableOre: Record<string, number> = {};
+  for (const f of haulable) accumulateOreMass(haulableOre, f.fragment.volume, f.fragment.oreDensities);
+  const haulableOreKg = Object.values(haulableOre).reduce((a, b) => a + b, 0);
 
   // Ramp depth is measured from the start surface and must land on the crater
   // floor (~9.5 m): the west start sits near 16.5 m, the east one near 13.4 m (floor 10.5).
@@ -73,10 +83,12 @@ function openingKitHaul(side: 'west' | 'east') {
   };
   const rampTicks = tickWhile(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), RAMP_SETUP_TICKS, sample);
 
-  const baseline = oreKg(state) + state.logistics.storedMassKg;
+  const baseline = oreKg(state);
+  const storedBefore = state.logistics.storedMassKg;
   tickWhile(run, state, () => false, HAUL_WINDOW_TICKS, sample);
-  const hauledKg = oreKg(state) + state.logistics.storedMassKg - baseline;
-  return { state, haulableMass, rampTicks, maxStuck, hauledKg, haulable };
+  const hauledOreKg = oreKg(state) - baseline;
+  const storedKg = state.logistics.storedMassKg - storedBefore;
+  return { state, haulableOreKg, rampTicks, maxStuck, hauledOreKg, storedKg, haulable };
 }
 
 describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, haul (#1719)', (side) => {
@@ -100,8 +112,14 @@ describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, 
     expect((haulable.length - outOfReach) / haulable.length).toBeGreaterThanOrEqual(MIN_ORDERED_SHARE);
   });
 
-  it('a real share of the haulable mass reaches storage or the ore tally', () => {
-    expect(result.hauledKg).toBeGreaterThanOrEqual(MIN_HAULED_SHARE * result.haulableMass);
+  it('delivered ore runs until a real limit binds, well above the old stuck baseline', () => {
+    const { hauledOreKg, haulableOreKg, storedKg } = result;
+    expect(haulableOreKg).toBeGreaterThan(0);
+    // The warehouse limits stored fragment mass (ore-bearing rock, not the ore kg inside it).
+    expect(storedKg).toBeGreaterThanOrEqual(
+      Math.min(MIN_HAULED_SHARE * haulableOreKg, MIN_STORAGE_FILL_SHARE * KIT_STORAGE_KG),
+    );
+    expect(hauledOreKg).toBeGreaterThan(OLD_STUCK_BASELINE_KG);
   });
 
   it('world invariants hold', () => {
