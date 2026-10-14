@@ -8,6 +8,9 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../src/console/commands/world.js';
+import { forecast, createWeatherCycle } from '../../src/core/weather/WeatherCycle.js';
+import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
+import { TICKS_PER_DAY } from '../../src/core/config/balance.js';
 
 /**
  * Ticks until every hole ordered by the last drill_plan grid has landed in
@@ -269,5 +272,32 @@ describe('fizzle share caps the blast rating (#1675)', () => {
     wet.runner.run('weather set heavy_rain');
     const result = drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
     expect(result.output).toContain(t('mining.blast.rating_cap_fizzled_failure', { base: wet.ctx.state!.lastBlastReport!.baseRating?.toUpperCase() ?? '' }));
+  });
+});
+
+describe('weather follows the level biome (#1688)', () => {
+  it.each(getAllBiomes().map(b => b.id))('%s: forecast(cycle, N, biome) equals the live cycle after N days of ticks', (biome) => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run(`new_game seed:42 mine_type:${biome}`).success).toBe(true);
+    ctx.state!.events.eventFreqMultiplier = 0;
+    expect(ctx.state!.mineType).toBe(biome);
+    expect(ctx.state!.weather).toEqual(createWeatherCycle(42, undefined, biome));
+    const N = 6;
+    const before = structuredClone(ctx.state!.weather);
+    const predicted = forecast(ctx.state!.weather, N, ctx.state!.mineType);
+    expect(ctx.state!.weather).toEqual(before);
+    expect(runner.run(`tick ${N * TICKS_PER_DAY}`).success).toBe(true);
+    expect(ctx.state!.weather.current).toBe(predicted[N - 1]);
+  });
+
+  it('a desert game and a tropical game on the same seed diverge in weather', () => {
+    const run = (biome: string) => {
+      const { runner, ctx } = createRunner();
+      runner.run(`new_game seed:42 mine_type:${biome}`);
+      ctx.state!.events.eventFreqMultiplier = 0;
+      runner.run('tick 600');
+      return ctx.state!.weather.history.join(',');
+    };
+    expect(run('desert_badlands')).not.toBe(run('tropical_karst'));
   });
 });

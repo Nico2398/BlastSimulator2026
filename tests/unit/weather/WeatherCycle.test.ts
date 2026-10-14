@@ -14,10 +14,12 @@ import {
 } from '../../../src/core/weather/WeatherCycle.js';
 import {
   WEATHER_HISTORY_MAX,
+  WEATHER_RNG_SEED_OFFSET,
   HOLE_WET_THRESHOLD,
   GROUND_WETNESS_RISE_RATE,
   GROUND_WETNESS_DECAY_RATE,
 } from '../../../src/core/config/balance.js';
+import { getWeatherClimate } from '../../../src/core/weather/WeatherClimates.js';
 import {
   advanceHoleWater,
   advanceGroundWetness,
@@ -461,5 +463,107 @@ describe('pinned weather cycle (#1585)', () => {
     expect(copy.pinned).toBe(true);
     for (let i = 0; i < 300; i++) tickWeather(copy);
     expect(copy.current).toBe('sunny');
+  });
+});
+
+describe('WeatherCycle per-biome climates (#1688)', () => {
+  const BIOMES = ['desert_badlands', 'red_canyon', 'volcanic_flats', 'tropical_karst', 'alpine_granite', 'green_foothills'];
+
+  function run(seed: number, biome: string | undefined, n: number): WeatherState[] {
+    const c = createWeatherCycle(seed, undefined, biome);
+    const out: WeatherState[] = [];
+    for (let i = 0; i < n; i++) out.push(tickWeather(c, biome));
+    return out;
+  }
+
+  it('same seed and biome give the same sequence', () => {
+    for (const b of BIOMES) expect(run(42, b, 400)).toEqual(run(42, b, 400));
+  });
+
+  it('different biomes diverge on the same seed', () => {
+    expect(run(42, 'desert_badlands', 600)).not.toEqual(run(42, 'tropical_karst', 600));
+    expect(run(42, 'alpine_granite', 600)).not.toEqual(run(42, 'tropical_karst', 600));
+  });
+
+  it('unknown biome / undefined reproduce the temperate sequence', () => {
+    expect(run(42, undefined, 400)).toEqual(run(42, 'green_foothills', 400));
+    expect(run(42, 'desert', 400)).toEqual(run(42, 'green_foothills', 400));
+  });
+
+  it('serialised cycle carries no biome or climate field', () => {
+    const c = createWeatherCycle(42, undefined, 'tropical_karst');
+    for (let i = 0; i < 50; i++) tickWeather(c, 'tropical_karst');
+    const json = JSON.stringify(c);
+    expect(json).not.toMatch(/biome|climate|tropical/i);
+    expect(Object.keys(c).sort()).toEqual(['current', 'history', 'rngState', 'ticksRemaining']);
+  });
+
+  it('initial rng stream is seed + WEATHER_RNG_SEED_OFFSET in every biome', () => {
+    for (const b of BIOMES) {
+      expect(createWeatherCycle(42, undefined, b).rngState).toBe((42 + WEATHER_RNG_SEED_OFFSET) | 0);
+    }
+  });
+
+  it('desert initial sunny duration stays inside the arid sunny range', () => {
+    const c = createWeatherCycle(42, undefined, 'desert_badlands');
+    const [min, max] = getWeatherClimate('desert_badlands').durations.sunny;
+    expect(c.ticksRemaining).toBeGreaterThanOrEqual(min);
+    expect(c.ticksRemaining).toBeLessThanOrEqual(max);
+  });
+
+  it('pinned cycles stay pinned and consume no RNG in any biome', () => {
+    for (const b of BIOMES) {
+      const c = createWeatherCycle(42, 'storm', b);
+      const before = structuredClone(c);
+      for (let i = 0; i < 200; i++) tickWeather(c, b);
+      expect(c).toEqual(before);
+      expect(c.current).toBe('storm');
+      expect(c.pinned).toBe(true);
+    }
+  });
+
+  it('forecast with a biome matches live ticking, without mutating', () => {
+    for (const b of BIOMES) {
+      const c = createWeatherCycle(7, undefined, b);
+      const snapshot = structuredClone(c);
+      const predicted = forecast(c, 5, b);
+      expect(c).toEqual(snapshot);
+      for (let i = 0; i < 5 * 24; i++) tickWeather(c, b);
+      expect(predicted[4]).toBe(c.current);
+    }
+  });
+
+  it('setWeather and forceAdvanceInState work with a biome', () => {
+    const c = createWeatherCycle(5, undefined, 'tropical_karst');
+    setWeather(c, 'heat_wave', 'tropical_karst');
+    expect(c.current).toBe('heat_wave');
+    // tropical heat_wave max (10) differs from temperate (16)
+    expect(c.ticksRemaining).toBe(getWeatherClimate('tropical_karst').durations.heat_wave[1]);
+    expect(c.ticksRemaining).not.toBe(getWeatherClimate(undefined).durations.heat_wave[1]);
+    forceAdvanceInState(c, 'tropical_karst');
+    expect(ALL_WEATHER_STATES).toContain(c.current);
+    expect(c.ticksRemaining).toBeGreaterThan(0);
+    // heat_wave in the tropical climate never lasts beyond its configured max
+    const { durations } = getWeatherClimate('tropical_karst');
+    expect(c.ticksRemaining).toBeLessThanOrEqual(durations[c.current][1]);
+  });
+
+  it('durations drawn on transition respect the biome climate', () => {
+    for (const b of BIOMES) {
+      const { durations } = getWeatherClimate(b);
+      const c = createWeatherCycle(11, undefined, b);
+      let transitions = 0;
+      for (let i = 0; i < 2000; i++) {
+        const willTransition = c.ticksRemaining <= 1;
+        tickWeather(c, b);
+        if (willTransition) {
+          transitions++;
+          const [min, max] = durations[c.current];
+          expect(c.ticksRemaining).toBeGreaterThanOrEqual(min);
+          expect(c.ticksRemaining).toBeLessThanOrEqual(max);
+        }
+      }
+      expect(transitions).toBeGreaterThan(10);
+    }
   });
 });
