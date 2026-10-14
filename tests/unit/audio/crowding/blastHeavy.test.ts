@@ -27,14 +27,11 @@ describe(`${SCENARIO} at 8x`, () => {
     for (const layer of MAIN_LAYERS) expect(sim().recorder.heard.filter(p => p.id === layer), layer).toHaveLength(5);
   });
 
-  it('keeps every shot to its bound of sounds in twenty seconds', () => {
-    // The bound is the design one: four layers, a tail and one rain impact per bin (BLAST_AUDIO_CONFIG.rain.maxBins).
-    // Measured 15, 13, 30, 40 and 8 sounds under the site's arid climate (#1688; 27 in the fourth shot under the old
-    // weather, whose rain left the holes wetter and the charges weaker; the dry climate fires it at full strength).
-    const bound = 5 + BLAST_AUDIO_CONFIG.rain.maxBins;
+  it('keeps every shot to 39 sounds in twenty seconds', () => {
+    // Measured 15, 13, 30, 27 and 8 sounds (the rain of the rock that moves after the four layers, duds and a tail).
     for (const shot of shots()) {
       const timeline = sim().recorder.heard.filter(p => isBlastSound(p.id) && p.id !== 'blast_beep' && p.startS >= shot.startS - 0.01 && p.startS < shot.startS + TIMELINE_S);
-      expect(timeline.length).toBeLessThanOrEqual(bound);
+      expect(timeline.length).toBeLessThanOrEqual(39);
       expect(peakIn(timeline, 1)).toBeLessThanOrEqual(20); // measured 15 at most in any one second of any shot
     }
   });
