@@ -2,12 +2,12 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { accumulateOreMass, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
+import { accumulateOreMass, clampCollectedOre, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
-import { drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg } from './SpoilHeaps.js';
+import { creditFirstSpoilHeap, drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
@@ -303,7 +303,9 @@ export function extractOreFromFragment(
  * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
  * ore content — any fragment, ore-bearing or not — and debits every ore the
  * removed mass carried. Rubble draws on the spoil heaps first (#1530), then
- * storage; `buildings` is where the heaps are.
+ * storage; `buildings` is where the heaps are. After an ore sale (and before it,
+ * for legacy leftovers) barren stored rock is released to the first heap
+ * (releaseBarrenStoredFragments, #1690); with no heap it stays stored.
  */
 export function consumeStoredOre(
   state: LogisticsState,
@@ -321,6 +323,8 @@ export function consumeStoredOre(
   }
 
   if (materialId !== '') {
+    // Legacy leftovers and heaps built after the rock was stored (#1690).
+    releaseBarrenStoredFragments(state, collectedOre, buildings);
     const available = collectedOre[materialId] ?? 0;
     if (amountKg > available) {
       return {
@@ -353,6 +357,8 @@ export function consumeStoredOre(
       tally += extracted.oreKg;
     }
 
+    // The rock left after the sale is spoil: it leaves storage for the heap (#1690).
+    releaseBarrenStoredFragments(state, collectedOre, buildings);
     return { success: true, consumedKg: Math.min(tally, amountKg) };
   }
 
@@ -513,4 +519,31 @@ export function inTransitMassKg(state: LogisticsState): number {
     if (f.state === 'in_transit') total += f.fragment.mass;
   }
   return total;
+}
+
+/**
+ * Move every stored barren fragment (isBarrenFragment) out of state.fragments onto
+ * the first spoil heap: debits storedMassKg and any residual ore (decrementCollectedOre),
+ * credits the heap. Returns kg released. No heap in `buildings` => no-op, returns 0.
+ */
+export function releaseBarrenStoredFragments(
+  state: LogisticsState,
+  collectedOre: Record<string, number>,
+  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
+): number {
+  if (!buildings.some(b => b.type === 'spoil_heap')) return 0;
+  const barren = state.fragments.filter(f => f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities));
+  if (barren.length === 0) return 0;
+
+  let releasedKg = 0;
+  for (const tracked of barren) {
+    decrementCollectedOre(collectedOre, tracked.fragment);
+    releasedKg += tracked.fragment.mass;
+  }
+  clampCollectedOre(collectedOre);
+  const released = new Set(barren);
+  state.fragments = state.fragments.filter(f => !released.has(f));
+  state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
+  creditFirstSpoilHeap(buildings, releasedKg);
+  return releasedKg;
 }

@@ -359,3 +359,117 @@ describe('seeded blast with a heap and a warehouse (#1530)', () => {
     expectNoWorldInvariantViolations(state);
   });
 });
+
+describe('rock left after an ore sale leaves the warehouse as spoil (#1690)', () => {
+  const ORE_PER_FRAGMENT_KG = 0.3 * 0.5 * 2500; // volume x density x ORE_DENSITY_KG_M3 = 375
+  const MASS = 900;
+  const LEFTOVER_KG = MASS * 0.5; // a sale removes mass x density; the rest is barren rock
+
+  /** Haul site whose tier-1 warehouse is filled (to within 500 kg) with ore-bearing fragments. */
+  function fullWarehouseSite() {
+    const site = haulSite();
+    const { state } = site;
+    const warehouse = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    refreshLogisticsCapacity(state);
+    const cap = state.logistics.storageCapacityKg;
+    const count = Math.floor((cap - 500) / MASS);
+    for (let i = 0; i < count; i++) {
+      state.logistics.fragments.push({ fragment: rich(7001 + i, 0, 0, MASS), state: 'stored', vehicleId: null, warehouseId: warehouse.id });
+      state.logistics.storedMassKg += MASS;
+    }
+    state.collectedOre['blingite'] = (state.collectedOre['blingite'] ?? 0) + count * ORE_PER_FRAGMENT_KG;
+    return { ...site, count, cap };
+  }
+
+  function sellOre(state: GameState, quantityKg: number): void {
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const pool = state.contracts;
+    const c: Contract = {
+      id: pool.nextId++, type: 'ore_sale', materialId: 'blingite', description: '[fixture] ore sale',
+      quantityKg, deliveredKg: 0, pricePerKg: 10, deadlineTicks: 5000, acceptedAtTick: 0,
+      penaltyAmount: 100, earlyBonus: 50, completed: false, expired: false,
+    };
+    pool.available.push(c);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    expect(contractCommand(ctx, ['deliver', String(c.id)], { amount: String(quantityKg) }).success).toBe(true);
+  }
+
+  it('a full warehouse blocks an ore haul as storage_full before any ore is sold (control)', () => {
+    const { state } = fullWarehouseSite();
+    addBlastFragments(state.logistics, [rich(9701, 5, 6, MASS)], state.navGrid);
+    syncHaulDispatch(state);
+    const order = state.pendingActions.find(a => a.type === 'haul_debris' && a.payload['fragmentId'] === 9701)!;
+    expect(haulBlockedReason(state, order)).toBe('storage_full');
+  });
+
+  it('selling the warehouse ore frees its storage: stored mass drops to zero and the rock lands on the heap', () => {
+    const { state, count } = fullWarehouseSite();
+    const storedBefore = state.logistics.storedMassKg;
+
+    sellOre(state, count * ORE_PER_FRAGMENT_KG);
+
+    expect(state.logistics.fragments.filter(f => f.state === 'stored')).toHaveLength(0);
+    expect(state.logistics.storedMassKg).toBeCloseTo(0, 3);
+    expect(state.collectedOre['blingite'] ?? 0).toBeCloseTo(0, 3);
+    expect(totalSpoilKg(state.buildings.buildings)).toBeCloseTo(count * LEFTOVER_KG, 3);
+    expect(state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings)).toBeCloseTo(storedBefore - count * LEFTOVER_KG, 3);
+    expectNoWorldInvariantViolations(state);
+  });
+
+  it('after the sale the storage_full block clears, hauling resumes and the ore reaches the warehouse', () => {
+    const { run, state, vehicle, count } = fullWarehouseSite();
+    addBlastFragments(state.logistics, [rich(9801, 5, 6, MASS)], state.navGrid);
+    syncHaulDispatch(state);
+    const order = () => state.pendingActions.find(a => a.type === 'haul_debris' && a.payload['fragmentId'] === 9801)!;
+    expect(haulBlockedReason(state, order())).toBe('storage_full');
+
+    sellOre(state, count * ORE_PER_FRAGMENT_KG);
+    refreshLogisticsCapacity(state);
+    expect(haulBlockedReason(state, order())).toBeNull();
+
+    expect(run(`vehicle haul ${vehicle.id} fragment:9801`)).toMatchObject({ success: true });
+    tickUntil(run, () => stateOf(state, 9801)?.state === 'stored', 1500);
+
+    expect(stateOf(state, 9801)!.state).toBe('stored');
+    expect(state.logistics.storedMassKg).toBeCloseTo(MASS, 3);
+  });
+
+  it('the heap keeps growing while the warehouse cycles: barren rock hauled after the sale adds to the released rock', () => {
+    const { run, state, vehicle, count } = fullWarehouseSite();
+    sellOre(state, count * ORE_PER_FRAGMENT_KG);
+    const heapBefore = totalSpoilKg(state.buildings.buildings);
+    addBlastFragments(state.logistics, [barren(9901, 5, 6, 700)], state.navGrid);
+    syncHaulDispatch(state);
+
+    expect(run(`vehicle haul ${vehicle.id} fragment:9901`)).toMatchObject({ success: true });
+    tickUntil(run, () => stateOf(state, 9901) === undefined, 1500);
+
+    expect(totalSpoilKg(state.buildings.buildings)).toBeCloseTo(heapBefore + 700, 3);
+    expect(state.logistics.storedMassKg).toBeCloseTo(0, 3);
+    expect(state.pendingActions.some(a => a.blockedReason === 'storage_full')).toBe(false);
+  });
+
+  it('a rubble_disposal contract delivered after the release draws the released rock from the heap and pays as before', () => {
+    const { state, count } = fullWarehouseSite();
+    sellOre(state, count * ORE_PER_FRAGMENT_KG);
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const pool = state.contracts;
+    const offer: Contract = {
+      id: pool.nextId++, type: 'rubble_disposal', materialId: '', description: '[fixture] rubble',
+      quantityKg: 1000, deliveredKg: 0, pricePerKg: 2, deadlineTicks: 5000, acceptedAtTick: 0,
+      penaltyAmount: 100, earlyBonus: 50, completed: false, expired: false,
+    };
+    pool.available.push(offer);
+    expect(contractCommand(ctx, ['accept', String(offer.id)], {}).success).toBe(true);
+    const cashBefore = state.cash;
+    const heapBefore = totalSpoilKg(state.buildings.buildings);
+
+    const r = contractCommand(ctx, ['deliver', String(offer.id)], { amount: '1000' });
+
+    expect(r.success).toBe(true);
+    expect(r.output).toContain('COMPLETED');
+    expect(totalSpoilKg(state.buildings.buildings)).toBeCloseTo(heapBefore - 1000, 3);
+    expect(state.logistics.storedMassKg).toBeCloseTo(0, 3);
+    expect(state.cash - cashBefore).toBeGreaterThanOrEqual(2000);
+  });
+});
