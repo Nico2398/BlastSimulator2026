@@ -196,14 +196,14 @@ describe('estimateSurveyResult depthProfile (#1683)', () => {
   });
 
   it('ore beyond the seismic 25 m reach never appears in a seismic profile', () => {
-    const grid = makeColumn(d => (d === 0 ? { shally: 0.8 } : d === 30 ? { trentium: 0.8 } : {}));
+    const grid = makeColumn(d => (d <= 20 ? { shally: 1.0 } : d === 30 ? { trentium: 0.8 } : {}));
     const bands = survey(grid, 'seismic').depthProfile!['5,5']!;
     expect(bands.some(b => 'trentium' in b.ores)).toBe(false);
     expect(Math.max(...bands.map(b => b.toM))).toBeLessThanOrEqual(SURVEY_DEPTH_BELOW_SURFACE.seismic);
   });
 
   it('a core sample sees the 30 m ore a seismic survey misses, in the 30-31 m band', () => {
-    const grid = makeColumn(d => (d === 0 ? { shally: 0.8 } : d === 30 ? { trentium: 0.8 } : {}));
+    const grid = makeColumn(d => (d <= 20 ? { shally: 1.0 } : d === 30 ? { trentium: 0.8 } : {}));
     const bands = survey(grid, 'core_sample').depthProfile!['5,5']!;
     const span = oreDepthSpan(bands, 'trentium');
     expect(span).toEqual({ fromM: 30, toM: 31 });

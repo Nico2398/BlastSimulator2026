@@ -11,7 +11,7 @@ import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import { findSurveyForColumn, surveyColumnKey } from '../../core/mining/SurveyColumn.js';
-import { oreDepthRuns } from '../../core/mining/SurveyDepthProfile.js';
+import { oreDepthBands } from '../../core/mining/SurveyDepthProfile.js';
 import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
@@ -168,7 +168,7 @@ export class HoverTag {
       row.appendChild(el('span', { text: t(`ore.${oreId}.name`), attrs: { style: 'color:var(--bsx-text-secondary)' } }));
       row.appendChild(el('span', { className: 'bsx-mono', text: `${Math.round(density * 100)}%`, attrs: { style: 'color:var(--bsx-ore-text)' } }));
       wrap.appendChild(row);
-      const runs = oreDepthRuns(survey.depthProfile?.[surveyColumnKey(terrain.tileX, terrain.tileZ)], oreId).slice(0, HOVER_DEPTH_RUNS_PER_ORE);
+      const runs = oreDepthBands(survey.depthProfile?.[surveyColumnKey(terrain.tileX, terrain.tileZ)], oreId).slice(0, HOVER_DEPTH_RUNS_PER_ORE);
       if (runs.length > 0) {
         wrap.appendChild(el('div', {
           className: 'bsx-mono',

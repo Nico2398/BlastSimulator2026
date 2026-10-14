@@ -81,17 +81,14 @@ export function oreDepthSpan(
   return toM === -Infinity ? undefined : { fromM, toM };
 }
 
-/** Contiguous depth ranges (shallowest first) where the ore is reported; adjacent bands merge. */
-export function oreDepthRuns(
+/** Depth ranges (shallowest first) of each band that reports the ore, as given, not merged. */
+export function oreDepthBands(
   bands: readonly SurveyDepthBand[] | undefined,
   oreId: string,
 ): Array<{ fromM: number; toM: number }> {
-  const runs: Array<{ fromM: number; toM: number }> = [];
+  const out: Array<{ fromM: number; toM: number }> = [];
   for (const band of bands ?? []) {
-    if (band.ores[oreId] === undefined) continue;
-    const last = runs[runs.length - 1];
-    if (last && last.toM === band.fromM) last.toM = band.toM;
-    else runs.push({ fromM: band.fromM, toM: band.toM });
+    if (band.ores[oreId] !== undefined) out.push({ fromM: band.fromM, toM: band.toM });
   }
-  return runs;
+  return out;
 }
