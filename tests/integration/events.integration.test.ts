@@ -82,6 +82,8 @@ function makeEventCtx(overrides: Partial<{
       ecology: overrides.ecology ?? 50,
       nuisance: overrides.nuisance ?? 50,
       decayRate: overrides.decayRate ?? SCORE_DECAY_RATE,
+      freshDustKg: 0,
+      lastLooseRockKg: 0,
     },
     employeeCount: overrides.employeeCount ?? 0,
     deathCount: overrides.deathCount ?? 0,
