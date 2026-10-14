@@ -83,7 +83,7 @@ describe('retargetRampLayers (#1719)', () => {
   });
 
   it('retargets each ramp\'s own lead independently', () => {
-    const s = make([action(1), action(2, { targetZ: 10 } as Partial<PendingAction>), action(3), action(4)], [ramp(1, [1, 2]), ramp(2, [3, 4])]);
+    const s = make([action(1), action(2), action(3), action(4)], [ramp(1, [1, 2]), ramp(2, [3, 4])]);
     const moved = retargetRampLayers(s, (a, x) => (a.id === 1 ? x >= 14 : x <= 10));
     expect(moved).toBe(2);
     expect(targetOf(s, 1)).toEqual({ x: 14, z: 10 });

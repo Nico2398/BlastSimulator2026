@@ -570,7 +570,7 @@ describe('cost and duration scale linearly with volume', () => {
   });
 });
 
-// ── #1723: reachable work target, column-by-column progress ──
+// ── #1723: column-by-column carve progress ──
 
 describe('carveLevelColumnsStep', () => {
   it('carves at most maxColumns, nearest the first column first, and returns how many it carved', () => {

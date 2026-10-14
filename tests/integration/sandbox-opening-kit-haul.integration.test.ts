@@ -96,7 +96,8 @@ describe.each(['west', 'east'] as const)('opening kit: blast, ramp from the %s, 
   beforeAll(() => { result = openingKitHaul(side); }, 600_000);
 
   it('every ramp segment completes within the setup window', () => {
-    const { state } = result;
+    const { state, rampTicks } = result;
+    expect(rampTicks).toBeLessThan(RAMP_SETUP_TICKS);
     expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
     expect(state.builtRamps.length).toBe(1);
   });

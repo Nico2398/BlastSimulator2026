@@ -163,7 +163,7 @@ alone and is never adjusted, rejected or relocated for reachability. No reachabi
 belongs to the player: connect it (ramp, levelling, another blast) or leave it.
 
 **Levelling a crater (#1723).** A `level_ground` order's work target is the reachable column
-(`employeeClimbReach`) of its rectangle nearest the rect's min corner (`pickLevelWorkTarget`), so a
+(`employeeClimbReach`) of its rectangle nearest the rect's min corner (`pickReachableColumn`), so a
 rectangle the crew can partly reach starts instead of waiting `target_unreachable`; when none is
 reachable the target stays the corner and the order waits. The digger carves as it works
 (`carveLevelColumnsStep`, each tick's share of the columns left; the payload's `levelCursor` counts
