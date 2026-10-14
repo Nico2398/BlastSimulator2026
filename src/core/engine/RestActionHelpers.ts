@@ -19,12 +19,12 @@ import {
   AGENT_WALK_SPEED, NEED_DRAIN_RATES, BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS,
 } from '../config/balance.js';
 import { moveTo, alightOnArrival } from './MoveTo.js';
-import { leaveBuildingIfInside } from './Mount.js';
+import { leaveBuildingIfInside, alightIfMounted } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier } from '../entities/Vehicle.js';
+import { canReleaseDriver } from '../entities/Vehicle.js';
+import { hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 import { estimateLegDistance, planItinerary } from './PlanItinerary.js';
 import { cellsToTravelTicks } from './ActionSelection.js';
-import { hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -264,53 +264,59 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
 }
 
 /**
- * Start `emp` travelling to (x, z) as a rest destination, preserving mount
- * continuity: a MOUNTED employee is routed through moveTo/planItinerary like
- * any other journey, so they drive there instead of desyncing from their
- * vehicle (I2_mounted_position_mismatch, WorldInvariants.ts). Continuity is
- * travel-only: alightOnArrival marks the installed itinerary's final leg to
- * alight once that travel completes, freeing the vehicle at arrival — same as
- * any other arrival-gated action — rather than holding it for the whole rest,
- * unless hasClaimableSameRoleFollowUp says this employee is the only
- * one who could ever reclaim it anyway, in which case alighting is skipped
- * and mount continuity holds through the whole rest instead (see that
- * function's own doc comment). Both on-foot and mounted employees route
- * through the same single moveTo call, `allowUnreachable: true` (#1178,
- * single-mover unification) — a genuinely unreachable target still installs
- * a best-effort itinerary rather than refusing the trip. Sets
+ * Start `emp` travelling to (x, z) as a rest destination by the faster of
+ * walking and driving (chooseRestTrip, #1709). An on-foot employee walks. A
+ * MOUNTED employee whose vehicle is slower than walking (a drill rig crawls at
+ * half walking pace) parks it where it stands (alightIfMounted, the same
+ * "give up the vehicle" step tickCollapse takes) and walks; ordinary dispatch
+ * of the interrupted job plans the board leg once the rest is over, so there
+ * is no explicit return step and no same-role continuity on this path. Resting
+ * in place (target is where the worker already stands) has no trip: the
+ * pre-#1709 mount continuity applies (keep the vehicle, free it on arrival
+ * unless hasClaimableSameRoleFollowUp). A
+ * faster vehicle, or one whose driver may not alight (loaded haul,
+ * canReleaseDriver), drives the trip through moveTo/planItinerary as before so
+ * the worker never desyncs from the vehicle (I2_mounted_position_mismatch,
+ * WorldInvariants.ts). `allowUnreachable: true` (#1178): a genuinely
+ * unreachable target still installs a best-effort itinerary. Sets
  * pendingActionType alongside the itinerary so the renderer distinguishes a
  * walk-to-rest from an ordinary task walk (#1013 pictograms) and
  * computeEmployeeActivity (EmployeeActivity.ts) reports actionType: 'rest'
- * for the whole trip, not just once the rest itself is executing. The one
- * shared entry point every rest-creating path calls, except hard-collapse
- * (tickCollapse, NeedRestoration.ts), which alights first — a genuine "give
- * up the vehicle" event (#1118).
+ * for the whole trip. The one shared entry point every rest-creating path
+ * calls.
  *
- * `buildingId` (#1204): when given and the employee is not mounted, routes
- * through `moveTo(state, emp.id, { buildingId }, ...)` instead of the plain
- * (x, z) reposition — the employee walks to the living_quarters' ring and
- * enters it unseen on arrival, exactly like #1203's training-enrolment walk.
- * A mounted employee always keeps the plain (x, z) call (a mounted rest never
- * enters a building — #1122), and so does the no-building rest-in-place case
- * (buildingId undefined) — both leave the mount-continuity handling below
- * untouched. A `buildingId` that no longer resolves to any building (demolished
- * between claim and dispatch) falls back to the same plain (x, z) walk rather
- * than leaving the employee with no itinerary at all — `moveTo`'s `{buildingId}`
- * overload refuses outright (`move_to.building_not_found`) instead of ever
- * installing a partial itinerary, so this is the one call site responsible for
- * degrading that refusal into the ordinary reposition every other rest still
- * gets.
+ * `buildingId` (#1204): when given and the employee is on foot (including one
+ * who just parked), routes through `moveTo(state, emp.id, { buildingId }, ...)`
+ * so the employee walks to the living_quarters' ring and enters it unseen on
+ * arrival, like #1203's training-enrolment walk. A still-mounted (driven) trip
+ * and the no-building rest-in-place case keep the plain (x, z) call. A
+ * `buildingId` that no longer resolves (demolished between claim and dispatch)
+ * falls back to the same plain (x, z) walk, since `moveTo`'s `{buildingId}`
+ * overload refuses outright instead of installing a partial itinerary.
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number, buildingId?: number, emitter?: EventEmitter): void {
   const wasMounted = isMounted(emp.locomotion);
-  const viaBuilding = !wasMounted && buildingId !== undefined
+  // Resting in place (no quarters; the target is where they already stand) has
+  // no trip to choose: the mounted worker keeps the vehicle for the rest and
+  // frees it on arrival, as before #1709.
+  if (wasMounted && Math.hypot(x - emp.x, z - emp.z) < 1) {
+    const result = moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
+    if (result.success && !hasClaimableSameRoleFollowUp(state, emp)) alightOnArrival(emp);
+    emp.pendingActionType = 'rest';
+    return;
+  }
+  // Mounted and the walk is faster (or equal): park and walk. The vehicle
+  // stays where it is; ordinary dispatch of the interrupted job plans the
+  // board leg afterwards. A refused alight (loaded haul) leaves the worker
+  // mounted, so the trip is driven as before.
+  if (wasMounted && chooseRestTrip(state, emp, x, z)?.mode === 'walk') {
+    alightIfMounted(state, emp, emitter, { x, z });
+  }
+  const viaBuilding = !isMounted(emp.locomotion) && buildingId !== undefined
     ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true }, emitter)
     : undefined;
-  const result = viaBuilding?.success
-    ? viaBuilding
-    : moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
-  if (wasMounted && result.success && !hasClaimableSameRoleFollowUp(state, emp)) {
-    alightOnArrival(emp);
+  if (!viaBuilding?.success) {
+    moveTo(state, emp.id, { x, z }, { allowUnreachable: true }, emitter);
   }
   emp.pendingActionType = 'rest';
 }
@@ -375,23 +381,16 @@ export function restRoundTripWorthwhile(
   if (building === null) return true;
   if (state.navGrid === null) return true;
 
-  // Mounted employees drive the round trip at their vehicle's speed rather
-  // than walking it — mirrors hasClaimableSameRoleFollowUp's own mounted-
-  // vehicle lookup above.
-  let speed: number = AGENT_WALK_SPEED;
-  if (isMounted(emp.locomotion)) {
-    const vehicle = state.vehicles.vehicles.find(v => v.id === mountedVehicleId(emp.locomotion));
-    if (vehicle) {
-      speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;
-    }
-  }
-
-  const oneWay = estimateLegDistance(state, 'exact', emp.id, emp.x, emp.z, targetX, targetZ, false);
   // Unreachable is another mechanism's problem (routing failure) — never
   // block a forced rest on it here.
-  if (oneWay === null) return true;
+  if (estimateLegDistance(state, 'exact', emp.id, emp.x, emp.z, targetX, targetZ, false) === null) return true;
 
-  const travelCost = 2 * cellsToTravelTicks(oneWay, speed) * NEED_DRAIN_RATES.fatigue.traveling;
+  // Round trip at the pace of the trip the employee would actually take
+  // (chooseRestTrip: walk or drive, whichever is faster).
+  const trip = chooseRestTrip(state, emp, targetX, targetZ);
+  if (trip === null) return true;
+
+  const travelCost = 2 * trip.estTicks * NEED_DRAIN_RATES.fatigue.traveling;
 
   const headroom = MAX_NEED_GAUGE - emp.fatigue;
   const maxRecovery = Math.min(headroom, BUILDING_REPLENISH_RATES.fatigue[building.tier] * NEED_REST_DURATIONS.fatigue);
@@ -423,8 +422,8 @@ export function resolveRestDestination(
 }
 
 /**
- * Fatigue the employee would burn travelling to (targetX, targetZ), or null
- * when no journey can be planned.
+ * Fatigue the employee would burn on the rest trip chooseRestTrip picks to
+ * (targetX, targetZ), or null when no journey can be planned.
  */
 export function restTripFatigueCost(
   state: GameState,
@@ -432,23 +431,40 @@ export function restTripFatigueCost(
   targetX: number,
   targetZ: number,
 ): number | null {
-  const itinerary = planItinerary(state, emp, { kind: 'reposition', x: targetX, z: targetZ }, 'estimate');
-  if (itinerary === null) return null;
-  return itinerary.estTotalTicks * NEED_DRAIN_RATES.fatigue.traveling;
+  const trip = chooseRestTrip(state, emp, targetX, targetZ);
+  return trip === null ? null : trip.estTicks * NEED_DRAIN_RATES.fatigue.traveling;
 }
 
 /** How an employee covers a rest trip. */
-export type RestTripMode = 'walk' | 'drive';
+type RestTripMode = 'walk' | 'drive';
 
 /** A plannable rest trip: chosen mode and its estimated tick cost. */
-export interface RestTrip { mode: RestTripMode; estTicks: number }
+interface RestTrip { mode: RestTripMode; estTicks: number }
 
 /**
  * Faster way for `emp` to reach (x,z). Unmounted: always 'walk'. Mounted: 'drive'
  * only when driveTicks < walkTicks (tie -> walk) or alighting is refused (loaded
  * haul). null = no plannable trip.
  */
-export function chooseRestTrip(_state: GameState, _emp: Employee, _x: number, _z: number): RestTrip | null {
-  // TODO: implement
-  return null;
+export function chooseRestTrip(state: GameState, emp: Employee, x: number, z: number): RestTrip | null {
+  const itinerary = planItinerary(state, emp, { kind: 'reposition', x, z }, 'estimate');
+  const planned: RestTrip | null = itinerary === null ? null : { mode: 'walk', estTicks: itinerary.estTotalTicks };
+  if (!isMounted(emp.locomotion)) return planned;
+
+  const vehicleId = mountedVehicleId(emp.locomotion);
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  const drive: RestTrip | null = planned === null ? null : { mode: 'drive', estTicks: planned.estTicks };
+  // Walking starts where the vehicle stands.
+  const dist = estimateLegDistance(
+    state, 'exact', emp.id, vehicle?.x ?? emp.x, vehicle?.z ?? emp.z, x, z, false,
+  );
+  const walk: RestTrip | null = dist === null
+    ? null
+    : { mode: 'walk', estTicks: cellsToTravelTicks(dist, AGENT_WALK_SPEED) };
+
+  // Alighting refused (loaded haul): the vehicle carries the worker.
+  if (vehicleId !== null && !canReleaseDriver(state.vehicles, vehicleId).success) return drive;
+  if (drive === null) return walk;
+  if (walk === null) return drive;
+  return drive.estTicks < walk.estTicks ? drive : walk;
 }

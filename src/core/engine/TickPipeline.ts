@@ -333,7 +333,7 @@ export function runTick(
   releaseInjuredEmployeesQueues(state);
   // Claims held by the dead go back to the pool so OrderReachability re-stamps them (#1660).
   releaseDeadHoldersActions(state, emitter);
-  const dispatchResult = tickEmployees(state);
+  const dispatchResult = tickEmployees(state, emitter);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
   // 8e. Task duration progress + XP/level-up reporting. taskTicksRemaining
