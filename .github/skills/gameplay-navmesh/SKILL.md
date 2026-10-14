@@ -119,3 +119,5 @@ Agents move at most `walkSpeed` cells/tick toward next waypoint. Next waypoint b
 - Emits `agent_stuck` event
 - Resumes when path clears
 
+
+A mover mid-hop paths from its committed hop origin (`inFlightHopOrigin`), not the rounded cell of its fractional position, which can be a sealed pit (#1687).

@@ -397,11 +397,13 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // clampToGrid floors instead, which can choose a start cell up to a full
   // diagonal away from the agent's true nearest cell — see this file's own
   // NavGrid.clampX/clampZ usage throughout AgentAdvance.ts for the same fix.
-  // A mover mid-hop paths from its committed hop origin instead: the rounded
-  // cell of a fractional diagonal position can be a sealed pit (#1687).
+  const roundedFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
+  const roundedFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
+  // Retry origin when the rounded cell has no route: a mover mid-hop paths
+  // from its committed hop origin, since the rounded cell of a fractional
+  // diagonal position can be a sealed pit (#1687). Only a fallback — a found
+  // route from the rounded cell keeps the pre-#1687 behaviour untouched.
   const hopOrigin = inFlightHopOrigin(readCommitted(emp), emp.x, emp.z, leg.destX, leg.destZ);
-  const driveFromX = hopOrigin ? hopOrigin.x : state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
-  const driveFromZ = hopOrigin ? hopOrigin.z : state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
 
   // #1206: AgentOccupancy — via advanceAlongPath's own per-hop check
   // (mover/occupancy threaded in below) and handleAgentOccupancyBlock's
@@ -425,28 +427,33 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // tick re-derives `avoidVehicles` fresh from the mover's new position above
   // and can find the strict route "found" again from there, discarding this
   // relaxed route's own in-flight RouteCommitment and oscillating.
-  let path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> };
-  if (isDrive) {
-    path = state.navGrid
-      ? findPath(state.navGrid, {
-          agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
-          requiredClearance: vehicleRequiredClearanceCells(vehicle!),
-        })
-      : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
-  } else if (state.navGrid) {
-    const footResult = findFootPathWithVehicleFallback(
-      state.navGrid,
-      { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles },
-      false /* exact */,
-    );
-    path = footResult;
-    if (footResult.crossedVehicles) {
-      avoidVehicles = false;
-      leg.crossesVehicles = true;
+  const planPath = (driveFromX: number, driveFromZ: number): PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } => {
+    let path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> };
+    if (isDrive) {
+      path = state.navGrid
+        ? findPath(state.navGrid, {
+            agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
+            requiredClearance: vehicleRequiredClearanceCells(vehicle!),
+          })
+        : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
+    } else if (state.navGrid) {
+      const footResult = findFootPathWithVehicleFallback(
+        state.navGrid,
+        { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles },
+        false /* exact */,
+      );
+      path = footResult;
+      if (footResult.crossedVehicles) {
+        avoidVehicles = false;
+        leg.crossesVehicles = true;
+      }
+    } else {
+      path = { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
     }
-  } else {
-    path = { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
-  }
+    return path;
+  };
+  let path = planPath(roundedFromX, roundedFromZ);
+  if (!path.found && hopOrigin) path = planPath(hopOrigin.x, hopOrigin.z);
 
   const outcome = advanceAlongPath({
     x: emp.x, z: emp.z, walkSpeed: speed,
