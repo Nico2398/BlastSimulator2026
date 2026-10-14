@@ -919,6 +919,15 @@ export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
  */
 export const AGENT_FREE_CELL_SEARCH_MAX_RADIUS = 4;
 
+/**
+ * Longest walkable route (NavGrid move cost) from a relocated mover's cell
+ * back to its sidestep cell that still counts as "can get back" when the direct
+ * step is a cliff (#1672). Measured: the sidesteps level 1 relies on cost <= ~8
+ * (a short detour on a gentle slope); the level-2 strand that stalled the first
+ * blast costs 77+ (a full loop round the bench). 3 ring radii sits between them.
+ */
+export const AGENT_FREE_CELL_MAX_RETURN_COST = 3 * AGENT_FREE_CELL_SEARCH_MAX_RADIUS;
+
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
 

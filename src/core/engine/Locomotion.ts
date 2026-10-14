@@ -27,6 +27,7 @@ import {
   MOVE_STUCK_ABANDON_TICKS,
   AGENT_OCCUPANCY_WAIT_TICKS,
   AGENT_FREE_CELL_SEARCH_MAX_RADIUS,
+  AGENT_FREE_CELL_MAX_RETURN_COST,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { employeeWorkState } from './EmployeeDispatch.js';
@@ -1014,6 +1015,17 @@ function handleAgentOccupancyBlock(
       if (crossing.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
       }
+      // Another idle employee behind the vehicle (the corridor's next cell) defeats the avoid-all search above;
+      // the mover then crosses the vehicle on a direct route and the corridor relocation clears that employee next hop.
+      if (state.navGrid) {
+        const direct = findPath(state.navGrid, {
+          agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+          avoidVehicles: false, ...(requiredClearance !== undefined && { requiredClearance }),
+        });
+        if (direct.found) {
+          return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result, blocker!);
+        }
+      }
     } else if (blockerIsStationaryBusyEmployee && state.navGrid) {
       // #1283 dense-grid follow-up: a busy EMPLOYEE blocker (unlike a
       // genuinely parked vehicle) sits inside a population that is itself
@@ -1236,12 +1248,19 @@ function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number
   updateVehicleCellOccupancy(state, blocker, true, true, prevX, prevZ);
 }
 
+/** True when a foot route from (fromX, fromZ) to (toX, toZ) exists and costs at most `AGENT_FREE_CELL_MAX_RETURN_COST`. */
+function hasShortReturnRoute(grid: NavGrid, fromX: number, fromZ: number, toX: number, toZ: number): boolean {
+  const route = findPath(grid, { agentId: -1, fromX, fromZ, toX, toZ, avoidVehicles: false });
+  return route.found && route.totalCost <= AGENT_FREE_CELL_MAX_RETURN_COST;
+}
+
 /**
  * Nearest walkable cell (ring search: immediate neighbours first, then two
  * cells out) around (originX, originZ) that `isBlocked` reports free — shared
  * core `findNearestFreeCellForAgent` (below) builds its AgentOccupancy
- * freedom check on top of. Only cells a slope-limited step can reach from
- * the origin qualify. Returns null when nothing within
+ * freedom check on top of. Only cells the origin can get back from qualify: a
+ * slope-limited step away, or a short walkable route (`AGENT_FREE_CELL_MAX_RETURN_COST`)
+ * from it. Returns null when nothing within
  * `AGENT_FREE_CELL_SEARCH_MAX_RADIUS` cells qualifies, or there is no NavGrid
  * yet.
  */
@@ -1272,7 +1291,9 @@ function findNearestFreeCell(
 
         const distSq = (x - bx) ** 2 + (z - bz) ** 2;
         // A cell across a cliff is no sidestep: the mover could never climb back (strands a crew member on a steep site).
-        if (!isStepClimbable(originY, cell.surfaceY, Math.sqrt(distSq))) continue;
+        // A cliff step is fine when a short walkable route still joins the cells; a long loop round a bench is the same strand.
+        if (!isStepClimbable(originY, cell.surfaceY, Math.sqrt(distSq))
+          && !hasShortReturnRoute(grid, bx, bz, x, z)) continue;
         if (distSq < bestDistSq) {
           bestDistSq = distSq;
           best = { x, z };
