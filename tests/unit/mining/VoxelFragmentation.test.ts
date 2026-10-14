@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   identifyFragmentedVoxels,
   isFragmented,
+  floorToGrade,
 } from '../../../src/core/mining/VoxelFragmentation.js';
 import {
   createEnergyField,
@@ -15,7 +16,7 @@ import {
   setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
-import { CRACKED_VOXEL_WEAKENING } from '../../../src/core/config/balance.js';
+import { CRACKED_VOXEL_WEAKENING, BLAST_GRADE_MAX_CUT_M, BLAST_GRADE_FLOOR_OFFSET_M } from '../../../src/core/config/balance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -380,5 +381,102 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     for (let y = 0; y < gridSize; y++) {
       expect(grid.densityAt(3, y, 3), `density at y=${y} should be unchanged`).toBe(before[y]!);
     }
+  });
+});
+
+// ── Floor to grade (#1723) ────────────────────────────────────────────────────
+
+describe('VoxelFragmentation — floorToGrade', () => {
+  const SIZE = 12;
+
+  /** Field over a solid cube with `gradeY` set and the given voxels (x,z column, y range) already broken. */
+  function gradedField(gradeY: number | null, broken: Array<{ x: number; z: number; fromY: number; toY: number }>) {
+    const grid = solidGrid(SIZE);
+    const field = createEnergyField(grid, wholeGrid(grid, SIZE));
+    (field as { gradeY: number | null }).gradeY = gradeY;
+    const mask = new Uint8Array(field.nx * field.ny * field.nz);
+    for (const b of broken) for (let y = b.fromY; y <= b.toY; y++) mask[indexOf(field, b.x, y, b.z)] = 1;
+    return { field, mask };
+  }
+
+  const isBroken = (f: ReturnType<typeof gradedField>, x: number, y: number, z: number) =>
+    f.mask[indexOf(f.field, x, y, z)] === 1;
+
+  it('a ridge column broken only near the top breaks down to the grade plane', () => {
+    const f = gradedField(6, [{ x: 5, z: 5, fromY: 9, toY: 11 }]);
+    const gradeY = 6 + BLAST_GRADE_FLOOR_OFFSET_M;
+
+    const count = floorToGrade(f.field, f.mask);
+
+    for (let y = Math.ceil(gradeY); y <= 11; y++) expect(isBroken(f, 5, y, 5), `y=${y}`).toBe(true);
+    expect(isBroken(f, 5, Math.ceil(gradeY) - 1, 5)).toBe(false);
+    expect(count).toBe(3); // y 6, 7, 8 newly broken
+  });
+
+  it('columns with no broken voxel (outside the footprint) are untouched', () => {
+    const f = gradedField(6, [{ x: 5, z: 5, fromY: 9, toY: 11 }]);
+
+    floorToGrade(f.field, f.mask);
+
+    for (let y = 0; y < SIZE; y++) {
+      expect(isBroken(f, 6, y, 5), `neighbour y=${y}`).toBe(false);
+      expect(isBroken(f, 2, y, 2), `far y=${y}`).toBe(false);
+    }
+  });
+
+  it('a column already broken down to grade is left as it is and counts nothing', () => {
+    const f = gradedField(6, [{ x: 5, z: 5, fromY: 4, toY: 11 }]);
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+    expect(isBroken(f, 5, 3, 5)).toBe(false);
+  });
+
+  it('never cuts more than BLAST_GRADE_MAX_CUT_M below a column\'s broken rock', () => {
+    const f = gradedField(0, [{ x: 5, z: 5, fromY: 10, toY: 11 }]);
+
+    const count = floorToGrade(f.field, f.mask);
+
+    const lowest = 10 - BLAST_GRADE_MAX_CUT_M;
+    expect(isBroken(f, 5, lowest, 5)).toBe(true);
+    expect(isBroken(f, 5, lowest - 1, 5)).toBe(false);
+    expect(count).toBe(BLAST_GRADE_MAX_CUT_M);
+  });
+
+  it('a null grade is a no-op', () => {
+    const f = gradedField(null, [{ x: 5, z: 5, fromY: 9, toY: 11 }]);
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+    let broken = 0;
+    for (const flag of f.mask) if (flag === 1) broken++;
+    expect(broken).toBe(3);
+  });
+
+  it('air voxels in a footprint column are not marked', () => {
+    const grid = solidGrid(SIZE);
+    const field = createEnergyField(grid, wholeGrid(grid, SIZE));
+    (field as { gradeY: number | null }).gradeY = 6;
+    const mask = new Uint8Array(field.nx * field.ny * field.nz);
+    mask[indexOf(field, 5, 9, 5)] = 1;
+    field.air[indexOf(field, 5, 7, 5)] = 1;
+
+    floorToGrade(field, mask);
+
+    expect(mask[indexOf(field, 5, 7, 5)]).toBe(0);
+    expect(mask[indexOf(field, 5, 8, 5)]).toBe(1);
+  });
+
+  it('identifyFragmentedVoxels reports the voxels it floored, 0 without a grade', () => {
+    const grid = solidGrid(SIZE);
+    const field = createEnergyField(grid, wholeGrid(grid, SIZE));
+    seedEnergy(field, [{ x: 6, y: 10, z: 6, energy: CRUITE * 10 }]);
+    expect(identifyFragmentedVoxels(field, grid, false).gradedCount).toBe(0);
+
+    const grid2 = solidGrid(SIZE);
+    const field2 = createEnergyField(grid2, wholeGrid(grid2, SIZE));
+    (field2 as { gradeY: number | null }).gradeY = 2;
+    seedEnergy(field2, [{ x: 6, y: 10, z: 6, energy: CRUITE * 10 }]);
+    const result = identifyFragmentedVoxels(field2, grid2, false);
+    expect(result.gradedCount).toBeGreaterThan(0);
+    expect(result.gradedCount).toBeLessThanOrEqual(result.fragmented.length);
   });
 });
