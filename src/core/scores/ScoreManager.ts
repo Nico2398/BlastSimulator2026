@@ -46,14 +46,14 @@ export interface ScoreInputs {
   /** Number of employees. */
   employeeCount: number;
   /** Mass of loose rock lying on the ground (kg). */
-  looseRockKg?: number;
+  looseRockKg: number;
 }
 
 // ── Update logic ──
 
 /** Per-tick ecology loss from loose rubble on the ground, capped. */
-function dustEcologyLoss(kg: number | undefined): number {
-  if (kg === undefined || !Number.isFinite(kg) || kg <= 0) return 0;
+function dustEcologyLoss(kg: number): number {
+  if (!Number.isFinite(kg) || kg <= 0) return 0;
   return Math.min(ECOLOGY_DUST_MAX_PER_TICK, (kg / 1000) * ECOLOGY_DUST_PER_TONNE_PER_TICK);
 }
 

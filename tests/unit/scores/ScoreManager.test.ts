@@ -203,15 +203,18 @@ describe('ecology responds to how the mine is run (#1691)', () => {
     expect(state.ecology).toBe(ref.ecology);
   });
 
-  it('heap plus 10 t rises, heap plus 57 t falls', () => {
+  it('heap plus rubble rises less than a heap alone, and more rubble means less', () => {
+    const clean = createScoreState();
     const ten = createScoreState();
-    const fifty7 = createScoreState();
+    const big = createScoreState();
     for (let i = 0; i < 20; i++) {
+      updateScores(clean, makeInputs({ buildings: withHeap() }));
       updateScores(ten, makeInputs({ buildings: withHeap(), looseRockKg: 10_000 }));
-      updateScores(fifty7, makeInputs({ buildings: withHeap(), looseRockKg: 57_000 }));
+      updateScores(big, makeInputs({ buildings: withHeap(), looseRockKg: 57_000 }));
     }
     expect(ten.ecology).toBeGreaterThan(50);
-    expect(fifty7.ecology).toBeLessThan(50);
+    expect(ten.ecology).toBeLessThan(clean.ecology);
+    expect(big.ecology).toBeLessThan(ten.ecology);
   });
 
   it('heap with no rubble reaches the ecology star threshold within 100 ticks', () => {

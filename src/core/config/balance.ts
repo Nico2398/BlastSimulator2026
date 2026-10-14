@@ -146,9 +146,9 @@ export const BRIBERY_COSTS = {
 /** Score decay rate per tick (0–100 scale). All scores trend toward 50 without input. */
 export const SCORE_DECAY_RATE = 0.05;
 /** Ecology loss per tonne of loose rock on the ground, per tick. */
-export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.005;
+export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.001;
 /** Cap on ecology loss from dust in a single tick. */
-export const ECOLOGY_DUST_MAX_PER_TICK = 0.6;
+export const ECOLOGY_DUST_MAX_PER_TICK = 0.06;
 
 // ─── World / Sandbox ────────────────────────────────────────────────────────────
 
