@@ -516,53 +516,101 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     expect(colEstimates!['silver']).toBeDefined();
   });
 
-  // ── #1186: surface-relative depth window (no more scanning to y=0) ─────────
+  // ── #1186 / #1676: surface-relative depth window ───────────────────────────
+
+  /** Rock voxel carrying a single ore at density 0.8. */
+  const oreVoxel = (oreId: string) => ({
+    composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
+    density: 1, oreDensities: { [oreId]: 0.8 }, fractureModifier: 1.0,
+  });
 
   /**
-   * Surface at y=25 (topmost solid). One ore ('shally') well within either
-   * survey method's depth window (5 voxels below the surface); a second,
-   * distinct ore ('trentium') 23 voxels below the surface — outside both
-   * SURVEY_DEPTH_BELOW_SURFACE.seismic (15) and .core_sample (8), but still
-   * inside the OLD code's full `0..grid.sizeY-1` column scan. Because the two
-   * ores are distinct ids, whether 'trentium' shows up in the result is a
-   * clean, RNG-independent signal of whether the deep voxel was sampled at
-   * all — not a magnitude comparison.
+   * Column (5,*,5) with its topmost solid at y=SURFACE_Y carrying 'shally',
+   * plus a distinct ore 'trentium' exactly `below` voxels under that surface
+   * (`below` = 0 would collide with the surface voxel, so callers pass >= 1).
+   * The ids differ, so whether 'trentium' shows up is a clean, RNG-independent
+   * signal of whether that depth was sampled at all.
    */
-  function makeDepthWindowGrid(): VoxelGrid {
+  const SURFACE_Y = 60;
+  function makeDeepOreGrid(below: number): VoxelGrid {
     const grid = new VoxelGrid(11, 11);
-    grid.setVoxel(5, 25, 5, {
-      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
-      density: 1, oreDensities: { shally: 0.6 }, fractureModifier: 1.0,
-    });
-    grid.setVoxel(5, 20, 5, {
-      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
-      density: 1, oreDensities: { shally: 0.6 }, fractureModifier: 1.0,
-    });
-    grid.setVoxel(5, 2, 5, {
-      composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
-      density: 1, oreDensities: { trentium: 0.6 }, fractureModifier: 1.0,
-    });
+    grid.setVoxel(5, SURFACE_Y, 5, oreVoxel('shally'));
+    grid.setVoxel(5, SURFACE_Y - below, 5, oreVoxel('trentium'));
     return grid;
   }
 
-  it(`#1186: seismic samples only SURVEY_DEPTH_BELOW_SURFACE.seismic (${SURVEY_DEPTH_BELOW_SURFACE.seismic}) voxels below the surface, not the whole column down to y=0`, () => {
-    const grid = makeDepthWindowGrid();
-    const params: EstimateSurveyParams = { ...BASE_PARAMS, method: 'seismic', centerX: 5, centerZ: 5 };
-    const result = estimateSurveyResult(grid, params, new Random(12345));
-    const col = result.estimates['5,5'];
+  function surveyColumn(method: SurveyMethod, grid: VoxelGrid, seed = 12345) {
+    const params: EstimateSurveyParams = { ...BASE_PARAMS, method, centerX: 5, centerZ: 5 };
+    return estimateSurveyResult(grid, params, new Random(seed)).estimates['5,5'];
+  }
+
+  it('#1676: SURVEY_DEPTH_BELOW_SURFACE is strictly ordered aerial < seismic < core_sample', () => {
+    expect(SURVEY_DEPTH_BELOW_SURFACE.aerial).toBeLessThan(SURVEY_DEPTH_BELOW_SURFACE.seismic);
+    expect(SURVEY_DEPTH_BELOW_SURFACE.seismic).toBeLessThan(SURVEY_DEPTH_BELOW_SURFACE.core_sample);
+  });
+
+  it('#1676: reach constants are aerial 2, seismic 25, core_sample 40 (the deepest drillable hole)', () => {
+    expect(SURVEY_DEPTH_BELOW_SURFACE.aerial).toBe(2);
+    expect(SURVEY_DEPTH_BELOW_SURFACE.seismic).toBe(25);
+    expect(SURVEY_DEPTH_BELOW_SURFACE.core_sample).toBe(40);
+  });
+
+  it('#1676: a core sample over a column whose only deep ore sits 30 m down reports it', () => {
+    const col = surveyColumn('core_sample', makeDeepOreGrid(30));
+    expect(col).toBeDefined();
+    expect(col!['trentium']).toBeGreaterThan(0);
+  });
+
+  it('#1676: seismic does not see ore 30 m down (below its reach)', () => {
+    const col = surveyColumn('seismic', makeDeepOreGrid(30));
     expect(col).toBeDefined();
     expect(col!['shally']).toBeDefined();
     expect(col!['trentium']).toBeUndefined();
   });
 
-  it(`#1186: core_sample samples only SURVEY_DEPTH_BELOW_SURFACE.core_sample (${SURVEY_DEPTH_BELOW_SURFACE.core_sample}) voxels below the surface, not the whole column down to y=0`, () => {
-    const grid = makeDepthWindowGrid();
-    const params: EstimateSurveyParams = { ...BASE_PARAMS, method: 'core_sample', centerX: 5, centerZ: 5 };
-    const result = estimateSurveyResult(grid, params, new Random(12345));
-    const col = result.estimates['5,5'];
+  it('#1676: seismic detects ore 24 m below the surface, misses ore 26 m below', () => {
+    expect(surveyColumn('seismic', makeDeepOreGrid(24))!['trentium']).toBeGreaterThan(0);
+    expect(surveyColumn('seismic', makeDeepOreGrid(26))!['trentium']).toBeUndefined();
+  });
+
+  it('#1676: core_sample detects ore 39 m below the surface, misses ore 41 m below', () => {
+    expect(surveyColumn('core_sample', makeDeepOreGrid(39))!['trentium']).toBeGreaterThan(0);
+    expect(surveyColumn('core_sample', makeDeepOreGrid(41))!['trentium']).toBeUndefined();
+  });
+
+  it('#1676: seismic reaches deeper than the old 15 m window (ore 20 m down is seen)', () => {
+    expect(surveyColumn('seismic', makeDeepOreGrid(20))!['trentium']).toBeGreaterThan(0);
+  });
+
+  it('#1676: aerial samples only the top 2 voxels — ore 3 m below the surface is not seen', () => {
+    const col = surveyColumn('aerial', makeDeepOreGrid(3));
     expect(col).toBeDefined();
     expect(col!['shally']).toBeDefined();
     expect(col!['trentium']).toBeUndefined();
+  });
+
+  it('#1676: aerial estimates are unchanged by deeper ore (same seed, same RNG stream)', () => {
+    const shallowOnly = new VoxelGrid(11, 11);
+    shallowOnly.setVoxel(5, SURFACE_Y, 5, oreVoxel('shally'));
+    const withDeep = makeDeepOreGrid(30);
+    expect(surveyColumn('aerial', withDeep, 777)).toEqual(surveyColumn('aerial', shallowOnly, 777));
+  });
+
+  it('#1676: a shallow column (window extends past the grid bottom) is surveyed safely', () => {
+    const grid = new VoxelGrid(11, 11);
+    grid.setVoxel(5, 5, 5, oreVoxel('shally'));
+    grid.setVoxel(5, 2, 5, oreVoxel('trentium'));
+    for (const method of ['seismic', 'core_sample'] as const) {
+      const col = surveyColumn(method, grid);
+      expect(col).toBeDefined();
+      expect(col!['trentium']).toBeGreaterThan(0);
+    }
+  });
+
+  it('#1676: the same seed gives the same deep core-sample result', () => {
+    const a = surveyColumn('core_sample', makeDeepOreGrid(30), 99);
+    const b = surveyColumn('core_sample', makeDeepOreGrid(30), 99);
+    expect(a).toEqual(b);
   });
 
   it('#1186: a survey centered on a site expanded west scans columns at negative x, not clamped to x >= 0', () => {
