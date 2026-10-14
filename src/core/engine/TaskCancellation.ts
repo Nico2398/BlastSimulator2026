@@ -19,6 +19,7 @@ import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import { releasePlannedOrderForCancelledAction, type FreedFootprint } from './CancelledOrderCleanup.js';
+import { returnOrderStock } from '../mining/ExplosiveStock.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
 export interface CancelActionResult {
@@ -93,6 +94,7 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
     state.cash += refunded;
     addIncome(state.finances, refunded, 'refund', `Cancelled ${action.type} action`, state.tickCount);
   }
+  const refundedStockKg = refundOrderStock(state, action);
 
   completePendingAction(state, actionId);
 
@@ -100,7 +102,19 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
   // with it, so every cancel path (console, events) releases it exactly once.
   const freed = releasePlannedOrderForCancelledAction(state, action);
 
-  return freed ? { success: true, action, refunded, freedFootprint: freed } : { success: true, action, refunded };
+  const result: CancelActionResult = { success: true, action, refunded };
+  if (refundedStockKg > 0) result.refundedStockKg = refundedStockKg;
+  if (freed) result.freedFootprint = freed;
+  return result;
+}
+
+/** Restock the explosive a cancelled charge order drew from warehouses (#1678); returns the kg drawn, 0 for legacy or cash-only orders. */
+function refundOrderStock(state: GameState, action: PendingAction): number {
+  if (action.type !== 'charge_hole') return 0;
+  const drawn = action.payload['orderStock'] as { explosiveId: string; kg: number } | undefined;
+  if (!drawn) return 0;
+  returnOrderStock(state, drawn.explosiveId, drawn.kg);
+  return drawn.kg;
 }
 
 /**

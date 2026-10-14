@@ -8,7 +8,8 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor } from './ExplosiveStock.js';
+import { explosivePriceFactor, drawStockForOrder } from './ExplosiveStock.js';
+import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
 type AutoChargeOutcome = 'ordered' | 'awaiting_funds' | 'invalid' | 'skipped';
@@ -65,7 +66,11 @@ export function dispatchChargeAction(
   cancelOutstandingChargeAction(state, hole.id);
 
   const durationTicks = computeChargeHoleDurationTicks(amountKg);
-  const orderCost = chargeOrderCost(explosiveId, amountKg) * explosivePriceFactor(state);
+  // Stock first (the cancel above restocked any replaced order), the rest paid in cash.
+  const { fromStockKg, fromCashKg } = drawStockForOrder(getExplosivesStockByType(state.buildings), explosiveId, amountKg);
+  if (fromStockKg > 0) consumeExplosives(state.buildings, explosiveId, fromStockKg);
+  const orderCost = chargeOrderCost(explosiveId, fromCashKg) * explosivePriceFactor(state);
+  const orderStock = fromStockKg > 0 ? { explosiveId, kg: fromStockKg } : undefined;
   const actionId = state.nextPendingActionId++;
   // Worked from a charging truck by a crew member holding 'blasting' and the
   // truck's licence (#1649). skipQualificationCheck (#554): the order must still
@@ -81,14 +86,17 @@ export function dispatchChargeAction(
     targetY: 0,
     payload: {
       holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
+      ...(orderStock && { orderStock }),
     } satisfies ChargeHoleActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
   state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
 
-  state.cash -= orderCost;
-  addExpense(state.finances, orderCost, 'explosives', `Charge ${hole.id}: ${explosiveId} ${amountKg}kg`, state.tickCount);
+  if (orderCost > 0) {
+    state.cash -= orderCost;
+    addExpense(state.finances, orderCost, 'explosives', `Charge ${hole.id}: ${explosiveId} ${amountKg}kg`, state.tickCount);
+  }
 }
 
 /**
@@ -100,11 +108,21 @@ export function chargeFundsFailureAmount(
   state: GameState,
   orders: ReadonlyArray<{ holeId: string; explosiveId: string; amountKg: number }>,
 ): { need: number } | null {
+  // Stock is simulated sequentially: an earlier order in the batch depletes what a later one finds,
+  // and a replaced hole's outstanding stock draw is restocked first.
+  const stock = { ...getExplosivesStockByType(state.buildings) };
+  const factor = explosivePriceFactor(state);
   let need = 0;
   for (const o of orders) {
     const outstanding = findOutstandingChargeAction(state, o.holeId);
-    const refund = outstanding ? ((outstanding.payload['orderCost'] as number) ?? 0) : 0;
-    need += chargeOrderCost(o.explosiveId, o.amountKg) * explosivePriceFactor(state) - refund;
+    if (outstanding) {
+      need -= (outstanding.payload['orderCost'] as number) ?? 0;
+      const held = outstanding.payload['orderStock'] as ChargeHoleActionPayload['orderStock'];
+      if (held) stock[held.explosiveId] = (stock[held.explosiveId] ?? 0) + held.kg;
+    }
+    const { fromStockKg, fromCashKg } = drawStockForOrder(stock, o.explosiveId, o.amountKg);
+    stock[o.explosiveId] = (stock[o.explosiveId] ?? 0) - fromStockKg;
+    need += chargeOrderCost(o.explosiveId, fromCashKg) * factor;
   }
   // A replacement costing no more than the refunded order needs no new cash,
   // even when the balance is negative. Sub-cent residue is float noise.

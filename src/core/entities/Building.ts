@@ -621,9 +621,10 @@ export function checkFootprintPlacement(
 }
 
 /** Total kg of explosives held in one building, across all explosive ids (#1678). */
-export function warehouseStockKg(_b: Pick<Building, 'storedExplosives'>): number {
-  // TODO: implement
-  return 0;
+export function warehouseStockKg(b: Pick<Building, 'storedExplosives'>): number {
+  let total = 0;
+  for (const kg of Object.values(b.storedExplosives ?? {})) total += kg;
+  return total;
 }
 
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
