@@ -14,7 +14,12 @@ import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { buildPlanEnergyField } from '../../src/core/mining/BlastExecution.js';
 import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
-import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
+import {
+  NAV_MAX_SLOPE_RATIO,
+  DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M,
+  CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
+} from '../../src/core/config/balance.js';
+import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
@@ -899,4 +904,142 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
     // Reachable orders left at the midpoint keep draining afterwards (stranded ones carry a blockedReason and are not counted).
     if (midpointQueued > 0) expect(reachableQueued()).toBeLessThan(midpointQueued);
   }, 240_000);
+});
+
+// ── #1724: a charge too deep to break out keeps its rock in the ground ──────
+
+/** Smooth surface height of every column in the box, keyed "x,z". */
+function surfaceSnapshot(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number): Map<string, number> {
+  const out = new Map<string, number>();
+  for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) out.set(`${x},${z}`, getSmoothTerrainSurfaceY(grid, x, z));
+  return out;
+}
+
+/** Columns whose smooth surface dropped by more than 0.5 m since `before`. */
+function loweredColumns(grid: VoxelGrid, before: Map<string, number>): string[] {
+  const lowered: string[] = [];
+  for (const [key, h0] of before) {
+    const [x, z] = key.split(',').map(Number) as [number, number];
+    if (h0 - getSmoothTerrainSurfaceY(grid, x, z) > 0.5) lowered.push(key);
+  }
+  return lowered;
+}
+
+/** Sandbox desert_badlands seed 42 flat pad: a 3x3 krackle pattern at (28,18). */
+function sandboxBlast(spacing: number, depth: number, kg: number, stemming: number) {
+  const { runner, ctx } = createRunner();
+  expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
+  const grid = ctx.grid!;
+  const holes = createGridPlan({ nextHoleId: 1 }, { x: 28, z: 18 }, 3, 3, spacing, depth, 0.15);
+  const depths: Record<string, number> = {};
+  for (const h of holes) depths[h.id] = h.depth;
+  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, stemming);
+  const plan = assembleBlastPlan(holes, charges);
+  const before = surfaceSnapshot(grid, 18, 50, 10, 40);
+  const result = executeBlast(plan, grid, []);
+  expect(result, 'blast plan was rejected').not.toBeNull();
+  return { grid, result: result!, before };
+}
+
+describe('Blast execution — a charge too deep to break out (#1724)', () => {
+  it('the measured 4 kg pattern does not break out: rock is broken but no column drops', () => {
+    const { grid, result, before } = sandboxBlast(4, 8, 4, 2.5);
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.brokeOut).toBe(false);
+    expect(loweredColumns(grid, before)).toHaveLength(0);
+  });
+
+  it('the measured 4 kg pattern leaves no fragment resting above the pre-blast surface of its column', () => {
+    const { result, before } = sandboxBlast(4, 8, 4, 2.5);
+    expect(result.flights.length).toBeGreaterThan(0);
+    for (const fl of result.flights) {
+      const surface = before.get(`${Math.floor(fl.to.x)},${Math.floor(fl.to.z)}`);
+      if (surface === undefined) continue;
+      expect(fl.to.y, `fragment ${fl.fragmentId} came to rest on top of intact ground`).toBeLessThanOrEqual(surface);
+    }
+  });
+
+  it('the measured 4 kg pattern throws nothing: every flight is a drop', () => {
+    const { result } = sandboxBlast(4, 8, 4, 2.5);
+    expect(result.flights.some(f => f.thrown)).toBe(false);
+  });
+
+  it('the measured 4 kg pattern reports the failure: cap no_breakout, rating no better than bad', () => {
+    const { result } = sandboxBlast(4, 8, 4, 2.5);
+    const report = buildBlastReport(result, 0, 0);
+    expect(report.ratingCap).toBe('no_breakout');
+    expect(['bad', 'catastrophic']).toContain(report.rating);
+    expect(report.brokeOut).toBe(false);
+  });
+
+  it('a pattern that opens a crater (krackle 8 kg) breaks out and is not capped for it', () => {
+    const { grid, result, before } = sandboxBlast(4, 8, 8, 2.5);
+    expect(result.brokeOut).toBe(true);
+    expect(loweredColumns(grid, before).length).toBeGreaterThan(0);
+    expect(buildBlastReport(result, 0, 0).ratingCap).not.toBe('no_breakout');
+  });
+
+  it('the default plan (grid, charge and stemming defaults) breaks out on the sandbox flat pad and lowers the surface', () => {
+    const { grid, result, before } = sandboxBlast(
+      DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
+    );
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.brokeOut).toBe(true);
+    // A crater, not a couple of edge columns: at least one lowered column per hole.
+    expect(loweredColumns(grid, before).length).toBeGreaterThanOrEqual(9);
+    expect(buildBlastReport(result, 0, 0).ratingCap).not.toBe('no_breakout');
+  });
+
+  it('the default plan carries every cleared voxel in a fragment (volume conserved) and opens a crater', () => {
+    const { grid, result, before } = sandboxBlast(
+      DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
+    );
+    expect(loweredColumns(grid, before).length).toBeGreaterThanOrEqual(9);
+    // Volume is conserved: every cleared voxel is carried by a fragment.
+    const volume = result.fragments.reduce((sum, f) => sum + f.volume, 0);
+    expect(volume).toBeCloseTo(result.clearedVoxels, 0);
+  });
+});
+
+describe('Blast execution — the tutorial plan opens the box cut (#1724)', () => {
+  it('tutorial_pit: ramp, then the 3x3 spacing 4 depth 8 plan charged with the defaults, breaks out and lowers the surface', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    const topUp = (): void => {
+      ctx.state!.cash = Math.max(ctx.state!.cash, 500000);
+      for (const e of ctx.state!.employees.employees) { e.fatigue = 100; e.ticksWorked = 0; }
+    };
+    const tickWhile = (pending: () => boolean, cap: number): void => {
+      for (let i = 0; i < cap && pending(); i++) {
+        topUp();
+        run('tick 1');
+        if (ctx.state!.events.pendingEvent) run('event choose 0');
+      }
+    };
+    expect(run('campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    expect(run('build living_quarters at:12,15').success).toBe(true);
+    expect(run('build_ramp start:10,23 end:10,35 depth:6').success).toBe(true);
+    tickWhile(() => ctx.state!.plannedRamps.length > 0 || ctx.state!.pendingActions.some(a => a.type === 'dig_ramp_segment'), 1500);
+    expect(ctx.state!.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
+
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:14,24').success).toBe(true);
+    tickWhile(() => ctx.state!.plannedDrillHoles.length > 0, 1500);
+    expect(ctx.state!.drillHoles.length).toBe(9);
+    expect(run(`charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`).success).toBe(true);
+    tickWhile(() => Object.keys(ctx.state!.plannedChargesByHole).length > 0, 3000);
+    expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
+
+    const grid = ctx.grid!;
+    const before = surfaceSnapshot(grid, 6, 28, 18, 40);
+    topUp();
+    const out = run('blast');
+    expect(out.success, out.output).toBe(true);
+
+    const report = ctx.state!.lastBlastReport!;
+    expect(report.clearedVoxels).toBeGreaterThan(0);
+    expect(report.brokeOut).not.toBe(false);
+    expect(report.ratingCap).not.toBe('no_breakout');
+    // A crater, not a couple of edge columns: at least one lowered column per hole.
+    expect(loweredColumns(grid, before).length).toBeGreaterThanOrEqual(9);
+  }, 300000);
 });

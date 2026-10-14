@@ -267,3 +267,62 @@ describe('buildBlastReport rating caps (#1349)', () => {
     expect(r.ratingCap).toBeUndefined();
   });
 });
+
+describe('applyRatingCaps no breakout (#1724)', () => {
+  it('a blast that never broke out caps a perfect base at bad', () => {
+    expect(applyRatingCaps('perfect', facts({ noBreakout: true }))).toEqual({ rating: 'bad', cap: 'no_breakout' });
+  });
+  it('caps good and mediocre bases at bad too', () => {
+    expect(applyRatingCaps('good', facts({ noBreakout: true }))).toEqual({ rating: 'bad', cap: 'no_breakout' });
+    expect(applyRatingCaps('mediocre', facts({ noBreakout: true }))).toEqual({ rating: 'bad', cap: 'no_breakout' });
+  });
+  it('leaves a bad base alone, no cap reported', () => {
+    expect(applyRatingCaps('bad', facts({ noBreakout: true }))).toEqual({ rating: 'bad', cap: null });
+  });
+  it('leaves a catastrophic base alone, no cap reported', () => {
+    expect(applyRatingCaps('catastrophic', facts({ noBreakout: true }))).toEqual({ rating: 'catastrophic', cap: null });
+  });
+  it('death wins over no breakout', () => {
+    expect(applyRatingCaps('perfect', facts({ noBreakout: true, deaths: 1 }))).toEqual({ rating: 'catastrophic', cap: 'death' });
+  });
+  it('a casualty is reported before no breakout', () => {
+    expect(applyRatingCaps('perfect', facts({ noBreakout: true, injuries: 1 }))).toEqual({ rating: 'bad', cap: 'casualty_or_destruction' });
+    expect(applyRatingCaps('good', facts({ noBreakout: true, destroyedBuildings: 1 }))).toEqual({ rating: 'bad', cap: 'casualty_or_destruction' });
+  });
+  it('is reported ahead of the milder caps it subsumes', () => {
+    expect(applyRatingCaps('perfect', facts({ noBreakout: true, oversizedFragments: 90 }))).toEqual({ rating: 'bad', cap: 'no_breakout' });
+    expect(applyRatingCaps('perfect', facts({ noBreakout: true, wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 10 })))
+      .toEqual({ rating: 'bad', cap: 'no_breakout' });
+  });
+  it('noBreakout false or undefined changes nothing', () => {
+    expect(applyRatingCaps('perfect', facts({ noBreakout: false }))).toEqual({ rating: 'perfect', cap: null });
+    expect(applyRatingCaps('perfect', facts())).toEqual({ rating: 'perfect', cap: null });
+    expect(applyRatingCaps('perfect', facts({ noBreakout: undefined }))).toEqual({ rating: 'perfect', cap: null });
+  });
+});
+
+describe('buildBlastReport no breakout (#1724)', () => {
+  const sealed = (o: Partial<BlastResult> = {}): BlastResult => ({ ...emptyResult(), clearedVoxels: 300, brokeOut: false, ...o });
+
+  it('a cleared blast that did not break out is rated no better than bad with cap no_breakout', () => {
+    const r = buildBlastReport(sealed(), 0, 0);
+    expect(r.rating).toBe('bad');
+    expect(r.baseRating).toBe('perfect');
+    expect(r.ratingCap).toBe('no_breakout');
+    expect(r.brokeOut).toBe(false);
+  });
+  it('a blast that broke out is not capped', () => {
+    const r = buildBlastReport(sealed({ brokeOut: true }), 0, 0);
+    expect(r.rating).toBe('perfect');
+    expect(r.ratingCap).toBeUndefined();
+  });
+  it('a blast that cleared nothing is not blamed for failing to break out', () => {
+    const r = buildBlastReport(sealed({ clearedVoxels: 0 }), 0, 0);
+    expect(r.ratingCap).toBeUndefined();
+  });
+  it('a result without brokeOut (old saves) reads as broke out', () => {
+    const { brokeOut: _omit, ...rest } = sealed();
+    const r = buildBlastReport(rest as BlastResult, 0, 0);
+    expect(r.ratingCap).toBeUndefined();
+  });
+});

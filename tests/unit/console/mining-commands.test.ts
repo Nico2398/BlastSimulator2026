@@ -18,6 +18,8 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
+import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { carveRampSegment } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../src/core/config/balance.js';
@@ -2183,5 +2185,50 @@ describe('previewCommand (#790 characterization)', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe('Usage: preview energy|fragments|projections|vibrations');
+  });
+});
+
+// ── blast report line for a blast that did not break out (#1724) ──────────
+
+describe('blastCommand — no breakout report line (#1724)', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** Charge one hole and fire it, with the executed blast's `brokeOut` forced to `brokeOut`. */
+  function fireWith(brokeOut: boolean | undefined, clearedOverride?: number) {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
+    const real = BlastExecutionModule.executeBlastSteps;
+    vi.spyOn(BlastExecutionModule, 'executeBlastSteps').mockImplementation(function* (...args: Parameters<typeof real>) {
+      const result = yield* real(...args);
+      result.brokeOut = brokeOut;
+      if (clearedOverride !== undefined) result.clearedVoxels = clearedOverride;
+      return result;
+    });
+    const result = blastCommand(ctx, [], {});
+    expect(result.success).toBe(true);
+    return result;
+  }
+
+  it('says the blast did not break out when voxels were cleared and brokeOut is false', () => {
+    const result = fireWith(false, 40);
+    expect(result.output).toContain(t('mining.blast.no_breakout'));
+  });
+
+  it('says nothing about it when the blast broke out', () => {
+    const result = fireWith(true, 40);
+    expect(result.output).not.toContain(t('mining.blast.no_breakout'));
+  });
+
+  it('says nothing about it when brokeOut is absent', () => {
+    const result = fireWith(undefined, 40);
+    expect(result.output).not.toContain(t('mining.blast.no_breakout'));
+  });
+
+  it('says nothing about it when nothing was cleared, whatever brokeOut says', () => {
+    const result = fireWith(false, 0);
+    expect(result.output).not.toContain(t('mining.blast.no_breakout'));
   });
 });
