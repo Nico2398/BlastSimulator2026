@@ -12,7 +12,7 @@
 import type { WeatherState } from './WeatherCycle.js';
 import { WEATHER_FALLBACK_CLIMATE } from '../config/balance.js';
 
-export interface WeatherClimate {
+interface WeatherClimate {
   /** Weighted next-state options per state (weights are normalized at runtime). */
   transitions: Record<WeatherState, Array<[WeatherState, number]>>;
   /** Inclusive [min, max] tick duration per state (1 tick = 1 game-hour). */
