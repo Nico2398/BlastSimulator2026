@@ -169,3 +169,26 @@ describe('BlastFooter', () => {
     });
   });
 });
+
+describe('BlastFooter cost net of stock (#1685)', () => {
+  it('shows only the cash part of a charge partly drawn from stock', () => {
+    const { footer } = makeFooter();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 3 };
+    footer.update(state);
+    // 2 kg x $12 cash
+    expect(footer.root.textContent).toContain('$24');
+    expect(footer.root.textContent).not.toContain('$60');
+  });
+
+  it('shows $0 cost for a pattern fully covered by stock', () => {
+    const { footer } = makeFooter();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.chargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 5 };
+    footer.update(state);
+    expect(footer.root.textContent).toContain('$0');
+    expect(footer.root.textContent).not.toContain('$60');
+  });
+});

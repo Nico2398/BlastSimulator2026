@@ -168,7 +168,7 @@ export function paintToggleButton(btn: HTMLElement, active: boolean, inactiveBor
 }
 
 /** Stat grid (blast report, pre-flight): N equal columns, each a key/value cell. */
-export function statGrid(items: { key: string; value: string; color?: string }[], columns: number): HTMLElement {
+export function statGrid(items: { key: string; value: string; color?: string; info?: string }[], columns: number): HTMLElement {
   const grid = el('div', { className: 'bsx-stat-grid' });
   grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
   for (const item of items) {
@@ -176,6 +176,7 @@ export function statGrid(items: { key: string; value: string; color?: string }[]
     cell.appendChild(el('span', { className: 'bsx-stat-key', text: item.key }));
     const valueEl = el('span', { className: 'bsx-stat-value', text: item.value });
     if (item.color) valueEl.style.color = item.color;
+    if (item.info) valueEl.dataset['info'] = item.info;
     cell.appendChild(valueEl);
     grid.appendChild(cell);
   }

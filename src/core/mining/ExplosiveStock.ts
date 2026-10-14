@@ -29,18 +29,31 @@ type BuyStockResult =
   | { success: true; kg: number; cost: number; pricePerKg: number; stockKg: number; capacityKg: number }
   | { success: false; reason: BuyStockFailure; freeKg?: number; need?: number };
 
+/** Pure pre-check mirroring buyExplosiveStock's validation order; null when the purchase would succeed (#1685). */
+export function buyStockBlockReason(
+  state: Pick<GameState, 'buildings' | 'cash' | 'campaign' | 'events' | 'tickCount'>,
+  explosiveId: string,
+  kg: number,
+): BuyStockFailure | null {
+  if (!Number.isInteger(kg) || kg < 1) return 'invalid_amount';
+  if (!getExplosive(explosiveId)) return 'unknown_explosive';
+  if (!isExplosiveAvailable(state.campaign.activeLevelId, explosiveId)) return 'not_available';
+  if (getExplosivesCapacity(state.buildings) <= 0) return 'no_warehouse';
+  if (kg > getExplosivesFreeCapacity(state.buildings)) return 'over_capacity';
+  if (kg * bulkPricePerKg(explosiveId, explosivePriceFactor(state)) > state.cash) return 'insufficient_funds';
+  return null;
+}
+
 /** Buy `kg` of an explosive into warehouse stock, paying bulk price. Refusals mutate nothing. */
 export function buyExplosiveStock(state: GameState, explosiveId: string, kg: number): BuyStockResult {
-  if (!Number.isInteger(kg) || kg < 1) return { success: false, reason: 'invalid_amount' };
-  if (!getExplosive(explosiveId)) return { success: false, reason: 'unknown_explosive' };
-  if (!isExplosiveAvailable(state.campaign.activeLevelId, explosiveId)) return { success: false, reason: 'not_available' };
+  const reason = buyStockBlockReason(state, explosiveId, kg);
+  if (reason === 'over_capacity') return { success: false, reason, freeKg: getExplosivesFreeCapacity(state.buildings) };
+  if (reason === 'insufficient_funds') return { success: false, reason, need: kg * bulkPricePerKg(explosiveId, explosivePriceFactor(state)) };
+  if (reason) return { success: false, reason };
+
   const capacityKg = getExplosivesCapacity(state.buildings);
-  if (capacityKg <= 0) return { success: false, reason: 'no_warehouse' };
-  const freeKg = getExplosivesFreeCapacity(state.buildings);
-  if (kg > freeKg) return { success: false, reason: 'over_capacity', freeKg };
   const pricePerKg = bulkPricePerKg(explosiveId, explosivePriceFactor(state));
   const cost = kg * pricePerKg;
-  if (cost > state.cash) return { success: false, reason: 'insufficient_funds', need: cost };
 
   storeExplosives(state.buildings, explosiveId, kg);
   state.cash -= cost;
@@ -56,6 +69,17 @@ export function drawStockForOrder(
 ): { fromStockKg: number; fromCashKg: number } {
   const fromStockKg = Math.min(kg, Math.max(0, stock[explosiveId] ?? 0));
   return { fromStockKg, fromCashKg: kg - fromStockKg };
+}
+
+/** Like drawStockForOrder, but depletes `pool` in place so the next order in a batch sees what is left. */
+export function drawFromStockPool(
+  pool: Record<string, number>,
+  explosiveId: string,
+  kg: number,
+): { fromStockKg: number; fromCashKg: number } {
+  const draw = drawStockForOrder(pool, explosiveId, kg);
+  pool[explosiveId] = (pool[explosiveId] ?? 0) - draw.fromStockKg;
+  return draw;
 }
 
 /** Kg of a charge order served from warehouse stock at order time (#1678). */

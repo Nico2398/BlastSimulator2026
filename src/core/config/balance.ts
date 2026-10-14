@@ -510,6 +510,9 @@ export const EXPLOSIVE_ENERGY_SCALE = 10.0;
 /** Bulk purchase price relative to the per-order price of an explosive (#1678). */
 export const EXPLOSIVE_BULK_PRICE_FACTOR = 0.7;
 
+/** Kg added or removed per click of the stock purchase stepper (#1685). */
+export const STOCK_BUY_STEP_KG = 50;
+
 /** Kinetic energy (in joules) that one unit of blast energy imparts to a fragment
  *  it throws. Absorption thresholds are a balance scale rather than joules, so
  *  turning leftover energy into a speed needs an explicit conversion — without one

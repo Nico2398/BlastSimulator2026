@@ -13,7 +13,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
-import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
+import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
 export class BlastFooter {
   private readonly el: HTMLElement;
@@ -59,6 +59,7 @@ export class BlastFooter {
     margin.wrap.style.alignItems = 'flex-end';
 
     this.costEl = cost.value;
+    this.costEl.dataset['info'] = 'plan-cost';
     this.valueEl = value.value;
     this.marginEl = margin.value;
     row.append(cost.wrap, value.wrap, margin.wrap);
@@ -86,7 +87,7 @@ export class BlastFooter {
     const hasHoles = plan.holes.length > 0;
     const fireOk = hasHoles && errors.length === 0;
 
-    const planCost = plannedChargesCost(state.chargesByHole);
+    const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
     const margin = estValue - planCost;
 

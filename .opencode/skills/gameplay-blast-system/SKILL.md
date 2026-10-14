@@ -301,3 +301,7 @@ points for an ordinary blast and ~5 for an oversized one.
 - `scripts/verify-blast-visual.ts` photographs a blast before, mid-collapse and settled, and dumps
   the muck pile behind each shot. Its camera looks *into* the site: a blast digs a hole, and from
   eye level the crater's rim hides everything in it. `setOrbit` takes **degrees**.
+
+## Charge cost: cash vs stock (#1685)
+
+A charge order records `fromStockKg` (the part drawn from warehouse stock at order time) on `plannedChargesByHole`, carried into `chargesByHole` on loading. Every cost shown to the player is the cash part at list price (`recordedChargesCost`; forward preview `stockAwareChargesCost`). `BlastReport.spent` = cash, `BlastReport.spentFromStock` = list value of the stock kg. Detail in `gameplay-buildings`.

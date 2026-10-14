@@ -8,7 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor, drawStockForOrder, readOrderStock, type OrderStockDraw } from './ExplosiveStock.js';
+import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, type OrderStockDraw } from './ExplosiveStock.js';
 import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
@@ -91,7 +91,7 @@ export function dispatchChargeAction(
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
-  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
+  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM, ...(fromStockKg > 0 && { fromStockKg }) };
 
   if (orderCost > 0) {
     state.cash -= orderCost;
@@ -120,8 +120,7 @@ export function chargeFundsFailureAmount(
       const held = readOrderStock(outstanding);
       if (held) stock[held.explosiveId] = (stock[held.explosiveId] ?? 0) + held.kg;
     }
-    const { fromStockKg, fromCashKg } = drawStockForOrder(stock, o.explosiveId, o.amountKg);
-    stock[o.explosiveId] = (stock[o.explosiveId] ?? 0) - fromStockKg;
+    const { fromCashKg } = drawFromStockPool(stock, o.explosiveId, o.amountKg);
     need += chargeOrderCost(o.explosiveId, fromCashKg) * factor;
   }
   // A replacement costing no more than the refunded order needs no new cash,

@@ -848,4 +848,25 @@ describe('BlastReportModal rating cap note (#1349)', () => {
       expect(modal.root.textContent).not.toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
     }
   });
+
+  it('shows the from-stock stat when explosives came from warehouse stock (#1685)', () => {
+    const { modal, setPlayback } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport({ spentFromStock: 480 });
+
+    openReport(modal, state, setPlayback);
+
+    const stat = modal.root.querySelector('[data-info="report-spent-from-stock"]');
+    expect(stat?.textContent).toContain('$480');
+  });
+
+  it('omits the from-stock stat when nothing came from stock (#1685)', () => {
+    const { modal, setPlayback } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport({ spentFromStock: 0 });
+
+    openReport(modal, state, setPlayback);
+
+    expect(modal.root.querySelector('[data-info="report-spent-from-stock"]')).toBeNull();
+  });
 });
