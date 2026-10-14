@@ -80,7 +80,7 @@ export interface TrainingState {
   skill: SkillCategory;
   ticksRemaining: number;
   fee: number;
-  /** Set when the course raises an already-held driving licence to this level (#1524). */
+  /** Legacy (#1524, pre-grantsLevel saves): course raises a held driving licence to this level. New courses set grantsLevel. */
   raisesLicenceTo?: Exclude<LicenceLevel, 1>;
   /** Level the course brings the skill to; absent in older saves (completes as before). */
   grantsLevel?: 1 | 2 | 3;

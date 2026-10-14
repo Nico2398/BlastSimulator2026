@@ -1,12 +1,13 @@
 // BlastSimulator2026 — Employee training
 //
-// Training is the only way to obtain a qualification a role is not hired with.
-// It never raises proficiency — XP from work does. Roles arrive holding their own
-// licences (ROLE_STARTING_QUALIFICATIONS); `driving.rock_fragmenter` belongs to
-// no hiring role, so without a reachable course nobody could hold it.
+// A course at a tier-N school brings a skill to level N (never above the tier):
+// it unlocks a missing skill or upgrades a held one. Higher levels come from
+// working (XP), not from schools. Roles arrive holding their own licences
+// (ROLE_STARTING_QUALIFICATIONS); `driving.rock_fragmenter` belongs to no hiring
+// role, so without a reachable course nobody could hold it.
 
 import type { Employee, EmployeeState, SkillCategory, TrainingState, LicenceLevel } from './Employee.js';
-import { calculateSalary } from './Employee.js';
+import { calculateSalary, qualificationAtLevel } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
 import { getBuildingPeopleCapacity, isOperating } from './Building.js';
 import type { GameState } from '../state/GameState.js';
@@ -18,10 +19,10 @@ import {
   TRAINING_BUILDING_SKILLS,
   TRAINING_BASE_TICKS,
   TRAINING_TIER_SPEED,
-  TRAINING_BASE_FEE,
+  TRAINING_LEVEL_FEE,
+  TRAINING_LEVEL_TICKS_MULT,
   QUALIFICATION_SALARY_BONUS,
-  LICENCE_COURSE_FEE,
-  LICENCE_COURSE_TICKS_MULT,
+  XP_THRESHOLDS,
 } from '../config/balance.js';
 
 export type ProficiencyLevel = 1 | 2 | 3 | 4 | 5;
@@ -99,17 +100,18 @@ export function availableTrainingOffers(buildings: readonly Building[]): SkillOf
 /** What a course would cost and grant. */
 export interface TrainingPlan {
   skill: SkillCategory;
+  /** Level the course brings the skill to: the school's tier. */
+  grantsLevel: 1 | 2 | 3;
+  /** Whether the course unlocks a missing skill or upgrades a held one. */
+  kind: 'unlock' | 'upgrade';
   ticks: number;
   fee: number;
-  /** Salary raise (per pay cycle) the new qualification causes on grant. */
+  /** Salary raise (per pay cycle) the course causes on grant. */
   salaryIncrease: number;
-  /** Set when the course raises an already-held driving licence to this level (#1524). */
-  raisesLicenceTo?: Exclude<LicenceLevel, 1>;
-  /** Level the course brings the skill to (the school's tier, capped at 3). */
-  grantsLevel?: 1 | 2 | 3;
-  /** Whether the course unlocks a missing skill or upgrades a held one. */
-  kind?: 'unlock' | 'upgrade';
 }
+
+/** Whether `skill` is a driving licence (levelled by licenceLevel, not proficiency). */
+export const isLicenceSkill = (skill: SkillCategory): boolean => skill.startsWith('driving.');
 
 /**
  * Level at which `qualifications` hold `skill`: the licence level for driving
@@ -119,8 +121,9 @@ export function heldCourseLevel(
   qualifications: readonly Employee['qualifications'][number][],
   skill: SkillCategory,
 ): 0 | ProficiencyLevel {
-  void qualifications; void skill;
-  return 0; // TODO: implement
+  const held = qualifications.find(q => q.category === skill);
+  if (!held) return 0;
+  return isLicenceSkill(skill) ? (held.licenceLevel ?? 1) : held.proficiencyLevel;
 }
 
 /** Refusal of a course the school's tier cannot give (held level >= tier, or tier 3 reached). */
@@ -129,41 +132,45 @@ export function trainingRefusal(
   skill: SkillCategory,
   tier: BuildingTier,
 ): { error: string } & RefusalKey {
-  void employee; void skill; void tier;
-  return { error: '' }; // TODO: implement
+  const held = heldCourseLevel(employee.qualifications, skill);
+  if (held >= 3 || tier >= 3) {
+    return {
+      error: `${employee.name} already holds ${skill} at the highest level a school teaches`,
+      errorKey: 'employees.train_top_level',
+      errorParams: { name: employee.name, skill },
+    };
+  }
+  const school = schoolFor(skill) ?? '';
+  return {
+    error: `${employee.name} already holds ${skill} at level ${held}; a higher-tier ${school} is needed`,
+    errorKey: 'employees.train_needs_higher_school',
+    errorParams: { name: employee.name, skill, level: held, school },
+  };
 }
 
 /**
- * Cost and duration of a course in a skill.
+ * Cost and duration of a course in a skill: a tier-N school brings it to level N.
  *
- * @returns The plan, or null when the employee already holds the skill at any
- *   level — courses grant missing qualifications only.
+ * @returns The plan, or null when the employee already holds the skill at the
+ *   school's tier or above — see `trainingRefusal` for the reason.
  */
 export function planTraining(
   employee: Employee,
   skill: SkillCategory,
   tier: BuildingTier,
 ): TrainingPlan | null {
-  const held = employee.qualifications.find(q => q.category === skill);
-  const baseTicks = TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[tier];
-  if (!held) {
-    return {
-      skill,
-      salaryIncrease: QUALIFICATION_SALARY_BONUS[1],
-      ticks: Math.max(1, Math.round(baseTicks)),
-      fee: TRAINING_BASE_FEE,
-    };
-  }
-  // A held driving licence can be raised a level at a time; any other held skill is refused.
-  const level = held.licenceLevel ?? 1;
-  if (!skill.startsWith('driving.') || level >= 3) return null;
-  const next = (level + 1) as 2 | 3;
+  const held = heldCourseLevel(employee.qualifications, skill);
+  if (held >= tier) return null;
+  const unlock = held === 0;
+  const bonus = unlock ? QUALIFICATION_SALARY_BONUS[tier] : QUALIFICATION_SALARY_BONUS[tier] - QUALIFICATION_SALARY_BONUS[held as ProficiencyLevel];
   return {
     skill,
-    salaryIncrease: 0,
-    ticks: Math.max(1, Math.round(baseTicks * LICENCE_COURSE_TICKS_MULT[next])),
-    fee: LICENCE_COURSE_FEE[next],
-    raisesLicenceTo: next,
+    grantsLevel: tier,
+    kind: unlock ? 'unlock' : 'upgrade',
+    // A driving licence is a pass, not a rank: the unlock pays the level-1 bonus and raises pay nothing.
+    salaryIncrease: isLicenceSkill(skill) ? (unlock ? QUALIFICATION_SALARY_BONUS[1] : 0) : bonus,
+    ticks: Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[tier] * TRAINING_LEVEL_TICKS_MULT[tier])),
+    fee: TRAINING_LEVEL_FEE[tier],
   };
 }
 
@@ -236,12 +243,7 @@ export function enrolInTraining(
   }
 
   const plan = planTraining(employee, skill, building.tier);
-  if (!plan) return {
-    success: false,
-    error: `Already qualified in ${skill}`,
-    errorKey: 'employees.train_already_qualified',
-    errorParams: { name: employee.name, skill },
-  };
+  if (!plan) return { success: false, ...trainingRefusal(employee, skill, building.tier) };
 
   if (isSchoolFull(state, building)) {
     return {
@@ -263,18 +265,18 @@ export function enrolInTraining(
   // Only the walk-in is queued here — arrival (moving this into
   // `trainingState`) is ArrivalGate.tickArrivalGate's job, mirroring
   // pendingRestDuration's claim-time/arrival-time split.
-  employee.pendingTrainingState = { buildingId: building.id, skill, ticksRemaining: plan.ticks, fee: plan.fee, ...(plan.raisesLicenceTo !== undefined && { raisesLicenceTo: plan.raisesLicenceTo }) };
+  employee.pendingTrainingState = { buildingId: building.id, skill, ticksRemaining: plan.ticks, fee: plan.fee, grantsLevel: plan.grantsLevel };
 
   return { success: true, fee: plan.fee, plan };
 }
 
-/** One course that finished on this tick: a new qualification (level 1, isNew true) or a licence-level raise (isNew false, proficiency unchanged). */
+/** One course that finished on this tick: a new qualification (isNew true) or a raise of a held one (isNew false); `level` is the level reached (licence level for driving). */
 export interface TrainingCompletion {
   employeeId: number;
   employeeName: string;
   skill: SkillCategory;
   level: ProficiencyLevel;
-  /** True when the course taught a skill the employee did not hold; false for a licence-level raise. */
+  /** True when the course taught a skill the employee did not hold; false for a raise. */
   isNew: boolean;
 }
 
@@ -288,8 +290,8 @@ export interface TrainingCancellation {
 }
 
 /**
- * Tick every employee in training. On completion the qualification is granted at
- * Rookie level with no XP; proficiency only grows from work. Also reports courses cancelled mid-way
+ * Tick every employee in training. On completion the skill reaches the course's
+ * `grantsLevel` (the school's tier); a held skill is only ever raised. Also reports courses cancelled mid-way
  * (#1203 — the school teaching them was demolished), each refunding its fee.
  */
 export function tickTraining(
@@ -332,13 +334,31 @@ export function tickTraining(
     emp.trainingState = null;
     leaveBuilding(state, emp.id, emitter);
 
-    // Enrolment refuses a held skill, but the employee may have gained it
-    // mid-course (e.g. assign_skill). The course then teaches nothing: no
-    // completion, event or salary recompute.
+    const grants = trainingState.grantsLevel;
+    if (grants !== undefined) {
+      const held = emp.qualifications.find(q => q.category === skill);
+      // Stale when the employee reached this level mid-course (work, assign_skill): nothing taught.
+      if (heldCourseLevel(emp.qualifications, skill) >= grants) continue;
+      const isNew = !held;
+      if (isLicenceSkill(skill)) {
+        if (held) held.licenceLevel = grants as LicenceLevel;
+        else emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0, ...(grants > 1 && { licenceLevel: grants as LicenceLevel }) });
+      } else if (held) {
+        held.proficiencyLevel = grants;
+        held.xp = Math.max(held.xp, XP_THRESHOLDS[grants]);
+      } else {
+        emp.qualifications.push(qualificationAtLevel(skill, grants));
+      }
+      emp.salary = calculateSalary(emp);
+      completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level: grants, isNew });
+      emitter?.emit('employee:trained', { employeeId: emp.id, skill, level: grants, isNew });
+      continue;
+    }
+
+    // Legacy in-flight course (saved before grantsLevel): level-1 unlock or licence raise.
     const held = emp.qualifications.find(q => q.category === skill);
     const raisesTo = trainingState.raisesLicenceTo;
     if (raisesTo !== undefined) {
-      // Licence raise: only the level moves; proficiency and XP are untouched. Stale if already at or past it.
       if (!held || (held.licenceLevel ?? 1) >= raisesTo) continue;
       held.licenceLevel = raisesTo;
       completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level: held.proficiencyLevel, isNew: false });
@@ -347,7 +367,6 @@ export function tickTraining(
     }
     if (held) continue;
     emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0 });
-    // A newly qualified employee demands more pay; calculateSalary keeps earned raises.
     emp.salary = calculateSalary(emp);
 
     completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level: 1, isNew: true });
