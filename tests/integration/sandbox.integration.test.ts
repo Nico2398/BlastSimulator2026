@@ -21,7 +21,6 @@ import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
-import type { GameState } from '../../src/core/state/GameState.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 /**

@@ -41,7 +41,6 @@ import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
-import type { GameState } from '../../src/core/state/GameState.js';
 import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, PLAYER_BLAST_VERB, type Run } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ import { isBarrenFragment } from '../../src/core/economy/SpoilHeaps.js';
 import { haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
+import { tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 const cap = (tier: 1 | 2 | 3) => getBuildingDef('freight_warehouse', tier).capacity;
 
