@@ -178,7 +178,7 @@ describe('oresSurveyedAt (#1703)', () => {
     });
 
     it('fall back when only surfaceYs is missing', () => {
-      const s = { ...depthSurvey(), surfaceYs: undefined };
+      const { surfaceYs: _omitted, ...s } = depthSurvey();
       expect(oresSurveyedAt(s, 12, 8, 3)).toEqual({ grumpite: 0.5 });
     });
   });
