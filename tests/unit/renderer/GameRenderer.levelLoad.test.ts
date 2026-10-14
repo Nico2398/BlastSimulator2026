@@ -222,7 +222,7 @@ describe('GameRenderer — staged level load (#474)', () => {
 // it pointing at the first level's disposed material.
 
 describe('GameRenderer — landscape material follows the terrain material across level loads (#1674)', () => {
-  const ctxFor = (mineType: string): Promise<MiningContext> =>
+  const ctxFor = async (mineType: string): Promise<MiningContext> =>
     makeGameContext({ mineType, seed: '42', size: '64' });
 
   function stagedLoad(renderer: GameRenderer, ctx: MiningContext): void {
