@@ -188,6 +188,8 @@ A `reposition` goal moves a vehicle with no work attached: parking the fleet cle
 
 ## Cost Model
 
+Ranking is tier first, then cost (`ACTION_RANK_TIER`, #1742; see `gameplay-employee-skills`): cost orders candidates only within a rank tier, so a cheap haul never outranks a `charge_hole`.
+
 A queued action's cost is the itinerary's cost. For a vehicle-gated action claimed by an employee
 on foot that is exactly:
 

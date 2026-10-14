@@ -1548,7 +1548,7 @@ describe('charge orders outrank reserved-ahead debris hauling (#1742)', () => {
     const { state, employee, charge } = blasterWithReservedHaul();
     employee.taskQueue = [];
     state.pendingActions = state.pendingActions.filter(a => a.id !== 1);
-    const { employee: driver } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    const { employee: driver } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2);
     assignSkill(state.employees, driver.id, ROLE_LICENCE_REQUIRED.charging_truck, 1);
 
     const selection = claimOnePoolCandidate(state, employee, false, true);
