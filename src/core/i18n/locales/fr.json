@@ -2824,6 +2824,7 @@
   "ui.survey.depth_range": "{from}-{to} m",
   "ui.survey.depth_surface": "surface",
   "ui.survey.depth_log_heading": "Profil en profondeur",
+  "ui.survey.depth_log_row": "{range} : {ores}",
   "ui.survey.duration_ticks": "{ticks}t",
   "ui.survey.note_core_sample": "Le moins cher et le plus précis, mais un seul point — aucun rayon.",
   "ui.survey.note_seismic": "Endommage les bâtiments dans un rayon de {radius} cases (−{hp} PV).",

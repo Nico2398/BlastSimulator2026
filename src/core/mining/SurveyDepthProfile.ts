@@ -1,8 +1,8 @@
-// BlastSimulator2026 — Depth-resolved survey results (stubs, #1683)
+// BlastSimulator2026 — Depth-resolved survey results (#1683)
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Random } from '../math/Random.js';
-import { averageSolidOreDensity, clamp, roundToEstimateStep } from './SurveyCalc.js';
+import { averageSolidOreDensity, clamp, roundToEstimateStep } from './SurveyEstimateMath.js';
 
 /** One depth slice of a surveyed column. */
 export interface SurveyDepthBand {
@@ -66,29 +66,28 @@ export function buildDepthProfile(
   return bands;
 }
 
-/** Metre span from the first to the last band holding the ore; undefined when absent. */
-export function oreDepthSpan(
-  bands: readonly SurveyDepthBand[] | undefined,
-  oreId: string,
-): { fromM: number; toM: number } | undefined {
-  let fromM = Infinity;
-  let toM = -Infinity;
-  for (const band of bands ?? []) {
-    if (band.ores[oreId] === undefined) continue;
-    fromM = Math.min(fromM, band.fromM);
-    toM = Math.max(toM, band.toM);
-  }
-  return toM === -Infinity ? undefined : { fromM, toM };
-}
-
 /** Depth ranges (shallowest first) of each band that reports the ore, as given, not merged. */
 export function oreDepthBands(
   bands: readonly SurveyDepthBand[] | undefined,
   oreId: string,
 ): Array<{ fromM: number; toM: number }> {
+  if (!Array.isArray(bands)) return []; // malformed saved profile
   const out: Array<{ fromM: number; toM: number }> = [];
-  for (const band of bands ?? []) {
-    if (band.ores[oreId] !== undefined) out.push({ fromM: band.fromM, toM: band.toM });
+  for (const band of bands) {
+    if (band?.ores?.[oreId] !== undefined) out.push({ fromM: band.fromM, toM: band.toM });
   }
   return out;
+}
+
+/** Metre span from the first to the last band holding the ore; undefined when absent. */
+export function oreDepthSpan(
+  bands: readonly SurveyDepthBand[] | undefined,
+  oreId: string,
+): { fromM: number; toM: number } | undefined {
+  const ranges = oreDepthBands(bands, oreId);
+  if (ranges.length === 0) return undefined;
+  return {
+    fromM: Math.min(...ranges.map((r) => r.fromM)),
+    toM: Math.max(...ranges.map((r) => r.toM)),
+  };
 }

@@ -41,7 +41,7 @@ export function buildDepthLog(survey: SurveyResult): HTMLElement | null {
     const ores = Object.entries(band.ores).sort((a, b) => b[1] - a[1])
       .map(([oreId, density]) => `${t(`ore.${oreId}.name`)} ${Math.round(density * 100)}%`).join(', ');
     log.appendChild(el('span', {
-      text: `${t('ui.survey.depth_range', { from: band.fromM, to: band.toM })}: ${ores}`,
+      text: t('ui.survey.depth_log_row', { range: t('ui.survey.depth_range', { from: band.fromM, to: band.toM }), ores }),
       className: 'bsx-mono',
       attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' },
     }));

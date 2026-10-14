@@ -2824,6 +2824,7 @@
   "ui.survey.depth_range": "{from}-{to} m",
   "ui.survey.depth_surface": "surface",
   "ui.survey.depth_log_heading": "Depth log",
+  "ui.survey.depth_log_row": "{range}: {ores}",
   "ui.survey.duration_ticks": "{ticks}t",
   "ui.survey.note_core_sample": "Cheapest and most accurate, but a single point — no radius.",
   "ui.survey.note_seismic": "Damages buildings within {radius} cells (−{hp} HP).",
