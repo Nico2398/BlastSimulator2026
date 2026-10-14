@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
 import type { VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
-import { buildTerrainContext, climateBiasLandingOn } from '../../../src/core/world/TerrainGen.js';
-import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
-import { getAllBiomes, type BiomeDef } from '../../../src/core/world/BiomeCatalog.js';
+import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
-import { ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
+import { SEEDS, BLOCK, MAX_DEPTH, sampleSite, blockIndexOf, shareBelow, richestDecileOverMedian, argmax, peakBlockByOre, type SiteOre } from '../../helpers/oreSite.js';
+import { createRunner } from '../../../src/console/createRunner.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
 const CRUITE_COMPOSITION: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
@@ -99,68 +98,7 @@ describe('OreVeinSampler', () => {
 // Ore progression by depth, per biome (#1677)
 // ---------------------------------------------------------------------------
 
-const SEEDS = [1, 7, 42] as const;
-const SITE = 64;
-const DATUM = 17;
-const INTERIOR_LO = 8;
-const INTERIOR_HI = 56;
-const BLOCK = 8;
-const MAX_DEPTH = 40;
-/** Sample every 2nd voxel on each axis (64 of 512 per block); each sample stands for 8 m3. */
-const STRIDE = 2;
-const SAMPLE_VOLUME_M3 = STRIDE * STRIDE * STRIDE;
 const MIN_BLOCK_ORE_KG = 2000;
-
-interface SiteOre {
-  /** blockMass[slab][bx * 6 + bz] = ore kg in that 8x8x8 block. slab = floor(depth / 8). */
-  blockMass: number[][];
-  /** oreKg[depth][oreId] summed over every sampled interior column. */
-  oreKgByDepth: Record<string, number>[];
-}
-
-const siteCache = new Map<string, SiteOre>();
-
-/** Samples ore mass by depth over a site's interior, exactly as the sandbox builds its terrain. */
-function sampleSite(biome: BiomeDef, seed: number): SiteOre {
-  const key = `${biome.id}:${seed}`;
-  const cached = siteCache.get(key);
-  if (cached) return cached;
-
-  const { worldGen, strata, oreVeins, biome: generated } = buildTerrainContext({
-    sizeX: SITE, sizeZ: SITE, datum: DATUM, seed,
-    climateBias: climateBiasLandingOn(seed, SITE, SITE, biome),
-  });
-  // The fixture is only meaningful if the site really is the requested biome.
-  expect(generated.id).toBe(biome.id);
-
-  const blocksPerAxis = (INTERIOR_HI - INTERIOR_LO) / BLOCK;
-  const slabs = Math.ceil(MAX_DEPTH / BLOCK);
-  const blockMass = Array.from({ length: slabs }, () => new Array<number>(blocksPerAxis * blocksPerAxis).fill(0));
-  const oreKgByDepth: Record<string, number>[] = Array.from({ length: MAX_DEPTH }, () => ({}));
-
-  for (let x = INTERIOR_LO; x < INTERIOR_HI; x += STRIDE) {
-    for (let z = INTERIOR_LO; z < INTERIOR_HI; z += STRIDE) {
-      const surfaceY = Math.round(sampleSurfaceHeightY(worldGen, x, z));
-      const boundaries = strata.boundariesAt(x, z);
-      const blockIdx = Math.floor((x - INTERIOR_LO) / BLOCK) * blocksPerAxis + Math.floor((z - INTERIOR_LO) / BLOCK);
-      for (let depth = 0; depth < MAX_DEPTH; depth += STRIDE) {
-        const y = surfaceY - depth;
-        const composition = strata.compositionAt(x, y, z, depth, boundaries);
-        const ores = oreVeins.densitiesAt(x, y, z, depth, composition, generated.oreRichness);
-        for (const [oreId, density] of Object.entries(ores)) {
-          const kg = density * SAMPLE_VOLUME_M3 * ORE_DENSITY_KG_M3;
-          const slabMass = blockMass[Math.floor(depth / BLOCK)]!;
-          slabMass[blockIdx] = (slabMass[blockIdx] ?? 0) + kg;
-          const byOre = oreKgByDepth[depth]!;
-          byOre[oreId] = (byOre[oreId] ?? 0) + kg;
-        }
-      }
-    }
-  }
-  const site = { blockMass, oreKgByDepth };
-  siteCache.set(key, site);
-  return site;
-}
 
 function shareOfRichBlocks(site: SiteOre, slab: number): number {
   const blocks = site.blockMass[slab]!;
@@ -250,4 +188,141 @@ describe('desert and red canyon shallow ore stays as it is (#1677)', () => {
       });
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// Ore deposits on sandbox sites (#1682)
+// ---------------------------------------------------------------------------
+
+describe('ore deposits off keeps today\'s ore (#1682)', () => {
+  // Pinned on main before the change: cruite host rock, oreRichness 1.0, seed 42.
+  const PINNED: ReadonlyArray<readonly [number, number, number, number, Record<string, number>]> = [
+    [11, 4, 22, 6, { dirtite: 0.29 }],
+    [3, 0, 5, 2, {}],
+    [30, 2, 40, 5, {}],
+    [50, 1, 9, 8, { dirtite: 0.95 }],
+    [20, 3, 20, 3, { dirtite: 0.66 }],
+    [44, 5, 31, 9, {}],
+  ];
+
+  for (const options of [undefined, {}, { deposits: false }] as const) {
+    it(`densitiesAt matches the pre-change values with options ${JSON.stringify(options)}`, () => {
+      const sampler = options === undefined ? new OreVeinSampler(42) : new OreVeinSampler(42, options);
+      for (const [x, y, z, depth, expected] of PINNED) {
+        expect(sampler.densitiesAt(x, y, z, depth, CRUITE_COMPOSITION, 1.0), `(${x},${y},${z}) d${depth}`).toEqual(expected);
+      }
+    });
+  }
+
+  it('OreVeinSampler(seed) equals OreVeinSampler(seed, { deposits: false }) over a large sample', () => {
+    const plain = new OreVeinSampler(7);
+    const off = new OreVeinSampler(7, { deposits: false });
+    expect(scanColumns(off, 5, CRUITE_COMPOSITION, 1.0)).toEqual(scanColumns(plain, 5, CRUITE_COMPOSITION, 1.0));
+  });
+
+  it('turning deposits on changes the output somewhere', () => {
+    const plain = new OreVeinSampler(7);
+    const on = new OreVeinSampler(7, { deposits: true });
+    expect(scanColumns(on, 5, CRUITE_COMPOSITION, 1.0)).not.toEqual(scanColumns(plain, 5, CRUITE_COMPOSITION, 1.0));
+  });
+
+  it('with deposits on the sampler is still deterministic and never invents ore outside its window', () => {
+    const a = new OreVeinSampler(7, { deposits: true });
+    const b = new OreVeinSampler(7, { deposits: true });
+    expect(scanColumns(a, 5, CRUITE_COMPOSITION, 1.0)).toEqual(scanColumns(b, 5, CRUITE_COMPOSITION, 1.0));
+    expect(scanColumns(a, 50, CRUITE_COMPOSITION, 1.0).every(r => !('dirtite' in r))).toBe(true);
+    for (const r of scanColumns(a, 5, CRUITE_COMPOSITION, 1.0)) {
+      for (const d of Object.values(r)) {
+        expect(d).toBeGreaterThanOrEqual(0.05);
+        expect(d).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+});
+
+/** The crew's start column in a real sandbox start of this biome and seed (not the site centre). */
+function crewStartColumn(biomeId: string, seed: number): { x: number; z: number } {
+  const { runner, ctx } = createRunner();
+  const result = runner.run(`sandbox start biome:${biomeId} seed:${seed} staffed:true`);
+  expect(result.success, result.output).toBe(true);
+  const state = ctx.state!;
+  const agents = [...state.employees.employees, ...state.vehicles.vehicles];
+  expect(agents.length).toBeGreaterThan(0);
+  return {
+    x: Math.round(agents.reduce((s, a) => s + a.x, 0) / agents.length),
+    z: Math.round(agents.reduce((s, a) => s + a.z, 0) / agents.length),
+  };
+}
+
+describe('ore deposits on sandbox sites, every biome (#1682)', () => {
+  const SLABS = [0, 1] as const; // 0-8 m and 8-16 m
+  for (const biome of getAllBiomes()) {
+    describe(biome.id, () => {
+      for (const seed of SEEDS) {
+        for (const slab of SLABS) {
+          const label = `seed ${seed}, ${slab * BLOCK}-${(slab + 1) * BLOCK} m`;
+          it(`${label}: at least 30% of blocks hold under 1 t of ore`, () => {
+            const blocks = sampleSite(biome, seed, { oreDeposits: true }).blockMass[slab]!;
+            expect(shareBelow(blocks, 1000)).toBeGreaterThanOrEqual(0.3);
+          });
+
+          it(`${label}: the richest decile averages at least 5x the median block`, () => {
+            const blocks = sampleSite(biome, seed, { oreDeposits: true }).blockMass[slab]!;
+            expect(richestDecileOverMedian(blocks)).toBeGreaterThanOrEqual(5);
+          });
+
+          it(`${label}: some block still holds real ore (the site is not barren)`, () => {
+            const blocks = sampleSite(biome, seed, { oreDeposits: true }).blockMass[slab]!;
+            expect(Math.max(...blocks)).toBeGreaterThanOrEqual(MIN_BLOCK_ORE_KG);
+          });
+
+          it(`${label}: different ores peak in different blocks`, () => {
+            const peaks = Object.values(peakBlockByOre(sampleSite(biome, seed, { oreDeposits: true }), slab));
+            expect(peaks.length, 'at least two ores carry mass').toBeGreaterThanOrEqual(2);
+            expect(new Set(peaks).size).toBeGreaterThanOrEqual(2);
+          });
+        }
+      }
+
+      for (const slab of SLABS) {
+        it(`${slab * BLOCK}-${(slab + 1) * BLOCK} m: for at least two of three seeds the block under the crew start is not the richest`, () => {
+          let notRichest = 0;
+          for (const seed of SEEDS) {
+            const blocks = sampleSite(biome, seed, { oreDeposits: true }).blockMass[slab]!;
+            const crew = crewStartColumn(biome.id, seed);
+            const idx = blockIndexOf(crew.x, crew.z);
+            // A crew outside the sampled interior cannot be standing on the richest sampled block.
+            if (idx === null || idx !== argmax(blocks)) notRichest++;
+          }
+          expect(notRichest).toBeGreaterThanOrEqual(2);
+        });
+      }
+    });
+  }
+
+  it('the legacy veins fail the distribution the deposits must meet (the helper has teeth)', () => {
+    const desert = getAllBiomes().find(b => b.id === 'desert_badlands')!;
+    const blocks = sampleSite(desert, 42, { oreDeposits: undefined }).blockMass[0]!;
+    expect(shareBelow(blocks, 1000)).toBeLessThan(0.3);
+  });
+});
+
+describe('oreSite helper definitions', () => {
+  it('blockIndexOf maps interior columns to 6x6 blocks and rejects the border', () => {
+    expect(blockIndexOf(8, 8)).toBe(0);
+    expect(blockIndexOf(55, 55)).toBe(35);
+    expect(blockIndexOf(16, 8)).toBe(6);
+    expect(blockIndexOf(7, 20)).toBeNull();
+    expect(blockIndexOf(20, 56)).toBeNull();
+  });
+
+  it('richestDecileOverMedian is large for a concentrated slab and 1-ish for a flat one', () => {
+    const concentrated = [...new Array(32).fill(0), 20000, 20000, 20000, 20000];
+    expect(richestDecileOverMedian(concentrated)).toBeGreaterThanOrEqual(5);
+    expect(richestDecileOverMedian(new Array(36).fill(5000))).toBeCloseTo(1, 5);
+  });
+
+  it('shareBelow counts strictly-below blocks', () => {
+    expect(shareBelow([0, 999, 1000, 5000], 1000)).toBe(0.5);
+  });
 });

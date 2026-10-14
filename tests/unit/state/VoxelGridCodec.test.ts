@@ -40,6 +40,7 @@ function genToConfig(gen: SerializedTerrainGen): TerrainConfig {
     datum: gen.datum,
     sizeZ: gen.sizeZ,
     ...(gen.mixedRockHardness !== undefined ? { mixedRockHardness: gen.mixedRockHardness } : {}),
+    ...(gen.oreDeposits !== undefined ? { oreDeposits: gen.oreDeposits } : {}),
     ...(gen.pitMask !== undefined ? { pitMask: gen.pitMask } : {}),
   };
 }
@@ -573,5 +574,57 @@ describe('decodeVoxelGrid — edit rows at any height round-trip; corrupt rows a
       editFractures: [{ x: 5, y: -MAX_VOXEL_ABS_Y - 1, z: 5, modifier: 0.5 }],
     };
     expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: edit fracture y/);
+  });
+});
+
+describe('encodeVoxelGrid / decodeVoxelGrid — oreDeposits (#1682)', () => {
+  const params = { seed: 42, climateBias: [0.6, 0.7] as [number, number], sizeX: 64, datum: 24, sizeZ: 64 };
+
+  /** Number of (x, y, z) samples whose ore record differs between two grids. */
+  function oreDifferences(a: VoxelGrid, b: VoxelGrid): number {
+    let n = 0;
+    for (let x = 0; x < params.sizeX; x += 2) {
+      for (let z = 0; z < params.sizeZ; z += 2) {
+        for (let y = 0; y < TEST_HEIGHT_RANGE; y++) {
+          if (JSON.stringify(a.oresAt(x, y, z)) !== JSON.stringify(b.oresAt(x, y, z))) n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  it('round-trips oreDeposits through gen and regenerates the deposit ore, not the legacy veins', () => {
+    const gen = makeGen({ ...params, oreDeposits: true });
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.gen.oreDeposits).toBe(true);
+
+    const decoded = decodeVoxelGrid(JSON.parse(JSON.stringify(payload)) as SerializedVoxels);
+    assertGridsMatchVoxelForVoxel(decoded, grid, gen);
+
+    // Deposits genuinely reached generation: the ore differs from the legacy-vein grid somewhere.
+    const legacy = generateTerrain(params);
+    expect(oreDifferences(decoded, legacy), 'deposit ore should differ from legacy veins').toBeGreaterThan(0);
+    expect(oreDifferences(decoded, grid)).toBe(0);
+  });
+
+  it('an absent oreDeposits serialises with no oreDeposits key and decodes to legacy veins', () => {
+    const gen = makeGen(params);
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(JSON.stringify(payload.gen)).not.toContain('oreDeposits');
+    expect('oreDeposits' in payload.gen).toBe(false);
+    expect(oreDifferences(decodeVoxelGrid(payload), generateTerrain(params))).toBe(0);
+  });
+
+  it('oreDeposits: false decodes to the same ore as absent', () => {
+    const gen = makeGen({ ...params, oreDeposits: false });
+    const decoded = decodeVoxelGrid(encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen));
+    expect(oreDifferences(decoded, generateTerrain(params))).toBe(0);
+  });
+
+  it('the generator version is unchanged by deposits', () => {
+    expect(TERRAIN_GENERATOR_VERSION).toBe(1);
+    expect(encodeVoxelGrid(generateTerrain(params), makeGen({ ...params, oreDeposits: true })).gen.version).toBe(1);
   });
 });
