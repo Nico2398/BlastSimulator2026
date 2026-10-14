@@ -2,7 +2,7 @@
 // A drill plan is a set of holes. Each hole has position, depth, and diameter.
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY, renormaliseVoxelColumnAfterCarve } from '../world/VoxelGrid.js';
-import type { Vehicle } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleTier } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import {
   DRILL_HOLE_BASE_DURATION_TICKS,
@@ -225,4 +225,10 @@ export function drillDepthRefusal(
   const reach = fleetDrillReachM(vehicles);
   if (!(depth > reach)) return null; // within reach; NaN left to existing behaviour
   return { key: 'mining.drill_plan.refused_depth', params: { depth, reach } };
+}
+
+/** Lowest drill rig tier whose max depth (DRILL_RIG_MAX_DEPTH_M) reaches `depth`. */
+export function minDrillRigTier(depth: number): VehicleTier {
+  void depth; // TODO: implement
+  return 1;
 }

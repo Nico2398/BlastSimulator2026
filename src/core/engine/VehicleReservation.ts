@@ -172,8 +172,15 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
   return licenceLevelOf(employee, role) > 0;
 }
 
+/** Lowest vehicle tier `action` can be done with (e.g. a drill_hole's rig must reach payload.depth). */
+export function minVehicleTierFor(action: Pick<PendingAction, 'type' | 'payload'>): VehicleTier {
+  void action; // TODO: implement
+  return 1;
+}
+
 /** Lowest tier among the fleet's vehicles of `role`, or null when it owns none (#1524). */
-export function lowestFleetTier(vehicles: readonly Vehicle[], role: VehicleRole): VehicleTier | null {
+export function lowestFleetTier(vehicles: readonly Vehicle[], role: VehicleRole, minTier: VehicleTier = 1): VehicleTier | null {
+  void minTier; // TODO: implement
   let lowest: VehicleTier | null = null;
   for (const v of vehicles) if (v.type === role && (lowest === null || v.tier < lowest)) lowest = v.tier;
   return lowest;
@@ -271,7 +278,8 @@ export function withUnderRepairIndex<T>(state: GameState, fn: () => T): T {
  * idle employee actually claiming it). Read-only — never mutates. Returns
  * null when none qualify.
  */
-export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee): Vehicle | null {
+export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee, minTier: VehicleTier = 1): Vehicle | null {
+  void minTier; // TODO: implement
   if (!isLicensedForRole(employee, role)) return null;
 
   const closed = outOfServiceIds(state.events.activeModifiers, 'vehicle', state.tickCount);

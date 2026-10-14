@@ -3337,6 +3337,7 @@
   "notification.order_blocked_no_driver": "{order} nécessite un(e) {role} — personne n'est autorisé(e) à en conduire un(e).",
   "notification.charge_awaiting_funds": "Pas assez de liquidités pour charger {count} trou(s). Ils seront chargés automatiquement dès que les fonds le permettront.",
   "notification.order_blocked_no_dual_employee": "{order} nécessite un seul employé ayant à la fois le permis {licence} et {skill}.",
+  "notification.order_blocked_no_reaching_vehicle": "{order} nécessite un {role} de niveau {tier} et un conducteur titulaire du permis correspondant.",
   "notification.order_blocked_licence_level": "{order} nécessite le permis {licence} niveau {level}.",
   "notification.order_blocked_target_unreachable": "La cible de {order} est inaccessible — aucun chemin ne la relie au reste du site.",
   "notification.order_blocked_no_warehouse": "{order} nécessite un entrepôt de fret — construisez-en un pour stocker la roche transportée.",

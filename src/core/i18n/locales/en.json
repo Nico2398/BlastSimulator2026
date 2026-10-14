@@ -3337,6 +3337,7 @@
   "notification.order_blocked_no_driver": "{order} needs a {role} — nobody is licensed to drive one.",
   "notification.charge_awaiting_funds": "Not enough cash to charge {count} hole(s). They are charged automatically once funds allow.",
   "notification.order_blocked_no_dual_employee": "{order} needs one employee with both the {licence} licence and {skill}.",
+  "notification.order_blocked_no_reaching_vehicle": "{order} needs a tier-{tier} {role} and a driver licensed for it.",
   "notification.order_blocked_licence_level": "{order} needs {licence} licence level {level}.",
   "notification.order_blocked_target_unreachable": "{order} can't reach its target — no route connects it to the rest of the site.",
   "notification.order_blocked_no_warehouse": "{order} needs a Freight Warehouse — build one to store hauled rock.",
