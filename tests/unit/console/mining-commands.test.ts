@@ -2203,7 +2203,9 @@ describe('blastCommand — no breakout report line (#1724)', () => {
     const real = BlastExecutionModule.executeBlastSteps;
     vi.spyOn(BlastExecutionModule, 'executeBlastSteps').mockImplementation(function* (...args: Parameters<typeof real>) {
       const result = yield* real(...args);
-      result.brokeOut = brokeOut;
+      if (!result) return result;
+      // An old save's result carries no brokeOut: the field is absent, not false.
+      (result as { brokeOut?: boolean | undefined }).brokeOut = brokeOut;
       if (clearedOverride !== undefined) result.clearedVoxels = clearedOverride;
       return result;
     });
