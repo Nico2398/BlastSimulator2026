@@ -172,7 +172,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
 type SandboxRuggedness = 'flat' | 'rolling' | 'steep';
 
 /** Player-facing traits of a biome, shown in the sandbox picker (#1686). */
-export interface SandboxBiomeTraits {
+interface SandboxBiomeTraits {
   descKey: string;
   /** Hardness tier range over the biome's dominant rocks. */
   hardnessTierMin: number;
@@ -212,7 +212,7 @@ export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
 }
 
 /** What a difficulty hands the player at the start (#1686). */
-export interface SandboxDifficultyDetails {
+interface SandboxDifficultyDetails {
   id: SandboxDifficultyId;
   labelKey: string;
   startingCash: number;
