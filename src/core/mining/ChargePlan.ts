@@ -4,6 +4,7 @@
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
+import { drawStockForOrder } from './ExplosiveStock.js';
 import { t } from '../i18n/I18n.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import {
@@ -96,6 +97,7 @@ export function landLoadedCharge(planned: PlannedCharge): HoleCharge {
     explosiveId: planned.explosiveId,
     amountKg: planned.amountKg,
     stemmingM: planned.stemmingM,
+    ...(planned.fromStockKg && { fromStockKg: planned.fromStockKg }),
   };
 }
 
@@ -135,13 +137,8 @@ export function chargeOrderCost(explosiveId: string, amountKg: number): number {
   return explosive ? explosive.costPerKg * amountKg : 0;
 }
 
-/** Total cash cost of every charge in a per-hole charge map. */
-export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): number {
-  return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
-}
-
 /** Cash/stock split of a set of charge orders (#1685). */
-export interface ChargeCostSplit {
+interface ChargeCostSplit {
   /** Cash paid at list price for the kg not covered by stock. */
   cashCost: number;
   /** List-price value of the kg drawn from stock. */
@@ -155,14 +152,32 @@ export function stockAwareChargesCost(
   orders: ReadonlyArray<{ explosiveId: string; amountKg: number }>,
   stock: Readonly<Record<string, number>>,
 ): ChargeCostSplit {
-  void orders; void stock;
-  return { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 }; // TODO: implement
+  const pool = { ...stock };
+  const split: ChargeCostSplit = { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 };
+  for (const o of orders) {
+    const { fromStockKg, fromCashKg } = drawStockForOrder(pool, o.explosiveId, o.amountKg);
+    pool[o.explosiveId] = (pool[o.explosiveId] ?? 0) - fromStockKg;
+    addSplit(split, o.explosiveId, o.amountKg, fromStockKg, fromCashKg);
+  }
+  return split;
 }
 
 /** Split of already-ordered charges, read from each charge's recorded `fromStockKg` (#1685). */
 export function recordedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): ChargeCostSplit {
-  void chargesByHole;
-  return { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 }; // TODO: implement
+  const split: ChargeCostSplit = { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 };
+  for (const c of Object.values(chargesByHole)) {
+    const fromStockKg = Math.min(c.amountKg, c.fromStockKg ?? 0);
+    addSplit(split, c.explosiveId, c.amountKg, fromStockKg, c.amountKg - fromStockKg);
+  }
+  return split;
+}
+
+function addSplit(split: ChargeCostSplit, explosiveId: string, amountKg: number, fromStockKg: number, fromCashKg: number): void {
+  if (!getExplosive(explosiveId)) return;
+  split.cashCost += chargeOrderCost(explosiveId, fromCashKg);
+  split.stockValue += chargeOrderCost(explosiveId, fromStockKg);
+  split.fromStockKg += fromStockKg;
+  split.totalKg += amountKg;
 }
 
 /** Metres of hole column that `amountKg` of explosive occupies. */

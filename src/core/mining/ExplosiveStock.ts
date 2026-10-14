@@ -35,22 +35,24 @@ export function buyStockBlockReason(
   explosiveId: string,
   kg: number,
 ): BuyStockFailure | null {
-  void state; void explosiveId; void kg;
-  return null; // TODO: implement
+  if (!Number.isInteger(kg) || kg < 1) return 'invalid_amount';
+  if (!getExplosive(explosiveId)) return 'unknown_explosive';
+  if (!isExplosiveAvailable(state.campaign.activeLevelId, explosiveId)) return 'not_available';
+  if (getExplosivesCapacity(state.buildings) <= 0) return 'no_warehouse';
+  if (kg > getExplosivesFreeCapacity(state.buildings)) return 'over_capacity';
+  if (kg * bulkPricePerKg(explosiveId, explosivePriceFactor(state)) > state.cash) return 'insufficient_funds';
+  return null;
 }
 
 /** Buy `kg` of an explosive into warehouse stock, paying bulk price. Refusals mutate nothing. */
 export function buyExplosiveStock(state: GameState, explosiveId: string, kg: number): BuyStockResult {
-  if (!Number.isInteger(kg) || kg < 1) return { success: false, reason: 'invalid_amount' };
-  if (!getExplosive(explosiveId)) return { success: false, reason: 'unknown_explosive' };
-  if (!isExplosiveAvailable(state.campaign.activeLevelId, explosiveId)) return { success: false, reason: 'not_available' };
+  const reason = buyStockBlockReason(state, explosiveId, kg);
   const capacityKg = getExplosivesCapacity(state.buildings);
-  if (capacityKg <= 0) return { success: false, reason: 'no_warehouse' };
-  const freeKg = getExplosivesFreeCapacity(state.buildings);
-  if (kg > freeKg) return { success: false, reason: 'over_capacity', freeKg };
   const pricePerKg = bulkPricePerKg(explosiveId, explosivePriceFactor(state));
   const cost = kg * pricePerKg;
-  if (cost > state.cash) return { success: false, reason: 'insufficient_funds', need: cost };
+  if (reason === 'over_capacity') return { success: false, reason, freeKg: getExplosivesFreeCapacity(state.buildings) };
+  if (reason === 'insufficient_funds') return { success: false, reason, need: cost };
+  if (reason) return { success: false, reason };
 
   storeExplosives(state.buildings, explosiveId, kg);
   state.cash -= cost;

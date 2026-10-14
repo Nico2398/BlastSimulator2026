@@ -91,7 +91,7 @@ export function dispatchChargeAction(
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
-  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
+  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM, ...(fromStockKg > 0 && { fromStockKg }) };
 
   if (orderCost > 0) {
     state.cash -= orderCost;

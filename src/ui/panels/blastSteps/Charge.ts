@@ -26,7 +26,8 @@ import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } 
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, type HoleDrainView } from './ChargeHoleList.js';
-import { chargeOrderCost, chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
+import { ChargeStockBlock, buildStockView } from './ChargeStock.js';
+import { stockAwareChargesCost, chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
@@ -36,6 +37,7 @@ import { TUBING_COST, hasTubing } from '../../../core/mining/Tubing.js';
 import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M, HOLE_DRAIN_COST_PER_HOLE } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import { getExplosivesStockByType } from '../../../core/entities/Building.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 
@@ -60,6 +62,7 @@ export class ChargeStep {
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
   private readonly drainEl: HTMLElement;
+  private readonly stockBlock: ChargeStockBlock;
 
   private gameConsole?: GameConsoleFn;
   private holeRockSampler?: (hole: DrillHole) => ColumnRock | null;
@@ -127,6 +130,10 @@ export class ChargeStep {
     this.awaitingLineEl = el('div');
     this.noticeEl = el('div');
     this.noticeEl.style.display = 'none';
+    this.stockBlock = new ChargeStockBlock(
+      () => { this.lastSignature = ''; },
+      kg => this.runAndNotify(`buy explosive:${this.selectedExplosiveId} kg:${kg}`),
+    );
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
 
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
@@ -135,7 +142,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.weakLineEl,
+      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.stockBlock.root, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -177,6 +184,9 @@ export class ChargeStep {
       };
     }
 
+    const stockView = buildStockView(
+      state, this.allowedIds, this.selectedExplosiveId, this.stockBlock.stepKg, holes.length, this.amountKg,
+    );
     const columns = holes.map(h => this.holeRockSampler?.(h) ?? null);
     const signature = JSON.stringify({
       rocks: columns.map(c => c?.rockId ?? null),
@@ -192,6 +202,7 @@ export class ChargeStep {
       planned_holes: state.plannedDrillHoles.length,
       pattern: state.patternCharge ? holeChargeSignature(state.patternCharge) + state.patternCharge.explosiveId : null,
       awaiting: state.chargeAwaitingFunds ?? [],
+      stock: stockView,
       wet, tubed, tub: state.tubingState.inventory,
       // Water levels (as percent) so the panel repaints while water fades, plus drain affordability.
       water: holes.map(h => Math.round((state.holeWater[h.id]?.level ?? 0) * 100)),
@@ -201,7 +212,8 @@ export class ChargeStep {
     this.lastSignature = signature;
 
     this.renderProductList(wet.length > 0);
-    this.updateChargeLine(holes.length);
+    this.stockBlock.render(stockView);
+    this.updateChargeLine(holes.length, getExplosivesStockByType(state.buildings));
     this.updateFitLine(shallowest, holes.length + state.plannedDrillHoles.length === 0);
     this.updatePatternLines(state);
     this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
@@ -263,10 +275,11 @@ export class ChargeStep {
     return card;
   }
 
-  private updateChargeLine(holeCount: number): void {
+  private updateChargeLine(holeCount: number, stock: Readonly<Record<string, number>>): void {
     const explosive = getExplosive(this.selectedExplosiveId);
     const name = explosive ? t(explosive.nameKey) : this.selectedExplosiveId;
-    const cost = chargeOrderCost(this.selectedExplosiveId, holeCount * this.amountKg);
+    const orders = Array.from({ length: holeCount }, () => ({ explosiveId: this.selectedExplosiveId, amountKg: this.amountKg }));
+    const cost = stockAwareChargesCost(orders, stock).cashCost;
     this.chargeLineEl.textContent = t('ui.blast_workshop.charge.charge_line', {
       count: holeCount, amount: this.amountKg, name, cost: `$${formatMoney(cost)}`,
     });

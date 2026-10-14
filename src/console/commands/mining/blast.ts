@@ -7,7 +7,8 @@ import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleVal
 import { executeBlastSteps, emitRegionInStrips, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
-import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
+import { formatMoney } from '../../../core/economy/formatMoney.js';
+import { recordedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments } from '../../../core/economy/Logistics.js';
 import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
@@ -297,11 +298,11 @@ export function* fireBlastSteps(
 
   // Report figure only: explosives were already paid when each charge order
   // was placed (charge.ts, #1341), so the blast itself never touches cash.
-  const spent = plannedChargesCost(state.chargesByHole);
+  const { cashCost: spent, stockValue: spentFromStock } = recordedChargesCost(state.chargesByHole);
   const wetReport = classifyWetChargedHoles(plan.charges, wetHoleIds);
   const report = buildBlastReport(
     result, state.tickCount, spent, thisBlastAccidents,
-    wetReport, secondaryReports,
+    wetReport, secondaryReports, spentFromStock,
   );
   state.lastBlastReport = report;
 
@@ -369,6 +370,8 @@ export function* fireBlastSteps(
         : []),
       `Total rock volume: ${result.totalRockVolume.toFixed(1)} m³`,
       `Total ore value: $${result.totalOreValue.toFixed(0)}`,
+      t('mining.blast.spent_cash', { cash: formatMoney(report.spent) }),
+      ...(spentFromStock > 0 ? [t('mining.blast.spent_from_stock', { value: formatMoney(spentFromStock) })] : []),
       ...(result.destroyedBuildings.length > 0
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
