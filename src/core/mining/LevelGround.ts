@@ -226,31 +226,51 @@ export function carveLevelColumns(
 }
 
 /**
- * Pick the next column of `columns` a digger should work on: one inside `rect`
- * that `isReachable` accepts, or null when none is left.
+ * The column of `columns` a digger should drive to: the reachable one nearest
+ * the rect's (minX, minZ) corner, ties broken by list order; null when none
+ * is reachable.
  */
 export function pickLevelWorkTarget(
-  _columns: { x: number; z: number }[],
-  _rect: LevelOrderDef,
-  _isReachable: (x: number, z: number) => boolean,
+  columns: { x: number; z: number }[],
+  rect: LevelOrderDef,
+  isReachable: (x: number, z: number) => boolean,
 ): { x: number; z: number } | null {
-  // TODO: implement
-  return null;
+  let best: { x: number; z: number } | null = null;
+  let bestDistSq = Infinity;
+  for (const column of columns) {
+    if (!isReachable(column.x, column.z)) continue;
+    const dx = column.x - rect.minX;
+    const dz = column.z - rect.minZ;
+    const distSq = dx * dx + dz * dz;
+    if (distSq < bestDistSq) {
+      best = column;
+      bestDistSq = distSq;
+    }
+  }
+  return best === null ? null : { x: best.x, z: best.z };
 }
 
 /**
- * Carve at most `maxColumns` of `columns` down to `targetY`, emitting
- * `terrain:updated` for the affected region; returns the columns carved.
+ * Carve at most `maxColumns` of `columns` down to `targetY`, in list order,
+ * skipping columns already at it; emits `terrain:updated` for the affected
+ * region only when something was carved. Returns the columns carved.
  */
 export function carveLevelColumnsStep(
-  _grid: VoxelGrid,
-  _columns: { x: number; z: number }[],
-  _targetY: number,
-  _maxColumns: number,
-  _emitter?: EventEmitter,
+  grid: VoxelGrid,
+  columns: { x: number; z: number }[],
+  targetY: number,
+  maxColumns: number,
+  emitter?: EventEmitter,
 ): number {
-  // TODO: implement
-  return 0;
+  const batch: { x: number; z: number }[] = [];
+  for (const column of columns) {
+    if (batch.length >= maxColumns) break;
+    if (getSmoothTerrainSurfaceY(grid, column.x, column.z) - targetY <= LEVEL_EPSILON) continue;
+    batch.push(column);
+  }
+  if (batch.length === 0) return 0;
+  carveLevelColumns(grid, batch, targetY, emitter);
+  return batch.length;
 }
 
 /**

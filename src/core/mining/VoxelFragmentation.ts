@@ -8,7 +8,7 @@
 // See the gameplay-blast-system skill, "Step 2 — What Breaks".
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX, BLAST_SLICE_CELLS } from '../config/balance.js';
+import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX, BLAST_SLICE_CELLS, BLAST_GRADE_MAX_CUT_M } from '../config/balance.js';
 import { type EnergyField, indexOf, contains } from './EnergyPropagation.js';
 import { drain, type Steps } from '../engine/Steps.js';
 
@@ -132,9 +132,38 @@ export function* identifyFragmentedVoxelsSteps(
  * bottoms as fragmented, and report how many voxels it took. Runs before the
  * unsupported-rock pass.
  */
-export function floorToGrade(_field: EnergyField, _mask: Uint8Array): number {
-  // TODO: implement
-  return 0;
+export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
+  const { box, gradeY } = field;
+  if (gradeY === null) return 0;
+  let graded = 0;
+
+  for (let z = box.minZ; z < box.maxZ; z++) {
+    for (let x = box.minX; x < box.maxX; x++) {
+      // Footprint column: highest and lowest voxel the energy pass already broke.
+      let topBroken: number | null = null;
+      let lowBroken = 0;
+      for (let y = box.maxY - 1; y >= box.minY; y--) {
+        if (mask[indexOf(field, x, y, z)] !== 1) continue;
+        if (topBroken === null) topBroken = y;
+        lowBroken = y;
+      }
+      if (topBroken === null) continue;
+
+      // Grade plane, held within the cut cap of this column's own floor so a
+      // deep outlier hole cannot gouge the pit.
+      const floorY = Math.max(gradeY, lowBroken - BLAST_GRADE_MAX_CUT_M);
+      // Walk down the broken zone: standing rock whose upper neighbour is
+      // air or broken is open to it and goes down to grade with it.
+      for (let y = topBroken - 1; y >= floorY && y >= box.minY; y--) {
+        const i = indexOf(field, x, y, z);
+        if (field.air[i] === 1) continue;
+        if (mask[i] === 1) continue;
+        mask[i] = 1;
+        graded++;
+      }
+    }
+  }
+  return graded;
 }
 
 /**

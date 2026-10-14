@@ -28,8 +28,8 @@ export function hireDriver(run: (cmd: string) => unknown, state: GameState): voi
   expect(run('employee hire role:driver')).toMatchObject({ success: true });
 }
 
-/** The 3 tutorial_pit NavGrid cells this file's own direct trace confirmed permanently climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's approach cell, for the (18,10) amount:3 blast below. */
-export const POCKET_CELLS: ReadonlySet<string> = new Set(['18,9', '19,10', '18,10']);
+/** The tutorial_pit NavGrid cells a direct trace confirmed permanently climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's approach cell, for the (18,10) amount:5 blast (#1723). */
+export const POCKET_CELLS: ReadonlySet<string> = new Set(['18,8', '17,9', '18,9', '19,9', '17,10', '18,10', '19,10', '18,11', '19,11']);
 export function isPocketCell(x: number, z: number): boolean {
   return POCKET_CELLS.has(`${x},${z}`);
 }

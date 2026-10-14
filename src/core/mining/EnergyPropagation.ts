@@ -19,6 +19,7 @@ import { getRock } from '../world/RockCatalog.js';
 import { tierShortfall, tierThresholdFactor, dominantRockTierAt } from './ExplosiveRockFit.js';
 import {
   MAX_PROPAGATION_ITERATIONS,
+  BLAST_GRADE_FLOOR_OFFSET_M,
   PROPAGATION_ENERGY_EPSILON,
   TRANSMISSION_LOSS_BASE,
   TRANSMISSION_LOSS_POROSITY_SCALE,
@@ -113,7 +114,7 @@ export interface EnergyField {
   /** Metres from each voxel to the nearest free face; 0 for air itself. */
   readonly distAir: Float32Array;
   /** World Y of the highest charged-hole bottom (the blast's grade); null when nothing is charged. */
-  readonly gradeY: number | null;
+  gradeY: number | null;
   /** Total energy handed to `seedEnergy`. */
   seeded: number;
   /** Energy lost to damping, vented into air, or stranded at the iteration cap. */
@@ -316,7 +317,7 @@ export function* createEnergyFieldSteps(
     air: new Uint8Array(count),
     loss: new Float32Array(count),
     distAir: new Float32Array(count),
-    gradeY: null, // TODO: implement
+    gradeY: null,
     seeded: 0,
     dissipated: 0,
     iterations: 0,
@@ -440,6 +441,8 @@ export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[
   const weightScratch = new Float64Array(NEIGHBOUR_OFFSETS.length);
   yield;
 
+  // Lowest charged voxel per hole column: the hole's bottom.
+  const holeBottoms = new Map<number, number>();
   for (const seed of seeds) {
     if (!Number.isFinite(seed.energy) || seed.energy <= PROPAGATION_ENERGY_EPSILON) continue;
     if (!contains(field, seed.x, seed.y, seed.z)) continue;
@@ -450,6 +453,9 @@ export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[
       field.dissipated += seed.energy;
       continue;
     }
+    const column = (seed.x - field.box.minX) + field.nx * (seed.z - field.box.minZ);
+    const known = holeBottoms.get(column);
+    if (known === undefined || seed.y < known) holeBottoms.set(column, seed.y);
     if (currentEnergy[i] === 0) seeded.push(i);
     currentEnergy[i]! += seed.energy;
   }
@@ -458,6 +464,10 @@ export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[
   // a measurable share of a large blast. Two seeds can land in one cell; keep
   // each active cell listed once, in ascending order so the wave sweeps cells
   // deterministically.
+  for (const bottom of holeBottoms.values()) {
+    const grade = bottom + BLAST_GRADE_FLOOR_OFFSET_M;
+    if (field.gradeY === null || grade > field.gradeY) field.gradeY = grade;
+  }
   yield;
   let currentActive = new Int32Array(cellCount);
   let nextActive = new Int32Array(cellCount);
