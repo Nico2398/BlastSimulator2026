@@ -6,7 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -177,6 +177,7 @@ const LEVELS: readonly LevelDef[] = [
     // Level 2 — Grumpstone Ridge
     // Mountain site. Mixed rock hardness. Mid-tier explosives. Moderate challenge.
     // Neighboring village lowers neighbour relations.
+    // Opens with a free crew, fleet, rock digger, warehouse and spoil heap (GRUMPSTONE_RIDGE_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'grumpstone_ridge',
     nameKey: 'level.grumpstone_ridge.name',
@@ -193,6 +194,7 @@ const LEVELS: readonly LevelDef[] = [
     unlockThreshold: 250000,
     eventFreqMultiplier: 1.0,    // Normal event rate
     contractPriceMultiplier: 1.0, // Fair market prices
+    startingSite: GRUMPSTONE_RIDGE_STARTING_SITE,
     scoreDecayRate: 0.05,         // Standard decay rate
     mixedRockHardness: false,
     difficultyTier: 2,
@@ -204,6 +206,7 @@ const LEVELS: readonly LevelDef[] = [
     // Mixed hard + soft rock hardness = complex projection management.
     // Mafia presence. Multiple villages. Tight contracts.
     // Human note: "The rocks here didn't read the rulebook" difficulty.
+    // Opens with a free crew, fleet, rock digger, warehouse and spoil heap (TRERANIUM_DEPTHS_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'treranium_depths',
     nameKey: 'level.treranium_depths.name',
@@ -227,6 +230,7 @@ const LEVELS: readonly LevelDef[] = [
     scoreDecayRate: 0.08,          // Harsh — scores fall fast without upkeep
     mixedRockHardness: true,       // Hard+soft interleaved — unpredictable projections
     difficultyTier: 3,
+    startingSite: TRERANIUM_DEPTHS_STARTING_SITE,
   },
 ];
 

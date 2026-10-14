@@ -16,7 +16,7 @@ describe('Level 2 — Win', () => {
   let ctx: ReturnType<typeof makeCampaignCtxWithUnlock>;
 
   beforeEach(() => {
-    ctx = makeCampaignCtxWithUnlock('grumpstone_ridge');
+    ctx = makeCampaignCtxWithUnlock('grumpstone_ridge', { levelDefaultStart: true });
   });
 
   it('starts level 2 with correct initial state', () => {
@@ -37,10 +37,10 @@ describe('Level 2 — Win', () => {
     // Hire a driller
     const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
     expect(hireResult.success).toBe(true);
-    expect(ctx.state!.employees.employees.length).toBe(1);
+    expect(ctx.state!.employees.employees.length).toBe(5); // free kit of 4 (#1672) + the hire
 
     // Assign blasting skill
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
+    employeeCommand(ctx, ['assign_skill', '5'], { skill: 'blasting', level: '5' });
 
     // Charging needs a charging truck (#1649); performBlast buys it, so fund it
     fundChargingTruck(ctx);

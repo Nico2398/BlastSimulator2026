@@ -1402,19 +1402,28 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }],
 };
 
-// TODO(#1672): fill with the sandbox 'normal' kit; not yet wired into Level.ts.
-export const GRUMPSTONE_RIDGE_STARTING_SITE: StartingSiteComposition = {
-  employees: [],
-  vehicles: [],
-  buildings: [],
+const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
 };
 
-// TODO(#1672): fill with the sandbox 'normal' kit; not yet wired into Level.ts.
-export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = {
-  employees: [],
-  vehicles: [],
-  buildings: [],
+/**
+ * The free kit shared by sandbox 'normal' and the Grumpstone Ridge and
+ * Treranium Depths openings (#1672): the Dusty Hollow kit plus a rock digger
+ * (a ramp into the crater) and its excavator-licensed driver. Each opens able
+ * to drill, charge, fire, haul and fill an ore contract with no purchases.
+ * Starting cash stays at the level's own value: the kit is free, and the
+ * explosives for a first blast are well inside $75k / $100k.
+ */
+const DIGGER_STARTING_SITE: StartingSiteComposition = {
+  employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
+  vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
+  buildings: DUSTY_HOLLOW_STARTING_SITE.buildings,
 };
+
+export const GRUMPSTONE_RIDGE_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+
+export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
 
 /**
  * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet
@@ -1431,10 +1440,6 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
 export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
 
 const SANDBOX_KIT_BUILDINGS: readonly StartingBuildingSlot[] = DUSTY_HOLLOW_STARTING_SITE.buildings;
-const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
-  role: 'driver',
-  qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
-};
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
   qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
@@ -1449,11 +1454,7 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
   hard: DUSTY_HOLLOW_STARTING_SITE,
-  normal: {
-    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
-    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
-    buildings: SANDBOX_KIT_BUILDINGS,
-  },
+  normal: DIGGER_STARTING_SITE,
   easy: {
     employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],

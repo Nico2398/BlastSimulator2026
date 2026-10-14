@@ -113,6 +113,18 @@ describe('campaign start level:dusty_hollow staffed flag (#1363)', () => {
   });
 });
 
+describe('levels 2 and 3 open with the free digger kit (#1672)', () => {
+  for (const id of ['grumpstone_ridge', 'treranium_depths']) {
+    it(`${id} opens with a crew, fleet, warehouse and spoil heap`, () => {
+      const { state } = startLevel(id);
+      expect(state.employees.employees.map((e) => e.role).sort()).toEqual(['blaster', 'driller', 'driver', 'driver']);
+      expect(state.employees.employees.some((e) => e.qualifications.some((q) => q.category === 'driving.excavator'))).toBe(true);
+      expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger']);
+      expect(state.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
+    });
+  }
+});
+
 describe('other levels and the tutorial are unchanged (#1363)', () => {
   it('tutorial_pit opens with no crew or fleet, only the opening spoil heap (#1574)', () => {
     const { state } = startLevel('tutorial_pit');

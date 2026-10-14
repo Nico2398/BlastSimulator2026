@@ -38,6 +38,9 @@ function _unlockTreraniumDepths(campaign: any): void {
   recordProfit(campaign, 'grumpstone_ridge', 250000);
 }
 
+/** Levels whose own opening is a free kit; helpers start them bare unless asked otherwise. */
+const LEVELS_WITH_FREE_KIT = new Set(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']);
+
 /**
  * Levels that declare a free starting kit (#1363, #1672). Tests calibrated on a
  * bare opening keep one by default; `levelDefaultStart` opts into the kit.
@@ -78,8 +81,8 @@ export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boo
  * @param levelId The campaign level identifier to start.
  * @returns A fully initialised GameContext with preceding levels completed.
  */
-export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
-  return makeCampaignCtx(levelId);
+export function makeCampaignCtxWithUnlock(levelId: string, opts: { levelDefaultStart?: boolean } = {}): GameContext {
+  return makeCampaignCtx(levelId, opts);
 }
 
 /**
