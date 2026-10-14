@@ -13,7 +13,7 @@ import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUN
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
+import { canReleaseDriver, getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -352,6 +352,16 @@ function buildMountLegs(
   if (isMounted(employee.locomotion) && mountedVehicleId(employee.locomotion) === vehicle.id) {
     return { legs: [], driveFromX: employee.x, driveFromZ: employee.z, def };
   }
+
+  // A driver locked into a loaded vehicle (cargo aboard, e.g. a hauler whose
+  // depot is full) cannot alight: `alight()` refuses through
+  // canReleaseDriver's mid-haul guard, so the plan's first leg would abort
+  // the very tick it is claimed. Planning it anyway let such a driver claim
+  // every other-vehicle action in turn and release it with a stuck backoff,
+  // starving the employee who could actually do it (#1723, level2's last
+  // charge pattern never loaded). Same "no route right now" null as below.
+  const mountedId = mountedVehicleId(employee.locomotion);
+  if (mountedId !== null && !canReleaseDriver(state.vehicles, mountedId).success) return null;
 
   const legs: Leg[] = [];
   const alightLeg = buildAlightLegIfMountedElsewhere(employee);

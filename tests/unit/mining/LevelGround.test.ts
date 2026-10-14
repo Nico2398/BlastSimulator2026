@@ -20,7 +20,7 @@ import {
 } from '../../../src/core/world/VoxelGrid.js';
 import {
   computeLevelTargetY, computeLevelColumns, computeLevelVolume, computeLevelRegion,
-  validateLevelOrder, carveLevelColumns, levelGroundRect, computeLevelGroundDurationTicks,
+  validateLevelOrder, carveLevelColumns, pickLevelWorkTarget, carveLevelColumnsStep, levelGroundRect, computeLevelGroundDurationTicks,
   type LevelOrderDef,
 } from '../../../src/core/mining/LevelGround.js';
 import {
@@ -567,5 +567,97 @@ describe('cost and duration scale linearly with volume', () => {
 
   it('computeLevelGroundDurationTicks returns at least 1 tick even for zero voxels', () => {
     expect(computeLevelGroundDurationTicks(0, 1)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── #1723: reachable work target, column-by-column progress ──
+
+describe('pickLevelWorkTarget', () => {
+  const rect: LevelOrderDef = { minX: 10, maxX: 14, minZ: 20, maxZ: 24 };
+  const all = (): { x: number; z: number }[] => {
+    const cols: { x: number; z: number }[] = [];
+    for (let z = rect.minZ; z <= rect.maxZ; z++) for (let x = rect.minX; x <= rect.maxX; x++) cols.push({ x, z });
+    return cols;
+  };
+
+  it('returns the rect corner when every column is reachable', () => {
+    expect(pickLevelWorkTarget(all(), rect, () => true)).toEqual({ x: 10, z: 20 });
+  });
+
+  it('returns the reachable column nearest the rect corner when the corner is not reachable', () => {
+    const reachable = (x: number, z: number) => x >= 12 && z >= 22;
+    expect(pickLevelWorkTarget(all(), rect, reachable)).toEqual({ x: 12, z: 22 });
+  });
+
+  it('ignores reachable columns that are not in the order\'s columns list', () => {
+    const columns = all().filter(c => c.x !== 10 || c.z !== 20);
+    const target = pickLevelWorkTarget(columns, rect, () => true);
+    expect(target).not.toEqual({ x: 10, z: 20 });
+    expect(target).not.toBeNull();
+  });
+
+  it('returns null when no column is reachable', () => {
+    expect(pickLevelWorkTarget(all(), rect, () => false)).toBeNull();
+  });
+
+  it('returns null for an empty column list', () => {
+    expect(pickLevelWorkTarget([], rect, () => true)).toBeNull();
+  });
+});
+
+describe('carveLevelColumnsStep', () => {
+  it('carves at most maxColumns, nearest the first column first, and returns how many it carved', () => {
+    const grid = makeFlatGrid(20, 20, 15);
+    const columns = [{ x: 5, z: 5 }, { x: 6, z: 5 }, { x: 7, z: 5 }, { x: 8, z: 5 }];
+
+    const carved = carveLevelColumnsStep(grid, columns, 10, 2);
+
+    expect(carved).toBe(2);
+    expect(computeVoxelColumnSurfaceHeight(grid, 5, 5)).toBe(10);
+    expect(computeVoxelColumnSurfaceHeight(grid, 6, 5)).toBe(10);
+    expect(computeVoxelColumnSurfaceHeight(grid, 7, 5)).toBe(15);
+    expect(computeVoxelColumnSurfaceHeight(grid, 8, 5)).toBe(15);
+  });
+
+  it('is progressive: repeated steps finish the list, then return 0', () => {
+    const grid = makeFlatGrid(20, 20, 15);
+    const columns = [{ x: 5, z: 5 }, { x: 6, z: 5 }, { x: 7, z: 5 }];
+
+    expect(carveLevelColumnsStep(grid, columns, 10, 2)).toBe(2);
+    expect(carveLevelColumnsStep(grid, columns, 10, 2)).toBe(1);
+    expect(carveLevelColumnsStep(grid, columns, 10, 2)).toBe(0);
+    for (const c of columns) expect(computeVoxelColumnSurfaceHeight(grid, c.x, c.z)).toBe(10);
+  });
+
+  it('skips columns already at target without spending the budget on them', () => {
+    const grid = makeFlatGrid(20, 20, 15);
+    const compId = internRock(grid);
+    setVoxelColumnSurfaceHeight(grid, 5, 5, 10, compId);
+    const columns = [{ x: 5, z: 5 }, { x: 6, z: 5 }, { x: 7, z: 5 }];
+
+    expect(carveLevelColumnsStep(grid, columns, 10, 1)).toBe(1);
+    expect(computeVoxelColumnSurfaceHeight(grid, 6, 5)).toBe(10);
+    expect(computeVoxelColumnSurfaceHeight(grid, 7, 5)).toBe(15);
+  });
+
+  it('carves nothing for maxColumns 0 and for an empty list', () => {
+    const grid = makeFlatGrid(20, 20, 15);
+    expect(carveLevelColumnsStep(grid, [{ x: 5, z: 5 }], 10, 0)).toBe(0);
+    expect(computeVoxelColumnSurfaceHeight(grid, 5, 5)).toBe(15);
+    expect(carveLevelColumnsStep(grid, [], 10, 5)).toBe(0);
+  });
+
+  it('emits terrain:updated for the carved region only when something was carved', () => {
+    const grid = makeFlatGrid(20, 20, 15);
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('terrain:updated', handler);
+
+    carveLevelColumnsStep(grid, [{ x: 5, z: 5 }, { x: 6, z: 5 }], 10, 1, emitter);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0]![0].region).toMatchObject({ minX: 5, maxX: 5, minZ: 5, maxZ: 5 });
+
+    carveLevelColumnsStep(grid, [], 10, 1, emitter);
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });

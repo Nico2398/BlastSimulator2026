@@ -11,6 +11,10 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { createRunner, runCommand } from '../../src/console/createRunner.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
+import { buildPlanEnergyField } from '../../src/core/mining/BlastExecution.js';
+import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
+import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import { NAV_MAX_SLOPE_RATIO } from '../../src/core/config/balance.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
@@ -758,6 +762,91 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
 
     expect(res.success).toBe(false);
     expect(ctx.state!.pendingDetonation).toBeNull();
+  });
+});
+
+// ── #1723: a blast breaks its floor down to grade, so the crater is drivable ──
+
+/** Sandbox desert_badlands seed 42, a 3x3 spacing-S 8 m grid at (28,18), krackle `kg` kg, stemming 2.5 — the issue's measured pattern. */
+function sandboxCraterBlast(kg: number, spacing: number) {
+  const { runner, ctx } = createRunner();
+  expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
+  const grid = ctx.grid!;
+  const counter = { nextHoleId: 1 };
+  const holes = createGridPlan(counter, { x: 28, z: 18 }, 3, 3, spacing, 8, 0.15);
+  const depths: Record<string, number> = {};
+  for (const h of holes) depths[h.id] = h.depth;
+  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, 2.5);
+  const plan = assembleBlastPlan(holes, charges);
+
+  const before = new Map<string, number>();
+  for (let z = 10; z < 40; z++) for (let x = 18; x < 50; x++) before.set(`${x},${z}`, getSmoothTerrainSurfaceY(grid, x, z));
+  const field = buildPlanEnergyField(plan, grid);
+  const estimatedBroken = field ? identifyFragmentedVoxels(field, grid, false).fragmented.length : 0;
+  const result = executeBlast(plan, grid, []);
+  expect(result, 'blast plan was rejected').not.toBeNull();
+
+  const crater: Array<{ x: number; z: number }> = [];
+  for (const [key, h0] of before) {
+    const [x, z] = key.split(',').map(Number) as [number, number];
+    if (h0 - getSmoothTerrainSurfaceY(grid, x, z) > 0.5) crater.push({ x, z });
+  }
+  return { grid, result: result!, crater, estimatedBroken };
+}
+
+/** Size of the largest group of `crater` columns joined (8-neighbour) by steps within the slope limit on the smooth surface. */
+function largestDrivablePatch(grid: VoxelGrid, crater: Array<{ x: number; z: number }>): number {
+  const key = (x: number, z: number) => `${x},${z}`;
+  const cols = new Set(crater.map(c => key(c.x, c.z)));
+  const seen = new Set<string>();
+  let best = 0;
+  for (const start of crater) {
+    if (seen.has(key(start.x, start.z))) continue;
+    let size = 0;
+    const stack = [start];
+    seen.add(key(start.x, start.z));
+    while (stack.length > 0) {
+      const c = stack.pop()!;
+      size++;
+      const h = getSmoothTerrainSurfaceY(grid, c.x, c.z);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dz === 0) continue;
+        const nx = c.x + dx, nz = c.z + dz;
+        const k = key(nx, nz);
+        if (!cols.has(k) || seen.has(k)) continue;
+        const run = Math.hypot(dx, dz);
+        if (Math.abs(getSmoothTerrainSurfaceY(grid, nx, nz) - h) / run > NAV_MAX_SLOPE_RATIO) continue;
+        seen.add(k);
+        stack.push({ x: nx, z: nz });
+      }
+    }
+    best = Math.max(best, size);
+  }
+  return best;
+}
+
+describe('Blast execution — floor broken to grade (#1723)', () => {
+  // 6 kg at spacing 4 is not covered: it leaves nine separate pits with intact
+  // rock between the holes (issue #1723's table), so no grade makes them one
+  // drivable patch. The measured patterns are 8 kg and 10 kg.
+  for (const kg of [8, 10]) {
+    it(`krackle ${kg} kg, spacing 4: at least 80% of the crater's columns are one slope-connected patch`, () => {
+      const { grid, crater } = sandboxCraterBlast(kg, 4);
+      expect(crater.length).toBeGreaterThan(20);
+      expect(largestDrivablePatch(grid, crater) / crater.length).toBeGreaterThanOrEqual(0.8);
+    });
+  }
+
+  it('krackle 8 kg: the pre-blast estimate breaks exactly the voxels the blast clears', () => {
+    const { result, estimatedBroken } = sandboxCraterBlast(8, 4);
+    expect(estimatedBroken).toBeGreaterThan(0);
+    expect(estimatedBroken).toBe(result.clearedVoxels);
+  });
+
+  it('krackle 8 kg: the fragments carry every cleared voxel (volume conserved)', () => {
+    const { result } = sandboxCraterBlast(8, 4);
+    const volume = result.fragments.reduce((sum, f) => sum + f.volume, 0);
+    expect(volume).toBeCloseTo(result.clearedVoxels, 0);
   });
 });
 
