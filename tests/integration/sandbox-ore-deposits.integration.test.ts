@@ -45,7 +45,7 @@ function assertChunkOresMatch(a: VoxelGrid, b: VoxelGrid, cx: number, cz: number
         expect(a.densityAt(x, y, z), `density (${x},${y},${z})`).toBe(b.densityAt(x, y, z));
         const bOres = b.oresAt(x, y, z);
         expect(a.oresAt(x, y, z), `ores (${x},${y},${z})`).toEqual(bOres);
-        if (Object.keys(bOres).length > 0) oreVoxels++;
+        if (bOres && Object.keys(bOres).length > 0) oreVoxels++;
       }
     }
   }
