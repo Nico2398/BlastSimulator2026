@@ -16,7 +16,7 @@ export function explosivePriceFactor(state: Pick<GameState, 'events' | 'tickCoun
 }
 
 /** Bulk price per kg of an explosive: catalog cost x EXPLOSIVE_BULK_PRICE_FACTOR x priceFactor. */
-function bulkPricePerKg(explosiveId: string, priceFactor: number): number {
+export function bulkPricePerKg(explosiveId: string, priceFactor: number): number {
   const explosive = getExplosive(explosiveId);
   return explosive ? explosive.costPerKg * EXPLOSIVE_BULK_PRICE_FACTOR * priceFactor : 0;
 }
