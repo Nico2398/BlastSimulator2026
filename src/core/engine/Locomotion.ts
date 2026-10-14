@@ -1039,14 +1039,9 @@ function handleAgentOccupancyBlock(
     const blockerIsStationaryBusyEmployee = blocker?.kind === 'employee'
       && blockerEmp !== undefined && isStationaryBusyEmployee(blockerEmp);
     if (blockerIsIdleParkedVehicle) {
-      const crossing = findPathAvoidingOccupiedCells(
-        state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
-      );
-      if (crossing.found) {
-        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
-      }
-      // Another idle employee behind the vehicle (the corridor's next cell) defeats the avoid-all search above;
-      // the mover then crosses the vehicle on a direct route and the corridor relocation clears that employee next hop.
+      // #1709: cross on the direct route first. The avoid-everything-else route below can start by backing
+      // away from the blocker; the next tick's ordinary path then walks back into it, and the two trade
+      // places forever (parked rest-trip vehicles in a work corridor made that a livelock, not a one-off).
       if (state.navGrid) {
         const direct = findPath(state.navGrid, {
           agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
@@ -1055,6 +1050,13 @@ function handleAgentOccupancyBlock(
         if (direct.found) {
           return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result, blocker!);
         }
+      }
+      // No direct route: avoid every other occupied cell, crossing only this blocker.
+      const crossing = findPathAvoidingOccupiedCells(
+        state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
+      );
+      if (crossing.found) {
+        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
       }
     } else if (blockerIsStationaryBusyEmployee && state.navGrid) {
       // #1283 dense-grid follow-up: a busy EMPLOYEE blocker (unlike a
