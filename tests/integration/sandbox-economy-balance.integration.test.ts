@@ -120,7 +120,7 @@ describe('sandbox economy: value consistency', () => {
   });
 });
 
-describe('sandbox economy: the market absorbs a shot', () => {
+describe('sandbox economy: contract board offer volume against a shot', () => {
   const { ctx } = startSandbox(DESERT, 42);
   const result = fireReferenceShot(ctx);
   const oreKg = oreKgByType(result);
@@ -149,8 +149,8 @@ describe('sandbox economy: the market absorbs a shot', () => {
 
   // The shot's 340 t is ground truth, but the opening kit hauls ~30 kg of ore a tick into a 25 t warehouse
   // (balance.ts PRODUCTION_ORE_SALE_QTY_KG), so offers are sized to what it can fill; the relationship
-  // asserted is against the legacy board, which could not absorb even that.
-  it('offers for the shot\'s own ores, over 5 game days, are at least 3x what the legacy board offers', () => {
+  // asserted is against the legacy board, which could not match even that (no 5-day absorption of the shot is asserted).
+  it('ore-sale offer volume for the shot\'s own ores over 5 game days is at least 3x the legacy board\'s (offers are sized to the kit\'s hauling, not the shot\'s 340 t)', () => {
     const forShot = (b: ReturnType<typeof offersOver>) => sum(b.filter(c => c.type === 'ore_sale' && oreKg[c.materialId] !== undefined).map(c => c.quantityKg));
     const production = sum(boards.map(forShot));
     const legacy = sum(Array.from({ length: BOARD_SEEDS }, (_, i) => forShot(offersOver(1000 + i, 'legacy'))));

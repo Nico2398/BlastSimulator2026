@@ -21,7 +21,7 @@ export function oreValuePerM3(density: number, valuePerKg: number): number {
 }
 
 /** Estimated ore value ($ per m³) of rock at the given densities, priced in `marketId` (#1681); unknown ore ids and non-positive densities are ignored. */
-export function columnOreValuePerM3(densities: Readonly<Record<string, number>>, marketId?: MarketId): number {
+export function columnOreValuePerM3(densities: Readonly<Record<string, number>>, marketId: MarketId): number {
   let value = 0;
   for (const [oreId, density] of Object.entries(densities)) {
     if (!(density > 0)) continue;
@@ -47,7 +47,7 @@ export function estimateBlastOreValue(
   surveyResults: readonly SurveyResult[],
   grid: VoxelGrid,
   wetHoleIds: ReadonlySet<string> = new Set(),
-  marketId?: MarketId,
+  marketId: MarketId = 'legacy',
 ): number {
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return 0;

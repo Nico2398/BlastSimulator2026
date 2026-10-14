@@ -897,7 +897,9 @@ describe('production market contracts (#1681)', () => {
   it('supply contracts use the supply range and the cheapest ores', () => {
     const supply = offers.filter((c) => c.type === 'supply');
     expect(supply.length).toBeGreaterThan(0);
-    const cheapest = ALL_ORES.slice(0, SUPPLY_COMMON_ORE_COUNT);
+    const cheapest = [...ALL_ORES]
+      .sort((a, b) => oreContractBasePrice(a, 'production') - oreContractBasePrice(b, 'production'))
+      .slice(0, SUPPLY_COMMON_ORE_COUNT);
     for (const c of supply) {
       expect(cheapest).toContain(c.materialId);
       expect(c.quantityKg).toBeGreaterThanOrEqual(profile.supplyQtyKg.min);

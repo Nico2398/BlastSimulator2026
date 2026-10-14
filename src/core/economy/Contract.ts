@@ -508,6 +508,6 @@ export function ensureScriptedOreSale(
   state.available.push(buildOffer(
     state, 'ore_sale', offer.materialId, `Deliver ${offer.materialId} ore`,
     offer.quantityKg, offer.deadlineTicks,
-    oreContractBasePrice(offer.materialId, 'legacy') * offer.priceFactor, priceMultiplier,
+    oreContractBasePrice(offer.materialId, state.market) * offer.priceFactor, priceMultiplier,
   ));
 }
