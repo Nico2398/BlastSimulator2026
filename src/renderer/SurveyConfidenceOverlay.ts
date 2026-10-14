@@ -38,6 +38,8 @@ export interface SurveyConfidencePoint {
   confidence: number;
   /** Whether this survey point is still fresh (not stale). */
   fresh: boolean;
+  /** Estimated ore value ($ per m³) of this column, for the value overlay mode. */
+  valuePerM3?: number;
 }
 
 /** Parameters to configure the survey confidence overlay appearance. */
@@ -68,6 +70,12 @@ export function confidenceToColor(confidence: number): THREE.Color {
     const u = (t - 0.5) / 0.5; // 0..1
     return new THREE.Color(1 - u, 1, 0);
   }
+}
+
+/** Map an estimated ore value ($ per m³) to a log-scaled colour ramp. */
+export function valueToColor(_valuePerM3: number): THREE.Color {
+  // TODO: implement
+  return new THREE.Color();
 }
 
 // ---------- Overlay Class ----------

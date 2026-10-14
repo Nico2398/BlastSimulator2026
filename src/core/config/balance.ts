@@ -2448,3 +2448,14 @@ export const BLAST_REPORT_MIN_PLAYBACK_S = 3;
 
 /** Rendered seconds after which the blast report opens even if some debris is still moving. */
 export const BLAST_REPORT_MAX_PLAYBACK_S = 8;
+
+/**
+ * Value-overlay colour ramp floor ($ per m³ of rock column). Ore value per m³ =
+ * density × ORE_DENSITY_KG_M3 × valuePerKg; ores span 2–2000 $/kg, so one m³ at
+ * full density is worth 5 000 (dirtite) to 5 000 000 (treranium). Floor sits at
+ * a lean dirtite column (~20% density).
+ */
+export const SURVEY_OVERLAY_VALUE_FLOOR = 1000;
+
+/** Value-overlay colour ramp ceiling ($ per m³); log-scaled between floor and ceil. */
+export const SURVEY_OVERLAY_VALUE_CEIL = 1_000_000;
