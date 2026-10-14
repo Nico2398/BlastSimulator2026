@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "sandbox start biome:alpine_granite difficulty:hard seed:777",
-      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #1671: with no staffed: flag the difficulty opens on its free starting kit (crew, drill rig, charging truck, debris hauler, freight warehouse, spoil heap), so the full drill/charge/blast cycle needs no purchases. Interaction mode (#1671): a player opens the Sandbox panel from the main menu, picks biome, Hard and the seed, and clicks Start — no console command stands in.",
+      "description": "No new_game first \u2014 a sandbox site is created from nothing, which is the point of the mode. #1671: with no staffed: flag the difficulty opens on its free starting kit (crew, drill rig, charging truck, debris hauler, freight warehouse, spoil heap), so the full drill/charge/blast cycle needs no purchases. Interaction mode (#1671): a player opens the Sandbox panel from the main menu, picks biome, Hard and the seed, and clicks Start \u2014 no console command stands in. #1686: before picking the final settings the player previews Volcanic Flats on Easy and the details elements (description, hardness, ores, terrain, starting cash, opening) appear -- every wait is on a condition, no fixed delay.",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -17,6 +17,43 @@
         {
           "type": "awaitUsable",
           "selector": "#bs-sandbox-start"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-sandbox-biome",
+          "value": "volcanic_flats"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-sandbox-difficulty",
+          "value": "easy"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-sandbox-biome-desc",
+          "property": "textContent",
+          "expectedValue": "Ash-flat plains over hard, ore-rich volcanic rock.",
+          "timeoutMs": 5000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-sandbox-biome-hardness"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-sandbox-biome-ores"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-sandbox-biome-terrain"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-sandbox-difficulty-cash"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-sandbox-difficulty-opening"
         },
         {
           "type": "set",
