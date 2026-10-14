@@ -35,6 +35,8 @@ Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
 | **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
 
+**Drill rig reach (#1679).** A rig's tier caps the deepest hole it can drill: `DRILL_RIG_MAX_DEPTH_M` = 12 / 24 / 40 m for tiers 1 / 2 / 3, minimum `DRILL_HOLE_MIN_DEPTH_M` = 1. The fleet's reach (`fleetDrillReachM`, `DrillPlan.ts`) is the best owned rig's value; with no rig owned it falls back to the tier-1 value (12 m). `drill_plan grid|add` and the saved-plan load refuse a deeper hole (`drillDepthRefusal`, `mining.drill_plan.refused_depth`) before any mutation; the Blast Workshop depth stepper is clamped to the reach and the Fleet tooltip lists it.
+
 **Charging Truck decisions (#1645, defaulted).** Licence: the existing `driving.truck`, like the hauler and destroyer
 (no new `SkillCategory`, Driving Center course or starting qualification; Drivers already hold it). Base stats
 (`VEHICLE_BASE_STATS.charging_truck`): 28 000 $, workRate 6, capacity 500, speed 2, maxHp 115, upkeep 4, fuel 6 per tick

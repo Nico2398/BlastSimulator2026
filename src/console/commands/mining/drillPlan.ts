@@ -7,7 +7,7 @@ import type { MiningContext } from './types.js';
 import { requireGameWithSub, resolveHoleId, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
 import {
   gridCellPositions, createHolesAt, addHole, removeHole,
-  computeDrillHoleDurationTicks,
+  computeDrillHoleDurationTicks, drillDepthRefusal,
 } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
@@ -131,6 +131,9 @@ export function drillPlanCommand(
       };
     }
 
+    const tooDeep = drillDepthRefusal(depth, ctx.state!.vehicles.vehicles);
+    if (tooDeep) return { success: false, output: t(tooDeep.key, tooDeep.params) };
+
     const cells = gridCellPositions({ x: origin[0] ?? 0, z: origin[1] ?? 0 }, rows, cols, spacing);
 
     // Claim before committing the plan: a grid reaching ground the site
@@ -181,6 +184,8 @@ export function drillPlanCommand(
     const z = parseFloat(named['z'] ?? named['y'] ?? '0');
     const depth = parseFloat(named['depth'] ?? '8');
     const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
+    const tooDeep = drillDepthRefusal(depth, ctx.state!.vehicles.vehicles);
+    if (tooDeep) return { success: false, output: t(tooDeep.key, tooDeep.params) };
     const claim = claimForAction(ctx, [{ x, z }], 'drill');
     if (!claim.ok) return { success: false, output: claim.output! };
     if (coveredByFootprint([{ id: 'add', x, z }], buildingFootprintOccupants(ctx.state!)).size > 0) {

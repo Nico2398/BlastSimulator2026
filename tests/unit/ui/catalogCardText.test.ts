@@ -15,6 +15,7 @@ import {
 import {
   getAllBuildingTypes, getBuildingDef, getFootprintSize, type BuildingTier,
 } from '../../../src/core/entities/Building.js';
+import { DRILL_RIG_MAX_DEPTH_M } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
@@ -67,7 +68,8 @@ describe('vehicleCardLine', () => {
         const def = getVehicleDefByTier(role, tier);
         const perHour = Math.round(def.maintenanceCostPerTick + def.fuelCostPerTick);
         const line = vehicleCardLine(def);
-        expect(line).toBe(`${t(`vehicle.${role}.desc`)}${SEP}$${perHour}/h`);
+        const base = `${t(`vehicle.${role}.desc`)}${SEP}$${perHour}/h`;
+        expect(line).toBe(role === 'drill_rig' ? `${base}${SEP}${t('ui.fleet.card.reach', { value: DRILL_RIG_MAX_DEPTH_M[tier] })}` : base);
         expect(line).not.toContain('×');
         expect(line).not.toContain('1.0');
       });
@@ -83,6 +85,17 @@ describe('vehicleCardLine', () => {
   });
 });
 
+describe('vehicleCardLine drill rig reach (#1679)', () => {
+  it('drill rig card states 12 / 24 / 40 m reach; other roles omit it', () => {
+    const expected = { 1: 12, 2: 24, 3: 40 } as const;
+    for (const tier of TIERS) {
+      expect(vehicleCardLine(getVehicleDefByTier('drill_rig', tier)))
+        .toContain(t('ui.fleet.card.reach', { value: expected[tier] }));
+    }
+    expect(vehicleCardLine(getVehicleDefByTier('debris_hauler', 1))).not.toContain(t('ui.fleet.card.reach', { value: 12 }));
+  });
+});
+
 describe('vehicleCardTooltip', () => {
   for (const role of getAllVehicleRoles()) {
     for (const tier of TIERS) {
@@ -93,7 +106,8 @@ describe('vehicleCardTooltip', () => {
         const capacity = VEHICLE_CAPACITY_UNIT[role]
           ? t('ui.fleet.tip.capacity_work', { value: fixed(def.capacity), unit: t(VEHICLE_CAPACITY_UNIT[role]!) })
           : t('ui.fleet.tip.capacity_kg', { value: fixed(def.capacity) });
-        expect(tip.split('\n')).toEqual([
+        const reachLine = t('ui.fleet.tip.reach', { value: DRILL_RIG_MAX_DEPTH_M[tier] });
+        expect(tip.split('\n').filter(l => l !== reachLine)).toEqual([
           t('ui.fleet.tip.speed', { value: fixed(def.speed) }),
           capacity,
           t('ui.fleet.tip.work_rate', { value: fixed(def.workRate) }),
@@ -105,6 +119,34 @@ describe('vehicleCardTooltip', () => {
       });
     }
   }
+
+  it('drill rig tooltips state the tier reach: 12 / 24 / 40 m (#1679)', () => {
+    const expected = { 1: 12, 2: 24, 3: 40 } as const;
+    for (const tier of TIERS) {
+      const tip = vehicleCardTooltip(getVehicleDefByTier('drill_rig', tier));
+      const reach = t('ui.fleet.tip.reach', { value: expected[tier] });
+      expect(tip.split('\n')).toContain(reach);
+      expect(reach).not.toMatch(/ui\.fleet\.tip/);
+      expect(reach).toContain(String(expected[tier]));
+    }
+  });
+
+  it('other vehicle roles carry no reach line (#1679)', () => {
+    for (const role of getAllVehicleRoles().filter(r => r !== 'drill_rig')) {
+      for (const tier of TIERS) {
+        const tip = vehicleCardTooltip(getVehicleDefByTier(role, tier));
+        expect(tip.split('\n')).toHaveLength(4);
+      }
+    }
+  });
+
+  it('reach line is translated in French (#1679)', () => {
+    expect(EN['ui.fleet.tip.reach']).toBeDefined();
+    expect(FR['ui.fleet.tip.reach']).toBeDefined();
+    expect(FR['ui.fleet.tip.reach']).not.toBe(EN['ui.fleet.tip.reach']);
+    setLocale('fr');
+    expect(vehicleCardTooltip(getVehicleDefByTier('drill_rig', 2))).toContain(t('ui.fleet.tip.reach', { value: 24 }));
+  });
 
   it('hauler capacity is a kg payload; destroyer and fragmenter are kg/h throughput', () => {
     expect(vehicleCardTooltip(getVehicleDefByTier('debris_hauler', 1))).toContain('Capacity: 4,000 kg');

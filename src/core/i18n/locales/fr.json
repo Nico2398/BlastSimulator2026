@@ -3994,5 +3994,9 @@
   "entities.build_destroy_lost_ore": "Attention : {kg} kg de minerai et de roche stockés seront perdus avec cet entrepôt.",
   "mining.blast.warehouse_stock_lost": "Entrepôt de fret #{id} détruit : {kg} kg de stock perdus.",
   "notification.warehouse_stock_lost": "L'entrepôt de fret #{id} a été détruit. {kg} kg de stock sont perdus.",
-  "notification.title.warehouse_stock_lost": "Stock perdu"
+  "notification.title.warehouse_stock_lost": "Stock perdu",
+  "ui.fleet.tip.reach": "Trou le plus profond : {value} m",
+  "ui.fleet.card.reach": "Portée {value} m",
+  "ui.blast_workshop.drill.depth_reach": "Trou le plus profond que votre meilleure foreuse peut percer : {reach} m. Améliorez une foreuse pour aller plus profond.",
+  "mining.drill_plan.refused_depth": "Impossible de forer un trou de {depth} m : votre meilleure foreuse atteint {reach} m. Achetez ou améliorez une foreuse pour aller plus profond."
 }
