@@ -29,7 +29,7 @@ function step(state: GameState, emitter = new EventEmitter()): void {
 }
 
 function quietGame(seed = SEED, mineType?: string): GameState {
-  const state = createGame({ seed, mineType });
+  const state = createGame({ seed, ...(mineType !== undefined ? { mineType } : {}) });
   state.events.eventFreqMultiplier = 0; // pending events would halt console `tick`; weather is what is under test
   return state;
 }
