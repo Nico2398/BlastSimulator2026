@@ -3395,7 +3395,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 47.30410256410258,
+          "wellBeing": 45.82615384615376,
           "safety": 0,
           "ecology": 48.4383360853848,
           "nuisance": 46.04236684455177
@@ -3861,7 +3861,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3886,7 +3886,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3908,7 +3908,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3930,7 +3930,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3951,7 +3951,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3974,7 +3974,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3995,7 +3995,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4023,7 +4023,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4042,7 +4042,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4065,7 +4065,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4095,7 +4095,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4137,9 +4137,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
@@ -4161,14 +4161,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 51.0166666666666,
+          "wellBeing": 83.09667332667611,
           "safety": 0,
-          "ecology": 17.95401729480197,
-          "nuisance": 8.057624212722736
+          "ecology": 17.270820753762365,
+          "nuisance": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -4187,14 +4187,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 10,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 51.0166666666666,
+          "wellBeing": 83.09667332667611,
           "safety": 0,
-          "ecology": 17.95401729480197,
-          "nuisance": 8.057624212722736
+          "ecology": 17.270820753762365,
+          "nuisance": 0
         },
         "changedBy": {
           "tickCount": 0
