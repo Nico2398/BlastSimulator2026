@@ -391,8 +391,10 @@ describe('SandboxPanel', () => {
   it('biome select has no fixed width and a min-width of at least 180px', () => {
     panel.show();
     const select = control('biome') as HTMLSelectElement;
-    expect(select.style.width).toBe('');
-    expect(select.style.cssText).not.toMatch(/(^|;)\s*width\s*:/);
+    // 'auto' sizes to content; any px/% width would be a fixed width.
+    expect(['', 'auto']).toContain(select.style.width);
+    expect(select.style.cssText).not.toMatch(/(^|;)\s*width\s*:(?!\s*auto)/);
+    expect(parseInt(select.style.maxWidth, 10)).toBeGreaterThanOrEqual(180);
     expect(parseInt(select.style.minWidth, 10)).toBeGreaterThanOrEqual(180);
   });
 });

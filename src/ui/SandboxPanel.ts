@@ -30,8 +30,9 @@ const ROW_STYLE = 'display:flex;align-items:center;justify-content:space-between
 const LABEL_STYLE = 'font-size:12px;color:#c0a060;flex:1';
 const INPUT_STYLE = [
   'padding:4px 6px;font-size:12px;font-family:monospace',
-  'background:rgba(0,0,0,0.5);color:#ffe0a0',
-  'border:1px solid rgba(200,160,60,0.35);border-radius:4px',
+  // Order matters for jsdom's cssText parser: rgba background before rgba border drops the whole string.
+  'color:#ffe0a0;border:1px solid rgba(200,160,60,0.35);border-radius:4px',
+  'background:rgba(0,0,0,0.5)',
 ].join(';');
 const NUMBER_INPUT_STYLE = `width:120px;${INPUT_STYLE}`;
 // Choice labels ("Desert Badlands", French names) must fit unclipped at 1280x720.
