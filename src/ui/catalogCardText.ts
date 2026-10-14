@@ -1,6 +1,7 @@
 import type { VehicleDef, VehicleRole } from '../core/entities/Vehicle.js';
 import { getFootprintSize, type BuildingDef, type BuildingType } from '../core/entities/Building.js';
 import { t } from '../core/i18n/I18n.js';
+import { DRILL_RIG_MAX_DEPTH_M } from '../core/config/balance.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 
 /**
@@ -56,6 +57,7 @@ export function vehicleCardTooltip(def: VehicleDef): string {
     capacity,
     t('ui.fleet.tip.work_rate', { value: num(def.workRate) }),
     t('ui.fleet.tip.licence', { tier: def.tier }),
+    ...(def.type === 'drill_rig' ? [t('ui.fleet.tip.reach', { value: DRILL_RIG_MAX_DEPTH_M[def.tier as 1 | 2 | 3] })] : []),
   ].join('\n');
 }
 

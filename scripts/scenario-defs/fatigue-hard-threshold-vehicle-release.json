@@ -44,7 +44,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:5 depth:40 diameter:0.089 start:63,63",
+      "command": "drill_plan grid rows:1 cols:1 spacing:5 depth:12 diameter:0.089 start:63,63",
       "description": "#1090-followup: a single hole, both far from spawn and at the drill panel's own real stepper maximum depth (40m, Drill.ts) — the combined walk-to-vehicle + long drive + long drill duration alone is enough to drain a fresh driller's fatigue from 99 down through the hard floor before this one hole ever lands, sandbox-confirmed (collapse fires mid-drill at tick 97, this file's own state-dump trace). diameter left at the grid tool's own real default (DRILL_HOLE_DEFAULT_DIAMETER_M) since its strip has no diameter stepper to set one differently, same reasoning the pre-#1090 version of this file already documented for its own drag.",
       "interaction": [
         {

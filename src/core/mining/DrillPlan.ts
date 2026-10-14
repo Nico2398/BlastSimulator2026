@@ -8,6 +8,7 @@ import {
   DRILL_HOLE_BASE_DURATION_TICKS,
   DRILL_HOLE_REFERENCE_DEPTH_M,
   DRILL_HOLE_REFERENCE_DIAMETER_M,
+  DRILL_RIG_MAX_DEPTH_M,
 } from '../config/balance.js';
 
 export interface DrillHole {
@@ -205,8 +206,13 @@ type RigLike = Pick<Vehicle, 'type' | 'tier'>;
  * `drill_rig` vehicles. With no rig owned, falls back to the tier-1 value (#1679).
  */
 export function fleetDrillReachM(vehicles: ReadonlyArray<RigLike>): number {
-  void vehicles;
-  return 0; // TODO: implement
+  let reach = DRILL_RIG_MAX_DEPTH_M[1] as number;
+  for (const v of vehicles) {
+    if (v.type !== 'drill_rig') continue;
+    const tierReach = DRILL_RIG_MAX_DEPTH_M[v.tier as 1 | 2 | 3];
+    if (tierReach !== undefined && tierReach > reach) reach = tierReach;
+  }
+  return reach;
 }
 
 /**
@@ -217,7 +223,7 @@ export function drillDepthRefusal(
   depth: number,
   vehicles: ReadonlyArray<RigLike>,
 ): { key: 'mining.drill_plan.refused_depth'; params: { depth: number; reach: number } } | null {
-  void depth;
-  void vehicles;
-  return null; // TODO: implement
+  const reach = fleetDrillReachM(vehicles);
+  if (!(depth > reach)) return null; // within reach; NaN left to existing behaviour
+  return { key: 'mining.drill_plan.refused_depth', params: { depth, reach } };
 }
