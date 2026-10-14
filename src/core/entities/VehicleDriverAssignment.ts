@@ -24,8 +24,12 @@ export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
 
 /** Licence level `employee` holds for `role`'s licence: 0 when not held, else `licenceLevel ?? 1` (#1524). */
 export function licenceLevelOf(employee: Pick<Employee, 'qualifications'>, role: VehicleRole): number {
-  const licence = ROLE_LICENCE_REQUIRED[role];
-  const held = employee.qualifications.find(q => q.category === licence);
+  return licenceLevelOfSkill(employee.qualifications, ROLE_LICENCE_REQUIRED[role]);
+}
+
+/** Level at which `qualifications` hold the licence skill `licence`: 0 when not held, else `licenceLevel ?? 1`. */
+export function licenceLevelOfSkill(qualifications: readonly Employee['qualifications'][number][], licence: SkillCategory): number {
+  const held = qualifications.find(q => q.category === licence);
   return held ? (held.licenceLevel ?? 1) : 0;
 }
 

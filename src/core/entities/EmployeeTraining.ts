@@ -7,8 +7,10 @@
 // role, so without a reachable course nobody could hold it.
 
 import type { Employee, EmployeeState, SkillCategory, TrainingState, LicenceLevel } from './Employee.js';
+import { licenceLevelOfSkill } from './VehicleDriverAssignment.js';
 import { calculateSalary, qualificationAtLevel } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
+import { t } from '../i18n/I18n.js';
 import { getBuildingPeopleCapacity, isOperating } from './Building.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -123,7 +125,7 @@ export function heldCourseLevel(
 ): 0 | ProficiencyLevel {
   const held = qualifications.find(q => q.category === skill);
   if (!held) return 0;
-  return isLicenceSkill(skill) ? (held.licenceLevel ?? 1) : held.proficiencyLevel;
+  return isLicenceSkill(skill) ? (licenceLevelOfSkill(qualifications, skill) as ProficiencyLevel) : held.proficiencyLevel;
 }
 
 /** Refusal of a course the school's tier cannot give (held level >= tier, or tier 3 reached). */
@@ -131,18 +133,21 @@ export function trainingRefusal(
   employee: Employee,
   skill: SkillCategory,
   tier: BuildingTier,
-): { error: string } & RefusalKey {
+): { error: string; kind: 'top_level' | 'needs_higher_school' } & RefusalKey {
   const held = heldCourseLevel(employee.qualifications, skill);
   if (held >= 3 || tier >= 3) {
     return {
+      kind: 'top_level',
       error: `${employee.name} already holds ${skill} at the highest level a school teaches`,
       errorKey: 'employees.train_top_level',
       errorParams: { name: employee.name, skill },
     };
   }
-  const school = schoolFor(skill) ?? '';
+  const schoolType = schoolFor(skill);
+  const school = schoolType ? t(`building.${schoolType}.name`) : '';
   return {
-    error: `${employee.name} already holds ${skill} at level ${held}; a higher-tier ${school} is needed`,
+    kind: 'needs_higher_school',
+    error: `${employee.name} already holds ${skill} at level ${held}; a higher-tier ${schoolType ?? ''} is needed`,
     errorKey: 'employees.train_needs_higher_school',
     errorParams: { name: employee.name, skill, level: held, school },
   };
@@ -162,13 +167,13 @@ export function planTraining(
   const held = heldCourseLevel(employee.qualifications, skill);
   if (held >= tier) return null;
   const unlock = held === 0;
-  const bonus = unlock ? QUALIFICATION_SALARY_BONUS[tier] : QUALIFICATION_SALARY_BONUS[tier] - QUALIFICATION_SALARY_BONUS[held as ProficiencyLevel];
+  const bonusAt = (level: 0 | ProficiencyLevel): number => (level === 0 ? 0 : QUALIFICATION_SALARY_BONUS[level]);
   return {
     skill,
     grantsLevel: tier,
     kind: unlock ? 'unlock' : 'upgrade',
     // A driving licence is a pass, not a rank: the unlock pays the level-1 bonus and raises pay nothing.
-    salaryIncrease: isLicenceSkill(skill) ? (unlock ? QUALIFICATION_SALARY_BONUS[1] : 0) : bonus,
+    salaryIncrease: isLicenceSkill(skill) ? (unlock ? bonusAt(1) : 0) : bonusAt(tier) - bonusAt(held),
     ticks: Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[tier] * TRAINING_LEVEL_TICKS_MULT[tier])),
     fee: TRAINING_LEVEL_FEE[tier],
   };
@@ -361,8 +366,8 @@ export function tickTraining(
     if (raisesTo !== undefined) {
       if (!held || (held.licenceLevel ?? 1) >= raisesTo) continue;
       held.licenceLevel = raisesTo;
-      completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level: held.proficiencyLevel, isNew: false });
-      emitter?.emit('employee:trained', { employeeId: emp.id, skill, level: held.proficiencyLevel, isNew: false });
+      completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level: raisesTo, isNew: false });
+      emitter?.emit('employee:trained', { employeeId: emp.id, skill, level: raisesTo, isNew: false });
       continue;
     }
     if (held) continue;

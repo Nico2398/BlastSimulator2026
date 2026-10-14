@@ -52,7 +52,6 @@ import {
   XP_THRESHOLDS, TRAINING_BASE_FEE, TRAINING_BASE_TICKS, TRAINING_TIER_SPEED, QUALIFICATION_SALARY_BONUS,
   TRAINING_LEVEL_FEE, TRAINING_LEVEL_TICKS_MULT,
 } from '../../../src/core/config/balance.js';
-import * as balance from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
@@ -257,14 +256,6 @@ describe('planTraining', () => {
     for (const tier of [1, 2, 3] as const) expect(planTraining(emp, 'geology', tier)!.ticks).toBeGreaterThanOrEqual(1);
   });
 
-  it('TRAINING_LEVEL_COST_MULTIPLIER no longer exists in balance.ts', () => {
-    expect('TRAINING_LEVEL_COST_MULTIPLIER' in balance).toBe(false);
-  });
-
-  it('the old licence-only course constants are gone', () => {
-    expect('LICENCE_COURSE_FEE' in balance).toBe(false);
-    expect('LICENCE_COURSE_TICKS_MULT' in balance).toBe(false);
-  });
 });
 
 describe('planTraining — driving licences', () => {
@@ -734,17 +725,22 @@ describe('licences no role is hired with', () => {
   });
 });
 
-// ── Completion grants qualifications only (#1388) ───────────────────────────
+// ── Level-1 course completion (#1388) ───────────────────────────────────────
 //
-// There is no promotion path: a course on a skill the employee lacks adds it at
-// Rookie with 0 xp, and completion never touches an existing qualification.
+// A level-1 course on a skill the employee lacks adds it at Rookie with 0 xp;
+// completion never touches a skill already held at that level or above.
 
-/** Puts `employee` mid-course (inside `school`) on `skill`, one tick from done. */
-function startFinalTick(employee: Employee, school: Building, skill: SkillCategory): void {
+/** Puts `employee` mid-course (inside `school`) on `skill`, one tick from done, granting `grantsLevel`. */
+function startFinalTick(employee: Employee, school: Building, skill: SkillCategory, grantsLevel: 1 | 2 | 3 = 1): void {
+  employee.trainingState = { buildingId: school.id, skill, ticksRemaining: 1, fee: TRAINING_BASE_FEE, grantsLevel };
+}
+
+/** As `startFinalTick`, but a course saved before `grantsLevel` existed. */
+function startLegacyFinalTick(employee: Employee, school: Building, skill: SkillCategory): void {
   employee.trainingState = { buildingId: school.id, skill, ticksRemaining: 1, fee: TRAINING_BASE_FEE };
 }
 
-describe('tickTraining grants qualifications only', () => {
+describe('tickTraining — level-1 course completion', () => {
   it('a brand-new qualification starts at level 1 with 0 xp', () => {
     const { state, school } = setupSchool('driving_center');
     const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2); // truck + excavator, not the fragmenter
@@ -1148,7 +1144,7 @@ describe('tickTraining — legacy training state (no grantsLevel)', () => {
   it('a legacy unlock completes as a level-1 qualification', () => {
     const { state, school } = setupSchool('geology_lab', 2);
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
-    startFinalTick(employee, school, 'geology');
+    startLegacyFinalTick(employee, school, 'geology');
     const { completed } = tickTraining(state);
     expect(completed[0]).toMatchObject({ skill: 'geology', level: 1, isNew: true });
     expect(employee.qualifications.find(q => q.category === 'geology')).toEqual({ category: 'geology', proficiencyLevel: 1, xp: 0 });
@@ -1162,7 +1158,7 @@ describe('tickTraining — legacy training state (no grantsLevel)', () => {
     qual.xp = XP_THRESHOLDS[3];
     employee.trainingState = { buildingId: school.id, skill: 'driving.drill_rig', ticksRemaining: 1, fee: 5000, raisesLicenceTo: 2 };
     const { completed } = tickTraining(state);
-    expect(completed[0]).toMatchObject({ skill: 'driving.drill_rig', isNew: false });
+    expect(completed[0]).toMatchObject({ skill: 'driving.drill_rig', level: 2, isNew: false });
     expect(qual.licenceLevel).toBe(2);
     expect(qual.proficiencyLevel).toBe(3);
     expect(qual.xp).toBe(XP_THRESHOLDS[3]);
@@ -1171,7 +1167,7 @@ describe('tickTraining — legacy training state (no grantsLevel)', () => {
   it('a legacy course on an already-held skill completes silently', () => {
     const { state, school } = setupSchool('blasting_academy', 2);
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
-    startFinalTick(employee, school, 'blasting');
+    startLegacyFinalTick(employee, school, 'blasting');
     expect(tickTraining(state).completed).toEqual([]);
   });
 });

@@ -857,6 +857,7 @@ describe('Level courses through the console (#1726)', () => {
     const cashBefore = state.cash;
     const result = employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' });
     expect(result.success).toBe(false);
+    expect(result.output).toMatch(/higher-tier/);
     expect(state.cash).toBe(cashBefore);
     expect(state.employees.employees.find(e => e.id === surveyorId)!.pendingTrainingState).toBeNull();
   });

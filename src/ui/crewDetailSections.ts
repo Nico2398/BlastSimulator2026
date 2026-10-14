@@ -12,7 +12,7 @@ import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, isSchoolFull, heldCourseLevel, isLicenceSkill } from '../core/entities/EmployeeTraining.js';
+import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, heldCourseLevel, isLicenceSkill } from '../core/entities/EmployeeTraining.js';
 import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
@@ -313,7 +313,8 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     const title = t(`course.${skill}`);
 
     if (!plan) {
-      row.append(trainingInfoBlock(title, heldCourseLevel(e.qualifications, skill) >= 3 || building.tier >= 3
+      const refusal = trainingRefusal(e, skill, building.tier);
+      row.append(trainingInfoBlock(title, refusal.kind === 'top_level'
         ? t('ui.crew.training_top_level')
         : t('ui.crew.training_needs_higher_school', { level: heldCourseLevel(e.qualifications, skill) })));
     } else if (isSchoolFull(state, building)) {

@@ -121,7 +121,7 @@ describe('wireCrewNotifications', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0]!.severity).toBe('info');
     expect(notes[0]!.body).toContain(empName);
-    expect(notes[0]!.body).toContain('2');
+    expect(notes[0]!.body).toMatch(/level 2/);
   });
 
   it('trained is info and names the employee', () => {
@@ -136,7 +136,7 @@ describe('wireCrewNotifications', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0]!.body).toContain(empName);
     expect(notes[0]!.body).toMatch(/learned/i);
-    expect(notes[0]!.body).toContain('2');
+    expect(notes[0]!.body).toMatch(/level 2/);
   });
 
   it('an upgrade says the skill rose to the level, not learned', () => {

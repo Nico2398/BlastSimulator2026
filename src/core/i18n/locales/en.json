@@ -3862,7 +3862,6 @@
   "employees.train_no_school": "No building teaches {skill}.",
   "employees.train_building_no_teach": "Building #{buildingId} does not teach {skill}.",
   "employees.train_no_building_on_site": "No {schoolType} on site. Build one to train {skill}.",
-  "employees.train_already_qualified": "{name} is already qualified in {skill}.",
   "employees.train_needs_higher_school": "{name} already holds {skill} at level {level}; a higher-tier {school} is needed to teach more.",
   "employees.train_top_level": "{name} cannot be taught more of {skill} — schools teach up to level 3 only.",
   "employees.train_insufficient_funds": "Insufficient funds: course costs ${fee}.",

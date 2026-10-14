@@ -201,6 +201,7 @@ describe('train_employee — unlocks only (#1726)', () => {
     const outcome = UNQUALIFIED_TASK_EFFECTS['train_employee']!([s.actionId], s.world, TICK);
     expect(outcome.resultKeySuffix).toBe('');
     expect(totalDebit(s.cashAfterOrder, s.state, outcome)).toBe(5000);
+    expect(outcome.effects.join(' ')).toContain('(level 2)');
     expect((s.driver!.pendingTrainingState ?? s.driver!.trainingState)!.grantsLevel).toBe(2);
   });
 
