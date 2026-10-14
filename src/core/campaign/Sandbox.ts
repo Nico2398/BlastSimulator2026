@@ -12,7 +12,7 @@
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { LevelDef } from './Level.js';
 
@@ -26,13 +26,15 @@ export interface SandboxDifficultyDef {
   /** i18n key for the difficulty's label. */
   labelKey: string;
   startingCash: number;
+  /** Free opening crew, fleet and buildings (#1671). */
+  startingSite: StartingSiteComposition;
 }
 
 /** Named difficulty presets — the only thing that varies between them is starting cash (#504). */
 export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
-  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingCash: 250_000 },
-  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingCash: 100_000 },
-  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingCash: 50_000 },
+  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: 250_000 },
+  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: 100_000 },
+  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: 50_000 },
 } as const;
 
 export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy', 'normal', 'hard'];
@@ -143,6 +145,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     datum: SANDBOX_DATUM,
     gridZ: DEFAULT_GRID_SIZE,
     startingCash: SANDBOX_DIFFICULTIES[clamped.difficulty].startingCash,
+    startingSite: SANDBOX_DIFFICULTIES[clamped.difficulty].startingSite,
     availableExplosives: getAllExplosives().map(e => e.id),
     unlockThreshold: SANDBOX_FIXED_UNLOCK_THRESHOLD,
     eventFreqMultiplier: SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER,

@@ -1407,6 +1407,17 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'spoil_heap', tier: 1 }],
 };
 
+/** Sandbox difficulty ids a starting kit is keyed by (#1671). */
+export type SandboxStartingSiteId = 'easy' | 'normal' | 'hard';
+
+/** Free starting kit per sandbox difficulty (#1671). */
+export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxStartingSiteId, StartingSiteComposition>> = {
+  // TODO: implement
+  easy: { employees: [], vehicles: [], buildings: [] },
+  normal: { employees: [], vehicles: [], buildings: [] },
+  hard: { employees: [], vehicles: [], buildings: [] },
+};
+
 /**
  * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
  * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
