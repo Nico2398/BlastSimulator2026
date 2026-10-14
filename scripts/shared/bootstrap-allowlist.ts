@@ -45,6 +45,11 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // actually about is set by clicking the Ops panel's policy controls
   // (`player` role), never through this entry.
   'set_policy mode:continuous fatigue:0',
+  // #1673: the shift length now rests a crew member between two vehicle jobs.
+  // A scenario whose fixed tick budgets cannot absorb that drops the shift
+  // trigger but keeps the fatigue threshold (default 60), which is how the
+  // crew behaved before the rest applied there. Exact-string, same reasoning.
+  'set_policy mode:continuous',
   'weather set',
   'weather',
   'event fire',

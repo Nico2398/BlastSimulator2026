@@ -959,9 +959,16 @@ describe('restTripFatigueCost (#1673)', () => {
     expect(cost!).toBeLessThan(1);
   });
 
-  it('unreachable target (walled off) returns null', () => {
+  it('walled-off target: the cost comes from the planner\'s estimate fidelity, so it stays the finite heuristic cost', () => {
+    // 'estimate' is the octile heuristic and never reports a route as missing;
+    // whether a rest trip is reachable at all is restRoundTripWorthwhile's
+    // concern (it treats unreachable as worthwhile). A null cost is reserved
+    // for a trip the planner cannot plan, which counts as covered.
     const { state, employee } = fixture();
+    const open = restTripFatigueCost(state, employee, 40, 5);
     blockColumn(state.navGrid!, 20);
-    expect(restTripFatigueCost(state, employee, 40, 5)).toBeNull();
+    const walled = restTripFatigueCost(state, employee, 40, 5);
+    expect(walled).not.toBeNull();
+    expect(walled).toBe(open);
   });
 });

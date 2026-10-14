@@ -14,12 +14,12 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
 import { createRestPendingAction, resolveRestDestination, restTripFatigueCost, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId } from './RestActionHelpers.js';
-import { isMidVehicleGatedWork } from './VehicleReservation.js';
+import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_DRAIN_RATES, NEED_REST_ARRIVAL_FATIGUE_FLOOR, NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE } from '../config/balance.js';
+import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_DRAIN_RATES, NEED_REST_ARRIVAL_FATIGUE_FLOOR, NEED_VEHICLE_JOB_FATIGUE_ALLOWANCE, MAX_NEED_GAUGE } from '../config/balance.js';
 
 /**
  * Shared leading guard of forceShiftRestIfNeeded and
@@ -393,10 +393,19 @@ export function forceShiftRestIfNeededByPolicy(
   // the employee's active work — see forceShiftRestIfNeeded's own comment on
   // the identical ordering requirement (#1170).
   const dest = resolveRestDestination(state, emp);
-  if (!dest.worthwhile) return;
-  // Mid-drive to a vehicle-gated target: keep driving while the gauge still
-  // covers the trip to the rest building (#1673).
-  if (midVehicleWork && fatigueCoversTripToRest(state, emp, dest.targetX, dest.targetZ)) return;
+  // Idle gap between two same-role jobs (#1090): the follow-up is about to be claimed.
+  const betweenVehicleJobs = emp.activeActionId === null && hasClaimableSameRoleFollowUp(state, emp);
+  const vehicleJob = midVehicleWork || betweenVehicleJobs;
+  const covered = vehicleJob && fatigueCoversTripToRest(state, emp, dest.targetX, dest.targetZ);
+  const shiftExpired = shouldForceRest(state.sitePolicy, { ...snapshot, fatigue: MAX_NEED_GAUGE }, true);
+  // Mid-drive: keep driving while the gauge still covers the trip to the rest
+  // building (#1673). Between jobs only a fatigue-threshold crossing waits on
+  // that; an expired shift rests at once, so the overrun is the job just done.
+  if (covered && (midVehicleWork || !shiftExpired)) return;
+  // A round trip that costs more than it recovers is skipped, except where
+  // working on only ends in a collapse on that same drive (vehicle work whose
+  // gauge no longer covers the trip) or the shift ran out between two jobs.
+  if (!dest.worthwhile && !(vehicleJob && !covered) && !(betweenVehicleJobs && shiftExpired)) return;
   if (dest.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
 
   // #678 follow-up: release the action this employee was actively working

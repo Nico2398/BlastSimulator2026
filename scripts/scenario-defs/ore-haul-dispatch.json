@@ -255,8 +255,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 4
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },

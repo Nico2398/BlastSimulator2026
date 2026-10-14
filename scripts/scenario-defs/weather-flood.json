@@ -19,6 +19,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous",
+      "description": "#1673: the default site policy (shift_8h) now rests a crew member at the shift length between two jobs, which would stretch this file's fixed tick budgets. Continuous mode drops the shift-length trigger and keeps the fatigue threshold.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "time resume",
       "interaction": [
         {

@@ -76,8 +76,8 @@ describe('a full-screen menu', () => {
   let bedsBefore: number;
 
   beforeAll(() => {
-    // A busy game, 45 real seconds in, then the main menu comes up over it.
-    sim = playScenario('vibration-budget', { speed: 8, maxRealS: 45 });
+    // A busy game, 60 real seconds in (the crew's shift rests slow the opening, #1673), then the main menu comes up over it.
+    sim = playScenario('vibration-budget', { speed: 8, maxRealS: 60 });
     playsBefore = sim.recorder.plays.length;
     bedsBefore = sim.recorder.beds.length;
     sim.menuUp = true;
