@@ -5,13 +5,15 @@
 import type { BlastRating } from './BlastExecution.js';
 import { BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
 
-export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize';
+export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial';
 
 export interface RatingCapFacts {
   deaths: number;
   injuries: number;
   destroyedBuildings: number;
   wetHoleCount: number;
+  fizzledHoleCount: number;
+  chargedHoleCount: number;
   oversizedFragments: number;
   fragmentCount: number;
 }
@@ -52,4 +54,10 @@ export function applyRatingCaps(
 /** Fraction (0..1) of fragments that are oversized; 0 when there are no fragments. */
 export function oversizeShare(oversized: number, total: number): number {
   return total > 0 ? oversized / total : 0;
+}
+
+/** Fraction (0..1) of charged holes that fizzled; 0 when no holes were charged. */
+export function fizzleShare(_fizzled: number, _charged: number): number {
+  // TODO: implement
+  return 0;
 }

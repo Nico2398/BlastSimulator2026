@@ -658,6 +658,12 @@ export const THROW_DISTANCE_CATASTROPHIC = 25;
 /** Share of fragments that may be oversized before the blast rating is capped. */
 export const BLAST_OVERSIZE_SHARE_CAP = 0.30;
 
+/** Share of charged holes that may fizzle (water-sensitive explosive in a wet hole) before the rating is capped to 'bad' (#1675). */
+export const BLAST_FIZZLE_SHARE_FAILURE = 0.75;
+
+/** Share of charged holes that may fizzle before the rating is capped to 'mediocre' (#1675). */
+export const BLAST_FIZZLE_SHARE_PARTIAL = 0.25;
+
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
 
