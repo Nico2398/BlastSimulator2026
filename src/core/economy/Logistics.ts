@@ -514,3 +514,18 @@ export function inTransitMassKg(state: LogisticsState): number {
   }
   return total;
 }
+
+/**
+ * Move every stored barren fragment (isBarrenFragment) out of state.fragments onto
+ * the first spoil heap: debits storedMassKg and any residual ore (decrementCollectedOre),
+ * credits the heap. Returns kg released. No heap in `buildings` => no-op, returns 0.
+ */
+export function releaseBarrenStoredFragments(
+  state: LogisticsState,
+  collectedOre: Record<string, number>,
+  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
+): number {
+  // TODO: implement
+  void state; void collectedOre; void buildings;
+  return 0;
+}

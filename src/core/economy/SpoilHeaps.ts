@@ -62,3 +62,13 @@ export function drawSpoilKg(buildings: readonly Pick<Building, 'type' | 'storedS
 export function creditSpoilKg(heap: Pick<Building, 'storedSpoilKg'>, amountKg: number): void {
   heap.storedSpoilKg = (heap.storedSpoilKg ?? 0) + amountKg;
 }
+
+/**
+ * Credit `amountKg` of barren rock to the first spoil_heap building (building order).
+ * Returns false, crediting nothing, when no heap exists.
+ */
+export function creditFirstSpoilHeap(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], amountKg: number): boolean {
+  // TODO: implement
+  void buildings; void amountKg;
+  return false;
+}
