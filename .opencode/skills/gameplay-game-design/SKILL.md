@@ -44,6 +44,9 @@ Tier 0 (none) → Tier 1 (energy heatmap) → Tier 2 (fragment prediction) → T
 ### Blast Execution
 See blast-system skill for detailed physics algorithm.
 
+### Fragmenter Availability
+Normal kit deliberately has no `rock_fragmenter` (Easy has one); oversized fragments need a purchased one. Not a bug.
+
 ### Post-Blast Recovery
 Fragments picked up by excavators → loaded onto trucks → sold via contracts
 

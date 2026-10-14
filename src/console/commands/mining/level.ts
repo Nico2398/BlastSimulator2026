@@ -7,7 +7,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import {
-  validateLevelOrder, pickLevelWorkTarget,
+  validateLevelOrder,
   type LevelOrderDef, type LevelOrderValidation,
 } from '../../../core/mining/LevelGround.js';
 import { rectOverlapsOccupants } from '../../../core/entities/Building.js';
@@ -16,6 +16,7 @@ import { LEVEL_GROUND_COST_PER_VOXEL } from '../../../core/config/balance.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
+import { pickReachableColumn } from '../../../core/mining/WorkTarget.js';
 import { employeeClimbReach } from '../../../core/engine/OrderReachability.js';
 import { claimForAction, cellsInRect } from '../siteExpansion.js';
 
@@ -112,7 +113,7 @@ export function levelGroundCommand(
   const crew = ctx.state!.employees.employees.filter(e => e.alive);
   const reachable = reach?.reachableFrom(crew);
   const workTarget = reachable
-    ? pickLevelWorkTarget(columns, rect, (x, z) => reachable.has(x, z))
+    ? pickReachableColumn(columns, { x: rect.minX, z: rect.minZ }, (x, z) => reachable.has(x, z))
     : null;
   const targetX = workTarget?.x ?? rect.minX;
   const targetZ = workTarget?.z ?? rect.minZ;
