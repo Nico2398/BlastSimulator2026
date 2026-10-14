@@ -32,6 +32,7 @@ import {
   AGENT_WALK_SPEED,
   NEED_DRAIN_RATES,
   MAX_NEED_GAUGE,
+  SHIFT_DURATIONS_TICKS,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -1273,5 +1274,66 @@ describe('#1118 — mounted-rest continuity round-trip', () => {
     // The vehicle was already released on arrival, long before rest completed.
     expect(vehicle.occupantIds).not.toContain(empId);
     expect(vehicleDriverId(vehicle)).toBeNull();
+  });
+});
+
+describe('#1669 — a collapse rest restarts the work clock: return to work, not a second rest at full fatigue', () => {
+  it('after a collapse rest completes, no further rest (policy-forced or otherwise) is queued or started', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 100_000;
+    const empId = hireOne(ctx, 'driller');
+    const emp = getEmployee(ctx, empId);
+
+    buildLivingQuartersAndComplete(ctx, '20,20');
+
+    const setPolicy = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
+    expect(setPolicy.success).toBe(true);
+
+    // Isolate the shift-duration trigger from the fatigue-threshold one, so the
+    // only thing that can force a rest after the collapse rest is a stale work clock.
+    state.sitePolicy.fatigueRestThreshold = -1;
+
+    // Hard-threshold collapse; the employee has worked a full shift's worth of
+    // ticks by the time the collapse rest is under way.
+    emp.activeActionId = null;
+    emp.fatigue = 0;
+
+    const MAX_TICKS = 300;
+    let ticks = 0;
+    let sawCollapse = false;
+    do {
+      tickCommand(ctx, ['1'], {});
+      ticks++;
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+      if (emp.collapsing && !sawCollapse) {
+        sawCollapse = true;
+        emp.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+      }
+    } while (ticks < MAX_TICKS && !(sawCollapse && !emp.collapsing));
+    expect(ticks).toBeLessThan(MAX_TICKS);
+    expect(sawCollapse).toBe(true);
+
+    // The collapse rest just completed: the gauge is restored, the work clock
+    // restarted, and the very same tick did NOT start a second (policy-forced) rest.
+    expect(emp.fatigue).toBeGreaterThan(NEED_SOFT_THRESHOLDS.fatigue);
+    expect(emp.ticksWorked).toBe(0);
+    expect(emp.restTicksRemaining).toBeNull();
+    expect(emp.pendingRestDuration).toBeNull();
+    expect(state.pendingActions.some(a => a.type === 'rest')).toBe(false);
+
+    // Keep the employee idle at full fatigue for a while: no second rest may appear.
+    emp.fatigue = MAX_NEED_GAUGE;
+    for (let i = 0; i < 20; i++) {
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+      emp.fatigue = MAX_NEED_GAUGE;
+      expect(emp.restTicksRemaining).toBeNull();
+      expect(emp.pendingRestDuration).toBeNull();
+      expect(state.pendingActions.filter(a => a.type === 'rest')).toEqual([]);
+      expect(state.pendingActions.some(a => a.payload.triggeredBy === 'shift_cycle_policy')).toBe(false);
+    }
   });
 });

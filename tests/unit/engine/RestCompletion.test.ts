@@ -10,10 +10,13 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { completeRestForEmployee } from '../../../src/core/engine/RestActionHelpers.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
+import { forceShiftRestIfNeededByPolicy } from '../../../src/core/engine/ForceShiftRest.js';
 import {
   NEED_REST_COSTS,
   MAX_NEED_GAUGE,
   NEED_REST_NO_BUILDING_CAP,
+  SHIFT_DURATIONS_TICKS,
 } from '../../../src/core/config/balance.js';
 
 describe('tickGeneralRestCompletion', () => {
@@ -290,5 +293,99 @@ describe('completeRestForEmployee emits employee:left_building (#1588)', () => {
     completeRestForEmployee(state, employee, 'fatigue', undefined, emitter);
 
     expect(left).toEqual([]);
+  });
+});
+
+// #1669: a completed rest of ANY origin restarts the continuous-work clock.
+// Before the fix only a policy-forced rest (triggeredBy 'shift_cycle_policy')
+// reset ticksWorked, so a collapse / soft-threshold rest left it stale and the
+// next tick the shift policy forced a second full rest at fatigue 100.
+describe('tickGeneralRestCompletion — resets ticksWorked for every rest origin (#1669)', () => {
+  const SEED = 42;
+
+  type RestPayload = Record<string, unknown>;
+
+  /** Employee one tick from finishing a claimed rest whose action carries `payload`. */
+  function setupRest(payload: RestPayload, restTicksRemaining = 1) {
+    const state = createGame({ seed: SEED });
+    state.cash = 1000;
+    const rng = new Random(SEED);
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 10;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h + 5;
+    employee.restTicksRemaining = restTicksRemaining;
+    employee.restNeedKey = 'fatigue';
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 5,
+      targetZ: 5,
+      targetY: 0,
+      payload,
+      targetEmployeeId: employee.id,
+      status: 'in_progress',
+      holderId: employee.id,
+      queuedAtTick: 0,
+    });
+    return { state, employee };
+  }
+
+  const ORIGINS: Array<[string, RestPayload]> = [
+    ['collapse (tickCollapse)', { buildingId: 1, collapsedNeed: 'fatigue', needKey: 'fatigue', restDuration: 10 }],
+    ['soft-threshold (autoInsertNeedTasks)', { buildingId: 1, restDuration: 10, triggeredBy: ['fatigue'], needKey: 'fatigue' }],
+    ['need restoration (tickNeedRestoration)', { buildingId: 1, needKey: 'fatigue', restDuration: 10 }],
+    ['bare payload', { needKey: 'fatigue' }],
+    ['policy-forced (#678)', { needKey: 'fatigue', triggeredBy: 'shift_cycle_policy', buildingId: 1 }],
+  ];
+
+  for (const [label, payload] of ORIGINS) {
+    it(`resets ticksWorked to 0 when a ${label} rest completes`, () => {
+      const { state, employee } = setupRest(payload);
+      tickGeneralRestCompletion(state);
+      expect(employee.restTicksRemaining).toBeNull();
+      expect(employee.ticksWorked).toBe(0);
+    });
+
+    it(`next policy tick queues no second rest after a completed ${label} rest`, () => {
+      const { state, employee } = setupRest(payload);
+      state.sitePolicy = createSitePolicy('shift_8h');
+      state.sitePolicy.revision = 1;
+      tickGeneralRestCompletion(state);
+      employee.fatigue = 100; // the rest restored the gauge
+
+      forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+      expect(state.pendingActions.filter(a => a.type === 'rest')).toEqual([]);
+      expect(employee.pendingRestDuration).toBeNull();
+      expect(employee.activeActionId).toBeNull();
+    });
+  }
+
+  it('does not reset ticksWorked while a collapse rest is still counting down', () => {
+    const { state, employee } = setupRest({ collapsedNeed: 'fatigue', needKey: 'fatigue' }, 3);
+    const before = employee.ticksWorked;
+    tickGeneralRestCompletion(state);
+    expect(employee.restTicksRemaining).toBe(2);
+    expect(employee.ticksWorked).toBe(before);
+  });
+
+  it('does not reset ticksWorked while a soft-threshold rest is still counting down', () => {
+    const { state, employee } = setupRest({ triggeredBy: ['fatigue'], needKey: 'fatigue' }, 2);
+    const before = employee.ticksWorked;
+    tickGeneralRestCompletion(state);
+    expect(employee.restTicksRemaining).toBe(1);
+    expect(employee.ticksWorked).toBe(before);
+  });
+
+  it('does not reset ticksWorked while a policy-forced rest is still counting down', () => {
+    const { state, employee } = setupRest({ needKey: 'fatigue', triggeredBy: 'shift_cycle_policy' }, 2);
+    const before = employee.ticksWorked;
+    tickGeneralRestCompletion(state);
+    expect(employee.ticksWorked).toBe(before);
   });
 });
