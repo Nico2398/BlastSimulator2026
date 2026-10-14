@@ -17,13 +17,13 @@ describe('Level 3 — Win', () => {
   let ctx: ReturnType<typeof makeCampaignCtxWithUnlock>;
 
   beforeEach(() => {
-    ctx = makeCampaignCtxWithUnlock('treranium_depths');
+    ctx = makeCampaignCtxWithUnlock('treranium_depths', { levelDefaultStart: true });
   });
 
   it('starts level 3 with correct initial state', () => {
     expect(ctx.state).not.toBeNull();
-    // Level 3 starting cash is $100,000
-    expect(ctx.state!.cash).toBe(100000);
+    // Level 3 starting cash is $125,000 (#1672: sized to carry the free crew to its first sale)
+    expect(ctx.state!.cash).toBe(125000);
     expect(ctx.state!.campaign.activeLevelId).toBe('treranium_depths');
     expect(ctx.grid).not.toBeNull();
     // Verify grid dimensions: treranium_depths = 160x64x160 (#458 T6.1/D13)
@@ -35,10 +35,10 @@ describe('Level 3 — Win', () => {
     // Hire a driller
     const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
     expect(hireResult.success).toBe(true);
-    expect(ctx.state!.employees.employees.length).toBe(1);
+    expect(ctx.state!.employees.employees.length).toBe(5); // free kit of 4 (#1672) + the hire
 
     // Assign blasting skill
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
+    employeeCommand(ctx, ['assign_skill', '5'], { skill: 'blasting', level: '5' });
 
     // Charging needs a charging truck (#1649); performBlast buys it, so fund it
     fundChargingTruck(ctx);

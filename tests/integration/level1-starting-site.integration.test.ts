@@ -7,13 +7,14 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { recordProfit } from '../../src/core/campaign/Campaign.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
-import { STARTING_SITE_STAFFED_COMPOSITION, FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
+import { STARTING_SITE_STAFFED_COMPOSITION, FREIGHT_WAREHOUSE_CAPACITY_KG, SANDBOX_STARTING_SITES } from '../../src/core/config/balance.js';
 import { getStorageCapacity } from '../../src/core/entities/Building.js';
 
 function startLevel(levelId: string, args = '') {
   const { runner, ctx } = createRunner();
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
   recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
+  recordProfit(ctx.campaignProfile.campaign, 'grumpstone_ridge', 250000);
   const result = runner.run(`campaign start level:${levelId}${args ? ` ${args}` : ''}`);
   expect(result.success, result.output).toBe(true);
   return { runner, ctx, state: ctx.state! };
@@ -112,6 +113,18 @@ describe('campaign start level:dusty_hollow staffed flag (#1363)', () => {
   });
 });
 
+describe('levels 2 and 3 open with the free digger kit (#1672)', () => {
+  for (const id of ['grumpstone_ridge', 'treranium_depths']) {
+    it(`${id} opens with a crew, fleet, warehouse and spoil heap`, () => {
+      const { state } = startLevel(id);
+      expect(state.employees.employees.map((e) => e.role).sort()).toEqual(['blaster', 'driller', 'driver', 'driver']);
+      expect(state.employees.employees.some((e) => e.qualifications.some((q) => q.category === 'driving.excavator'))).toBe(true);
+      expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger']);
+      expect(state.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
+    });
+  }
+});
+
 describe('other levels and the tutorial are unchanged (#1363)', () => {
   it('tutorial_pit opens with no crew or fleet, only the opening spoil heap (#1574)', () => {
     const { state } = startLevel('tutorial_pit');
@@ -120,11 +133,39 @@ describe('other levels and the tutorial are unchanged (#1363)', () => {
     expect(state.buildings.buildings.map((b) => b.type)).toEqual(['spoil_heap']);
   });
 
-  it('grumpstone_ridge opens bare', () => {
-    const { state } = startLevel('grumpstone_ridge');
+  it.each(['grumpstone_ridge', 'treranium_depths'])('%s opens with the level kit, not bare (#1672)', (levelId) => {
+    const { state } = startLevel(levelId);
+    const kit = SANDBOX_STARTING_SITES.normal;
+    expect(state.employees.employees.map((e) => e.role).sort()).toEqual(kit.employees.map((e) => e.role).sort());
+    expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(kit.vehicles.map((v) => v.role).sort());
+    expect(state.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
+    expect(state.buildings.buildings.every((b) => b.active)).toBe(true);
+    expect(state.logistics.storageCapacityKg).toBeGreaterThanOrEqual(FREIGHT_WAREHOUSE_CAPACITY_KG[1]);
+    expect(state.cash).toBe(getLevel(levelId)!.startingCash);
+    expect(state.finances.transactions).toHaveLength(0);
+  });
+
+  it.each(['grumpstone_ridge', 'treranium_depths'])('%s staffed:false stays bare (#1672)', (levelId) => {
+    const { state } = startLevel(levelId, 'staffed:false');
     expect(state.employees.employees).toHaveLength(0);
     expect(state.vehicles.vehicles).toHaveLength(0);
     expect(state.buildings.buildings).toHaveLength(0);
+    expect(state.logistics.storageCapacityKg).toBe(0);
+  });
+
+  it.each(['grumpstone_ridge', 'treranium_depths'])('%s kit has a charging truck and a blasting + driving.truck employee (#1672)', (levelId) => {
+    const { state } = startLevel(levelId);
+    expect(state.vehicles.vehicles.filter((v) => v.type === 'charging_truck' && v.tier === 1)).toHaveLength(1);
+    expect(state.employees.employees.some((e) => {
+      const cats = e.qualifications.map((q) => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    })).toBe(true);
+  });
+
+  it.each(['grumpstone_ridge', 'treranium_depths'])('%s kit has a rock digger and an excavator-licensed driver for the ramp (#1672)', (levelId) => {
+    const { state } = startLevel(levelId);
+    expect(state.vehicles.vehicles.filter((v) => v.type === 'rock_digger' && v.tier === 1)).toHaveLength(1);
+    expect(state.employees.employees.some((e) => e.qualifications.some((q) => q.category === 'driving.excavator'))).toBe(true);
   });
 
   it('a level restart re-opens dusty_hollow staffed again, one warehouse and one heap, not two', () => {
