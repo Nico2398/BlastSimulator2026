@@ -234,6 +234,57 @@ describe('HoverTag', () => {
     expect(root.textContent).toContain('STALE');
   });
 
+  it('shows each depth band of a surveyed column with its ore (#1683)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    state.surveyResults.push({
+      id: 1, method: 'seismic', centerX: 12, centerZ: 8, completedTick: state.tickCount,
+      surveyorId: 1, confidence: 0.8,
+      estimates: { '12,8': { grumpite: 0.65 } },
+      depthProfile: { '12,8': [
+        { fromM: 5, toM: 10, ores: { grumpite: 0.4 } },
+        { fromM: 10, toM: 15, ores: { grumpite: 0.65 } },
+      ] },
+    });
+    const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } };
+
+    tag.update(hover, state);
+    expect(root.textContent).toContain('5-10 m');
+    expect(root.textContent).toContain('10-15 m');
+    expect(root.textContent).toContain('65%');
+  });
+
+  it('shows 1 m core-sample bands as given (#1683)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    state.surveyResults.push({
+      id: 1, method: 'core_sample', centerX: 12, centerZ: 8, completedTick: state.tickCount,
+      surveyorId: 1, confidence: 0.95,
+      estimates: { '12,8': { grumpite: 0.5 } },
+      depthProfile: { '12,8': [{ fromM: 10, toM: 11, ores: { grumpite: 0.5 } }] },
+    });
+    const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } };
+
+    tag.update(hover, state);
+    expect(root.textContent).toContain('10-11 m');
+  });
+
+  it('shows no depth bands when the survey carries no depth profile (#1683)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    state.surveyResults.push({
+      id: 1, method: 'seismic', centerX: 12, centerZ: 8, completedTick: state.tickCount,
+      surveyorId: 1, confidence: 0.8,
+      estimates: { '12,8': { grumpite: 0.65 } },
+    });
+    const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } };
+
+    tag.update(hover, state);
+    expect(root.textContent).toContain('65%');
+    expect(root.textContent).toContain('FRESH');
+    expect(root.textContent).not.toMatch(/\d+-\d+ m/);
+  });
+
   it('hide() hides the tag', () => {
     const { tag, root } = makeTag();
     const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 1, tileZ: 1, distance: 1 } };

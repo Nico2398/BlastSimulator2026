@@ -30,6 +30,9 @@ import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import { findSurveyForColumn } from '../../src/core/mining/SurveyColumn.js';
+import { oreDepthSpan } from '../../src/core/mining/SurveyDepthProfile.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -935,5 +938,82 @@ describe('Survey system — injured surveyor releases queued surveys (#1381)', (
     expect(state.surveyResults).toHaveLength(4);
     expect(state.surveyResults.every(r => r.surveyorId === id2)).toBe(true);
     expect(e1.taskQueue).toEqual([]);
+  });
+});
+
+// ── #1683: depth-resolved results and legacy saves ──────────────────────────
+
+describe('Survey system — depth profile and legacy saves (#1683)', () => {
+  /** A survey saved before depth profiles existed: no `depthProfile` key at all. */
+  function legacySurvey(): SurveyResult {
+    return {
+      id: 3, method: 'core_sample', centerX: 10, centerZ: 10, completedTick: 50,
+      surveyorId: 1, confidence: 0.95,
+      estimates: { '10,10': { blingite: 0.5 }, '12,10': { dirtite: 0.3 } },
+    };
+  }
+
+  const fragments = (): FragmentData[] => [{
+    id: 1, position: { x: 10, y: 4, z: 10 }, volume: 2.0, mass: 5000, rockId: 'cruite',
+    oreDensities: { blingite: 0.5 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+    halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 1, origin: { x: 10, y: 4, z: 10 },
+  }];
+
+  it('a save holding old-shape survey results round-trips save/load unchanged', () => {
+    const state = createGame({ seed: 42 });
+    state.surveyResults.push(legacySurvey());
+    const restored = deserialize(serialize(state));
+    expect(restored.surveyResults).toEqual([legacySurvey()]);
+    expect(restored.surveyResults[0]!.depthProfile).toBeUndefined();
+  });
+
+  it('findSurveyForColumn and computeBlastOreReport still work on a legacy survey after loading', () => {
+    const state = createGame({ seed: 42 });
+    state.surveyResults.push(legacySurvey());
+    const restored = deserialize(serialize(state));
+    expect(findSurveyForColumn(restored.surveyResults, 10, 10)?.id).toBe(3);
+    const report = computeBlastOreReport(fragments(), restored.surveyResults);
+    expect(report.estimatedYieldKg).toBeCloseTo(2500, 0);
+  });
+
+  it('a new survey on a loaded legacy game still estimates and appends beside the old one', () => {
+    const state = createGame({ seed: 42 });
+    state.surveyResults.push(legacySurvey());
+    const restored = deserialize(serialize(state));
+    const fresh = estimateSurveyResult(makeOreGrid(), {
+      id: 4, method: 'core_sample', centerX: 10, centerZ: 10, surveyorId: 1, skillLevel: 3, completedTick: 60,
+    }, new Random(42));
+    restored.surveyResults.push(fresh);
+    expect(fresh.estimates['10,10']!['blingite']).toBeGreaterThan(0);
+    expect(findSurveyForColumn(restored.surveyResults, 10, 10)?.id).toBe(4);
+    expect(findSurveyForColumn(restored.surveyResults, 12, 10)?.id).toBe(3);
+  });
+
+  it('a core sample depth profile survives save/load and yields the ore span', () => {
+    const state = createGame({ seed: 42 });
+    const result = estimateSurveyResult(makeOreGrid(), {
+      id: 5, method: 'core_sample', centerX: 10, centerZ: 10, surveyorId: 1, skillLevel: 5, completedTick: 70,
+    }, new Random(42));
+    expect(result.depthProfile?.['10,10']?.length).toBeGreaterThan(0);
+    state.surveyResults.push(result);
+    const restored = deserialize(serialize(state));
+    expect(restored.surveyResults[0]!.depthProfile).toEqual(result.depthProfile);
+    const span = oreDepthSpan(restored.surveyResults[0]!.depthProfile?.['10,10'], 'blingite');
+    expect(span).toBeDefined();
+    expect(span!.toM).toBeGreaterThan(span!.fromM);
+  });
+
+  it('a survey completed through the console carries a depth profile for core_sample but not aerial', () => {
+    const ctx = makeCtx();
+    const id = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(id)], { skill: 'geology', level: '3' });
+    expect(surveyCommand(ctx as any, ['core_sample'], { x: '10', z: '10' }).success).toBe(true);
+    expect(surveyCommand(ctx as any, ['aerial'], { x: '16', z: '16' }).success).toBe(true);
+    for (let i = 0; i < 300; i++) tickCommand(ctx, ['1'], {});
+    const results = ctx.state!.surveyResults;
+    expect(results.length).toBe(2);
+    expect(results.find(r => r.method === 'aerial')!.depthProfile).toBeUndefined();
+    const core = results.find(r => r.method === 'core_sample')!;
+    expect(Object.keys(core.depthProfile ?? {})).toEqual(Object.keys(core.estimates));
   });
 });
