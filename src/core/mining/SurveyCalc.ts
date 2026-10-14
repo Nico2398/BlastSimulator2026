@@ -160,21 +160,15 @@ export function estimateSurveyResult(
 
       if (!isColumnInSurveyDisc({ method, centerX, centerZ }, x, z)) continue;
 
-      // Determine which Y levels to sample
-      let yLevels: number[];
-      if (method === 'aerial') {
-        const surfaceY = firstEmptyLayerAboveGround(grid, x, z);
-        // No ceiling to filter against any more — voxel storage has no
-        // vertical cap (#1183). Window: surfaceY down SURVEY_DEPTH_BELOW_SURFACE.aerial layers.
-        yLevels = [];
-        for (let y = surfaceY; y > surfaceY - SURVEY_DEPTH_BELOW_SURFACE.aerial; y--) yLevels.push(y);
-      } else {
-        const topY = computeVoxelColumnSurfaceY(grid, x, z);
-        if (topY === null) continue; // no ground in this column, nothing to sample
-        const depth = SURVEY_DEPTH_BELOW_SURFACE[method];
-        yLevels = [];
-        for (let y = topY; y > topY - depth; y--) yLevels.push(y);
-      }
+      // Window: SURVEY_DEPTH_BELOW_SURFACE[method] layers, descending from the
+      // anchor. Aerial anchors on the first empty layer above ground (voxel
+      // storage has no vertical cap, #1183); the others on the top solid voxel.
+      const anchorY = method === 'aerial'
+        ? firstEmptyLayerAboveGround(grid, x, z)
+        : computeVoxelColumnSurfaceY(grid, x, z);
+      if (anchorY === null) continue; // no ground in this column, nothing to sample
+      const yLevels: number[] = [];
+      for (let y = anchorY; y > anchorY - SURVEY_DEPTH_BELOW_SURFACE[method]; y--) yLevels.push(y);
 
       // Collect ore IDs present in any solid voxel in the sampled range
       const allOreIds = new Set<string>();

@@ -1796,8 +1796,8 @@ export const SURVEY_COVERAGE_RADIUS = {
  * column storage has no floor, so "the whole column" is unbounded).
  * - aerial: the top 2 levels (surfaceY, surfaceY - 1), a shallow horizon.
  * - seismic: 25 — deeper than the common ores, reaching into the uncommon ones.
- * - core_sample: 40 — the deepest hole a drill rig can sink, so a core sees
- *   everything a drill could ever reach.
+ * - core_sample: 40 — matches the deepest hole the Drill step offers (its depth
+ *   stepper tops out at 40 m), so a core sees everything a drill could reach.
  * The survey panel shows these numbers to the player.
  */
 export const SURVEY_DEPTH_BELOW_SURFACE = {
