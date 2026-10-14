@@ -17,6 +17,7 @@ import { findById } from '../state/IdIndex.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
+import { retargetRampLayers } from './RampLayerRetarget.js';
 import { lowestFleetTier, minVehicleTierFor } from './VehicleReservation.js';
 import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
@@ -373,6 +374,19 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
 }
 
 /**
+ * A ramp layer's work target follows the digger's reach: a lead layer whose
+ * band centre sits on an unreachable fill cell moves to a reachable column of
+ * its own cells, so the verdict, ghost and dispatcher all read the same target.
+ */
+function retargetQueuedRampLayers(state: GameState): void {
+  if (state.navGrid === null || state.plannedRamps.length === 0) return;
+  const rampLayers = state.pendingActions.filter(a => a.status === 'queued' && a.type === 'dig_ramp_segment');
+  if (rampLayers.length === 0) return;
+  const reach = buildOrderReachability(state, rampLayers);
+  retargetRampLayers(state, (action, x, z) => reach.canReach(orderActorKey(action), x, z));
+}
+
+/**
  * Classify every queued, unclaimed action: stamp `blockedReason`, flip each
  * ghost's `unreachable` flag (bumping `ghostPreviewsRevision` only on a flip),
  * and report the actions no eligible employee could ever perform.
@@ -381,6 +395,7 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
  * `sliceDebris`.
  */
 export function classifyQueuedOrders(state: GameState, debrisPerCall = Infinity): { unqualifiedIds: Set<number> } {
+  retargetQueuedRampLayers(state);
   let flipped = false;
   for (const ghost of state.ghostPreviews) {
     if (ghost.claimed && ghost.unreachable === true) {
