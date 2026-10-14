@@ -1249,7 +1249,7 @@ describe('ecology responds to how the mine is run (#1691)', () => {
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
     const state = ctx.state!;
-    state.eventFreqMultiplier = 0;
+    state.events.eventFreqMultiplier = 0;
     if (opts.heap) expect(run('build spoil_heap at:10,18').success).toBe(true);
     const pieces = Math.max(1, Math.round(opts.rubbleKg / 1000));
     if (opts.rubbleKg > 0) {

@@ -1337,15 +1337,15 @@ describe('onGroundMassKg (#1691)', () => {
   it('ignores in_transit and stored fragments', () => {
     const state = createLogisticsState();
     addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 250), makeFragment(3, 400)]);
-    state.fragments[1].state = 'in_transit';
-    state.fragments[2].state = 'stored';
+    state.fragments[1]!.state = 'in_transit';
+    state.fragments[2]!.state = 'stored';
     expect(onGroundMassKg(state)).toBe(100);
   });
 
   it('is 0 when nothing lies on the ground', () => {
     const state = createLogisticsState();
     addBlastFragments(state, [makeFragment(1, 100)]);
-    state.fragments[0].state = 'stored';
+    state.fragments[0]!.state = 'stored';
     expect(onGroundMassKg(state)).toBe(0);
   });
 });
