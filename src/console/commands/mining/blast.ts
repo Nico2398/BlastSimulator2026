@@ -15,8 +15,7 @@ import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles } from '../../../core/engine/Mount.js';
-import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
-import { killEmployee } from '../../../core/entities/Employee.js';
+import { processProjections, bookEmployeeDeath, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
@@ -185,12 +184,7 @@ export function* fireBlastSteps(
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
     if (!blastedColumns.has(`${Math.floor(emp.x)},${Math.floor(emp.z)}`)) continue;
-    killEmployee(state.employees, emp.id);
-    state.damage.deathCount++;
-    state.damage.lawsuitPending = true;
-    const accident: AccidentRecord = {
-      tick: state.tickCount, type: 'death', entityId: emp.id, fragmentId: -1, kineticEnergy: 0,
-    };
+    const accident = bookEmployeeDeath(state.employees, state.damage, emp.id, state.tickCount);
     state.damage.accidents.push(accident);
     thisBlastAccidents.push(accident);
   }

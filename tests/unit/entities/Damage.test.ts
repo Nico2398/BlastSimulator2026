@@ -3,6 +3,7 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import {
   createDamageState,
   processProjections,
+  bookEmployeeDeath,
 } from '../../../src/core/entities/Damage.js';
 import {
   createBuildingState,
@@ -249,5 +250,48 @@ describe('flying rock destroying a mounted vehicle (#1389)', () => {
     expect(driver.locomotion).toEqual({ kind: 'on_foot' });
     expect(driver.injured).toBe(true);
     expectNoWorldInvariantViolations(state);
+  });
+});
+
+describe('bookEmployeeDeath (#1700)', () => {
+  function setup() {
+    const employees = createEmployeeState();
+    const emp = hireEmployee(employees, 'driller', new Random(42), 1, 1).employee;
+    return { employees, emp, damage: createDamageState() };
+  }
+
+  it('kills the employee, sets lawsuitPending and counts the death', () => {
+    const { employees, emp, damage } = setup();
+    bookEmployeeDeath(employees, damage, emp.id, 5);
+    expect(emp.alive).toBe(false);
+    expect(damage.lawsuitPending).toBe(true);
+    expect(damage.deathCount).toBe(1);
+  });
+
+  it('returns a death record with defaults fragmentId -1 and kineticEnergy 0', () => {
+    const { employees, emp, damage } = setup();
+    expect(bookEmployeeDeath(employees, damage, emp.id, 5)).toEqual({
+      tick: 5, type: 'death', entityId: emp.id, fragmentId: -1, kineticEnergy: 0,
+    });
+  });
+
+  it('carries the given fragment id and kinetic energy', () => {
+    const { employees, emp, damage } = setup();
+    const rec = bookEmployeeDeath(employees, damage, emp.id, 9, 7, 1234);
+    expect(rec).toEqual({ tick: 9, type: 'death', entityId: emp.id, fragmentId: 7, kineticEnergy: 1234 });
+  });
+
+  it('does not push the record into damage.accidents (caller logs it)', () => {
+    const { employees, emp, damage } = setup();
+    bookEmployeeDeath(employees, damage, emp.id, 5);
+    expect(damage.accidents).toEqual([]);
+  });
+
+  it('counts each employee once per call', () => {
+    const { employees, emp, damage } = setup();
+    const other = hireEmployee(employees, 'driller', new Random(43), 2, 2).employee;
+    bookEmployeeDeath(employees, damage, emp.id, 5);
+    bookEmployeeDeath(employees, damage, other.id, 6);
+    expect(damage.deathCount).toBe(2);
   });
 });
