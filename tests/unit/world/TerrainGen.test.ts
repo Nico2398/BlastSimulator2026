@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
-  requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION,
+  requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION,
   climateBiasLandingOn, resolveGeneratedBiome,
   isInBorderZone, TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
@@ -667,5 +667,130 @@ describe('TerrainGen — ore outside the original rectangle (#1670)', () => {
         if (v.density > 0) expect(Object.keys(v.oreDensities).length).toBe(0);
       }
     }
+  });
+});
+
+// ── Sandbox site joins the landscape (#1734) ───────────────────────────────
+
+import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
+import { sampleBaseHeight as sampleRawHeight } from '../../../src/core/world/WorldGen.js';
+import { SANDBOX_FLAT_PAD_TARGET, SANDBOX_PIT_MASK, type PitMaskShape } from '../../../src/core/config/balance.js';
+import { sandboxTerrainConfig, flatPadShare } from '../../helpers/sandboxSite.js';
+
+describe('sandbox site blend (#1734)', () => {
+  const SITE = 64;
+  const CORE = SANDBOX_PIT_MASK.margin;
+  const REACH = 30;
+  const BIOMES = getAllBiomes().map(b => b.id);
+  const RUGGED = ['alpine_granite', 'tropical_karst', 'red_canyon'];
+
+  /**
+   * Share of perimeter lines (every 4 m along each side, 1 m steps from the core edge outwards to 30 m past
+   * the grid edge) whose blend is walkable. Only steps touching a column the mask actually reshaped count:
+   * a cliff the landscape has on its own, inside the cone, is not the blend's doing.
+   */
+  function walkableShare(biome: string, seed: number): number {
+    const ctx = buildTerrainContext(sandboxTerrainConfig(biome, seed)).worldGen;
+    const h = (x: number, z: number): number => sampleSurfaceHeightY(ctx, x, z);
+    const reshaped = (x: number, z: number): boolean =>
+      Math.abs(h(x, z) - (sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset)) > 1e-6;
+    let ok = 0, total = 0;
+    for (let along = 4; along < SITE; along += 4) {
+      const lines: Array<(t: number) => [number, number]> = [
+        t => [CORE - t, along], t => [SITE - CORE + t, along],
+        t => [along, CORE - t], t => [along, SITE - CORE + t],
+      ];
+      for (const at of lines) {
+        let climbable = true;
+        for (let t = 0; t < CORE + REACH; t++) {
+          const [x0, z0] = at(t);
+          const [x1, z1] = at(t + 1);
+          if ((reshaped(x0, z0) || reshaped(x1, z1)) && !isStepClimbable(h(x0, z0), h(x1, z1), 1)) { climbable = false; break; }
+        }
+        total++;
+        if (climbable) ok++;
+      }
+    }
+    return ok / total;
+  }
+
+  describe.each(BIOMES)('%s', (biome) => {
+    it.each([1, 7, 42])('seed %i: >= 80% of the perimeter is a walkable slope from the core edge to 30 m out', (seed) => {
+      expect(walkableShare(biome, seed)).toBeGreaterThanOrEqual(0.8);
+    });
+
+    it.each([1, 7, 42])(`seed %i: at least ${SANDBOX_FLAT_PAD_TARGET * 100}% flat 9x9 pads survive`, (seed) => {
+      expect(flatPadShare(generateTerrain(sandboxTerrainConfig(biome, seed)))).toBeGreaterThanOrEqual(SANDBOX_FLAT_PAD_TARGET);
+    });
+
+    it('generation is deterministic', () => {
+      const a = buildTerrainContext(sandboxTerrainConfig(biome, 42)).worldGen;
+      const b = buildTerrainContext(sandboxTerrainConfig(biome, 42)).worldGen;
+      for (let x = -30; x <= 94; x += 13) for (let z = -30; z <= 94; z += 17) {
+        expect(sampleSurfaceHeightY(a, x, z)).toBe(sampleSurfaceHeightY(b, x, z));
+      }
+    });
+  });
+
+  it.each(RUGGED)('%s: the flat outline is not a square slab (rounded, wobbling corners differ from a sharp rectangle)', (biome) => {
+    for (const seed of [1, 7, 42]) {
+      const config = sandboxTerrainConfig(biome, seed);
+      const shaped = buildTerrainContext(config).worldGen;
+      const sharpMask: PitMaskShape = { margin: CORE, reliefKeep: SANDBOX_PIT_MASK.reliefKeep, envelopeSlope: SANDBOX_PIT_MASK.envelopeSlope };
+      const sharp = buildTerrainContext({ ...config, pitMask: sharpMask }).worldGen;
+      const corners: Array<[number, number]> = [[0, 0], [SITE, 0], [0, SITE], [SITE, SITE]];
+      let cornersDiffering = 0;
+      for (const [cx, cz] of corners) {
+        let maxDiff = 0;
+        for (let dx = -20; dx <= 20; dx += 2) for (let dz = -20; dz <= 20; dz += 2) {
+          maxDiff = Math.max(maxDiff, Math.abs(sampleSurfaceHeightY(shaped, cx + dx, cz + dz) - sampleSurfaceHeightY(sharp, cx + dx, cz + dz)));
+        }
+        if (maxDiff > 0.25) cornersDiffering++;
+      }
+      expect(cornersDiffering, `${biome} seed ${seed}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('the surface beyond the site still follows natural terrain once inside the cone', () => {
+    const ctx = buildTerrainContext(sandboxTerrainConfig('alpine_granite', 42)).worldGen;
+    let natural = 0, total = 0;
+    for (let x = -200; x <= 264; x += 8) for (let z = -200; z <= 264; z += 8) {
+      if (x > -60 && x < SITE + 60 && z > -60 && z < SITE + 60) continue;
+      total++;
+      const raw = sampleRawHeight(ctx.fields, x, z, ctx.shapingAt(x, z)) + ctx.groundOffset;
+      if (Math.abs(sampleSurfaceHeightY(ctx, x, z) - raw) < 1e-6) natural++;
+    }
+    expect(natural / total).toBeGreaterThan(0.5);
+  });
+});
+
+describe('requireValidPitMask — envelope fields (#1734)', () => {
+  const full: PitMaskShape = { margin: 14, reliefKeep: 0.05, envelopeSlope: 0.45, outlineWobble: 3, cornerRadius: 8 };
+
+  it('preserves envelopeSlope, outlineWobble and cornerRadius', () => {
+    expect(requireValidPitMask(full, 'm')).toEqual(full);
+    expect(requireValidPitMask(JSON.parse(JSON.stringify(full)), 'm')).toEqual(full);
+  });
+
+  it('a legacy two-field mask stays two fields', () => {
+    expect(requireValidPitMask({ margin: 14, reliefKeep: 0.05 }, 'm')).toEqual({ margin: 14, reliefKeep: 0.05 });
+  });
+
+  it('accepts the boundaries: slope 1, wobble 0, radius 0', () => {
+    const edge = { ...full, envelopeSlope: 1, outlineWobble: 0, cornerRadius: 0 };
+    expect(requireValidPitMask(edge, 'm')).toEqual(edge);
+  });
+
+  it.each([
+    ['NaN envelopeSlope', { envelopeSlope: NaN }],
+    ['zero envelopeSlope', { envelopeSlope: 0 }],
+    ['negative envelopeSlope', { envelopeSlope: -0.2 }],
+    ['envelopeSlope above 1', { envelopeSlope: 1.01 }],
+    ['NaN outlineWobble', { outlineWobble: NaN }],
+    ['negative outlineWobble', { outlineWobble: -0.5 }],
+    ['NaN cornerRadius', { cornerRadius: NaN }],
+    ['negative cornerRadius', { cornerRadius: -3 }],
+  ])('rejects %s with the corrupt-save error', (_label, extra) => {
+    expect(() => requireValidPitMask({ ...full, ...extra }, 'world.pitMask')).toThrow(/corrupt save: world\.pitMask is not a valid pit mask/);
   });
 });

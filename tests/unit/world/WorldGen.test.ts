@@ -3,6 +3,8 @@ import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 import {
   sampleBaseHeight,
   applyPitMask,
+  pitDistance,
+  outlineWobbleAt,
   computeGroundOffset,
   heightToVoxelY,
   heightToVoxelYContinuous,
@@ -11,7 +13,7 @@ import {
   DEFAULT_SHAPING,
   type Rect,
 } from '../../../src/core/world/WorldGen.js';
-import { DEFAULT_PIT_MASK } from '../../../src/core/config/balance.js';
+import { DEFAULT_PIT_MASK, type PitMaskShape } from '../../../src/core/config/balance.js';
 
 describe('sampleBaseHeight', () => {
   it('is deterministic for the same fields, shaping, and coordinates', () => {
@@ -66,6 +68,126 @@ describe('applyPitMask', () => {
 
   it('does nothing when height already equals centerHeight', () => {
     expect(applyPitMask(50, 50, rect, 100, 100)).toBeCloseTo(50, 10);
+  });
+});
+
+describe('applyPitMask slope-limited envelope (#1734)', () => {
+  const rect: Rect = { minX: 0, minZ: 0, maxX: 200, maxZ: 200 };
+  const mask: PitMaskShape = { margin: 14, reliefKeep: 0.05, envelopeSlope: 0.45, outlineWobble: 0, cornerRadius: 0 };
+
+  it('equals the compressed height (center + keep * delta) at and inside the core edge, d = 0', () => {
+    expect(applyPitMask(100, 0, rect, 100, 100, mask)).toBeCloseTo(5, 6);
+    expect(applyPitMask(100, 0, rect, 14, 100, mask)).toBeCloseTo(5, 6);
+    expect(applyPitMask(-100, 0, rect, 14, 100, mask)).toBeCloseTo(-5, 6);
+  });
+
+  it('clamps a tall natural height to the cone: compressed + envelopeSlope * d, beyond the rect too', () => {
+    // x = -50 is 64 m outside the core edge (x = 14): e = 0.45 * 64 = 28.8.
+    expect(applyPitMask(100, 0, rect, -50, 100, mask)).toBeCloseTo(5 + 28.8, 6);
+    expect(applyPitMask(100, 0, rect, 20, 100, mask)).toBeCloseTo(5, 6);
+    expect(applyPitMask(100, 0, rect, 4, 100, mask)).toBeCloseTo(5 + 0.45 * 10, 6);
+  });
+
+  it('clamps a deep natural height from below symmetrically', () => {
+    expect(applyPitMask(-100, 0, rect, -50, 100, mask)).toBeCloseTo(-5 - 28.8, 6);
+  });
+
+  it('leaves the natural height alone once it sits inside the cone', () => {
+    // delta 10, inner 0.5: rest 9.5 is below e = 28.8 at d = 64.
+    expect(applyPitMask(10, 0, rect, -50, 100, mask)).toBeCloseTo(10, 6);
+    expect(applyPitMask(-10, 0, rect, -50, 100, mask)).toBeCloseTo(-10, 6);
+    // And far beyond the rect it never touches anything within slope reach.
+    expect(applyPitMask(30, 0, rect, 400, 100, mask)).toBeCloseTo(30, 6);
+  });
+
+  it('is continuous: a 0.25 m step never moves the result by more than slope * step', () => {
+    for (const h of [100, -100, 40, 8]) {
+      let prev = applyPitMask(h, 0, rect, -120, 100, mask);
+      for (let x = -119.75; x <= 100; x += 0.25) {
+        const cur = applyPitMask(h, 0, rect, x, 100, mask);
+        expect(Math.abs(cur - prev), `h=${h} x=${x}`).toBeLessThanOrEqual(0.45 * 0.25 + 1e-9);
+        prev = cur;
+      }
+    }
+  });
+
+  it('rounded corners push the cone away from the corner: Euclidean distance to the rounded core', () => {
+    const sharp = applyPitMask(1000, 0, rect, 6, 6, mask);
+    expect(sharp).toBeCloseTo(50 + 0.45 * Math.sqrt(128), 5);
+    const rounded = applyPitMask(1000, 0, rect, 6, 6, { ...mask, cornerRadius: 8 });
+    // Arc centre (22, 22), radius 8: distance sqrt(512) - 8.
+    expect(rounded).toBeCloseTo(50 + 0.45 * (Math.sqrt(512) - 8), 5);
+    // Straight sides do not care about the radius.
+    expect(applyPitMask(1000, 0, rect, -10, 100, { ...mask, cornerRadius: 8 }))
+      .toBeCloseTo(applyPitMask(1000, 0, rect, -10, 100, mask), 9);
+  });
+
+  it('wobble only widens the flat region: the deviation from the flat level never grows', () => {
+    const wobbly: PitMaskShape = { ...mask, outlineWobble: 3 };
+    let differs = false;
+    for (let x = -40; x <= 14; x += 3) for (let z = -40; z <= 240; z += 7) {
+      const plain = Math.abs(applyPitMask(500, 0, rect, x, z, mask) - 25);
+      const wob = Math.abs(applyPitMask(500, 0, rect, x, z, wobbly) - 25);
+      expect(wob).toBeLessThanOrEqual(plain + 1e-9);
+      if (plain - wob > 1e-6) differs = true;
+    }
+    expect(differs, 'outlineWobble must change the surface somewhere').toBe(true);
+  });
+
+  it('is deterministic', () => {
+    const wobbly: PitMaskShape = { ...mask, outlineWobble: 3, cornerRadius: 8 };
+    expect(applyPitMask(300, 20, rect, -17.3, 61.9, wobbly)).toBe(applyPitMask(300, 20, rect, -17.3, 61.9, wobbly));
+  });
+
+  it('a legacy mask (no envelopeSlope) keeps the exact smoothstep blend, even with the other new fields set', () => {
+    const legacy: PitMaskShape = { margin: 14, reliefKeep: 0.05 };
+    for (const [h, x, z] of [[100, -50, 50], [100, 5, 100], [-40, 12, 100], [60, 100, 100]] as const) {
+      const t = Math.min(1, Math.max(0, Math.min(x, 200 - x, z, 200 - z) / 14));
+      const w = t * t * (3 - 2 * t);
+      const expected = h + w * ((0 + (h - 0) * 0.05) - h);
+      expect(applyPitMask(h, 0, rect, x, z, legacy)).toBeCloseTo(expected, 9);
+      expect(applyPitMask(h, 0, rect, x, z, { ...legacy, outlineWobble: 3, cornerRadius: 8 })).toBeCloseTo(expected, 9);
+    }
+  });
+});
+
+describe('outlineWobbleAt (#1734)', () => {
+  it('is deterministic, never negative and bounded', () => {
+    for (let x = -60; x <= 120; x += 9) for (let z = -60; z <= 120; z += 11) {
+      const w = outlineWobbleAt(x, z, 3);
+      expect(w).toBe(outlineWobbleAt(x, z, 3));
+      expect(w).toBeGreaterThanOrEqual(0);
+      expect(w).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('is zero for zero amplitude and varies with position otherwise', () => {
+    expect(outlineWobbleAt(10, 20, 0)).toBe(0);
+    const seen = new Set<string>();
+    for (let x = 0; x < 64; x += 4) seen.add(outlineWobbleAt(x, 0, 3).toFixed(4));
+    expect(seen.size).toBeGreaterThan(3);
+  });
+});
+
+describe('pitDistance (#1734)', () => {
+  const rect: Rect = { minX: 0, minZ: 0, maxX: 200, maxZ: 200 };
+
+  it('is finite, symmetric across the rect and strictly monotone from the centre outwards', () => {
+    expect(pitDistance(rect, 14, 100, 100, 0, 0)).toBeCloseTo(pitDistance(rect, 14, 100, 100, 0, 0), 12);
+    const along: number[] = [];
+    for (let x = 100; x >= -40; x -= 10) along.push(pitDistance(rect, 14, x, 60, 0, 0));
+    for (const v of along) expect(Number.isFinite(v)).toBe(true);
+    const diffs = along.slice(1).map((v, i) => v - along[i]!);
+    // Inside the core the distance may plateau; beyond the core edge (x < 14) it must keep moving the same way.
+    const outside = diffs.slice(diffs.length - 5);
+    expect(outside.every(d => d > 0) || outside.every(d => d < 0)).toBe(true);
+    expect(pitDistance(rect, 14, 30, 60, 0, 0)).toBeCloseTo(pitDistance(rect, 14, 170, 60, 0, 0), 9);
+    expect(pitDistance(rect, 14, 60, 30, 0, 0)).toBeCloseTo(pitDistance(rect, 14, 60, 170, 0, 0), 9);
+  });
+
+  it('a corner radius moves a corner point but not a straight-side point', () => {
+    expect(pitDistance(rect, 14, 6, 6, 8, 0)).not.toBeCloseTo(pitDistance(rect, 14, 6, 6, 0, 0), 3);
+    expect(pitDistance(rect, 14, -10, 100, 8, 0)).toBeCloseTo(pitDistance(rect, 14, -10, 100, 0, 0), 9);
   });
 });
 

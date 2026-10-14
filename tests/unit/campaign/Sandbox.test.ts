@@ -568,48 +568,14 @@ import {
   SANDBOX_PIT_MASK,
   DEFAULT_PIT_MASK,
   SANDBOX_FLAT_PAD_TARGET,
-  SANDBOX_FLAT_PAD_MAX_SPREAD,
-  SANDBOX_FLAT_PAD_SIZE,
 } from '../../../src/core/config/balance.js';
 import { getAllLevels } from '../../../src/core/campaign/Level.js';
-import { generateTerrain, buildTerrainContext, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
-import { computeVoxelColumnSurfaceY, CompositionPalette, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { generateTerrain, buildTerrainContext } from '../../../src/core/world/TerrainGen.js';
+import { computeVoxelColumnSurfaceY, CompositionPalette } from '../../../src/core/world/VoxelGrid.js';
+import { sandboxTerrainConfig, flatPadShare } from '../../helpers/sandboxSite.js';
 import { sampleSurfaceHeightY } from '../../../src/core/world/WorldGen.js';
 import { sampleLandscapeColumn } from '../../../src/core/world/LandscapeMap.js';
 import { type StructureSet } from '../../../src/core/world/Structures.js';
-
-/** The terrain config the game builds for a sandbox site (sandbox start -> regenerateGrid). */
-function sandboxTerrainConfig(biome: string, seed: number): TerrainConfig {
-  const level = sandboxLevelDef({ ...SANDBOX_DEFAULTS, biome, seed });
-  return {
-    seed: level.terrainSeed,
-    climateBias: level.climateBias,
-    sizeX: level.gridX,
-    datum: level.datum,
-    sizeZ: level.gridZ,
-    mixedRockHardness: level.mixedRockHardness,
-    ...(level.oreDeposits ? { oreDeposits: true } : {}),
-    ...(level.pitMask ? { pitMask: level.pitMask } : {}),
-  };
-}
-
-/** Share of SIZE x SIZE pads (origin step 3, fully inside the grid) whose surface spread is within the cap. */
-function flatPadShare(grid: VoxelGrid): number {
-  const size = SANDBOX_FLAT_PAD_SIZE;
-  let flat = 0, total = 0;
-  for (let x0 = 0; x0 + size <= grid.sizeX; x0 += 3) {
-    for (let z0 = 0; z0 + size <= grid.sizeZ; z0 += 3) {
-      let lo = Infinity, hi = -Infinity;
-      for (let x = x0; x < x0 + size; x++) for (let z = z0; z < z0 + size; z++) {
-        const y = computeVoxelColumnSurfaceY(grid, x, z)!;
-        lo = Math.min(lo, y); hi = Math.max(hi, y);
-      }
-      total++;
-      if (hi - lo <= SANDBOX_FLAT_PAD_MAX_SPREAD) flat++;
-    }
-  }
-  return flat / total;
-}
 
 describe('sandbox pit mask (#1680)', () => {
   it('sandboxLevelDef carries SANDBOX_PIT_MASK', () => {
@@ -619,7 +585,7 @@ describe('sandbox pit mask (#1680)', () => {
   it('SANDBOX_PIT_MASK is stronger than the default: shorter ramp, less relief kept', () => {
     expect(SANDBOX_PIT_MASK.margin).toBeLessThan(DEFAULT_PIT_MASK.margin);
     expect(SANDBOX_PIT_MASK.reliefKeep).toBeLessThan(DEFAULT_PIT_MASK.reliefKeep);
-    expect(SANDBOX_PIT_MASK).toEqual({ margin: 14, reliefKeep: 0.05 });
+    expect(SANDBOX_PIT_MASK).toEqual({ margin: 14, reliefKeep: 0.05, envelopeSlope: 0.45, outlineWobble: 3, cornerRadius: 8 });
   });
 
   it('every campaign level leaves pitMask undefined (default mask)', () => {
