@@ -422,11 +422,11 @@ describe('createGameForLevel staffed is tri-state (#1363)', () => {
     expect(state.vehicles.vehicles).toHaveLength(0);
   });
 
-  it('undefined on grumpstone_ridge stays bare', () => {
+  it('undefined on grumpstone_ridge opens with its free kit (#1672)', () => {
     const campaign = createCampaignState();
     campaign.levels['grumpstone_ridge']!.unlocked = true;
     const state = createGameForLevel(campaign, 'grumpstone_ridge')!;
-    expect(state.employees.employees).toHaveLength(0);
+    expect(state.employees.employees).toHaveLength(4);
   });
 });
 

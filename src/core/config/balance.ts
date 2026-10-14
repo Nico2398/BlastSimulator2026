@@ -500,6 +500,9 @@ export const MAX_RAMP_LENGTH = 1_000;
  *  realistic volume per kilogram (powder factor ≈ 0.3 kg/m³). */
 export const EXPLOSIVE_ENERGY_SCALE = 10.0;
 
+/** Bulk purchase price relative to the per-order price of an explosive (#1678). */
+export const EXPLOSIVE_BULK_PRICE_FACTOR = 0.7;
+
 /** Kinetic energy (in joules) that one unit of blast energy imparts to a fragment
  *  it throws. Absorption thresholds are a balance scale rather than joules, so
  *  turning leftover energy into a speed needs an explicit conversion — without one
@@ -918,6 +921,15 @@ export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
  * issue's scope.
  */
 export const AGENT_FREE_CELL_SEARCH_MAX_RADIUS = 4;
+
+/**
+ * Longest walkable route (NavGrid move cost) from a relocated mover's cell
+ * back to its sidestep cell that still counts as "can get back" when the direct
+ * step is a cliff (#1672). Measured: the sidesteps level 1 relies on cost <= ~8
+ * (a short detour on a gentle slope); the level-2 strand that stalled the first
+ * blast costs 77+ (a full loop round the bench). 3 ring radii sits between them.
+ */
+export const AGENT_FREE_CELL_MAX_RETURN_COST = 3 * AGENT_FREE_CELL_SEARCH_MAX_RADIUS;
 
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
@@ -1407,6 +1419,29 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }],
 };
 
+const DIGGER_KIT_DRIVER: StartingSiteEmployeeSlot = {
+  role: 'driver',
+  qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
+};
+
+/**
+ * The free kit shared by sandbox 'normal' and the Grumpstone Ridge and
+ * Treranium Depths openings (#1672): the Dusty Hollow kit plus a rock digger
+ * (a ramp into the crater) and its excavator-licensed driver. Each opens able
+ * to drill, charge, fire, haul and fill an ore contract with no purchases.
+ * The kit is free, but its payroll (~$230/tick) is not: each level's own
+ * startingCash (Level.ts) is sized to carry it to the first sale.
+ */
+const DIGGER_STARTING_SITE: StartingSiteComposition = {
+  employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER],
+  vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
+  buildings: DUSTY_HOLLOW_STARTING_SITE.buildings,
+};
+
+export const GRUMPSTONE_RIDGE_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+
+export const TRERANIUM_DEPTHS_STARTING_SITE: StartingSiteComposition = DIGGER_STARTING_SITE;
+
 /**
  * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet
  * (the tutorial hires its own). The heap is not a scripted step, so the first
@@ -1421,11 +1456,6 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
 /** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
 export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
 
-const SANDBOX_KIT_BUILDINGS: readonly StartingBuildingSlot[] = DUSTY_HOLLOW_STARTING_SITE.buildings;
-const SANDBOX_KIT_DIGGER_DRIVER: StartingSiteEmployeeSlot = {
-  role: 'driver',
-  qualifications: [{ category: 'driving.excavator', proficiencyLevel: 1 }],
-};
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
   qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
@@ -1440,15 +1470,11 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
   hard: DUSTY_HOLLOW_STARTING_SITE,
-  normal: {
-    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER],
-    vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }],
-    buildings: SANDBOX_KIT_BUILDINGS,
-  },
+  normal: DIGGER_STARTING_SITE,
   easy: {
-    employees: [...BASE_STARTING_EMPLOYEES, SANDBOX_KIT_DIGGER_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
+    employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
-    buildings: SANDBOX_KIT_BUILDINGS,
+    buildings: DIGGER_STARTING_SITE.buildings,
   },
 };
 

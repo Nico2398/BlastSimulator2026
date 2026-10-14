@@ -21,8 +21,7 @@ import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { resolveGeneratedBiome } from '../../src/core/world/TerrainGen.js';
 import { resolveContractOres } from '../../src/core/campaign/Level.js';
-import type { GameState } from '../../src/core/state/GameState.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 /**
  * Solid-voxel count inside a fixed height window around the sandbox datum — a
@@ -324,7 +323,7 @@ describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first
       run('charge hole:* explosive:boomite amount:5 stemming:2');
       tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
-      clearZone(run, state);
+      clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);
       for (let i = 0; i < 400 && !over() && !sold(); i++) {
         playContracts(run, state);
@@ -339,17 +338,6 @@ describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 });
-
-/** Order everyone out of the blast radius and wait until the zone reads clear. */
-function clearZone(run: Run, state: GameState): void {
-  const xs = state.drillHoles.map(h => h.x);
-  const zs = state.drillHoles.map(h => h.z);
-  if (xs.length === 0) return;
-  const m = 16;
-  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
-  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
-}
 
 describe('parseSandboxArgs', () => {
   it('leaves unmentioned keys alone so defaults survive', () => {
@@ -581,4 +569,32 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
     const gen = stateForSave(ctx, ctx.state!).world!.voxels!.gen;
     expect(gen.climateBias).toEqual([...getBiome('desert_badlands')!.climateCenter]);
   });
+});
+
+// #1677: the opening-site survey finds ore in the two biomes whose ore used to be locked out.
+describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start survey finds ore (#1677)', (biome) => {
+  it.each(['aerial', 'core_sample'] as const)('%s survey at the start reports ore', (method) => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`).success).toBe(true);
+    runner.run('time resume');
+    const state = ctx.state!;
+    // The free kit has no surveyor: hire one and grant geology, as a player would via the roster.
+    expect(runner.run('employee hire role:surveyor').success).toBe(true);
+    const surveyor = state.employees.employees.slice(-1)[0]!;
+    expect(runner.run(`employee assign_skill ${surveyor.id} skill:geology level:3`).success).toBe(true);
+
+    // Centre on the surveyor so the survey needs no travel.
+    const cx = Math.round(surveyor.x);
+    const cz = Math.round(surveyor.z);
+    const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
+    expect(result.success, result.output).toBe(true);
+
+    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) runner.run('tick 1');
+    expect(state.surveyResults.length).toBeGreaterThan(0);
+
+    const survey = state.surveyResults[0]!;
+    expect(survey.method).toBe(method);
+    const densities = Object.values(survey.estimates).flatMap(col => Object.values(col));
+    expect(densities.some(d => d > 0), 'the report contains ore').toBe(true);
+  }, 60_000);
 });

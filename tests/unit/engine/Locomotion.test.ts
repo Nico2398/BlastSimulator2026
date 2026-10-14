@@ -1858,6 +1858,51 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(Number.isNaN(blocker.x)).toBe(false);
     expect(Number.isNaN(blocker.z)).toBe(false);
   });
+
+  it('relocates an idle blocker past a nearer cliff-adjacent cell to the nearest climbable free cell (#1672)', () => {
+    const state = buildFlatNavGridState(30, 30);
+    const rng = new Random(SEED);
+    const grid = state.navGrid!;
+
+    const bx = 15;
+    const bz = 15;
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, bx, bz);
+    const moverStart = { x: bx - 1, z: bz };
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    // Same destination-blocker fixture as the radius-widening test: an
+    // 'enter_building' arrival so only relocateIdleDestinationBlocker can clear the block.
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: bx, destZ: bz,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: bx, z: bz },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    // Radius 1 and 2 saturated with terrain, except: the mover's held cell,
+    // a free cell one step away that sits atop a 10-unit cliff (the nearest
+    // candidate, unclimbable from the blocker), and a flat free cell two steps away.
+    const cliff = { x: bx + 1, z: bz };
+    const climbable = { x: bx + 2, z: bz };
+    blockNeighbourhood(grid, bx, bz, 2, [moverStart, cliff, climbable]);
+    const originY = grid.cellAt(bx, bz)!.surfaceY ?? 0;
+    grid.cellAt(bx, bz)!.surfaceY = originY;
+    grid.cellAt(cliff.x, cliff.z)!.surfaceY = originY + 10;
+    grid.cellAt(climbable.x, climbable.z)!.surfaceY = originY;
+
+    const occupancy = new AgentOccupancy();
+    expect(occupancy.tryMove({ kind: 'employee', id: mover.id }, moverStart.x, moverStart.z)).toBe(true);
+    expect(occupancy.tryMove({ kind: 'employee', id: blocker.id }, bx, bz)).toBe(true);
+    state.agentOccupancy = occupancy;
+
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 10; i++) tickLocomotion(state);
+
+    expect(blocker.x === bx && blocker.z === bz, 'blocker should have been relocated').toBe(false);
+    expect(blocker.x === cliff.x && blocker.z === cliff.z, 'blocker must not step across the cliff').toBe(false);
+    expect({ x: Math.floor(blocker.x), z: Math.floor(blocker.z) }).toEqual(climbable);
+  });
 });
 
 // ── #1283: crossing a busy (working/resting) EMPLOYEE blocker — dense-grid

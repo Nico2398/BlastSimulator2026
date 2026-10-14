@@ -39,6 +39,7 @@ import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
+import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 
 import {
@@ -256,12 +257,12 @@ describe('executeBlast — building destruction', () => {
 
 // ── 3. executeBlast — secondary blast events ──────────────────────────────────
 //
-// When an explosive_warehouse with storedExplosivesKg > 0 is destroyed by a blast,
+// When an explosive_warehouse with storedExplosives > 0 is destroyed by a blast,
 // executeBlast emits a secondaryBlastEvent in result.secondaryBlastEvents:
 //   { buildingId: number; x: number; z: number; explosivesKg: number }
 //
 // No event is emitted when:
-//   • storedExplosivesKg is 0 or absent
+//   • storedExplosives is 0 or absent
 //   • The destroyed building is not an explosive_warehouse
 
 describe('executeBlast — secondary blast events', () => {
@@ -274,8 +275,8 @@ describe('executeBlast — secondary blast events', () => {
     const buildingId = placed.building!.id;
     const { cx, cz } = buildingCenter(placed.building!);
 
-    // storedExplosivesKg triggers a secondary blast event when the building is destroyed.
-    (buildingState.buildings[0] as any).storedExplosivesKg = 200;
+    // storedExplosives triggers a secondary blast event when the building is destroyed.
+    (buildingState.buildings[0] as any).storedExplosives = { anfo: 200 };
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 5, 5, 5, 0.15);
@@ -293,11 +294,11 @@ describe('executeBlast — secondary blast events', () => {
     expect(events[0].z).toBe(cz);
   });
 
-  it('emits no secondaryBlastEvent when storedExplosivesKg is 0', () => {
+  it('emits no secondaryBlastEvent when storedExplosives is 0', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
     placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
-    (buildingState.buildings[0] as any).storedExplosivesKg = 0;
+    (buildingState.buildings[0] as any).storedExplosives = { anfo: 0 };
 
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 5, 5, 5, 0.15);
@@ -311,10 +312,10 @@ describe('executeBlast — secondary blast events', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('emits no secondaryBlastEvent when storedExplosivesKg is absent (undefined)', () => {
+  it('emits no secondaryBlastEvent when storedExplosives is absent (undefined)', () => {
     const grid = makeTestGrid();
     const buildingState = createBuildingState();
-    // No storedExplosivesKg set at all — field will be undefined.
+    // No storedExplosives set at all — field will be undefined.
     placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
 
     const holes: DrillHole[] = [];
@@ -430,7 +431,7 @@ describe('processProjections — secondary blast collector (#1394)', () => {
     const buildings = createBuildingState();
     placeBuilding(buildings, 'explosive_warehouse', 5, 5, 64, 64);
     const wh = buildings.buildings[0]!;
-    if (stock !== undefined) wh.storedExplosivesKg = stock;
+    if (stock !== undefined) wh.storedExplosives = { anfo: stock };
     wh.hp = 1;
     return { buildings, wh };
   }
@@ -526,7 +527,7 @@ function makeBlastContextWithWarehouse(kg: number) {
   const hole = state.drillHoles[0]!;
   placeBuilding(state.buildings, 'explosive_warehouse', Math.floor(hole.x), Math.floor(hole.z), 32, 32);
   const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-  wh.storedExplosivesKg = kg;
+  wh.storedExplosives = { anfo: kg };
   return { ctx, state, wh };
 }
 
@@ -557,13 +558,51 @@ describe('blast command — secondary blast from a stocked warehouse (#1394)', (
   });
 });
 
+describe('blast command — warehouse stocked through purchases (#1678)', () => {
+  function stockedByPurchase(purchases: Array<[string, number]>) {
+    const { ctx, state, wh } = makeBlastContextWithWarehouse(0);
+    delete wh.storedExplosives;
+    state.cash = 1_000_000;
+    for (const [id, kg] of purchases) {
+      expect(buyExplosiveStock(state, id, kg).success).toBe(true);
+    }
+    return { ctx, state, wh };
+  }
+
+  it('detonates when the blast destroys it; explosivesKg is the total stock', () => {
+    const { ctx, state, wh } = stockedByPurchase([['boomite', 100]]);
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
+    const sec = state.lastBlastReport!.secondaryBlasts;
+    expect(sec).toHaveLength(1);
+    expect(sec![0]!.buildingId).toBe(wh.id);
+    expect(sec![0]!.explosivesKg).toBe(100);
+    expect(result.output).toContain('Secondary blast: 100 kg of stored explosives detonated');
+  });
+
+  it('sums every explosive type held into the secondary blast', () => {
+    const { ctx, state } = stockedByPurchase([['boomite', 100], ['krackle', 50]]);
+    blastCommand(ctx, [], {});
+    expect(state.lastBlastReport!.secondaryBlasts![0]!.explosivesKg).toBe(150);
+  });
+
+  it('adds no secondary blast once the purchased stock was fully drawn by charge orders', () => {
+    const { ctx, state, wh } = stockedByPurchase([['boomite', 5]]);
+    wh.storedExplosives = { boomite: 0 };
+    blastCommand(ctx, [], {});
+    expect(state.lastBlastReport!.secondaryBlasts ?? []).toEqual([]);
+  });
+});
+
 describe('build destroy — stocked explosive warehouse (#1394)', () => {
   it('warns about the lost explosives and does not detonate', () => {
     const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
     const state = ctx.state!;
     placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32);
     const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
-    wh.storedExplosivesKg = 80;
+    wh.storedExplosives = { anfo: 80 };
     state.cash = 1_000_000;
     const accidentsBefore = state.damage.accidents.length;
 

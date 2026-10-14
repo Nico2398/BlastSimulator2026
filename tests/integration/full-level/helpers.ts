@@ -39,14 +39,21 @@ function _unlockTreraniumDepths(campaign: any): void {
 }
 
 /**
+ * Levels that declare a free starting kit (#1363, #1672). Tests calibrated on a
+ * bare opening keep one by default; `levelDefaultStart` opts into the kit.
+ */
+const BARE_BY_DEFAULT_LEVELS: ReadonlySet<string> = new Set(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']);
+
+/**
  * Create a GameContext with a fresh campaign started for the given level.
  * Automatically completes any prior levels needed to unlock the target.
  * Calls campaignStartCommand to initialise the level.
  * @param levelId The campaign level identifier (e.g. 'dusty_hollow').
  * @param opts `levelDefaultStart` opens the level exactly as a player's
- *   `campaign start` does. By default dusty_hollow is started `staffed:false`
- *   (a bare site, #1363): the lose-condition tests were calibrated on one, and
- *   only the win playthrough wants the level's own crew, fleet and warehouse.
+ *   `campaign start` does. By default dusty_hollow, grumpstone_ridge and
+ *   treranium_depths are started `staffed:false` (a bare site, #1363, #1672):
+ *   the lose-condition tests were calibrated on one, and only a real
+ *   playthrough wants the level's own crew, fleet and buildings.
  * @returns A fully initialised GameContext ready for test commands.
  */
 export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boolean } = {}): GameContext {
@@ -59,7 +66,7 @@ export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boo
     _unlockTreraniumDepths(ctx.campaignProfile.campaign);
   }
   // tutorial_pit is unlocked by default — no unlock needed
-  const bare = levelId === 'dusty_hollow' && !opts.levelDefaultStart;
+  const bare = BARE_BY_DEFAULT_LEVELS.has(levelId) && !opts.levelDefaultStart;
   campaignStartCommand(ctx, [], { level: levelId, ...(bare ? { staffed: 'false' } : {}) });
   return ctx;
 }
@@ -71,8 +78,8 @@ export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boo
  * @param levelId The campaign level identifier to start.
  * @returns A fully initialised GameContext with preceding levels completed.
  */
-export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
-  return makeCampaignCtx(levelId);
+export function makeCampaignCtxWithUnlock(levelId: string, opts: { levelDefaultStart?: boolean } = {}): GameContext {
+  return makeCampaignCtx(levelId, opts);
 }
 
 /**
@@ -212,9 +219,11 @@ export function fundChargingTruck(ctx: GameContext): void {
  * @param ctx The game context (cast to MiningContext internally for command compatibility).
  * @param originX X-coordinate of the drill grid origin.
  * @param originZ Z-coordinate of the drill grid origin.
+ * @param driveTicks Tick budget for drilling and for charging (each); a crew walled in by a steep
+ *   site (grumpstone_ridge) needs a longer one than the default.
  * @returns The blast command output text.
  */
-export function performBlast(ctx: GameContext, originX: number, originZ: number): string {
+export function performBlast(ctx: GameContext, originX: number, originZ: number, driveTicks = 400): string {
   ensureDrillRigCrew(ctx);
   ensureChargingTruckCrew(ctx);
   drillPlanCommand(ctx as any, ['grid'], {
@@ -225,14 +234,14 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
     depth: '8',
   });
   // Holes must be drilled and charged before FIRE has anything to blast (#1345).
-  driveDrillPlanToCompletion(ctx);
+  driveDrillPlanToCompletion(ctx, driveTicks);
   chargeCommand(ctx as any, [], {
     hole: '*',
     explosive: 'boomite',
     amount: '5kg',
     stemming: '2m',
   });
-  driveChargePlanToCompletion(ctx);
+  driveChargePlanToCompletion(ctx, driveTicks);
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }
