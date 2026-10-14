@@ -342,13 +342,21 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
       expect(state.lastLooseRockKg).toBe(10 * T);
     });
 
-    it('hauling is not a pulse: a falling pile adds no fresh dust', () => {
+    it('hauling is not a pulse: a falling pile only decays the fresh dust by the half-life', () => {
       const state = createScoreState();
-      updateScores(state, makeInputs({ looseRockKg: 100 * T }));
-      updateScores(state, makeInputs({ looseRockKg: 50 * T }));
-      const before = state.freshDustKg;
-      updateScores(state, makeInputs({ looseRockKg: 40 * T }));
-      expect(state.freshDustKg).toBeLessThan(before);
+      state.freshDustKg = 10 * T;
+      state.lastLooseRockKg = 100 * T;
+      updateScores(state, makeInputs({ looseRockKg: 80 * T }));
+      const retention = 0.5 ** (1 / ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS);
+      expect(state.freshDustKg).toBeCloseTo(10 * T * retention, 6);
+    });
+
+    it('a score at 0 with no heap lifts when hauling drops looseKg and a heap gain arrives', () => {
+      const state = createScoreState(0);
+      updateScores(state, makeInputs({ looseRockKg: 100 * T })); // settles state.lastLooseRockKg
+      state.ecology = 0;
+      updateScores(state, makeInputs({ buildings: withHeaps(4), looseRockKg: 0 }));
+      expect(state.ecology, 'heap gain beats dust once the rubble is hauled away').toBeGreaterThan(0);
     });
 
     it('3 heaps with a 2,344 t blast pulse every 100 ticks and no hauling still reach 0 within 3000 ticks', () => {

@@ -67,7 +67,7 @@ const DUST_SETTLE_RETENTION = Math.pow(0.5, 1 / ECOLOGY_DUST_SETTLE_HALF_LIFE_TI
  * recent blast threw up, settling with a half-life) and `state.lastLooseRockKg`. Fresh rock costs
  * the high rate, settled rock the low one. No cap.
  */
-function dustEcologyLoss(state: ScoreState, looseKg: number): number {
+function advanceDustAndEcologyLoss(state: ScoreState, looseKg: number): number {
   const loose = Number.isFinite(looseKg) && looseKg > 0 ? looseKg : 0;
   const prev = state.lastLooseRockKg ?? loose;
   const prevFresh = Number.isFinite(state.freshDustKg) ? state.freshDustKg : 0; // old saves lack the field
@@ -106,7 +106,7 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   // (heap gain beats dust), so the shutdown warning leaves room to act.
   let ecDelta = buildingEffects.ecology * 0.1;
   ecDelta -= inputs.maxRecentVibration * 0.01; // Vibrations worsen ecology
-  ecDelta -= dustEcologyLoss(state, inputs.looseRockKg);
+  ecDelta -= advanceDustAndEcologyLoss(state, inputs.looseRockKg);
   state.ecology = clampScore(state.ecology + ecDelta);
 
   // ── Neighbour relations (internal key: nuisance) ──

@@ -2,7 +2,7 @@
 // Applies consequences of player decisions. Outcomes hidden until chosen.
 
 import type { Random } from '../math/Random.js';
-import { clampScore, type ScoreState } from '../scores/ScoreManager.js';
+import { clampScore, type ScoreState, type ScoreId } from '../scores/ScoreManager.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { addIncome, addExpense } from '../economy/Finance.js';
 import { applyExposure } from './MafiaActions.js';
@@ -200,7 +200,7 @@ function applyConsequence(
   // Score effects
   if (c.scoreDelta) {
     for (const [key, val] of Object.entries(c.scoreDelta)) {
-      const k = key as keyof ScoreState;
+      const k = key as ScoreId;
       const v = val as number;
       scores[k] = clampScore((scores[k] ?? 0) + v);
       scoreChanges[k] = v;

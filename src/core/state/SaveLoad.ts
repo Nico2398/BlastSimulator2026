@@ -752,7 +752,7 @@ export function deserialize(json: string): GameState {
   ensureField(obj, 'ghostPreviewsRevision', v => typeof v === 'number', 0);
 
   // Settling dust (#1733): scores persist verbatim, so the two dust keys round-trip. A save that
-  // predates them has no airborne dust (0); lastLooseRockKg stays undefined, which the model
+  // predates them has no airborne dust (0); lastLooseRockKg is left absent, which the model
   // reads as "no pulse" on the first tick rather than a phantom blast.
   ensureField(
     obj['scores'] as Record<string, unknown> | undefined,

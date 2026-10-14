@@ -16,9 +16,9 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
-import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { ECOLOGICAL_SHUTDOWN_TICKS, ECOLOGICAL_WARNING_TICKS } from '../../src/core/config/balance.js';
 import { playTick, type Run } from '../helpers/playthrough.js';
+import { makeRubbleFragment } from '../helpers/blastFixtures.js';
 
 const RUN_TICKS = 3000;
 const BLAST_INTERVAL = 600;
@@ -122,7 +122,11 @@ function fireOrdinaryPattern(site: Site, notBefore: number): number {
   return pre;
 }
 
-/** Order everyone out of the blast radius and wait for the zone to read clear (the Blast panel's evacuate control). */
+/**
+ * Order everyone out of the blast radius and wait for the zone to read clear (the Blast panel's evacuate control).
+ * Kept local rather than using helpers/playthrough.ts clearBlastZone: that one waits with bare playTick, while
+ * this run needs step()'s per-tick fatigue/score/cash upkeep so the wait cannot trip another lose condition.
+ */
 function clearBlastZone(site: Site): void {
   const { run, state } = site;
   const xs = state.drillHoles.map(h => h.x);
@@ -132,26 +136,10 @@ function clearBlastZone(site: Site): void {
   ticks(site, 80, () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); });
 }
 
-function rubble(id: number, massKg: number): FragmentData {
-  return {
-    id,
-    position: { x: 40 + (id % 5), y: 0, z: 30 + Math.floor(id / 5) },
-    volume: massKg / 2500,
-    mass: massKg,
-    rockId: 'sandite',
-    oreDensities: {},
-    initialVelocity: { x: 0, y: 0, z: 0 },
-    isProjection: false,
-    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
-    shapeSeed: 1,
-    origin: { x: 40, y: 0, z: 30 },
-  };
-}
-
 let nextFragmentId = 1_000_000;
 /** A blast's worth of muck the crew never reaches, as a pile of 20 t pieces (fewer pieces keep the tick fast). */
 function dropRubble(state: GameState, tonnes: number): void {
-  const pieces = Array.from({ length: Math.ceil(tonnes / 20) }, () => rubble(nextFragmentId++, 20_000));
+  const pieces = Array.from({ length: Math.ceil(tonnes / 20) }, () => makeRubbleFragment(nextFragmentId++, 20_000, { x: 40, y: 0, z: 30 }));
   addBlastFragments(state.logistics, pieces);
 }
 
@@ -172,6 +160,7 @@ describe('sandbox ecology under ordinary play (#1733)', () => {
     expect(state.ecological.shutdown).toBe(false);
     expect(state.levelEnded, `level ended: ${String(state.levelEndReason)}`).toBe(false);
     expect(windows.length, 'at least two blasts were fired').toBeGreaterThanOrEqual(2);
+    let assertedWindows = 0;
 
     for (let w = 0; w < windows.length; w++) {
       const win = windows[w]!;
@@ -183,7 +172,9 @@ describe('sandbox ecology under ordinary play (#1733)', () => {
       const minIdx = after.findIndex(s => s.ecology === min);
       const later = after.slice(minIdx + 1);
       expect(later.some(s => s.ecology > min + 1), `blast ${w + 1}: ecology recovers above its minimum ${min.toFixed(1)}`).toBe(true);
+      assertedWindows++;
     }
+    expect(assertedWindows, 'at least one blast window was long enough to assert dip and recovery').toBeGreaterThanOrEqual(1);
   }, 600_000);
 });
 
