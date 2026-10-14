@@ -41,6 +41,8 @@ import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
+import type { GameState } from '../../src/core/state/GameState.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1084,4 +1086,137 @@ describe('Campaign star persistence (#1311)', () => {
     checkLevelComplete(state, campaign, new EventEmitter());
     expect(getBestStars(campaign.levels['grumpstone_ridge'])).toBe(0);
   });
+});
+
+// ── #1672: levels 2 and 3 open with a free starting site ────────────────────
+
+const KIT_LEVELS = ['grumpstone_ridge', 'treranium_depths'] as const;
+
+/** The explosive and per-hole charge a careful player picks for each level's rock (level 3 is hardness 4-5: boomite/krackle break nothing there). */
+const FIRST_BLAST_CHARGE: Readonly<Record<(typeof KIT_LEVELS)[number], string>> = {
+  grumpstone_ridge: 'explosive:boomite amount:5',
+  treranium_depths: 'explosive:obliviax amount:10',
+};
+
+function startKitLevel(levelId: string, args = '') {
+  const { runner, ctx } = createRunner();
+  recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
+  recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
+  recordProfit(ctx.campaignProfile.campaign, 'grumpstone_ridge', 250000);
+  const result = runner.run(`campaign start level:${levelId}${args ? ` ${args}` : ''}`);
+  expect(result.success, result.output).toBe(true);
+  return { runner, ctx, state: ctx.state! };
+}
+
+describe.each(KIT_LEVELS)('campaign start level:%s opens with a starting site (#1672)', (levelId) => {
+  it('has a driller, a blaster, a truck driver and an excavator-licensed driver', () => {
+    const { state } = startKitLevel(levelId);
+    expect(state.employees.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver', 'driver']);
+    expect(state.employees.employees.some(e => e.qualifications.some(q => q.category === 'driving.excavator'))).toBe(true);
+    expect(state.employees.employees.some(e => {
+      const cats = e.qualifications.map(q => q.category);
+      return cats.includes('blasting') && cats.includes('driving.truck');
+    })).toBe(true);
+  });
+
+  it('has a drill rig, a debris hauler, a tier-1 charging truck and a tier-1 rock digger', () => {
+    const { state } = startKitLevel(levelId);
+    expect(state.vehicles.vehicles.map(v => `${v.type}:${v.tier}`).sort()).toEqual(
+      ['charging_truck:1', 'debris_hauler:1', 'drill_rig:1', 'rock_digger:1'],
+    );
+  });
+
+  it('has an active freight warehouse and an active spoil heap', () => {
+    const { state } = startKitLevel(levelId);
+    expect(state.buildings.buildings.map(b => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
+    expect(state.buildings.buildings.every(b => b.active)).toBe(true);
+    expect(state.logistics.storageCapacityKg).toBeGreaterThan(0);
+  });
+
+  it('charges nothing for the kit: cash is the level start cash with zero transactions', () => {
+    const { state } = startKitLevel(levelId);
+    expect(state.cash).toBe(getLevel(levelId)!.startingCash);
+    expect(state.finances.cash).toBe(getLevel(levelId)!.startingCash);
+    expect(state.finances.transactions).toHaveLength(0);
+  });
+
+  it('staffed:false still opens bare', () => {
+    const { state } = startKitLevel(levelId, 'staffed:false');
+    expect(state.employees.employees).toHaveLength(0);
+    expect(state.vehicles.vehicles).toHaveLength(0);
+    expect(state.buildings.buildings).toHaveLength(0);
+    expect(state.cash).toBe(getLevel(levelId)!.startingCash);
+  });
+
+  it('keeps the level cash relative to Dusty Hollow: level 2 and 3 start with more cash than level 1', () => {
+    expect(getLevel(levelId)!.startingCash).toBeGreaterThanOrEqual(getLevel('dusty_hollow')!.startingCash);
+  });
+});
+
+// A scripted first blast from the free kit alone, real level seeds, player verbs only.
+const KIT_CYCLE_TICK_CAP = 4000;
+const KIT_BUY_OR_HIRE = /^(employee hire|employee assign_skill|vehicle buy|vehicle purchase|build |hire |purchase |sandbox |new_game|campaign complete)/;
+const KIT_ALLOWED_VERB = /^(campaign start|time resume|tick|drill_plan|charge|sequence|blast|zone clear|zone status|contract accept|contract deliver|event choose)\b/;
+
+/** Order everyone out of the blast radius and wait until the zone reads clear. */
+function clearKitZone(run: Run, state: GameState): void {
+  const xs = state.drillHoles.map(h => h.x);
+  const zs = state.drillHoles.map(h => h.z);
+  if (xs.length === 0) return;
+  const m = 16;
+  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
+  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
+  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
+}
+
+describe.each(KIT_LEVELS)('first blast to first sale on %s from the starting kit (#1672)', (levelId) => {
+  it('drills, charges, sequences, fires, hauls and fills an ore contract with no hire, purchase or bootstrap, and never goes bankrupt', () => {
+    const { runner, ctx } = createRunner();
+    const commands: string[] = [];
+    const run: Run = (cmd) => { commands.push(cmd); return runner.run(cmd); };
+    recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
+    recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
+    recordProfit(ctx.campaignProfile.campaign, 'grumpstone_ridge', 250000);
+
+    expect(run(`campaign start level:${levelId}`).success).toBe(true);
+    run('time resume');
+    const state = ctx.state!;
+    expect(state.employees.employees.length, 'the level opens staffed').toBeGreaterThan(0);
+    const rig = state.vehicles.vehicles.find(v => v.type === 'drill_rig');
+    expect(rig, 'the level opens with a drill rig').toBeDefined();
+
+    const start = state.tickCount;
+    const over = () => state.levelEnded || state.tickCount - start >= KIT_CYCLE_TICK_CAP;
+    const sold = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
+
+    let shot = 0;
+    let blasts = 0;
+    while (!over() && !sold() && shot < 6) {
+      const x = Math.round(rig!.x) + 14;
+      const z = Math.round(rig!.z) + 13 + shot * 10;
+      shot++;
+      if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
+      tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
+      expect(state.drillHoles.length, 'the crew drilled the holes').toBeGreaterThan(0);
+      expect(run(`charge hole:* ${FIRST_BLAST_CHARGE[levelId]} stemming:2`).success).toBe(true);
+      tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
+      run('sequence auto');
+      clearKitZone(run, state);
+      expect(run('blast').success).toBe(true);
+      blasts++;
+      expect(state.lastBlastReport, 'the shot produced a report').not.toBeNull();
+      for (let i = 0; i < 400 && !over() && !sold(); i++) {
+        playContracts(run, state);
+        playTick(run, state);
+      }
+    }
+
+    expect(blasts, 'at least one blast was fired').toBeGreaterThan(0);
+    expect(state.levelEndReason, `ended ${String(state.levelEndReason)}`).not.toBe('bankruptcy');
+    expect(sold(), 'an ore contract was filled').toBe(true);
+    expect(state.cash).toBeGreaterThan(0);
+    expect(commands.filter(c => KIT_BUY_OR_HIRE.test(c))).toEqual([]);
+    expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+    expect(commands.filter(c => !KIT_ALLOWED_VERB.test(c))).toEqual([]);
+  }, 600_000);
 });

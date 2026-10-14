@@ -39,14 +39,21 @@ function _unlockTreraniumDepths(campaign: any): void {
 }
 
 /**
+ * Levels that declare a free starting kit (#1363, #1672). Tests calibrated on a
+ * bare opening keep one by default; `levelDefaultStart` opts into the kit.
+ */
+const BARE_BY_DEFAULT_LEVELS: ReadonlySet<string> = new Set(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']);
+
+/**
  * Create a GameContext with a fresh campaign started for the given level.
  * Automatically completes any prior levels needed to unlock the target.
  * Calls campaignStartCommand to initialise the level.
  * @param levelId The campaign level identifier (e.g. 'dusty_hollow').
  * @param opts `levelDefaultStart` opens the level exactly as a player's
- *   `campaign start` does. By default dusty_hollow is started `staffed:false`
- *   (a bare site, #1363): the lose-condition tests were calibrated on one, and
- *   only the win playthrough wants the level's own crew, fleet and warehouse.
+ *   `campaign start` does. By default dusty_hollow, grumpstone_ridge and
+ *   treranium_depths are started `staffed:false` (a bare site, #1363, #1672):
+ *   the lose-condition tests were calibrated on one, and only a real
+ *   playthrough wants the level's own crew, fleet and buildings.
  * @returns A fully initialised GameContext ready for test commands.
  */
 export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boolean } = {}): GameContext {
@@ -59,7 +66,7 @@ export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boo
     _unlockTreraniumDepths(ctx.campaignProfile.campaign);
   }
   // tutorial_pit is unlocked by default — no unlock needed
-  const bare = levelId === 'dusty_hollow' && !opts.levelDefaultStart;
+  const bare = BARE_BY_DEFAULT_LEVELS.has(levelId) && !opts.levelDefaultStart;
   campaignStartCommand(ctx, [], { level: levelId, ...(bare ? { staffed: 'false' } : {}) });
   return ctx;
 }
