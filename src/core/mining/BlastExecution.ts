@@ -162,6 +162,8 @@ export interface BlastReport {
   totalOreValue: number;
   /** Total cost of the charges spent on this blast (kg × explosive $/kg, summed before the plan was cleared). */
   spent: number;
+  /** Kg of the spent charges drawn from warehouse stock (#1685). Optional: pre-existing fixtures omit it; treat absent as 0. */
+  spentFromStock?: number;
   destroyedBuildings: DestroyedBuildingInfo[];
   /** Casualties/damage this blast caused (#557). Optional: pre-existing literal fixtures omit it; buildBlastReport defaults to `[]`. */
   accidents?: AccidentRecord[];

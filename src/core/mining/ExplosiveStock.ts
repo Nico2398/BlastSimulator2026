@@ -29,6 +29,16 @@ type BuyStockResult =
   | { success: true; kg: number; cost: number; pricePerKg: number; stockKg: number; capacityKg: number }
   | { success: false; reason: BuyStockFailure; freeKg?: number; need?: number };
 
+/** Pure pre-check mirroring buyExplosiveStock's validation order; null when the purchase would succeed (#1685). */
+export function buyStockBlockReason(
+  state: Pick<GameState, 'buildings' | 'cash' | 'campaign' | 'events' | 'tickCount'>,
+  explosiveId: string,
+  kg: number,
+): BuyStockFailure | null {
+  void state; void explosiveId; void kg;
+  return null; // TODO: implement
+}
+
 /** Buy `kg` of an explosive into warehouse stock, paying bulk price. Refusals mutate nothing. */
 export function buyExplosiveStock(state: GameState, explosiveId: string, kg: number): BuyStockResult {
   if (!Number.isInteger(kg) || kg < 1) return { success: false, reason: 'invalid_amount' };

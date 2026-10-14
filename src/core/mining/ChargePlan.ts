@@ -15,6 +15,8 @@ export interface HoleCharge {
   explosiveId: string;
   amountKg: number;
   stemmingM: number;
+  /** Kg of this charge drawn from warehouse stock when ordered (#1685). Absent = all paid in cash. */
+  fromStockKg?: number;
 }
 
 export interface ChargeError {
@@ -136,6 +138,31 @@ export function chargeOrderCost(explosiveId: string, amountKg: number): number {
 /** Total cash cost of every charge in a per-hole charge map. */
 export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): number {
   return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
+}
+
+/** Cash/stock split of a set of charge orders (#1685). */
+export interface ChargeCostSplit {
+  /** Cash paid at list price for the kg not covered by stock. */
+  cashCost: number;
+  /** List-price value of the kg drawn from stock. */
+  stockValue: number;
+  fromStockKg: number;
+  totalKg: number;
+}
+
+/** Forward preview: draw `stock` sequentially across `orders`, list price cash for the rest (#1685). */
+export function stockAwareChargesCost(
+  orders: ReadonlyArray<{ explosiveId: string; amountKg: number }>,
+  stock: Readonly<Record<string, number>>,
+): ChargeCostSplit {
+  void orders; void stock;
+  return { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 }; // TODO: implement
+}
+
+/** Split of already-ordered charges, read from each charge's recorded `fromStockKg` (#1685). */
+export function recordedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): ChargeCostSplit {
+  void chargesByHole;
+  return { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 }; // TODO: implement
 }
 
 /** Metres of hole column that `amountKg` of explosive occupies. */
