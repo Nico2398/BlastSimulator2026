@@ -263,7 +263,7 @@ describe('SANDBOX_FIELDS', () => {
 describe('sandboxLevelDef — generated biome equals the picked biome (#1668)', () => {
   const SEEDS = [...Array.from({ length: 1000 }, (_, i) => i), 28, 29, 34, 39, 60, 72, 106];
   const biomeField = SANDBOX_FIELDS.find(f => f.key === 'biome')!;
-  const pickable = (biomeField.kind === 'choice' ? biomeField.options() : []).map(o => o.id);
+  const pickable = (biomeField.kind === 'choice' ? biomeField.options?.() ?? [] : []).map(o => o.id);
 
   it('offers all six biomes', () => {
     expect(pickable).toHaveLength(6);
