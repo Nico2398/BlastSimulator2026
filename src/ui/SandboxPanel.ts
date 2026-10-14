@@ -281,7 +281,7 @@ function detailLine(id: string, text: string): HTMLElement {
 }
 
 /** Player-facing ore depth window; open-ended windows read "from N m down". */
-export function oreDepthWindow(min: number, max: number): string {
+function oreDepthWindow(min: number, max: number): string {
   return max >= ORE_DEPTH_UNBOUNDED
     ? t('sandbox.detail.depth_open', { min })
     : t('sandbox.detail.depth_range', { min, max });
