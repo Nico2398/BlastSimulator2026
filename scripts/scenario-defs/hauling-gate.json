@@ -461,7 +461,7 @@
     },
     {
       "command": "tick 60",
-      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable on every seed/timing here, and the first delivery of spoil to the heap lands inside this block (#1649: moved here from the 20-tick block above).",
+      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable on every seed/timing here, and the first delivery to a depot lands inside this block (#1649). #1722: ore (to the warehouse) and spoil (to the heap) are different orders and which lands first depends on which reachable rock bin the hauler weighs first; reachable bins are now picked ahead of walled-off ones, so ore arrives first here and the first spoil delivery moves to the 40-tick block below. Asserting stored ore keeps this step about 'hauling delivers' rather than which kind of rock was nearest.",
       "interaction": [
         {
           "type": "command",
@@ -474,7 +474,7 @@
           "cash"
         ],
         "increased": [
-          "storedSpoilKg"
+          "storedMassKg"
         ]
       }
     },
@@ -511,14 +511,19 @@
     },
     {
       "command": "tick 40",
-      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke.",
+      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke. #1722: the first spoil delivery to the heap lands inside this block (it used to land in the tick 60 block above).",
       "interaction": [
         {
           "type": "command",
           "command": "tick 40"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedSpoilKg"
+        ]
+      }
     },
     {
       "command": "fragments",
