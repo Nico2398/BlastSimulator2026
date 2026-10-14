@@ -129,6 +129,8 @@ export interface BlastResult {
   /** "x,z" of every ground column the blast removed rock from. Anything standing
    *  on one of these was standing on the blast. */
   clearedColumns: string[];
+  /** False when the blast failed to break out and its rock stayed inside the sealed void (#1724). */
+  brokeOut?: boolean;
 }
 
 /**
@@ -175,6 +177,8 @@ export interface BlastReport {
   fizzledHoleIds?: string[];
   /** Secondary detonations from destroyed stocked explosive warehouses (#1394). Optional: omitted when none. */
   secondaryBlasts?: SecondaryBlastReport[];
+  /** False when the blast did not break out of its sealed void (#1724). Optional: absent = true. */
+  brokeOut?: boolean;
 }
 
 /** One secondary detonation as shown in the blast report (#1394). */
@@ -201,6 +205,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     chargedHoleCount: wetHoles.chargedCount,
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
+    noBreakout: false, // TODO: implement (#1724)
   });
   return {
     tick,
@@ -545,6 +550,7 @@ export function* executeBlastSteps(
     destroyedBuildings,
     secondaryBlastEvents,
     clearedColumns: [...new Set(toClear.map(c => `${c.x},${c.z}`))],
+    brokeOut: true, // TODO: implement (#1724)
     maxThrowDistance,
     projectileCount,
     flights,

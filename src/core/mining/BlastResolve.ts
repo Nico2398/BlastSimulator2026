@@ -160,7 +160,7 @@ class PileHeights {
    * grown well above its neighbours spills into the lowest one nearby, which is
    * what spreads muck across the floor of the pit instead of stacking it.
    */
-  place(x: number, z: number, volume: number): { x: number; z: number; y: number } {
+  place(x: number, z: number, volume: number, _fromY?: number): { x: number; z: number; y: number } {
     const column = { x: Math.floor(x), z: Math.floor(z) };
     const target = this.spillTarget(column.x, column.z);
     const base = this.surfaceAt(target.x, target.z);
@@ -177,6 +177,16 @@ class PileHeights {
       z: target.z + (z - column.z),
       y: base + rise / 2,
     };
+  }
+
+  /** Highest solid surface at or below `y` in a column, or null when none. */
+  surfaceBelow(_x: number, _z: number, _y: number): number | null {
+    return null; // TODO: implement (#1724)
+  }
+
+  /** Lowest solid ceiling above `y` in a column. */
+  ceilingAbove(_x: number, _z: number, y: number): number {
+    return y; // TODO: implement (#1724)
   }
 
   /**

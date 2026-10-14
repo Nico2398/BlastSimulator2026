@@ -5,7 +5,7 @@
 import type { BlastRating } from './BlastExecution.js';
 import { BLAST_FIZZLE_SHARE_FAILURE, BLAST_FIZZLE_SHARE_PARTIAL, BLAST_OVERSIZE_SHARE_CAP } from '../config/balance.js';
 
-export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial';
+export type BlastRatingCap = 'death' | 'casualty_or_destruction' | 'wet_holes' | 'oversize' | 'fizzled_failure' | 'fizzled_partial' | 'no_breakout';
 
 export interface RatingCapFacts {
   deaths: number;
@@ -16,6 +16,8 @@ export interface RatingCapFacts {
   chargedHoleCount: number;
   oversizedFragments: number;
   fragmentCount: number;
+  /** True when the blast never broke out of its sealed void (#1724). */
+  noBreakout?: boolean;
 }
 
 const ORDER: readonly BlastRating[] = ['perfect', 'good', 'mediocre', 'bad', 'catastrophic'];
