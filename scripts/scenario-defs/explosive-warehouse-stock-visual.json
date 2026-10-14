@@ -1,0 +1,396 @@
+{
+  "name": "explosive-warehouse-stock-visual",
+  "description": "Explosive Warehouse UI (#1685), by real clicks only: with no warehouse the Charge step's buy control is disabled with a reason; the player builds a warehouse, buys boomite into stock from the Charge step at the bulk price, charges a 6-hole pattern that the Charge step says is paid from stock ($0 cash), stock drops by the kg used, the blast footer and Preflight modal show $0 cost, and the selected warehouse shows stock and free capacity.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true cash:120000",
+      "description": "Staffed opening: drill_rig, charging truck and crew for free. No warehouse yet.",
+      "timeout": 30,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 120000,
+          "holeCount": 0,
+          "buildingCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true cash:120000"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15",
+      "description": "Order the 2x3 pattern by real clicks, as in blast-charge-visual.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 6,
+          "holeCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 23,
+          "z2": 19
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:6 max_ticks:300",
+      "description": "The crew drills all six holes.",
+      "timeout": 125,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 6
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 6,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite kg:50",
+      "description": "No warehouse yet: the Charge step shows the buy control disabled, with a visible reason (no console command is used to try it; command mode proves the console refuses too).",
+      "commandOutcome": "refused",
+      "role": "guard",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"stock-buy\"]",
+        "note": "rejected: no Explosive Warehouse"
+      },
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-info=\"stock-buy-reason\"]"
+        }
+      ]
+    },
+    {
+      "command": "build explosive_warehouse at:3,5",
+      "description": "The player orders the tier-1 Explosive Warehouse (500 kg) from the Build panel.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -20000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      },
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 3,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the crew build it out.",
+      "timeout": 130,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ]
+    },
+    {
+      "command": "buy explosive:boomite kg:50",
+      "description": "With a warehouse the buy control is usable: one click buys the stepper's default (STOCK_BUY_STEP_KG = 50 kg) of the selected boomite at the bulk price, 50 x $12 x 0.7 = $420. The boomite stock row then reads 50 kg.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -420
+        },
+        "usable": "#bs-blast-panel [data-action=\"stock-buy\"]"
+      },
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-stock=\"boomite\"][data-kg=\"50\"]"
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "6 holes x 5 kg = 30 kg against 50 kg of stock: the Charge step's paid-from line says $0 cash before the click, and the order spends no cash.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedChargeCount": 6
+        }
+      },
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-info=\"paid-from\"][data-cash=\"0\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ]
+    },
+    {
+      "command": "time speed 8",
+      "description": "Speed up the loading wait.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:chargedCount equals:6 max_ticks:6000",
+      "description": "The charging crew loads all six holes from the stock-paid orders.",
+      "timeout": 245,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 6,
+          "maxTicks": 6000,
+          "timeoutMs": 240000
+        }
+      ]
+    },
+    {
+      "command": "time speed 1",
+      "description": "Restore normal speed.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 1"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Stock fell from 50 to 20 kg (30 kg charged). The blast footer's plan cost, net of stock, reads $0 because every loaded charge was stock-paid.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "textEquals": {
+          "#bs-blast-panel [data-info=\"plan-cost\"]": "$0"
+        }
+      },
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-stock=\"boomite\"][data-kg=\"20\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-info=\"plan-cost\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "FIRE opens the Preflight modal; its cost stat shows $0 for a pattern fully covered by stock.",
+      "role": "player",
+      "expect": {
+        "textEquals": {
+          "[data-info=\"preflight-cost\"]": "$0"
+        },
+        "usable": "[data-info=\"preflight-cost\"]"
+      },
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-info=\"preflight-cost\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Cancel the Preflight modal; the pattern stays charged.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-cancel\"]"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Selecting the Explosive Warehouse (the first building placed, id 1) shows its stock (20 kg) and free capacity (480 kg of 500).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 1
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-selection-bar [data-info=\"warehouse-stock\"][data-stock-kg=\"20\"][data-free-kg=\"480\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}

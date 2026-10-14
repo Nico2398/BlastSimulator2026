@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks, computeChargeDurationTicks, chargeOrderCost,
   chargeColumnM, maxChargeKgForHole, weakHoleSummary,
+  stockAwareChargesCost, recordedChargesCost, plannedChargesCost,
 } from '../../../src/core/mining/ChargePlan.js';
-import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
+import type { PlannedCharge, ChargeCostSplit } from '../../../src/core/mining/ChargePlan.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { VEHICLE_TIER_MULTIPLIERS, MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
 
@@ -367,5 +368,129 @@ describe('computeChargeDurationTicks (#1649)', () => {
 
   it('a higher proficiency level shortens the duration', () => {
     expect(computeChargeDurationTicks(120, 2, 5)).toBeLessThan(computeChargeDurationTicks(120, 2, 1));
+  });
+});
+
+// ── stock-aware cost (#1685) ────────────────────────────────────────────────
+// Boomite lists at $12/kg (chargeOrderCost), so 5 kg = $60.
+
+describe('stockAwareChargesCost (#1685)', () => {
+  const nine = Array.from({ length: 9 }, () => ({ explosiveId: 'boomite', amountKg: 6 }));
+
+  it('equals the list-price total when there is no stock', () => {
+    const r = stockAwareChargesCost(nine, {});
+    expect(r.cashCost).toBeCloseTo(9 * chargeOrderCost('boomite', 6), 6);
+    expect(r.stockValue).toBe(0);
+    expect(r.fromStockKg).toBe(0);
+    expect(r.totalKg).toBe(54);
+  });
+
+  it('with empty stock matches plannedChargesCost of the same orders', () => {
+    const byHole = Object.fromEntries(nine.map((o, i) => [`H${i}`, { ...o, stemmingM: 2 }]));
+    expect(stockAwareChargesCost(nine, {}).cashCost).toBeCloseTo(plannedChargesCost(byHole), 6);
+  });
+
+  it('costs no cash when stock covers every order', () => {
+    const r = stockAwareChargesCost(nine, { boomite: 100 });
+    expect(r.cashCost).toBe(0);
+    expect(r.fromStockKg).toBe(54);
+    expect(r.stockValue).toBeCloseTo(54 * 12, 6);
+    expect(r.totalKg).toBe(54);
+  });
+
+  it('covered exactly by stock equal to the total (boundary) costs no cash', () => {
+    const r = stockAwareChargesCost(nine, { boomite: 54 });
+    expect(r.cashCost).toBe(0);
+    expect(r.fromStockKg).toBe(54);
+  });
+
+  it('prices only the shortfall when stock covers part', () => {
+    const r = stockAwareChargesCost(nine, { boomite: 50 });
+    expect(r.fromStockKg).toBe(50);
+    expect(r.stockValue).toBeCloseTo(50 * 12, 6);
+    expect(r.cashCost).toBeCloseTo(4 * 12, 6);
+  });
+
+  it('draws sequentially from one pool: later orders get what earlier ones left', () => {
+    const r = stockAwareChargesCost(
+      [{ explosiveId: 'boomite', amountKg: 4 }, { explosiveId: 'boomite', amountKg: 4 }],
+      { boomite: 5 },
+    );
+    expect(r.fromStockKg).toBe(5);
+    expect(r.cashCost).toBeCloseTo(3 * 12, 6);
+  });
+
+  it('keeps a separate pool per explosive', () => {
+    const r = stockAwareChargesCost(
+      [{ explosiveId: 'boomite', amountKg: 5 }, { explosiveId: 'krackle', amountKg: 5 }],
+      { boomite: 5 },
+    );
+    expect(r.fromStockKg).toBe(5);
+    expect(r.stockValue).toBeCloseTo(chargeOrderCost('boomite', 5), 6);
+    expect(r.cashCost).toBeCloseTo(chargeOrderCost('krackle', 5), 6);
+  });
+
+  it('returns zeros for no orders', () => {
+    expect(stockAwareChargesCost([], { boomite: 10 })).toEqual({ cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 });
+  });
+
+  it('prices an unknown explosive at 0 and does not throw', () => {
+    const r = stockAwareChargesCost([{ explosiveId: 'nope', amountKg: 5 }], { nope: 2 });
+    expect(r.cashCost).toBe(0);
+    expect(r.stockValue).toBe(0);
+  });
+
+  it('does not mutate the stock record or the orders', () => {
+    const stock = Object.freeze({ boomite: 10 });
+    const orders = Object.freeze([Object.freeze({ explosiveId: 'boomite', amountKg: 5 })]);
+    expect(() => stockAwareChargesCost(orders, stock)).not.toThrow();
+    expect(stock).toEqual({ boomite: 10 });
+  });
+});
+
+describe('recordedChargesCost (#1685)', () => {
+  it('equals plannedChargesCost with cash everywhere when no charge records stock', () => {
+    const byHole = { H1: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 }, H2: { explosiveId: 'krackle', amountKg: 3, stemmingM: 2 } };
+    const r = recordedChargesCost(byHole);
+    expect(r.cashCost).toBeCloseTo(plannedChargesCost(byHole), 6);
+    expect(r.stockValue).toBe(0);
+    expect(r.fromStockKg).toBe(0);
+    expect(r.totalKg).toBe(8);
+  });
+
+  it('prices only the cash part of a partly stock-drawn charge', () => {
+    const r = recordedChargesCost({ H1: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 3 } });
+    expect(r.fromStockKg).toBe(3);
+    expect(r.stockValue).toBeCloseTo(36, 6);
+    expect(r.cashCost).toBeCloseTo(24, 6);
+  });
+
+  it('costs no cash for a charge drawn entirely from stock (boundary)', () => {
+    const r = recordedChargesCost({ H1: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 5 } });
+    expect(r.cashCost).toBe(0);
+    expect(r.stockValue).toBeCloseTo(60, 6);
+  });
+
+  it('sums mixed charges and is zero for an empty map', () => {
+    const r = recordedChargesCost({
+      H1: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 5 },
+      H2: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
+    });
+    expect(r.cashCost).toBeCloseTo(60, 6);
+    expect(r.stockValue).toBeCloseTo(60, 6);
+    const empty: ChargeCostSplit = { cashCost: 0, stockValue: 0, fromStockKg: 0, totalKg: 0 };
+    expect(recordedChargesCost({})).toEqual(empty);
+  });
+});
+
+describe('landLoadedCharge carries fromStockKg (#1685)', () => {
+  it('keeps the recorded stock kg on the loaded charge', () => {
+    const loaded = landLoadedCharge({ explosiveId: 'boomite', amountKg: 5, stemmingM: 2, fromStockKg: 3 });
+    expect(loaded.fromStockKg).toBe(3);
+  });
+
+  it('leaves it absent for an all-cash charge', () => {
+    const loaded = landLoadedCharge({ explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    expect(loaded.fromStockKg).toBeUndefined();
   });
 });
