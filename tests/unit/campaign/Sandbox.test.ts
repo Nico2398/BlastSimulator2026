@@ -661,3 +661,34 @@ describe('sandbox pit mask (#1680)', () => {
     }
   });
 });
+
+
+describe('sandbox market (#1681)', () => {
+  it('every biome and difficulty runs on the production market', async () => {
+    const { getAllBiomes } = await import('../../../src/core/world/BiomeCatalog.js');
+    for (const biome of getAllBiomes()) {
+      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
+        const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id, difficulty }));
+        expect(level.market, `${biome.id}/${difficulty}`).toBe('production');
+      }
+    }
+  });
+
+  it('campaign levels leave the market unset (legacy)', async () => {
+    const { getAllLevels, resolveMarketId } = await import('../../../src/core/campaign/Level.js');
+    const { createGame } = await import('../../../src/core/state/GameState.js');
+    for (const level of getAllLevels()) expect(level.market, level.id).toBeUndefined();
+    const state = createGame({ seed: 42 });
+    expect(resolveMarketId(state)).toBe('legacy');
+  });
+
+  it('resolveMarketId reads the contract board market, defaulting to legacy', async () => {
+    const { resolveMarketId } = await import('../../../src/core/campaign/Level.js');
+    const { createGame } = await import('../../../src/core/state/GameState.js');
+    const state = createGame({ seed: 42 });
+    state.contracts.market = 'production';
+    expect(resolveMarketId(state)).toBe('production');
+    state.contracts.market = undefined;
+    expect(resolveMarketId(state)).toBe('legacy');
+  });
+});

@@ -11,6 +11,7 @@ import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
+import { oreValuePerKg } from '../../../src/core/economy/Market.js';
 import { ORE_DENSITY_KG_M3, BLAST_ESTIMATE_BREAK_RADIUS_M } from '../../../src/core/config/balance.js';
 
 function makeHole(id: string, x: number, z: number, depth = 8): DrillHole {
@@ -284,5 +285,32 @@ describe('estimateBlastOreValue — stale surveys (#1356)', () => {
     const onlyFresh = estimateBlastOreValue(plan, [freshElsewhere]);
     expect(onlyFresh).toBeGreaterThan(0);
     expect(estimateBlastOreValue(plan, [staleHere, freshElsewhere])).toBeCloseTo(onlyFresh, 6);
+  });
+});
+
+
+describe('estimateBlastOreValue market (#1681)', () => {
+  const plan = makePlan([makeHole('H1', 20, 20, 8)]);
+  const survey = makeUniformSurvey(0, 40, { dirtite: 0.2, blingite: 0.1 });
+
+  it('an undefined market equals the legacy market', () => {
+    expect(estimateBlastOreValue(plan, [survey])).toBe(estimateBlastOreValue(plan, [survey], 'legacy'));
+  });
+
+  it('production values each ore at its production price', () => {
+    const legacy = estimateBlastOreValue(plan, [survey], 'legacy');
+    const production = estimateBlastOreValue(plan, [survey], 'production');
+    expect(production).toBeGreaterThan(0);
+    expect(production).toBeLessThan(legacy);
+    // Ore-by-ore: a single-ore survey scales by exactly the price ratio.
+    for (const ore of ['dirtite', 'blingite']) {
+      const one = makeUniformSurvey(0, 40, { [ore]: 0.2 });
+      const ratio = estimateBlastOreValue(plan, [one], 'production') / estimateBlastOreValue(plan, [one], 'legacy');
+      expect(ratio).toBeCloseTo(oreValuePerKg(ore, 'production') / oreValuePerKg(ore, 'legacy'), 9);
+    }
+  });
+
+  it('still returns 0 for an unsurveyed plan in production', () => {
+    expect(estimateBlastOreValue(plan, [], 'production')).toBe(0);
   });
 });
