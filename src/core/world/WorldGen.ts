@@ -20,7 +20,7 @@ import {
   type Spline,
 } from './HeightSpline.js';
 import { smoothstep } from '../math/Smoothstep.js';
-import { DEFAULT_PIT_MASK, type PitMaskShape } from '../config/balance.js';
+import { DEFAULT_PIT_MASK, OUTLINE_WOBBLE_WAVELENGTH_A, OUTLINE_WOBBLE_WAVELENGTH_B, OUTLINE_WOBBLE_WAVE_A_DIR, OUTLINE_WOBBLE_WAVE_B_DIR, type PitMaskShape } from '../config/balance.js';
 
 export interface HeightShapingParams {
   baseSpline: Spline;
@@ -94,8 +94,9 @@ function distanceInsideRect(rect: Rect, x: number, z: number): number {
 }
 
 /**
- * Signed distance inward from rect's outline, with rounded corners and a
- * wobbled edge; negative outside.
+ * Euclidean distance (m) from the flat core — the rect inset by `margin`, corners
+ * rounded to `cornerRadius` — shrunk by `wobble`; 0 inside the core and keeps
+ * growing beyond the rect.
  */
 export function pitDistance(
   rect: Rect,
@@ -105,16 +106,20 @@ export function pitDistance(
   cornerRadius: number,
   wobble: number,
 ): number {
-  // TODO: implement
-  void rect; void margin; void x; void z; void cornerRadius; void wobble;
-  return 0;
+  const hx = (rect.maxX - rect.minX) / 2 - margin;
+  const hz = (rect.maxZ - rect.minZ) / 2 - margin;
+  const r = Math.max(0, Math.min(cornerRadius, hx, hz));
+  const qx = Math.abs(x - (rect.minX + rect.maxX) / 2) - (hx - r);
+  const qz = Math.abs(z - (rect.minZ + rect.maxZ) / 2) - (hz - r);
+  const dist = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) - r;
+  return Math.max(0, dist - wobble);
 }
 
-/** Deterministic outline offset in [-amplitude, amplitude] metres at (x, z). */
+/** Deterministic outline offset in [0, 2 * amplitude] metres at (x, z): only grows the flat region. */
 export function outlineWobbleAt(x: number, z: number, amplitude: number): number {
-  // TODO: implement
-  void x; void z; void amplitude;
-  return 0;
+  const a = (OUTLINE_WOBBLE_WAVE_A_DIR[0] * x + OUTLINE_WOBBLE_WAVE_A_DIR[1] * z) * 2 * Math.PI / OUTLINE_WOBBLE_WAVELENGTH_A;
+  const b = (OUTLINE_WOBBLE_WAVE_B_DIR[0] * x + OUTLINE_WOBBLE_WAVE_B_DIR[1] * z) * 2 * Math.PI / OUTLINE_WOBBLE_WAVELENGTH_B;
+  return amplitude * (1 + (Math.sin(a) + Math.sin(b)) / 2);
 }
 
 /**
@@ -122,6 +127,11 @@ export function outlineWobbleAt(x: number, z: number, amplitude: number): number
  * rect's edge, blending back to the untouched height outside it (negative
  * distanceInsideRect drives the smoothstep to 0 automatically — no separate
  * outside-the-rect branch needed).
+ *
+ * With mask.envelopeSlope set, a slope-limited envelope replaces the smoothstep:
+ * the terrain may deviate from the (reliefKeep-compressed) flat level by at most
+ * envelopeSlope * d metres, d being the distance from the flat core (#1734).
+ * Continuous, steepness-bounded, and natural height once inside the cone.
  */
 export function applyPitMask(
   height: number,
@@ -131,6 +141,14 @@ export function applyPitMask(
   z: number,
   mask: PitMaskShape = DEFAULT_PIT_MASK,
 ): number {
+  if (mask.envelopeSlope !== undefined) {
+    const wobble = outlineWobbleAt(x, z, mask.outlineWobble ?? 0);
+    const d = pitDistance(rect, mask.margin, x, z, mask.cornerRadius ?? 0, wobble);
+    const delta = height - centerHeight;
+    const inner = delta * mask.reliefKeep;
+    const e = mask.envelopeSlope * d;
+    return centerHeight + inner + Math.max(-e, Math.min(e, delta - inner));
+  }
   const dIn = distanceInsideRect(rect, x, z);
   const w = smoothstep(0, mask.margin, dIn);
   const compressed = centerHeight + (height - centerHeight) * mask.reliefKeep;

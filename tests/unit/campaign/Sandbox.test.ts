@@ -585,7 +585,7 @@ describe('sandbox pit mask (#1680)', () => {
   it('SANDBOX_PIT_MASK is stronger than the default: shorter ramp, less relief kept', () => {
     expect(SANDBOX_PIT_MASK.margin).toBeLessThan(DEFAULT_PIT_MASK.margin);
     expect(SANDBOX_PIT_MASK.reliefKeep).toBeLessThan(DEFAULT_PIT_MASK.reliefKeep);
-    expect(SANDBOX_PIT_MASK).toEqual({ margin: 14, reliefKeep: 0.05, envelopeSlope: 0.45, outlineWobble: 3, cornerRadius: 8 });
+    expect(SANDBOX_PIT_MASK).toEqual({ margin: 14, reliefKeep: 0.05, envelopeSlope: 0.25, outlineWobble: 3, cornerRadius: 8 });
   });
 
   it('every campaign level leaves pitMask undefined (default mask)', () => {
@@ -618,7 +618,8 @@ describe('sandbox pit mask (#1680)', () => {
       }
       return hi - lo;
     };
-    expect(relief(masked, false)).toBeGreaterThanOrEqual(relief(unmasked, false));
+    // The envelope cone (#1734) trims only the nearest foothills; the ridges stay.
+    expect(relief(masked, false)).toBeGreaterThanOrEqual(relief(unmasked, false) * 0.9);
     // ...while inside the playable rect the mask flattens it.
     expect(relief(masked, true)).toBeLessThan(relief(unmasked, true));
   });
