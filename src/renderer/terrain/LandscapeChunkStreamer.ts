@@ -42,6 +42,12 @@ function footprintContaining(footprints: readonly ChunkFootprint[], x: number, z
   return null;
 }
 
+/** True when the two footprints' squares share any area — touching edges do not count. */
+function footprintsOverlap(a: ChunkFootprint, b: ChunkFootprint): boolean {
+  return a.originX < b.originX + b.span && b.originX < a.originX + a.span
+    && a.originZ < b.originZ + b.span && b.originZ < a.originZ + a.span;
+}
+
 /** Streams landscape chunk residency against the camera, and invalidates cached chunks a terrain edit has made stale. */
 export interface LandscapeChunkStreamer {
   update(dt: number, cameraX: number, cameraZ: number, handle: LandscapeHandle, palette: CompositionPalette, cut: PlayableCut): void;
@@ -97,6 +103,13 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
   let lastCameraZ = 0;
   /** Desired set the last stream() converged on; null when the next stream() must scan for work. */
   let convergedSignature: string | null = null;
+  /**
+   * Built chunks currently drawn. A chunk built while the ground it replaces
+   * is still drawn is held hidden, and the swap happens in one call once every
+   * replacement is built (`swapReplaced`) — so the drawn set always tiles
+   * the ground with no hole and no overlap, whatever the per-frame budget.
+   */
+  const shown = new Set<string>();
 
   /**
    * `footprint`'s four sides' neighbour step, read geometrically against
@@ -131,6 +144,48 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     built.set(chunkKey(id), { id, steps });
   };
 
+  const show = (id: LandscapeChunkId): void => {
+    mesh.setChunkVisible(id, true);
+    shown.add(chunkKey(id));
+  };
+
+  const disposeResident = (id: LandscapeChunkId): void => {
+    mesh.disposeChunk(id);
+    built.delete(chunkKey(id));
+    shown.delete(chunkKey(id));
+  };
+
+  /**
+   * Retire every resident chunk that fell out of the desired set, without
+   * ever uncovering ground. An undesired chunk still drawn goes only once
+   * every desired chunk over its footprint is built, and those are shown in
+   * the same call; an undesired chunk never drawn just goes. Then any built,
+   * hidden desired chunk with no drawn undesired chunk under it is shown.
+   *
+   * Ladder chunks nest — any two either nest or are disjoint — and the
+   * desired set tiles the whole extent, so the desired chunks over a retired
+   * footprint cover it exactly and overlap nothing else still drawn.
+   */
+  const swapReplaced = (desiredFootprints: readonly ChunkFootprint[], desiredKeys: ReadonlySet<string>, centerX: number, centerZ: number): void => {
+    const undesired = footprintsOf(
+      Array.from(built.values(), r => r.id).filter(id => !desiredKeys.has(chunkKey(id))), centerX, centerZ,
+    );
+    const stillDrawn: ChunkFootprint[] = [];
+    for (const old of undesired) {
+      if (!shown.has(chunkKey(old.id))) { disposeResident(old.id); continue; }
+      const replacements = desiredFootprints.filter(f => footprintsOverlap(f, old));
+      if (!replacements.every(f => built.has(chunkKey(f.id)))) { stillDrawn.push(old); continue; }
+      disposeResident(old.id);
+      for (const f of replacements) show(f.id);
+    }
+    for (const f of desiredFootprints) {
+      const key = chunkKey(f.id);
+      if (shown.has(key) || !built.has(key)) continue;
+      if (stillDrawn.some(old => footprintsOverlap(old, f))) mesh.setChunkVisible(f.id, false);
+      else show(f.id);
+    }
+  };
+
   /** Resident, still-desired chunks whose recorded steps differ from what the desired set now implies. */
   const staleChunks = (desiredFootprints: readonly ChunkFootprint[]): ChunkFootprint[] =>
     desiredFootprints.filter(f => {
@@ -139,11 +194,12 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     });
 
   /**
-   * Bring residency in line with (cameraX, cameraZ): dispose what is no
-   * longer wanted, then build at most `maxBuilds` of what is missing or
-   * stale, nearest-first. Updates `pending` to what is still owed afterwards
-   * and returns how many chunks were built. Shared by the per-frame
-   * `update()` (budgeted) and `flush()` (unbounded).
+   * Bring residency in line with (cameraX, cameraZ): build at most
+   * `maxBuilds` of what is missing or stale, nearest-first, then retire what
+   * is no longer wanted as far as the new builds cover it (`swapReplaced`).
+   * Updates `pending` to what is still owed afterwards and returns how many
+   * chunks were built. Shared by the per-frame `update()` (budgeted) and
+   * `flush()` (unbounded).
    */
   const stream = (
     cameraX: number, cameraZ: number,
@@ -153,13 +209,8 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     const desiredIds = selectLandscapeChunks(cameraX, cameraZ, handle.map.centerX, handle.map.centerZ, handle.map.extentHalf);
     const desiredKeys = new Set(desiredIds.map(chunkKey));
 
-    // Dispose every resident chunk no longer desired — cheap, unbudgeted, every call.
-    for (const [key, { id }] of built) {
-      if (desiredKeys.has(key)) continue;
-      mesh.disposeChunk(id);
-      built.delete(key);
-    }
-
+    // A converged set has every desired chunk built, so swapReplaced already
+    // retired everything undesired — nothing to do until the set changes.
     const signature = Array.from(desiredKeys).sort().join('|');
     if (signature === convergedSignature) return 0;
 
@@ -179,6 +230,7 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
       const f = work[i]!;
       buildRecorded(f.id, neighbourStepsFor(f, footprints), handle, palette, cut);
     }
+    swapReplaced(footprints, desiredKeys, handle.map.centerX, handle.map.centerZ);
     pending = work.length - spent;
     convergedSignature = pending === 0 ? signature : null;
     return spent;
@@ -225,6 +277,7 @@ export function createLandscapeChunkStreamer(mesh: LandscapeMesh): LandscapeChun
     reset() {
       mesh.dispose();
       built.clear();
+      shown.clear();
       lastHandle = null;
       lastPalette = null;
       lastCut = null;

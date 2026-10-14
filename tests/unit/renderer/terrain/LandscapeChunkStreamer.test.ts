@@ -941,3 +941,80 @@ describe('createLandscapeChunkStreamer — seam consistency under residency chan
     mesh.dispose();
   });
 });
+
+// ── No hole on screen while residency changes ──────────────────────────────
+//
+// A camera move quarters a coarse chunk into four finer ones (or merges four
+// back into one). Builds are budgeted per frame, so the replacements arrive
+// over several frames; disposing the old chunk the frame it fell out of the
+// desired set left its footprint empty until they did — terrain blinking out
+// for a frame or two while the camera moves. Whatever is drawn after any
+// single update() must tile the whole extent: no hole, no overlap.
+
+/** World-space x/z rectangle of every drawn chunk mesh in `scene`. */
+function drawnFootprints(scene: THREE.Scene): Array<{ minX: number; maxX: number; minZ: number; maxZ: number }> {
+  return scene.children
+    .filter((o): o is THREE.Mesh => o instanceof THREE.Mesh && o.visible)
+    .map(m => {
+      m.geometry.computeBoundingBox();
+      const b = m.geometry.boundingBox!;
+      return { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z };
+    });
+}
+
+describe('createLandscapeChunkStreamer — no hole while the camera moves', () => {
+  it('every frame of a camera sweep draws ground over the whole extent, with no chunk drawn over another', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, EXTENT);
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+    const roots = selectLandscapeChunks(1e6, 1e6, 0, 0, EXTENT);
+    const extentArea = roots.length * chunkSpanAt(LADDER_STEPS.length - 1) ** 2;
+
+    streamer.update(0, 0, 0, handle, palette, FAR_CUT);
+    streamer.flush();
+
+    let framesWithWork = 0;
+    for (let i = 1; i <= 60; i++) {
+      const camera = [i * 7, i * 3] as const;
+      streamer.update(0, camera[0], camera[1], handle, palette, FAR_CUT);
+      if (streamer.pendingChunkCount() > 0) framesWithWork++;
+      const drawn = drawnFootprints(scene);
+      for (let a = 0; a < drawn.length; a++) {
+        for (let b = a + 1; b < drawn.length; b++) {
+          const p = drawn[a]!, q = drawn[b]!;
+          const overlap = Math.max(0, Math.min(p.maxX, q.maxX) - Math.max(p.minX, q.minX))
+            * Math.max(0, Math.min(p.maxZ, q.maxZ) - Math.max(p.minZ, q.minZ));
+          expect(overlap, `frame ${i}: two drawn chunks overlap`).toBe(0);
+        }
+      }
+      const area = drawn.reduce((s, r) => s + (r.maxX - r.minX) * (r.maxZ - r.minZ), 0);
+      expect(area, `frame ${i} at camera (${camera[0]}, ${camera[1]}): drawn ground area`).toBe(extentArea);
+    }
+    expect(framesWithWork, 'premise: the sweep makes the budget spread builds across frames').toBeGreaterThan(0);
+
+    mesh.dispose();
+  });
+
+  it('a chunk built while the one it replaces is still drawn stays hidden from picking until the swap', () => {
+    const { palette, compId } = makePalette();
+    const handle = makeHandle(compId, EXTENT);
+    const scene = makeScene();
+    const mesh = new LandscapeMesh(scene, makeMaterial());
+    const streamer = createLandscapeChunkStreamer(mesh);
+
+    streamer.update(0, 0, 0, handle, palette, FAR_CUT);
+    streamer.flush();
+    streamer.update(0, 300, 200, handle, palette, FAR_CUT);
+    expect(streamer.pendingChunkCount(), 'premise: the move left builds owed').toBeGreaterThan(0);
+
+    expect(mesh.meshCount, 'premise: a replacement is built and waiting').toBeGreaterThan(drawnFootprints(scene).length);
+    for (const m of mesh.meshes) expect(m.visible).toBe(true);
+    expect(mesh.meshes.length).toBe(drawnFootprints(scene).length);
+    streamer.flush();
+    expect(mesh.meshes.length).toBe(mesh.meshCount);
+
+    mesh.dispose();
+  });
+});
