@@ -279,3 +279,10 @@ function detailLine(id: string, text: string): HTMLElement {
   el.textContent = text;
   return el;
 }
+
+/** Player-facing ore depth window; open-ended windows read "from N m down". */
+export function oreDepthWindow(min: number, max: number): string {
+  // TODO: implement
+  void min; void max;
+  return '';
+}

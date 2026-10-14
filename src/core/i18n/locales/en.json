@@ -3426,6 +3426,8 @@
   "sandbox.detail.hardness": "Rock hardness: tier {min}-{max}",
   "sandbox.detail.hardness_single": "Rock hardness: tier {tier}",
   "sandbox.detail.ores": "Ores: {list} (depth {min}-{max} m)",
+  "sandbox.detail.depth_range": "depth {min}-{max} m",
+  "sandbox.detail.depth_open": "from {min} m down",
   "sandbox.detail.terrain": "Terrain: {terrain}",
   "sandbox.detail.cash": "Starting cash: ${cash}",
   "sandbox.detail.opens_with": "Opens with: crew: {crew}; vehicles: {vehicles}; buildings: {buildings}",
