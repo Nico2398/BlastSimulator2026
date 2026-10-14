@@ -224,6 +224,62 @@ describe('SurveyPanel', () => {
     expect(coordTexts[3]).toContain('(2, 2)');
   });
 
+  describe('depth-resolved result cards (#1683)', () => {
+    function cardAt(panel: SurveyPanel, coords: string): string {
+      const card = [...panel.root.querySelectorAll('.bsx-card')].find(c => c.textContent?.includes(coords));
+      expect(card).toBeDefined();
+      return card!.textContent!;
+    }
+
+    it('shows the depth range of each reported ore on a seismic card', () => {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult({
+        centerX: 21, centerZ: 21,
+        estimates: { '21,21': { sparkium: 0.6, grumpite: 0.3 } },
+        depthProfile: { '21,21': [
+          { fromM: 5, toM: 10, ores: { sparkium: 0.4 } },
+          { fromM: 10, toM: 15, ores: { sparkium: 0.6, grumpite: 0.3 } },
+        ] },
+      })] }));
+      const text = cardAt(panel, '(21, 21)');
+      expect(text).toContain('5-15 m'); // sparkium: first band start to last band end
+      expect(text).toContain('10-15 m'); // grumpite
+    });
+
+    it('aerial card says the ore is at the surface', () => {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult({ method: 'aerial', centerX: 22, centerZ: 22, estimates: { '22,22': { sparkium: 0.6 } } })] }));
+      const text = cardAt(panel, '(22, 22)');
+      expect(text).toContain('surface');
+      expect(text).not.toMatch(/\d+-\d+ m/);
+    });
+
+    it('core sample card shows the depth log heading and its bands', () => {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult({
+        method: 'core_sample', centerX: 23, centerZ: 23,
+        estimates: { '23,23': { sparkium: 0.5 } },
+        depthProfile: { '23,23': [
+          { fromM: 10, toM: 11, ores: { sparkium: 0.5 } },
+          { fromM: 11, toM: 12, ores: { sparkium: 0.5 } },
+        ] },
+      })] }));
+      const text = cardAt(panel, '(23, 23)');
+      expect(text).toContain('Depth log');
+      expect(text).toContain('10-11 m');
+      expect(text).toContain('11-12 m');
+    });
+
+    it('a legacy result with no depthProfile renders without a depth line', () => {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult({ method: 'core_sample', centerX: 25, centerZ: 25, estimates: { '25,25': { sparkium: 0.5 } } })] }));
+      const text = cardAt(panel, '(25, 25)');
+      expect(text).toContain('50%');
+      expect(text).not.toContain('Depth log');
+      expect(text).not.toMatch(/\d+-\d+ m/);
+    });
+  });
+
   it('refreshLocale() re-renders the title and method cards without throwing', () => {
     const { panel } = makePanel();
     panel.update(makeState());
