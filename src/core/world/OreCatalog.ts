@@ -42,7 +42,8 @@ const ORES: readonly OreType[] = [
     valuePerKg: 25,
     rarity: 'uncommon',
     color: '#FFD700',       // Gold
-    depthMin: 5, depthMax: 22,
+    // Depth windows are global; biome coverage comes from which rocks host an ore (#1677).
+    depthMin: 5, depthMax: 40,
   },
   {
     id: 'gloomium',

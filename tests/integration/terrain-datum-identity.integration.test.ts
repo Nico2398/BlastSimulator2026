@@ -82,7 +82,7 @@ const CASES: Case[] = [
       sizeX: 160, sizeZ: 160, datum: datumFromSizeY(64),
       seed: 3666, climateBias: [0.6, 0.7], mixedRockHardness: true,
     },
-    expectedHash: '064648ae9b121c581481bf579eccd851ad6bfca198e431318e7e999f1dddbec2',
+    expectedHash: 'edb4bf7d2bf2b3dbf2816c93ff8f28a16ae6563ea5fef1bf9d01861d01f91542',
   },
   {
     name: 'sandbox_default',
