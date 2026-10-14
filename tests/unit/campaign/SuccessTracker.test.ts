@@ -11,6 +11,10 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import type { Vec3 } from '../../../src/core/math/Vec3.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
 import { STAR_ECOLOGY_MIN } from '../../../src/core/config/balance.js';
+import { createMafiaState, arrangeAccident } from '../../../src/core/events/MafiaActions.js';
+import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
+import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { serializeLevelStats, deserializeLevelStats } from '../../../src/core/campaign/SuccessTracker.js';
 
 const zeroVec: Vec3 = { x: 0, y: 0, z: 0 };
@@ -257,5 +261,45 @@ describe('Success tracker (7.8)', () => {
     it('deserialize of an old save without finalEcology yields 0', () => {
       expect(deserializeLevelStats({ totalWealth: 5, bestEcology: 90 }).finalEcology).toBe(0);
     });
+  });
+});
+
+describe('Arranged mafia accident vs the safety star (#1700)', () => {
+  function levelAfter(arrange: boolean) {
+    const state = createGame({ seed: 1 });
+    state.employees = createEmployeeState();
+    const victim = hireEmployee(state.employees, 'driller', new Random(1), 5, 5).employee;
+    if (arrange) {
+      let done = false;
+      for (let seed = 0; seed < 200 && !done; seed++) {
+        done = arrangeAccident(createMafiaState(), state, createCorruptionState(), victim.id, new Random(seed)).success;
+      }
+      expect(done).toBe(true);
+    }
+    const stats = createLevelStats();
+    addIncome(state.finances, 100000, 'sales', 'test', 0);
+    state.scores.ecology = 70;
+    snapshotStats(stats, state);
+    return calculateStarRating(stats, 80000);
+  }
+
+  it('a level with one arranged accident reports one casualty and no safety star', () => {
+    const state = createGame({ seed: 1 });
+    state.employees = createEmployeeState();
+    const victim = hireEmployee(state.employees, 'driller', new Random(1), 5, 5).employee;
+    for (let seed = 0; seed < 200 && state.damage.deathCount === 0; seed++) {
+      arrangeAccident(createMafiaState(), state, createCorruptionState(), victim.id, new Random(seed));
+    }
+    const stats = createLevelStats();
+    snapshotStats(stats, state);
+    expect(stats.casualties).toBe(1);
+    const rating = levelAfter(true);
+    expect(rating.details.safetyPass).toBe(false);
+  });
+
+  it('the control level without an accident earns the safety star', () => {
+    const rating = levelAfter(false);
+    expect(rating.details.safetyPass).toBe(true);
+    expect(rating.stars).toBe(3);
   });
 });
