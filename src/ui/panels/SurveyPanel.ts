@@ -26,6 +26,8 @@ import {
 } from '../../core/config/balance.js';
 import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
 import { buildDepthLog } from './surveyDepthSection.js';
+import { resolveMarketId } from '../../core/campaign/Level.js';
+import type { MarketId } from '../../core/economy/Market.js';
 import { summarizeSurveyOres } from '../../core/mining/SurveyOreSummary.js';
 import { buildOreRows } from './surveyOreRows.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -201,7 +203,7 @@ export class SurveyPanel extends PanelBase {
     if (pending !== this.lastPendingCount || done !== this.lastResultCount) {
       this.lastPendingCount = pending;
       this.lastResultCount = done;
-      this.renderResults(state.surveyResults, state.tickCount);
+      this.renderResults(state.surveyResults, state.tickCount, resolveMarketId(state));
     }
   }
 
@@ -339,7 +341,7 @@ export class SurveyPanel extends PanelBase {
 
   // ── Results ──────────────────────────────────────────────────────────────
 
-  private renderResults(results: readonly SurveyResult[], currentTick: number): void {
+  private renderResults(results: readonly SurveyResult[], currentTick: number, marketId: MarketId): void {
     this.resultsEl.replaceChildren();
 
     if (results.length === 0) {
@@ -348,11 +350,11 @@ export class SurveyPanel extends PanelBase {
     }
 
     for (const survey of results.slice(-MAX_RESULTS_SHOWN).reverse()) {
-      this.resultsEl.appendChild(this.makeResultCard(survey, currentTick));
+      this.resultsEl.appendChild(this.makeResultCard(survey, currentTick, marketId));
     }
   }
 
-  private makeResultCard(survey: SurveyResult, currentTick: number): HTMLElement {
+  private makeResultCard(survey: SurveyResult, currentTick: number, marketId: MarketId): HTMLElement {
     const stale = isSurveyStale(survey);
     const age = currentTick - survey.completedTick;
 
@@ -376,7 +378,7 @@ export class SurveyPanel extends PanelBase {
 
     if (stale) rows.push(reasonLine(t('ui.survey.stale_warning'), true));
 
-    const ores = summarizeSurveyOres(survey).slice(0, MAX_ORES_SHOWN);
+    const ores = summarizeSurveyOres(survey, marketId).slice(0, MAX_ORES_SHOWN);
     if (ores.length === 0) {
       rows.push(el('span', { text: t('ui.survey.no_ore'), attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }));
     } else {

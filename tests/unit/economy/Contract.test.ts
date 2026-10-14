@@ -28,6 +28,7 @@ import {
   SUPPLY_COMMON_ORE_COUNT,
 } from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
+import { resolveMarket, oreContractBasePrice } from '../../../src/core/economy/Market.js';
 const ALL_ORES: readonly string[] = Object.keys(ORE_PRICES);
 
 /** A minimal offered contract — only the fields hasFillableOreSaleOffer reads carry meaning. */
@@ -852,5 +853,106 @@ describe('contractAcceptBlocker (#1372)', () => {
   it('never blocks other contract types', () => {
     expect(contractAcceptBlocker(offer({ type: 'supply' }), false)).toBeNull();
     expect(contractAcceptBlocker(offer({ type: 'supply' }), true)).toBeNull();
+  });
+});
+
+
+// ── Markets (#1681) ─────────────────────────────────────────────────────────
+
+/** Every offer from `refreshes` consecutive board refreshes. */
+function boardsOver(market: 'legacy' | 'production' | undefined, seed: number, refreshes: number, multiplier = 1): Contract[] {
+  const state = createContractState();
+  if (market !== undefined) state.market = market;
+  const rng = new Random(seed);
+  const seen: Contract[] = [];
+  for (let i = 0; i < refreshes; i++) {
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, multiplier, ALL_ORES);
+    seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH));
+  }
+  return seen;
+}
+
+describe('production market contracts (#1681)', () => {
+  const profile = resolveMarket('production');
+  const offers = boardsOver('production', 42, 40);
+
+  it('ore sales sit inside the profile quantity range, on the quantity step', () => {
+    const sales = offers.filter((c) => c.type === 'ore_sale');
+    expect(sales.length).toBeGreaterThan(10);
+    for (const c of sales) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(profile.oreSaleQtyKg.min);
+      expect(c.quantityKg).toBeLessThanOrEqual(profile.oreSaleQtyKg.max);
+      expect(c.quantityKg % profile.qtyStepKg).toBe(0);
+    }
+  });
+
+  it('ore sale prices are the production base times a factor inside the profile range', () => {
+    for (const c of offers.filter((o) => o.type === 'ore_sale')) {
+      const base = oreContractBasePrice(c.materialId, 'production');
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(base * profile.oreSalePriceFactor.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(base * profile.oreSalePriceFactor.max + 1e-9);
+    }
+  });
+
+  it('supply contracts use the supply range and the cheapest ores', () => {
+    const supply = offers.filter((c) => c.type === 'supply');
+    expect(supply.length).toBeGreaterThan(0);
+    const cheapest = [...ALL_ORES]
+      .sort((a, b) => oreContractBasePrice(a, 'production') - oreContractBasePrice(b, 'production'))
+      .slice(0, SUPPLY_COMMON_ORE_COUNT);
+    for (const c of supply) {
+      expect(cheapest).toContain(c.materialId);
+      expect(c.quantityKg).toBeGreaterThanOrEqual(profile.supplyQtyKg.min);
+      expect(c.quantityKg).toBeLessThanOrEqual(profile.supplyQtyKg.max);
+      const base = oreContractBasePrice(c.materialId, 'production');
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(base * profile.supplyPriceFactor.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(base * profile.supplyPriceFactor.max + 1e-9);
+    }
+  });
+
+  it('rubble disposal offers are large and priced inside the profile range', () => {
+    const rubble = offers.filter((c) => c.type === 'rubble_disposal');
+    expect(rubble.length).toBeGreaterThan(5);
+    for (const c of rubble) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(profile.rubbleQtyKg.min);
+      expect(c.quantityKg).toBeLessThanOrEqual(profile.rubbleQtyKg.max);
+      expect(c.quantityKg % profile.qtyStepKg).toBe(0);
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(profile.rubblePricePerKg.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(profile.rubblePricePerKg.max + 1e-9);
+    }
+    expect(Math.max(...rubble.map((c) => c.quantityKg))).toBeGreaterThan(500);
+  });
+
+  it('the level price multiplier still scales production prices', () => {
+    const base = boardsOver('production', 7, 6, 1);
+    const doubled = boardsOver('production', 7, 6, 2);
+    expect(doubled.length).toBe(base.length);
+    base.forEach((c, i) => expect(doubled[i]!.pricePerKg).toBeCloseTo(c.pricePerKg * 2, 9));
+  });
+
+  it('production boards are not the legacy boards for the same seed', () => {
+    expect(boardsOver('production', 42, 6)).not.toEqual(boardsOver(undefined, 42, 6));
+  });
+});
+
+describe('legacy market contracts are unchanged (#1681)', () => {
+  it('an unset market and an explicit legacy market produce identical boards', () => {
+    expect(boardsOver('legacy', 42, 10)).toEqual(boardsOver(undefined, 42, 10));
+  });
+
+  it('keeps every offer at 50-500 kg on a 10 kg step', () => {
+    for (const c of boardsOver(undefined, 42, 30)) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(50);
+      expect(c.quantityKg).toBeLessThanOrEqual(500);
+      expect(c.quantityKg % 10).toBe(0);
+    }
+  });
+
+  it('keeps ore sale prices within 0.8-1.3x of ORE_PRICES', () => {
+    for (const c of boardsOver(undefined, 42, 30).filter((o) => o.type === 'ore_sale')) {
+      const base = ORE_PRICES[c.materialId as keyof typeof ORE_PRICES];
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(base * 0.8 - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(base * 1.3 + 1e-9);
+    }
   });
 });

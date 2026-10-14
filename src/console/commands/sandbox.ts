@@ -99,6 +99,7 @@ export function sandboxCommand(
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 
+  if (level.market) ctx.state.contracts.market = level.market;
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
   generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state));
 

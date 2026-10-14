@@ -7,6 +7,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { BlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { wetHoleIdsFor } from '../../core/mining/WetHoles.js';
+import { resolveMarketId } from '../../core/campaign/Level.js';
 
 export class OreEstimateMemo {
   private key = '';
@@ -17,15 +18,17 @@ export class OreEstimateMemo {
   get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): number {
     if (!grid) return 0;
     const wet = wetHoleIdsFor(state);
+    const marketId = resolveMarketId(state);
     const key = JSON.stringify([
       plan.holes, plan.charges, [...wet].sort(),
       state.surveyResults.map(s => [s.id, s.stale === true, s.completedTick]),
+      marketId,
       grid.editRevision,
     ]);
     if (grid === this.grid && key === this.key) return this.value;
     this.grid = grid;
     this.key = key;
-    this.value = estimateBlastOreValue(plan, state.surveyResults, grid, wet);
+    this.value = estimateBlastOreValue(plan, state.surveyResults, grid, wet, marketId);
     return this.value;
   }
 }

@@ -21,6 +21,8 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { getOre } from '../../core/world/OreCatalog.js';
+import { oreValuePerKg } from '../../core/economy/Market.js';
+import { resolveMarketId } from '../../core/campaign/Level.js';
 import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
@@ -262,6 +264,7 @@ export class OperationsPanel extends PanelBase {
   private makeOreRows(state: GameState): HTMLElement[] {
     const entries = Object.entries(state.collectedOre).filter(([, kg]) => kg > 0.5);
     if (entries.length === 0) return [emptyState(t('ui.operations.no_ore'))];
+    const marketId = resolveMarketId(state);
     return entries.map(([oreId, kg]) => {
       const ore = getOre(oreId);
       const row = el('div');
@@ -272,7 +275,7 @@ export class OperationsPanel extends PanelBase {
         dot,
         el('span', { text: ore ? t(ore.nameKey) : oreId, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', { text: `${Math.round(kg).toLocaleString('en-US')} kg`, attrs: { style: 'margin-left:auto;font:500 11px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)' } }),
-        el('span', { text: `$${formatMoney(kg * (ore?.valuePerKg ?? 0))}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-positive);width:64px;text-align:right' } }),
+        el('span', { text: `$${formatMoney(ore ? kg * oreValuePerKg(oreId, marketId) : 0)}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-positive);width:64px;text-align:right' } }),
       );
       return row;
     });

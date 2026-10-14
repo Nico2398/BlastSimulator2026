@@ -19,7 +19,7 @@ import type { BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 const estimate = vi.mocked(estimateBlastOreValue);
 
 function stateWith(surveys: Array<{ id: number; completedTick: number; stale?: boolean }>): GameState {
-  return { surveyResults: surveys } as unknown as GameState;
+  return { surveyResults: surveys, contracts: {} } as unknown as GameState;
 }
 
 function planWith(holeX: number): BlastPlan {

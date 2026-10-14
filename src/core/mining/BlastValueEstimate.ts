@@ -4,6 +4,7 @@
 // player already knows (survey estimates), never from ground-truth ore data.
 // The grid supplies rock geometry only (what breaks), never ore content.
 
+import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
 import { freshSurveys } from './SurveyStaleness.js';
@@ -19,13 +20,13 @@ export function oreValuePerM3(density: number, valuePerKg: number): number {
   return density * ORE_DENSITY_KG_M3 * valuePerKg;
 }
 
-/** Estimated ore value ($ per m³) of rock at the given densities; unknown ore ids and non-positive densities are ignored. */
-export function columnOreValuePerM3(densities: Readonly<Record<string, number>>): number {
+/** Estimated ore value ($ per m³) of rock at the given densities, priced in `marketId` (#1681); unknown ore ids and non-positive densities are ignored. */
+export function columnOreValuePerM3(densities: Readonly<Record<string, number>>, marketId: MarketId): number {
   let value = 0;
   for (const [oreId, density] of Object.entries(densities)) {
     if (!(density > 0)) continue;
     const ore = getOre(oreId);
-    if (ore) value += oreValuePerM3(density, ore.valuePerKg);
+    if (ore) value += oreValuePerM3(density, oreValuePerKg(oreId, marketId));
   }
   return value;
 }
@@ -39,13 +40,14 @@ export function columnOreValuePerM3(densities: Readonly<Record<string, number>>)
  * fresh survey covering its column, read at the voxel's own depth
  * (`oresSurveyedAt`): ore a survey did not locate at that depth counts for
  * nothing, so an aerial reading values its top 2 m only. Value =
- * density x ORE_DENSITY_KG_M3 x valuePerKg x survey confidence.
+ * density x ORE_DENSITY_KG_M3 x oreValuePerKg(ore, marketId) x survey confidence.
  */
 export function estimateBlastOreValue(
   plan: BlastPlan,
   surveyResults: readonly SurveyResult[],
   grid: VoxelGrid,
   wetHoleIds: ReadonlySet<string> = new Set(),
+  marketId: MarketId = 'legacy',
 ): number {
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return 0;
@@ -56,7 +58,7 @@ export function estimateBlastOreValue(
     const survey = findSurveyForColumn(surveys, x, z);
     if (!survey) continue;
     const densities = oresSurveyedAt(survey, x, z, y);
-    if (densities) value += columnOreValuePerM3(densities) * survey.confidence;
+    if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
   }
   return value;
 }
