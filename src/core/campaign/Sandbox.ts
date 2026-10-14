@@ -105,7 +105,7 @@ const SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER = 1;
 const SANDBOX_FIXED_CONTRACT_PRICE_MULTIPLIER = 1;
 const SANDBOX_FIXED_MIXED_ROCK_HARDNESS = false;
 /** Sandbox ore forms localized deposits separated by barren ground (#1682). */
-export const SANDBOX_FIXED_ORE_DEPOSITS = true;
+const SANDBOX_FIXED_ORE_DEPOSITS = true;
 // Inert LevelDef filler: the sandbox has no activeLevelId, so no profit goal is ever evaluated
 // against it — sandbox is endless free play (#1321).
 const SANDBOX_FIXED_UNLOCK_THRESHOLD = 100000;
