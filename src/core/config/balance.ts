@@ -152,6 +152,9 @@ export const SCORE_DECAY_RATE = 0.05;
 export const DEFAULT_GRID_SIZE = 64;
 /** Fixed sandbox generation datum (voxel Y the site centre's surface lands on). Sandbox no longer exposes depth as a player control (#504). */
 export const SANDBOX_DATUM = 17;
+/** Sandbox biome ruggedness bands on pvAmplitude: flat below ROLLING, rolling below STEEP, else steep (#1686). */
+export const SANDBOX_RUGGEDNESS_ROLLING_PV = 20;
+export const SANDBOX_RUGGEDNESS_STEEP_PV = 40;
 
 /**
  * Largest number of intermediate chunks `PlayableArea.claimArea` will bridge

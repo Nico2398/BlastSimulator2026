@@ -166,3 +166,38 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     difficultyTier: 0,
   };
 }
+
+export type SandboxRuggedness = 'flat' | 'rolling' | 'steep';
+
+/** Player-facing traits of a biome, shown in the sandbox picker (#1686). */
+export interface SandboxBiomeTraits {
+  descKey: string;
+  /** Hardness tier range over the biome's dominant rocks. */
+  hardnessTierMin: number;
+  hardnessTierMax: number;
+  /** Ores the biome's dominant rocks can yield. */
+  ores: readonly { oreId: string; nameKey: string; depthMin: number; depthMax: number }[];
+  oreDepthMin: number;
+  oreDepthMax: number;
+  ruggedness: SandboxRuggedness;
+  pvAmplitude: number;
+}
+
+/** Traits for a biome id; an unknown id resolves to the default biome. */
+export function sandboxBiomeTraits(_biomeId: string): SandboxBiomeTraits {
+  throw new Error('not implemented');
+}
+
+/** What a difficulty hands the player at the start (#1686). */
+export interface SandboxDifficultyDetails {
+  id: SandboxDifficultyId;
+  labelKey: string;
+  startingCash: number;
+  crew: readonly { role: string; count: number }[];
+  vehicles: readonly { role: string; tier: number; count: number }[];
+  buildings: readonly { type: string; tier: number; count: number }[];
+}
+
+export function sandboxDifficultyDetails(_id: SandboxDifficultyId): SandboxDifficultyDetails {
+  throw new Error('not implemented');
+}
