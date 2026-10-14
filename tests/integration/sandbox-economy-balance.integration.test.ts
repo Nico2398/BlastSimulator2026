@@ -26,7 +26,7 @@ import {
   SANDBOX_REFERENCE_SHOT_CYCLE_TICKS,
   TICKS_PER_DAY,
 } from '../../src/core/config/balance.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 const DESERT = 'desert_badlands';
 const ABSORB_DAYS = 5;
@@ -147,9 +147,9 @@ describe('sandbox economy: the market absorbs a shot', () => {
     expect(totalOreKg).toBeGreaterThan(100_000);
   });
 
-  // The shot's 340 t is ground truth, but the opening kit hauls only a few tonnes of it (no ramp, no
-  // fragmenter: balance.ts PRODUCTION_ORE_SALE_QTY_KG), so the board is sized to what a kit can fill and
-  // the relationship asserted is against the legacy board, which could not absorb even that.
+  // The shot's 340 t is ground truth, but the opening kit hauls ~30 kg of ore a tick into a 25 t warehouse
+  // (balance.ts PRODUCTION_ORE_SALE_QTY_KG), so offers are sized to what it can fill; the relationship
+  // asserted is against the legacy board, which could not absorb even that.
   it('offers for the shot\'s own ores, over 5 game days, are at least 3x what the legacy board offers', () => {
     const forShot = (b: ReturnType<typeof offersOver>) => sum(b.filter(c => c.type === 'ore_sale' && oreKg[c.materialId] !== undefined).map(c => c.quantityKg));
     const production = sum(boards.map(forShot));
@@ -227,51 +227,64 @@ describe('sandbox economy: reference shot vs crew cost', () => {
 describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   const HORIZON = 2000;
   const MIDPOINT = 1000;
+  // Seed 42's ore deposit sits near (40,33) (#1682): the first shot opens it, a ramp from the west
+  // joins the crater floor to the haul network (#1719) and the bunkhouse keeps the crew's morale up.
+  const FIRST_SHOT = '36,30';
+  const SECOND_SHOT = '16,22';
+  const RAMP = 'start:12,34 end:34,34 depth:6';
+  const BUNKHOUSE = 'living_quarters at:6,14 tier:1';
+  /** Contracts filled before the player can afford a second blaster. */
+  const CONTRACTS_BEFORE_HIRE = 3;
 
-  it('Normal, opening kit only, fires a blast and fills an ore contract before the 2000-tick horizon', () => {
+  it('Normal, opening kit only, fires two blasts and grows cash from tick 1000 to tick 2000', () => {
     const { run, ctx } = startSandbox(DESERT, 42, 'normal');
     run('time resume');
     const state = ctx.state!;
-    const rig = state.vehicles.vehicles.find(v => v.type === 'drill_rig');
-    expect(rig, 'the level opens with a drill rig').toBeDefined();
 
     const commands: string[] = [];
     const logged: Run = (c) => { commands.push(c); return run(c); };
 
     const startTick = state.tickCount;
-    const startCash = state.cash;
     let cashAtMid: number | null = null;
     const elapsed = () => state.tickCount - startTick;
     const over = () => state.levelEnded || elapsed() >= HORIZON;
-    const markMid = () => { if (cashAtMid === null && elapsed() >= MIDPOINT) cashAtMid = state.cash; };
+    const play = () => { playContracts(logged, state); playTick(logged, state); if (cashAtMid === null && elapsed() >= MIDPOINT) cashAtMid = state.cash; };
+    const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) play(); };
+    const filled = () => state.contracts.completedHistory.filter(c => c.completed).length;
 
-    // Sites around the rig, nearest first; a plan that does not fit is skipped.
-    const sites: Array<[number, number]> = [];
-    for (let dx = 10; dx <= 26; dx += 8) for (let dz = -26; dz <= 26; dz += 10) sites.push([Math.round(rig!.x) + dx, Math.round(rig!.z) + dz]);
+    // Shot 1: 3x3, drilled, charged and fired by the opening crew.
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${FIRST_SHOT}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:6 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+    // The crater floor joins the haul network; the crew sleeps in a bunkhouse (without one the morale spiral ends in a revolt).
+    expect(logged(`build_ramp ${RAMP}`).success).toBe(true);
+    expect(logged(`build ${BUNKHOUSE}`).success).toBe(true);
 
-    for (const [x, z] of sites) {
-      if (over()) break;
-      if (!logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
-      tickUntil(logged, state, 800, () => over() || state.plannedDrillHoles.length === 0);
+    // Sell what the haul brings. Once income is proven, a second blaster takes the charge orders
+    // while the first stays on the debris hauler, and the second shot is fired.
+    // TODO(#1742): the only blaster holds the debris hauler for good, so charge orders starve; hire a
+    // second one, and drop the hire once charge orders outrank hauling.
+    playUntil(HORIZON, () => filled() >= CONTRACTS_BEFORE_HIRE);
+    if (!over()) {
+      expect(logged('employee hire role:blaster').success).toBe(true);
+      expect(logged(`drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:${SECOND_SHOT}`).success).toBe(true);
+      playUntil(800, () => state.plannedDrillHoles.length === 0);
       logged('charge hole:* explosive:krackle amount:6 stemming:2');
-      tickUntil(logged, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
-      logged('sequence auto');
+      playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
       clearBlastZone(logged, state);
-      if (!logged('blast').success) continue;
-      // Haul and sell until the stock is cleared or a cycle's worth of time has passed.
-      for (let i = 0; i < 150 && !over(); i++) { playContracts(logged, state); playTick(logged, state); markMid(); }
+      logged('blast');
     }
-    // Keep selling what is left until the horizon.
-    while (!over()) { playContracts(logged, state); playTick(logged, state); markMid(); }
+    // Keep selling until the horizon.
+    playUntil(HORIZON, () => false);
 
-    expect(state.levelEndReason, `ended ${String(state.levelEndReason)}`).not.toBe('bankruptcy');
-    expect(state.damage.blastCount).toBeGreaterThanOrEqual(1);
+    expect(state.levelEnded, `ended ${String(state.levelEndReason)}`).toBe(false);
+    expect(state.damage.blastCount).toBeGreaterThanOrEqual(2);
     expect(state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed), 'an ore contract was filled').toBe(true);
-    // TODO(#1719): the opening kit hauls only a few tonnes of a shot's ore (debris out of reach, no
-    // fragmenter), so the crew's upkeep outruns income and the run ends in a revolt after one blast.
-    // Restore the issue's line once #1719 lands: >= 2 blasts, cash above start and above the
-    // tick-1000 value, and no level end.
-    void startCash; void cashAtMid;
+    expect(cashAtMid, 'the run reached the midpoint').not.toBeNull();
+    expect(state.cash, `cash at tick 1000 ${cashAtMid} vs tick ${HORIZON} ${state.cash}`).toBeGreaterThan(cashAtMid!);
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 });

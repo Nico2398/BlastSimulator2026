@@ -62,8 +62,11 @@ describe('production market', () => {
     expect(Math.max(...prices)).toBeGreaterThan(Math.min(...prices));
   });
 
-  it('is far cheaper than the legacy catalog for every ore', () => {
-    for (const id of ORE_IDS) expect(oreValuePerKg(id, 'production')).toBeLessThan(oreValuePerKg(id, 'legacy'));
+  it('flattens the legacy catalog: the common ore pays more, the rarest far less', () => {
+    const first = ORE_IDS[0]!;
+    const last = ORE_IDS[ORE_IDS.length - 1]!;
+    expect(oreValuePerKg(first, 'production')).toBeGreaterThan(oreValuePerKg(first, 'legacy'));
+    expect(oreValuePerKg(last, 'production')).toBeLessThan(oreValuePerKg(last, 'legacy'));
   });
 
   it('an unknown ore falls back to the cheapest ore (dirtite) price', () => {

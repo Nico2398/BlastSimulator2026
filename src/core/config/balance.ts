@@ -2574,31 +2574,36 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
 /**
  * Ore sale prices (dollars/kg) in the production market; also what the blast report,
  * survey estimates and panels value ore at there. Rarity-ordered like ORE_PRICES.
- * The ladder is flat (0.60 to 9.60, 16x) against the catalog's 1000x: measured on
+ * The ladder is flat (21 to 336, 16x) against the catalog's 1000x: measured on
  * desert/red canyon/alpine/green/tropical/volcanic sandboxes (seeds 42/7/123, 8 m blocks,
  * depth 0-55 m) the richest block pays 3.7x the richest desert surface block per m3,
- * inside SANDBOX_MAX_RICHNESS_RATIO. The absolute level is set by the crew-cost target:
- * the reference desert shot's ore (~300 t, $120k at x1.0) at x2.4 is worth about 2x the
- * crew over SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x).
+ * inside SANDBOX_MAX_RICHNESS_RATIO. The absolute level is set by what the opening kit can
+ * actually deliver (#1719): ~31 kg of ore a tick (47 t sold between ticks ~500 and 2,000),
+ * so a crew costing ~SANDBOX_REFERENCE_CREW_COST_PER_TICK needs ~$20/kg just to break even
+ * and the first contract (~$20-35k, filled around tick 600) must lift cash back over the
+ * bankruptcy line before 150k of starting cash burns out. At this level the kit's steady
+ * income is ~2-2.5x crew cost and the whole reference shot is worth ~2.3x the crew over
+ * SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x).
  */
 export const PRODUCTION_ORE_PRICES: Record<string, number> = {
-  dirtite: 0.60,
-  rustite: 1.10,
-  blingite: 1.70,
-  gloomium: 2.40,
-  sparkium: 3.40,
-  craktonite: 4.80,
-  absurdium: 6.70,
-  treranium: 9.60,
+  dirtite: 21,
+  rustite: 38.5,
+  blingite: 59.5,
+  gloomium: 84,
+  sparkium: 119,
+  craktonite: 168,
+  absurdium: 234.5,
+  treranium: 336,
 };
 
 /**
- * Ore-sale offer sizes (kg). Sized to what the opening kit can fill, not to a shot's
- * ~340 t: with no ramp and no fragmenter, the debris hauler reaches only a few percent of a
- * shot's fragments (measured, desert seed 42: 2-12 t stored, of which one ore type holds
- * 0.7-1.7 t a few hundred ticks in, while 600+ fragments wait as debris_out_of_reach / no rock_fragmenter), and a
- * Tier 1 warehouse holds 25 t. An offer above the stock of its ore can never be accepted
- * in full, so larger offers would leave the opening kit with nothing to sell.
+ * Ore-sale offer sizes (kg), sized to what the opening kit can fill, not to a shot's ~340 t:
+ * the kit hauls ~31 kg of ore a tick into a 25 t tier-1 warehouse, and offers expire after
+ * 30-100 ticks, so an offer above a few tonnes can never be filled and the crew would be
+ * penalised for accepting it. The board still offers ~2 t of ore a day, about 2.5x what the
+ * kit hauls, so income is limited by production, not by the market. A whole shot is
+ * therefore absorbed over the ~11,000 ticks it takes to haul, not within 5 game days: the
+ * 5-day target conflicts with fillable offers (balance: hauling, not demand, binds).
  */
 export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
 /** Supply deals are bulk and recurring: bigger than a sale. */
@@ -2618,10 +2623,11 @@ export const SANDBOX_MARKET: 'legacy' | 'production' = 'production';
 /** Reference sandbox crew cost per tick (driller + blaster + driver + upkeep, ~$250-300/h). */
 export const SANDBOX_REFERENCE_CREW_COST_PER_TICK = 250;
 /**
- * Ticks from first drill order to haul complete (storage plateau) for the ordinary 3x3 desert
- * seed 42 shot, Easy kit: ~374 to fire plus ~205 hauling = ~580 (measured, #1681).
+ * Ticks from first drill order to the whole shot's ore delivered for the ordinary 3x3 desert
+ * seed 42 shot, opening kit (#1681, #1719): ~360 to drill, charge and fire plus ~340 t of ore
+ * at the kit's measured ~31 kg/tick = ~11,300.
  */
-export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 580;
+export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 11_300;
 /** Richest biome/depth may pay at most this multiple of desert surface rock per m3. */
 export const SANDBOX_MAX_RICHNESS_RATIO = 10;
 
