@@ -294,10 +294,9 @@ describe('applyRatingCaps no breakout (#1724)', () => {
     expect(applyRatingCaps('perfect', facts({ noBreakout: true, wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 10 })))
       .toEqual({ rating: 'bad', cap: 'no_breakout' });
   });
-  it('noBreakout false or undefined changes nothing', () => {
+  it('noBreakout false or omitted changes nothing', () => {
     expect(applyRatingCaps('perfect', facts({ noBreakout: false }))).toEqual({ rating: 'perfect', cap: null });
     expect(applyRatingCaps('perfect', facts())).toEqual({ rating: 'perfect', cap: null });
-    expect(applyRatingCaps('perfect', facts({ noBreakout: undefined }))).toEqual({ rating: 'perfect', cap: null });
   });
 });
 

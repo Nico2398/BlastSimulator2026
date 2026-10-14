@@ -205,7 +205,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     chargedHoleCount: wetHoles.chargedCount,
     oversizedFragments: result.oversizedFragments,
     fragmentCount: result.fragmentCount,
-    noBreakout: result.clearedVoxels > 0 && !result.brokeOut,
+    noBreakout: result.clearedVoxels > 0 && result.brokeOut === false,
   });
   return {
     tick,

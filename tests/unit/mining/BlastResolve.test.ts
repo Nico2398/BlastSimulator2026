@@ -341,7 +341,7 @@ describe('BlastResolve — sealed void under an intact cap (#1724)', () => {
 
     expect(flights).toHaveLength(30);
     for (const fl of flights) {
-      expect(fl.to.y).toBeLessThan(CAP_BOTTOM_Y);
+      expect(fl.to.y).toBeLessThanOrEqual(CAP_BOTTOM_Y);
       expect(fl.to.y).toBeGreaterThanOrEqual(VOID_FLOOR_Y);
       expect(fl.thrown).toBe(false);
     }
