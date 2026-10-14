@@ -63,8 +63,8 @@ describe('retargetRampLayers (#1719)', () => {
     expect(targetOf(s, 1)).toEqual({ x: 12, z: 10 });
   });
 
-  it('never moves a non-queued (claimed) lead layer', () => {
-    const s = make([action(1, { status: 'claimed' } as Partial<PendingAction>)], [ramp(1, [1])]);
+  it('never moves a non-queued (assigned) lead layer', () => {
+    const s = make([action(1, { status: 'assigned' })], [ramp(1, [1])]);
     expect(retargetRampLayers(s, (_a, x) => x >= 13)).toBe(0);
     expect(targetOf(s, 1)).toEqual({ x: 12, z: 10 });
   });
