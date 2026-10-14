@@ -6,6 +6,7 @@ import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
+import type { ActionType } from '../state/GameState.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -1063,6 +1064,14 @@ export const EVACUATION_DRIVER_MAX_PATH_ATTEMPTS = 5;
 // entire default site, so a very distant ore fragment still loses to a truly
 // nearby plain one rather than winning unconditionally regardless of distance.
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
+
+/** Rank tier per action type: lower tier wins before cost is compared. Unlisted types are tier 0. */
+export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = {};
+
+/** Rank tier of an action type (see ACTION_RANK_TIER). */
+export function actionRankTier(_type: ActionType): number {
+  return 0; // TODO: implement
+}
 
 /**
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any

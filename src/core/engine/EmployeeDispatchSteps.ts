@@ -360,6 +360,7 @@ export function claimOnePoolCandidate(
   employee: Employee,
   excludeOnFootActions = false,
   deferVehicleGatedToIdleAlternative = false,
+  _minExclusiveTier = -Infinity,
 ): SelectedAction | null {
   // Built once per pass: the pool holds one action per on-ground fragment
   // after a blast, and a per-action scan over the fragments made this filter
