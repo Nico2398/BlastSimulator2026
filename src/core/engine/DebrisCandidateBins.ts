@@ -73,7 +73,9 @@ export function thinDebrisCandidates(
   isDebris: (action: PendingAction) => boolean,
   carriesOre: (action: PendingAction) => boolean,
   allowed: (action: PendingAction) => boolean,
+  reachable: (action: PendingAction) => boolean = () => true, // TODO: implement (#1722)
 ): PendingAction[] {
+  void reachable; // TODO: implement (#1722) — stub, parameter not yet consulted
   let debris = 0;
   for (const action of candidates) if (isDebris(action)) debris++;
   if (debris <= DEBRIS_SELECTION_BINNING_MIN) return candidates.filter(allowed);
