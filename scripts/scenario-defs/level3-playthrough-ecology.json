@@ -1085,7 +1085,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (ECOLOGY_DUST_PER_TONNE_PER_TICK, capped by ECOLOGY_DUST_MAX_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged."
+        "note": "#1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (fresh rubble costs ECOLOGY_DUST_PER_TONNE_PER_TICK, settled rubble the lower ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged."
       },
       "commandOutcome": "either"
     },

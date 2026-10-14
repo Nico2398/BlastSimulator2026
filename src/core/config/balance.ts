@@ -145,17 +145,25 @@ export const BRIBERY_COSTS = {
 
 /** Score decay rate per tick (0–100 scale). All scores trend toward 50 without input. */
 export const SCORE_DECAY_RATE = 0.05;
-/** Ecology loss per tonne of loose rock on the ground, per tick. */
-export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.005;
 /**
- * Cap on ecology loss from dust in a single tick. Set to two spoil heaps' gain (2 x 0.2):
- * a real blast leaves thousands of tonnes lying for hundreds of ticks, so an uncapped or
- * higher loss makes any mine that blasts at scale unwinnable (#1691).
+ * Ecology loss per tonne of FRESH loose rock (the pulse a blast just threw onto the ground), per
+ * tick. Fresh dust decays with `ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS`. Measured against ordinary play:
+ * one spoil heap (+0.2/tick), a ~2,344 t pile left lying and a blast about every 600 ticks. At
+ * 0.00015 the pulse costs ~0.35/tick at its peak, so ecology dips to the low 60s and recovers
+ * before the next blast, rather than falling off a cliff (#1733).
  */
-export const ECOLOGY_DUST_MAX_PER_TICK = 0.4;
-/** Ecology loss per tonne of settled loose rock, per tick (#1733 settling dust model). */
+export const ECOLOGY_DUST_PER_TONNE_PER_TICK = 0.00015;
+/**
+ * Ecology loss per tonne of SETTLED loose rock (lying past the fresh pulse), per tick. 0.000004
+ * puts the same 2,344 t pile at ~0.0094/tick, well under one heap's +0.2, so one heap carries
+ * ordinary play while rubble left lying and never hauled still bleeds ecology slowly (#1733).
+ */
 export const ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK = 0.000004;
-/** Ticks for fresh dust to halve as it settles (#1733 settling dust model). */
+/**
+ * Ticks for fresh dust to halve as it settles. 150 ticks keeps a blast's pulse mostly spent inside
+ * the 600-tick blast cycle measured for one heap and 2,344 t, while a pulse every 100 ticks (3
+ * heaps, no hauling) keeps the fresh term stacked and still reaches 0 within 3000 ticks (#1733).
+ */
 export const ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS = 150;
 
 // ─── World / Sandbox ────────────────────────────────────────────────────────────
