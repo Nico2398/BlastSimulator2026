@@ -14,7 +14,7 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -170,6 +170,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     // Tier 0 keeps it off the campaign world map, which lists tier > 0 only.
     difficultyTier: 0,
     pitMask: SANDBOX_PIT_MASK,
+    market: SANDBOX_MARKET,
   };
 }
 

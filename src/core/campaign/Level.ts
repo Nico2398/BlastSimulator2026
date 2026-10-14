@@ -76,9 +76,8 @@ export interface LevelDef {
 }
 
 /** Market of the active level; 'legacy' by default (#1681). */
-export function resolveMarketId(_state: GameState): MarketId {
-  // TODO: implement
-  return 'legacy';
+export function resolveMarketId(state: GameState): MarketId {
+  return state.contracts.market ?? 'legacy';
 }
 
 // ── Level catalog ──

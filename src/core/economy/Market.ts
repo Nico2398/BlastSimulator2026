@@ -1,4 +1,27 @@
-// BlastSimulator2026 — Market profiles (#1681). Stubs only.
+// BlastSimulator2026 — Market profiles (#1681).
+//
+// A market decides how big the contract board's offers are, what they pay, and
+// what one kg of each ore is worth everywhere a value is shown (blast report,
+// survey estimates, contracts). 'legacy' is the pre-#1681 board every campaign
+// level still runs on; 'production' is the sandbox's, scaled to a crew's costs.
+
+import {
+  ORE_PRICES,
+  PRODUCTION_ORE_PRICES,
+  RUBBLE_DISPOSAL_PRICE_RANGE,
+  LEGACY_OFFER_QTY_KG,
+  LEGACY_OFFER_QTY_STEP_KG,
+  LEGACY_ORE_SALE_PRICE_FACTOR,
+  LEGACY_SUPPLY_PRICE_FACTOR,
+  PRODUCTION_ORE_SALE_QTY_KG,
+  PRODUCTION_SUPPLY_QTY_KG,
+  PRODUCTION_RUBBLE_QTY_KG,
+  PRODUCTION_OFFER_QTY_STEP_KG,
+  PRODUCTION_ORE_SALE_PRICE_FACTOR,
+  PRODUCTION_SUPPLY_PRICE_FACTOR,
+  PRODUCTION_RUBBLE_PRICE_PER_KG,
+} from '../config/balance.js';
+import { getOre } from '../world/OreCatalog.js';
 
 export type MarketId = 'legacy' | 'production';
 
@@ -7,7 +30,7 @@ export interface MarketRange {
   max: number;
 }
 
-export interface MarketProfile {
+interface MarketProfile {
   oreSaleQtyKg: MarketRange;
   supplyQtyKg: MarketRange;
   rubbleQtyKg: MarketRange;
@@ -17,21 +40,40 @@ export interface MarketProfile {
   rubblePricePerKg: MarketRange;
 }
 
-export const MARKETS: Record<MarketId, MarketProfile> = undefined as unknown as Record<MarketId, MarketProfile>;
+const MARKETS: Record<MarketId, MarketProfile> = {
+  legacy: {
+    oreSaleQtyKg: LEGACY_OFFER_QTY_KG,
+    supplyQtyKg: LEGACY_OFFER_QTY_KG,
+    rubbleQtyKg: LEGACY_OFFER_QTY_KG,
+    qtyStepKg: LEGACY_OFFER_QTY_STEP_KG,
+    oreSalePriceFactor: LEGACY_ORE_SALE_PRICE_FACTOR,
+    supplyPriceFactor: LEGACY_SUPPLY_PRICE_FACTOR,
+    rubblePricePerKg: RUBBLE_DISPOSAL_PRICE_RANGE,
+  },
+  production: {
+    oreSaleQtyKg: PRODUCTION_ORE_SALE_QTY_KG,
+    supplyQtyKg: PRODUCTION_SUPPLY_QTY_KG,
+    rubbleQtyKg: PRODUCTION_RUBBLE_QTY_KG,
+    qtyStepKg: PRODUCTION_OFFER_QTY_STEP_KG,
+    oreSalePriceFactor: PRODUCTION_ORE_SALE_PRICE_FACTOR,
+    supplyPriceFactor: PRODUCTION_SUPPLY_PRICE_FACTOR,
+    rubblePricePerKg: PRODUCTION_RUBBLE_PRICE_PER_KG,
+  },
+};
 
-export function resolveMarket(_id?: MarketId): MarketProfile {
-  // TODO: implement
-  return undefined as unknown as MarketProfile;
+/** Profile of a market; omitted = 'legacy'. */
+export function resolveMarket(id: MarketId = 'legacy'): MarketProfile {
+  return MARKETS[id];
 }
 
-/** Value (dollars/kg) of one kg of the ore in the given market. */
-export function oreValuePerKg(_oreId: string, _id?: MarketId): number {
-  // TODO: implement
-  return 0;
+/** Value (dollars/kg) of one kg of the ore in the given market. Unknown ores are worth 0 in legacy (no catalog entry), the cheapest ore's price in production. */
+export function oreValuePerKg(oreId: string, id: MarketId = 'legacy'): number {
+  if (id === 'production') return PRODUCTION_ORE_PRICES[oreId] ?? PRODUCTION_ORE_PRICES['dirtite']!;
+  return getOre(oreId)?.valuePerKg ?? 0;
 }
 
-/** Base contract price (dollars/kg) of the ore in the given market. */
-export function oreContractBasePrice(_oreId: string, _id?: MarketId): number {
-  // TODO: implement
-  return 0;
+/** Base contract price (dollars/kg) of the ore in the given market; legacy falls back to 10 for an unpriced ore. */
+export function oreContractBasePrice(oreId: string, id: MarketId = 'legacy'): number {
+  if (id === 'production') return oreValuePerKg(oreId, id);
+  return (ORE_PRICES as Record<string, number>)[oreId] ?? 10;
 }

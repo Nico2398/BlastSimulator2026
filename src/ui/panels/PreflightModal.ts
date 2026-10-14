@@ -19,6 +19,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
+import { resolveMarketId } from '../../core/campaign/Level.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
@@ -151,7 +152,7 @@ export class PreflightModal {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
-    const estValue = estimateBlastOreValue(plan, state.surveyResults);
+    const estValue = estimateBlastOreValue(plan, state.surveyResults, resolveMarketId(state));
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);

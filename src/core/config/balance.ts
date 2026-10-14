@@ -2482,12 +2482,62 @@ export const SANDBOX_FLAT_PAD_MAX_SPREAD = 2;
 /** Side length (voxels) of the flat pad. */
 export const SANDBOX_FLAT_PAD_SIZE = 9;
 
-// ── Production market (#1681) — placeholder values, set by implementation ──
+// ── Production market (#1681) ──
+//
+// The sandbox's market. Legacy offers (50-500 kg) absorb ~1 t of ore a day while
+// one ordinary shot yields ~340 t, so income ignored production. These constants
+// put a shot's ore on the scale of the crew that mined it.
 
-/** Ore sale prices (dollars/kg) in the production market. */
-export const PRODUCTION_ORE_PRICES: Record<string, number> = {};
+/** Pre-#1681 offer size (kg) and rounding step: what every campaign level still sees. */
+export const LEGACY_OFFER_QTY_KG = { min: 50, max: 500 } as const;
+export const LEGACY_OFFER_QTY_STEP_KG = 10;
+/** Pre-#1681 price factors on an ore's base price. */
+export const LEGACY_ORE_SALE_PRICE_FACTOR = { min: 0.8, max: 1.3 } as const;
+export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
+
+/**
+ * Ore sale prices (dollars/kg) in the production market; also what the blast report,
+ * survey estimates and panels value ore at there. Rarity-ordered like ORE_PRICES.
+ * The ladder is flat (0.60 to 9.60, 16x) against the catalog's 1000x: measured on
+ * desert/red canyon/alpine/green/tropical/volcanic sandboxes (seeds 42/7/123, 8 m blocks,
+ * depth 0-55 m) the richest block pays 3.7x the richest desert surface block per m3,
+ * inside SANDBOX_MAX_RICHNESS_RATIO. The absolute level is set by the crew-cost target:
+ * the reference desert shot's ore (~300 t, $120k at x1.0) at x2.4 is worth about 2x the
+ * crew over SANDBOX_REFERENCE_SHOT_CYCLE_TICKS (target 1.5-3x).
+ */
+export const PRODUCTION_ORE_PRICES: Record<string, number> = {
+  dirtite: 0.60,
+  rustite: 1.10,
+  blingite: 1.70,
+  gloomium: 2.40,
+  sparkium: 3.40,
+  craktonite: 4.80,
+  absurdium: 6.70,
+  treranium: 9.60,
+};
+
+/** Offer sizes (kg): about a day or two of one shot's ore per offer, so 3 offers per refresh absorb a shot (~340 t) in about 5 game days. */
+export const PRODUCTION_ORE_SALE_QTY_KG = { min: 30_000, max: 90_000 } as const;
+/** Supply deals are bulk and recurring: bigger than a sale. */
+export const PRODUCTION_SUPPLY_QTY_KG = { min: 60_000, max: 200_000 } as const;
+/** Rubble is ~1,500 t per shot; disposal offers take a meaningful share of it. */
+export const PRODUCTION_RUBBLE_QTY_KG = { min: 100_000, max: 300_000 } as const;
+/** Rounding step (kg) of production offer sizes. */
+export const PRODUCTION_OFFER_QTY_STEP_KG = 1_000;
+/** Ore sales pay close to base price; supply deals discount for volume. */
+export const PRODUCTION_ORE_SALE_PRICE_FACTOR = { min: 0.9, max: 1.1 } as const;
+export const PRODUCTION_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
+/** Rubble disposal pay (dollars/kg): cents, since the volume is huge. */
+export const PRODUCTION_RUBBLE_PRICE_PER_KG = { min: 0.01, max: 0.03 } as const;
+
 /** Market the sandbox uses. */
 export const SANDBOX_MARKET: 'legacy' | 'production' = 'production';
-export const SANDBOX_REFERENCE_CREW_COST_PER_TICK = 0;
-export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 0;
-export const SANDBOX_MAX_RICHNESS_RATIO = 0;
+/** Reference sandbox crew cost per tick (driller + blaster + driver + upkeep, ~$250-300/h). */
+export const SANDBOX_REFERENCE_CREW_COST_PER_TICK = 250;
+/**
+ * Ticks from first drill order to haul complete (storage plateau) for the ordinary 3x3 desert
+ * seed 42 shot, Easy kit: ~374 to fire plus ~205 hauling = ~580 (measured, #1681).
+ */
+export const SANDBOX_REFERENCE_SHOT_CYCLE_TICKS = 580;
+/** Richest biome/depth may pay at most this multiple of desert surface rock per m3. */
+export const SANDBOX_MAX_RICHNESS_RATIO = 10;

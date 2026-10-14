@@ -3,7 +3,7 @@
 // the sticky footer's EST. ORE VALUE needs a number derived only from what the
 // player already knows (survey estimates), never from ground-truth voxel data.
 
-import type { MarketId } from '../economy/Market.js';
+import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
 import { freshSurveys } from './SurveyStaleness.js';
@@ -52,14 +52,14 @@ function coveredColumns(
  * `BLAST_ESTIMATE_BREAK_RADIUS_M` of a hole is assumed to break to
  * `BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR` × the deepest covering hole's depth.
  * Each such column is valued from the most recent fresh (non-stale) survey covering it:
- * `volume × density × ORE_DENSITY_KG_M3 × ore.valuePerKg × confidence`
+ * `volume × density × ORE_DENSITY_KG_M3 × oreValuePerKg(oreId, market) × confidence`
  * (a low-confidence aerial pass counts for less than a core sample).
  * Columns with no covering survey, no ore, or an unknown ore id contribute 0.
  */
 export function estimateBlastOreValue(
   plan: BlastPlan,
   surveyResults: readonly SurveyResult[],
-  _marketId?: MarketId,
+  marketId?: MarketId,
 ): number {
   let value = 0;
   const surveys = freshSurveys(surveyResults);
@@ -77,7 +77,7 @@ export function estimateBlastOreValue(
       const ore = getOre(oreId);
       if (!ore) continue;
       const massKg = columnVolume * density * ORE_DENSITY_KG_M3;
-      value += massKg * ore.valuePerKg * survey.confidence;
+      value += massKg * oreValuePerKg(oreId, marketId) * survey.confidence;
     }
   }
 

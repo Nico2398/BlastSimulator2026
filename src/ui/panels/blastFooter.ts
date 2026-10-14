@@ -12,6 +12,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import { resolveMarketId } from '../../core/campaign/Level.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
@@ -88,7 +89,7 @@ export class BlastFooter {
     const fireOk = hasHoles && errors.length === 0;
 
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
-    const estValue = estimateBlastOreValue(plan, state.surveyResults);
+    const estValue = estimateBlastOreValue(plan, state.surveyResults, resolveMarketId(state));
     const margin = estValue - planCost;
 
     // Undrilled (ordered, not yet landed) holes are a PreflightModal warning
