@@ -58,7 +58,7 @@ describe('OreCatalog', () => {
     });
     const present = minByTier.filter((m): m is number => m !== undefined);
     for (let i = 1; i < present.length; i++) {
-      expect(present[i]).toBeGreaterThanOrEqual(present[i - 1]);
+      expect(present[i]).toBeGreaterThanOrEqual(present[i - 1]!);
     }
   });
 
@@ -77,7 +77,7 @@ describe('OreCatalog', () => {
     }
   });
 
-  for (const [from, to] of [[0, 8], [24, 32]] as const) {
+  for (const [from, to] of [[0, 8], [24, 32]] as [number, number][]) {
     for (const biome of getAllBiomes()) {
       it(`${biome.id}: the ores its dominant rocks host have depth windows that cover ${from}-${to} m`, () => {
         const windows = biome.dominantRocks

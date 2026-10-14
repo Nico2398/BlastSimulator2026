@@ -149,8 +149,10 @@ function sampleSite(biome: BiomeDef, seed: number): SiteOre {
         const ores = oreVeins.densitiesAt(x, y, z, depth, composition, generated.oreRichness);
         for (const [oreId, density] of Object.entries(ores)) {
           const kg = density * SAMPLE_VOLUME_M3 * ORE_DENSITY_KG_M3;
-          blockMass[Math.floor(depth / BLOCK)][blockIdx] += kg;
-          oreKgByDepth[depth][oreId] = (oreKgByDepth[depth][oreId] ?? 0) + kg;
+          const slabMass = blockMass[Math.floor(depth / BLOCK)]!;
+          slabMass[blockIdx] = (slabMass[blockIdx] ?? 0) + kg;
+          const byOre = oreKgByDepth[depth]!;
+          byOre[oreId] = (byOre[oreId] ?? 0) + kg;
         }
       }
     }
@@ -161,14 +163,14 @@ function sampleSite(biome: BiomeDef, seed: number): SiteOre {
 }
 
 function shareOfRichBlocks(site: SiteOre, slab: number): number {
-  const blocks = site.blockMass[slab];
+  const blocks = site.blockMass[slab]!;
   return blocks.filter(kg => kg >= MIN_BLOCK_ORE_KG).length / blocks.length;
 }
 
 function oreKgInSlab(site: SiteOre, slab: number): number {
   let total = 0;
   for (let d = slab * BLOCK; d < (slab + 1) * BLOCK; d++) {
-    for (const kg of Object.values(site.oreKgByDepth[d])) total += kg;
+    for (const kg of Object.values(site.oreKgByDepth[d] ?? {})) total += kg;
   }
   return total;
 }
@@ -204,10 +206,11 @@ describe('ore progression by depth, every biome (#1677)', () => {
             }
           });
           const means = ORE_RARITY_TIERS.filter(t => (mass.get(t) ?? 0) > 0).map(t => ({ tier: t, mean: depthMoment.get(t)! / mass.get(t)! }));
+          const meanAt = (i: number): number => means[i]!.mean;
           // Every biome must offer at least a common and one deeper tier to climb.
           expect(means.length).toBeGreaterThanOrEqual(2);
           for (let i = 1; i < means.length; i++) {
-            expect(means[i].mean, `${means[i].tier} vs ${means[i - 1].tier}`).toBeGreaterThan(means[i - 1].mean);
+            expect(meanAt(i), `${means[i]!.tier} vs ${means[i - 1]!.tier}`).toBeGreaterThan(meanAt(i - 1));
           }
         });
       }
@@ -239,11 +242,11 @@ describe('desert and red canyon shallow ore stays as it is (#1677)', () => {
         const site = sampleSite(biome, seed);
         const kg: Record<string, number> = {};
         for (let d = 0; d < SHALLOW_DEPTH; d++) {
-          for (const [oreId, v] of Object.entries(site.oreKgByDepth[d])) kg[oreId] = (kg[oreId] ?? 0) + v;
+          for (const [oreId, v] of Object.entries(site.oreKgByDepth[d] ?? {})) kg[oreId] = (kg[oreId] ?? 0) + v;
         }
         expect(Object.keys(kg).sort()).toEqual(['dirtite', 'rustite']);
-        expect(kg.dirtite).toBeCloseTo(PINNED_KG[biomeId][seed].dirtite, 0);
-        expect(kg.rustite).toBeCloseTo(PINNED_KG[biomeId][seed].rustite, 0);
+        expect(kg.dirtite).toBeCloseTo(PINNED_KG[biomeId]![seed]!.dirtite, 0);
+        expect(kg.rustite).toBeCloseTo(PINNED_KG[biomeId]![seed]!.rustite, 0);
       });
     }
   }
