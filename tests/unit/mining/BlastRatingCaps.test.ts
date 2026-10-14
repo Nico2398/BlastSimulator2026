@@ -166,7 +166,7 @@ describe('applyRatingCaps', () => {
   });
 
   it('wet holes reported before oversize when both lower the rating', () => {
-    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 4, oversizedFragments: 50, fragmentCount: 100 })))
+    expect(applyRatingCaps('perfect', facts({ wetHoleCount: 1, fizzledHoleCount: 1, chargedHoleCount: 5, oversizedFragments: 50, fragmentCount: 100 })))
       .toEqual({ rating: 'good', cap: 'wet_holes' });
   });
 });
