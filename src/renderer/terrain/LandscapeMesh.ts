@@ -703,11 +703,18 @@ export class LandscapeMesh {
   get meshCount(): number { return this.meshesByChunk.size; }
 
   /**
-   * Every resident chunk mesh, for raycasting past the site's claimed edge
+   * Every drawn chunk mesh, for raycasting past the site's claimed edge
    * (#558) — mirrors TerrainMesh.meshes so a caller can raycast both without
-   * knowing which one it hit.
+   * knowing which one it hit. A chunk built but held hidden until the one it
+   * replaces can go (`setChunkVisible`) is not on screen, so it is not here.
    */
-  get meshes(): THREE.Mesh[] { return Array.from(this.meshesByChunk.values()); }
+  get meshes(): THREE.Mesh[] { return Array.from(this.meshesByChunk.values()).filter(m => m.visible); }
+
+  /** Shows or hides chunk `id`'s mesh, if resident. */
+  setChunkVisible(id: LandscapeChunkId, visible: boolean): void {
+    const mesh = this.meshesByChunk.get(chunkKey(id));
+    if (mesh) mesh.visible = visible;
+  }
 
   /**
    * Builds (or rebuilds) chunk `id`'s mesh against its live neighbour steps
@@ -717,17 +724,20 @@ export class LandscapeMesh {
    *
    * `cut` defaults to the handle's own generation-time rect, for callers with
    * no live site to cut against (tests, and any level that never expands).
+   * A rebuild keeps the visibility the chunk had; a new chunk is drawn.
    */
   buildChunk(
     id: LandscapeChunkId, handle: LandscapeHandle, palette: CompositionPalette,
     neighbourSteps: NeighbourSteps, cut?: PlayableCut,
   ): void {
+    const visible = this.meshesByChunk.get(chunkKey(id))?.visible ?? true;
     this.disposeChunk(id);
     const chunk = handle.map.getChunk(id);
     const playable = cut ?? rectCut(handle.playableRect);
     const mesh = buildChunkMesh(chunk, neighbourSteps, palette, playable, handle.sampleColumn);
     if (!mesh) return;
     mesh.material = this.material;
+    mesh.visible = visible;
     this.scene.add(mesh);
     this.meshesByChunk.set(chunkKey(id), mesh);
   }

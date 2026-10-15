@@ -17,6 +17,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import {
   enrolInTraining,
   planTraining,
+  trainingRefusal,
   schoolFor,
   trainableSkills,
 } from '../../core/entities/EmployeeTraining.js';
@@ -272,7 +273,7 @@ export function employeeCommand(
       }
 
       const plan = planTraining(emp, skill, building.tier);
-      if (!plan) return { success: false, output: t('employees.train_already_qualified', { name: emp.name, skill }) };
+      if (!plan) return { success: false, output: refusalText(trainingRefusal(emp, skill, building.tier)) };
       if (state.cash < plan.fee) {
         return { success: false, output: t('employees.train_insufficient_funds', { fee: plan.fee }) };
       }
@@ -289,6 +290,7 @@ export function employeeCommand(
           buildingType: building.type,
           buildingId: building.id,
           skill,
+          level: plan.grantsLevel,
           ticks: plan.ticks,
           fee: plan.fee,
           raise: perHour(plan.salaryIncrease),

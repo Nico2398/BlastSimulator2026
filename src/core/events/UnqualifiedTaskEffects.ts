@@ -119,12 +119,12 @@ const trainEmployee: UnqualifiedEffectHandler = (ids, world, tick) => {
     .sort((a, b) => a.id - b.id);
   for (const emp of candidates) {
     const plan = planTraining(emp, skill, offer.building.tier);
-    if (!plan || state.cash < plan.fee) continue;
+    if (!plan || plan.kind !== 'unlock' || state.cash < plan.fee) continue;
     const result = enrolInTraining(state, emp.id, offer.building, skill, world.emitter);
     if (!result.success) continue;
     state.cash -= plan.fee;
     addExpense(state.finances, plan.fee, 'salaries', `Train ${emp.name}: ${skill}`, tick);
-    return outcome({ effects: [`${emp.name} sent to train ${skill}`], cashSettled: -plan.fee });
+    return outcome({ effects: [`${emp.name} sent to train ${skill} (level ${plan.grantsLevel})`], cashSettled: -plan.fee });
   }
   return alt();
 };

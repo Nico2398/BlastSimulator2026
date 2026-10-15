@@ -131,7 +131,7 @@ export class CrewPanel extends PanelBase {
     const rows = state.employees.employees
       .filter(e => e.alive)
       .map(e => {
-        const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
+        const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}${q.licenceLevel ?? ''}`).join(',');
         return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
           + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
