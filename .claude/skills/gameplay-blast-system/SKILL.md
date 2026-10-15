@@ -64,7 +64,10 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
   via `weakHoleSummary`, shows `data-warning="weak-explosive"` naming the hardest offending rock and
   "N of M holes". Advisory: Charge All stays enabled.
 - **Spread** goes to the 18 face-and-edge neighbours, weighted by 1/distance and biased toward
-  neighbours nearer a free face (`FREE_FACE_BIAS`), losing `transmissionLoss` (derived from rock
+  neighbours nearer a free face (`FREE_FACE_BIAS`, via `freeFaceWeight`). Air above always pulls; a side
+  or lower face pulls only within `FREE_FACE_LATERAL_RANGE_M` (4 m) of the rock, so an excavation beside
+  a pattern (an access ramp dug first) cannot drag energy off distant charges and leave pillars (#1793).
+  Spread loses `transmissionLoss` (derived from rock
   porosity) at each step. Air neither absorbs nor carries: a void shields what is behind it.
 - **Energy is conserved.** `seeded == Σ effective + dissipated`. Keep it that way.
 
