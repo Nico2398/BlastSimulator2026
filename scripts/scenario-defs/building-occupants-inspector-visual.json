@@ -1,0 +1,340 @@
+{
+  "name": "building-occupants-inspector-visual",
+  "description": "The building inspector shows who is inside (#1760). A player builds a Driving Center, trains an employee from the employee inspector, clicks the school to see the trainee row with its time left counting down, clicks the trainee's name to switch the inspector to that employee, then builds Living Quarters and clicks it while someone rests there to see a resident row.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 cash:300000 staffed:true",
+      "description": "Staffed opening (#551). Employee 4 is the driver, who holds no drill rig licence, so a Driving Center offers them a course.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 cash:300000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 300000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build driving_center at:14,5",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 14.5,
+          "z": 5.5,
+          "distance": 30
+        },
+        {
+          "type": "pickTile",
+          "x": 14,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Driving Center site completes; it becomes building 1.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Click employee 4 in the scene to open their inspector with the Train button for the Driving Center's course.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 4
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+      }
+    },
+    {
+      "command": "employee train 4 skill:driving.drill_rig building:1",
+      "description": "Train from the inspector itself; enrolment sends the employee walking to the school.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "description": "Wait for the walk-in to end and the course to start, rather than a fixed tick pad.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Click the Driving Center in the scene: its inspector lists the trainee as a name link with the skill, level and time left.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"] [data-group=\"trainees\"] [data-select-kind=\"employee\"][data-select-id=\"4\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"] [data-group=\"trainees\"] [data-select-kind=\"employee\"][data-select-id=\"4\"]"
+      }
+    },
+    {
+      "command": "tick 5",
+      "description": "Let the course run five ticks while the inspector stays open; the screenshot shows the trainee row's time left (no scenario action compares text, so the change is read from the image, and the training count proves the course is still running).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Click the trainee's name: the inspector switches to employee 4.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"] [data-select-kind=\"employee\"][data-select-id=\"4\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"]"
+      }
+    },
+    {
+      "command": "build living_quarters at:12,15",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 12.5,
+          "z": 15.5,
+          "distance": 30
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:600",
+      "description": "Living Quarters site completes; it becomes building 2.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "wait_until field:insideBuildingCount equals:2 max_ticks:2000",
+      "description": "Run the shift until a crew member rests in the Living Quarters, or a second occupant is inside; the default policy sends tired workers to rest.",
+      "timeout": 120,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "insideBuildingCount",
+          "equals": 2,
+          "maxTicks": 2000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "insideBuildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Click the Living Quarters while someone rests: a resident row with a name link appears.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"2\"] [data-select-kind=\"employee\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"building\"][data-id=\"2\"] [data-select-kind=\"employee\"]"
+      }
+    }
+  ]
+}

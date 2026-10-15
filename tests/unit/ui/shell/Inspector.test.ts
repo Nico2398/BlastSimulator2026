@@ -97,14 +97,16 @@ describe('Inspector', () => {
     const { employee: a } = hireEmployee(state.employees, 'driller', new Random(1));
     const { employee: b } = hireEmployee(state.employees, 'driller', new Random(2));
     building.occupantIds = [a.id, b.id];
+    a.trainingState = { buildingId: building.id, skill: 'driving.truck' as never, ticksRemaining: 9, fee: 500, grantsLevel: 1 as const };
+    b.trainingState = { buildingId: building.id, skill: 'driving.truck' as never, ticksRemaining: 9, fee: 500, grantsLevel: 1 as const };
 
     bar.show(entity('building', building.id), state);
 
     // driving_center tier 1 has a 4-person capacity (getBuildingPeopleCapacity).
+    // A school lists its occupants as trainee rows (#1760), not the plain "Inside:" line.
     expect(root.textContent).toContain('2/4');
     expect(root.textContent).toContain(a.name);
     expect(root.textContent).toContain(b.name);
-    expect(root.textContent).toContain('Inside:');
   });
 
   it('shows the occupancy count with no occupant listing for a people-holding building with zero occupants (#1205)', () => {
@@ -637,6 +639,7 @@ describe('Inspector — window frame (#1756)', () => {
     expect(root.textContent).toContain('0/4');
 
     building.occupantIds = [employee.id];
+    employee.trainingState = { buildingId: building.id, skill: 'driving.truck' as never, ticksRemaining: 9, fee: 500, grantsLevel: 1 as const };
     bar.update(state);
 
     expect(root.textContent).toContain('1/4');
@@ -679,6 +682,7 @@ describe('Inspector — window frame (#1756)', () => {
     const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; occupantIds: number[] } };
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
     building.occupantIds = [employee.id];
+    employee.trainingState = { buildingId: building.id, skill: 'driving.truck' as never, ticksRemaining: 9, fee: 500, grantsLevel: 1 as const };
     const onSelect = vi.fn();
     bar.setSelectHandler(onSelect);
     bar.show(entity('building', building.id), state);
