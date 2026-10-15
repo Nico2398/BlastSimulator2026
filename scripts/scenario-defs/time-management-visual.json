@@ -1,6 +1,6 @@
 {
   "name": "time-management-visual",
-  "description": "Visual verification of time management controls: speed buttons (1x, 2x, 4x, 8x), pause/resume toggle, current speed indicator in HUD, tick count display, and auto-pause behavior during events. Originally console-only despite its own description promising real button clicks (issue #479 follow-up) -- pause/resume and every speed change now go through the real HUD controls.",
+  "description": "Visual verification of time management controls: speed buttons (1x, 2x, 4x, 8x), pause as a fifth segment of the same radio group (#1751: lit while paused, a repeated pause click leaves the game paused, any speed click resumes at that speed), current speed indicator in HUD, tick count display, and auto-pause behavior during events. Pause and every speed change go through the real HUD controls.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:false",
@@ -35,7 +35,7 @@
     },
     {
       "command": "time pause",
-      "description": "The pause/resume control is a single toggle button (TopBar.ts) with no separate pause vs. resume element -- one click alternates it, matching togglePause()'s own `isPaused ? 'time resume' : 'time pause'` logic.",
+      "description": "Pause segment of the speed group: clicking it pauses and keeps the selected speed.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -45,7 +45,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "isPaused": true
+          "isPaused": true,
+          "timeScale": 1
         }
       }
     },
@@ -65,8 +66,25 @@
       }
     },
     {
-      "command": "time resume",
-      "description": "Same toggle button as the pause step above -- clicking it again alternates back.",
+      "command": "time speed 1 resume:true",
+      "description": "Resume is a click on a speed segment (1x), not a second pause click.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "isPaused": false,
+          "timeScale": 1
+        }
+      }
+    },
+    {
+      "command": "time pause",
+      "description": "Pause again after resuming.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -76,12 +94,31 @@
       "role": "player",
       "expect": {
         "equals": {
-          "isPaused": false
+          "isPaused": true,
+          "timeScale": 1
         }
       }
     },
     {
-      "command": "time speed 2",
+      "command": "time pause",
+      "description": "Repeated pause click: pause is a selection, not a toggle, so the game stays paused and the speed is kept.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top [data-action=\"pause-toggle\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "isPaused": true,
+          "timeScale": 1
+        }
+      }
+    },
+    {
+      "command": "time speed 2 resume:true",
+      "description": "Clicking 2x while paused resumes the game at 2x.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -91,6 +128,7 @@
       "role": "player",
       "expect": {
         "equals": {
+          "isPaused": false,
           "timeScale": 2
         }
       }

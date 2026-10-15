@@ -5,6 +5,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
+import { selectSpeed, setSpeed } from '../../core/engine/GameLoop.js';
 
 export function timeCommand(
   ctx: GameContext,
@@ -40,10 +41,12 @@ export function timeCommand(
 
     case 'speed': {
       const speed = parseInt(args[1] ?? named['speed'] ?? '', 10);
-      if (![1, 2, 4, 8].includes(speed)) {
+      const applied = named['resume'] === 'true'
+        ? selectSpeed(state, speed)
+        : setSpeed(state, speed);
+      if (!applied) {
         return { success: false, output: t('time.invalid_speed') };
       }
-      state.timeScale = speed;
       return { success: true, output: t('time.speed_set', { speed }) };
     }
 
