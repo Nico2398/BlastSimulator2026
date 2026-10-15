@@ -126,7 +126,7 @@ describe('Inspector', () => {
     bar.show(entity('building', building.id), state);
 
     expect(root.textContent).toContain(String(Math.round(building.hp)));
-    expect(root.textContent).not.toContain('/');
+    expect(root.textContent).not.toContain(t('inspector.occupancy'));
     expect(root.textContent).not.toContain('Inside:');
   });
 
@@ -735,9 +735,9 @@ describe('Inspector — window frame (#1756)', () => {
   it('shows a rebuild site as Rebuilding with upgrade, move and demolish disabled', () => {
     const { bar, root } = makeBar();
     const state = makeState();
-    state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2 } as never);
+    state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2, rebuild: true } as never);
     bar.show(entity('building', 77), state);
-    expect(root.textContent).toContain(t('inspector.rebuilding'));
+    expect(root.textContent).toContain(t('inspector.status.rebuilding_waiting', { tier: 2 }));
     for (const a of ['upgrade', 'move', 'demolish']) {
       expect(root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!.disabled, a).toBe(true);
     }

@@ -4073,5 +4073,6 @@
   "inspector.reason.single_tier": "This building has a single tier",
   "inspector.reason.demolition_ordered": "A demolition is already ordered",
   "inspector.reason.under_construction": "Still being built",
+  "inspector.tip.upgrade": "Orders the next tier: the building is demolished and rebuilt by a builder",
   "ui.build.demolish_confirm_loses_ore": "Stored ore ({kg} kg) is lost."
 }

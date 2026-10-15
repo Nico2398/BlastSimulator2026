@@ -81,7 +81,7 @@ function standingActions(state: GameState, rules: BuildingActionRules): ActionSp
     const reason = reasonText(upgrade.reasonKey, upgrade.cost ?? 0, state.cash, upgrade.reasonParams);
     actions.push(upgrade.cost === null
       ? { action: 'upgrade', labelKey: 'inspector.action.upgrade', icon: 'up', variant: 'ghost', disabled: true, ...(reason ? { title: reason } : {}) }
-      : withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason));
+      : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
   }
   actions.push(
     withCost('move', 'inspector.action.move', 'drive', move.cost, reasonText(move.disabledReasonKey, move.cost, state.cash)),
@@ -168,7 +168,7 @@ export const buildingContent: KindContent = {
       sub: `#${b.id} · ${kindLabel('building')} · ${t('inspector.tier', { tier: b.tier })}`,
       icon: 'build',
       status: text,
-      signature: `${b.type}:${b.tier}:${capacity}:${b.occupantIds.join(',')}:${occupants.map(o => o.name).join('|')}`,
+      signature: `${b.type}:${b.tier}:${status.kind}:${capacity}:${b.occupantIds.join(',')}:${occupants.map(o => o.name).join('|')}`,
       get sections() {
         const rows: HTMLElement[] = [
           liveRow(t('inspector.status'), 'status', text),

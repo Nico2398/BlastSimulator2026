@@ -60,11 +60,11 @@ describe('buildingActionRules — upgrade', () => {
   });
 
   it('shows live progress once research is queued', () => {
-    const b = makeBuilding();
+    const b = makeBuilding({ tier: 2 });
     const s = stateWith(b);
-    const def = getResearchTaskDef('management_office', 2);
+    const def = getResearchTaskDef('management_office', 3);
     s.buildings.researchQueue.push({
-      targetType: 'management_office', targetTier: 2, ticksRemaining: Math.floor(def.ticks / 2), cost: def.cost, conditions: [],
+      targetType: 'management_office', targetTier: 3, ticksRemaining: Math.floor(def.ticks / 2), cost: def.cost, conditions: [],
     });
     const q = buildingActionRules(s, b).research!.queued!;
     expect(q.remaining).toBe(Math.floor(def.ticks / 2));

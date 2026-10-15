@@ -4073,5 +4073,6 @@
   "inspector.reason.single_tier": "Ce bâtiment n'a qu'un seul niveau",
   "inspector.reason.demolition_ordered": "Une démolition est déjà ordonnée",
   "inspector.reason.under_construction": "Encore en chantier",
+  "inspector.tip.upgrade": "Commande le niveau suivant : le bâtiment est démoli puis reconstruit par un ouvrier",
   "ui.build.demolish_confirm_loses_ore": "Le minerai stocké ({kg} kg) est perdu."
 }
