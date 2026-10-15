@@ -92,10 +92,11 @@ export function researchCommand(
         // Preconditions were re-checked above; a failure here means state
         // changed between the checks and the commit (should not happen in
         // single-threaded console mode), but relay it defensively.
+        const failCode = result.code ?? 'no_research_center';
         return {
           success: false,
-          code: result.code ?? 'no_research_center',
-          output: t('research.queue_failed', { code: result.code ?? 'unknown error' }),
+          code: failCode,
+          output: t('research.queue_failed', { code: failCode }),
         };
       }
 
@@ -103,10 +104,10 @@ export function researchCommand(
       state.cash -= cost;
       addExpense(state.finances, cost, 'construction', `Research ${type} T${tier}`, state.tickCount);
 
-      const durationSuffix = def.ticks > 0 ? `${def.ticks} ticks, $${cost}` : `$${cost}`;
+      const queuedKey = def.ticks > 0 ? 'research.queue_queued' : 'research.queue_queued_instant';
       return {
         success: true,
-        output: t('research.queue_queued', { type: buildingTypeName(type), tier, details: durationSuffix }),
+        output: t(queuedKey, { type: buildingTypeName(type), tier, ticks: def.ticks, cost }),
       };
     }
     case 'status': {
@@ -121,6 +122,6 @@ export function researchCommand(
       return { success: true, output: lines.join('\n') };
     }
     default:
-      return { success: false, output: 'Usage: research (queue type:<BuildingType> tier:2|3 | status)' };
+      return { success: false, output: t('research.usage') };
   }
 }

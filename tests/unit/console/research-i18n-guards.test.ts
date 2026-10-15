@@ -114,3 +114,62 @@ describe('research queue refusals — translated, display-named (#1808)', () => 
     });
   }
 });
+
+describe('research queue usage, funds and success messages — translated (#1808)', () => {
+  for (const locale of ['en', 'fr'] as const) {
+    it(`queue_usage (${locale}) prints t(research.queue_usage)`, () => {
+      const ctx = makeCtx();
+      setLocale(locale);
+      const result = researchCommand(ctx, ['queue'], {});
+      expect(result.success).toBe(false);
+      expect(result.code).toBe('usage');
+      expect(result.output).toBe(t('research.queue_usage'));
+    });
+
+    it(`queue_insufficient_funds (${locale}) prints t() with the cost`, () => {
+      const ctx = makeCtx();
+      placeResearchCenter(ctx);
+      ctx.state!.cash = 0;
+      setLocale(locale);
+      const result = researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '2' });
+      expect(result.success).toBe(false);
+      expect(result.code).toBe('insufficient_funds');
+      expect(result.output).toMatch(/\d/);
+      expect(result.output).not.toBe('research.queue_insufficient_funds');
+      expect(result.output.startsWith(t('research.queue_insufficient_funds', { cost: 0 }).split('0')[0])).toBe(true);
+    });
+
+    it(`queue_queued (${locale}) prints t() with name, tier, ticks and cost`, () => {
+      const ctx = makeCtx();
+      placeResearchCenter(ctx);
+      setLocale(locale);
+      const cashBefore = ctx.state!.cash;
+      const result = researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '2' });
+      expect(result.success).toBe(true);
+      const task = ctx.state!.buildings.researchQueue[0];
+      const cost = cashBefore - ctx.state!.cash;
+      const key = task.ticksRemaining > 0 ? 'research.queue_queued' : 'research.queue_queued_instant';
+      expect(result.output).toBe(
+        t(key, { type: t('building.geology_lab.name'), tier: 2, ticks: task.ticksRemaining, cost }),
+      );
+      expect(result.output).not.toContain('{');
+    });
+  }
+
+  it('queue_usage and queued outputs differ between en and fr', () => {
+    const enCtx = makeCtx();
+    const en = researchCommand(enCtx, ['queue'], {}).output;
+    setLocale('fr');
+    const fr = researchCommand(makeCtx(), ['queue'], {}).output;
+    expect(fr).not.toBe(en);
+  });
+
+  it('default usage line is translated and differs per locale', () => {
+    const en = researchCommand(makeCtx(), ['bogus'], {}).output;
+    expect(en).toBe(t('research.usage'));
+    setLocale('fr');
+    const fr = researchCommand(makeCtx(), ['bogus'], {}).output;
+    expect(fr).toBe(t('research.usage'));
+    expect(fr).not.toBe(en);
+  });
+});
