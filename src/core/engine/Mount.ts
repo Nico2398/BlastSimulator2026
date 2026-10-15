@@ -435,9 +435,11 @@ function staleVehicleOrder(emp: Employee, live: ReadonlySet<number>): boolean {
  *   `pendingDriverVehicleId` names it) lose the whole order and stuck state
  *   in place, idle for dispatch the same tick. They never boarded, so no
  *   alighted event and they are not in the return value. An evacuation walk
- *   holds no activeActionId (Evacuation.ts), so nothing blocks dispatch. An action they were claiming is not released here
- *   (TaskCancellation imports this module, so importing it back would close a
- *   cycle).
+ *   holds no activeActionId (Evacuation.ts), so nothing blocks dispatch. An
+ *   action they were claiming is not released here (TaskCancellation imports
+ *   this module, so importing it back would close a cycle). The stuck reset is
+ *   inline: Locomotion's `resetStuckTracking` is private and Locomotion
+ *   imports this module.
  */
 export function releaseOccupantsOfRemovedVehicles(state: GameState, emitter?: EventEmitter): number[] {
   const liveVehicleIds = new Set(state.vehicles.vehicles.map(v => v.id));

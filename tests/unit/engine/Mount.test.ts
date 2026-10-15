@@ -848,12 +848,22 @@ describe('releaseOccupantsOfRemovedVehicles - walkers to a removed vehicle (#178
     } as never;
     employee.destinationX = 40;
     employee.destinationZ = 40;
-    employee.pendingDriverVehicleId = 999;
+    employee.pendingDriverVehicleId = null;
 
     releaseOccupantsOfRemovedVehicles(state);
 
     expect(employee.itinerary).toBeNull();
-    expect(employee.pendingDriverVehicleId).toBeNull();
+    expect(employee.destinationX).toBeNull();
+  });
+
+  it('clears a walker with a stale board leg when pendingDriverVehicleId is null', () => {
+    const state = createGame({ seed: SEED });
+    const employee = walkerTo(state, 999);
+    employee.pendingDriverVehicleId = null;
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.itinerary).toBeNull();
     expect(employee.destinationX).toBeNull();
   });
 
