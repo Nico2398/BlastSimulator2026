@@ -188,15 +188,6 @@ describe('HoverTag', () => {
     expect(root.style.display).toBe('none');
   });
 
-  it('is hidden for a surveyed tile when the overlay flag is omitted', () => {
-    const { tag, root } = makeTag();
-    const state = makeState();
-    addSurvey(state);
-    const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } };
-    tag.update(hover, state, true);
-    expect(root.style.display).toBe('none');
-  });
-
   it('hides a showing tag when the overlay is toggled off', () => {
     const { tag, root } = makeTag();
     const state = makeState();

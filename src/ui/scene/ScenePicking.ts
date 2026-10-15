@@ -93,7 +93,7 @@ const CLICK_MOVE_THRESHOLD_PX = 5;
 /** Hover tag appears after the cursor rests on the same target for this long (spec: 60ms). */
 const HOVER_DELAY_MS = 60;
 /** The terrain hover tag appears after the pointer rests on one pick key for this long. */
-const HOVER_TAG_DWELL_MS = 400;
+export const HOVER_TAG_DWELL_MS = 400;
 
 export type HoverChangeHandler = (hover: PickResult | null) => void;
 /** Fires with the pick the pointer rested on, or null once the rest ends. */
