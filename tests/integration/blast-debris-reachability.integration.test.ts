@@ -311,10 +311,11 @@ describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
       expect(state.logistics.fragments.filter(f => sealed.has(f.fragment.id) && f.state !== 'on_ground')).toHaveLength(0);
 
       // A breakout blast over the same void opens it: its rock is ordinary debris.
-      const idsBefore = new Set(state.logistics.fragments.map(f => f.fragment.id));
+      // Fragment ids restart at 0 every blast, so earlier rock is told apart by identity, not id.
+      const trackedBefore = new Set(state.logistics.fragments);
       fireKrackleShot(run, state, 10);
       expect(state.lastBlastReport!.ratingCap).not.toBe('no_breakout');
-      const fresh = state.logistics.fragments.filter(f => !idsBefore.has(f.fragment.id) && f.state === 'on_ground');
+      const fresh = state.logistics.fragments.filter(f => !trackedBefore.has(f) && f.state === 'on_ground');
       expect(fresh.length).toBeGreaterThan(0);
       const open = new Set(fresh.filter(f => !isFragmentSealed(grid, f.fragment.position)).map(f => f.fragment.id));
       expect(open.size).toBeGreaterThan(0);
@@ -323,11 +324,12 @@ describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
       expect(ordersTargeting(state, open).length).toBeGreaterThan(0);
       // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both.
       const hauledKg = (): number => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
-      tickToppedUntil(run, state, () => hauledKg() > 0, 1500);
+      // The opened void also holds the earlier sealed rock, so wait on the breakout blast's own rock being picked up (or split by the fragmenter), not on any haul.
+      const freshTracked = new Set(fresh);
+      const freshStillOnGroundCount = (): number => state.logistics.fragments.filter(f => freshTracked.has(f) && f.state === 'on_ground').length;
+      tickToppedUntil(run, state, () => hauledKg() > 0 && freshStillOnGroundCount() < fresh.length, 3000);
       expect(hauledKg()).toBeGreaterThan(0);
-      // Some of the breakout blast's own rock was picked up (or split by the fragmenter).
-      const freshIds = new Set(fresh.map(f => f.fragment.id));
-      const freshStillOnGround = state.logistics.fragments.filter(f => freshIds.has(f.fragment.id) && f.state === 'on_ground').length;
+      const freshStillOnGround = freshStillOnGroundCount();
       expect(freshStillOnGround).toBeLessThan(fresh.length);
     },
     600000,
