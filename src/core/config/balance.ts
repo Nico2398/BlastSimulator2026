@@ -280,15 +280,14 @@ export const TRAFFIC_JAM_MIN_TICKS = 4;
 // ─── Vehicle Spawn Placement ────────────────────────────────────────────────────
 
 /**
- * `vehicle buy` spreads new arrivals across a ring/grid pattern around the
- * depot point instead of stacking every purchase on one tile — a shared tile
- * fully occluded all but the tallest mesh (#411). SPAWN_RING_SIZE columns
- * before wrapping to the next row; SPAWN_TILE_SPACING tiles between spawns —
- * wide enough that adjacent vehicle meshes stay visually distinct (1-tile
- * spacing still let bodies merge, see TRAFFIC_JAM_MIN_TICKS's neighbour
- * vehicle-traffic-routing-visual fix) while staying near the depot.
+ * Tiles between the vehicles of a staffed roster's authored starting row
+ * (`applyStaffedComposition`), before terrain exists to place them on: wide
+ * enough that adjacent vehicle meshes stay visually distinct (1-tile spacing
+ * let bodies merge, see TRAFFIC_JAM_MIN_TICKS's neighbour
+ * vehicle-traffic-routing-visual fix) and that two vehicles never tie on
+ * octile cost (#591). Mid-game purchases spawn around the rally point instead
+ * (`rallySpawnCell`, CREW_SPAWN_VEHICLE_SEPARATION).
  */
-export const SPAWN_RING_SIZE = 3;
 export const SPAWN_TILE_SPACING = 3;
 
 /**
@@ -375,6 +374,47 @@ export const CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION = 1.5;
  * near-zero straight-line distance makes any ratio at all look catastrophic.
  */
 export const CREW_SPAWN_VEHICLE_ROUTE_SLACK = 2;
+
+// ─── Rally Point ─────────────────────────────────────────────────────────────────
+
+/**
+ * Half-width, in cells, of the square of ground that must be flat around a
+ * site's rally point (`chooseRallyPoint`, src/core/state/RallyPoint.ts): 2
+ * gives a 5x5 area, room for the flag and the first arrivals standing on
+ * level ground around it.
+ */
+export const RALLY_POINT_FLAT_RADIUS = 2;
+
+/**
+ * Most the ground may rise or fall, in metres, across the rally area for it to
+ * count as flat. Matches `BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD`: ground flat
+ * enough to build on is flat enough to park a fleet on.
+ */
+export const RALLY_POINT_MAX_HEIGHT_SPREAD_M = 1;
+
+/**
+ * Flat candidates whose route to the site's middle `chooseRallyPoint` will
+ * check before settling for the nearest flat one. Bounds the cost of a
+ * one-time choice on a rugged 160x160 site.
+ */
+export const RALLY_POINT_MAX_ROUTE_CHECKS = 64;
+
+/**
+ * Cells around the rally point `rallySpawnCell` will visit looking for a free
+ * spawn cell — far more than a site ever holds agents, so a crowded flag
+ * still spawns everyone on its own ground.
+ */
+export const RALLY_POINT_SPAWN_SEARCH_LIMIT = 600;
+
+/** Cells a vehicle spawns away from the flag, so the flag is never inside a vehicle's body. */
+export const RALLY_POINT_VEHICLE_STANDOFF = 2;
+
+/**
+ * Cells a level's opening buildings keep their footprints away from the rally
+ * point, leaving the ground around the flag free for the crew and fleet that
+ * spawn there.
+ */
+export const RALLY_POINT_BUILDING_CLEARANCE = 5;
 
 /**
  * Render-only queue offsets for vehicles in the 'waiting' operational state
@@ -1432,13 +1472,6 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
 } as const;
 
 /**
- * Metres from the starting crew, toward the site centre, where a level's
- * opening buildings start their placement search. Close enough to walk to,
- * far enough that a footprint cannot wall a vehicle into the crew's own pocket.
- */
-export const STARTING_BUILDING_STANDOFF_M = 12;
-
-/**
  * Dusty Hollow's own opening crew, fleet, warehouse and spoil heap (#1363,
  * #1574). The heap is placed after the warehouse, so barren rock has a dump
  * from the first blast.
@@ -1494,6 +1527,24 @@ export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
   vehicles: [],
   buildings: [{ type: 'spoil_heap', tier: 1 }],
 };
+
+/**
+ * tutorial_pit's rally point, in tiles: on the flat plateau between the
+ * building pins (living quarters, driving centre and warehouse to the west)
+ * and the blast (box cut at x=10 and drill pattern from z=24, to the south),
+ * clear of both by `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`. The old spawn, the
+ * post-survey world centre, put every vehicle bought on the hillside east of
+ * the pattern.
+ */
+export const TUTORIAL_RALLY_POINT = { x: 15, z: 17 } as const;
+
+/**
+ * Where tutorial_pit's free spoil heap is sought, in tiles: the flat ground
+ * south of the building pins and west of the box cut, clear of the blast and
+ * of every pin the tutorial and its scenarios build on. Its old anchor, east
+ * of the site centre, put the heap on the hillside.
+ */
+export const TUTORIAL_STARTING_BUILDINGS_NEAR = { x: 4, z: 19 } as const;
 
 /** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
 export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
