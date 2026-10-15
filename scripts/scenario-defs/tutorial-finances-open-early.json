@@ -154,7 +154,7 @@
     {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
-      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
+      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched (clicking the method row arms the picker itself, #1771 — the Run button is already rail-locked by then), and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
       "role": "player",
       "interaction": [
         {
@@ -165,10 +165,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"seismic\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-survey-run"
         },
         {
           "type": "waitForSelector",
