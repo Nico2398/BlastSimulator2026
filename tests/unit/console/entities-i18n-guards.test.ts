@@ -19,7 +19,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { type GameContext } from '../../../src/console/commands/world.js';
 import { buildCommand, zoneCommand } from '../../../src/console/commands/entities.js';
-import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import {
   placeBuilding,
   getBuildingDef,
@@ -222,7 +222,7 @@ describe('entities.ts — build upgrade at max tier (T3)', () => {
 // ── build_upgrade_not_researched ─────────────────────────────────────────
 
 describe('entities.ts — build upgrade to an unresearched tier', () => {
-  const EN = 'Tier 2 management_office is not researched — research required before upgrade.';
+  const EN = 'Tier 2 Management Office is not researched — research required before upgrade.';
 
   it('matches the exact English literal by default (tier 2 never unlocked)', () => {
     const ctx = makeCtx();
@@ -470,7 +470,7 @@ describe('build <type> at: — order refusals', () => {
     const ctx = makeCtx();
     const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Tier 2 management_office is not researched — research required before placement.');
+    expect(result.output).toBe('Tier 2 Management Office is not researched — research required before placement.');
   });
 
   it('unresearched tier — fr prints the exact build_not_researched text', () => {
@@ -478,7 +478,8 @@ describe('build <type> at: — order refusals', () => {
     setLocale('fr');
     const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
     expect(result.success).toBe(false);
-    expect(result.output).toBe(fr('entities.build_not_researched', { tier: 2, type: 'management_office' }));
+    expect(result.output).toBe(fr('entities.build_not_researched', { tier: 2, type: 'Bureau de Gestion' }));
+    expect(result.output).not.toContain('management_office');
   });
 
   it('insufficient funds — en keeps the English literal', () => {
@@ -748,6 +749,54 @@ describe('vehicle haul / break — refusals', () => {
       const frResult = vehicleCommand(ctx, [sub, '777'], { fragment: '1' });
       expect(frResult.success).toBe(false);
       expect(frResult.output).toBe(fr('vehicle.not_found', { id: 777 }));
+    });
+  }
+});
+
+// ── #1808: not-researched refusals name the building by display name ─────
+
+describe('not-researched refusals — translated building display name (#1808)', () => {
+  it('upgrade fr — uses the translated display name, not the raw id', () => {
+    const ctx = makeCtx();
+    const id = placeTestBuilding(ctx, 'management_office', 1);
+    setLocale('fr');
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(
+      fr('entities.build_upgrade_not_researched', { tier: 2, type: t('building.management_office.name') }),
+    );
+    expect(result.output).toContain('Bureau de Gestion');
+    expect(result.output).not.toContain('management_office');
+  });
+
+  it('placement fr — uses t()-computed expectation', () => {
+    const ctx = makeCtx();
+    setLocale('fr');
+    const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
+    expect(result.output).toBe(
+      fr('entities.build_not_researched', { tier: 2, type: t('building.management_office.name') }),
+    );
+  });
+
+  for (const locale of ['en', 'fr'] as const) {
+    it(`living_quarters upgrade (${locale}) — no raw id, has display name`, () => {
+      const ctx = makeCtx();
+      const id = placeTestBuilding(ctx, 'living_quarters', 1);
+      setLocale(locale);
+      const result = buildCommand(ctx, ['upgrade', String(id)], {});
+      expect(result.success).toBe(false);
+      expect(result.output).not.toContain('living_quarters');
+      expect(result.output).toContain(t('building.living_quarters.name'));
+      expect(result.output).toContain(locale === 'en' ? 'Living Quarters' : 'Logements');
+    });
+
+    it(`living_quarters placement (${locale}) — no raw id, has display name`, () => {
+      const ctx = makeCtx();
+      setLocale(locale);
+      const result = buildCommand(ctx, ['living_quarters'], { at: '4,4', tier: '2' });
+      expect(result.success).toBe(false);
+      expect(result.output).not.toContain('living_quarters');
+      expect(result.output).toContain(t('building.living_quarters.name'));
     });
   }
 });

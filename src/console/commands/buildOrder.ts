@@ -27,7 +27,7 @@ import { terrainReservations } from '../../core/entities/PlacementReservations.j
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
 
-import { refusalText } from './commandUtils.js';
+import { refusalText, buildingTypeName } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
@@ -93,7 +93,7 @@ export function orderBuildingCommand(
   // research gate, then funds — both ahead of claimForAction/the footprint
   // check because those mutate (claim off-site land, reserve the site).
   if (isPlacementBlockedByResearch(state.buildings, type, tier)) {
-    return { success: false, output: t('entities.build_not_researched', { tier, type }) };
+    return { success: false, output: t('entities.build_not_researched', { tier, type: buildingTypeName(type) }) };
   }
 
   const def = getBuildingDef(type, tier);
@@ -129,7 +129,7 @@ export function orderBuildingCommand(
     const placed = placeBuilding(
       state.buildings, type, x, z, bounds.width, bounds.depth, tier, bounds.originX, bounds.originZ, undefined, ctx.grid ?? undefined,
     );
-    if (!placed.success) return { success: false, output: placed.error! };
+    if (!placed.success) return { success: false, output: refusalText(placed) };
     chargeConstruction(state, type, tier, def.constructionCost);
     settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
     return {

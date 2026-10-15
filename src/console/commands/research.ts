@@ -14,14 +14,15 @@ import {
 import { addExpense } from '../../core/economy/Finance.js';
 import { getResearchTaskDef } from '../../core/config/balance.js';
 import { factorFor, researchCostFor } from '../../core/events/ActiveModifiers.js';
-import { requireGame } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
+import { requireGame, buildingTypeName } from './commandUtils.js';
 
-/** Human-readable message for each read-only `getQueueBlockCode` result. */
-const QUEUE_BLOCK_MESSAGES: Record<QueueBlockCode, (type: BuildingType, tier: 2 | 3) => string> = {
-  no_research_center: (type, tier) => `A Research Center is required before queueing tier ${tier} ${type}.`,
-  already_unlocked: (type, tier) => `Tier ${tier} ${type} is already unlocked.`,
-  already_queued: (type, tier) => `Tier ${tier} ${type} is already queued for research.`,
-  conditions_not_met: (type, tier) => `Tier ${tier} ${type} does not meet its research prerequisites.`,
+/** Locale key of the message for each read-only `getQueueBlockCode` result. */
+const QUEUE_BLOCK_KEYS: Record<QueueBlockCode, string> = {
+  no_research_center: 'research.queue_no_center',
+  already_unlocked: 'research.queue_already_unlocked',
+  already_queued: 'research.queue_already_queued',
+  conditions_not_met: 'research.queue_conditions_not_met',
 };
 
 /**
@@ -47,7 +48,7 @@ export function researchCommand(
         return {
           success: false,
           code: 'usage',
-          output: 'Usage: research queue type:<BuildingType> tier:2|3',
+          output: t('research.queue_usage'),
         };
       }
       const tierNum = parseInt(named['tier'] ?? '', 10);
@@ -55,7 +56,7 @@ export function researchCommand(
         return {
           success: false,
           code: 'usage',
-          output: 'Usage: research queue type:<BuildingType> tier:2|3',
+          output: t('research.queue_usage'),
         };
       }
       const tier = tierNum as 2 | 3;
@@ -73,7 +74,7 @@ export function researchCommand(
         return {
           success: false,
           code: blockCode,
-          output: QUEUE_BLOCK_MESSAGES[blockCode](type, tier),
+          output: t(QUEUE_BLOCK_KEYS[blockCode], { type: buildingTypeName(type), tier }),
         };
       }
       const factor = factorFor(state.events.activeModifiers, 'research_cost', state.tickCount);
@@ -82,7 +83,7 @@ export function researchCommand(
         return {
           success: false,
           code: 'insufficient_funds',
-          output: `Insufficient funds: research costs $${scaled}.`,
+          output: t('research.queue_insufficient_funds', { cost: scaled }),
         };
       }
 
@@ -91,10 +92,11 @@ export function researchCommand(
         // Preconditions were re-checked above; a failure here means state
         // changed between the checks and the commit (should not happen in
         // single-threaded console mode), but relay it defensively.
+        const failCode = result.code ?? 'no_research_center';
         return {
           success: false,
-          code: result.code ?? 'no_research_center',
-          output: `Could not queue research: ${result.code ?? 'unknown error'}.`,
+          code: failCode,
+          output: t('research.queue_failed', { code: failCode }),
         };
       }
 
@@ -102,10 +104,10 @@ export function researchCommand(
       state.cash -= cost;
       addExpense(state.finances, cost, 'construction', `Research ${type} T${tier}`, state.tickCount);
 
-      const durationSuffix = def.ticks > 0 ? `${def.ticks} ticks, $${cost}` : `$${cost}`;
+      const queuedKey = def.ticks > 0 ? 'research.queue_queued' : 'research.queue_queued_instant';
       return {
         success: true,
-        output: `Queued research: ${type} tier ${tier} — ${durationSuffix}.`,
+        output: t(queuedKey, { type: buildingTypeName(type), tier, ticks: def.ticks, cost }),
       };
     }
     case 'status': {
@@ -120,6 +122,6 @@ export function researchCommand(
       return { success: true, output: lines.join('\n') };
     }
     default:
-      return { success: false, output: 'Usage: research (queue type:<BuildingType> tier:2|3 | status)' };
+      return { success: false, output: t('research.usage') };
   }
 }
