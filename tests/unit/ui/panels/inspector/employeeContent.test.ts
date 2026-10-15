@@ -78,6 +78,19 @@ describe('employee inspector — sections', () => {
     expect(root.querySelector('.bs-train-btn')).not.toBeNull();
   });
 
+  it.each(['driller', 'driver', 'surveyor'] as const)('the detail body carries data-employee-role="%s" (#1763)', (role) => {
+    const { view } = build(makeEmployee({ role }));
+    const body = view.sections[0]!;
+    expect(body.matches('.bs-employee-detail')).toBe(true);
+    expect(body.getAttribute('data-employee-role')).toBe(role);
+  });
+
+  it('a tutorial-style inspector selector resolves to the driver train button (#1763)', () => {
+    const { root } = build(makeEmployee({ role: 'driver' }));
+    expect(root.querySelector('.bs-employee-detail[data-employee-role="driver"] .bs-train-btn')).not.toBeNull();
+    expect(root.querySelector('.bs-employee-detail[data-employee-role="driller"] .bs-train-btn')).toBeNull();
+  });
+
   it('manager effect only for managers', () => {
     const plain = build(makeEmployee()).root;
     expect(plain.querySelector('.bs-crew-manager-effect')).toBeNull();

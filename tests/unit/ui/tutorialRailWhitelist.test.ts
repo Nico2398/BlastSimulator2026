@@ -76,6 +76,16 @@ function buildFixture(): Probe[] {
   const sel = add(document.body, 'div', { id: 'bs-inspector' });
   probe('demolish', [], add(sel, 'button', { 'data-action': 'demolish' }));
   probe('fire employee', [], add(sel, 'button', { 'data-action': 'fire-employee' }));
+  // #1763: the employee inspector's train buttons. Only the driver's Rock Fragmenter one is scripted.
+  const driverDetail = add(sel, 'div', { 'data-employee-role': 'driver' }, 'bs-employee-detail');
+  probe('inspector driver train rock_fragmenter', ['train-fragmenter'], add(driverDetail, 'button',
+    { 'data-skill': 'driving.rock_fragmenter' }, 'bs-train-btn'));
+  probe('inspector driver train drill_rig', [], add(driverDetail, 'button',
+    { 'data-skill': 'driving.drill_rig' }, 'bs-train-btn'));
+  const drillerDetail = add(sel, 'div', { 'data-employee-role': 'driller' }, 'bs-employee-detail');
+  probe('inspector driller train rock_fragmenter', [], add(drillerDetail, 'button',
+    { 'data-skill': 'driving.rock_fragmenter' }, 'bs-train-btn'));
+  probe('inspector action strip train', [], add(sel, 'button', { 'data-action': 'train' }));
 
   return probes;
 }
@@ -144,6 +154,15 @@ describe('tutorial rails whitelist (#1595)', () => {
       applyRails(buy, document, BASE_PERMANENTLY_ALLOWED, false);
       const live = probes.filter(p => p.el.classList.contains(ALLOWED_CLASS)).map(p => p.name);
       expect(live).toEqual([`dealership ${role} tier 1`]);
+    });
+  });
+
+  describe('train-fragmenter step (#1763)', () => {
+    it('the train stage allows only the driver Rock Fragmenter button in the inspector', () => {
+      const stages = stagesFor('train-fragmenter');
+      applyRails(stages[stages.length - 1] as TutorialStage, document, BASE_PERMANENTLY_ALLOWED, false);
+      const live = probes.filter(p => p.el.classList.contains(ALLOWED_CLASS)).map(p => p.name);
+      expect(live).toEqual(['inspector driver train rock_fragmenter']);
     });
   });
 
