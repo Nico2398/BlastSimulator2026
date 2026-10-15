@@ -100,7 +100,7 @@ describe('UIManager — building flows without the Build panel (#1758)', () => {
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));
   });
 
-  it('queueBuildingResearch dispatches research queue for the building's next tier, panel closed', () => {
+  it('queueBuildingResearch dispatches research queue for the next tier of the building, panel closed', () => {
     ui.update(state);
     ui.queueBuildingResearch(7);
     expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
