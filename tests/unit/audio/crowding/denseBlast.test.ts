@@ -1,6 +1,6 @@
 // BlastSimulator2026 — The densest real blasts, and the hauling after them
-// ore-haul-dispatch blasts nine holes and drops 643 fragments within 0.4 s (a collapse, not a throw); only 17 of them
-// move, and only the rock that moves rains. blast-debris-stranded-ramp then has trucks load, dump and break boulders.
+// ore-haul-dispatch blasts nine holes and drops 643 fragments within 0.4 s (a collapse, not a throw); 246 of them
+// move (#1724: rock falling into the sealed void), and only the rock that moves rains. blast-debris-stranded-ramp then has trucks load, dump and break boulders.
 // Both at 8x, where the trucks make the most trips per real second.
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -28,14 +28,15 @@ describe(`${COLLAPSE}: a 643-fragment collapse at 8x`, () => {
     for (const layer of ['blast_snap', 'blast_sub', 'blast_crack', 'blast_boom', 'blast_tail'] as const) {
       expect(plays.filter(p => p.id === layer && p.accepted), layer).toHaveLength(1);
     }
-    // Measured: 10 rain requests, 9 admitted (the engine's caps of 10 impacts and 8 pebbles at once); nothing else is refused.
+    // Measured (#1724: rock that falls into the sealed void now moves, 246 flights): 30 rain requests, 16 admitted (the
+    // engine's caps of 10 impacts and 8 pebbles at once), 14 impacts refused; nothing else is refused.
     const refused = plays.filter(p => !p.accepted);
-    expect(refused.length).toBeLessThanOrEqual(2);
+    expect(refused.length).toBeLessThanOrEqual(14);
     expect(refused.every(p => p.id === 'debris_hit' || p.id === 'debris_pebble')).toBe(true);
   });
 
   it('rains for the rock that moves only: no more impacts than moving fragments, none before the first one lands', () => {
-    // 643 flights, 17 of them animated by the renderer. Measured: 10 requests, the first 0.08 s after the shot, when the
+    // 643 flights, 246 of them animated by the renderer (#1724; 17 before rock fell into the sealed void). Measured then: 10 requests, the first 0.08 s after the shot, when the
     // first moving fragment lands; counting the 626 that stay put gave 36 requests and an impact at the moment of the boom.
     const flights = sim().engine.ctx.lastBlastFlights ?? [];
     const moving = flights.filter(isAnimatedFlight);
@@ -49,11 +50,12 @@ describe(`${COLLAPSE}: a 643-fragment collapse at 8x`, () => {
     for (const impact of rain) expect(impact.startS - shot.startS).toBeGreaterThanOrEqual(firstLanding - 0.02);
   });
 
-  it('spends the shot second on at most 22 sounds and 16 voices', () => {
-    // Measured 17 sounds in the second after the shot and 12 voices; the engine caps at 32.
+  it('spends the shot second on at most 24 sounds and 17 voices', () => {
+    // Measured 24 sounds in the second after the shot and 17 voices (#1724: the rock that falls into the sealed void
+    // rains too); the engine caps at 32.
     const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(22);
-    expect(stats.maxVoices).toBeLessThanOrEqual(16);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(24);
+    expect(stats.maxVoices).toBeLessThanOrEqual(17);
   });
 
   it('keeps the world to 3 sounds a second, 9 in ten seconds, 22 in thirty', () => {
@@ -77,10 +79,10 @@ describe(`${HAULING}: trucks hauling after a blast at 8x`, () => {
     expectWorldWithinBudget(sim(), { per1s: 5, per10s: 12, per30s: 26 });
   });
 
-  it('spends the shot second on at most 17 sounds and 13 voices', () => {
-    // Measured 13 sounds in a second and 10 voices at once.
+  it('spends the shot second on at most 19 sounds and 13 voices', () => {
+    // Measured 19 sounds in a second and 13 voices at once (#1724: the blast's rock now falls into its sealed void).
     const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(17);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(19);
     expect(stats.maxVoices).toBeLessThanOrEqual(13);
   });
 });

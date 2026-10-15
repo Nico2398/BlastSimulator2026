@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLevelObjective } from '../../../src/core/campaign/LevelObjective.js';
+import { getLevelObjective, getProfitShortfall } from '../../../src/core/campaign/LevelObjective.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { addIncome, addExpense, getOperatingProfit } from '../../../src/core/economy/Finance.js';
@@ -65,5 +65,24 @@ describe('getLevelObjective', () => {
 
   it('returns null for an unknown level id', () => {
     expect(getLevelObjective('no_such_level', finances())).toBeNull();
+  });
+});
+
+describe('getProfitShortfall', () => {
+  it('is Infinity when no target applies', () => {
+    expect(getProfitShortfall(null, finances())).toBe(Infinity);
+    expect(getProfitShortfall('no_such_level', finances())).toBe(Infinity);
+  });
+
+  it('is the profit still missing to the target', () => {
+    const f = finances();
+    addIncome(f, 20000, 'sales', 'ore', 1);
+    expect(getProfitShortfall(LEVEL, f)).toBe(target() - 20000);
+  });
+
+  it('clamps to 0 once the target is met or exceeded', () => {
+    const f = finances();
+    addIncome(f, target() * 3, 'sales', 'ore', 1);
+    expect(getProfitShortfall(LEVEL, f)).toBe(0);
   });
 });

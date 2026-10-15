@@ -318,6 +318,32 @@ export function hasFillableOreSaleOffer(
 }
 
 /**
+ * True when `offer` is an `ore_sale` the site can fill in full whose payout
+ * (`quantityKg * pricePerKg`) covers `shortfall` — the profit still missing to
+ * the level's target. Offers are re-rolled at random, so the first fillable one
+ * can be worth less than the operating deficit and leave the level running.
+ */
+export function isWinningSaleOffer(
+  offer: Contract,
+  collectedOre: Readonly<Record<string, number>>,
+  shortfall: number,
+): boolean {
+  return offer.type === 'ore_sale'
+    && isFillableSaleOffer(offer, collectedOre, 0)
+    && offer.quantityKg * offer.pricePerKg >= shortfall;
+}
+
+/** `isWinningSaleOffer` over the pool, narrowed to one ore: the wait before a scenario's one level-winning sale (#1724). */
+export function hasWinningOreSaleOffer(
+  available: readonly Contract[],
+  collectedOre: Readonly<Record<string, number>>,
+  materialId: string,
+  shortfall: number,
+): boolean {
+  return available.some(c => c.materialId === materialId && isWinningSaleOffer(c, collectedOre, shortfall));
+}
+
+/**
  * True when `offer` is a sale the site can fill in full today: an `ore_sale`
  * asking no more of its ore than `collectedOre` holds, or a `rubble_disposal`
  * asking no more than the raw `storedMassKg` (rubble has no material of its

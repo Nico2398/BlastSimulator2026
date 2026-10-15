@@ -55,7 +55,8 @@ import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
-import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { getProfitShortfall } from './core/campaign/LevelObjective.js';
+import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -847,6 +848,7 @@ window.__gameState = () => {
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     fillableDirtiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'dirtite'),
     fillableRustiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite'),
+    winningRustiteSaleOffered: hasWinningOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite', getProfitShortfall(s.campaign.activeLevelId, s.finances)),
     // An offered rubble_disposal contract, present in the pool at all — the
     // condition a scenario waits on before opening the Contracts panel for
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors

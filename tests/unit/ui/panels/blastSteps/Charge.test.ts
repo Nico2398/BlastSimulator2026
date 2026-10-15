@@ -108,7 +108,7 @@ describe('ChargeStep', () => {
     expect(cmd).toContain(`amount:${CHARGE_DEFAULT_AMOUNT_KG}kg`);
     expect(cmd).toContain(`stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
     // #1330: the retuned panel defaults, spelled out
-    expect(cmd).toContain('amount:4kg');
+    expect(cmd).toContain('amount:7kg');
     expect(cmd).toContain('stemming:2.5m');
   });
 
@@ -523,7 +523,7 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15); // shallowest: default 4 kg (2 m column) + 2.5 m stemming > 4 m
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15); // shallowest: default 7 kg (3.5 m column) + 2.5 m stemming > 4 m
     step.update(state, 'sunny');
 
     expect(chargeAll(step).disabled).toBe(true);
@@ -919,7 +919,7 @@ describe('ChargeStep explosive stock (#1685)', () => {
     step.update(state, 'sunny');
 
     const line = paidFrom(step);
-    expect(line).toContain(String(3 * CHARGE_DEFAULT_AMOUNT_KG)); // 12 kg
+    expect(line).toContain(String(3 * CHARGE_DEFAULT_AMOUNT_KG)); // 21 kg
     expect(line).toContain('$0');
   });
 
