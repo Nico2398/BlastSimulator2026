@@ -2537,6 +2537,7 @@
   "ui.crew.day_label": "Day {day}",
   "ui.crew.location": "LOCATION",
   "ui.crew.location_aboard": "Aboard {vehicle}",
+  "ui.crew.location_aboard_unknown": "Aboard a vehicle",
   "ui.crew.location_walking": "Walking to ({x}, {z})",
   "ui.crew.location_stuck": "Stuck for {n} ticks at ({x}, {z})",
   "ui.crew.location_inside": "Inside {building}",

@@ -6,7 +6,7 @@ import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import {
   describeActivity, raiseCommand, trainCommand, dismissConfirmConfig, makeCurrentTaskSection, makeDismissSection, makeHiredLocationStrip, makeIdentitySection,
-  makeManagerEffect, makeNeedsSection, makePaySection, makeRestSection, makeSkillsSection, makeTrainingSection,
+  hasRestSection, makeManagerEffect, makeNeedsSection, makePaySection, makeRestSection, makeSkillsSection, makeTrainingSection,
 } from '../../crewDetailSections.js';
 import type { InspectorLinks, KindContent } from './InspectorContent.js';
 import { kindLabel, linkFactory, syncSection } from './inspectorWidgets.js';
@@ -42,7 +42,7 @@ export const employeeContent: KindContent = {
       }
       return body;
     };
-    const optional = `${e.restTicksRemaining !== null || e.pendingRestDuration !== null ? 'r' : ''}${managementLevelOf(e) !== null ? 'm' : ''}`;
+    const optional = `${hasRestSection(e) ? 'r' : ''}${managementLevelOf(e) !== null ? 'm' : ''}`;
     return {
       title: e.name,
       sub: `#${e.id} · ${kindLabel('employee')} · ${role}`,

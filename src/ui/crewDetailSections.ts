@@ -144,7 +144,7 @@ export function makeHiredLocationStrip(e: Employee, state: GameState, link?: Lin
       : activity.vehicleId !== undefined && activity.vehicleId !== null ? { kind: 'vehicle', id: activity.vehicleId } : null;
     location = vehicle
       ? linkedSentence('ui.crew.location_aboard', 'vehicle', `#${vehicle.id}`, vehicle, link)
-      : t('ui.crew.location_aboard', { vehicle: '' }).trim();
+      : t('ui.crew.location_aboard_unknown');
   } else if (loc.kind === 'stuck') {
     location = t('ui.crew.location_stuck', { n: loc.ticks, x: loc.x, z: loc.z });
   } else if (loc.kind === 'walking') {
@@ -483,18 +483,22 @@ export function makeIdentitySection(e: Employee, state: GameState): HTMLElement 
   return el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px' }, children: [makeAvatar(e), nameCol, makeStatusTags(e, state)] });
 }
 
+/** True when the employee is resting or walking to rest, i.e. `makeRestSection` renders. */
+export function hasRestSection(e: Employee): boolean {
+  return e.restTicksRemaining !== null || e.pendingRestDuration !== null;
+}
+
 /** Resting at a building with time left, or walking to rest; null when neither. */
 export function makeRestSection(e: Employee, state: GameState, link?: LinkFactory): HTMLElement | null {
+  if (!hasRestSection(e)) return null;
   let line: HTMLElement;
   if (e.restTicksRemaining !== null) {
     const loc = resolveEmployeeLocation(e, state);
     line = loc.kind === 'inside'
       ? linkedSentence('ui.crew.rest_at', 'building', buildingLabel(loc.building, state), loc.building, link, { n: e.restTicksRemaining })
       : el('span', { text: `${t('ui.crew.task_resting')} · ${t('ui.crew.ticks_left', { n: e.restTicksRemaining })}` });
-  } else if (e.pendingRestDuration !== null) {
-    line = el('span', { text: t('ui.crew.rest_walking') });
   } else {
-    return null;
+    line = el('span', { text: t('ui.crew.rest_walking') });
   }
   line.style.cssText = 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
   return well([line]);
