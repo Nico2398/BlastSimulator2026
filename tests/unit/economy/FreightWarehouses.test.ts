@@ -351,11 +351,12 @@ describe('warehouseStockByOre', () => {
     const ore: Record<string, number> = {};
     const l = createLogisticsState(600);
     addBlastFragments(l, [realFrag(1, 200, mixed), realFrag(2, 100, { dirtite: 0.2 }), realFrag(3, 50, { dirtite: 0.5 })]);
-    for (const id of [1, 2, 3]) haul(l, id, ore, SITES);
+    const roomy = [{ ...A, capacityKg: 600 }];
+    for (const id of [1, 2, 3]) expect(haul(l, id, ore, roomy)).toBe(true);
     const stock = warehouseStockByOre(l, A.id);
     expect(stock.storedKg).toBeCloseTo(warehouseStoredKg(l, A.id), 6);
     expect(stock.storedKg).toBeCloseTo(350, 6);
-    expect(stock.oreKg.dirtite).toBeCloseTo(oreContributionKg(200 / 2500, 0.3) + oreContributionKg(50 / 2500, 0.5), 6);
+    expect(stock.oreKg.dirtite).toBeCloseTo(oreContributionKg(200 / 2500, 0.3) + oreContributionKg(100 / 2500, 0.2) + oreContributionKg(50 / 2500, 0.5), 6);
     expect(stock.oreKg.blingite).toBeCloseTo(oreContributionKg(200 / 2500, 0.1), 6);
     expect(stock.barrenKg).toBeGreaterThan(0);
     const oreSum = Object.values(stock.oreKg).reduce((a, b) => a + b, 0);

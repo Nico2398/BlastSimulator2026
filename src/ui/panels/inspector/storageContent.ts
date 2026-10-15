@@ -53,8 +53,11 @@ function explosiveModel(b: Building, closed: boolean): Model {
     rows: closed ? [] : stock.sort(([a], [c]) => (a < c ? -1 : 1))
       .map(([id, kg]) => ({ key: `stock-row-${id}`, label: t(`explosive.${id}.name`), text: kgText(kg) })),
     gauge: gaugeOf(total, getBuildingDef(b.type, b.tier).capacity),
-    lines: !closed && total > MIN_ROW_KG
-      ? [{ key: 'radius', text: t('inspector.detonation_radius', { radius: Math.round(secondaryBlastRadiusM(total)) }) }] : [],
+    lines: [
+      { key: 'free', text: t('inspector.free_kg', { kg: kgText(freeKg) }) },
+      ...(!closed && total > MIN_ROW_KG
+        ? [{ key: 'radius', text: t('inspector.detonation_radius', { radius: Math.round(secondaryBlastRadiusM(total)) }) }] : []),
+    ],
     note: closed ? t('inspector.stock_unavailable') : null,
     stockAttrs: { stockKg, freeKg },
     stockText: t('inspector.warehouse_stock', { stock: stockKg, free: freeKg }),
@@ -106,6 +109,19 @@ function modelOf(b: Building, state: GameState, closed: boolean): Model | null {
   }
 }
 
+function lineOf(key: string, text: string): HTMLElement {
+  const line = el('div', { text, className: 'bsx-mono' });
+  line.style.fontSize = '11px';
+  line.dataset['live'] = key;
+  return line;
+}
+
+function noteOf(text: string): HTMLElement {
+  const note = el('div', { text });
+  note.dataset['live'] = 'note';
+  return note;
+}
+
 function buildSection(m: Model): HTMLElement {
   const rows: HTMLElement[] = [];
   if (m.stockAttrs) {
@@ -129,35 +145,64 @@ function buildSection(m: Model): HTMLElement {
     rows.push(row, bar);
   }
   for (const r of m.rows) rows.push(liveRow(r.label, r.key, r.text));
-  for (const l of m.lines) {
-    const line = el('div', { text: l.text, className: 'bsx-mono' });
-    line.style.fontSize = '11px';
-    line.dataset['live'] = l.key;
-    rows.push(line);
-  }
-  if (m.note !== null) rows.push(el('div', { text: m.note }));
+  for (const l of m.lines) rows.push(lineOf(l.key, l.text));
+  if (m.note !== null) rows.push(noteOf(m.note));
   return sectionOf(t('inspector.section.contents'), rows);
+}
+
+/**
+ * Bring the tracked entries (rows, lines, note) of `root` in line with `wanted`: rewrite text in
+ * place, drop vanished entries, add new ones before the first entry that follows them in order.
+ */
+function entryOf(root: HTMLElement, key: string): HTMLElement | null {
+  const node = root.querySelector<HTMLElement>(`[data-live="${key}"]`);
+  return node && node.tagName === 'SPAN' ? node.parentElement : node;
+}
+
+function reconcile(root: HTMLElement, container: HTMLElement, shown: Set<string>, wanted: { key: string; text: string; make: () => HTMLElement }[]): void {
+  const wantedKeys = new Set(wanted.map(w => w.key));
+  for (const key of shown) {
+    if (wantedKeys.has(key)) continue;
+    entryOf(root, key)?.remove();
+    shown.delete(key);
+  }
+  for (const w of wanted) {
+    if (setLive(root, w.key, w.text)) continue;
+    const made = w.make();
+    const after = wanted.slice(wanted.indexOf(w) + 1).find(n => shown.has(n.key));
+    const anchorEl = after ? entryOf(root, after.key) : null;
+    if (anchorEl) anchorEl.before(made);
+    else container.append(made);
+    shown.add(w.key);
+  }
 }
 
 /** Storage section for a building, or null when the building stores nothing. */
 export function storageContents(b: Building, state: GameState, closed: boolean): StorageContents | null {
   const m = modelOf(b, state, closed);
   if (!m) return null;
+  const shown = new Set<string>([...m.rows.map(r => r.key), ...m.lines.map(l => l.key), ...(m.note !== null ? ['note'] : [])]);
+  const section = buildSection(m);
   return {
-    section: buildSection(m),
+    section,
     rowSignature: [...m.rows.map(r => r.key), ...m.lines.map(l => l.key), m.note !== null ? 'note' : ''].join(','),
     sync(root) {
-      if (m.stockAttrs) {
-        const node = setLive(root, 'stock', m.stockText);
-        if (node) { node.dataset['stockKg'] = String(m.stockAttrs.stockKg); node.dataset['freeKg'] = String(m.stockAttrs.freeKg); }
+      const cur = modelOf(b, state, closed);
+      if (!cur) return;
+      if (cur.stockAttrs) {
+        const node = setLive(root, 'stock', cur.stockText);
+        if (node) { node.dataset['stockKg'] = String(cur.stockAttrs.stockKg); node.dataset['freeKg'] = String(cur.stockAttrs.freeKg); }
       }
-      if (m.gauge) {
-        setLive(root, 'gauge', m.gauge.text);
+      if (cur.gauge) {
+        setLive(root, 'gauge', cur.gauge.text);
         const fill = root.querySelector<HTMLElement>('[data-live="gauge-bar"]');
-        if (fill) fill.style.width = `${Math.round(m.gauge.fraction * 100)}%`;
+        if (fill) fill.style.width = `${Math.round(cur.gauge.fraction * 100)}%`;
       }
-      for (const r of m.rows) setLive(root, r.key, r.text);
-      for (const l of m.lines) setLive(root, l.key, l.text);
+      reconcile(root, section, shown, [
+        ...cur.rows.map(r => ({ key: r.key, text: r.text, make: () => liveRow(r.label, r.key, r.text) })),
+        ...cur.lines.map(l => ({ key: l.key, text: l.text, make: () => lineOf(l.key, l.text) })),
+        ...(cur.note !== null ? [{ key: 'note', text: cur.note, make: () => noteOf(cur.note as string) }] : []),
+      ]);
     },
   };
 }
