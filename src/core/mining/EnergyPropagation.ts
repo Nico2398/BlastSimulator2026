@@ -96,7 +96,7 @@ const NEIGHBOUR_INV_DIST = Float64Array.from(NEIGHBOUR_OFFSETS, o => 1 / o[3]);
  * pulls only from within `FREE_FACE_LATERAL_RANGE_M`, so a distant excavation
  * cannot steal energy from charges it does not serve (#1793).
  */
-export function freeFaceWeight(invDist: number, ownDistAir: number, neighbourDistAir: number, rising: boolean): number {
+function freeFaceWeight(invDist: number, ownDistAir: number, neighbourDistAir: number, rising: boolean): number {
   if (!rising && ownDistAir > FREE_FACE_LATERAL_RANGE_M) return invDist;
   return invDist * (1 + FREE_FACE_BIAS * Math.max(0, ownDistAir - neighbourDistAir));
 }
