@@ -63,6 +63,35 @@ describe('buildDemolishConfirm (#1399)', () => {
     expect(cfg.body).not.toMatch(/\bkg\b.*lost|lost.*\bkg\b/i);
   });
 
+  it('freight ore in storage adds a line naming the kg lost (#1758)', () => {
+    const b = makeBuilding({ type: 'freight_warehouse' });
+    const cfg = buildDemolishConfirm(b, vi.fn(), { storedOreKg: 4200 });
+    expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_ore', { kg: 4200 }));
+    expect(cfg.body).toContain('4200');
+    expect(cfg.body).not.toContain('ui.build.demolish_confirm_loses_ore');
+    expect(cfg.body).not.toContain('{kg}');
+  });
+
+  it('zero or absent stored ore adds no ore line (#1758)', () => {
+    const b = makeBuilding({ type: 'freight_warehouse' });
+    expect(buildDemolishConfirm(b, vi.fn(), { storedOreKg: 0 }).body)
+      .toBe(buildDemolishConfirm(b, vi.fn()).body);
+    expect(buildDemolishConfirm(b, vi.fn(), {}).body).toBe(buildDemolishConfirm(b, vi.fn()).body);
+    expect(buildDemolishConfirm(b, vi.fn(), { storedOreKg: 0 }).body).not.toContain('loses_ore');
+  });
+
+  it('ore and explosives lines can both show, cost line first (#1758)', () => {
+    const b = makeBuilding({ type: 'explosive_warehouse', storedExplosives: { anfo: 250 } });
+    const cfg = buildDemolishConfirm(b, vi.fn(), { storedOreKg: 90 });
+    expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_explosives', { kg: 250 }));
+    expect(cfg.body).toContain(t('ui.build.demolish_confirm_loses_ore', { kg: 90 }));
+    expect(cfg.body.indexOf(`$${formatMoney(getDemolishCost(b))}`)).toBeLessThan(cfg.body.indexOf(t('ui.build.demolish_confirm_loses_ore', { kg: 90 })));
+  });
+
+  it('the ore line is localized, not an English fallback key (#1758)', () => {
+    expect(t('ui.build.demolish_confirm_loses_ore', { kg: 5 })).not.toBe('ui.build.demolish_confirm_loses_ore');
+  });
+
   it('building the config alone never runs onConfirm', () => {
     const onConfirm = vi.fn();
     buildDemolishConfirm(makeBuilding(), onConfirm);

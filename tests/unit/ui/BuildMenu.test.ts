@@ -1350,3 +1350,176 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
     expect(titles[0]).not.toBe(titles[1]);
   });
 });
+
+describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+  let gameConsole: ReturnType<typeof vi.fn<[string], CommandResult>>;
+  let messages: string[];
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+    gameConsole = vi.fn<[string], CommandResult>().mockReturnValue({ success: true, output: '' });
+    menu.setGameConsole(gameConsole);
+    messages = [];
+    menu.setFlowResultHandler((m) => messages.push(m));
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  function observed(b: Building, setup?: (s: GameState) => void): GameState {
+    const state = makeMockState();
+    state.buildings.buildings = [b];
+    setup?.(state);
+    menu.observe(state);
+    return state;
+  }
+
+  it('the panel stays hidden through every flow', () => {
+    const { kit } = makeMockKit();
+    menu.setPlacementKit(kit);
+    observed(makeBuilding({ id: 7, type: 'management_office', tier: 1 }));
+    menu.armMove(7);
+    expect(menu.visible).toBe(false);
+  });
+
+  it('armMove arms the footprint point tool and confirming dispatches build move', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    observed(makeBuilding({ id: 7, type: 'management_office', tier: 1 }));
+
+    menu.armMove(7);
+    expect(controller.isArmed).toBe(true);
+
+    controller.simulateSelect({ x1: 20, z1: 21, x2: 20, z2: 21 });
+    controller.simulateConfirm();
+    expect(gameConsole).toHaveBeenCalledWith('build move 7 to:20,21');
+  });
+
+  it('armMove uses the same tool as the placed row Move button (same overlay footprint ghost)', () => {
+    const viaRow = makeMockKit();
+    menu.setPlacementKit(viaRow.kit);
+    const b = makeBuilding({ id: 7, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [b];
+    menu.update(state);
+    findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-move-btn')!.click();
+    viaRow.controller.simulateHover({ x: 12, z: 12 });
+    const rowOverlay = viaRow.overlay.update.mock.calls.at(-1)![0];
+
+    menu.dispose();
+    container.remove();
+    ({ container, menu } = setupMenu());
+    menu.setGameConsole(gameConsole);
+    const viaInspector = makeMockKit();
+    menu.setPlacementKit(viaInspector.kit);
+    menu.observe(state);
+    menu.armMove(7);
+    viaInspector.controller.simulateHover({ x: 12, z: 12 });
+    expect(viaInspector.overlay.update.mock.calls.at(-1)![0]).toEqual(rowOverlay);
+  });
+
+  it('the move result reaches the flow handler: failure carries the console output', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    observed(makeBuilding({ id: 7, type: 'management_office', tier: 1 }));
+    gameConsole.mockReturnValue({ success: false, output: 'Nope: blocked' });
+
+    menu.armMove(7);
+    controller.simulateSelect({ x1: 20, z1: 21, x2: 20, z2: 21 });
+    controller.simulateConfirm();
+    expect(messages).toContain('Nope: blocked');
+  });
+
+  it('the move result reaches the flow handler: success reports moved', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    observed(makeBuilding({ id: 7, type: 'management_office', tier: 1 }));
+    menu.armMove(7);
+    controller.simulateSelect({ x1: 20, z1: 21, x2: 20, z2: 21 });
+    controller.simulateConfirm();
+    expect(messages).toContain(t('ui.build.moved'));
+  });
+
+  it('armMove for an unknown building arms nothing and throws nothing', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    observed(makeBuilding({ id: 7, type: 'management_office', tier: 1 }));
+    expect(() => menu.armMove(999)).not.toThrow();
+    expect(controller.isArmed).toBe(false);
+  });
+
+  it('armMove before any state was observed, or without a kit, is a no-op', () => {
+    const { kit, controller } = makeMockKit();
+    expect(() => menu.armMove(7)).not.toThrow();
+    menu.setPlacementKit(kit);
+    expect(() => menu.armMove(7)).not.toThrow();
+    expect(controller.isArmed).toBe(false);
+  });
+
+  it('requestUpgrade on an unlocked tier dispatches build upgrade and reports upgraded', () => {
+    observed(makeBuilding({ id: 9, type: 'management_office', tier: 1 }), (s) => {
+      s.buildings.unlockedTiers['management_office'] = 2;
+    });
+    menu.requestUpgrade(9);
+    expect(gameConsole).toHaveBeenCalledWith('build upgrade 9');
+    expect(messages).toContain(t('ui.build.upgraded'));
+    expect(menu.visible).toBe(false);
+  });
+
+  it('requestUpgrade on a locked tier reports research-required and does not upgrade', () => {
+    observed(makeBuilding({ id: 8, type: 'management_office', tier: 1 }));
+    menu.requestUpgrade(8);
+    expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));
+    expect(messages).toContain(t('ui.build.research_required', { tier: 2 }));
+  });
+
+  it('requestUpgrade surfaces the console refusal text', () => {
+    observed(makeBuilding({ id: 9, type: 'management_office', tier: 1 }), (s) => {
+      s.buildings.unlockedTiers['management_office'] = 2;
+    });
+    gameConsole.mockReturnValue({ success: false, output: 'Cannot upgrade: ramp' });
+    menu.requestUpgrade(9);
+    expect(messages).toContain('Cannot upgrade: ramp');
+  });
+
+  it('requestUpgrade for an unknown building or before observing sends no command', () => {
+    menu.requestUpgrade(9);
+    observed(makeBuilding({ id: 9, type: 'management_office', tier: 1 }));
+    menu.requestUpgrade(404);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('queueResearch (now public) dispatches research queue and reports progress to the handler', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    menu.queueResearch('management_office', 2);
+    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
+    expect(messages.length).toBeGreaterThan(0);
+  });
+
+  it('queueResearch failure reports the translated reason to the handler', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    gameConsole.mockReturnValue({ success: false, output: 'x', code: 'no_research_center' });
+    menu.queueResearch('management_office', 2);
+    expect(messages).toContain(t('ui.build.research_failed_no_research_center'));
+  });
+
+  it('queueResearch of tier 1 is ignored', () => {
+    menu.queueResearch('management_office', 1);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('placed-row Upgrade still dispatches through the shared flow and reports to the handler', () => {
+    const b = makeBuilding({ id: 9, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [b];
+    state.buildings.unlockedTiers['management_office'] = 2;
+    menu.update(state);
+    findPlacedRow(container, 9).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.click();
+    expect(gameConsole).toHaveBeenCalledWith('build upgrade 9');
+    expect(messages).toContain(t('ui.build.upgraded'));
+  });
+});
