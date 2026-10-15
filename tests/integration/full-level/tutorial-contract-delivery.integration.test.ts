@@ -211,7 +211,11 @@ describe('Tutorial Level — Contract Delivery', () => {
     // empty). Nudged to (8,13) (#1008): building placement now refuses an
     // uneven 4x4 footprint and (9,13) no longer sits flat post-blast — (8,13)
     // is the nearest flat spot on the same bench, still clear of (16,16).
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '8,13' });
+    // Nudged to (8,18) (#1793): the pattern now breaks fully, so the hauler's
+    // self-dispatch leaves it parked near (10,15), inside (8,13)'s footprint,
+    // and the new warehouse walled it in (reachable set of one cell). (8,18)
+    // is the same flat bench, south of the drill site and clear of its parking.
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '8,18' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);

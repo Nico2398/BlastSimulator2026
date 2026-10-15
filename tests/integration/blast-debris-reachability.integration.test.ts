@@ -22,6 +22,7 @@
 //
 // Drives the real console command layer (createRunner): no DOM, no Three.js.
 
+import { createRunner } from '../../src/console/createRunner.js';
 import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
@@ -320,4 +321,210 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
       600000,
     );
   }
+});
+
+// ── 3 m breakout pockets (#1792) ─────────────────────────────────────────────
+// #1740 lifted a one-voxel breakout only beside a column ending AT grade. At 3 m
+// spacing a 2x2 pocket at the centre of four holes (or a line cell between two)
+// has only sub-grade neighbours, so the pit survived and its rubble was stranded.
+// Repro: sandbox desert_badlands seed 42, 3x3 Krackle 8 kg, spacing 3, depth 8,
+// stemming 2.5 at (28,18); the pocket is cells (29-30, 22-23).
+
+interface SandboxShot {
+  run: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']>;
+  state: GameState;
+  grid: VoxelGrid;
+  tickWhile: (until: () => boolean, max: number) => void;
+  /** Post-blast surface Y of every column the blast lowered. */
+  craterSurfaces: number[];
+}
+
+/** Sandbox seed 42: 3x3 Krackle 8 kg, spacing 3, depth 8, stemming 2.5, starting at (startX, startZ). */
+function blastSandboxPattern(biome: string, startX: number, startZ: number): SandboxShot {
+  const { runner, ctx } = createRunner();
+  const run = (c: string) => runner.run(c);
+  expect(run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`)).toMatchObject({ success: true });
+  const state = ctx.state!;
+  const grid = ctx.grid!;
+  const refresh = (): void => {
+    state.cash = Math.max(state.cash, 1_000_000);
+    for (const e of state.employees.employees) e.fatigue = 100;
+  };
+  const tickWhile = (until: () => boolean, max: number): void => {
+    for (let i = 0; i < max && !until(); i++) { refresh(); run('tick 1'); }
+  };
+  refresh();
+
+  expect(run(`drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
+  tickWhile(() => state.plannedDrillHoles.length === 0, 800);
+  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 800);
+
+  const before = new Map<string, number>();
+  for (let z = startZ - 8; z < startZ + 22; z++) for (let x = startX - 10; x < startX + 22; x++) before.set(`${x},${z}`, computeVoxelColumnSurfaceY(grid, x, z)!);
+  expect(run('blast detonate')).toMatchObject({ success: true });
+  tickWhile(() => state.lastBlastReport !== null, 400);
+  expect(state.lastBlastReport).not.toBeNull();
+
+  const craterSurfaces: number[] = [];
+  for (const [key, y0] of before) {
+    const [x, z] = key.split(',').map(Number) as [number, number];
+    const y = computeVoxelColumnSurfaceY(grid, x, z)!;
+    if (y0 - y > 0) craterSurfaces.push(y);
+  }
+  return { run, state, grid, tickWhile, craterSurfaces };
+}
+
+describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stranded debris (#1792)', () => {
+  it(
+    'no crater column ends under its neighbours\' floor, and no order stays debris_out_of_reach once a ramp reaches the crater',
+    () => {
+      const { run, state, grid, tickWhile, craterSurfaces } = blastSandboxPattern('desert_badlands', 28, 18);
+      expect(craterSurfaces.length).toBeGreaterThan(20);
+      const floorY = craterFloorY(craterSurfaces);
+      const pits = craterSurfaces.filter(y => y < floorY);
+      expect(pits, `crater columns under the floor ${floorY}: ${pits.join(',')}`).toHaveLength(0);
+      for (const z of [22, 23]) {
+        for (const x of [29, 30]) expect(computeVoxelColumnSurfaceY(grid, x, z), `pocket cell ${x},${z}`).toBe(floorY);
+      }
+
+      expect(run('build_ramp start:32,46 end:32,26 depth:8')).toMatchObject({ success: true });
+      tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
+      expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
+
+      // Classification runs at the start of each employee tick: give it a pass after the last segment, then wait for the sweep.
+      tickWhile(() => false, 2);
+      const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+      tickWhile(() => stranded() === 0, 1500);
+      expect(debrisActions(state).length).toBeGreaterThan(0);
+      expect(stranded(), 'orders still stamped debris_out_of_reach after the ramp').toBe(0);
+    },
+    600000,
+  );
+
+  it('green foothills seed 42 at (28,28): every crater column reads one floor', () => {
+    const { craterSurfaces } = blastSandboxPattern('green_foothills', 28, 28);
+    expect(craterSurfaces.length).toBeGreaterThan(20);
+    const floorY = craterFloorY(craterSurfaces);
+    const off = craterSurfaces.filter(y => y !== floorY);
+    expect(off, `crater columns off the floor ${floorY}: ${off.join(',')}`).toHaveLength(0);
+    expect(floorY).toBe(9);
+  }, 600000);
+});
+
+// ── An access ramp dug before the shot (#1793) ───────────────────────────────
+// The ramp's void at the pattern's south edge is a free face that pulled the shot's
+// energy south: rock between the north and middle hole rows stayed standing as two
+// 2x2 full-height pillars, and 44 orders were stamped debris_out_of_reach. Digging the
+// ramp after the blast (the control) floors cleanly.
+// Repro: sandbox Easy desert_badlands seed 42, 3x3 Krackle 8 kg, spacing 4, depth 8,
+// stemming 2.5 at (28,18); ramp (32,46) -> (32,27).
+
+const PATTERN_START_X = 28;
+const PATTERN_START_Z = 18;
+const RAMP_COMMAND = 'build_ramp start:32,46 end:32,27 depth:8';
+/** The pillar cells that stood at full height with the ramp dug first: between the north and middle hole rows. */
+const PILLAR_CELLS: Array<[number, number]> = [];
+for (const z of [20, 21]) for (const x of [30, 31, 33, 34]) PILLAR_CELLS.push([x, z]);
+
+interface RampShot extends SandboxShot {
+  /** Floor height every crater column should read. */
+  floorY: number;
+}
+
+/** Sandbox Easy seed 42: Living Quarters, 8 h shifts, 3x3 pattern at 4 m; the ramp is ordered before or after the shot. */
+function blastRampScenario(rampFirst: boolean): RampShot {
+  const { runner, ctx } = createRunner();
+  const run = (c: string) => runner.run(c);
+  expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true')).toMatchObject({ success: true });
+  const state = ctx.state!;
+  const grid = ctx.grid!;
+  const tickWhile = (until: () => boolean, max: number): void => {
+    for (let i = 0; i < max && !until(); i++) {
+      // Money and rest are not what this probes: wages must not freeze the mine, and a crew asleep never clears the rubble.
+      state.cash = Math.max(state.cash, 1_000_000);
+      for (const e of state.employees.employees) e.fatigue = 100;
+      run('tick 1');
+    }
+  };
+  state.cash = Math.max(state.cash, 1_000_000);
+
+  expect(run('build living_quarters at:12,44')).toMatchObject({ success: true });
+  expect(run('set_policy mode:shift_8h fatigue:75')).toMatchObject({ success: true });
+  expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${PATTERN_START_X},${PATTERN_START_Z}`)).toMatchObject({ success: true });
+  if (rampFirst) expect(run(RAMP_COMMAND)).toMatchObject({ success: true });
+
+  // Planned holes leave the queue as they are drilled; charging needs every hole in the ground.
+  tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
+  expect(state.plannedDrillHoles).toHaveLength(0);
+  expect(state.drillHoles).toHaveLength(9);
+  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+  expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+  if (rampFirst) {
+    tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
+    expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
+  }
+
+  const before = new Map<string, number>();
+  for (let z = PATTERN_START_Z - 8; z < PATTERN_START_Z + 22; z++) {
+    for (let x = PATTERN_START_X - 10; x < PATTERN_START_X + 22; x++) before.set(`${x},${z}`, computeVoxelColumnSurfaceY(grid, x, z)!);
+  }
+  expect(run('blast detonate')).toMatchObject({ success: true });
+  tickWhile(() => state.lastBlastReport !== null, 400);
+  expect(state.lastBlastReport).not.toBeNull();
+
+  const craterSurfaces: number[] = [];
+  for (const [key, y0] of before) {
+    const [x, z] = key.split(',').map(Number) as [number, number];
+    const y = computeVoxelColumnSurfaceY(grid, x, z)!;
+    if (y0 - y > 0) craterSurfaces.push(y);
+  }
+  return { run, state, grid, tickWhile, craterSurfaces, floorY: 8 };
+}
+
+describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and no stranded debris (#1793)', () => {
+  it(
+    'ramp first: every crater column, pillar cells included, reads the floor, and no order is debris_out_of_reach',
+    () => {
+      const { state, grid, tickWhile, craterSurfaces, floorY } = blastRampScenario(true);
+      expect(craterSurfaces.length).toBeGreaterThan(30);
+      const off = craterSurfaces.filter(y => y !== floorY);
+      expect(off, `crater columns off the floor ${floorY}: ${off.join(',')}`).toHaveLength(0);
+      for (const [x, z] of PILLAR_CELLS) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z), `pillar cell ${x},${z}`).toBe(floorY);
+      }
+
+      // The ramp is already dug: no further order is needed. Classification runs at the start of each employee tick.
+      tickWhile(() => false, 3);
+      expect(debrisActions(state).length).toBeGreaterThan(0);
+      const stranded = state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach');
+      expect(stranded.length, `${stranded.length} orders debris_out_of_reach, e.g. at ${stranded.slice(0, 5).map(a => `${a.targetX},${a.targetZ}`).join(' ')}`).toBe(0);
+    },
+    600000,
+  );
+
+  it(
+    'ramp after (control): every crater column reads the floor, and no order stays debris_out_of_reach once the ramp is dug',
+    () => {
+      const { run, state, grid, tickWhile, craterSurfaces, floorY } = blastRampScenario(false);
+      expect(craterSurfaces.length).toBeGreaterThan(30);
+      const off = craterSurfaces.filter(y => y !== floorY);
+      expect(off, `crater columns off the floor ${floorY}: ${off.join(',')}`).toHaveLength(0);
+      for (const [x, z] of PILLAR_CELLS) {
+        expect(computeVoxelColumnSurfaceY(grid, x, z), `pillar cell ${x},${z}`).toBe(floorY);
+      }
+
+      expect(run(RAMP_COMMAND)).toMatchObject({ success: true });
+      tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
+      expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
+
+      tickWhile(() => false, 2);
+      const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+      tickWhile(() => stranded() === 0, 1500);
+      expect(debrisActions(state).length).toBeGreaterThan(0);
+      expect(stranded(), 'orders still stamped debris_out_of_reach after the ramp').toBe(0);
+    },
+    600000,
+  );
 });

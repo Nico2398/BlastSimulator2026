@@ -423,3 +423,88 @@ describe('EnergyPropagation — createEnergyField explosive tier resolver (#1358
     expect(thresholdAt(weak, mid, 8, mid)).toBe(0);
   });
 });
+
+// ── An excavation beside a pattern must not shield rock between its holes (#1793) ──
+// A void near the pattern is a free face. The pull of FREE_FACE_BIAS toward it must
+// not leave rock between charged holes standing that the same charges break without
+// the excavation (a ramp dug to a 3x3 pattern's edge left 2x2 full-height pillars).
+
+describe('EnergyPropagation — a trench beside a charged pattern (#1793)', () => {
+  const SIZE = 44;
+  const SURFACE_Y = 16;
+  const DEPTH = 8;
+  const FLOOR_Y = SURFACE_Y - DEPTH;
+  /** Top of the charge column: 8 kg at 2 kg/m fills 4 m up from the hole bottom. */
+  const CHARGE_TOP_Y = FLOOR_Y + 3;
+  const HOLE_COORDS = [12, 16, 20];
+  /** Energy per hole: twice the 8 kg Krackle repro charge, so uniform sandite floors every footprint column without a trench. */
+  const HOLE_ENERGY = 64000;
+
+  type Trench = (x: number, z: number) => boolean;
+  /** Two-wide (or one-wide) bench cut to the grade, running away from one side of the pattern. */
+  const TRENCHES: Record<string, Trench> = {
+    'south, 2 wide, flush against the pattern edge': (x, z) => (x === 15 || x === 16) && z >= 22,
+    'south, 2 wide, one column off the edge': (x, z) => (x === 15 || x === 16) && z >= 23,
+    'south, 1 wide': (x, z) => x === 16 && z >= 23,
+    'east, 2 wide': (x, z) => (z === 15 || z === 16) && x >= 23,
+    'north, 2 wide': (x, z) => (x === 15 || x === 16) && z <= 9,
+    'west, 2 wide': (x, z) => (z === 15 || z === 16) && x <= 9,
+  };
+
+  /** Shoots the 3x3 pattern (4 m apart) in sandite; `trench` columns are void from the floor up. */
+  function shoot(trench: Trench | null) {
+    const grid = new VoxelGrid(SIZE, SIZE);
+    for (let z = 0; z < SIZE; z++) {
+      for (let x = 0; x < SIZE; x++) {
+        for (let y = 0; y < SURFACE_Y; y++) {
+          if (trench && y >= FLOOR_Y && trench(x, z)) continue;
+          grid.setVoxel(x, y, z, rockVoxel('sandite'));
+        }
+      }
+    }
+    const field = createEnergyField(grid, {
+      minX: grid.minX, minY: 0, minZ: grid.minZ,
+      maxX: grid.maxX, maxY: SURFACE_Y + 2, maxZ: grid.maxZ,
+    });
+    const seeds: EnergySeed[] = [];
+    for (const z of HOLE_COORDS) {
+      for (const x of HOLE_COORDS) seeds.push(...buildHoleSeeds(SURFACE_Y, DEPTH, 8, HOLE_ENERGY, x, z, 0));
+    }
+    seedEnergy(field, seeds);
+    return field;
+  }
+
+  /** A column breaks when every voxel of its charged band has retained its full threshold. */
+  function columnBreaks(field: ReturnType<typeof shoot>, x: number, z: number): boolean {
+    for (let y = FLOOR_Y; y <= CHARGE_TOP_Y; y++) {
+      if (effectiveAt(field, x, y, z) < thresholdAt(field, x, y, z) * (1 - 1e-4)) return false;
+    }
+    return true;
+  }
+
+  const footprint: Array<[number, number]> = [];
+  for (let z = HOLE_COORDS[0]!; z <= HOLE_COORDS[2]!; z++) {
+    for (let x = HOLE_COORDS[0]!; x <= HOLE_COORDS[2]!; x++) footprint.push([x, z]);
+  }
+
+  it('control: without a trench every column of the pattern, between the holes included, breaks', () => {
+    const control = shoot(null);
+    const standing = footprint.filter(([x, z]) => !columnBreaks(control, x, z));
+    expect(standing, `control columns left standing: ${standing.join(' ')}`).toEqual([]);
+  });
+
+  for (const [name, trench] of Object.entries(TRENCHES)) {
+    it(`trench ${name}: every column that breaks without it still breaks`, () => {
+      const control = shoot(null);
+      const withTrench = shoot(trench);
+      const lost = footprint.filter(([x, z]) => columnBreaks(control, x, z) && !columnBreaks(withTrench, x, z));
+      expect(lost, `columns the trench left standing: ${lost.join(' ')}`).toEqual([]);
+    });
+
+    it(`trench ${name}: energy is conserved (seeded == retained + dissipated)`, () => {
+      const field = shoot(trench);
+      expect(field.seeded).toBeGreaterThan(0);
+      expect(Math.abs(totalEffective(field) + field.dissipated - field.seeded) / field.seeded).toBeLessThan(1e-3);
+    });
+  }
+});

@@ -625,6 +625,15 @@ export const CONFINEMENT_FULL_DEPTH = 6.0;
  *  what makes an over-buried charge fail to. */
 export const FREE_FACE_BIAS = 2.0;
 
+/** Metres from a side or lower free face within which rock still pulls overflow
+ *  toward it. Farther out, only air above keeps its pull. A lateral void (an
+ *  access ramp dug to a pattern's edge before the shot) otherwise drags energy
+ *  away from the charges that are nowhere near it and leaves full-height
+ *  pillars between holes that the same shot breaks cleanly without the void
+ *  (#1793). Set to one hole spacing: a charge that sits at a face keeps its
+ *  bench behaviour, rock a spacing further in is served by the sky as before. */
+export const FREE_FACE_LATERAL_RANGE_M = 4;
+
 /** Thickest cap of intact rock (metres) that a blast can lift off an excavation
  *  it has undermined. Thicker burden bridges the gap and stays standing, which is
  *  what makes a charge buried too deep fail to break out to surface. */
@@ -1371,10 +1380,10 @@ export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
 /**
  * Freight Warehouse storage capacity in kg, by tier (#1531). BuildingDefs reads it for `capacity`.
  *
- * Sized against a measured blast: the level-1 Dusty Hollow 1x2 boomite 2 kg reference shot (seed 1138)
- * yields 65,627 kg of ore-bearing rock (re-measured after the #1740 floor-to-grade breakout change; the
- * historic 2x2 shot read 57,061 kg). Tier 1 (25,000) holds ~38% of that blast; tier 2 (72,000) holds all
- * of it with ~10% margin; tier 3 (200,000) holds more than 3 such blasts. To re-measure, fire that shot
+ * Sized against a measured blast: the level-1 Dusty Hollow 1x2 boomite 2.2 kg reference shot (seed 1138)
+ * yields 45,888 kg of ore-bearing rock (re-measured after the #1792 flush-breakout change; the
+ * historic 2x2 shot read 57,061 kg). Tier 1 (25,000) holds ~54% of that blast; tier 2 (72,000) holds all
+ * of it with ~57% margin; tier 3 (200,000) holds more than 4 such blasts. To re-measure, fire that shot
  * headlessly (console, seed 1138) and sum the mass of fragments with ore density above
  * SPOIL_BARREN_ORE_FRACTION_THRESHOLD.
  */
