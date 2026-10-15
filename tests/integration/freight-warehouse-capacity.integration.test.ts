@@ -4,8 +4,8 @@
 // Reference shot: `campaign start level:dusty_hollow seed:1138`, a 1x2 grid
 // (spacing 3, depth 6) at rig+(14,13), boomite 2 kg (see REFERENCE_CHARGE_KG), stemming 2, auto
 // sequence, holes dry. Barren rock goes to a spoil heap (#1530), so only the
-// ORE-BEARING mass has to fit a warehouse. Measured on that shot: ~30,662 kg
-// ore-bearing, largest ore fragment ~4,400 kg.
+// ORE-BEARING mass has to fit a warehouse. Measured on that shot (re-measured
+// after the #1740 floor-to-grade change): ~65,627 kg ore-bearing.
 //
 // #1574: the level now opens with a spoil heap, which shifts when the rig
 // reaches the pattern and so which weather window the holes sit in. The old

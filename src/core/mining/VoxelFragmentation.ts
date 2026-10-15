@@ -138,9 +138,8 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   let graded = 0;
   const { nx } = field;
   const columns = nx * (box.maxZ - box.minZ);
-  // Per footprint column: whether the walk below floored rock in it, and the
-  // lowest voxel the energy pass broke (-1 when none).
-  const floored = new Uint8Array(columns);
+  // Per footprint column: the lowest broken voxel once flooring is done (-1
+  // when none), whichever pass broke it.
   const lowest = new Int32Array(columns).fill(-1);
   const columnOf = (x: number, z: number): number => (x - box.minX) + nx * (z - box.minZ);
 
@@ -168,36 +167,41 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
         if (mask[i] === 1) continue;
         mask[i] = 1;
         graded++;
-        floored[columnOf(x, z)] = 1;
+        if (y < lowest[columnOf(x, z)]!) lowest[columnOf(x, z)] = y;
       }
     }
   }
 
-  // A hole breaks about one voxel under its own charge. Beside rock just
-  // floored to grade that is a 1 m pit under every hole of the pattern: a step
-  // over NAV_MAX_SLOPE_DEGREES on every side, so the crater floor would be a
-  // grid of islands. Leave that sub-grade voxel standing where a neighbouring
-  // column was floored, so the floor is flush with grade. Deeper breakage (an
+  // A hole breaks about one voxel under its own charge. Beside any column
+  // ending at grade, whichever pass broke it, that is a 1 m pit under every
+  // hole of the pattern: a step over NAV_MAX_SLOPE_DEGREES on every side, so
+  // the crater floor would be a grid of islands. Leave that sub-grade voxel
+  // standing there, so the floor is flush with grade. Deeper breakage (an
   // outlier hole) is real excavation and stays, and so does a lone hole's pit,
-  // which nothing was floored beside.
+  // which has no neighbour at grade. A neighbour whose cut the cap clamped ends
+  // above grade and does not count. The test reads a snapshot taken before any
+  // lifting, so adjacent breakouts do not count each other.
   const subGradeY = Math.ceil(gradeY) - 1;
+  const gradeCeil = Math.ceil(gradeY);
+  const snapshot = lowest.slice();
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      if (lowest[columnOf(x, z)] !== subGradeY) continue;
-      if (!hasFlooredNeighbour(floored, columnOf, box, x, z)) continue;
+      if (snapshot[columnOf(x, z)] !== subGradeY) continue;
+      if (!hasNeighbourAtGrade(snapshot, columnOf, box, x, z, gradeCeil)) continue;
       mask[indexOf(field, x, subGradeY, z)] = 0;
     }
   }
   return graded;
 }
 
-/** True when any of the 8 columns around (x, z) inside `box` had rock floored. */
-function hasFlooredNeighbour(
-  floored: Uint8Array,
+/** True when any of the 8 columns around (x, z) inside `box` ends at `gradeCeil`. */
+function hasNeighbourAtGrade(
+  lowest: Int32Array,
   columnOf: (x: number, z: number) => number,
   box: EnergyField['box'],
   x: number,
   z: number,
+  gradeCeil: number,
 ): boolean {
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -205,7 +209,7 @@ function hasFlooredNeighbour(
       const nxc = x + dx;
       const nzc = z + dz;
       if (nxc < box.minX || nxc >= box.maxX || nzc < box.minZ || nzc >= box.maxZ) continue;
-      if (floored[columnOf(nxc, nzc)] === 1) return true;
+      if (lowest[columnOf(nxc, nzc)] === gradeCeil) return true;
     }
   }
   return false;

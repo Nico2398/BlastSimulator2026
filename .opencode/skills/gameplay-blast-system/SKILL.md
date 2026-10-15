@@ -91,7 +91,9 @@ Four passes, in order:
    sets it). In every footprint column (one with at least one voxel already broken), `floorToGrade`
    breaks the standing rock below the column's topmost broken voxel down to `gradeY`, but never more
    than `BLAST_GRADE_MAX_CUT_M` below that column's lowest broken voxel, so a deep outlier hole
-   cannot gouge the pit. It returns the voxels it added (`FragmentationResult.gradedCount`). The
+   cannot gouge the pit. A hole's one-voxel breakout under grade is left standing beside any column
+   ending at grade, whichever pass broke it (neighbours read from a pre-lift snapshot; a cut clamped
+   above grade does not count), so the floor is flush; a lone hole keeps its pit. It returns the voxels it added (`FragmentationResult.gradedCount`). The
    marks join the mask, so fragments, cleared voxels, the pre-blast estimate and the ore report
    follow the real broken volume; energy is untouched. Without it a pattern leaves pits under the
    holes and 1-4 m ridges between them, steeper than `NAV_MAX_SLOPE_DEGREES`, and one ramp into the
