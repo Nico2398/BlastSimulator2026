@@ -27,6 +27,11 @@ import {
   MAX_AVAILABLE_CONTRACTS,
   ORE_PRICES,
   SUPPLY_COMMON_ORE_COUNT,
+  FREIGHT_WAREHOUSE_CAPACITY_KG,
+  LEGACY_OFFER_DEADLINE_TICKS,
+  PRODUCTION_SUPPLY_QTY_KG,
+  PRODUCTION_SUPPLY_DEADLINE_TICKS,
+  PRODUCTION_OFFER_QTY_STEP_KG,
 } from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 import { resolveMarket, oreContractBasePrice } from '../../../src/core/economy/Market.js';
@@ -973,5 +978,98 @@ describe('legacy market contracts are unchanged (#1681)', () => {
       expect(c.pricePerKg).toBeGreaterThanOrEqual(base * 0.8 - 1e-9);
       expect(c.pricePerKg).toBeLessThanOrEqual(base * 1.3 + 1e-9);
     }
+  });
+});
+
+// ── Fillable supply offers on the production market (#1789) ─────────────────
+
+/** Opening kit's reference haul rate (kg of ore per tick), balance.ts "measured ~31 kg/tick". */
+const REFERENCE_HAUL_KG_PER_TICK = 31;
+const SUPPLY_SEEDS = Array.from({ length: 25 }, (_, i) => 100 + i);
+
+describe('production supply offers are fillable by the opening kit (#1789)', () => {
+  const supply = SUPPLY_SEEDS.flatMap((seed) => boardsOver('production', seed, 40).filter((c) => c.type === 'supply'));
+
+  it('the supply term constants are the contract values', () => {
+    expect(PRODUCTION_SUPPLY_QTY_KG).toEqual({ min: 4_000, max: 12_000 });
+    expect(PRODUCTION_SUPPLY_DEADLINE_TICKS).toEqual({ min: 500, max: 1_000 });
+    expect(resolveMarket('production').supplyDeadlineTicks).toEqual(PRODUCTION_SUPPLY_DEADLINE_TICKS);
+  });
+
+  it('the sample holds plenty of supply offers', () => {
+    expect(supply.length).toBeGreaterThan(50);
+  });
+
+  it('every offer has quantity in 4000-12000 kg on the 250 kg step', () => {
+    for (const c of supply) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(4_000);
+      expect(c.quantityKg).toBeLessThanOrEqual(12_000);
+      expect(c.quantityKg % PRODUCTION_OFFER_QTY_STEP_KG).toBe(0);
+    }
+  });
+
+  it('every offer has a deadline of 500-1000 ticks', () => {
+    for (const c of supply) {
+      expect(c.deadlineTicks).toBeGreaterThanOrEqual(500);
+      expect(c.deadlineTicks).toBeLessThanOrEqual(1_000);
+    }
+  });
+
+  it('every offer fits what the kit hauls in its deadline plus a full tier-1 warehouse', () => {
+    for (const c of supply) {
+      const capacity = REFERENCE_HAUL_KG_PER_TICK * c.deadlineTicks + FREIGHT_WAREHOUSE_CAPACITY_KG[1];
+      expect(c.quantityKg).toBeLessThanOrEqual(capacity);
+    }
+  });
+
+  it('every offer fits what the kit hauls within even the shortest deadline, stock aside', () => {
+    for (const c of supply) {
+      expect(c.quantityKg).toBeLessThanOrEqual(REFERENCE_HAUL_KG_PER_TICK * PRODUCTION_SUPPLY_DEADLINE_TICKS.min);
+    }
+  });
+
+  it('the offers use more than one deadline and quantity (the range is exercised)', () => {
+    expect(new Set(supply.map((c) => c.deadlineTicks)).size).toBeGreaterThan(10);
+    expect(new Set(supply.map((c) => c.quantityKg)).size).toBeGreaterThan(10);
+  });
+
+  it('ore sale and rubble offers keep the 30-100 tick deadline', () => {
+    const others = SUPPLY_SEEDS.flatMap((seed) => boardsOver('production', seed, 40).filter((c) => c.type !== 'supply'));
+    expect(others.length).toBeGreaterThan(100);
+    for (const c of others) {
+      expect(c.deadlineTicks).toBeGreaterThanOrEqual(LEGACY_OFFER_DEADLINE_TICKS.min);
+      expect(c.deadlineTicks).toBeLessThanOrEqual(LEGACY_OFFER_DEADLINE_TICKS.max);
+    }
+  });
+
+  it('the penalty stays on the unmultiplied base value (#959)', () => {
+    for (const c of supply.slice(0, 40)) {
+      expect(c.penaltyAmount).toBeGreaterThan(0);
+      expect(c.penaltyAmount).toBeLessThanOrEqual(c.quantityKg * c.pricePerKg);
+    }
+  });
+});
+
+describe('legacy supply offers keep their terms (#1789)', () => {
+  const legacy = SUPPLY_SEEDS.flatMap((seed) => boardsOver(undefined, seed, 30));
+
+  it('every legacy offer keeps a 30-100 tick deadline', () => {
+    for (const c of legacy) {
+      expect(c.deadlineTicks).toBeGreaterThanOrEqual(30);
+      expect(c.deadlineTicks).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('legacy supply offers stay at 50-500 kg', () => {
+    const supply = legacy.filter((c) => c.type === 'supply');
+    expect(supply.length).toBeGreaterThan(20);
+    for (const c of supply) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(50);
+      expect(c.quantityKg).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it('the legacy profile supply deadline is the legacy offer range', () => {
+    expect(resolveMarket('legacy').supplyDeadlineTicks).toEqual(LEGACY_OFFER_DEADLINE_TICKS);
   });
 });
