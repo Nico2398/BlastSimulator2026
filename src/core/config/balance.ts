@@ -1929,6 +1929,7 @@ export const NEED_WELL_RESTED_BONUS = 1;
  * time below 50, still collapses to a worker revolt (level1-lose-revolt,
  * level1-playthrough-revolt; 0.2 and above kept playthrough-revolt solvent and
  * ended it in bankruptcy). Does not stack with the well-rested bonus.
+ * A haul cycle that never reaches the band is covered by REST_COMPLETION_MORALE_CREDIT (#1801).
  */
 export const NEED_COMFORT_MORALE_RECOVERY = 0.1;
 
