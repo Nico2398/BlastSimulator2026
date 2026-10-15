@@ -44,7 +44,7 @@
     },
     {
       "command": "state",
-      "description": "#1771: the open Survey panel shows a prominent blocker next to the methods (no geology-qualified employee) with a hire action. Read-only observation.",
+      "description": "#1771: the open Survey panel shows a prominent blocker next to the methods (no geology-qualified employee) with a hire action. Read-only observation. Then a method-row click while blocked toasts the reason (screenshot) and arms nothing.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -57,6 +57,13 @@
         {
           "type": "awaitUsable",
           "selector": "#bs-survey-panel #bs-survey-hire"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
         {
           "type": "screenshot"
@@ -100,7 +107,7 @@
     },
     {
       "command": "survey core_sample x:32 z:32",
-      "description": "#1771: back in Survey the blocker is gone; clicking a method row arms the in-scene pick (no Pick Target button), pick a tile, Confirm. Waits on surveyCount, never a flat delay.",
+      "description": "#1771: back in Survey the blocker is gone; clicking a method row arms the in-scene pick (no Pick Target button), pick a tile, Confirm. The next step waits for it to complete (a waitUntil replaces the step command in command mode, so it cannot share this step).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -119,6 +126,9 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "screenshot"
+        },
+        {
           "type": "focusTile",
           "x": 32,
           "z": 32
@@ -135,7 +145,26 @@
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "timeout": 60,
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
         },
+        "note": "surveys are arrival-gated (#437) -- queued and paid for, not yet completed"
+      }
+    },
+    {
+      "command": "wait_until field:surveyCount equals:1 max_ticks:1500",
+      "description": "#1771: wait for the queued core sample to complete; waits on surveyCount, never a flat delay.",
+      "timeout": 150,
+      "role": "setup",
+      "interaction": [
         {
           "type": "waitUntil",
           "field": "surveyCount",
@@ -144,15 +173,10 @@
           "timeoutMs": 120000
         }
       ],
-      "timeout": 150,
-      "role": "player",
       "expect": {
         "equals": {
           "surveyCount": 1
-        },
-        "decreased": [
-          "cash"
-        ]
+        }
       }
     }
   ]
