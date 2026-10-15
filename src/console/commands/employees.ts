@@ -26,7 +26,7 @@ import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispa
 import { HIRING_ROLES, candidatesForRole, takeCandidate } from '../../core/entities/HiringPool.js';
 import { perHour } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
-import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, refusalText, buildingTypeName } from './commandUtils.js';
 import { hireSpawnPoint } from '../../core/entities/HireSpawn.js';
 import { t } from '../../core/i18n/I18n.js';
 import { emitFootprintOccupancyChanged } from './buildingHelpers.js';
@@ -268,7 +268,7 @@ export function employeeCommand(
           success: false,
           output: buildingRaw !== undefined
             ? t('employees.train_building_no_teach', { buildingId: buildingRaw, skill })
-            : t('employees.train_no_building_on_site', { schoolType, skill }),
+            : t('employees.train_no_building_on_site', { schoolType: buildingTypeName(schoolType), skill }),
         };
       }
 
@@ -279,7 +279,13 @@ export function employeeCommand(
       }
 
       const result = enrolInTraining(state, id, building, skill, ctx.emitter);
-      if (!result.success) return { success: false, output: refusalText(result) };
+      if (!result.success) {
+        const params = result.errorParams;
+        const refusal = params && 'buildingType' in params
+          ? { ...result, errorParams: { ...params, buildingType: buildingTypeName(building.type) } }
+          : result;
+        return { success: false, output: refusalText(refusal) };
+      }
 
       state.cash -= plan.fee;
       addExpense(state.finances, plan.fee, 'salaries', `Train ${emp.name}: ${skill}`, state.tickCount);
@@ -287,7 +293,7 @@ export function employeeCommand(
         success: true,
         output: t('employees.train_success', {
           name: emp.name,
-          buildingType: building.type,
+          buildingType: buildingTypeName(building.type),
           buildingId: building.id,
           skill,
           level: plan.grantsLevel,
