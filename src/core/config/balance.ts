@@ -1561,6 +1561,27 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
 };
 
 /**
+ * Opening cash per sandbox difficulty (#1747). Richer kits start with more
+ * cash, so easy has the most and hard the least.
+ *
+ * Bisected (#1747) on the standard opening (desert_badlands, seed 42, no cash
+ * injection, contracts accepted once stock covers them): tier-1 living_quarters
+ * at (30,48), then one 3x3 Krackle 8 kg pattern (spacing 4, depth 8, start
+ * 36,32), charge, clear zone, blast (~t562), haul, sell. Payroll and upkeep
+ * drain cash until the first sale, whose low point is linear in the start:
+ * normal bottoms at (start - 181.5k), hard at (start - 147.5k), so the
+ * minimum positive-cash start is ~181.6k normal / ~147.6k hard (normal 170k
+ * fails with a -11.5k low, 185k passes). Chosen with ~15% margin: 210k / 170k.
+ * Easy keeps 250k (low $36.9k, cash 681,127 at t2000) and stays strictly
+ * above normal. The old 150k / 120k went bankrupt at ~t609 / ~t582.
+ */
+export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxDifficultyId, number>> = {
+  easy: 250_000,
+  normal: 210_000,
+  hard: 170_000,
+};
+
+/**
  * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
  * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
  * operating-profit target before wellbeing collapses into a revolt (~tick
