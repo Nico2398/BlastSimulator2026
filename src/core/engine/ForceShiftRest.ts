@@ -13,7 +13,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatchSteps.js';
-import { createRestPendingAction, resolveRestDestination, restTripFatigueCost, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId } from './RestActionHelpers.js';
+import { createRestPendingAction, resolveRestDestination, restTripFatigueCost, beginRestTravel, isMidClaimedTaskExecution, resolveRestBuildingId, POLICY_REST_TRIGGER } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
@@ -462,7 +462,7 @@ export function forceShiftRestIfNeededByPolicy(
     targetX: dest.targetX,
     targetZ: dest.targetZ,
     targetEmployeeId: emp.id,
-    payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId: dest.buildingId },
+    payload: { needKey, triggeredBy: POLICY_REST_TRIGGER, buildingId: dest.buildingId },
   }, emp.id);
 
   finishForceRest(state, emp, restAction, firedEvents, shiftRested, emitter);

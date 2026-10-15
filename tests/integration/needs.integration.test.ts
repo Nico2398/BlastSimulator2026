@@ -10,7 +10,8 @@ import { tickCommand, eventCommand } from '../../src/console/commands/events.js'
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { createGameEngine } from '../../scripts/shared/command-runner.js';
-import { runCommand } from '../../src/console/createRunner.js';
+import { runCommand, createRunner } from '../../src/console/createRunner.js';
+import { playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 import {
   tickNeedGauges,
@@ -1733,3 +1734,111 @@ describe('#1692 — TickPipeline feeds crew fatigue strain into well-being', () 
     expect(runCrew(8, 0)).toBeLessThan(runCrew(8, 100));
   });
 });
+
+function startSandbox(biome: string, seed: number, difficulty: string): { run: Run; ctx: GameContext } {
+  const { runner, ctx } = createRunner();
+  const res = runner.run(`sandbox start biome:${biome} difficulty:${difficulty} seed:${seed}`);
+  expect(res.success, res.output).toBe(true);
+  return { run: (c) => runner.run(c), ctx };
+}
+
+describe('#1801 — the debris-hauler driver on long hauls recovers morale under the default policy', () => {
+  const TICKS = 3000;
+  const WINDOW = 500;
+  const FIRST_CHECK_TICK = 1500;
+  const TRACE_FROM = 1221;
+  const TRACE_TO = 1460;
+
+  interface HaulRun {
+    revolt: boolean;
+    /** Morale of the hauler's most frequent driver, by elapsed tick (undefined where the run ended early). */
+    driverMorale: number[];
+    wellBeingWindow: number[];
+    driverFound: boolean;
+  }
+
+  /**
+   * The #1778 repro: sandbox Easy desert_badlands seed 42, Living Quarters at
+   * (30,48), one 3x3 Krackle 8 kg shot at (36,32), ramp (40,12)->(40,31), contracts
+   * sold as stock covers them (the shared player-honest driver). No cash injected.
+   */
+  function runHaul(policy?: string): HaulRun {
+    const { run, ctx } = startSandbox('desert_badlands', 42, 'easy');
+    run('time resume');
+    const state = ctx.state!;
+    let revolt = false;
+    ctx.emitter.on('revolt:triggered', () => { revolt = true; });
+    if (policy) expect(run(policy).success).toBe(true);
+
+    const startTick = state.tickCount;
+    const driverTally = new Map<number, number>();
+    const moraleByEmployee = new Map<number, number[]>();
+    const wellBeingWindow: number[] = [];
+    let elapsed = 0;
+    const over = () => state.levelEnded || revolt || elapsed >= TICKS;
+    const step = () => {
+      playContracts(run, state);
+      playTick(run, state);
+      elapsed = state.tickCount - startTick;
+      for (const e of state.employees.employees) {
+        const series = moraleByEmployee.get(e.id) ?? [];
+        series[elapsed] = e.morale;
+        moraleByEmployee.set(e.id, series);
+      }
+      const hauler = state.vehicles.vehicles.find(v => v.type === 'debris_hauler');
+      const driver = hauler ? vehicleDriverId(hauler) : null;
+      if (driver !== null && elapsed >= TRACE_FROM && elapsed <= TRACE_TO) {
+        driverTally.set(driver, (driverTally.get(driver) ?? 0) + 1);
+      }
+      if (elapsed > TICKS - WINDOW) wellBeingWindow.push(state.scores.wellBeing);
+    };
+    const until = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) step(); };
+
+    expect(run('build living_quarters at:30,48 tier:1').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
+    until(800, () => state.plannedDrillHoles.length === 0);
+    run('charge hole:* explosive:krackle amount:8 stemming:2');
+    until(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(run, state);
+    expect(run('blast').success).toBe(true);
+    until(200, () => state.lastBlastReport !== null);
+    expect(run('build_ramp start:40,12 end:40,31 depth:6').success).toBe(true);
+    until(TICKS, () => false);
+
+    const driverId = [...driverTally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    return {
+      revolt,
+      driverMorale: driverId === undefined ? [] : moraleByEmployee.get(driverId)!,
+      wellBeingWindow,
+      driverFound: driverId !== undefined,
+    };
+  }
+
+  let base: HaulRun;
+  beforeAll(() => { base = runHaul(); }, 900_000);
+
+  it('the repro has a debris-hauler driver on the road between t1221 and t1460', () => {
+    expect(base.driverFound).toBe(true);
+  });
+
+  it('the driver\'s morale rises above 30 at some tick after t1500', () => {
+    const late = base.driverMorale.slice(FIRST_CHECK_TICK).filter(m => m !== undefined);
+    expect(Math.max(...late)).toBeGreaterThan(30);
+  });
+
+  it('the driver\'s morale is above 0 at t3000', () => {
+    expect(base.driverMorale[TICKS]).toBeGreaterThan(0);
+  });
+
+  it('well-being stays at or above 60 over the final window, with no revolt', () => {
+    expect(base.revolt).toBe(false);
+    expect(base.wellBeingWindow.length).toBe(WINDOW);
+    expect(Math.min(...base.wellBeingWindow)).toBeGreaterThanOrEqual(60);
+  });
+
+  it('control: `set_policy mode:continuous` still revolts or ends with lower well-being', () => {
+    const harsh = runHaul('set_policy mode:continuous fatigue:0');
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(harsh.revolt || mean(harsh.wellBeingWindow) < mean(base.wellBeingWindow)).toBe(true);
+  }, 900_000);
+}, 1_800_000);

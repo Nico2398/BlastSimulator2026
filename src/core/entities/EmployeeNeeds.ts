@@ -4,7 +4,7 @@
 // to (rest routing, morale, collapse).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS, WB_FATIGUE_COMFORT, NEED_COMFORT_MORALE_RECOVERY } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS, WB_FATIGUE_COMFORT, NEED_COMFORT_MORALE_RECOVERY, REST_COMPLETION_MORALE_CREDIT } from '../config/balance.js';
 
 /** The single need gauge tracked on every Employee. */
 export type NeedKey = 'fatigue';
@@ -188,4 +188,12 @@ export function computeCrewFatigueStrain(
     n++;
   }
   return n > 0 ? sum / n : 0;
+}
+
+/**
+ * Morale credit granted when a policy-forced rest completes (#1801).
+ * Zero for policies whose rest threshold is below the comfort band.
+ */
+export function restCompletionMoraleCredit(policyRestThreshold: number): number {
+  return policyRestThreshold >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable ? REST_COMPLETION_MORALE_CREDIT : 0;
 }
