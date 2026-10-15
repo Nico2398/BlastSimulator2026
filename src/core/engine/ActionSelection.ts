@@ -18,7 +18,7 @@ import { computeChargeDurationTicks } from '../mining/ChargePlan.js';
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
-import { createFragmentLookup, haulActionCarriesOre, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
 import { employeeClimbReach } from './OrderReachability.js';
@@ -243,14 +243,19 @@ function estimateWithBonus(
   return { cost: Math.max(0, rawCost - bonus) - demandBonus, bonus, demandBonus };
 }
 
-/** Ticks of demand bonus for `action`: 0 without urgency, for a held haul (a loaded one is never outbid, #1709), or for a non-ore action. */
+/**
+ * Ticks of demand bonus for `action`: 0 without urgency, for a held action, for anything but haul_debris (fragmenting is not
+ * ranked by demand), or for a non-ore haul. A loaded (in_transit) unheld haul gets the full bonus so no urgent ground fragment outbids it (#1709).
+ */
 function demandBonusOf(
   state: GameState,
   action: PendingAction,
   fragmentOf: FragmentLookup | undefined,
   urgency: ReadonlyMap<string, number> | undefined,
 ): number {
-  if (urgency === undefined || urgency.size === 0 || action.holderId !== null) return 0;
+  if (urgency === undefined || urgency.size === 0 || action.holderId !== null || action.type !== 'haul_debris') return 0;
+  // A loaded (in_transit) haul gets the full bonus so no urgent ground fragment can outbid it (#1709).
+  if (haulActionIsLoaded(state, action, fragmentOf)) return ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS;
   const densities = haulActionOreDensities(state, action, fragmentOf);
   return densities === null ? 0 : ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS * fragmentHaulUrgency(densities, urgency);
 }

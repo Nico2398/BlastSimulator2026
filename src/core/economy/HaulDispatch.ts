@@ -299,6 +299,19 @@ export function haulActionOreDensities(
   return resolveTrackedFragment(state, action, lookup)?.fragment.oreDensities ?? null;
 }
 
+/**
+ * True iff `action` is a haul_debris/fragment_debris action whose fragment is
+ * already in_transit, i.e. loaded cargo awaiting (re)claim (#1709/#1817).
+ */
+export function haulActionIsLoaded(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): boolean {
+  if (!isAutoDebrisAction(action.type)) return false;
+  return resolveTrackedFragment(state, action, lookup)?.state === 'in_transit';
+}
+
 /** True iff `action` is a haul_debris order still queued with no holder (#1370). */
 function isQueuedUnclaimedHaul(action: PendingAction): boolean {
   return action.type === 'haul_debris' && action.status === 'queued' && action.holderId === null;

@@ -14,18 +14,24 @@ export function oreHaulUrgency(
   active: readonly Contract[],
   collectedOre: Readonly<Record<string, number>>,
 ): ReadonlyMap<string, number> {
-  // Smallest kg any open demand for each ore still asks of the warehouse.
-  const need = new Map<string, number>();
-  const want = (materialId: string, kg: number): void => {
-    if (kg > 0 && kg < (need.get(materialId) ?? Infinity)) need.set(materialId, kg);
-  };
+  // Active contracts draw stock first (auto-delivery), so their remaining kg is
+  // committed; an open offer then needs its own quantity on top (smallest wins).
+  const committed = new Map<string, number>();
+  const smallestOffer = new Map<string, number>();
   for (const offer of available) {
-    if (offer.type === 'ore_sale') want(offer.materialId, offer.quantityKg);
+    if (offer.type !== 'ore_sale' || offer.quantityKg <= 0) continue;
+    const prev = smallestOffer.get(offer.materialId) ?? Infinity;
+    if (offer.quantityKg < prev) smallestOffer.set(offer.materialId, offer.quantityKg);
   }
   for (const c of active) {
     if ((c.type === 'ore_sale' || c.type === 'supply') && c.held !== true && !c.completed && !c.expired) {
-      want(c.materialId, remainingKg(c));
+      const kg = remainingKg(c);
+      if (kg > 0) committed.set(c.materialId, (committed.get(c.materialId) ?? 0) + kg);
     }
+  }
+  const need = new Map<string, number>();
+  for (const id of new Set([...committed.keys(), ...smallestOffer.keys()])) {
+    need.set(id, (committed.get(id) ?? 0) + (smallestOffer.get(id) ?? 0));
   }
   const urgency = new Map<string, number>();
   for (const [materialId, kg] of need) {
