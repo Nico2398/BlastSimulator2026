@@ -93,7 +93,7 @@ const SERIALIZED_FIELDS = [
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
-  'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
+  'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue', 'insideBuildingCount',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'winningRustiteSaleOffered', 'rubbleDisposalOffered', 'blastBanned', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
