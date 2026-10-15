@@ -58,6 +58,8 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Hover-tag dwell (#1752): the unit tests read the dwell to advance fake timers; production uses it inside ScenePicking.
+  'src/ui/scene/ScenePicking.ts:HOVER_TAG_DWELL_MS',
   // Floor-to-grade pass (#1723): the unit-tested contract of the grading rule; production runs it inside identifyFragmentedVoxelsSteps.
   'src/core/mining/VoxelFragmentation.ts:floorToGrade',
   // Bulk explosive price (#1678): the unit-tested pricing contract; production composes it inside buyExplosiveStock/returnOrderStock.

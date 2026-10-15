@@ -619,9 +619,12 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const surveyor = state.employees.employees.slice(-1)[0]!;
     expect(runner.run(`employee assign_skill ${surveyor.id} skill:geology level:3`).success).toBe(true);
 
-    // Centre on the surveyor so the survey needs no travel. A core sample reads one column
-    // only (radius 0), so a player coring blind may hit barren rock: aim it at the richest
-    // column within 10 m, as a player reading the aerial overlay would.
+    // Aerial centres on the surveyor so the survey needs no travel. A core sample reads one
+    // column only (radius 0), so a player coring blind may hit barren rock: aim it at the
+    // richest column within 20 m, as a player reading the aerial overlay would. 20 m, not 10:
+    // the surveyor spawns beside the rally flag, and on tropical_karst seed 42 the richest
+    // column within 10 m of it averages ~0.08, which the survey's noise and 0.05 rounding
+    // can report as barren — a short walk to real ore is what a player would do.
     let cx = Math.round(surveyor.x);
     let cz = Math.round(surveyor.z);
     if (method === 'core_sample') {
@@ -638,12 +641,12 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
         return sum / SURVEY_DEPTH_BELOW_SURFACE.core_sample;
       };
       let best: { x: number; z: number; mass: number } | null = null;
-      for (let x = cx - 10; x <= cx + 10; x++) for (let z = cz - 10; z <= cz + 10; z++) {
+      for (let x = cx - 20; x <= cx + 20; x++) for (let z = cz - 20; z <= cz + 20; z++) {
         if (!grid.containsColumn(x, z)) continue;
         const mass = oreMass(x, z);
         if (mass > 0 && (!best || mass > best.mass)) best = { x, z, mass };
       }
-      expect(best, 'ore within 10 m of the surveyor').not.toBeNull();
+      expect(best, 'ore within 20 m of the surveyor').not.toBeNull();
       cx = best!.x;
       cz = best!.z;
     }

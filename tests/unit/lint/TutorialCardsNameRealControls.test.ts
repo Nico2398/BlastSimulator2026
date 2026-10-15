@@ -1,7 +1,7 @@
 // BlastSimulator2026 — tutorial cards must quote control names exactly (#1331).
 //
 // A tutorial card that tells the player to click "Fire" when the button reads
-// "Blast!" sends them hunting. Each card below names one or more on-screen
+// "Blast" sends them hunting. Each card below names one or more on-screen
 // controls; the card text must contain the control's label verbatim, in both
 // locales. Case-sensitive, no normalization: the label key's value is the
 // exact string the player sees.
@@ -25,9 +25,12 @@ const CARD_CONTROLS: Record<string, string[]> = {
   'stage.open_crew': ['shell.rail.employees'],
   'stage.open_survey': ['shell.rail.survey'],
   'stage.open_blast': ['shell.rail.blast'],
-  // #1362: the horn button is gone; the evacuate card teaches Fire -> Detonate.
+  // #1362: the horn button is gone; the evacuate card teaches Blast -> Blast (footer button, then preflight button).
   step_evacuate: ['ui.blast_workshop.footer.fire', 'ui.blast_workshop.preflight.detonate'],
   'stage.detonate': ['ui.blast_workshop.preflight.detonate'],
+  // #1749: the tab and the cancel button are quoted under their renamed labels.
+  'stage.open_fire_tab': ['ui.blast_workshop.step.fire'],
+  'stage.detonation_stranded': ['ui.blast_workshop.preflight.cancel_detonation'],
   'stage.open_contracts': ['shell.rail.contracts'],
   'stage.open_vehicles': ['shell.rail.vehicles'],
   'stage.open_build': ['shell.rail.build'],

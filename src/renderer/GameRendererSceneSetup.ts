@@ -50,6 +50,7 @@ import { GhostMesh } from './GhostMesh.js';
 import { warmupShaders } from './ShaderWarmup.js';
 import { RampArrowLayer } from './RampArrow.js';
 import { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
+import { RallyFlagMesh } from './RallyFlagMesh.js';
 import { meshClaimsCell } from './terrain/PlayableCoverage.js';
 
 /**
@@ -103,6 +104,8 @@ export interface SceneSetupDeps {
   ghosts: GhostMesh | null;
   rampArrows: RampArrowLayer | null;
   trafficJamMarkers: TrafficJamMarkerLayer | null;
+  /** The site's rally flag, planted on `state.rallyPoint`. */
+  rallyFlag: RallyFlagMesh | null;
   lastGrid: VoxelGrid | null;
   lastCutBounds: string;
   terrainMeshRevision: number;
@@ -217,6 +220,9 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
 
   // Traffic jam markers (#1208), one per active jam
   deps.trafficJamMarkers = new TrafficJamMarkerLayer(scene, deps.getSmoothTerrainSurfaceY);
+
+  // The rally flag, where new hires and purchased vehicles arrive
+  deps.rallyFlag = new RallyFlagMesh(scene);
 
   // Ghosts first appear mid-game — haul orders the moment a blast lands —
   // so compile their materials now, with every light in place, rather than
@@ -414,6 +420,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.ghosts?.dispose();
   deps.rampArrows?.dispose();
   deps.trafficJamMarkers?.dispose();
+  deps.rallyFlag?.dispose();
   deps.taskProgress?.dispose();
   deps.pictograms?.dispose();
   deps.buildingOccupancyLabels?.dispose();
@@ -450,6 +457,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.ghosts = null;
   deps.rampArrows = null;
   deps.trafficJamMarkers = null;
+  deps.rallyFlag = null;
   deps.taskProgress = null;
   deps.pictograms = null;
   deps.buildingOccupancyLabels = null;

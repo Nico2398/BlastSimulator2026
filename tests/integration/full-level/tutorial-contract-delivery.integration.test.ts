@@ -26,6 +26,7 @@ import { contractCommand } from '../../../src/console/commands/economy.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { isOversized } from '../../../src/core/mining/BlastCalc.js';
 import { findNearestReachableFragment } from '../../../src/core/economy/FragmentTaskLifecycle.js';
+import { haulDestinationOf } from '../../../src/core/economy/SpoilHeaps.js';
 
 describe('Tutorial Level — Contract Delivery', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -342,16 +343,20 @@ describe('Tutorial Level — Contract Delivery', () => {
     // (#553, see the equivalent selection above) rather than a hardcoded
     // id:0, which was reachable before the drilling delay shifted where the
     // fleet ends up relative to the fragment field, but is not guaranteed to
-    // stay so.
+    // stay so. The fragment must also be warehouse-bound: a barren one is
+    // dumped on the spoil heap (#1530) and leaves the fragment list without
+    // ever being 'stored', and this test is about the warehouse draw path.
+    // Which piece is nearest depends on where the hauler spawned (beside the
+    // rally point since the rally flag landed), so nearest-any once picked a
+    // barren one.
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const haulableId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
-      !isOversized(tracked.fragment.volume),
+      !isOversized(tracked.fragment.volume) && haulDestinationOf(tracked.fragment) === 'warehouse',
     );
-    expect(haulableId, 'blast produced no reachable haulable (non-oversized) fragment').not.toBeNull();
+    expect(haulableId, 'blast produced no reachable haulable (non-oversized) warehouse-bound fragment').not.toBeNull();
     haulFragmentToStorage(vehicleId, haulableId!);
 
-    const storedBefore = ctx.state!.logistics.storedMassKg;
-    expect(storedBefore).toBeGreaterThan(0);
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
 
     // Accept a live rubble_disposal contract only now (#1574). The level opens
     // with a spoil heap, and a rubble contract draws on heap stock first and is
@@ -365,6 +370,10 @@ describe('Tutorial Level — Contract Delivery', () => {
     for (const b of ctx.state!.buildings.buildings) {
       if (b.type === 'spoil_heap') b.storedSpoilKg = 0;
     }
+    // Both read right before the delivery, with no tick in between: the
+    // contract search above ticks forward, and the self-dispatching hauler
+    // keeps filling the warehouse meanwhile.
+    const storedBefore = ctx.state!.logistics.storedMassKg;
     const cashBefore = ctx.state!.cash;
 
     // rubble_disposal (materialId '') — deliver an amount well within what

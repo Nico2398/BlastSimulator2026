@@ -28,7 +28,6 @@ import { freightWarehouseSites } from '../../../src/core/entities/BuildingWareho
 import { accumulateOreMass } from '../../../src/core/mining/BlastOreReport.js';
 import { createGameEngine } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
-import { countNavCellsByType } from '../../../src/ui/tutorialStepHelpers.js';
 import { REGION } from '../../../src/ui/tutorialStages.js';
 
 /** Starting cash comes from the level catalogue, not a copy of it. */
@@ -390,7 +389,13 @@ describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
     expect(runCommand(engine, `build_ramp start:${REGION.boxcut.x1},${REGION.boxcut.z1} end:${REGION.boxcut.x2},${REGION.boxcut.z2} depth:6`).success).toBe(true);
 
     const state = engine.ctx.state!;
-    const prevRampCount = state.navGrid ? countNavCellsByType(state.navGrid.cells, 'ramp') : 0;
+    // Completion is the ramp being recorded as built: every one of its
+    // segments dug (TaskCompletionEffects -> recordBuiltRamp). Not a rise in
+    // the nav grid's 'ramp' cell count — carving the cut re-slopes cells both
+    // into and out of 'ramp', so that count only flickers while the digger
+    // works and ends where it started (102 before and after on seed 42). A
+    // cancelled order never reaches builtRamps, so a stall cannot pass here.
+    const prevBuiltRamps = state.builtRamps.length;
 
     let ticksToComplete = -1;
     for (let i = 0; i < MAX_TICKS; i++) {
@@ -398,8 +403,7 @@ describe('box-cut ramp-dig performance (#928 travel-drain fix)', () => {
       if (state.events.pendingEvent) {
         runCommand(engine, 'event choose 0');
       }
-      const current = state.navGrid ? countNavCellsByType(state.navGrid.cells, 'ramp') : 0;
-      if (current > prevRampCount) {
+      if (state.builtRamps.length > prevBuiltRamps) {
         ticksToComplete = i + 1;
         break;
       }

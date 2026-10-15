@@ -156,7 +156,8 @@
       }
     },
     {
-      "command": "build_ramp origin:1,20 direction:south length:15 depth:8",
+      "command": "build_ramp origin:16,20 direction:south length:15 depth:8",
+      "description": "Rally point: the ramp moved from column x=1 to x=16. Every staffed vehicle now parks around the rally flag at (2,8) -- the rock_digger at (1,6) and the debris_hauler at (1,10) sit on the old x=1 ramp line, so the real drag's far end (1,5) no longer resolved to its own ground tile (\"an entity occludes it\") and the picker refused the drag. x=16 runs the same 15-tile, depth-8 southward ramp over open ground clear of the crew, the drill pattern (5..11) and the management office (0,3), so the overlay still gets its ramp cells beside the other three NavCell types. The camera frames the ramp's midpoint (16,12) from distance 40 at pitch 75, like building-cannot-seal-ramp.json's 20-tile drag: framed on the origin at the default angle, the far end (16,5) sat too near the horizon to resolve (\"too grazing an angle\").",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -172,14 +173,16 @@
         },
         {
           "type": "focusTile",
-          "x": 1,
-          "z": 20
+          "x": 16,
+          "z": 12,
+          "distance": 40,
+          "pitch": 75
         },
         {
           "type": "dragTiles",
-          "x1": 1,
+          "x1": 16,
           "z1": 20,
-          "x2": 1,
+          "x2": 16,
           "z2": 5
         },
         {

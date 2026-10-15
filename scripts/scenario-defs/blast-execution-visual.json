@@ -421,14 +421,15 @@
       "description": "#554/#590 finding: charging is real, worker-performed work that can take long enough (relative to MIN_EVENT_INTERVAL_TICKS) for a spontaneous event to fire mid-wait -- a single long `waitUntil` has no way to resolve one in interaction mode (its real, isPaused-gated clock halts exactly as it would for a real player, per interaction-executor.ts's own waitUntil doc comment), so the drain stalls forever at whatever count was ordered when the event hit. Command mode's own waitUntil auto-resolves silently and never showed this. Chunked here into the same tick-N/event-choose-0 pattern already used for this file's drilling waits, which does resolve mid-wait events in both modes."
     },
     {
-      "command": "event choose 0",
+      "command": "event choose 1",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "resolveEventIfPending",
+          "option": 1
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode. Option 1, not 0: since the rally point moved the crew's spawns, the event pending here in command mode is union_rep_secretary, whose option 0 hires a manager and would shift every employee id this file names from cycle 2 on; option 1 hires nobody.",
       "commandOutcome": "either"
     },
     {

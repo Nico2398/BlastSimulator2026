@@ -982,7 +982,7 @@ describe('TutorialRails — evacuate-zone waiting for clearance (#1591)', () => 
   }
 
   for (const phase of ['evacuating', 'stranded'] as const) {
-    it(`${phase}: Fire anyway is not allowed, Cancel detonation is`, () => {
+    it(`${phase}: Blast anyway is not allowed, Cancel blast is`, () => {
       const { fire, cancel } = waitingModal(phase);
       const rails = new TutorialRails();
       const s = state();

@@ -192,6 +192,8 @@ export function campaignStartCommand(
     ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
     startingCrew: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
+    ...(level.rallyPoint ? { rallyPoint: level.rallyPoint } : {}),
+    ...(level.startingBuildingsNear ? { startingBuildingsNear: level.startingBuildingsNear } : {}),
   });
 
   // Scripted levels (tutorial) offer the same hires on every run (#1600).
