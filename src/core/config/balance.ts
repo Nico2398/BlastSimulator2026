@@ -2830,8 +2830,8 @@ export const WB_MORALE_GAIN_PER_POINT = 0.02;
 export const WB_MORALE_LOSS_PER_POINT = 0.02;
 /** Score distance from the cap over which gains taper off (headroom damping), applied only while a Living Quarters gives a positive building effect; gives each housing tier its own equilibrium below 100. */
 export const WB_HEADROOM_SPAN = 50;
-/** Fatigue gauge level at or above which a worker feels no overwork strain; below it strain rises linearly to 1 at fatigue 0. Equals NEED_MORALE_EFFECT_THRESHOLDS.comfortable (50): the default site policy (rest at 60, in-place rests end at 70) keeps a working crew oscillating 60-70 and above 50, so ordinary work no longer drags well-being (#1778); only a crew the morale model already calls uncomfortable does. Inlined (not referenced) because it sits far from that declaration; keep the two equal. */
-export const WB_FATIGUE_COMFORT = 50;
+/** Fatigue gauge level at or above which a worker feels no overwork strain; below it strain rises linearly to 1 at fatigue 0. Is NEED_MORALE_EFFECT_THRESHOLDS.comfortable (50): the default site policy (rest at 60, in-place rests end at 70) keeps a working crew oscillating 60-70 and above 50, so ordinary work no longer drags well-being (#1778); only a crew the morale model already calls uncomfortable does. */
+export const WB_FATIGUE_COMFORT = NEED_MORALE_EFFECT_THRESHOLDS.comfortable;
 /** Max well-being drag from a fully fatigued crew; a crew below the comfort line (strain ~0.1-0.3) costs 0.015-0.05/tick, a crew at the default policy none; kept gentle so the no-housing scenarios that run an exhausted crew still finish before the revolt lands. */
 export const WB_OVERWORK_DRAG_MAX = 0.15;
 /** Max well-being drag when the whole crew lacks beds; scaled by the unhoused share of the crew. */

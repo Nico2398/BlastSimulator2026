@@ -1690,6 +1690,13 @@ describe('#1778 — a working crew under the default site policy keeps healthy w
 
   it('the same crew under `continuous` (rest threshold 0) ends with lower well-being', () => {
     const harsh = runCrew({ quarters: true, policy: { mode: 'continuous', fatigue: '0' } });
+    // A run that revolts before the final window leaves it empty (mean() 0), which must not
+    // pass as "lower": a revolt is itself the worse outcome; otherwise the window is full and compared.
+    if (harsh.revolt) {
+      expect(base.revolt).toBe(false);
+      return;
+    }
+    expect(harsh.wellBeingWindow.length).toBe(WINDOW);
     expect(mean(harsh.wellBeingWindow)).toBeLessThan(mean(base.wellBeingWindow));
   });
 }, 1_800_000);
