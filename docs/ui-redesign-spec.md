@@ -263,17 +263,17 @@ Restructure as a stepped workflow the player can read state from: **1 Drill → 
 - Catalog cards: building icon, localized tier name shown *before* purchase, cost, footprint size, one-line effect (beds N / stores N kg / teaches X / unlocks tiers / parks & repairs vehicles), upkeep per tick, tier selector T1–T3 with lock state; locked tier shows research requirement (cost, duration, prerequisites) and **Queue research** inline.
 - **Research status block (new):** current queue with per-task progress bars (`ticksRemaining`, cost) — data from `buildings.researchQueue`.
 - Placement via scene (6.9) with live validity (flat/overlap/protected/funds) and cost at cursor.
-- Placed list: icon, full name (no truncation — two-line layout), tier, coords with locate-in-scene button, **HP bar**, occupancy/utilization where meaningful (beds used, storage used, research busy), Move / Upgrade (cost shown, research-gated) / Demolish (cost, confirm).
+- Placed list (the site's building roster, a master list for the inspector, 6.18): icon, full name (no truncation — two-line layout), tier, locate-in-scene button, **HP bar**, occupancy/utilization where meaningful (beds used, seats used, storage used, research busy), a status badge (out of service, demolition ordered, rebuilding); construction sites listed with their progress. A row click selects the building and opens its inspector. Move / Upgrade / Research / Demolish live in the inspector, not on the row.
 - Ramp tool stays here (or moves to a Terrain group with future dig tools): drag line in scene + depth; show cost estimate before confirm.
 
 ### 6.7 Vehicles panel
-- Fleet cards: role icon + tier name, HP bar, status chip (idle / moving / working / hauling→phase / waiting ⚠ / stuck ⚠ / broken), payload bar (kg/capacity) for haulers, driver slot (assigned name → unassign; or licensed-crew picker; or "nobody licensed for X — train someone" link to Crew panel), locate-in-scene, contextual actions per role: **Haul** (with fragment count reachable; auto-best or pick-in-scene), future work orders (drill/dig/fragment/demolish) as the core grows, **Scrap** (confirm + any residual value).
+- Fleet rows (a master list for the inspector, 6.18): role icon + tier name + id, role, status chip (idle / moving / working / hauling→phase / waiting ⚠ / stuck ⚠ / broken), HP and payload mini-bars, driver name, locate-in-scene. A row click selects the vehicle and opens its inspector, which holds the driver slot, cargo, job, Move, Upgrade and **Scrap** (confirm + residual value) — none of them repeat on the row.
 - Buy section: per role (5), per tier (3): localized name, cost, and the stats that differ (speed ×, capacity ×, work rate ×, maintenance ×) so tiers are an informed choice.
 - Traffic advisory line when TrafficJam conditions detected.
 
 ### 6.8 Crew panel (employees)
 - **Roster list** (compact rows): portrait/avatar placeholder (role-colored, matches minion color in scene), name + id, role, morale mini-bar, status icons (union, injured, collapsing, training, resting, driving vehicle #), need-warning pip when any gauge < 30. Click row (or minion in scene, 6.9) → **detail view**.
-- **Detail (expanded row or side sheet):**
+- **Detail — the employee inspector (6.18), never an expanded row:**
   - Identity: name, role, hired-since, location + follow-in-scene.
   - Needs: hunger/fatigue/break gauges with thresholds marked, current activity ("Sleeping at Staff Dormitory, 5t left" from `restTicksRemaining` + building), collapse warning.
   - Skills: per qualification — category (localized), proficiency stars 1–5 with label (Rookie…Master), XP bar to next level, task-speed effect ("×0.70 duration").
@@ -287,9 +287,9 @@ Restructure as a stepped workflow the player can read state from: **1 Drill → 
 ### 6.9 3D scene interactions (new — the biggest structural addition)
 The scene is currently camera-only; the redesign should specify (and implementation will build) a picking layer:
 1. **Hover:** raycast highlight + name tag for employees, vehicles, buildings, drill holes, fragments; terrain shows tile coords + known survey info (uses the dead `showSurveyResult` pathway).
-2. **Select:** click employee/vehicle/building → opens its detail (same component as panel detail); selection outline in scene; Esc/click-away deselects.
+2. **Select:** click employee/vehicle/building/fragment/hole/ramp → opens its inspector (6.18 — the same window a list-row click opens); selection outline in scene; Esc/click-away deselects.
 3. **Placement modes** replacing the 2D tile-picker modal for: building placement (footprint ghost following cursor, green/red validity, cost tag, click confirm / Esc cancel), ramp (drag line), drill grid (drag rectangle with live rows×cols readout), survey target (click with method radius circle preview). The 2D picker can remain as a fallback/tutorial-pinned mode — tutorial rails currently pin regions in it — but primary UX is in-scene. Placement previews must keep working with tutorial `requiredRegion` pinning.
-4. **Contextual actions** on selection (mini action bar): employee → dispatch here / train / detail; hauler → haul this fragment; building → upgrade/move/demolish; hole → edit charge.
+4. **Contextual actions** on selection live in the inspector's action strip (6.18), which replaced the bottom-centre mini action bar.
 5. **Camera:** keep orbit/pan/zoom; add focus-on-selection and minimap-click-to-focus (bridges exist: `__cameraFocus`).
 6. Keep/redesign existing overlays: blast plan (holes, charge colors, delay numbers, tier-gated previews), ghost previews (pending actions), survey heatmap (+ stale fade), danger-zone ring when a blast plan is armed.
 
@@ -325,6 +325,83 @@ Slot cards with name, date, campaign summary (level, day, cash), load/save/delet
 ### 6.17 Tutorial
 Re-skin of the coach card (title, body, "do this" hint, step x/y, progress, PAUSED chip, command hints for power users) + highlight treatment on arbitrary controls. Must keep: bottom docking, never covering the highlighted control, rails inertness, tick-budget pause. One muted "Exit tutorial" button in the title row (behind a confirm; marks the tutorial completed) — no Next, no Skip. Rails always allow that button and the Settings session controls (language, volume, Save & Load, Return to Menu; not Replay Tutorial) (#1332). 23 steps currently reference: speed button, toolbar buttons (survey/blast/contracts/vehicles/build/employees/settings), score panel, balance, event badge — all must remain highlightable in the new layout.
 
+### 6.18 Entity inspector (the contextual window)
+
+**Why.** Selecting a thing used to show a one-line bottom bar. A building's contents, a vehicle's cargo and job, and an employee's details could not be reached from the thing itself: a full warehouse showed its HP and nothing else, employee detail lived only as an expanded Crew row, and vehicles and buildings had no detail at all. Meanwhile the same actions sat in two or three places (bar, list row, panel card), each wired differently.
+
+**Rule: one selection, one window.** Whatever the player selects — by clicking it in the scene, clicking its row in a list, or clicking a mention of it in another inspector — opens the **inspector**: one docked window that is the single home for that entity's facts and for every action on it. All three entry points go through the same selection; the selection drives the window.
+
+**Entry points.** Every inspectable entity is reachable by a click, with no console command:
+
+| Kind | Scene click | List row | Link inside another inspector |
+|---|---|---|---|
+| Building | standing building | Build panel → Placed (also construction and rebuild sites, which have no pickable mesh) | an employee's "inside / resting at / training at"; a vehicle job's destination; a fragment's "stored in" |
+| Vehicle | yes | Fleet panel row | an employee's "aboard"; a building's builder or destroyer; a fragment's "in transit on" |
+| Employee | when on foot | Crew roster row | a building's occupants, residents and trainees; a vehicle's driver; a site's builder |
+| Fragment, drill hole, ramp | yes | — (holes are planned in the Blast Workshop) | a vehicle's cargo (fragments) |
+
+An employee inside a building or a vehicle has no mesh and cannot be clicked in the scene; the roster and the links reach them. Such an entity **stays selected while it exists in the game state**, drawn or not, and the scene highlight goes to its host (the building or vehicle it is in; for a fragment, the vehicle carrying it or the warehouse holding it; for a construction or rebuild site, its footprint).
+
+**Lifecycle.**
+- Selecting an entity opens the inspector, or re-targets it when it is already open. One inspector at a time — no stacking or pinning in this version.
+- It closes on Esc, its close button, a click on empty ground, or when the entity leaves the game state (dismissed, dead, scrapped, demolished, fragment sold). It never closes merely because the entity stopped being drawn.
+- A level switch or a load clears it, as it clears the selection.
+- Opening, closing or switching list panels does not touch it. The open list highlights the selected entity's row, whichever way it was selected (two-way sync).
+- A language switch re-renders it in place rather than closing it.
+
+**Layout.**
+- Docked beside the left panel column: one panel wide, its left edge just right of the column, its top below the modifier chips, its bottom above the bottom-centre dock (the tutorial coach card, the placement parameter strip) — lifted by the same clearance the strip uses while the coach card is up. Height follows content; the body scrolls.
+- It is a hud region in the shell layout registry, so the layout matrix proves it collides with nothing at every matrix viewport. That band is chosen because it is the only one free at all of them — at 1280×720 the toasts and minimap own the right side — and because list-on-the-left, detail-beside-it reads as master and detail.
+- Panel z-layer; it never covers the top bar, minimap, coach card or parameter strip (6.0).
+
+**Anatomy — the same for every kind.**
+1. **Header:** kind icon (role-coloured avatar for an employee), localized name (building tier name, vehicle tier name, employee name), sub-line `#id · kind · tier or role`, **Locate** (frames the camera on the entity, or on its host), close.
+2. **Status line:** one live line saying what the entity is doing or what state it is in.
+3. **Sections:** kind-specific, each under a section header.
+4. **Action strip:** every action on this entity, each showing its cost where it has one and a visible reason when disabled (6.0); destructive ones go through the themed confirm, naming cost and loss.
+
+Every mention of another entity is a link that selects it. Values follow §2.3: structure rebuilds on a signature change, gauges, stock and countdowns are written in place every frame.
+
+**Content per kind.**
+
+*Building, every type:* status (operating · out of service, naming the event and time left · demolition ordered · rebuilding to the next tier with progress · under construction with progress and builder); HP bar with current and max; upkeep $/h; score effects; position. Actions: **Upgrade** (cost; when the next tier is locked, **Research** with cost and duration, then live progress), **Move** (arms the footprint placement tool right there, with its cost), **Demolish** (confirm: cost, nothing refunded, stored explosives *and stored freight ore* lost).
+
+| Type | Sections |
+|---|---|
+| Explosive Warehouse | stock per explosive (localized name, kg); used / capacity gauge; free kg; when stocked, the radius a destroying blast would detonate it at; closed → stock unavailable |
+| Freight Warehouse | stored / capacity gauge; kg reserved by loads in transit; stored kg **per ore** (localized ore names) plus barren rock |
+| Spoil Heap | spoil kg (no capacity) |
+| Living Quarters | beds used / total; residents (link, rest time left); the site-wide housing effect on task speed and the overcapacity warning |
+| Driving Center, Blasting Academy, Management Office, Geology Lab | seats used / total; trainees (link, course and level, time left) and trainees walking in; courses taught at this tier (skill, level, fee, duration), flagged when a higher-tier school is the one offering a skill |
+| Research Center | the research queue: running task (target tier name, progress, time left), pending tasks (cost); paused while closed |
+
+*Vehicle:* status chip (idle, moving, working, hauling phase, waiting N, stuck N, broken); HP with current and max, and repair state; current job (task and its target, linked) with destination and ETA; cargo for haulers (load gauge, kg per ore plus barren rock, fragment count); driver (link) · walking to board (link) · unmanned · no licensed driver (with the route to train one); specs (speed, capacity, work rate) and running cost $/h. Actions: **Move** (to a tile), **Upgrade** (cost; warning when nobody on the roster can drive the next tier), **Scrap** (confirm, residual value).
+
+*Employee:* avatar, role, morale, status icons; location (inside a building · aboard a vehicle — both links · walking to · stuck for N ticks · position) and hire day; now: current activity with its target (linked) and progress, and queued tasks; rest (resting at a building with time left · walking to rest); needs gauge; skills (stars, XP, speed effect) and driving licence tier; pay breakdown with raises; training (in progress at a school — linked — with time left · walking to school · offered courses with Train · why none is offered); manager effect. Actions: **Move** (dispatch to a tile), **Dismiss** (confirm; union rule); Raise and Train sit in their own sections.
+
+*Fragment:* mass, rock, ore content per ore, where it is (on the ground · in transit on a vehicle · stored in a warehouse — links), barren or not. *Drill hole:* depth, diameter, drilled or ordered, charge (explosive, kg, kg from stock, stemming), delay, wet or tubed; editing stays in the Blast Workshop. *Ramp:* width, depth, length; **Widen** with its cost.
+
+**Moving a mobile entity** uses the in-scene point pick that placement already uses (arm, click a tile, confirm), never the hovered tile at the moment of a button click: the inspector is opened from lists as often as from the scene, the target has to be visible before it is confirmed, and a hover-only action fails §2.8.
+
+**Lists are masters, not detail views.** A list row shows only what scanning and comparing a roster needs, plus Locate; a row click selects. Acquiring new entities stays in the list panels (Hire, Buy, Place, Research from the catalog).
+- Crew roster (6.8): avatar, name, role, morale bar, status icons, Locate. No inline detail.
+- Fleet (6.7): icon, tier name and id, role, status chip, HP and load mini-bars, driver name, Locate. No per-vehicle actions.
+- Build → Placed (6.6): icon, tier name and id, HP bar, utilization, status badge, Locate; construction sites with progress. No per-building actions.
+
+**What is shown twice on purpose.** Every fact and action not in this table has exactly one home.
+
+| Shown again | Where | Why |
+|---|---|---|
+| Identity and glanceable status (name, status chip, HP, load, utilization) | list row and inspector header | the list exists to scan and compare many entities; the inspector needs context at the top |
+| Hover tag | scene | transient preview before a click; carries no action |
+| Occupancy labels, task progress bars | scene | spatial, at a glance; carry no action |
+| Site-wide totals (stored kg, collected ore per type, explosive stock by type, total upkeep) | Contracts, Operations, Blast Workshop Charge step, Finances | a question about the site, not one entity; the Charge step needs stock where the explosive is chosen |
+| Courses in a school's inspector and in an employee's | both inspectors | different subjects: what this school teaches versus what this person can learn; **Train** lives only on the employee |
+
+**Retired by this design**, so nothing above is duplicated: the bottom-centre selection bar (its actions move to the action strip; Follow and Focus become the header's Locate; Detail and Train lose their reason to exist); the Crew roster's inline expansion; the Fleet cards' Upgrade, Reposition, Scrap and driver block; the Build placed rows' Move, Upgrade, Research and Demolish; a building's Move that only opened the Build panel; the hover-aimed Move Here and Dispatch Here.
+
+**Testing hooks (§2.5).** Root `#bs-inspector`, carrying the selected kind and id as data attributes; action buttons keep their existing `data-action` values (`dispatch_here`, `move_here`, `upgrade_vehicle`, `upgrade`, `move`, `demolish`, `widen`) and new ones follow the same convention; Locate is `data-action="locate"`; the close button carries the shared panel-close attribute the tutorial rails allow; list rows keep `[data-employee-id]`, `[data-vehicle-id]`, `[data-building-id]` and mark the selected row; Explosive Warehouse stock keeps `[data-info="warehouse-stock"]`. `__uiState()` reports whether the inspector is open and on which kind and id, so scenarios wait on it rather than on a delay.
+
 ---
 
 ## 7. Information the player must *always* be able to answer (acceptance checklist)
@@ -342,6 +419,7 @@ A redesign succeeds if a player can answer each of these without the console:
 10. What happened while I wasn't looking? (notification log)
 11. How do I get deeper / expand the pit? (ramp + dig tools discoverable)
 12. How do I do crimes? (6.14 — discoverable but discreet, consequences legible)
+13. What is inside this building, what is this vehicle carrying and doing, what is this person up to — by clicking it, in the scene or in its list? (6.18)
 
 ---
 
