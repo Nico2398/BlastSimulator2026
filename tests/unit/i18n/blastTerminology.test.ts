@@ -31,8 +31,10 @@ const RENAMED_KEYS = [
 const TUTORIAL_KEYS = RENAMED_KEYS.filter((k) => k.startsWith('tutorial.'));
 
 // Capitalised verbs/nouns are button names; lowercase imperatives are checked too.
+// FR is case-sensitive on purpose: the button name "Tir" is gone, but the generic
+// lowercase noun "tir" (a blast, as in "le tir part") is ordinary prose and allowed.
 const EN_OLD = /\b(fire|firing|detonate|detonation)\b/i;
-const FR_OLD = /\b(Tir|Tirer|Tirez|tirer|tirez)\b|d[ée]clench/i;
+const FR_OLD = /\b(Tir|Tirer|Tirez|tirer|tirez)\b|[Dd][ée]clench/;
 
 describe('blast button terminology (#1749)', () => {
   it('there are 13 renamed keys', () => {
