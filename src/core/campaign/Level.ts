@@ -6,7 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
 import type { MarketId } from '../economy/Market.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
@@ -53,6 +53,14 @@ export interface LevelDef {
   contractPriceMultiplier: number;
   /** Pre-hired roster, fleet and buildings this level opens with (#1363). */
   startingSite?: StartingSiteComposition;
+  /**
+   * Where this level wants its rally point (RallyPoint.ts); the flag goes on
+   * the flat ground nearest it. Omitted, nearest the starting crew, or the
+   * site centre for a level that opens with none.
+   */
+  rallyPoint?: { x: number; z: number };
+  /** Where the placement search for `startingSite.buildings` starts; omitted, the rally point itself. */
+  startingBuildingsNear?: { x: number; z: number };
   /** Weather pinned for the whole level; omitted = normal weather cycle (#1585). */
   fixedWeather?: WeatherState;
   /** Per-tick score decay rate (higher = harder to maintain scores). */
@@ -95,6 +103,8 @@ const LEVELS: readonly LevelDef[] = [
     hiringScript: TUTORIAL_HIRING_SCRIPT,       // Same four hires on every run (#1600)
     scriptedOreSale: TUTORIAL_ORE_SALE_OFFER,   // sell-ore never waits on the random board (#1600)
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
+    rallyPoint: TUTORIAL_RALLY_POINT,                       // Flat plateau, clear of the blast and the building pins
+    startingBuildingsNear: TUTORIAL_STARTING_BUILDINGS_NEAR, // The heap on flat ground west of the box cut, clear of the blast
     fixedWeather: 'sunny',      // Tutorial sky never changes: no rain flooding the scripted blast
     nameKey: 'level.tutorial_pit.name',
     descKey: 'level.tutorial_pit.desc',

@@ -14,6 +14,7 @@ import type { CharacterMesh } from './CharacterMesh.js';
 import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
 import type { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
+import type { RallyFlagMesh } from './RallyFlagMesh.js';
 import { findTrafficJams } from '../core/events/TrafficJams.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
@@ -47,6 +48,8 @@ export interface SyncDeps {
   rampArrows?: RampArrowLayer | null;
   /** One ground marker per active traffic jam (#1208). */
   trafficJamMarkers?: TrafficJamMarkerLayer | null;
+  /** The site's rally flag; optional since not every SyncDeps caller (e.g. tests) builds one. */
+  rallyFlag?: RallyFlagMesh | null;
   terrainMeshRevision: number;
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
@@ -149,6 +152,10 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   // segment is dug. A dig lowers the ground the arrow sampled, so a terrain
   // change rebuilds the survivors.
   deps.rampArrows?.sync(state.plannedRamps, terrainDirty);
+
+  // The rally flag stands on whatever ground is left under its tile, so a dig
+  // or a blast beneath it lowers it rather than leaving it floating.
+  if (deps.lastGrid) deps.rallyFlag?.sync(state.rallyPoint, deps.getTerrainSurfaceY);
 
   // Traffic jam markers (#1208): jams change only when a tick runs, so find
   // them once per tick — unsilenced, a marker shows a jam the player already answered.

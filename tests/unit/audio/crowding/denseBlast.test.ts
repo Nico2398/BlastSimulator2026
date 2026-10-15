@@ -12,8 +12,12 @@ import { expectWorldWithinBudget } from './worldBudget.js';
 const COLLAPSE = 'ore-haul-dispatch';
 const HAULING = 'blast-debris-stranded-ramp';
 const RUN_TIMEOUT_MS = 60_000;
-/** The shot is fired 37 s in; the hauling after it is not needed here. */
-const THROUGH_THE_SHOT_S = 40;
+/**
+ * The shot is fired 32 s in (37 s before the rally point put the crew beside the drill grid), and the 3 s after it
+ * are the shot's own; the hauling after it is not needed here. The next step runs to 41 s and sets the new warehouse,
+ * the first load and the first dump going in one second: that is HAULING's budget, not the collapse's.
+ */
+const THROUGH_THE_SHOT_S = 35;
 
 beforeAll(() => {
   scenarioRun(COLLAPSE, 8, THROUGH_THE_SHOT_S);
@@ -59,8 +63,8 @@ describe(`${COLLAPSE}: a 643-fragment collapse at 8x`, () => {
   });
 
   it('keeps the world to 3 sounds a second, 9 in ten seconds, 22 in thirty', () => {
-    // Measured 3, 12 and 17. The ten-second peak is the second after the shot (#1673: with the crew resting at the shift
-    // length the shot lands among different positions, so two vehicles are scrapped and an alert and an event cue follow).
+    // Measured 3, 8 and 19. The ten-second peak is now the drilling (each hole's drill sound and its done cue); the
+    // second after the shot holds the two vehicles it scraps and the bad-news cue that follows (#1673).
     expectWorldWithinBudget(sim(), { per1s: 3, per10s: 12, per30s: 22 });
   });
 });

@@ -115,7 +115,8 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
  * resolves its dialog for real (same click path as `case
  * 'resolveEventIfPending'`) — extracted so `clickSelector`'s covered-by-div
  * retry (#699) can call the same logic without going through the full
- * interaction-action dispatch. Returns whether it actually resolved a
+ * interaction-action dispatch. Clicks choice `option` (zero-based, the
+ * index `event choose N` takes). Returns whether it actually resolved a
  * pending event dialog.
  *
  * Touches the page exactly once when nothing is pending — a single
@@ -123,7 +124,7 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
  * anything in the way right now" never pays for a wait against a dialog that
  * was never going to appear.
  */
-export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000): Promise<boolean> {
+export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000, option = 0): Promise<boolean> {
   // Ask the game, not the DOM: read the typed `pendingEvent` mirror off
   // __gameState() (main.ts) rather than regex-matching `event status`'s
   // text output — this is the harness deciding whether to wait, the
@@ -154,12 +155,12 @@ export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000):
     return getState?.()?.levelEndReason != null;
   });
   if (levelEnded) {
-    await page.evaluate(() => {
+    await page.evaluate((choice: number) => {
       const run = (window as unknown as {
         __gameConsole?: (c: string) => unknown;
       }).__gameConsole;
-      run?.('event choose 0');
-    });
+      run?.(`event choose ${choice}`);
+    }, option);
     return true;
   }
 
@@ -167,7 +168,7 @@ export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000):
   // genuinely usable (see `waitUsableAndClick`'s own doc comment for why a
   // bare `page.waitForSelector` is the wrong primitive here) rather than
   // probing briefly, and fail loudly if it never becomes usable at all.
-  await waitUsableAndClick(page, '#bs-event-dialog .bs-event-choice', timeoutMs);
+  await waitUsableAndClick(page, `#bs-event-dialog .bs-event-choice:nth-child(${option + 1})`, timeoutMs);
   // The outcome panel replaces the choices; dismiss it if it appears. Its
   // own budget is short, not `timeoutMs` — plenty of events resolve with no
   // outcome panel at all.
@@ -604,7 +605,7 @@ export async function executeActionOnPage(
       // resolveEventIfPendingOnPage so clickSelector's covered-by-div retry
       // (#699) can share it without going through the full action dispatch.
       const evTimeout = action.timeoutMs ?? 30000;
-      await resolveEventIfPendingOnPage(page, evTimeout);
+      await resolveEventIfPendingOnPage(page, evTimeout, action.option ?? 0);
       break;
     }
     case 'clickIfPresent': {

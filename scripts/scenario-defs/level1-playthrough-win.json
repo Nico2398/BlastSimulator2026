@@ -282,13 +282,13 @@
       ]
     },
     {
-      "command": "tick 10",
+      "command": "tick 16",
       "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it. #1362: 8 ticks (was 6): DETONATE fires the blast a few ticks later than the old Sound the Horn + FIRE sequence, which re-rolls the contract board; at 6 the first fillable offer is a tiny dirtite order and the economy never recovers (bankruptcy). Contract draws are seeded by tick, so this pad picks a board whose sales carry the run. #1673: 10 ticks (was 8): the weather cycle now follows the biome (#1688), so the dry desert no longer waits out rain before the blast; the whole timeline moved earlier and the contract board re-rolled. At 8 the first fillable offer was a tiny one and the level went bankrupt before the profit target.",
+      "description": "Let the hauler start clearing the blasted rock before selling it. #1362: 8 ticks (was 6): DETONATE fires the blast a few ticks later than the old Sound the Horn + FIRE sequence, which re-rolls the contract board; at 6 the first fillable offer is a tiny dirtite order and the economy never recovers (bankruptcy). Contract draws are seeded by tick, so this pad picks a board whose sales carry the run. #1673: 10 ticks (was 8): the weather cycle now follows the biome (#1688), so the dry desert no longer waits out rain before the blast; the whole timeline moved earlier and the contract board re-rolled. At 8 the first fillable offer was a tiny one and the level went bankrupt before the profit target. Rally point: 16 ticks (was 10). The crew now spawns around the rally flag (~29,27) with the warehouse at (30,32) and spoil heap at (24,32), not in the origin corner, so drilling ends at tick 73 (was 114) and the blast at 146 (was 200); the board re-rolled and at 10 the first ore sale was not fillable, the command-mode sale cycles closed at $74k of the $80k operating-profit target and payroll ran the site into bankruptcy. Every pad from 12 to 28 completes (sweep re-measured); 16 sits mid-range and completes at tick 224 with ~$91k profit.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 16"
         }
       ]
     },
