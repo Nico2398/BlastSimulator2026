@@ -1918,6 +1918,13 @@ export const NEED_WELL_RESTED_THRESHOLD = 80;
 /** The well-rested morale bonus applied per tick when fatigue is above the threshold. */
 export const NEED_WELL_RESTED_BONUS = 1;
 
+/**
+ * Morale recovered per tick while fatigue sits in the comfortable band
+ * (NEED_MORALE_EFFECT_THRESHOLDS.comfortable up to NEED_WELL_RESTED_THRESHOLD).
+ * Placeholder value for the skeleton (#1778); real value set by the implementer.
+ */
+export const NEED_COMFORT_MORALE_RECOVERY = 0;
+
 /** Soft threshold per gauge: below this, proactive rest routing queues a rest action but does not yet force one. */
 export const NEED_SOFT_THRESHOLDS: Record<NeedKey, number> = {
   fatigue: 25,
