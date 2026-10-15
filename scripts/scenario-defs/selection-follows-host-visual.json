@@ -223,7 +223,7 @@
           "employeeCount": 2
         },
         "changedBy": {
-          "cash": -1000
+          "cash": -800
         }
       }
     },
@@ -244,6 +244,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 26,
+          "z": 14
         },
         {
           "type": "pickTile",
