@@ -285,6 +285,20 @@ export function haulActionCarriesOre(
   return fragmentHasOre(tracked.fragment.oreDensities);
 }
 
+/**
+ * The ore densities of the fragment a haul_debris/fragment_debris action
+ * references, or null for any other action type or a fragment id that no
+ * longer resolves (#1817).
+ */
+export function haulActionOreDensities(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): Record<string, number> | null {
+  void state; void action; void lookup;
+  return null; // TODO: implement
+}
+
 /** True iff `action` is a haul_debris order still queued with no holder (#1370). */
 function isQueuedUnclaimedHaul(action: PendingAction): boolean {
   return action.type === 'haul_debris' && action.status === 'queued' && action.holderId === null;
