@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
+import { isResting } from '../../../src/core/entities/EmployeeRestState.js';
 import {
   holdsRequiredSkill,
   createEmployeeState,
@@ -1666,5 +1667,15 @@ describe('Employee - injury recovery (#1382)', () => {
     const { state, employee } = oneEmployee(80);
     injureEmployee(state, employee.id);
     expect(computeAverageMorale(state.employees)).toBe(80 - INJURY_MORALE_PENALTY);
+  });
+});
+
+describe('isResting', () => {
+  it('is true for an active rest or a rest still being walked to', () => {
+    expect(isResting({ restTicksRemaining: 5, pendingRestDuration: null })).toBe(true);
+    expect(isResting({ restTicksRemaining: null, pendingRestDuration: 10 })).toBe(true);
+  });
+  it('is false when neither is set', () => {
+    expect(isResting({ restTicksRemaining: null, pendingRestDuration: null })).toBe(false);
   });
 });
