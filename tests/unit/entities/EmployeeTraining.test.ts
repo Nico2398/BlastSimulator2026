@@ -36,6 +36,9 @@ import {
   enrolInTraining,
   tickTraining,
   availableTrainingOffers,
+  courseTerms,
+  schoolTrainees,
+  schoolCourses,
   type EnrolInTrainingResult,
   type TrainingPlan,
 } from '../../../src/core/entities/EmployeeTraining.js';
@@ -1181,5 +1184,110 @@ describe('availableTrainingOffers — highest tier (#1726)', () => {
     ]);
     expect(offers).toHaveLength(1);
     expect(offers[0]!.building.tier).toBe(3);
+  });
+});
+
+describe('schoolTrainees (#1760)', () => {
+  function worker(id: number, name: string, patch: Partial<Employee> = {}): Employee {
+    const { employee } = hireEmployee(createGame({ seed: SEED }).employees, 'driller', new Random(SEED), 0, 0);
+    return { ...employee, id, name, trainingState: null, pendingTrainingState: null, alive: true, ...patch };
+  }
+  const course = (buildingId: number, ticksRemaining: number, skill: SkillCategory = 'blasting') =>
+    ({ buildingId, skill, ticksRemaining, fee: 500, grantsLevel: 2 as const });
+
+  it('lists an employee inside the school with course and remaining ticks', () => {
+    const rows = schoolTrainees([worker(1, 'Ann', { trainingState: course(5, 40) })], 5);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      employeeId: 1, name: 'Ann', skill: 'blasting', grantsLevel: 2, ticksRemaining: 40, fee: 500, phase: 'inside',
+    });
+  });
+
+  it('lists a walking-in employee from the pending course', () => {
+    const rows = schoolTrainees([worker(1, 'Ann', { pendingTrainingState: course(5, 90) })], 5);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ phase: 'walking_in', ticksRemaining: 90 });
+  });
+
+  it('separates inside from walking in and sorts inside first, then fewest ticks, then id', () => {
+    const rows = schoolTrainees([
+      worker(9, 'W', { pendingTrainingState: course(5, 10) }),
+      worker(4, 'B', { trainingState: course(5, 30) }),
+      worker(3, 'A', { trainingState: course(5, 30) }),
+      worker(2, 'C', { trainingState: course(5, 70) }),
+    ], 5);
+    expect(rows.map(r => r.employeeId)).toEqual([3, 4, 2, 9]);
+    expect(rows.map(r => r.phase)).toEqual(['inside', 'inside', 'inside', 'walking_in']);
+  });
+
+  it('counts an employee holding both states once, as inside', () => {
+    const rows = schoolTrainees([worker(1, 'Ann', { trainingState: course(5, 20), pendingTrainingState: course(5, 99) })], 5);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ phase: 'inside', ticksRemaining: 20 });
+  });
+
+  it('excludes other schools trainees, dead employees and idle ones', () => {
+    const rows = schoolTrainees([
+      worker(1, 'Other', { trainingState: course(6, 10) }),
+      worker(2, 'OtherWalk', { pendingTrainingState: course(6, 10) }),
+      worker(3, 'Dead', { trainingState: course(5, 10), alive: false }),
+      worker(4, 'Idle'),
+      worker(5, 'Mine', { trainingState: course(5, 10) }),
+    ], 5);
+    expect(rows.map(r => r.employeeId)).toEqual([5]);
+  });
+
+  it('drops a trainee whose course finished', () => {
+    const e = worker(1, 'Ann', { trainingState: course(5, 1) });
+    expect(schoolTrainees([e], 5)).toHaveLength(1);
+    e.trainingState = null;
+    expect(schoolTrainees([e], 5)).toEqual([]);
+  });
+
+  it('returns an empty list for no employees', () => {
+    expect(schoolTrainees([], 5)).toEqual([]);
+  });
+});
+
+describe('courseTerms and schoolCourses (#1760)', () => {
+  it.each([1, 2, 3] as BuildingTier[])('courseTerms(%i) equals the planTraining ticks and fee', tier => {
+    const { employee } = makeStateWithOne('driller');
+    const terms = courseTerms(tier);
+    const plan = planTraining({ ...employee, qualifications: [] }, 'blasting', tier)!;
+    expect(terms.ticks).toBe(plan.ticks);
+    expect(terms.fee).toBe(plan.fee);
+    expect(terms.ticks).toBeGreaterThan(0);
+  });
+
+  it('lists one course per taught skill at the building tier with planTraining terms', () => {
+    const { employee } = makeStateWithOne('driller');
+    const lab = makeBuilding({ id: 2, type: 'geology_lab', tier: 2 });
+    const courses = schoolCourses(lab, availableTrainingOffers([lab]));
+    expect(courses.map(c => c.skill).sort()).toEqual([...trainableSkills('geology_lab')].sort());
+    for (const c of courses) {
+      const plan = planTraining({ ...employee, qualifications: [] }, c.skill, 2)!;
+      expect(c.level).toBe(2);
+      expect(c.ticks).toBe(plan.ticks);
+      expect(c.fee).toBe(plan.fee);
+      expect(c.supersededBy).toBeNull();
+    }
+  });
+
+  it('marks courses superseded by the better school the offers name', () => {
+    const low = makeBuilding({ id: 1, type: 'blasting_academy', tier: 1 });
+    const high = makeBuilding({ id: 2, type: 'blasting_academy', tier: 3 });
+    const offers = availableTrainingOffers([low, high]);
+    for (const c of schoolCourses(low, offers)) expect(c.supersededBy).toBe(high);
+    for (const c of schoolCourses(high, offers)) expect(c.supersededBy).toBeNull();
+  });
+
+  it('does not mark the course superseded when this school is the best offer', () => {
+    const only = makeBuilding({ id: 1, type: 'blasting_academy', tier: 1 });
+    for (const c of schoolCourses(only, availableTrainingOffers([only]))) expect(c.supersededBy).toBeNull();
+  });
+
+  it('returns no courses for a non-school building', () => {
+    expect(schoolCourses(makeBuilding({ type: 'living_quarters' }), [])).toEqual([]);
+    expect(schoolCourses(makeBuilding({ type: 'research_center' }), [])).toEqual([]);
   });
 });

@@ -282,3 +282,43 @@ describe('building inspector — action strip', () => {
     for (const a of view.actions) expect(a.disabled, a.action).toBe(true);
   });
 });
+
+describe('building inspector — people and activity sections (#1760)', () => {
+  it('a living quarters view carries the residents section with a name link', () => {
+    const b = makeBuilding({ type: 'living_quarters', occupantIds: [1] });
+    const s = stateWith(b);
+    const { employee } = hireEmployee(s.employees, 'driller', new Random(7), 0, 0);
+    employee.name = 'Zed Sleeper';
+    employee.restTicksRemaining = 20;
+    b.occupantIds = [employee.id];
+    const root = document.createElement('div');
+    root.append(...viewOf(s).sections);
+    expect(root.querySelector(`[data-select-kind="employee"][data-select-id="${employee.id}"]`)!.textContent).toContain('Zed Sleeper');
+  });
+
+  it('a school view carries the courses and a research center view carries the research line', () => {
+    const school = makeBuilding({ type: 'blasting_academy' });
+    const sRoot = document.createElement('div');
+    sRoot.append(...viewOf(stateWith(school)).sections);
+    expect(sRoot.querySelector('[data-course]')).not.toBeNull();
+    const rc = makeBuilding({ type: 'research_center' });
+    const rRoot = document.createElement('div');
+    rRoot.append(...viewOf(stateWith(rc)).sections);
+    expect(rRoot.querySelector('[data-live="research-idle"]')).not.toBeNull();
+  });
+
+  it('a plain office carries none of the three sections', () => {
+    const root = document.createElement('div');
+    root.append(...viewOf(stateWith(makeBuilding())).sections);
+    expect(root.querySelector('[data-course], [data-live="research-idle"], [data-live="seats"]')).toBeNull();
+  });
+
+  it('the view signature changes when a trainee enrols', () => {
+    const b = makeBuilding({ type: 'blasting_academy' });
+    const s = stateWith(b);
+    const before = viewOf(s).signature;
+    const { employee } = hireEmployee(s.employees, 'driller', new Random(7), 0, 0);
+    employee.pendingTrainingState = { buildingId: 3, skill: 'blasting', ticksRemaining: 50, fee: 100, grantsLevel: 1 };
+    expect(viewOf(s).signature).not.toBe(before);
+  });
+});
