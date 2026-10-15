@@ -341,6 +341,47 @@ describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', 
   });
 });
 
+describe('UIManager — showCrewHiring (#1771)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('opens the Crew panel', () => {
+    uiManager = new UIManager(container);
+    uiManager.showCrewHiring('surveyor');
+    const panel = container.querySelector('#bs-employee-panel') as HTMLElement;
+    expect(panel.style.display).not.toBe('none');
+  });
+
+  it('asks the Crew panel to reveal hiring for the role', () => {
+    const spy = vi.spyOn(CrewPanel.prototype, 'revealHiring');
+    uiManager = new UIManager(container);
+    uiManager.showCrewHiring('surveyor');
+    expect(spy).toHaveBeenCalledWith('surveyor');
+  });
+
+  it('the Survey panel hire button opens Crew hiring for surveyors', () => {
+    const spy = vi.spyOn(CrewPanel.prototype, 'revealHiring');
+    uiManager = new UIManager(container);
+    uiManager.showPanel('survey');
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.employees.employees = [];
+    uiManager.update(state);
+    (container.querySelector('#bs-survey-hire') as HTMLElement).click();
+    expect(spy).toHaveBeenCalledWith('surveyor');
+  });
+});
+
 describe('UIManager — Crew panel Locate forwarding (#1422)', () => {
   let container: HTMLDivElement;
   let uiManager: UIManager;

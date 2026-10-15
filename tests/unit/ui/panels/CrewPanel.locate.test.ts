@@ -111,3 +111,65 @@ describe('CrewPanel — Locate button (#1422)', () => {
     expect(panel.root.querySelector('.bs-employee-detail')).not.toBeNull();
   });
 });
+
+describe('CrewPanel — revealHiring (#1771)', () => {
+  const SURVEYOR_GROUP = '[data-hiring-role="surveyor"]';
+
+  afterEach(() => {
+    delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  function spyScroll(): ReturnType<typeof vi.fn> {
+    const spy = vi.fn();
+    (Element.prototype as unknown as { scrollIntoView: unknown }).scrollIntoView = spy;
+    return spy;
+  }
+
+  it('scrolls the surveyor hiring group into view', () => {
+    const spy = spyScroll();
+    const panel = makePanel();
+    panel.update(makeState([]));
+    panel.revealHiring('surveyor');
+    const group = panel.root.querySelector(SURVEYOR_GROUP)!;
+    expect(group).not.toBeNull();
+    expect(spy).toHaveBeenCalled();
+    expect(spy.mock.contexts.some(c => c === group)).toBe(true);
+  });
+
+  it('scrolls the group of the requested role, not another', () => {
+    const spy = spyScroll();
+    const panel = makePanel();
+    panel.update(makeState([]));
+    panel.revealHiring('driller');
+    const drillerGroup = panel.root.querySelector('[data-hiring-role="driller"]')!;
+    expect(spy.mock.contexts.every(c => c === drillerGroup)).toBe(true);
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('defers the reveal until the first state arrives when none is known yet', () => {
+    const spy = spyScroll();
+    const panel = makePanel();
+    panel.revealHiring('surveyor');
+    expect(spy).not.toHaveBeenCalled();
+    panel.update(makeState([]));
+    const group = panel.root.querySelector(SURVEYOR_GROUP)!;
+    expect(spy.mock.contexts.some(c => c === group)).toBe(true);
+  });
+
+  it('a pending reveal fires once, not on every later update', () => {
+    const spy = spyScroll();
+    const panel = makePanel();
+    panel.revealHiring('surveyor');
+    panel.update(makeState([]));
+    const calls = spy.mock.calls.length;
+    panel.update(makeState([makeEmployee()]));
+    panel.update(makeState([makeEmployee()]));
+    expect(spy.mock.calls.length).toBe(calls);
+  });
+
+  it('does not throw where scrollIntoView is unimplemented', () => {
+    const panel = makePanel();
+    panel.update(makeState([]));
+    expect(() => panel.revealHiring('surveyor')).not.toThrow();
+  });
+});
