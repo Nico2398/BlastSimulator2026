@@ -15,6 +15,9 @@
 //      is what makes this the file's own convention rather than an omission.
 //   4. True cognate: the value is a real, correctly-spelled French word that
 //      happens to match the English one ("Mine", "Total", "Expert").
+//   5. Product term: the game's own vocabulary for an action. "Blast" is the
+//      verb on every blast-flow button in both locales, so the player learns
+//      one word, not "Fire"/"Tirer"/"Detonate"/"Déclencher" for one act.
 //
 // Fictional proper nouns are NOT admissible: the catalogs translate them with
 // French puns (Shatternite → Fracassine, Sparkium → Étincelium), so an
@@ -49,6 +52,11 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   // ── Language picker endonyms ──
   'ui.settings.english', // "English"
   'ui.settings.french',  // "Français"
+
+  // ── Product term: the game's own word for the action ──
+  'ui.blast_workshop.step.fire',       // "Blast"
+  'ui.blast_workshop.footer.fire',     // "Blast"
+  'ui.blast_workshop.preflight.detonate', // "Blast"
 
   // ── True French/English cognates ──
   'need.fatigue',               // "Fatigue"
