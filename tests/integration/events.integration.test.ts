@@ -1108,7 +1108,8 @@ describe('bribe protections shield the next event after a resolved one (#1816)',
     idleThenOpenGate(engine, 'union');
     expect(s.tickCount).toBeGreaterThanOrEqual(protection.expiresAtTick);
     const firedBefore = s.events.firedEventIds.length;
-    for (let i = 0; i < SETTLE_TICKS; i++) {
+    // Stop on the tick it shields: the tick after, the shielding protection has expired and the event fires normally.
+    for (let i = 0; i < SETTLE_TICKS && !protection.shielded; i++) {
       s.events.timers.find(t => t.category === 'union')!.remaining = 1;
       runCommand(engine, 'tick 1');
       expect(s.events.pendingEvent).toBeNull();

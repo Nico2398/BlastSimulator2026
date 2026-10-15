@@ -220,7 +220,7 @@ describe('protection granted the tick an event fires (#1816)', () => {
     const protections: ActiveProtection[] = [];
     grantProtection(protections, 'judge', T0);
     expect(protections[0]!.expiresAtTick).toBeLessThan(GATE_OPEN);
-    driveTicks(state, protections, 'lawsuit', T0, GATE_OPEN + 5, GATE_OPEN);
+    driveTicks(state, protections, 'lawsuit', T0, GATE_OPEN, GATE_OPEN);
     expect(state.pendingEvent).toBeNull();
     expect(state.firedEventIds).toHaveLength(1);
     expect(protections[0]!.dismissalsLeft).toBe(0);
@@ -231,9 +231,9 @@ describe('protection granted the tick an event fires (#1816)', () => {
     const state = justFired();
     const protections: ActiveProtection[] = [];
     grantProtection(protections, 'judge', T0);
-    driveTicks(state, protections, 'lawsuit', T0, GATE_OPEN + 5, GATE_OPEN);
+    driveTicks(state, protections, 'lawsuit', T0, GATE_OPEN, GATE_OPEN);
     expect(state.pendingEvent).toBeNull();
-    driveTicks(state, protections, 'lawsuit', GATE_OPEN + 5, GATE_OPEN + 40, GATE_OPEN);
+    driveTicks(state, protections, 'lawsuit', GATE_OPEN, GATE_OPEN + 40, GATE_OPEN);
     expect(state.pendingEvent).not.toBeNull();
     expect(state.firedEventIds).toHaveLength(2);
   });
@@ -256,7 +256,8 @@ describe('protection granted the tick an event fires (#1816)', () => {
         const protections: ActiveProtection[] = [];
         grantProtection(protections, target, T0);
         expect(protections[0]!.expiresAtTick).toBeLessThan(GATE_OPEN);
-        driveTicks(state, protections, category, T0, GATE_OPEN + 10, GATE_OPEN);
+        // Gate opens at GATE_OPEN: that tick the protection shields; the next tick it has expired.
+        driveTicks(state, protections, category, T0, GATE_OPEN, GATE_OPEN);
         expect(state.pendingEvent).toBeNull();
         expect(state.firedEventIds).not.toContain(eventId);
         expect(protections.map(p => p.target)).toContain(target);
@@ -268,9 +269,9 @@ describe('protection granted the tick an event fires (#1816)', () => {
         const state = justFired();
         const protections: ActiveProtection[] = [];
         grantProtection(protections, target, T0);
-        driveTicks(state, protections, category, T0, GATE_OPEN + 1, GATE_OPEN);
+        driveTicks(state, protections, category, T0, GATE_OPEN, GATE_OPEN);
         expect(state.pendingEvent).toBeNull();
-        driveTicks(state, protections, category, GATE_OPEN + 1, GATE_OPEN + 10, GATE_OPEN);
+        driveTicks(state, protections, category, GATE_OPEN, GATE_OPEN + 10, GATE_OPEN);
         expect(protections).toHaveLength(0);
         expect(state.pendingEvent?.eventId).toBe(eventId);
       });
