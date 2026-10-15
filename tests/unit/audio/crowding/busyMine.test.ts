@@ -36,11 +36,13 @@ const MAX_VOICES = 12;
  * Measured on the breakout game after #1787 (flush crater floors) moved its random-event clock: 5 world sounds in
  * one second (t=320 s: a politics event's alert lands beside a hammer, a vehicle start and a boulder break) and 13
  * voices at once in the shot second (21 sounds, see above). Events are not the shot's doing, only its timing.
+ * Re-measured after merging main's flush crater floors (#1787/#1795) and #1774's sealed-rock hauling: peaks at 14 voices, as the
+ * floors it flattens leave a little more rubble to voice. Limit 14; the engine cap is 32.
  */
 const BREAKOUT_WORLD_PER_SECOND = 5;
 const WORLD_PER_30S = 21;
 const BREAKOUT_WORLD_PER_30S = 22; // 22 measured in the window around that same burst
-const BREAKOUT_MAX_VOICES = 13;
+const BREAKOUT_MAX_VOICES = 14;
 
 const RUN_TIMEOUT_MS = 90_000;
 const SECONDS_PER_MINUTE = 60;

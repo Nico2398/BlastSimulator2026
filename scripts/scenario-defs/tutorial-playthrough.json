@@ -370,8 +370,8 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:4 stemming:1.8",
-      "description": "#1724: the panel's Charge All default is now 7 kg, so the click path sets the amount stepper to 4 explicitly and runs the same 4 kg shot as the command (this file keeps its own 4 kg geometry; at 7 kg the first blast buries the site and the warehouse is never built). #949: retuned from amount:5 stemming:2 -- the tutorial's own catastrophic-rated shot got its overload/under-stemming fixed at tutorialSteps.ts's own (different) geometry, and this file's first blast (fired before any box-cut free face exists) gets the same directional tuning applied to its own 3x3/spacing:3/depth:6 pattern: stemming raised to >= 0.3x depth (1.8m at depth 6) and amount dropped from 5kg to 4kg. Exact safe values for this specific geometry were verified to run clean via the command-mode scenario run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough` -- 59/59 steps OK).",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:1.8",
+      "description": "#1774: 5 kg, not 4 -- a 4 kg shot in a 6 m hole leaves the rubble sealed under the cap (BURDEN_BREAKOUT_MAX), sealed rock gets no haul order, and the crater stays stepped so the later build_ramp click at (15,15) cannot resolve its tile. 5 kg breaks out, the rubble is hauled as before. #1724: the panel's Charge All default is now 7 kg, so the click path sets the amount stepper explicitly and runs the same shot as the command (this file keeps its own 4 kg geometry; at 7 kg the first blast buries the site and the warehouse is never built). #949: retuned from amount:5 stemming:2 -- the tutorial's own catastrophic-rated shot got its overload/under-stemming fixed at tutorialSteps.ts's own (different) geometry, and this file's first blast (fired before any box-cut free face exists) gets the same directional tuning applied to its own 3x3/spacing:3/depth:6 pattern: stemming raised to >= 0.3x depth (1.8m at depth 6) and amount dropped from 5kg to 4kg. Exact safe values for this specific geometry were verified to run clean via the command-mode scenario run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough` -- 59/59 steps OK).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -384,7 +384,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 4
+          "value": 5
         },
         {
           "type": "setStepper",
