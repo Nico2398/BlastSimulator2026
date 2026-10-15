@@ -26,7 +26,6 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
-import { createRunner } from '../../src/console/createRunner.js';
 import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { isAutoDebrisAction } from '../../src/core/economy/HaulDispatch.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
