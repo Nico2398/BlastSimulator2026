@@ -5,6 +5,9 @@
 import { TOOLBAR_TARGET, hasBookedTraining } from './tutorialStepHelpers.js';
 import type { TutorialStage } from './tutorialStages.js';
 
+// The inspector's employee detail for the hired Driver (#1763).
+const DRIVER_DETAIL = '#bs-inspector[data-kind="employee"] .bs-employee-detail[data-employee-role="driver"]';
+
 export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   // #921: dropped the third (assign-driver) stage — a vehicle's driver is
   // claimed automatically now, so the step completes on purchase alone.
@@ -26,9 +29,9 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
     },
     {
       // The inspector shows the selected employee (the driver, after stage 2).
-      target: '#bs-inspector[data-kind="employee"] .bs-employee-detail[data-employee-role="driver"] .bs-train-btn[data-skill="driving.rock_fragmenter"]',
+      target: `${DRIVER_DETAIL} .bs-train-btn[data-skill="driving.rock_fragmenter"]`,
       // Booking the course replaces the button with a status view (#903).
-      doneTarget: '#bs-inspector[data-kind="employee"] .bs-employee-detail[data-employee-role="driver"] .bs-training-active[data-skill="driving.rock_fragmenter"]',
+      doneTarget: `${DRIVER_DETAIL} .bs-training-active[data-skill="driving.rock_fragmenter"]`,
       hintKey: 'tutorial.stage.train_fragmenter',
       orderIssuedWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
       spentWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
