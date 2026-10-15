@@ -124,6 +124,11 @@
       "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:18,10 diameter:0.089",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -360,6 +365,11 @@
       "command": "build freight_warehouse at:1,8",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -519,6 +529,11 @@
       "command": "build_ramp start:27,9 end:17,9 depth:5",
       "description": "The player connects the stranded pocket: a 10 m ramp from (27,9) down to the crater at (17,9), depth 5 (within the slope limit). Ordering only queues dig_ramp_segment work; the crewed rock digger carves it. Geometry traced in the blast-debris-reachability integration test.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"

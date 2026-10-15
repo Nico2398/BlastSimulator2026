@@ -323,6 +323,11 @@
       "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M (Drill.ts), same class of fix as level1-lose-ecology.json's Finding #42/Ground rule #15. spacing:3 already matched the panel's own default; the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct. #553: this only ORDERS the 25 holes as ghosts (state.plannedDrillHoles) -- holeCount stays 0 until a driller physically reaches one. #591: previously only employee #12/vehicle #5 could ever contribute (vehicle #1 stayed permanently deadlocked); now vehicle #1 drills too (see the tick-40 checkpoint below). diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/tutorial-playthrough.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a console-only default (0.15, mining.ts) that drilled each hole slower -- with the real default, holes land a little sooner, shifting the holeCount/cash progression through the fixed tick-40 checkpoints below (re-measured, confirmed via direct trace) while leaving the revolt's own outcome (tick 410, worker_revolt) unchanged in kind. #1151: shifted one cell east and one north. Under the 30-degree slope gate (5,11) and (8,17) sit outside the crew's climb-reachable patch on dusty_hollow, so those two holes could never be claimed and the pattern stalled at 23 of 25. Measured by replaying this file's own steps to this point; start:6,4 is the nearest origin whose whole 5x5 grid is reachable.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

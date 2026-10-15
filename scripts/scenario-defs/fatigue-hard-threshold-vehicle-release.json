@@ -68,6 +68,11 @@
       "description": "#1090-followup: a single hole, both far from spawn and at the tier-1 drill rig's maximum reach (12m, DRILL_RIG_MAX_DEPTH_M[1]) — the combined walk-to-vehicle + long drive + long drill duration alone is enough to drain a fresh driller's fatigue from 99 down through the hard floor before this one hole ever lands, sandbox-confirmed (collapse fires mid-drill at tick 97, this file's own state-dump trace). diameter left at the grid tool's own real default (DRILL_HOLE_DEFAULT_DIAMETER_M) since its strip has no diameter stepper to set one differently, same reasoning the pre-#1090 version of this file already documented for its own drag.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -181,6 +186,11 @@
       "description": "#1090-followup: the freed driller/vehicle pair takes on genuinely NEW work now, not just a resume of the hole it already had — proves the release above was a real, reusable reservation, not a one-shot special case. Uses the real, player-clickable Add Hole tool (`drill_plan add`, Drill.ts's `armAddHoleTool`), which is additive and does not clear the first hole already drilled (unlike `drill_plan grid`, which replaces the whole plan — see DrillPlan.ts's own comment on `clearDrillPlan`). depth set back down to an ordinary 8m via the shared depth stepper (still reading the previous step's 12 — Drill.ts's `gridDepth` field persists across tool arm/disarm, the same class of finding presplit-wall.json's own add-hole step already documents). #1090-followup CI fix: leading `ensureStep 1` added — by this point H1 is drilled but not yet charged, so BlastWorkshop's own `autoAdvance`/`suggestStep` (BlastWorkshop.ts) has already flipped the panel to the Charge tab on its own, leaving the Drill tab's add-hole-tool button hidden (display:none, 0x0) — the exact mechanism `ensureStep`'s own doc comment (scenario-types.ts) names as the root cause behind two of PR #616's fixes.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensureStep",
           "step": 1
         },
@@ -224,6 +234,11 @@
       "command": "drill_plan add x:19 z:14 depth:8 diameter:0.089",
       "description": "A second nearby hole, same reasoning as the one just above — two remaining holes to finish, not one, so `wait_until orderedHoleCount equals:0` below still proves the vehicle survives more than a single reclaim. Leading `ensureStep 1` for the same reason as the previous add-hole step: all three holes drilled so far remain uncharged, so the panel is still auto-advanced to the Charge tab.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensureStep",
           "step": 1

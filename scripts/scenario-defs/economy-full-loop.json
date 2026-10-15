@@ -79,6 +79,11 @@
       "command": "survey seismic x:12 z:12",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -255,6 +260,11 @@
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:14,6 diameter:0.089",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
@@ -578,6 +588,11 @@
     {
       "command": "build freight_warehouse at:1,8",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"

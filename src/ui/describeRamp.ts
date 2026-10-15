@@ -1,4 +1,4 @@
-// BlastSimulator2026 — Title and subline shared by the ramp selection bar and hover tag (#1298)
+// BlastSimulator2026 — Title and subline shared by the ramp inspector and hover tag (#1298)
 
 import { t } from '../core/i18n/I18n.js';
 import type { BuiltRamp } from '../core/state/GameState.js';

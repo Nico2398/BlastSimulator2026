@@ -1,6 +1,6 @@
 {
   "name": "level-switch-clears-selection",
-  "description": "Issue #1322: switching level must drop per-level UI state. Player selects an employee by clicking them in the 3D scene (selection bar shows), the level is won, and the player clicks Continue into the next level; the old level's selection bar must be gone (display none) instead of pointing at an employee that no longer exists.",
+  "description": "Issue #1322: switching level must drop per-level UI state. Player selects an employee by clicking them in the 3D scene (inspector shows), the level is won, and the player clicks Continue into the next level; the old level's inspector must be gone (display none) instead of pointing at an employee that no longer exists.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true",
@@ -21,7 +21,7 @@
     },
     {
       "command": "state",
-      "description": "Player clicks a hired employee in the 3D scene (clickEntity by kind+id); the selection bar must appear. `state` is the inert paired command.",
+      "description": "Player clicks a hired employee in the 3D scene (clickEntity by kind+id); the inspector must appear. `state` is the inert paired command.",
       "interaction": [
         {
           "type": "clickEntity",
@@ -30,13 +30,13 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+          "selector": "#bs-inspector [data-action=\"detail\"]"
         }
       ],
       "role": "player",
       "timeout": 60,
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "usable": "#bs-inspector [data-action=\"detail\"]",
         "changedBy": {
           "cash": 0
         }
@@ -100,11 +100,11 @@
     },
     {
       "command": "state",
-      "description": "The previous level's selection bar must be hidden after the switch (display none lays out to clientHeight 0, a top-level DOM property waitForProperty can read); a stale bar would point at an employee from the old level.",
+      "description": "The previous level's inspector must be hidden after the switch (display none lays out to clientHeight 0, a top-level DOM property waitForProperty can read); a stale bar would point at an employee from the old level.",
       "interaction": [
         {
           "type": "waitForProperty",
-          "selector": "#bs-selection-bar",
+          "selector": "#bs-inspector",
           "property": "clientHeight",
           "expectedValue": 0,
           "timeoutMs": 10000
@@ -113,7 +113,7 @@
       "role": "observe",
       "timeout": 30,
       "expect": {
-        "blocked": "#bs-selection-bar [data-action=\"detail\"]",
+        "blocked": "#bs-inspector [data-action=\"detail\"]",
         "equals": {
           "levelEnded": false
         }

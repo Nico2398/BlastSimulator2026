@@ -23,6 +23,11 @@
       "description": "Real click path: open the build panel, buy living_quarters, pick the known-flat (2,6) tile (building-placement-visual.json already places living_quarters there post-#1008's flatness check), confirm. Ordering only queues a construction site (blue ghost, #556) -- no building exists yet.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },

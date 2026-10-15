@@ -95,7 +95,7 @@
     },
     {
       "command": "vehicle reposition 1 8 20",
-      "description": "Real click path, pre-ramp: select hauler #1 in the 3D scene, rest the cursor on (8,20), press the selection bar's MOVE HERE, then Esc to drop the selection so the bottom-docked bar cannot sit over the ramp placement strip two steps later. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). cameraFocus sits at z=21.5, one tile past the target: at the default orbit the camera ray lands about a tile short of its focus point. Measured in a real browser until the dispatched command read `vehicle reposition 1 8 20`; never adjust it arithmetically.",
+      "description": "Real click path, pre-ramp: select hauler #1 in the 3D scene, rest the cursor on (8,20), press the inspector's MOVE HERE, then Esc to drop the selection so the bottom-docked bar cannot sit over the ramp placement strip two steps later. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). cameraFocus sits at z=21.5, one tile past the target: at the default orbit the camera ray lands about a tile short of its focus point. Measured in a real browser until the dispatched command read `vehicle reposition 1 8 20`; never adjust it arithmetically.",
       "interaction": [
         {
           "type": "clickEntity",
@@ -104,7 +104,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -123,7 +123,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "keypress",
@@ -211,7 +211,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -230,7 +230,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "keypress",

@@ -1,6 +1,6 @@
 {
   "name": "crew-locate-selects-employee",
-  "description": "Crew cards offer a Locate button (#1422): clicking it selects that employee in the scene (selection bar shows DETAIL), and DETAIL expands their crew row.",
+  "description": "Crew cards offer a Locate button (#1422): clicking it selects that employee in the scene (inspector shows DETAIL), and DETAIL expands their crew row.",
   "steps": [
     {
       "command": "new_game seed:42 size:32 staffed:true",
@@ -22,7 +22,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click Locate on a crew card (#1422) \u2014 selects that employee in the scene, so the selection bar offers DETAIL",
+      "description": "Click Locate on a crew card (#1422) \u2014 selects that employee in the scene, so the inspector offers DETAIL",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -39,22 +39,22 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "usable": "#bs-inspector [data-action=\"detail\"]",
         "note": "Locate must select the employee in the scene, not merely move the camera"
       }
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click DETAIL in the selection bar \u2014 opens the Crew panel with that employee's row expanded",
+      "description": "Click DETAIL in the inspector \u2014 opens the Crew panel with that employee's row expanded",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+          "selector": "#bs-inspector [data-action=\"detail\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+          "selector": "#bs-inspector [data-action=\"detail\"]"
         }
       ],
       "role": "player",

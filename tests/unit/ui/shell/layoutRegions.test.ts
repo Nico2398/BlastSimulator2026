@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // #956 — Shell layout region matrix. Every screen-edge HUD region (TopBar,
-// ToolRail, Toasts, SelectionBar, ActivityLog, MiniMap) registers its own on-screen
+// ToolRail, Toasts, Inspector, ActivityLog, MiniMap) registers its own on-screen
 // bounds with the shared `shellLayoutRegistry` (LayoutRegistry.ts). This file
 // proves two things at a matrix of viewport sizes (SHELL_VIEWPORT_MATRIX):
 //
@@ -26,11 +26,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TopBar } from '../../../../src/ui/shell/TopBar.js';
 import { ToolRail } from '../../../../src/ui/shell/ToolRail.js';
 import { Toasts } from '../../../../src/ui/shell/Toasts.js';
-import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
+import { Inspector } from '../../../../src/ui/shell/Inspector.js';
 import { ActivityLog } from '../../../../src/ui/shell/ActivityLog.js';
 import { MiniMap } from '../../../../src/ui/MiniMap.js';
 import { LeftColumn, LEFT_COL_RIGHT_EDGE_PX } from '../../../../src/ui/shell/LeftColumn.js';
-import { SELECTION_BAR_LEFT_COL_GAP_PX, selectionBarLeftCss } from '../../../../src/ui/shell/SelectionBar.js';
 import {
   LayoutRegistry,
   shellLayoutRegistry,
@@ -40,8 +39,9 @@ import {
   type Rect,
 } from '../../../../src/ui/shell/LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../../../../src/ui/tokens.js';
+import { PANEL_WIDTH_PX } from '../../../../src/ui/dom.js';
 
-const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log', 'minimap', 'left-col', 'modifier-chips'] as const;
+const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'inspector', 'activity-log', 'minimap', 'left-col', 'modifier-chips'] as const;
 
 /** Declared bounds of a registered region at a viewport, by id. */
 function boundsFor(id: string, viewport: { width: number; height: number }): Rect {
@@ -67,7 +67,7 @@ describe('shell regions — layout matrix (#956)', () => {
   let topBar!: TopBar;
   let toolRail!: ToolRail;
   let toasts!: Toasts;
-  let selectionBar!: SelectionBar;
+  let inspector!: Inspector;
   let activityLog!: ActivityLog;
   let miniMap!: MiniMap;
   let leftColumn!: LeftColumn;
@@ -77,7 +77,7 @@ describe('shell regions — layout matrix (#956)', () => {
     topBar = new TopBar(container);
     toolRail = new ToolRail(container, () => {});
     toasts = new Toasts(container);
-    selectionBar = new SelectionBar(container);
+    inspector = new Inspector(container);
     activityLog = new ActivityLog(container);
     miniMap = new MiniMap(container);
     leftColumn = new LeftColumn(container);
@@ -89,7 +89,7 @@ describe('shell regions — layout matrix (#956)', () => {
     topBar?.dispose();
     toolRail?.dispose();
     toasts?.dispose();
-    selectionBar?.dispose();
+    inspector?.dispose();
     activityLog?.dispose();
     miniMap?.dispose();
     leftColumn?.dispose();
@@ -128,50 +128,64 @@ describe('shell regions — layout matrix (#956)', () => {
   });
 });
 
-describe('selection bar never covers the left column (#1423)', () => {
+describe('inspector docks beside the left column and clears the other regions (#1756)', () => {
   let container!: HTMLDivElement;
-  let selectionBar!: SelectionBar;
+  let inspector!: Inspector;
   let leftColumn!: LeftColumn;
+  let toasts!: Toasts;
+  let miniMap!: MiniMap;
 
   beforeAll(() => {
     container = mountContainer();
-    selectionBar = new SelectionBar(container);
+    inspector = new Inspector(container);
     leftColumn = new LeftColumn(container);
+    toasts = new Toasts(container);
+    miniMap = new MiniMap(container);
   });
 
   afterAll(() => {
-    selectionBar.dispose();
+    inspector.dispose();
     leftColumn.dispose();
+    toasts.dispose();
+    miniMap.dispose();
   });
 
-  it.each(SHELL_VIEWPORT_MATRIX)('selection bar bounds do not intersect left-col bounds at %o', (viewport) => {
-    const bar = boundsFor('selection-bar', viewport);
+  it('is a hud-layer region', () => {
+    expect(shellLayoutRegistry.list().find(r => r.id === 'inspector')?.layer).toBe('hud');
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('inspector bounds do not intersect left-col bounds at %o', (viewport) => {
+    const box = boundsFor('inspector', viewport);
     const col = boundsFor('left-col', viewport);
-    expect(
-      rectsIntersect(bar, col),
-      `selection-bar ${JSON.stringify(bar)} intersects left-col ${JSON.stringify(col)}`,
-    ).toBe(false);
+    expect(rectsIntersect(box, col), `inspector ${JSON.stringify(box)} intersects left-col ${JSON.stringify(col)}`).toBe(false);
   });
 
-  it.each(SHELL_VIEWPORT_MATRIX)('selection bar keeps the gap right of the column at %o', (viewport) => {
-    const bar = boundsFor('selection-bar', viewport);
-    expect(bar.x).toBeGreaterThanOrEqual(LEFT_COL_RIGHT_EDGE_PX + SELECTION_BAR_LEFT_COL_GAP_PX);
+  it.each(SHELL_VIEWPORT_MATRIX)('inspector sits at or right of the column edge at %o', (viewport) => {
+    expect(boundsFor('inspector', viewport).x).toBeGreaterThanOrEqual(LEFT_COL_RIGHT_EDGE_PX);
   });
 
-  it.each(SHELL_VIEWPORT_MATRIX)('inline left CSS resolves to the same centre as the declared bounds at %o', (viewport) => {
-    const bar = boundsFor('selection-bar', viewport);
-    // jsdom drops max() from style.left, so read the string the constructor assigns.
-    // Expected form: max(50%, Npx) with translateX(-50%), so `left` is the bar centre.
-    const left = selectionBarLeftCss();
-    const m = /^max\(\s*50%\s*,\s*(-?\d+(?:\.\d+)?)px\s*\)$/.exec(left);
-    expect(m, `unexpected inline left "${left}"`).not.toBeNull();
-    const centre = Math.max(viewport.width / 2, Number(m![1]));
-    expect(centre).toBeCloseTo(bar.x + bar.width / 2, 3);
+  it.each(SHELL_VIEWPORT_MATRIX)('inspector is one panel wide at %o', (viewport) => {
+    expect(boundsFor('inspector', viewport).width).toBe(PANEL_WIDTH_PX);
   });
 
-  it.each(SHELL_VIEWPORT_MATRIX.filter(v => v.width >= 1920))('bar stays centred at wide viewport %o', (viewport) => {
-    const bar = boundsFor('selection-bar', viewport);
-    expect(bar.x).toBeCloseTo((viewport.width - bar.width) / 2, 3);
+  it.each(SHELL_VIEWPORT_MATRIX)('inspector top edge is below the top bar at %o', (viewport) => {
+    expect(boundsFor('inspector', viewport).y).toBeGreaterThanOrEqual(TOPBAR_HEIGHT_PX);
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('inspector does not intersect toasts at %o', (viewport) => {
+    const box = boundsFor('inspector', viewport);
+    const other = boundsFor('toasts', viewport);
+    expect(rectsIntersect(box, other), `inspector ${JSON.stringify(box)} intersects toasts ${JSON.stringify(other)}`).toBe(false);
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('inspector does not intersect the minimap at %o', (viewport) => {
+    const box = boundsFor('inspector', viewport);
+    const other = boundsFor('minimap', viewport);
+    expect(rectsIntersect(box, other), `inspector ${JSON.stringify(box)} intersects minimap ${JSON.stringify(other)}`).toBe(false);
+  });
+
+  it('no selection-bar region is registered any more', () => {
+    expect(shellLayoutRegistry.has('selection-bar')).toBe(false);
   });
 });
 

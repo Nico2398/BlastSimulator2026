@@ -27,6 +27,11 @@
       "timeout": 90,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -150,6 +155,11 @@
       "description": "Same still-armed tool: pick a free tile, Confirm becomes usable and the order goes through.",
       "timeout": 60,
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "pickTile",
           "x": 10,

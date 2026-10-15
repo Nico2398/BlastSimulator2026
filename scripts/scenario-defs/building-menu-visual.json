@@ -47,6 +47,11 @@
       "description": "#556: order-time validation and charging are unchanged from a direct placement -- only the result differs: a construction site is queued (orderedBuildingCount:1) instead of the building existing immediately (buildingCount stays 0). This step's own auto-captured screenshot is the 'ghost appears at order' checkpoint.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -108,6 +113,11 @@
       "command": "build management_office at:10,3",
       "description": "#556: same order-then-build semantics as the order above.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
@@ -172,6 +182,11 @@
       "description": "#556: same order-then-build semantics as the orders above.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
         },
@@ -229,6 +244,11 @@
       "description": "#556: same order-then-build semantics as the orders above.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
         },
@@ -284,6 +304,11 @@
     {
       "command": "build freight_warehouse at:4,14",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "awaitUsable",
           "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
@@ -350,6 +375,11 @@
     {
       "command": "build geology_lab at:10,13",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "awaitUsable",
           "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"

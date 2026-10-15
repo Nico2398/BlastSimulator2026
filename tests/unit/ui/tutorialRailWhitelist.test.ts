@@ -73,7 +73,7 @@ function buildFixture(): Probe[] {
   const blast = add(document.body, 'div', { id: 'bs-blast-panel' });
   probe('grid tool', ['drill-plan'], add(blast, 'button', { 'data-action': 'grid-tool' }));
 
-  const sel = add(document.body, 'div', { id: 'bs-selection-bar' });
+  const sel = add(document.body, 'div', { id: 'bs-inspector' });
   probe('demolish', [], add(sel, 'button', { 'data-action': 'demolish' }));
   probe('fire employee', [], add(sel, 'button', { 'data-action': 'fire-employee' }));
 

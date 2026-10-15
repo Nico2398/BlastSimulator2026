@@ -110,6 +110,11 @@
       "description": "Survey 1/2: seismic, pre-blast estimate.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -286,6 +291,11 @@
     {
       "command": "survey core_sample x:20 z:20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
@@ -648,6 +658,11 @@
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"

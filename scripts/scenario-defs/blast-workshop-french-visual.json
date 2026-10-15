@@ -39,6 +39,11 @@
       "description": "Split out of the original bundled setup step (issue #479). Drag (5,5)-(8,8) is 3x3 at the panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts) — matches the declared spacing:3 exactly, no stepper click needed (unlike most other blast-* grid steps, Finding #4). #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

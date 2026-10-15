@@ -25,6 +25,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -105,6 +110,11 @@
       "description": "Place a Research Center, tier 1 — the prerequisite the previous step was missing.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
@@ -201,6 +211,11 @@
       "description": "Proof the unlock is real, not just queued: tier 2 living quarters actually builds now, in both modes. Goes one step further than the playtest's own beat 7 (which stops at asserting the Place button is usable) so command mode has a real completion to check against — equals/increased have no interaction-only exemption (unlike usable/blocked/tutorialStep, scenario-types.ts's ScenarioStepGoal), so a step whose interaction only set the tier selector without clicking Buy would assert a buildingCount increase interaction mode never produced.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "set",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",

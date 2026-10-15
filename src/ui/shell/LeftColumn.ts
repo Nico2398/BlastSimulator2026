@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Left column shell region (#1423)
 // Owns the `bs-left-col` element that stacks the left-side panels, and
 // declares its worst-case envelope so the layout matrix can prove the
-// selection bar never covers it.
+// inspector never covers it.
 
 import { PANEL_WIDTH_PX } from '../dom.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';

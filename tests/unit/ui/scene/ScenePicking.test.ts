@@ -254,9 +254,9 @@ describe('ScenePicking (class — canvas wiring, debounce, click-vs-drag)', () =
 
   const SAMPLE_HIT: EntityPick = { kind: 'employee', id: 5, point: new THREE.Vector3(1, 0, 1), distance: 10 };
 
-  // ── aim latch (the SelectionBar-unreachable bug) ──────────────────────────
+  // ── aim latch (the Inspector-unreachable bug) ──────────────────────────
   //
-  // The SelectionBar is position:fixed over a full-viewport canvas, so a mouse
+  // The Inspector is position:fixed over a full-viewport canvas, so a mouse
   // can never reach Dispatch Here / Move Here / Haul without firing mouseleave
   // on the canvas first. While those handlers read the live hover, mouseleave
   // cleared it and every one of them bailed — the action was impossible with a

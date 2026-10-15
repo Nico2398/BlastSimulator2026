@@ -475,6 +475,11 @@
       "description": "#1431: living quarters keep wellBeing above zero through the drill and blast, so the revolt lands after the blast instead of before it.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -507,6 +512,11 @@
       "command": "build living_quarters at:25,17",
       "description": "#1431: living quarters keep wellBeing above zero through the drill and blast, so the revolt lands after the blast instead of before it.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -559,6 +569,11 @@
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:6,5",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"

@@ -109,6 +109,11 @@
       "command": "survey seismic x:20 z:20",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -286,6 +291,11 @@
       "command": "survey core_sample x:25 z:25",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
@@ -458,6 +468,11 @@
     {
       "command": "survey aerial x:30 z:30",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"aerial\"]"

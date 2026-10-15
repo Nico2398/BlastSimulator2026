@@ -124,9 +124,9 @@ export class ScenePicking {
    * `currentHover` answers two different questions that need opposite
    * lifetimes: "what should be highlighted right now" (clear it the moment the
    * cursor leaves) and "what is the player aiming at" (must outlive the trip to
-   * a HUD button). Using it for both made every SelectionBar action that reads
+   * a HUD button). Using it for both made every Inspector action that reads
    * the aim — Dispatch Here, Move Here, Haul — impossible to use with a mouse:
-   * the bar is `position:fixed` over a full-viewport canvas, so reaching the
+   * the inspector is `position:fixed` over a full-viewport canvas, so reaching the
    * button always fires `mouseleave` first, and the handler then read `null` and
    * bailed one millisecond later. Proven in a real browser: the identical click
    * dispatched synchronously (no cursor travel) worked; via a real mouse it

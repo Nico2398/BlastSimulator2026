@@ -24,6 +24,11 @@
       "description": "3x3 grid at the grid tool's own default spacing (DEFAULT_SPACING_M=3) — the (20,20)-(23,23) drag needs no spacing-stepper click first. #947 CI-fix: `diameter:0.089` added to match Drill.ts's DEFAULT_DIAMETER_M — the grid tool has no diameter stepper, so interaction mode always confirms at the UI's fixed 89mm regardless of clicks, while this command previously fell back to drillPlan.ts's own 0.15 default; that gap fed computeDrillHoleDurationTicks a different diameter per mode (same class of bug as blast-charge-loading-ui.json's #947 fix). Depth also diverged: the grid tool's own DEFAULT_DEPTH_M is 6m, not this command's declared 8m, and nothing below clicked the depth stepper to raise it — so interaction mode drilled shallower/faster holes than command mode simulated. Two increment clicks on the depth stepper (data-field=\"depth\", default 6 -> 8) raise interaction mode's grid depth to match the command's own explicit depth:8 before the drag+confirm, instead of watering the scenario's declared depth down to the UI default. Rally-point spawns: the pattern starts at (20,20), not (15,15). The staffed crew now gathers around the rally flag at (2,8), which put the idle driver at (7,12) about 8.5m from a (15,15) pattern and inside its flyrock (a third death). At (20,20) the bystanders stand about 15m or more from the nearest hole, as they did before the rally flag existed, so only the crew that worked the pattern is caught.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

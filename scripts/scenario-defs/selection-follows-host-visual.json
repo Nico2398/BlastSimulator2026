@@ -1,6 +1,6 @@
 {
   "name": "selection-follows-host-visual",
-  "description": "A selection lasts as long as its entity exists in state, not as long as it has a mesh (#1755). A player clicks Locate on the Crew row of an employee resting inside Living Quarters and the selection bar keeps showing them across ticks and after they step out; then selects a building, orders its upgrade, and it stays selected through demolition (Rebuilding, actions disabled) until the new tier stands.",
+  "description": "A selection lasts as long as its entity exists in state, not as long as it has a mesh (#1755). A player clicks Locate on the Crew row of an employee resting inside Living Quarters and the inspector keeps showing them across ticks and after they step out; then selects a building, orders its upgrade, and it stays selected through demolition (Rebuilding, actions disabled) until the new tier stands.",
   "steps": [
     {
       "command": "new_game seed:42 cash:200000",
@@ -55,6 +55,11 @@
       "timeout": 30,
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -133,7 +138,7 @@
     },
     {
       "command": "state",
-      "description": "Click Locate on the driller's Crew row while they rest inside Living Quarters (#1755): previously selected for one frame, then dropped because no mesh. The selection bar must offer DETAIL.",
+      "description": "Click Locate on the driller's Crew row while they rest inside Living Quarters (#1755): previously selected for one frame, then dropped because no mesh. The inspector must offer DETAIL.",
       "timeout": 40,
       "role": "player",
       "interaction": [
@@ -151,7 +156,7 @@
         }
       ],
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "usable": "#bs-inspector [data-action=\"detail\"]",
         "equals": {
           "insideBuildingCount": 1
         },
@@ -173,8 +178,8 @@
         "increased": [
           "tickCount"
         ],
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
-        "note": "Selection bar still showing the hidden employee after the ticks"
+        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "note": "Inspector still showing the hidden employee after the ticks"
       }
     },
     {
@@ -195,7 +200,7 @@
         "equals": {
           "insideBuildingCount": 0
         },
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "usable": "#bs-inspector [data-action=\"detail\"]",
         "note": "Still selected after stepping out"
       }
     },
@@ -233,6 +238,11 @@
       "timeout": 30,
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -372,7 +382,7 @@
     },
     {
       "command": "state",
-      "description": "Player clicks the Living Quarters (building #1) in the scene; the selection bar offers Upgrade.",
+      "description": "Player clicks the Living Quarters (building #1) in the scene; the inspector offers Upgrade.",
       "timeout": 40,
       "role": "player",
       "interaction": [
@@ -383,22 +393,22 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"upgrade\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
         }
       ],
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"upgrade\"]"
+        "usable": "#bs-inspector [data-action=\"upgrade\"]"
       }
     },
     {
       "command": "build upgrade 1",
-      "description": "Click Upgrade in the selection bar. The old building keeps standing until the Wrecking Rascal demolishes it.",
+      "description": "Click Upgrade in the inspector. The old building keeps standing until the Wrecking Rascal demolishes it.",
       "timeout": 40,
       "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"upgrade\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
         }
       ],
       "expect": {
@@ -408,7 +418,7 @@
         "equals": {
           "buildingCount": 2
         },
-        "usable": "#bs-selection-bar",
+        "usable": "#bs-inspector",
         "note": "Upgrade ordered; building still standing"
       }
     },
@@ -424,6 +434,13 @@
           "equals": 1,
           "maxTicks": 1200,
           "timeoutMs": 90000
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-inspector [data-action=\"demolish\"]",
+          "property": "disabled",
+          "expectedValue": true,
+          "timeoutMs": 10000
         }
       ],
       "expect": {
@@ -431,8 +448,8 @@
           "buildingCount": 1,
           "orderedBuildingCount": 1
         },
-        "usable": "#bs-selection-bar",
-        "blocked": "#bs-selection-bar [data-action=\"demolish\"]",
+        "usable": "#bs-inspector",
+        "blocked": "#bs-inspector [data-action=\"demolish\"]",
         "note": "Bar still visible (no mesh, held by site) and its Demolish button is disabled by the Rebuilding state"
       }
     },
@@ -456,7 +473,7 @@
           "buildingCount": 2,
           "orderedBuildingCount": 0
         },
-        "usable": "#bs-selection-bar [data-action=\"demolish\"]",
+        "usable": "#bs-inspector [data-action=\"demolish\"]",
         "note": "Bar still showing, Demolish usable again: selected building is the new tier"
       }
     }

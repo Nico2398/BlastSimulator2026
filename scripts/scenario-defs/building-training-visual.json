@@ -73,6 +73,11 @@
       "command": "build driving_center at:3,5",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -110,6 +115,11 @@
     {
       "command": "build blasting_academy at:10,3",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"blasting_academy\"] .bs-build-buy-btn"
@@ -151,6 +161,11 @@
       "command": "build management_office at:14,5",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
         },
@@ -184,6 +199,11 @@
     {
       "command": "build geology_lab at:20,5",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"
