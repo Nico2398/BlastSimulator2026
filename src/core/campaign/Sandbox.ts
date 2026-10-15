@@ -14,7 +14,7 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -47,9 +47,9 @@ export interface SandboxDifficultyDef {
  * keeps easy > normal > hard strictly.
  */
 export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
-  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: 250_000 },
-  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: 150_000 },
-  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: 120_000 },
+  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: SANDBOX_STARTING_CASH.easy },
+  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: SANDBOX_STARTING_CASH.normal },
+  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: SANDBOX_STARTING_CASH.hard },
 } as const;
 
 export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy', 'normal', 'hard'];

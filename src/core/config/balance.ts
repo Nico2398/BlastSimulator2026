@@ -1561,6 +1561,16 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
 };
 
 /**
+ * Opening cash per sandbox difficulty (#1747). Richer kits start with more
+ * cash, so easy has the most and hard the least.
+ */
+export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxDifficultyId, number>> = {
+  easy: 250_000,
+  normal: 150_000,
+  hard: 120_000,
+};
+
+/**
  * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
  * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
  * operating-profit target before wellbeing collapses into a revolt (~tick
