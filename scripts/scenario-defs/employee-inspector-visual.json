@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 size:32 cash:300000 staffed:true",
-      "description": "Staffed opening (#551): employee 3 is the driver, who holds no blasting qualification, so the Blasting Academy offers them a course. Employee 2 (the blaster) is the roster row clicked at the end.",
+      "description": "Staffed opening (#551): employee 4 is the driver, who holds no blasting qualification, so the Blasting Academy offers them a course. Employee 2 (the blaster) is the roster row clicked at the end.",
       "interaction": [
         {
           "type": "command",
@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "build blasting_academy at:10,3",
+      "command": "build blasting_academy at:14,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -36,14 +36,14 @@
         },
         {
           "type": "cameraFocus",
-          "x": 10.5,
-          "z": 3.5,
-          "distance": 25
+          "x": 14.5,
+          "z": 5.5,
+          "distance": 30
         },
         {
           "type": "pickTile",
-          "x": 10,
-          "z": 3
+          "x": 14,
+          "z": 5
         },
         {
           "type": "screenshot"
@@ -86,8 +86,13 @@
     },
     {
       "command": "employee list",
-      "description": "Clicking employee 3 in the scene opens the inspector with the full detail: identity, location, now, needs, skills, pay, training with a Train button for the academy's course, and dismiss. The command-mode stand-in is a read-only list; the click is what interaction mode proves.",
+      "description": "Clicking employee 4 in the scene opens the inspector with the full detail: identity, location, now, needs, skills, pay, training with a Train button for the academy's course, and dismiss. The command-mode stand-in is a read-only list; the click is what interaction mode proves.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickIfPresent",
           "selector": "#bs-inspector [data-panel-close]",
@@ -96,15 +101,28 @@
         {
           "type": "clickEntity",
           "kind": "employee",
-          "id": 3
+          "id": 4
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-employee-detail"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-employee-detail"
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-train-btn[data-skill=\"blasting\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"blasting\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "mousemove",
+          "x": 570,
+          "y": 400
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": -3000
         },
         {
           "type": "screenshot"
@@ -112,16 +130,16 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-train-btn[data-skill=\"blasting\"]"
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"blasting\"]"
       }
     },
     {
-      "command": "employee train 3 skill:blasting building:1",
+      "command": "employee train 4 skill:blasting building:1",
       "description": "Train from the inspector itself. Enrolment sends the employee walking to the school (#1203), so trainingCount stays 0 until they enter it.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-train-btn[data-skill=\"blasting\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"blasting\"]"
         },
         {
           "type": "screenshot"
@@ -160,18 +178,31 @@
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-training-active[data-skill=\"blasting\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-training-active[data-skill=\"blasting\"]"
+        },
+        {
+          "type": "mousemove",
+          "x": 570,
+          "y": 400
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": -3000
+        },
+        {
+          "type": "screenshot"
         },
         {
           "type": "screenshot"
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] [data-select-kind=\"building\"][data-select-id=\"1\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] [data-select-kind=\"building\"][data-select-id=\"1\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] [data-select-kind=\"building\"][data-select-id=\"1\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] [data-select-kind=\"building\"][data-select-id=\"1\"]"
         },
         {
           "type": "awaitUsable",
