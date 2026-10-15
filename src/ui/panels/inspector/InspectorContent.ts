@@ -2,6 +2,10 @@
 import type { GameState } from '../../../core/state/GameState.js';
 import type { EntityPick } from '../../scene/ScenePicking.js';
 import type { InspectorAction } from '../../shell/Inspector.js';
+import { buildingContent } from './buildingContent.js';
+import { vehicleContent } from './vehicleContent.js';
+import { employeeContent } from './employeeContent.js';
+import { pickedContent } from './pickedContent.js';
 
 export type InspectorKind = EntityPick['kind'];
 
@@ -37,7 +41,15 @@ export interface KindContent {
   view(entity: Pick<EntityPick, 'kind' | 'id'>, state: GameState, links: InspectorLinks): InspectorView | null;
 }
 
+const CONTENT: Record<InspectorKind, KindContent> = {
+  building: buildingContent,
+  vehicle: vehicleContent,
+  employee: employeeContent,
+  fragment: pickedContent,
+  hole: pickedContent,
+  ramp: pickedContent,
+};
+
 export function contentFor(kind: InspectorKind): KindContent {
-  void kind;
-  return undefined as unknown as KindContent; // TODO: implement
+  return CONTENT[kind];
 }

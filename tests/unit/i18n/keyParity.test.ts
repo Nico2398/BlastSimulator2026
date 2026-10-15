@@ -493,8 +493,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1648: +3 keys (tutorial buy-charging-truck step): 3976.
     // #1662: +1 key (ui.settings.audio.credits): 3977.
     // #1675: +4 keys (rating_cap_fizzled_failure / _fizzled_partial in ui.blast_workshop.report and mining.blast): 3981.
-    // #1676: depth_full + depth_surface removed, depth_metres added, net -1: 3980. #1678: +6 explosive-stock keys: 3986. #1679: +4 drill-reach keys: 3990. #1686: +10 sandbox keys: 4000. #1683: +4 survey-depth keys: 4004. #1683: +1 depth-log row key: 4005. #1685: +14 explosive-stock UI keys: 4019. #1684: +5 survey ore-row keys: 4024. #1684: +4 compact-number keys (ui.survey.compact_lt1/k/m/b): 4028. #1714: +1 order-blocked key: 4029. #1731: +2 sandbox detail depth keys: 4031. #1726: +5 training-level keys, -1 unused (train_already_qualified): 4035. #1724: +3 breakout report keys: 4038. #1752: -1 hovertag no_survey key: 4037. #1751: -1 shell.topbar.paused: 4036. #1771: +2 survey blocker keys (blocked_title, hire_surveyor): 4038.
-    expect(Object.keys(en).length).toBe(4038);
+    // #1676: depth_full + depth_surface removed, depth_metres added, net -1: 3980. #1678: +6 explosive-stock keys: 3986. #1679: +4 drill-reach keys: 3990. #1686: +10 sandbox keys: 4000. #1683: +4 survey-depth keys: 4004. #1683: +1 depth-log row key: 4005. #1685: +14 explosive-stock UI keys: 4019. #1684: +5 survey ore-row keys: 4024. #1684: +4 compact-number keys (ui.survey.compact_lt1/k/m/b): 4028. #1714: +1 order-blocked key: 4029. #1731: +2 sandbox detail depth keys: 4031. #1726: +5 training-level keys, -1 unused (train_already_qualified): 4035. #1724: +3 breakout report keys: 4038. #1752: -1 hovertag no_survey key: 4037. #1751: -1 shell.topbar.paused: 4036. #1771: +2 survey blocker keys (blocked_title, hire_surveyor): 4038. #1756: +32 inspector.* keys, -15 shell.selection.* keys: 4055.
+    expect(Object.keys(en).length).toBe(4055);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

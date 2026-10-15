@@ -375,7 +375,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-selection-bar [data-info=\"warehouse-stock\"][data-stock-kg=\"20\"][data-free-kg=\"480\"]"
+          "selector": "#bs-inspector [data-info=\"warehouse-stock\"][data-stock-kg=\"20\"][data-free-kg=\"480\"]"
         },
         {
           "type": "screenshot"

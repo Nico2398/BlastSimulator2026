@@ -56,7 +56,7 @@ const REGIONS: Array<[string, string]> = [
   ['#bs-world-map', 'world_map'],
   ['#bs-level-end-screen', 'level_end'],
   ['#bs-saves-modal', 'saves'],
-  ['#bs-selection-bar', 'selection'], // scene selection bar (redesign P2)
+  ['#bs-inspector', 'inspector'], // entity inspector (6.18)
 ];
 
 /**

@@ -117,7 +117,7 @@ Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the q
 | `scope:economy` | `src/core/economy`, `src/core/campaign`, `src/core/scores` |
 | `scope:world` | `src/core/world`, `src/core/weather`, `src/core/events` |
 | `scope:ui` | The shared UI base: `UIManager`, `PanelBase`, `dom`, `styles`, `tokens`, `icons` — clashes with every UI area below |
-| `scope:hud` | `src/ui/shell` (top bar, tool rail, selection bar, toasts, activity log), `src/ui/notify`, `MiniMap*`, `KeyboardShortcuts`, `gameConsole` |
+| `scope:hud` | `src/ui/shell` (top bar, tool rail, inspector, toasts, activity log), `src/ui/notify`, `MiniMap*`, `KeyboardShortcuts`, `gameConsole` |
 | `scope:panels` | Management panels and modals in `src/ui/panels` (crew, fleet, contracts, finances, operations, shady, survey, settings, saves, event, confirm), `crewDetailSections`, `fleetDetailSections`, `accidentLookup` |
 | `scope:workshop` | Blast planning UI: `BlastWorkshop`, `src/ui/panels/blastSteps`, `blastFooter`, `BlastReportModal`, `PreflightModal` |
 | `scope:scene` | In-scene interaction: `src/ui/scene` (placement, picking, hover tags), `BuildMenu`, `describeRamp` |

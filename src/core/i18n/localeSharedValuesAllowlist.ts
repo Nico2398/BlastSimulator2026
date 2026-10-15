@@ -86,6 +86,9 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.portfolio.back', // "MENU" — identical in French UI convention
   'ui.portfolio.star_progress', // "{earned} / {total} ★" — format-only, no natural-language content
   'ui.portfolio.biome.tropical', // "TROPICAL" — true cognate
+  'inspector.description', // "Description"
+  'inspector.kind.fragment', // "Fragment"
+  'inspector.stock', // "Stock"
   'ui.operations.fragment_count', // "{count} fragments"
   'ui.operations.incidents', // "Incidents"
   'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue

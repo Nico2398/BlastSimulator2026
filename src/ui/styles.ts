@@ -3,6 +3,7 @@
 
 import { GUIDED_CLASS, ALLOWED_CLASS } from './tutorialGuide.js';
 import { RAILED_CONTROL_SELECTOR } from './tutorialActivationGuard.js';
+import { INSPECTOR_LEFT_PX, INSPECTOR_TOP_PX, INSPECTOR_BOTTOM_PX } from './panels/inspector/inspectorLayout.js';
 
 /** Rail rule selector list, derived from the shared constant so the keyboard guard and CSS cannot drift. */
 const RAIL_RULE_SELECTORS = RAILED_CONTROL_SELECTOR.split(',')
@@ -105,6 +106,19 @@ const CSS = `
    of sitting behind it — same screen edge, same z-stack region. */
 #bs-param-strip { bottom: 18px; }
 body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
+/* ─── Entity inspector (6.18) ───
+   Docked right of the left column, below the modifier chips. Height follows
+   content up to the band above the bottom-centre dock; the coach card lifts
+   that bottom edge by the same clearance the parameter strip uses. */
+#bs-inspector {
+  --bs-inspector-bottom: ${INSPECTOR_BOTTOM_PX}px;
+  position: fixed;
+  left: ${INSPECTOR_LEFT_PX}px;
+  top: ${INSPECTOR_TOP_PX}px;
+  z-index: var(--bsx-z-panel);
+  max-height: calc(100vh - ${INSPECTOR_TOP_PX}px - var(--bs-inspector-bottom));
+}
+body.bs-tutorial-card #bs-inspector { --bs-inspector-bottom: var(--bsx-tutorial-card-clearance, 210px); }
 /* The coach card's title sits inline with the CLOCK HELD chip and step counter
    instead of owning a bordered header row. */
 .bs-tutorial-box .bs-panel-title {

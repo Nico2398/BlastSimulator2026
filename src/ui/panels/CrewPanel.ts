@@ -85,8 +85,8 @@ export class CrewPanel extends PanelBase {
 
   /**
    * Expand a specific employee's card and scroll it into view — the
-   * panel-side half of the scene selection bar's DETAIL/TRAIN actions
-   * (src/ui/shell/SelectionBar.ts via UIManager.showEmployeeDetail), which
+   * panel-side half of the inspector's DETAIL/TRAIN actions
+   * (src/ui/shell/Inspector.ts via UIManager.showEmployeeDetail), which
    * pick an employee in the 3D scene and need their card opened here, not
    * just the panel shown.
    */

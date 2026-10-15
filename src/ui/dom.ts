@@ -295,7 +295,7 @@ const TRAILING_BTN_STYLE =
  * A panel's root element: the rounded card itself, hidden until `show()`.
  * `display` is set on its own line rather than inside the cssText string —
  * jsdom's parser drops a declaration that shares cssText with a `var(...)`
- * value (see SelectionBar.ts).
+ * value (see Inspector.ts).
  */
 export function panelRoot(id: string): HTMLElement {
   const root = el('div', { className: 'bsx-root', attrs: { id } });

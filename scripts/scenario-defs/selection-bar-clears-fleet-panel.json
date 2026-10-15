@@ -1,6 +1,6 @@
 {
   "name": "selection-bar-clears-fleet-panel",
-  "description": "#1423: at 1280x720 with the Fleet and Crew panels open in the left column, selecting an employee shows the selection bar. Reaches the state only: no step goal compares two element rects (expect has no rect-disjoint form), so the geometric proof lives in tests/unit/ui/shell/layoutRegions.test.ts. A vehicle cannot be selected by a player click without scene picking; the Fleet panel's locate button only moves the camera.",
+  "description": "#1423: at 1280x720 with the Fleet and Crew panels open in the left column, selecting an employee shows the inspector. Reaches the state only: no step goal compares two element rects (expect has no rect-disjoint form), so the geometric proof lives in tests/unit/ui/shell/layoutRegions.test.ts. A vehicle cannot be selected by a player click without scene picking; the Fleet panel's locate button only moves the camera.",
   "steps": [
     {
       "command": "new_game seed:42 size:32 staffed:true",
@@ -43,7 +43,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Open Crew and locate an employee so the selection bar appears beside the open left-column panels",
+      "description": "Open Crew and locate an employee so the inspector appears beside the open left-column panels",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -60,8 +60,8 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
-        "note": "selection bar visible while a left-column panel is open"
+        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "note": "inspector visible while a left-column panel is open"
       }
     }
   ]

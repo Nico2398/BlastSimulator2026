@@ -583,7 +583,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"dispatch_here\"]"
+          "selector": "#bs-inspector [data-action=\"dispatch_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -602,7 +602,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"dispatch_here\"]"
+          "selector": "#bs-inspector [data-action=\"dispatch_here\"]"
         },
         {
           "type": "keypress",
