@@ -107,6 +107,7 @@ export function tickDetonation(state: GameState): DetonationPhase {
     const stranded = orderEvacuation(state);
     if (stranded !== null) {
       pending.lastEvacuationTick = state.tickCount;
+      // Employees accumulate (union): anyone ever caught inside stays reported. Vehicles use the latest verdict, below.
       pending.strandedEmployeeIds = [...new Set([...pending.strandedEmployeeIds, ...stranded.employees])];
       // Latest verdict, not a union: a vehicle since rescued or awaiting its rescuer (#1746) is no longer stranded.
       pending.strandedVehicleIds = stranded.vehicles;

@@ -481,6 +481,11 @@ export function bestAvailableManagerLevel(employees: readonly Employee[]): numbe
   return best;
 }
 
+/** Resting, or walking to a rest whose timer has not started yet (#437). */
+export function isResting(employee: Pick<Employee, 'restTicksRemaining' | 'pendingRestDuration'>): boolean {
+  return employee.restTicksRemaining !== null || employee.pendingRestDuration !== null;
+}
+
 /**
  * The living roster — every employee still `alive`. Shared filter for any
  * aggregate/threshold computed over the roster (headcount-style stats,

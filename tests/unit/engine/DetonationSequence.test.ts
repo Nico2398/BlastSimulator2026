@@ -242,18 +242,24 @@ describe('tickDetonation', () => {
     expect(emp.destinationX).not.toBeNull();
   });
 
-  it('re-evacuation sends a licensed employee who was outside the zone when armed for a driverless vehicle (#1746)', () => {
+  it('re-evacuation sends a licensed employee who became available after arm time, clearing the stranded verdict (#1746)', () => {
     const state = chargedState();
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 30, 30);
     vehicle.occupantIds = [];
     const bystander = addWorker(state, 70, 70);
     assignSkill(state.employees, bystander.id, 'driving.excavator', 1);
+    bystander.injured = true; // unavailable when armed
     armDetonation(state);
+    expect(state.pendingDetonation!.strandedVehicleIds).toContain(vehicle.id);
+    expect(detonationPhase(state).kind).toBe('stranded');
+
+    bystander.injured = false; // freed before the next re-evacuation
     state.tickCount = DETONATION_REEVACUATE_INTERVAL_TICKS;
-    tickDetonation(state);
+    const phase = tickDetonation(state);
 
     expect(bystander.itinerary).not.toBeNull();
     expect(state.pendingDetonation!.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(phase.kind).not.toBe('stranded');
   });
 
   it('stays stranded (never ready) while the stranded occupant is still inside', () => {

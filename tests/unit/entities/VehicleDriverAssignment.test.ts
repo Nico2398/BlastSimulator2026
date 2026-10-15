@@ -65,39 +65,6 @@ describe('findAvailableDriverForReposition — eligibility', () => {
   });
 });
 
-describe('findAvailableDriverForReposition — onlyAmong filter (#1648)', () => {
-  it('considers only the listed employees, even when a closer licensed one exists', () => {
-    const { vs, es, vehicle, rng } = makeFixture(220);
-    addLicensedDriver(es, rng, 21, 21);
-    const listed = addLicensedDriver(es, rng, 0, 0);
-
-    expect(findAvailableDriverForReposition(vehicle, vs, es, [listed.id])?.id).toBe(listed.id);
-  });
-
-  it('returns null for an empty list and for ids matching nobody', () => {
-    const { vs, es, vehicle, rng } = makeFixture(221);
-    addLicensedDriver(es, rng, 21, 21);
-
-    expect(findAvailableDriverForReposition(vehicle, vs, es, [])).toBeNull();
-    expect(findAvailableDriverForReposition(vehicle, vs, es, [9999])).toBeNull();
-  });
-
-  it('still applies eligibility to a listed employee', () => {
-    const { vs, es, vehicle, rng } = makeFixture(222);
-    const listed = addLicensedDriver(es, rng, 21, 21);
-    listed.injured = true;
-
-    expect(findAvailableDriverForReposition(vehicle, vs, es, [listed.id])).toBeNull();
-  });
-
-  it('treats undefined like no filter', () => {
-    const { vs, es, vehicle, rng } = makeFixture(223);
-    const near = addLicensedDriver(es, rng, 21, 21);
-
-    expect(findAvailableDriverForReposition(vehicle, vs, es, undefined)?.id).toBe(near.id);
-  });
-});
-
 // Each case puts the INELIGIBLE employee closer to the vehicle than the
 // eligible one, so a dropped guard doesn't merely widen the pool — it changes
 // the answer, and the assertion catches it.
