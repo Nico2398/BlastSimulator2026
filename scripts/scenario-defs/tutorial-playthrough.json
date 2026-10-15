@@ -971,8 +971,10 @@
         },
         {
           "type": "focusTile",
-          "x": 20,
-          "z": 25
+          "x": 17,
+          "z": 20,
+          "distance": 35,
+          "pitch": 75
         },
         {
           "type": "dragTiles",
