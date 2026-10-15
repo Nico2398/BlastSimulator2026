@@ -107,4 +107,51 @@ describe('retargetRampLayers (#1719)', () => {
     const s = make([action(1)], []);
     expect(retargetRampLayers(s, () => false)).toBe(0);
   });
+
+  describe('lead layer with no reachable own cell falls back to the ramp\'s other segments (#1827)', () => {
+    /** Segment 0 cells at x 10..14, z=10; segment 1 cells at x 10..14, z=11. */
+    const twoBandRamp = (): PlannedRamp => {
+      const r = ramp(1, [1, 2]);
+      r.segments[1]!.cells = [10, 11, 12, 13, 14].map(x => ({ x, y: -1, z: 11 }));
+      return r;
+    };
+
+    it('retargets to the nearest reachable column of another segment and counts it', () => {
+      const s = make([action(1), action(2)], [twoBandRamp()]);
+      const moved = retargetRampLayers(s, (_a, x, z) => z === 11 && x >= 13);
+      expect(moved).toBe(1);
+      expect(targetOf(s, 1)).toEqual({ x: 13, z: 11 });
+      expect(targetOf(s, 2)).toEqual({ x: 12, z: 10 });
+    });
+
+    it('a reachable own cell wins over a nearer reachable cell of another segment', () => {
+      const s = make([action(1), action(2)], [twoBandRamp()]);
+      // Own cell (14,10) is 2 columns away; the other segment's (12,11) is 1 away and also reachable.
+      const moved = retargetRampLayers(s, (_a, x, z) => (z === 10 && x === 14) || (z === 11 && x === 12));
+      expect(moved).toBe(1);
+      expect(targetOf(s, 1)).toEqual({ x: 14, z: 10 });
+    });
+
+    it('leaves the lead untouched and counts nothing when no column of the ramp is reachable', () => {
+      const s = make([action(1), action(2)], [twoBandRamp()]);
+      expect(retargetRampLayers(s, () => false)).toBe(0);
+      expect(targetOf(s, 1)).toEqual({ x: 12, z: 10 });
+    });
+
+    it('never moves a claimed lead, even when another segment is reachable', () => {
+      const s = make([action(1, { status: 'assigned' }), action(2)], [twoBandRamp()]);
+      expect(retargetRampLayers(s, (_a, _x, z) => z === 11)).toBe(0);
+      expect(targetOf(s, 1)).toEqual({ x: 12, z: 10 });
+    });
+
+    it('asks about each shared column once (cells deduped across segments)', () => {
+      const r = ramp(1, [1, 2]);
+      r.segments[1]!.cells = bandCells(-1); // same columns as segment 0
+      const s = make([action(1), action(2)], [r]);
+      const canReach = vi.fn(() => false);
+      retargetRampLayers(s, canReach);
+      // centre probe + 5 own columns; the second segment adds no new column.
+      expect(canReach).toHaveBeenCalledTimes(6);
+    });
+  });
 });
