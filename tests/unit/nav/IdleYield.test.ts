@@ -45,8 +45,8 @@ describe('pickYieldCell', () => {
   it('picks a cell beside a 1-wide corridor rather than the next corridor cell', () => {
     // Corridor z=2, x=3..10; open room cells at x<=2. Blocker at (6,2), route runs along the corridor.
     const g = flatGrid(14, 5);
-    const isCorridor = (x: number, z: number) => x >= 3 && x <= 10;
-    const free = (x: number, z: number) => inBounds(g, x, z) && (!isCorridor(x, z) || z === 2) && !(x === 6 && z === 2);
+    const isCorridor = (x: number) => x >= 3 && x <= 10;
+    const free = (x: number, z: number) => inBounds(g, x, z) && (!isCorridor(x) || z === 2) && !(x === 6 && z === 2);
     const route = new Set<string>();
     for (let x = 0; x <= 13; x++) route.add(key(x, 2));
     const picked = pickYieldCell(g, { x: 6, z: 2 }, route, free, IDLE_YIELD_SEARCH_RADIUS_CELLS);
