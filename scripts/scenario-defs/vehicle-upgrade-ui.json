@@ -1,6 +1,6 @@
 {
   "name": "vehicle-upgrade-ui",
-  "description": "A player upgrades a vehicle in place twice by clicking: the Fleet panel card Upgrade button (tier 1 to 2), then the selection-bar Upgrade button after selecting the vehicle (tier 2 to 3). Each click costs the purchase-price difference.",
+  "description": "A player upgrades a vehicle in place twice by clicking: the Fleet panel card Upgrade button (tier 1 to 2), then the inspector Upgrade button after selecting the vehicle (tier 2 to 3). Each click costs the purchase-price difference.",
   "steps": [
     {
       "command": "new_game seed:42 cash:300000",
@@ -75,7 +75,7 @@
     },
     {
       "command": "vehicle upgrade 1",
-      "description": "Player selects the vehicle by its (only) Fleet panel row, then clicks the selection-bar Upgrade button: tier 2 to 3 costs 100,000 - 50,000.",
+      "description": "Player selects the vehicle by its (only) Fleet panel row, then clicks the inspector Upgrade button: tier 2 to 3 costs 100,000 - 50,000.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -83,11 +83,11 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"upgrade_vehicle\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"upgrade_vehicle\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade_vehicle\"]"
         }
       ],
       "role": "player",

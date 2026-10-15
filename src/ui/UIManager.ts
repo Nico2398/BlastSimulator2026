@@ -85,7 +85,7 @@ export class UIManager {
     // Left column — panels (temporary adapter, per the implementation plan:
     // panel bodies migrate to the new dock chrome surface-by-surface in
     // P4-P9; P1 only replaces the shell around them). Self-registers its
-    // bounds so the selection bar can keep clear of it (#1423).
+    // bounds so the inspector can keep clear of it (#1423).
     this.leftColumn = new LeftColumn(container);
     const leftCol = this.leftColumn.el;
 
@@ -537,7 +537,7 @@ export class UIManager {
     if (changed) this.cues?.panelShown(true);
   }
 
-  /** Open the Crew panel with a specific employee's card expanded — the DETAIL/TRAIN actions of the scene selection bar (src/ui/shell/SelectionBar.ts). */
+  /** Open the Crew panel with a specific employee's card expanded — the DETAIL/TRAIN actions of the inspector (src/ui/shell/Inspector.ts). */
   showEmployeeDetail(id: number): void {
     this.showPanel('employees');
     this.crewPanel.expandEmployee(id);

@@ -25,6 +25,11 @@
       "description": "One increment click on the spacing stepper (data-field=\"spacing\") raises it 3->4m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(23,19) rectangle computes the declared 3x2 instead of the default-spacing 4x2 (issue #479 follow-up, Finding #4). #553: confirming the grid queues 6 drill_hole PendingActions and pushes 6 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

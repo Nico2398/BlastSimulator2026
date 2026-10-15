@@ -79,6 +79,11 @@
       "command": "survey seismic x:20 z:20",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -239,6 +244,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
       "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: shrunk from 4x4 (16 holes) to 2x2 (4 holes) -- this file demonstrates the core gameplay loop end to end, not blast density, and a single driller cannot land 16 holes without risking a worker_revolt (sandbox-measured elsewhere in this pass). Drag rectangle previously 'corrected' to (20,20)-(26,26), but that arithmetic was wrong: a 6x6 span at spacing 3 is round(6/3)+1 = round(2)+1 = 3, a 3x3=9 grid (reproduced: orderedHoleCount came back 9, not 4). Drill.ts's real formula is cols/rows = Math.max(1, Math.round((x2-x1)/spacing)+1) (blastSteps/Drill.ts:286-287,304-305) -- to land exactly 2 per axis needs round(size/3)=1, i.e. size in [1.5,4.5). Re-corrected to (20,20)-(23,23), a 3x3 span: round(3/3)+1 = 1+1 = 2, a true 2x2=4-hole grid.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"

@@ -1,6 +1,6 @@
 {
   "name": "ramp-width-select-widen",
-  "description": "#1298: ramp width is a player choice and a built ramp can be selected and widened. A player arms the ramp tool, raises the width param from the default 3 to 5 with the width stepper, drags the corridor and confirms (cost scales with width); once the ramp is dug BuiltRamp state reports one ramp of width 5. The player then clicks the ramp in the scene: the selection bar offers Widen and no Demolish (a ramp is a terrain feature, not a building). Clicking Widen orders only the delta, and once the extra side strips are dug the ramp is 7 wide. Contract for console-api state: builtRampCount (state.builtRamps.length) and builtRampWidth (width of the first built ramp, 0 when none).",
+  "description": "#1298: ramp width is a player choice and a built ramp can be selected and widened. A player arms the ramp tool, raises the width param from the default 3 to 5 with the width stepper, drags the corridor and confirms (cost scales with width); once the ramp is dug BuiltRamp state reports one ramp of width 5. The player then clicks the ramp in the scene: the inspector offers Widen and no Demolish (a ramp is a terrain feature, not a building). Clicking Widen orders only the delta, and once the extra side strips are dug the ramp is 7 wide. Contract for console-api state: builtRampCount (state.builtRamps.length) and builtRampWidth (width of the first built ramp, 0 when none).",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -57,24 +57,24 @@
     {
       "command": "state",
       "timeout": 90,
-      "description": "Player clicks the dug ramp in the scene (viewport centre after a near top-down focusTile on the corridor midpoint, so the ray lands on the floor tile whatever the dug depth). The selection bar shows the ramp with a Widen action; Demolish must not exist (a ramp is a terrain feature).",
+      "description": "Player clicks the dug ramp in the scene (viewport centre after a near top-down focusTile on the corridor midpoint, so the ray lands on the floor tile whatever the dug depth). The inspector shows the ramp with a Widen action; Demolish must not exist (a ramp is a terrain feature).",
       "interaction": [
         { "type": "focusTile", "x": 20, "z": 25, "distance": 16, "pitch": 80 },
         { "type": "click", "x": 640, "y": 360 },
-        { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"widen\"]", "timeout": 60000 }
+        { "type": "waitForSelector", "selector": "#bs-inspector [data-action=\"widen\"]", "timeout": 60000 }
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"widen\"]",
+        "usable": "#bs-inspector [data-action=\"widen\"]",
         "note": "Ramp selected; widen offered (width 5 < max 7). Demolish absence is asserted by unit tests."
       }
     },
     {
       "command": "widen_ramp id:1 width:7",
       "timeout": 30,
-      "description": "Player clicks Widen on the selection bar. Each click steps to the next option (5 -> 7) and orders only the delta cost, length * (7 - 5) * RAMP_COST_PER_METER_PER_WIDTH.",
+      "description": "Player clicks Widen on the inspector. Each click steps to the next option (5 -> 7) and orders only the delta cost, length * (7 - 5) * RAMP_COST_PER_METER_PER_WIDTH.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-selection-bar [data-action=\"widen\"]" }
+        { "type": "clickSelector", "selector": "#bs-inspector [data-action=\"widen\"]" }
       ],
       "role": "player",
       "expect": {

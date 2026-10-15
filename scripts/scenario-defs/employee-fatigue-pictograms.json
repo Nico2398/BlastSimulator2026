@@ -35,6 +35,11 @@
       "description": "Ordered before any employee exists — the first idle hire below (Walt) auto-claims and builds it (#556), landing him right next to it once done, which is what makes his own later rest near-instant and keeps him out of the way of the Stan/Bob pair this file is actually about. (32,32) is flat ground at this seed — confirmed live; (10,10)/(50,50) are not.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },

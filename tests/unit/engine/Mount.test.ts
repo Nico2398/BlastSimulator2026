@@ -25,6 +25,8 @@ import { openMovementTrail, appendToTrail } from '../../../src/core/entities/Mov
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { NavCell } from '../../../src/core/nav/NavGrid.js';
 
+import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
+
 const SEED = 42;
 
 /** A `driver` employee already holds the truck licence — boards a hauler/destroyer directly. */
@@ -737,6 +739,215 @@ describe('releaseOccupantsOfRemovedVehicles (#1389)', () => {
     expect(releaseOccupantsOfRemovedVehicles(state)).toEqual([]);
     expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
     expect(onFoot.locomotion).toEqual({ kind: 'on_foot' });
+  });
+});
+
+
+describe('releaseOccupantsOfRemovedVehicles - walkers to a removed vehicle (#1781)', () => {
+  const footLeg = (destX: number, destZ: number) => ({
+    mode: 'foot', vehicleId: null, destX, destZ, arrival: 'adjacent',
+    onArrive: { kind: 'none' }, estTicks: 5,
+  });
+  const boardLeg = (vehicleId: number, destX: number, destZ: number) => ({
+    mode: 'foot', vehicleId: null, destX, destZ, arrival: 'adjacent',
+    onArrive: { kind: 'board', vehicleId }, estTicks: 5,
+  });
+  const driveLeg = (vehicleId: number) => ({
+    mode: 'drive', vehicleId, destX: 40, destZ: 40, arrival: 'exact',
+    onArrive: { kind: 'none' }, estTicks: 5,
+  });
+
+  /** A stuck walker on foot at (7,9) heading to board `vehicleId`, itinerary [foot leg, board leg]. */
+  function walkerTo(state: ReturnType<typeof createGame>, vehicleId: number) {
+    const employee = hireTruckDriver(state, 7, 9);
+    employee.itinerary = {
+      legs: [footLeg(12, 12), boardLeg(vehicleId, 14, 12), driveLeg(vehicleId)],
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      workTicks: 0,
+      estTotalTicks: 15,
+    } as never;
+    employee.destinationX = 12;
+    employee.destinationZ = 12;
+    employee.pendingDriverVehicleId = vehicleId;
+    employee.moveConsecutiveFailures = 12;
+    employee.isMoveStuck = true;
+    employee.vehicleWaitingTicks = 9;
+    employee.blockEpisode = { destX: 12, destZ: 12, count: 3 };
+    return employee;
+  }
+
+  it('drops the order of a walker whose target vehicle was removed', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const employee = walkerTo(state, vehicle.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.itinerary).toBeNull();
+    expect(employee.pendingDriverVehicleId).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 7, z: 9 });
+  });
+
+  it('resets the stuck state of that walker', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const employee = walkerTo(state, vehicle.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.moveConsecutiveFailures).toBe(0);
+    expect(employee.vehicleWaitingTicks).toBe(0);
+    expect(employee.isMoveStuck).toBe(false);
+    expect(employee.blockEpisode).toBeUndefined();
+  });
+
+  it('leaves the walker dispatchable: no order, no destination, no pending vehicle, no task', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const employee = walkerTo(state, vehicle.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    // The reading EmployeeDispatch and isIdleForReposition use.
+    expect(employee.pendingDriverVehicleId).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX === null && employee.destinationZ === null).toBe(true);
+    expect(employee.alive).toBe(true);
+  });
+
+  it('does not emit employee:alighted for the walker and does not list it as released', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const employee = walkerTo(state, vehicle.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+    const emitter = new EventEmitter();
+    const seen: unknown[] = [];
+    emitter.on('employee:alighted', e => seen.push(e));
+
+    const released = releaseOccupantsOfRemovedVehicles(state, emitter);
+
+    expect(seen).toEqual([]);
+    expect(released).not.toContain(employee.id);
+  });
+
+  it('clears a walker whose itinerary names the removed vehicle only in a drive leg', () => {
+    const state = createGame({ seed: SEED });
+    const employee = hireTruckDriver(state, 7, 9);
+    employee.itinerary = {
+      legs: [driveLeg(999)],
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    } as never;
+    employee.destinationX = 40;
+    employee.destinationZ = 40;
+    employee.pendingDriverVehicleId = null;
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+  });
+
+  it('clears a walker with a stale board leg when pendingDriverVehicleId is null', () => {
+    const state = createGame({ seed: SEED });
+    const employee = walkerTo(state, 999);
+    employee.pendingDriverVehicleId = null;
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+  });
+
+  it('leaves a walker heading to a live vehicle untouched', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const employee = walkerTo(state, vehicle.id);
+    const itinerary = employee.itinerary;
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.itinerary).toBe(itinerary);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+    expect(employee.destinationX).toBe(12);
+    expect(employee.moveConsecutiveFailures).toBe(12);
+    expect(employee.isMoveStuck).toBe(true);
+  });
+
+  it('leaves a walker heading to a different live vehicle untouched when another vehicle is removed', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle: live } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const { vehicle: doomed } = purchaseVehicle(state.vehicles, 'debris_hauler', 25, 25);
+    const walker = walkerTo(state, live.id);
+    const other = walkerTo(state, doomed.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== doomed.id);
+    const itinerary = walker.itinerary;
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(walker.itinerary).toBe(itinerary);
+    expect(walker.pendingDriverVehicleId).toBe(live.id);
+    expect(walker.isMoveStuck).toBe(true);
+    expect(other.itinerary).toBeNull();
+    expect(other.pendingDriverVehicleId).toBeNull();
+  });
+
+  it('still releases a mounted employee of the removed vehicle and emits employee:alighted', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    const walker = walkerTo(state, vehicle.id);
+    const rider = hireTruckDriver(state, 3, 3);
+    rider.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+    const emitter = new EventEmitter();
+    const seen: Array<{ employeeId: number; vehicleId: number }> = [];
+    emitter.on('employee:alighted', e => seen.push(e));
+
+    const released = releaseOccupantsOfRemovedVehicles(state, emitter);
+
+    expect(released).toEqual([rider.id]);
+    expect(seen).toEqual([{ employeeId: rider.id, vehicleId: vehicle.id }]);
+    expect(rider.locomotion).toEqual({ kind: 'on_foot' });
+    expect(walker.itinerary).toBeNull();
+  });
+
+  it('leaves an employee with a foot-only itinerary untouched', () => {
+    const state = createGame({ seed: SEED });
+    const employee = hireTruckDriver(state, 7, 9);
+    employee.itinerary = {
+      legs: [footLeg(12, 12)],
+      goal: { kind: 'reposition', x: 12, z: 12 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    } as never;
+    employee.destinationX = 12;
+    employee.destinationZ = 12;
+    const itinerary = employee.itinerary;
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expect(employee.itinerary).toBe(itinerary);
+    expect(employee.destinationX).toBe(12);
+    expect(employee.destinationZ).toBe(12);
+  });
+
+  it('leaves world invariants clean after clearing a walker', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 20, 20);
+    walkerTo(state, vehicle.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+
+    releaseOccupantsOfRemovedVehicles(state);
+
+    expectNoWorldInvariantViolations(state);
   });
 });
 

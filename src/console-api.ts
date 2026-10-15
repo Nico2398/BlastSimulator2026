@@ -2,6 +2,7 @@
 // Exports the game engine's pure logic without browser dependencies.
 
 import { getMaxBuildingTier } from './core/entities/Building.js';
+import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { createRunner, type RunnerWithContext } from './console/createRunner.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
@@ -15,6 +16,7 @@ import { getProfitShortfall } from './core/campaign/LevelObjective.js';
 import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
+import { isActive } from './core/events/ActiveModifiers.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -88,6 +90,8 @@ export interface SerializableGameState {
   collapsedCount: number;
   /** Lowest `fatigue` (0-100, 100 = fully rested) across the roster — the employee closest to collapse. 100 with no employees. */
   minFatigue: number;
+  /** Employees currently inside a building (locomotion `inside`) — resting or training; they have no character mesh (#1755). */
+  insideBuildingCount: number;
   /** Employees currently in the `isMoveStuck` state — pathfinding has failed STUCK_THRESHOLD consecutive times (EntityMovementTick.ts). */
   stuckEmployeeCount: number;
   /** Contracts currently accepted and in progress (state.contracts.active) — proves accept/deliver-completion actually moved a contract, not just clicked at. */
@@ -123,6 +127,8 @@ export interface SerializableGameState {
    * stock against, so mere presence in the pool is the whole condition.
    */
   rubbleDisposalOffered: boolean;
+  /** An event's blasting ban is in force (#1414): `blast` is refused until it lapses, so a scenario waits for `false` before firing instead of padding ticks. */
+  blastBanned: boolean;
   /** An `ore_sale` for blingite is on the board at any quantity (`hasOreSaleOffer`, #1586): the wait before accepting a sale storage cannot fill yet. */
   blingiteSaleOffered: boolean;
   /**
@@ -223,6 +229,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     trainingCount: livingEmployees.filter(e => e.trainingState !== null).length,
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    insideBuildingCount: livingEmployees.filter(e => isInsideBuilding(e.locomotion)).length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
@@ -230,6 +237,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     fillableRustiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite'),
     winningRustiteSaleOffered: hasWinningOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite', getProfitShortfall(s.campaign.activeLevelId, s.finances)),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount),
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,

@@ -454,6 +454,11 @@
       "command": "survey seismic x:20 z:20",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "survey"
         },
@@ -508,6 +513,11 @@
       "command": "survey core_sample x:20 z:20",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
@@ -557,6 +567,11 @@
     {
       "command": "survey aerial x:20 z:20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"aerial\"]"
@@ -890,6 +905,11 @@
       "command": "build freight_warehouse at:6,0",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -941,6 +961,11 @@
       "command": "build spoil_heap at:12,0",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -980,6 +1005,11 @@
     {
       "command": "build spoil_heap at:16,0",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1138,6 +1168,11 @@
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1178,6 +1213,11 @@
       "command": "build living_quarters at:36,0",
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1220,6 +1260,11 @@
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1260,6 +1305,11 @@
       "command": "build living_quarters at:36,4",
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1321,6 +1371,11 @@
       "command": "build_ramp start:24,6 end:24,19 depth:7",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1366,6 +1421,11 @@
     {
       "command": "drill_plan grid rows:4 cols:6 spacing:3 depth:6 diameter:0.089 start:20,20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -2132,6 +2192,11 @@
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,35",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "blast"
         },
@@ -2850,6 +2915,11 @@
       "command": "drill_plan grid rows:5 cols:6 spacing:3 depth:6 diameter:0.089 start:15,25",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "blast"
         },
@@ -2953,7 +3023,7 @@
         "changedBy": {
           "tickCount": 0
         },
-        "note": "TODO(#1781): the pins from step 110 on include a 30-tick freeze of employee #1 after blast 2: at the step-88 DETONATE (tick 1502) #1775 orders driller #1 to fetch drill rig #8 out of the zone, the step-89 fire-anyway destroys rig #8 the same tick, and the rescue order to the destroyed rig is not dropped, so employee #1 stands stuck at (37,7), skipped by dispatch, until MOVE_STUCK_ABANDON_TICKS gives up at tick 1532. That shifts pattern 3 (holeCount 7 at step 116) and the score pins at steps 132, 162 and 163. Re-measure every pin from step 110 on once #1781 lands. #1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. Merge of #1773 (well-being stays a managed score once Living Quarters stand) over the rally-point layout and #1770: the quarters no longer pin wellBeing at 99.95, it now sits between about 48 and 55 (overwork and accident drags). The event drawn on the first tick of the drilling wait above (tick 1515) is weighted by those scores, so it is now politics_efficiency_expert (option 0: +20% work rate, a morale dip) rather than politics_ai_replacement, whose option 0 made driller #8 quit under the #1770-only merge. Nobody leaves, so employeeCount is back to 15 here and 17 after the pattern-4 hires. Deaths after blasts 3 and 4 re-measured 5 -> 3 and 7 -> 5, holeCount at the pattern-3 charge 4 -> 6, and wellBeing, ecology and nuisance at the later checkpoints re-measured. Every command still succeeds and the level still ends completed."
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. Merge of #1773 (well-being stays a managed score once Living Quarters stand) over the rally-point layout and #1770: the quarters no longer pin wellBeing at 99.95, it now sits between about 48 and 55 (overwork and accident drags). The event drawn on the first tick of the drilling wait above (tick 1515) is weighted by those scores, so it is now politics_efficiency_expert (option 0: +20% work rate, a morale dip) rather than politics_ai_replacement, whose option 0 made driller #8 quit under the #1770-only merge. Nobody leaves, so employeeCount is back to 15 here and 17 after the pattern-4 hires. Deaths after blasts 3 and 4 re-measured 5 -> 3 and 7 -> 5, holeCount at the pattern-3 charge 4 -> 6, and wellBeing, ecology and nuisance at the later checkpoints re-measured. Every command still succeeds and the level still ends completed. #1781: a rescuer whose rig was destroyed by the fire-anyway blast is freed at once instead of freezing 30 ticks, so pins from step 110 on were re-measured: holeCount 7 -> 6 at the pattern-3 charge, wellBeing, ecology and nuisance at the later checkpoints, deathCount 5 -> 6 after blast 4 (one more worker still in the zone when the shot fires anyway), and profit at the force-win reads 250000.00000000023 (float noise in the shortfall grant). A blasting ban drawn during the pattern-4 waits is waited out on blastBanned."
       }
     },
     {
@@ -3111,7 +3181,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 7,
+          "holeCount": 6,
           "chargedCount": 0
         },
         "changedBy": {
@@ -3198,7 +3268,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3223,7 +3293,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3245,7 +3315,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3266,51 +3336,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win."
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ],
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3333,7 +3359,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3354,7 +3380,51 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win."
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ],
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1774 merged with main: pins re-measured on the merged tree (command mode, deterministic); deaths, wellBeing, safety, ecology and nuisance shift with main's changes to haul/blast timing. No behaviour defect; the level still ends as a win."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3382,7 +3452,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3402,7 +3472,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3432,7 +3502,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3473,7 +3543,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3495,14 +3565,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 55.621918854906326,
+          "wellBeing": 63.38241432882544,
           "safety": 0,
-          "ecology": 99.88663769223189,
-          "nuisance": 46.529588149423496
+          "ecology": 79.18103834818648,
+          "nuisance": 11.767366844551818
         },
         "changedBy": {
           "tickCount": 0
@@ -3521,7 +3591,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3543,7 +3613,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3648,6 +3718,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:10,25",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "blast"
         },
@@ -3689,7 +3764,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3743,7 +3818,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3765,7 +3840,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3787,7 +3862,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3874,7 +3949,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 3,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3913,6 +3988,26 @@
           "orderedChargeCount": 0
         },
         "note": "#1723 merged with #1691/#1722: this wait used to stall forever — a blaster still mounted on a loaded debris hauler (warehouse full, cargo aboard, so alighting is refused) kept claiming each charge_hole and aborting it the same tick, stamping a stuck backoff that starved the free blaster. PlanItinerary.buildMountLegs now plans no route for a driver locked into a loaded vehicle, so the charges load and the level still wins."
+      }
+    },
+    {
+      "command": "wait_until field:blastBanned equals:false max_ticks:600",
+      "description": "An event drawn during the drilling and charging waits bans blasting for a few hours (#1414) and the console refuses the shot until it lapses. Wait on the ban lapsing, not on a hand-counted tick pad: the draw moves with every upstream timeline change.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "blastBanned",
+          "equals": false,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "timeout": 65,
+      "expect": {
+        "equals": {
+          "blastBanned": false
+        }
       }
     },
     {
@@ -3966,7 +4061,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3991,7 +4086,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4013,7 +4108,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4035,7 +4130,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4056,7 +4151,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4079,7 +4174,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4100,7 +4195,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4128,7 +4223,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4147,7 +4242,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4170,7 +4265,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4200,7 +4295,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4242,9 +4337,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
@@ -4266,14 +4361,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 58.763337318639685,
+          "wellBeing": 61.91280455317426,
           "safety": 0,
-          "ecology": 99.43938403220942,
-          "nuisance": 45.87735992480058
+          "ecology": 41.95708979211914,
+          "nuisance": 9.64472676935254
         },
         "changedBy": {
           "tickCount": 0
@@ -4292,14 +4387,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 58.763337318639685,
+          "wellBeing": 61.91280455317426,
           "safety": 0,
-          "ecology": 99.43938403220942,
-          "nuisance": 45.87735992480058
+          "ecology": 41.95708979211914,
+          "nuisance": 9.64472676935254
         },
         "changedBy": {
           "tickCount": 0

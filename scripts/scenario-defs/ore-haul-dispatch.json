@@ -24,6 +24,11 @@
       "description": "9-hole grid, deterministic under seed 10 -- sandbox-confirmed to expose ~250 ore-bearing ground fragments alongside plenty of plain rock once blasted. diameter:0.089 added to match the real grid-tool confirm's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter fell back to a different console-only default (0.15, mining.ts), desyncing drill duration/tick timing against interaction mode (same fix as rock-fragmenter-breaking.json's own drill_plan step).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -280,6 +285,11 @@
       "command": "build freight_warehouse at:12,17",
       "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"

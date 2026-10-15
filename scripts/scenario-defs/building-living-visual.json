@@ -109,6 +109,11 @@
       "description": "Placed before any research is queued — a placed research_center is a hard prerequisite (#442) to queue a research task at all.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -165,6 +170,11 @@
     {
       "command": "build living_quarters at:2,6 tier:1",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
@@ -265,6 +275,11 @@
       "command": "build living_quarters at:13,0 tier:2",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
         },
@@ -360,6 +375,11 @@
     {
       "command": "build living_quarters at:16,17 tier:3",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"

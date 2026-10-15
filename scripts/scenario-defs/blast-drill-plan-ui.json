@@ -26,6 +26,11 @@
       "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts) — dragging this rectangle at that default would compute a different rows/cols than this command declares. Two increment clicks on the strip's own spacing stepper (data-field=\"spacing\", added so this is reachable at all) raise it 3->5 before dragging (round(10/5)+1=3 cols, round(5/5)+1=2 rows), so the click reaches the exact grid the command names. #553: confirming the grid queues 6 drill_hole PendingActions and pushes 6 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. Hole count kept modest (6, not the larger patterns used pre-#553) so the staffed roster's ongoing maintenance/fuel costs (no income in this scenario) don't run the site into BANKRUPTCY_GRACE_TICKS territory before the plan finishes draining below.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -125,6 +130,11 @@
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 confirm:true",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"

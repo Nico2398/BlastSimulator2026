@@ -40,6 +40,11 @@
       },
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -139,6 +144,11 @@
         }
       },
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
@@ -375,7 +385,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-selection-bar [data-info=\"warehouse-stock\"][data-stock-kg=\"20\"][data-free-kg=\"480\"]"
+          "selector": "#bs-inspector [data-info=\"warehouse-stock\"][data-stock-kg=\"20\"][data-free-kg=\"480\"]"
         },
         {
           "type": "screenshot"

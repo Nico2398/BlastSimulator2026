@@ -102,6 +102,11 @@
       "description": "#1431: living quarters keep the lone driller rested and wellBeing up, so the level never ends in a worker revolt (#1313 freezes the mine at level end) and the run reaches its full tick budget.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -134,6 +139,11 @@
       "command": "build living_quarters at:25,17",
       "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -168,6 +178,11 @@
       "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -201,6 +216,11 @@
       "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -233,6 +253,11 @@
       "command": "build living_quarters at:30,17",
       "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"

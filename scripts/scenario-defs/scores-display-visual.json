@@ -256,6 +256,11 @@
       "command": "build management_office at:3,5",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -294,6 +299,11 @@
       "command": "build living_quarters at:17,21",
       "description": "#601-followup: relocated again, from (22,21) to (17,21) -- (22,21) was never actually clear of every hole cell as #554's own description claimed. living_quarters' footprint (`rect(3,3)`, BuildingDefs.ts) is anchored at its own top-left corner (`building.x + dx`, Building.ts), not centered, so `at:22,21` occupies x:[22,24] z:[21,23] -- which contains (23,23), one of this file's own 4 drill holes (the 2x2 grid at spacing 4 from (20,20) lands corners at (20,20)/(23,20)/(20,23)/(23,23)). A drill_rig can never actually reach a hole a building is standing on: #554's own diagnostic (still 1-4 ordered after 6000 ticks) was this exact bug already, misread as a fatigue/travel-distance problem and \"fixed\" by moving closer -- which happened to leave 3 of 4 holes clear by coincidence, not by the equidistant-from-every-corner reasoning the old description claimed. Confirmed directly: `wait_until field:orderedHoleCount equals:0` (the deterministic replacement for the old real-time-driven wait, see below) stalls at exactly 1 forever regardless of maxTicks (still stuck after 5000 ticks, sandbox-measured) with EITHER one driller or two drillers with independent rigs -- decisive against a fatigue-margin theory, since two independent crews sharing the same 4 holes would have trivially finished a merely-slow job. (17,21) sits entirely outside the (20,20)-(23,23) hole bounding box (its own footprint is x:[17,19] z:[21,23], nearest-tile distance to any hole at most ~4.1) -- clear of every hole like (22,21) was meant to be, but close enough that the charge phase below (on foot, no vehicle gate) keeps the same short rest trips #554's original relocation was actually chasing.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
@@ -350,6 +360,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
       "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper clicks precede the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts) — the (20,20)-(24,24) rectangle (4x4) still computes 2x2 (round(4/3)+1=2). Four holes at minimal spacing/stemming (vs. the wider, well-stemmed grids used elsewhere) so their energy overlaps enough to actually throw fragments (isProjection) — a single lightly-charged hole clears rock cleanly with zero projections and never moves Ecology/Nuisance at all.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"

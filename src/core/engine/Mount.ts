@@ -412,22 +412,52 @@ export function releaseOccupantsOfRemovedBuildings(state: GameState, emitter?: E
 }
 
 /**
- * Put out everyone still mounted on a vehicle that no longer exists — scrap,
- * blast clearing or projection damage remove vehicles without reaching their
- * occupants. They stand on foot where the vehicle was (their own x/z, which
- * the vehicle's position mirrored). Dead employees are included so no
- * `mounted` locomotion outlives its vehicle. Returns the ids put out.
+ * Whether `emp`'s order names a vehicle that is no longer in `live`: a board
+ * or drive leg of its itinerary, or the driver-vehicle mirror of its first leg.
+ */
+function staleVehicleOrder(emp: Employee, live: ReadonlySet<number>): boolean {
+  if (emp.pendingDriverVehicleId !== null && !live.has(emp.pendingDriverVehicleId)) return true;
+  return emp.itinerary?.legs.some(leg => {
+    if (leg.mode === 'drive' && leg.vehicleId !== null && !live.has(leg.vehicleId)) return true;
+    return leg.onArrive.kind === 'board' && !live.has(leg.onArrive.vehicleId);
+  }) ?? false;
+}
+
+/**
+ * Drop the order of everyone tied to a vehicle that no longer exists — scrap,
+ * blast clearing or projection damage remove vehicles without reaching the
+ * people around them. Two kinds, only the first returned by id:
+ * - mounted occupants stand on foot where the vehicle was (their own x/z,
+ *   which the vehicle's position mirrored); dead employees are included so no
+ *   `mounted` locomotion outlives its vehicle. They get `employee:alighted`
+ *   and their ids are the return value.
+ * - walkers whose itinerary boards or drives the vanished vehicle (or whose
+ *   `pendingDriverVehicleId` names it) lose the whole order and stuck state
+ *   in place, idle for dispatch the same tick. They never boarded, so no
+ *   alighted event and they are not in the return value. An evacuation walk
+ *   holds no activeActionId (Evacuation.ts), so nothing blocks dispatch. An
+ *   action they were claiming is not released here (TaskCancellation imports
+ *   this module, so importing it back would close a cycle). The stuck reset is
+ *   inline: Locomotion's `resetStuckTracking` is private and Locomotion
+ *   imports this module.
  */
 export function releaseOccupantsOfRemovedVehicles(state: GameState, emitter?: EventEmitter): number[] {
   const liveVehicleIds = new Set(state.vehicles.vehicles.map(v => v.id));
   const released: number[] = [];
   for (const emp of state.employees.employees) {
-    if (!isMounted(emp.locomotion)) continue;
-    const vehicleId = emp.locomotion.vehicleId;
-    if (liveVehicleIds.has(vehicleId)) continue;
-    releaseOccupant(undefined, emp.id, emp, emp.x, emp.z);
-    emitter?.emit('employee:alighted', { employeeId: emp.id, vehicleId });
-    released.push(emp.id);
+    if (isMounted(emp.locomotion)) {
+      const vehicleId = emp.locomotion.vehicleId;
+      if (liveVehicleIds.has(vehicleId)) continue;
+      releaseOccupant(undefined, emp.id, emp, emp.x, emp.z);
+      emitter?.emit('employee:alighted', { employeeId: emp.id, vehicleId });
+      released.push(emp.id);
+    } else if (!isInsideBuilding(emp.locomotion) && staleVehicleOrder(emp, liveVehicleIds)) {
+      releaseOccupant(undefined, emp.id, emp, emp.x, emp.z);
+      emp.moveConsecutiveFailures = 0;
+      emp.vehicleWaitingTicks = 0;
+      emp.isMoveStuck = false;
+      delete emp.blockEpisode;
+    }
   }
   return released;
 }

@@ -24,8 +24,8 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
-import { canAffordVehicleUpgrade } from './core/entities/VehicleUpgrade.js';
 import { getMaxBuildingTier } from './core/entities/Building.js';
+import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
@@ -57,16 +57,18 @@ import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { getProfitShortfall } from './core/campaign/LevelObjective.js';
 import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { isActive } from './core/events/ActiveModifiers.js';
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { formatGameDuration } from './ui/formatGameDuration.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
+import { anchorFootprint, isHostResolvedKind, resolveSelection, type SelectionAnchor } from './ui/scene/SelectionHost.js';
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { buildDemolishConfirm } from './ui/demolishConfirm.js';
-import { SelectionBar } from './ui/shell/SelectionBar.js';
+import { Inspector } from './ui/shell/Inspector.js';
 import { formatBalance } from './ui/shell/TopBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
@@ -141,14 +143,14 @@ const music = scenarioMode ? null : createMusicDirector(audioMgr);
 // Browsers hold audio back until a gesture they accept: every gesture retries until the context is running.
 installAudioUnlock(document, audioMgr, music);
 
-// --- Scene picking: hover tags, click-to-select, selection bar (redesign P2) ---
+// --- Scene picking: hover tags, click-to-select, entity inspector (redesign P2) ---
 // Declared here (with the other core objects) but wired further down, once
 // window.__gameConsole/t()/ctx are ready — same declare-early/wire-when-ready
 // shape the rest of this file already uses for uiManager itself.
 const scenePicking = new ScenePicking(canvas, scene.camera, gameRenderer);
 const entityHighlight = new EntityHighlight(scene.scene);
 const hoverTag = new HoverTag(uiContainer, canvas, scene.camera);
-const selectionBar = new SelectionBar(uiContainer);
+const inspector = new Inspector(uiContainer);
 
 /**
  * How far back the camera sits to frame a guided placement region.
@@ -291,7 +293,7 @@ uiManager.setLanguageChangeHandler(() => {
   worldMap.refreshLocale();
   levelEndScreen.refreshLocale();
   savesModal.refreshLocale();
-  selectionBar.refreshLocale();
+  inspector.refreshLocale();
   tutorial.refreshLocale();
 });
 // Symmetric with the above: a language switch made from the main menu's own
@@ -302,7 +304,7 @@ mainMenu.setOnLanguageChange(() => {
   worldMap.refreshLocale();
   levelEndScreen.refreshLocale();
   savesModal.refreshLocale();
-  selectionBar.refreshLocale();
+  inspector.refreshLocale();
   tutorial.refreshLocale();
 });
 mainMenu.show();
@@ -843,6 +845,7 @@ window.__gameState = () => {
     // fired, rather than a scenario guessing at it from a screenshot alone.
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    insideBuildingCount: livingEmployees.filter(e => isInsideBuilding(e.locomotion)).length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     // An offered ore_sale the site could fill outright right now — the
@@ -858,6 +861,7 @@ window.__gameState = () => {
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors
     // console-api.ts's own field so both modes read the same thing.
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount), // mirrors serializeGameState
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
@@ -1037,6 +1041,8 @@ window.__uiState = () => {
     // `ensureStep` action (interaction-executor.ts) — the panel's own
     // autoAdvance can move the tab out from under a scenario mid-sequence.
     activeBlastStep: uiManager.blastActiveStep,
+    // The entity inspector (6.18): whether it is open and on what.
+    inspector: { open: inspector.open, kind: inspector.target?.kind ?? null, id: inspector.target?.id ?? null },
   };
 };
 
@@ -1231,33 +1237,50 @@ uiManager.setSelectEmployeeHandler((employeeId) => {
 scenePicking.setRestChangeHandler((rest) => {
   if (ctx.state) hoverTag.update(rest, ctx.state, gameRenderer.surveyOverlayVisible);
 });
-/** Width of the selected ramp as last drawn (bar + corridor highlight); a widening that lands re-draws both (#1298). */
-let shownRampWidth: number | null = null;
-/** Tier and affordability of the selected vehicle's Upgrade button as last drawn; a change re-draws the bar (#1401). */
-let shownVehicleKey: string | null = null;
-function vehicleSelectionKey(entity: EntityPick, state: GameState): string | null {
-  if (entity.kind !== 'vehicle') return null;
-  const v = state.vehicles.vehicles.find(x => x.id === entity.id);
-  if (!v) return null;
-  return `${v.tier}:${canAffordVehicleUpgrade(v, state.cash)}`;
+/** Anchor the selection outline was last drawn on; a change (employee steps out, fragment loaded, site finished, ramp widened) re-draws it. */
+let shownAnchorKey: string | null = null;
+function anchorKey(entity: EntityPick, anchor: SelectionAnchor, state: GameState): string {
+  const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
+  if (ramp) return `ramp:${ramp.width}`;
+  if (anchor.type === 'self') return 'self';
+  if (anchor.type === 'host') return `host:${anchor.kind}:${anchor.id}`;
+  const f = anchor.footprint;
+  return `site:${f.minX},${f.maxX},${f.minZ},${f.maxZ}`;
+}
+function anchorWorldPosition(entity: EntityPick, anchor: SelectionAnchor, state: GameState): THREE.Vector3 | null {
+  const f = anchorFootprint(anchor, state);
+  if (!f) return gameRenderer.entityWorldPosition(anchor.type === 'host' ? anchor.kind : entity.kind, anchor.type === 'host' ? anchor.id : entity.id);
+  const x = (f.minX + f.maxX + 1) / 2, z = (f.minZ + f.maxZ + 1) / 2;
+  return new THREE.Vector3(x, gameRenderer.smoothSurfaceYAt(x, z), z);
+}
+/**
+ * Whether the selected entity no longer exists. Host-resolved kinds answer from their resolution
+ * (null when no state yet: not gone); other kinds are gone when the renderer has no position for them.
+ */
+function isSelectionGone(resolvedExists: boolean | null, hostResolved: boolean, pos: THREE.Vector3 | null): boolean {
+  if (resolvedExists !== null) return !resolvedExists;
+  return !hostResolved && !pos;
 }
 function showSelection(entity: EntityPick, state: GameState): void {
-  selectionBar.show(entity, state);
-  const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+  inspector.show(entity, state);
+  const resolved = isHostResolvedKind(entity.kind) ? resolveSelection(state, entity.kind, entity.id) : null;
+  const anchor: SelectionAnchor = resolved?.exists ? resolved.anchor : { type: 'self' };
+  shownAnchorKey = anchorKey(entity, anchor, state);
+  const pos = anchorWorldPosition(entity, anchor, state);
+  const footprint = anchorFootprint(anchor, state);
   const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
-  shownRampWidth = ramp?.width ?? null;
-  shownVehicleKey = vehicleSelectionKey(entity, state);
   if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
-  else if (pos) entityHighlight.show(pos, entity.kind);
+  else if (pos && footprint) entityHighlight.showFootprint(footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
+  else if (pos) entityHighlight.show(pos, anchor.type === 'host' ? anchor.kind : entity.kind);
+  else entityHighlight.hide();
 }
 scenePicking.setSelectChangeHandler((entity) => {
   if (entity && ctx.state) {
     showSelection(entity, ctx.state);
     uiCues.entitySelected(entity.kind);
   } else {
-    shownRampWidth = null;
-    shownVehicleKey = null;
-    selectionBar.hide();
+    shownAnchorKey = null;
+    inspector.hide();
     entityHighlight.hide();
   }
 });
@@ -1275,7 +1298,7 @@ uiManager.registerEscLayer(() => !uiManager.confirmOpen && worldMap.requestRetur
 // Esc closes the Saves modal, outranking deselect/Site Map; a confirm or event modal on top keeps Esc.
 uiManager.registerEscLayer(() => !uiManager.confirmOpen && !uiManager.eventModalVisible && savesModal.handleEscape());
 
-/** Report a failed console command from a selection-bar action as a toast; success is silent (the world visibly changing is the feedback). */
+/** Report a failed console command from an inspector action as a toast; success is silent (the world visibly changing is the feedback). */
 function reportIfFailed(title: string, result: CommandResult): void {
   if (!result.success) uiManager.notify({ severity: 'warn', title, body: result.output });
 }
@@ -1283,7 +1306,9 @@ function reportIfFailed(title: string, result: CommandResult): void {
 function reportOrderResult(title: string, result: CommandResult): void {
   uiManager.notify({ severity: result.success ? 'info' : 'warn', title, body: result.output });
 }
-selectionBar.setActionHandler((action, entity) => {
+inspector.setSelectHandler((entity) => scenePicking.select(entity));
+inspector.setCloseHandler(() => scenePicking.clearSelection());
+inspector.setActionHandler((action, entity) => {
   switch (action) {
     case 'detail':
     case 'train':
@@ -1294,14 +1319,14 @@ selectionBar.setActionHandler((action, entity) => {
       // the live hover state, read at the moment the button is clicked.
       const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
-        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_move_target') });
+        uiManager.notify({ severity: 'warn', title: t('inspector.action.dispatch_here'), body: t('inspector.no_move_target') });
         break;
       }
-      reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
+      reportIfFailed(t('inspector.action.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
       break;
     }
     case 'upgrade_vehicle':
-      reportIfFailed(t('shell.selection.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
+      reportIfFailed(t('inspector.action.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
       break;
     case 'move_here': {
       // Vehicle counterpart of Dispatch Here: drive to whatever tile the
@@ -1311,20 +1336,25 @@ selectionBar.setActionHandler((action, entity) => {
       // driver on its own when the vehicle is empty.
       const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
-        uiManager.notify({ severity: 'warn', title: t('shell.selection.move_here'), body: t('shell.selection.no_move_target') });
+        uiManager.notify({ severity: 'warn', title: t('inspector.action.move_here'), body: t('inspector.no_move_target') });
         break;
       }
-      reportIfFailed(t('shell.selection.move_here'), window.__gameConsole(`vehicle reposition ${entity.id} ${terrain.tileX} ${terrain.tileZ}`));
+      reportIfFailed(t('inspector.action.move_here'), window.__gameConsole(`vehicle reposition ${entity.id} ${terrain.tileX} ${terrain.tileZ}`));
       break;
     }
-    case 'follow':
-    case 'focus': {
-      const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
-      if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, action === 'follow' ? 40 : 20);
+    case 'locate': {
+      // An employee inside a building or vehicle has no mesh: frame the host the outline is on.
+      const state = ctx.state;
+      const resolved = state && isHostResolvedKind(entity.kind) ? resolveSelection(state, entity.kind, entity.id) : null;
+      const pos = state && resolved?.exists
+        ? anchorWorldPosition(entity, resolved.anchor, state)
+        : gameRenderer.entityWorldPosition(entity.kind, entity.id);
+      const distance = entity.kind === 'vehicle' || entity.kind === 'employee' ? 40 : 20;
+      if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, distance);
       break;
     }
     case 'upgrade':
-      reportOrderResult(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
+      reportOrderResult(t('inspector.action.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
       break;
     case 'move':
       // Move needs a tile picker — the in-scene placement layer is P3's job.
@@ -1334,14 +1364,14 @@ selectionBar.setActionHandler((action, entity) => {
     case 'widen': {
       const ramp = ctx.state?.builtRamps.find(r => r.id === entity.id);
       const next = ramp ? nextRampWidth(ramp.width) : null;
-      if (next !== null) reportIfFailed(t('shell.selection.widen'), window.__gameConsole(`widen_ramp id:${entity.id} width:${next}`));
+      if (next !== null) reportIfFailed(t('inspector.action.widen'), window.__gameConsole(`widen_ramp id:${entity.id} width:${next}`));
       break;
     }
     case 'demolish': {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;
       uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
-        reportOrderResult(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
+        reportOrderResult(t('inspector.action.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
       }));
       break;
     }
@@ -1418,15 +1448,25 @@ scene.start((dt) => {
   entityHighlight.update(dt);
   // Keep the selection ring on a moving vehicle/employee; if the selected
   // entity is gone (destroyed, hauled away, collected), deselect it —
-  // the select-change handler above then hides the ring and the bar.
-  if (scenePicking.selection) {
-    const pos = gameRenderer.entityWorldPosition(scenePicking.selection.kind, scenePicking.selection.id);
-    if (!pos) scenePicking.clearSelection();
-    else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === scenePicking.selection?.id)?.width !== shownRampWidth) {
-      showSelection(scenePicking.selection, ctx.state!);
-    } else if (shownVehicleKey !== null && ctx.state && vehicleSelectionKey(scenePicking.selection, ctx.state) !== shownVehicleKey) {
-      showSelection(scenePicking.selection, ctx.state);
-    } else entityHighlight.setPosition(pos);
+  // the select-change handler above then hides the ring and the inspector.
+  const selection = scenePicking.selection;
+  if (selection) {
+    const state = ctx.state;
+    const kind = selection.kind;
+    const hostResolved = isHostResolvedKind(kind);
+    const resolved = state && hostResolved ? resolveSelection(state, kind, selection.id) : null;
+    const pos = state && resolved
+      ? (resolved.exists ? anchorWorldPosition(selection, resolved.anchor, state) : null)
+      : hostResolved ? null : gameRenderer.entityWorldPosition(selection.kind, selection.id);
+    if (isSelectionGone(resolved ? resolved.exists : null, hostResolved, pos)) scenePicking.clearSelection();
+    else {
+      if (state) inspector.update(state);
+      // The inspector hides itself once the entity left the state; the selection and outline follow.
+      if (state && !inspector.open) scenePicking.clearSelection();
+      else if (state && anchorKey(selection, resolved?.exists ? resolved.anchor : { type: 'self' }, state) !== shownAnchorKey) {
+        showSelection(selection, state);
+      } else if (pos) entityHighlight.setPosition(pos);
+    }
   }
 
   // Advance game time. A blast resolving in slices holds the clock until it lands (#1603).

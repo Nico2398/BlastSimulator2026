@@ -182,7 +182,6 @@
     "src/ui/scene/ScenePicking.ts:HoverChangeHandler",
     "src/ui/scene/ScenePicking.ts:SelectChangeHandler",
     "src/ui/scene/ScenePicking.ts:TerrainPick",
-    "src/ui/shell/SelectionBar.ts:SelectionAction",
     "src/ui/tutorialGuide.ts:ClockDecision",
     "src/ui/tutorialOverlayDom.ts:TutorialCardElements",
     "src/ui/tutorialRails.ts:RailsView",

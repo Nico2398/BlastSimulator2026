@@ -110,6 +110,11 @@
       "description": "#1771: back in Survey the blocker is gone; clicking a method row arms the in-scene pick (no Pick Target button), pick a tile, Confirm. The next step waits for it to complete (a waitUntil replaces the step command in command mode, so it cannot share this step).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "survey"
         },

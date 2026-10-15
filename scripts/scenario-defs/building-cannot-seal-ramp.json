@@ -26,6 +26,11 @@
       "timeout": 90,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -153,6 +158,11 @@
       "description": "Pick a tile clear of the ramp in the same armed tool: Confirm becomes usable and the order goes through.",
       "timeout": 60,
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "pickTile",
           "x": 50,

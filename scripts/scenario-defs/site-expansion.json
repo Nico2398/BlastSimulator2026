@@ -60,6 +60,11 @@
       "timeout": 150,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -100,6 +105,11 @@
       "description": "Was left as a bare command (role bootstrap) for the same reason as the step above -- converted now that #558 lets the picker raycast past the (still-expanding) site edge.",
       "timeout": 150,
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -193,6 +203,11 @@
       "description": "Was left as a bare command (role bootstrap) for the same raycast-past-the-edge reason as the drill steps above; converted now that #558 lets the picker raycast the landscape past the site. BuildMenu.ts's rampDepth field defaults to 8 (data-field=\"depth\" on the ParamStrip, #925 visual-loop finding, same as building-ramp-visual.json): two decrement clicks bring it to 6 before the drag+confirm, so the interaction-mode depth matches this step's own command:depth:6 fallback instead of silently reverting to the panel's default and queueing extra excavation layers that stall the buildingCount wait further down this file. Length lengthened from 8 to 11 (#1151: length >= ceil(depth * 1.8) = 11 for depth:6, keeping every per-column step within NAV_MAX_SLOPE_RATIO) — the footprint's new far edge (x:41) still sits comfortably inside the world bound (worldSizeX:64, worldMinX:-16 → world spans to x:47) the earlier far-west drill hole already claimed, so this alone triggers no further site expansion.",
       "timeout": 150,
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
@@ -444,6 +459,11 @@
       "timeout": 150,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -504,6 +524,11 @@
       "timeout": 150,
       "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS. Run immediately after the blast step (before save/load/terrain_info/state) so the blast report modal that step 'blast' just dismissed hasn't had a chance to reopen (#558 round 3) and cover this step's toolbar button. The Blast panel is already open from step 'blast' (togglePanel closes on a redundant toggle click, round 4), so this step's clicks start straight at add-hole-tool instead of re-clicking the toolbar toggle.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"

@@ -24,6 +24,11 @@
       "description": "Production grid drilled first (Finding #8: drill_plan grid replaces the whole plan and resets hole ids to H1 — see finding log — so the production grid must land before anything else, not after). The spacing stepper defaults to 3m (DEFAULT_SPACING_M) and depth to 6m (DEFAULT_DEPTH_M, Drill.ts); two increment clicks on spacing (3->5) and six on depth (6->12) before dragging the (20,20)-(25,25) rectangle (5x5) so it computes the declared 2x2 instead of the default-spacing 2x2-at-wrong-depth (issue #479 follow-up, Finding #4). #553: shrunk from 3x3 (9 holes) — see the opening step's description.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -74,6 +79,11 @@
       "description": "First presplit-row hole: the add-hole tool (data-action=\"add-hole-tool\", Drill.ts) — a real UI control distinct from the rect grid tool, point-shaped placement. Its depth stepper shares Drill.ts's single gridDepth field with the grid tool above, still sitting at 12m from the production grid; two decrement clicks bring it to the presplit row's declared 10m before placing this and every hole after it (the field persists across arm/disarm, Finding #4's class again).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
         },
@@ -120,6 +130,11 @@
       "description": "Second presplit-row hole.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
         },
@@ -153,6 +168,11 @@
       "command": "drill_plan add x:16 z:20 depth:10",
       "description": "Third and last presplit-row hole (#553: shrunk from 5 to 3 — see the opening step's description) — the presplit line now runs (10,20)-(16,20), parallel to and clear of the production grid at (20,20)-(25,25).",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
