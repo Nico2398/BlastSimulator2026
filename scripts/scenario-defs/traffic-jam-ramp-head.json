@@ -243,15 +243,15 @@
       "description": "The crew member walks down the ramp first and takes the convergence tile; the haulers sent next queue behind it."
     },
     {
-      "command": "tick 6",
+      "command": "tick 9",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 6"
+          "command": "tick 9"
         }
       ],
       "role": "setup",
-      "description": "Let the crew member reach the tile before the vehicles set off."
+      "description": "Let the crew member reach the tile before the vehicles set off. Rally-point spawns: 9 ticks, not 6. The crew now starts beside the rally flag at (2,8) and walks less, so its fatigue-threshold rests (60, kept by continuous mode, capped at 70 with no living_quarters) land later: four of the five rest from tick ~130, right through the convergence. Measured window for the convergence orders below: from tick 138 (the driller and driver #4 finish resting, so the drill rig and the rock_digger have an idle licensed driver) to tick 141 (driver #5 starts its next rest at 142). With the event above resolved at tick 130, a pad of 8 to 11 ticks lands in it; 9 is used."
     },
     {
       "command": "event choose 0",

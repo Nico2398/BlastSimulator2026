@@ -769,6 +769,14 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
     }
     expect(ctx.state!.employees.employees).toHaveLength(3);
     expect(ctx.state!.vehicles.vehicles).toHaveLength(3);
+    // Captured now, while the roster still stands where it spawned (around the
+    // rally flag): the warehouse build below walks one driver off to its site,
+    // and a cell they merely walked to is not the spawn cluster the debris
+    // exclusion further down is about.
+    const spawnPoints = [
+      ...ctx.state!.employees.employees.map(e => ({ x: e.x, z: e.z })),
+      ...ctx.state!.vehicles.vehicles.map(v => ({ x: v.x, z: v.z })),
+    ];
 
     // A freight_warehouse must exist before any haul_debris action can ever
     // actually complete (HaulingTask.ts refuses to start hauling with no
@@ -798,10 +806,6 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
     // detour around it — stranding whichever driver spawned there, not
     // because of anything the #1000 fix under test governs. Real terrain, not
     // fixture geometry, is what the test should be stressing.
-    const spawnPoints = [
-      ...ctx.state!.employees.employees.map(e => ({ x: e.x, z: e.z })),
-      ...ctx.state!.vehicles.vehicles.map(v => ({ x: v.x, z: v.z })),
-    ];
     const SPAWN_EXCLUSION_RADIUS = 2;
     const nearSpawn = (x: number, z: number): boolean => spawnPoints.some(
       p => Math.max(Math.abs(p.x - x), Math.abs(p.z - z)) <= SPAWN_EXCLUSION_RADIUS,

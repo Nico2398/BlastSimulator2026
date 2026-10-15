@@ -2,7 +2,6 @@
 // Extracted from tutorialSteps.ts to keep each file under 300 lines.
 
 import type { ActionType, GameState } from '../core/state/GameState.js';
-import type { NavCell } from '../core/nav/NavGrid.js';
 import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from './settingsHooks.js';
@@ -258,21 +257,6 @@ export function createUiActionStep(
       return count > 0 && count !== (Number(snapshot?.inspectCount) || 0);
     },
   };
-}
-
-/** Count nav grid cells matching a given type. */
-export function countNavCellsByType(
-  cells: NavCell[][] | undefined,
-  type: string,
-): number {
-  if (!cells) return 0;
-  let count = 0;
-  for (const row of cells) {
-    for (const cell of row) {
-      if (cell.type === type) count++;
-    }
-  }
-  return count;
 }
 
 /** Access a top-level property on GameState by key — uses unknown cast to bypass

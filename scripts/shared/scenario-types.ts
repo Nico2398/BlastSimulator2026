@@ -176,7 +176,7 @@ export type InteractionStepAction =
    * bookkeeping deciding whether to wait — the actual resolution is still a
    * real click, which is the thing under test.
    */
-  | { type: 'resolveEventIfPending'; timeoutMs?: number }
+  | { type: 'resolveEventIfPending'; timeoutMs?: number; /** Zero-based choice to click; defaults to 0, like `event choose 0`. */ option?: number }
   /**
    * Advance time until a named state-dump field reaches a target value,
    * bounded by a maximum so a stall fails loudly instead of hanging (issue

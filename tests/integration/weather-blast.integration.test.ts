@@ -73,6 +73,32 @@ function applyWeather(runner: ConsoleRunner, ctx: GameContext, weather: string):
   runner.run(`weather set ${weather}`);
 }
 
+/**
+ * Evacuates the pattern (plus a small margin) through the real `zone clear`
+ * command and ticks until `zone status` reads clear, as a player does before
+ * firing. Charging leaves the blaster mounted on the charging truck, parked on
+ * the last hole it charged; whether a shift rest has walked them off by blast
+ * time depends on where the crew spawned. Left there, they die on ground the
+ * blast removes even when every charge fizzles, and the death cap then hides
+ * the weather outcome these tests read.
+ */
+function clearPatternOfCrew(runner: ConsoleRunner, ctx: GameContext, maxTicks = 80): void {
+  const xs = ctx.state!.drillHoles.map(h => h.x);
+  const zs = ctx.state!.drillHoles.map(h => h.z);
+  const m = 2;
+  const ordered = runner.run(`zone clear x1:${Math.min(...xs) - m} z1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} z2:${Math.max(...zs) + m}`);
+  expect(ordered.success, ordered.output).toBe(true);
+  const isClear = (): boolean => runner.run('zone status').output.includes('— CLEAR');
+  for (let i = 0; i < maxTicks && !isClear(); i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.fatigue = 100;
+    }
+    keepFunded(ctx);
+    runner.run('tick 1');
+  }
+  expect(isClear(), runner.run('zone status').output).toBe(true);
+}
+
 // Weather ticks with the game (#1403), so a weather set before the long drill
 // and charge drives has drifted by blast time. Pin it right before the blast.
 function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny') {
@@ -80,6 +106,7 @@ function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: 
   driveDrillPlanToCompletion(runner, ctx);
   runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
   driveChargePlanToCompletion(runner, ctx);
+  clearPatternOfCrew(runner, ctx);
   applyWeather(runner, ctx, weather);
   return runner.run('blast');
 }
