@@ -43,6 +43,15 @@ export function warehouseStockByOre(l: LogisticsState, warehouseId: number): War
   return { storedKg, oreKg, barrenKg: Math.max(0, storedKg - oreSum) };
 }
 
+/** Mass (kg) in transit to one warehouse, reserved but not yet stored. */
+export function warehouseReservedKg(l: LogisticsState, warehouseId: number): number {
+  let total = 0;
+  for (const f of l.fragments) {
+    if (f.state === 'in_transit' && f.warehouseId === warehouseId) total += f.fragment.mass;
+  }
+  return total;
+}
+
 /** Mass (kg) stored or in transit per warehouse id, in one pass over the fragments. */
 export function warehouseUsedKgMap(l: LogisticsState): Map<number, number> {
   const used = new Map<number, number>();

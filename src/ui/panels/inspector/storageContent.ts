@@ -1,6 +1,6 @@
 /** Inspector storage section for warehouse buildings (#1757). */
 import { t } from '../../../core/i18n/I18n.js';
-import { warehouseUsedKgMap, warehouseStockByOre } from '../../../core/economy/FreightWarehouses.js';
+import { warehouseReservedKg, warehouseStockByOre } from '../../../core/economy/FreightWarehouses.js';
 import { getBuildingDef, warehouseFreeKg, warehouseStockKg, type Building } from '../../../core/entities/Building.js';
 import { secondaryBlastRadiusM } from '../../../core/entities/SecondaryBlast.js';
 import type { GameState } from '../../../core/state/GameState.js';
@@ -31,12 +31,14 @@ interface Model {
   stockAttrs: { stockKg: number; freeKg: number } | null;
 }
 
-const kgText = (kg: number): string => `${Math.round(kg).toLocaleString('en-US')} kg`;
+const kgNumber = (kg: number): string => Math.round(kg).toLocaleString('en-US');
+
+const kgText = (kg: number): string => `${kgNumber(kg)} kg`;
 
 const byKgDesc = (a: [string, number], b: [string, number]): number => b[1] - a[1] || (a[0] < b[0] ? -1 : 1);
 
 function gaugeOf(stored: number, capacity: number): NonNullable<Model['gauge']> {
-  const params = { stored: Math.round(stored).toLocaleString('en-US'), capacity: Math.round(capacity).toLocaleString('en-US') };
+  const params = { stored: kgNumber(stored), capacity: kgNumber(capacity) };
   return {
     text: t('inspector.stock_capacity', params),
     fraction: capacity > 0 ? Math.min(1, Math.max(0, stored / capacity)) : 0,
@@ -71,7 +73,7 @@ function oreLabel(oreId: string): string {
 function freightModel(b: Building, state: GameState): Model {
   const { storedKg, oreKg, barrenKg } = warehouseStockByOre(state.logistics, b.id);
   const capacity = getBuildingDef(b.type, b.tier).capacity;
-  const reservedKg = Math.max(0, (warehouseUsedKgMap(state.logistics).get(b.id) ?? 0) - storedKg);
+  const reservedKg = warehouseReservedKg(state.logistics, b.id);
   const rows: Row[] = [];
   if (reservedKg > MIN_ROW_KG) rows.push({ key: 'reserved', label: t('inspector.reserved_in_transit'), text: kgText(reservedKg) });
   for (const [id, kg] of Object.entries(oreKg).filter(([, kg]) => kg > MIN_ROW_KG).sort(byKgDesc)) {
@@ -146,15 +148,19 @@ function buildSection(m: Model): HTMLElement {
   return sectionOf(t('inspector.section.contents'), rows);
 }
 
-/**
- * Bring the tracked entries (rows, lines, note) of `root` in line with `wanted`: rewrite text in
- * place, drop vanished entries, add new ones before the first entry that follows them in order.
- */
+/** The element holding a live key: the parent row for a value span, else the node itself. */
 function entryOf(root: HTMLElement, key: string): HTMLElement | null {
   const node = root.querySelector<HTMLElement>(`[data-live="${key}"]`);
   return node && node.tagName === 'SPAN' ? node.parentElement : node;
 }
 
+/**
+ * Bring the tracked entries (rows, lines, note) of `root` in line with `wanted`: rewrite text in
+ * place, drop vanished entries, add new ones before the first entry that follows them in order.
+
+ * Add/remove stay in place because the row set can change between a view and the panel noticing
+ * the new `rowSignature`; sync must keep the DOM correct until the rebuild.
+ */
 function reconcile(root: HTMLElement, container: HTMLElement, shown: Set<string>, wanted: { key: string; text: string; make: () => HTMLElement }[]): void {
   const wantedKeys = new Set(wanted.map(w => w.key));
   for (const key of shown) {

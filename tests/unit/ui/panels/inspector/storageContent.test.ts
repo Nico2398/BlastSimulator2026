@@ -125,6 +125,7 @@ describe('storageContents: explosive warehouse', () => {
     expect(closed.root.textContent).not.toBe(open.root.textContent);
     expect(closed.root.textContent).not.toMatch(/\b(inspector|ui)\.[a-z_.]+/);
     expect(live(closed.root, 'radius')).toBeNull();
+    expect(live(closed.root, 'note')).not.toBeNull();
   });
 
   it('syncs in place: same nodes survive, text updates, new and emptied rows follow', () => {
