@@ -20,7 +20,7 @@ import type { PanelName } from '../UIManager.js';
 import { mountModifierChips } from './ModifierChips.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../tokens.js';
-import { activeTimeSegment } from './timeControlSegments.js';
+import { activeTimeSegment } from '../timeControlSegments.js';
 
 const FORECAST_DAYS = 14;
 /** Forecast reliability tiers — color-coded, never opacity-encoded (a11y). */

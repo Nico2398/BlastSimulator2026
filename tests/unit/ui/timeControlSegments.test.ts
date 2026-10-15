@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activeTimeSegment } from '../../../src/ui/shell/timeControlSegments.js';
+import { activeTimeSegment } from '../../../src/ui/timeControlSegments.js';
 
 describe('activeTimeSegment (#1751)', () => {
   it('lights pause when paused at 1x', () => {
