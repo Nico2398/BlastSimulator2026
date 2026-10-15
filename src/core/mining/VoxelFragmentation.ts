@@ -161,9 +161,7 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
       if (topBroken === null) continue;
       lowest[columnOf(x, z)] = lowBroken;
       footprint[columnOf(x, z)] = 1;
-      let solidTop = box.maxY - 1;
-      while (solidTop >= box.minY && field.air[indexOf(field, x, solidTop, z)] === 1) solidTop--;
-      if (topBroken >= solidTop) opened[columnOf(x, z)] = 1;
+      if (topBroken >= topSolidY(field, x, z)) opened[columnOf(x, z)] = 1;
 
       // Grade plane, held within the cut cap of this column's own floor so a
       // deep outlier hole cannot gouge the pit.
@@ -205,10 +203,17 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   return graded;
 }
 
+/** Highest non-air voxel of column (x, z); `box.minY - 1` when the column is all air. */
+function topSolidY(field: EnergyField, x: number, z: number): number {
+  let y = field.box.maxY - 1;
+  while (y >= field.box.minY && field.air[indexOf(field, x, y, z)] === 1) y--;
+  return y;
+}
+
 /**
  * Flag every non-footprint column that no 4-connected path of non-footprint
  * columns joins to the box shell: an unbroken pillar ringed by broken columns.
- * Linear in footprint columns.
+ * Linear in box columns.
  */
 function enclosedColumns(
   footprint: Uint8Array,
@@ -297,9 +302,7 @@ function floorEnclosedPillars(
       for (let r = 0; r < region.length; r += 2) {
         const x = region[r]!;
         const z = region[r + 1]!;
-        let y = box.maxY - 1;
-        while (y >= box.minY && field.air[indexOf(field, x, y, z)] === 1) y--;
-        for (; y >= floorY && y >= box.minY; y--) {
+        for (let y = topSolidY(field, x, z); y >= floorY && y >= box.minY; y--) {
           const i = indexOf(field, x, y, z);
           if (field.air[i] === 1 || mask[i] === 1) continue;
           mask[i] = 1;
