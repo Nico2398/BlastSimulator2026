@@ -374,3 +374,45 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 });
+
+describe('sandbox economy: a supply contract can be filled (#1789)', () => {
+  const HORIZON = 5000;
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  const SHOT_START = '36,32';
+
+  it('easy: the first dirtite supply offer is accepted, completes without penalty, and sales go on', () => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON);
+    const supplyId = { current: null as number | null };
+    const settled = () => supplyId.current !== null && state.contracts.completedHistory.some((c) => c.id === supplyId.current);
+    /** Like a player: accept the first dirtite supply offer the moment it is on the board. */
+    const step = () => {
+      if (supplyId.current === null) {
+        const offer = state.contracts.available.find((c) => c.type === 'supply' && c.materialId === 'dirtite');
+        if (offer && logged(`contract accept ${offer.id}`).success) supplyId.current = offer.id;
+      }
+    };
+
+    expect(logged(`build ${BUILD}`).success).toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+
+    while (!over() && !settled()) {
+      step();
+      playUntil(1, () => false);
+    }
+
+    expect(supplyId.current, 'a dirtite supply offer appeared and was accepted').not.toBeNull();
+    const done = state.contracts.completedHistory.find((c) => c.id === supplyId.current);
+    expect(done, 'the supply contract settled before the horizon').toBeDefined();
+    expect(done!.completed, `supply contract expired with ${done!.deliveredKg}/${done!.quantityKg} kg`).toBe(true);
+    expect(done!.expired).toBe(false);
+    expect(done!.penaltyCharged ?? 0).toBe(0);
+    expect(state.levelEnded, `ended ${String(state.levelEndReason)}`).toBe(false);
+    expect(state.contracts.completedHistory.some((c) => c.type === 'ore_sale' && c.completed), 'ore sales continued').toBe(true);
+    expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 900_000);
+});

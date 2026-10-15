@@ -11,6 +11,7 @@ import {
   NEGOTIATION_EARLY_BONUS_RATE,
   CONTRACT_PENALTY_RATE,
   SUPPLY_COMMON_ORE_COUNT,
+  LEGACY_OFFER_DEADLINE_TICKS,
 } from '../config/balance.js';
 
 // ── Contract types ──
@@ -146,6 +147,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   let basePricePerKg: number;
   let description: string;
   let qtyRange: MarketRange;
+  let deadlineRange: MarketRange = LEGACY_OFFER_DEADLINE_TICKS;
 
   if (!rubbleOnly && typeRoll < 0.5) {
     // Ore sale contract
@@ -162,11 +164,12 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
     qtyRange = profile.rubbleQtyKg;
     description = 'Dispose of rubble';
   } else {
-    // Supply contract (recurring, higher quantity, lower price)
+    // Supply contract (larger quantity, lower price, longer deadline)
     type = 'supply';
     materialId = rng.pick(commonOres(availableOres, market)); // Only the site's cheapest ores for supply
     basePricePerKg = oreContractBasePrice(materialId, market) * rng.nextFloat(profile.supplyPriceFactor.min, profile.supplyPriceFactor.max);
     qtyRange = profile.supplyQtyKg;
+    deadlineRange = profile.supplyDeadlineTicks;
     description = `Supply ${materialId} (bulk)`;
   }
 
@@ -181,7 +184,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   // $250,000 for the mistake the tutorial exists to let a player make.
 
   const quantityKg = Math.round(rng.nextFloat(qtyRange.min, qtyRange.max) / profile.qtyStepKg) * profile.qtyStepKg;
-  const deadlineTicks = rng.nextInt(30, 100);
+  const deadlineTicks = rng.nextInt(deadlineRange.min, deadlineRange.max);
   return buildOffer(state, type, materialId, description, quantityKg, deadlineTicks, basePricePerKg, priceMultiplier);
 }
 
@@ -347,7 +350,9 @@ export function hasWinningOreSaleOffer(
  * True when `offer` is a sale the site can fill in full today: an `ore_sale`
  * asking no more of its ore than `collectedOre` holds, or a `rubble_disposal`
  * asking no more than the raw `storedMassKg` (rubble has no material of its
- * own). `supply` is a recurring bulk deal, never a one-click sale (#1338).
+ * own). `supply` is never a one-click sale (#1338): it is a bulk deal completed by delivery
+ * over time. On the production market it is sized so the kit can deliver it in full by its
+ * deadline (#1789), so it is fillable that way, just not by this predicate.
  */
 export function isFillableSaleOffer(
   offer: Contract,

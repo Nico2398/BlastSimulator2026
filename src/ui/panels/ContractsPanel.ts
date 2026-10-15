@@ -407,7 +407,8 @@ export class ContractsPanel extends PanelBase {
     cardEl.dataset['contractType'] = c.type;
     cardEl.dataset['contractMaterial'] = c.materialId;
     // Whether the site could fill this offer outright today, per
-    // isFillableSaleOffer (a supply contract is never fillable), exposed so a
+    // isFillableSaleOffer (a supply contract is never a one-click sale; on the
+    // production market it is fillable by delivery over time, #1789), exposed so a
     // click can be scoped to an offer that can actually be
     // completed. Which ore the pool asks for and how much of it are both
     // random (Contract.ts's generateContracts), so a scenario that must sell

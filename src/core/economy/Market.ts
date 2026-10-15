@@ -11,9 +11,11 @@ import {
   RUBBLE_DISPOSAL_PRICE_RANGE,
   LEGACY_OFFER_QTY_KG,
   LEGACY_OFFER_QTY_STEP_KG,
+  LEGACY_OFFER_DEADLINE_TICKS,
   LEGACY_ORE_SALE_PRICE_FACTOR,
   LEGACY_SUPPLY_PRICE_FACTOR,
   PRODUCTION_ORE_SALE_QTY_KG,
+  PRODUCTION_SUPPLY_DEADLINE_TICKS,
   PRODUCTION_SUPPLY_QTY_KG,
   PRODUCTION_RUBBLE_QTY_KG,
   PRODUCTION_OFFER_QTY_STEP_KG,
@@ -33,6 +35,7 @@ export interface MarketRange {
 interface MarketProfile {
   oreSaleQtyKg: MarketRange;
   supplyQtyKg: MarketRange;
+  supplyDeadlineTicks: MarketRange;
   rubbleQtyKg: MarketRange;
   qtyStepKg: number;
   oreSalePriceFactor: MarketRange;
@@ -44,6 +47,7 @@ const MARKETS: Record<MarketId, MarketProfile> = {
   legacy: {
     oreSaleQtyKg: LEGACY_OFFER_QTY_KG,
     supplyQtyKg: LEGACY_OFFER_QTY_KG,
+    supplyDeadlineTicks: LEGACY_OFFER_DEADLINE_TICKS,
     rubbleQtyKg: LEGACY_OFFER_QTY_KG,
     qtyStepKg: LEGACY_OFFER_QTY_STEP_KG,
     oreSalePriceFactor: LEGACY_ORE_SALE_PRICE_FACTOR,
@@ -53,6 +57,7 @@ const MARKETS: Record<MarketId, MarketProfile> = {
   production: {
     oreSaleQtyKg: PRODUCTION_ORE_SALE_QTY_KG,
     supplyQtyKg: PRODUCTION_SUPPLY_QTY_KG,
+    supplyDeadlineTicks: PRODUCTION_SUPPLY_DEADLINE_TICKS,
     rubbleQtyKg: PRODUCTION_RUBBLE_QTY_KG,
     qtyStepKg: PRODUCTION_OFFER_QTY_STEP_KG,
     oreSalePriceFactor: PRODUCTION_ORE_SALE_PRICE_FACTOR,
