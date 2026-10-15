@@ -1349,3 +1349,186 @@ describe('onGroundMassKg (#1691)', () => {
     expect(onGroundMassKg(state)).toBe(0);
   });
 });
+
+// ── fragments whose ore densities sum above 1 (#1786) ────────────────────────
+
+/** Ledger value implied by storage: sum over stored fragments of V * d * ORE_DENSITY_KG_M3, per ore. */
+function ledgerFromStorage(state: LogisticsState): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const tracked of state.fragments) {
+    if (tracked.state !== 'stored') continue;
+    for (const oreId of Object.keys(tracked.fragment.oreDensities)) {
+      out[oreId] = (out[oreId] ?? 0) + oreKgIn(tracked.fragment, oreId);
+    }
+  }
+  return out;
+}
+
+function expectLedgerMatchesStorage(state: LogisticsState, collectedOre: Record<string, number>): void {
+  const implied = ledgerFromStorage(state);
+  for (const oreId of new Set([...Object.keys(implied), ...Object.keys(collectedOre)])) {
+    expect(collectedOre[oreId] ?? 0).toBeCloseTo(implied[oreId] ?? 0, 6);
+  }
+}
+
+function storedCount(state: LogisticsState): number {
+  return state.fragments.filter(f => f.state === 'stored').length;
+}
+
+interface DensityCase {
+  label: string;
+  make: () => { state: LogisticsState; collectedOre: Record<string, number>; dirtiteKg: number; rustiteKg: number };
+}
+
+function overOneStorage(volume: number, mass: number, dirtite: number, rustite: number) {
+  const state = createLogisticsState(TEST_STORAGE_KG);
+  putInStorage(state, makeStoredFragment(1, mass, volume, { dirtite, rustite }));
+  const dirtiteKg = volume * dirtite * ORE_DENSITY_KG_M3;
+  const rustiteKg = volume * rustite * ORE_DENSITY_KG_M3;
+  return { state, collectedOre: { dirtite: dirtiteKg, rustite: rustiteKg } as Record<string, number>, dirtiteKg, rustiteKg };
+}
+
+const OVER_ONE_CASES: DensityCase[] = [
+  { label: 'dirtite 1.0 + rustite 1.0 (1 m3)', make: () => overOneStorage(1, 2500, 1.0, 1.0) },
+  { label: 'rescaled dirtite 2.85 + rustite 1.0 (V=0.075, 157.5 kg)', make: () => overOneStorage(0.075, 157.5, 2.85, 1.0) },
+];
+
+describe('consumeStoredOre on fragments whose densities sum above 1 (#1786)', () => {
+  for (const c of OVER_ONE_CASES) {
+    describe(c.label, () => {
+      it('selling all dirtite delivers it in full and leaves rustite stored and in the ledger', () => {
+        const { state, collectedOre, dirtiteKg, rustiteKg } = c.make();
+
+        const result = consumeStoredOre(state, collectedOre, 'dirtite', dirtiteKg, []);
+
+        expect(result.success).toBe(true);
+        expect(result.consumedKg).toBeCloseTo(dirtiteKg, 6);
+        expect(collectedOre.dirtite).toBeCloseTo(0, 6);
+        expect(collectedOre.rustite).toBeCloseTo(rustiteKg, 6);
+        expect(storedOreKg(state, 'dirtite')).toBeCloseTo(0, 6);
+        expect(storedOreKg(state, 'rustite')).toBeCloseTo(rustiteKg, 6);
+        expectLedgerMatchesStorage(state, collectedOre);
+      });
+
+      it('selling all rustite delivers it in full and leaves dirtite stored and in the ledger', () => {
+        const { state, collectedOre, dirtiteKg, rustiteKg } = c.make();
+
+        const result = consumeStoredOre(state, collectedOre, 'rustite', rustiteKg, []);
+
+        expect(result.success).toBe(true);
+        expect(result.consumedKg).toBeCloseTo(rustiteKg, 6);
+        expect(collectedOre.rustite).toBeCloseTo(0, 6);
+        expect(collectedOre.dirtite).toBeCloseTo(dirtiteKg, 6);
+        expect(storedOreKg(state, 'rustite')).toBeCloseTo(0, 6);
+        expect(storedOreKg(state, 'dirtite')).toBeCloseTo(dirtiteKg, 6);
+        expectLedgerMatchesStorage(state, collectedOre);
+      });
+
+      for (const order of [['dirtite', 'rustite'], ['rustite', 'dirtite']] as const) {
+        it(`selling both whole, ${order.join(' then ')}, empties fragment and ledger`, () => {
+          const { state, collectedOre, dirtiteKg, rustiteKg } = c.make();
+          const kg: Record<string, number> = { dirtite: dirtiteKg, rustite: rustiteKg };
+
+          for (const oreId of order) {
+            const r = consumeStoredOre(state, collectedOre, oreId, kg[oreId]!, []);
+            expect(r.success).toBe(true);
+            expect(r.consumedKg).toBeCloseTo(kg[oreId]!, 6);
+            expectLedgerMatchesStorage(state, collectedOre);
+          }
+
+          expect(collectedOre.dirtite).toBeCloseTo(0, 6);
+          expect(collectedOre.rustite).toBeCloseTo(0, 6);
+          expect(storedCount(state)).toBe(0);
+          expect(state.storedMassKg).toBeCloseTo(0, 6);
+        });
+
+        it(`selling both in parts, ${order.join(' then ')}, keeps ledger equal to storage and empties it`, () => {
+          const { state, collectedOre, dirtiteKg, rustiteKg } = c.make();
+          const kg: Record<string, number> = { dirtite: dirtiteKg, rustite: rustiteKg };
+
+          for (const fraction of [0.25, 0.5]) {
+            for (const oreId of order) {
+              const r = consumeStoredOre(state, collectedOre, oreId, kg[oreId]! * fraction, []);
+              expect(r.success).toBe(true);
+              expect(r.consumedKg).toBeCloseTo(kg[oreId]! * fraction, 6);
+              expectLedgerMatchesStorage(state, collectedOre);
+            }
+          }
+          // 0.25 + 0.5 sold of each: 0.25 of the original remains.
+          expect(storedOreKg(state, 'dirtite')).toBeCloseTo(dirtiteKg * 0.25, 6);
+          expect(storedOreKg(state, 'rustite')).toBeCloseTo(rustiteKg * 0.25, 6);
+
+          for (const oreId of order) {
+            const r = consumeStoredOre(state, collectedOre, oreId, kg[oreId]! * 0.25, []);
+            expect(r.success).toBe(true);
+            expectLedgerMatchesStorage(state, collectedOre);
+          }
+          expect(collectedOre.dirtite).toBeCloseTo(0, 6);
+          expect(collectedOre.rustite).toBeCloseTo(0, 6);
+          expect(storedCount(state)).toBe(0);
+          expect(state.storedMassKg).toBeCloseTo(0, 6);
+        });
+      }
+    });
+  }
+
+  it('a single-ore fragment with density above 1 sells in full and is removed', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 200, 0.1, { dirtite: 2.0 }));
+    const kg = 0.1 * 2.0 * ORE_DENSITY_KG_M3;
+    const collectedOre: Record<string, number> = { dirtite: kg };
+
+    const result = consumeStoredOre(state, collectedOre, 'dirtite', kg, []);
+
+    expect(result.success).toBe(true);
+    expect(result.consumedKg).toBeCloseTo(kg, 6);
+    expect(collectedOre.dirtite).toBeCloseTo(0, 6);
+    expect(storedCount(state)).toBe(0);
+    expect(state.storedMassKg).toBeCloseTo(0, 6);
+  });
+
+  it('a single-ore fragment with density above 1 sells in parts', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 200, 0.1, { dirtite: 2.0 }));
+    const kg = 0.1 * 2.0 * ORE_DENSITY_KG_M3;
+    const collectedOre: Record<string, number> = { dirtite: kg };
+
+    const first = consumeStoredOre(state, collectedOre, 'dirtite', kg / 4, []);
+    expect(first.consumedKg).toBeCloseTo(kg / 4, 6);
+    expectLedgerMatchesStorage(state, collectedOre);
+    const second = consumeStoredOre(state, collectedOre, 'dirtite', kg * 0.75, []);
+    expect(second.consumedKg).toBeCloseTo(kg * 0.75, 6);
+    expect(collectedOre.dirtite).toBeCloseTo(0, 6);
+    expect(storedCount(state)).toBe(0);
+  });
+
+  it('densities summing to 1 (0.6 / 0.4) behave as before', () => {
+    const { state, collectedOre, dirtiteKg, rustiteKg } = overOneStorage(0.5, 1000, 0.6, 0.4);
+
+    const result = consumeStoredOre(state, collectedOre, 'dirtite', dirtiteKg, []);
+
+    expect(result.consumedKg).toBeCloseTo(dirtiteKg, 6);
+    expect(collectedOre.rustite).toBeCloseTo(rustiteKg, 6);
+    expect(storedOreKg(state, 'rustite')).toBeCloseTo(rustiteKg, 6);
+    expectLedgerMatchesStorage(state, collectedOre);
+
+    const rest = consumeStoredOre(state, collectedOre, 'rustite', rustiteKg, []);
+    expect(rest.consumedKg).toBeCloseTo(rustiteKg, 6);
+    expect(storedCount(state)).toBe(0);
+    expect(collectedOre.dirtite).toBeCloseTo(0, 6);
+    expect(collectedOre.rustite).toBeCloseTo(0, 6);
+  });
+});
+
+describe('extractOreFromFragment on densities summing above 1 (#1786)', () => {
+  it('removes the full contribution of one ore and keeps the other at its exact kg', () => {
+    const { state, dirtiteKg, rustiteKg } = overOneStorage(0.075, 157.5, 2.85, 1.0);
+
+    const out = extractOreFromFragment(state, 1, 'dirtite', dirtiteKg);
+
+    expect(out).not.toBeNull();
+    expect(out!.oreKg).toBeCloseTo(dirtiteKg, 6);
+    expect(storedOreKg(state, 'rustite')).toBeCloseTo(rustiteKg, 6);
+    expect(storedOreKg(state, 'dirtite')).toBeCloseTo(0, 6);
+  });
+});
