@@ -214,4 +214,23 @@ describe('thinDebrisCandidates', () => {
       expect(debrisIds(without)).toEqual(Array.from({ length: DEBRIS_SELECTION_MAX_BINS }, (_, i) => i + 1));
     });
   });
+
+  describe('isUrgent (#1817)', () => {
+    it('keeps a far urgent candidate that binning would thin away behind nearer non-urgent ones', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const far = state.pendingActions[state.pendingActions.length - 1]!;
+      const plain = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, barren, any);
+      expect(plain).not.toContain(far);
+      const urgent = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, barren, any, () => true, a => a === far);
+      expect(urgent).toContain(far);
+      expect(urgent).toHaveLength(plain.length + 1);
+    });
+
+    it('does not duplicate an urgent candidate a bin already represents', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const near = state.pendingActions[0]!;
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, barren, any, () => true, a => a === near);
+      expect(out.filter(a => a === near)).toHaveLength(1);
+    });
+  });
 });

@@ -445,6 +445,11 @@ export function remainingKg(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): nu
   return c.quantityKg - c.deliveredKg;
 }
 
+/** True while the contract can still draw stock automatically: not held, completed or expired. */
+export function isAutoDeliverable(c: Pick<Contract, 'held' | 'completed' | 'expired'>): boolean {
+  return c.held !== true && !c.completed && !c.expired;
+}
+
 /** Penalty owed if the contract expired now: the full penalty scaled by the share still undelivered. */
 export function outstandingPenalty(c: Pick<Contract, 'quantityKg' | 'deliveredKg' | 'penaltyAmount'>): number {
   return Math.round(c.penaltyAmount * undeliveredShare(c));
