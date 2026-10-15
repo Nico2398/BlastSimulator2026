@@ -21,6 +21,7 @@ import {
   DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M,
   CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
 } from '../../src/core/config/balance.js';
+import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
@@ -610,6 +611,33 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     s.run('blast');
     for (let i = 0; i < 100; i++) s.run('tick 1');
     expect(s.state().damage.blastCount).toBe(1);
+  });
+
+  it('fire anyway destroying the vehicle a rescuer is walking to releases the rescuer on that tick (#1781)', () => {
+    const s = setupCharged();
+    crewClear(s);
+    const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
+    vehicle.occupantIds = []; // parked, driverless, inside the danger zone
+
+    expect(s.run('blast detonate').success).toBe(true);
+    const rescuer = s.state().employees.employees.find(e => e.pendingDriverVehicleId === vehicle.id);
+    expect(rescuer, 'a rescuer must be sent for the parked vehicle').toBeDefined();
+    expect(rescuer!.itinerary).not.toBeNull();
+
+    const fired = s.run('blast');
+    expect(fired.success, fired.output).toBe(true);
+    expect(s.state().vehicles.vehicles.some(v => v.id === vehicle.id), 'vehicle destroyed').toBe(false);
+
+    // Same tick: no stale order, no stuck counter, free for dispatch.
+    expect(rescuer!.pendingDriverVehicleId).toBeNull();
+    expect(rescuer!.itinerary).toBeNull();
+    expect(rescuer!.destinationX).toBeNull();
+    expect(rescuer!.destinationZ).toBeNull();
+    expect(rescuer!.moveConsecutiveFailures).toBe(0);
+    expect(rescuer!.isMoveStuck).toBe(false);
+    expect(rescuer!.vehicleWaitingTicks).toBe(0);
+    expect(rescuer!.locomotion).toEqual({ kind: 'on_foot' });
+    expectNoWorldInvariantViolations(s.state());
   });
 
   it('a stranded occupant blocks the auto-fire, is named in blast status, and Fire anyway still works', () => {
