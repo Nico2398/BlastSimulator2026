@@ -201,6 +201,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickEntity",
           "kind": "building",
           "id": 2
