@@ -393,7 +393,7 @@ describe('sandbox starting site per difficulty (#1671)', () => {
     expect(slotKeys('normal').length).toBeLessThanOrEqual(slotKeys('easy').length);
   });
 
-  it('keeps cash at 250k / 150k / 120k alongside the kit', () => {
+  it('keeps cash at 250k / 210k / 170k alongside the kit', () => {
     expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'easy' })).startingCash).toBe(250_000);
     expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'normal' })).startingCash).toBe(210_000);
     expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(170_000);

@@ -213,6 +213,25 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
   });
 });
 
+/**
+ * Play-loop scaffold shared by the scripted-opening tests: a started, running sandbox plus a command
+ * log, an elapsed-tick clock, and `playUntil` stepping contracts and ticks up to `horizon`.
+ * `afterTick` runs once per played step (for per-step bookkeeping).
+ */
+function startPlayLoop(difficulty: string, horizon: number, afterTick: (elapsed: number) => void = () => {}) {
+  const { run, ctx } = startSandbox(DESERT, 42, difficulty);
+  run('time resume');
+  const state = ctx.state!;
+  const commands: string[] = [];
+  const logged: Run = (c) => { commands.push(c); return run(c); };
+  const startTick = state.tickCount;
+  const elapsed = () => state.tickCount - startTick;
+  const over = () => state.levelEnded || elapsed() >= horizon;
+  const play = () => { playContracts(logged, state); playTick(logged, state); afterTick(elapsed()); };
+  const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) play(); };
+  return { state, commands, logged, elapsed, over, playUntil };
+}
+
 describe('sandbox economy: reference shot vs crew cost', () => {
   it('ore of the ordinary desert 3x3 shot sells for 1.5-3x the crew cost over its drill-charge-fire-haul cycle', () => {
     expect(SANDBOX_REFERENCE_CREW_COST_PER_TICK).toBeGreaterThan(0);
@@ -240,19 +259,10 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   const CONTRACTS_BEFORE_SECOND_SHOT = 3;
 
   it('Normal, opening kit only, fires two blasts and grows cash from tick 1000 to tick 2000', () => {
-    const { run, ctx } = startSandbox(DESERT, 42, 'normal');
-    run('time resume');
-    const state = ctx.state!;
-
-    const commands: string[] = [];
-    const logged: Run = (c) => { commands.push(c); return run(c); };
-
-    const startTick = state.tickCount;
     let cashAtMid: number | null = null;
-    const elapsed = () => state.tickCount - startTick;
-    const over = () => state.levelEnded || elapsed() >= HORIZON;
-    const play = () => { playContracts(logged, state); playTick(logged, state); if (cashAtMid === null && elapsed() >= MIDPOINT) cashAtMid = state.cash; };
-    const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) play(); };
+    const { state, commands, logged, over, playUntil } = startPlayLoop('normal', HORIZON, (elapsed) => {
+      if (cashAtMid === null && elapsed >= MIDPOINT) cashAtMid = state.cash;
+    });
     const filled = () => state.contracts.completedHistory.filter(c => c.completed).length;
 
     // Shot 1: 3x3, drilled, charged and fired by the opening crew.
@@ -311,31 +321,21 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     buildOk: boolean;
   }
 
-  /** The scripted standard opening: bunkhouse, one 3x3 shot on the deposit, then sell to the horizon. */
+  /** The scripted standard opening: living quarters (tier 1), one 3x3 shot on the deposit, then sell to the horizon. */
   function playOpening(difficulty: string): OpeningTrace {
-    const { run, ctx } = startSandbox(DESERT, 42, difficulty);
-    run('time resume');
-    const state = ctx.state!;
-    const commands: string[] = [];
-    const logged: Run = (c) => { commands.push(c); return run(c); };
-    const startTick = state.tickCount;
-    const elapsed = () => state.tickCount - startTick;
     const trace: OpeningTrace = {
       endedAtTick: null, endReason: '', cashAtFirstBlast: null, cashAtHorizon: 0,
-      brokeBeforeSaleAtTick: null, commands, buildOk: false,
+      brokeBeforeSaleAtTick: null, commands: [], buildOk: false,
     };
     const saleDone = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
-    const over = () => state.levelEnded || elapsed() >= HORIZON;
-    const play = () => {
-      playContracts(logged, state);
-      playTick(logged, state);
-      if (trace.brokeBeforeSaleAtTick === null && !saleDone() && state.cash <= 0) trace.brokeBeforeSaleAtTick = elapsed();
+    const { state, commands, logged, over, playUntil } = startPlayLoop(difficulty, HORIZON, (elapsed) => {
+      if (trace.brokeBeforeSaleAtTick === null && !saleDone() && state.cash <= 0) trace.brokeBeforeSaleAtTick = elapsed;
       if (trace.endedAtTick === null && state.levelEnded) {
-        trace.endedAtTick = elapsed();
+        trace.endedAtTick = elapsed;
         trace.endReason = String(state.levelEndReason);
       }
-    };
-    const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) play(); };
+    });
+    trace.commands = commands;
 
     trace.buildOk = logged(`build ${BUILD}`).success;
     expect(trace.buildOk, 'living quarters placed').toBe(true);
