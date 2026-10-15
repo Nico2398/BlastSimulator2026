@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
+import { Inspector } from '../../../../src/ui/shell/Inspector.js';
+import { PANEL_CLOSE_ATTR } from '../../../../src/ui/panels/PanelBase.js';
+import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { placeBuilding, storeExplosives, getBuildingDef } from '../../../../src/core/entities/Building.js';
 import { purchaseVehicle, resolveVehicleDriver } from '../../../../src/core/entities/Vehicle.js';
@@ -19,10 +21,10 @@ function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
 }
 
-function makeBar(): { bar: SelectionBar; root: HTMLElement; container: HTMLElement } {
+function makeBar(): { bar: Inspector; root: HTMLElement; container: HTMLElement } {
   const container = document.createElement('div');
   document.body.appendChild(container);
-  const bar = new SelectionBar(container);
+  const bar = new Inspector(container);
   const root = container.firstElementChild as HTMLElement;
   return { bar, root, container };
 }
@@ -31,7 +33,7 @@ function entity(kind: EntityPick['kind'], id: number): EntityPick {
   return { kind, id, point: new THREE.Vector3(), distance: 1 };
 }
 
-describe('SelectionBar', () => {
+describe('Inspector', () => {
   it('is hidden initially', () => {
     const { root } = makeBar();
     expect(root.style.display).toBe('none');
@@ -51,20 +53,21 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Train'))).toBe(true);
   });
 
-  it('shows the vehicle action set (Follow, Move Here) and no Haul/Unassign', () => {
+  it('shows the vehicle action set (Locate, Move Here, Upgrade) and no Haul/Unassign', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
 
     bar.show(entity('vehicle', vehicle.id), state);
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
-    expect(labels.some(l => l?.includes('Follow'))).toBe(true);
+    expect(labels.some(l => l?.includes('Follow'))).toBe(false);
+    expect(root.querySelector('[data-action="locate"]')).not.toBeNull();
     expect(labels.some(l => l?.includes('Move Here'))).toBe(true);
     expect(labels.some(l => l?.includes('Haul'))).toBe(false);
     expect(labels.some(l => l?.includes('Unassign'))).toBe(false);
     expect(root.querySelector('[data-action="haul"]')).toBeNull();
     expect(root.querySelector('[data-action="unassign"]')).toBeNull();
-    expect(root.querySelectorAll('button[data-action]').length).toBe(3);
+    expect(Array.from(root.querySelectorAll('button[data-action]')).map(b => b.getAttribute('data-action')).sort()).toEqual(['locate', 'move_here', 'upgrade_vehicle']);
   });
 
   it('shows the building action set (Upgrade, Move, Demolish)', () => {
@@ -79,11 +82,11 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Demolish'))).toBe(true);
   });
 
-  it('shows the fragment action set (Focus)', () => {
+  it('shows the fragment action set (Locate, no Focus)', () => {
     const { bar, root } = makeBar();
     bar.show(entity('fragment', 42), makeState());
-    const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
-    expect(labels.some(l => l?.includes('Focus'))).toBe(true);
+    expect(root.querySelector('[data-action="locate"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="focus"]')).toBeNull();
   });
 
   it('shows occupancy count and an occupant-name listing for a people-holding building with occupants (#1205)', () => {
@@ -132,7 +135,7 @@ describe('SelectionBar', () => {
     expect(root.style.display).toBe('none');
   });
 
-  it('shows hole id, depth, and the Focus action', () => {
+  it('shows hole id, depth, and the Locate action', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
@@ -142,8 +145,8 @@ describe('SelectionBar', () => {
     expect(root.textContent).toContain(hole.id);
     expect(root.textContent).toContain('8m');
     expect(root.textContent).not.toContain('ms');
-    const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
-    expect(labels.some(l => l?.includes('Focus'))).toBe(true);
+    expect(root.querySelector('[data-action="locate"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="focus"]')).toBeNull();
   });
 
   it('shows hole depth only (`${depth}m`), never a delay suffix', () => {
@@ -197,8 +200,8 @@ describe('SelectionBar', () => {
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
     bar.show(entity('employee', employee.id), state);
 
-    // Every action button carries a data-action; the close button is the one that doesn't.
-    const closeBtn = root.querySelector('button:not([data-action])') as HTMLButtonElement;
+    // The close button carries the shared panel-close attribute.
+    const closeBtn = root.querySelector(`[${PANEL_CLOSE_ATTR}]`) as HTMLButtonElement;
     closeBtn.click();
     expect(root.style.display).toBe('none');
   });
@@ -223,7 +226,7 @@ describe('SelectionBar', () => {
 
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
     expect(labels.some(l => l?.includes('Train'))).toBe(false);
-    expect(labels.some(l => l?.includes('Follow'))).toBe(true);
+    expect(root.querySelector('[data-action="locate"]')).not.toBeNull();
   });
 
   // ── vehicle "Move Here" (gap G4: `vehicle reposition <id> <x> <z>` had no button) ──
@@ -290,7 +293,7 @@ describe('SelectionBar', () => {
   });
 });
 
-describe('SelectionBar vehicle upgrade button (#1401)', () => {
+describe('Inspector vehicle upgrade button (#1401)', () => {
   function upgradeBtn(root: HTMLElement): HTMLButtonElement {
     return root.querySelector('[data-action="upgrade_vehicle"]') as HTMLButtonElement;
   }
@@ -337,14 +340,14 @@ describe('removed vehicle Haul/Unassign i18n keys (#1400)', () => {
   }
 });
 
-// main.ts owns what each SelectionBar action *does*, and it can't be imported
+// main.ts owns what each Inspector action *does*, and it can't be imported
 // in a unit test (it wires a full SceneManager/Three.js canvas, audio and
 // IndexedDB at import time), so the handler is checked statically — same
 // approach as tests/unit/ui/TutorialBridge.test.ts. The template it dispatches
 // is then substituted and run through the *real* console runner, so a wrong
 // coordinate form (`x:… z:…` instead of `to:x,z`) fails here rather than
 // silently doing nothing in the browser.
-describe('SelectionBar move_here — the command src/main.ts dispatches', () => {
+describe('Inspector move_here — the command src/main.ts dispatches', () => {
   const mainTs = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8');
 
   /** The `vehicle reposition …` template literal handed to window.__gameConsole. */
@@ -364,7 +367,7 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
 
   it('reads the LATCHED aim, not the live hover, and warns when there is no target', () => {
     const handler = mainTs.slice(mainTs.indexOf("case 'move_here':"));
-    const body = handler.slice(0, handler.indexOf('case \'follow\':'));
+    const body = handler.slice(0, handler.indexOf("case 'upgrade':"));
     // Must be `aim`, never `hover`. The live hover is cleared by the
     // canvas mouseleave that firing this very button necessarily causes, so
     // reading it made the action impossible with a real mouse. This assertion
@@ -413,7 +416,7 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
   });
 });
 
-describe('SelectionBar — ramp (#1298)', () => {
+describe('Inspector — ramp (#1298)', () => {
   function stateWithRamp(width: 3 | 5 | 7) {
     const state = makeState();
     const def = { originX: 10, originZ: 5, direction: 'south' as const, length: 12, targetDepth: 6, width };
@@ -425,7 +428,7 @@ describe('SelectionBar — ramp (#1298)', () => {
   it('shows the ramp with its id and width', () => {
     const { bar, root } = makeBar();
     bar.show(entity('ramp', 1), stateWithRamp(5));
-    expect(bar.visible).toBe(true);
+    expect(bar.open).toBe(true);
     expect(root.textContent).toContain('5');
   });
 
@@ -456,7 +459,7 @@ describe('SelectionBar — ramp (#1298)', () => {
   it('hides the bar for a ramp id that no longer exists', () => {
     const { bar } = makeBar();
     bar.show(entity('ramp', 99), makeState());
-    expect(bar.visible).toBe(false);
+    expect(bar.open).toBe(false);
   });
 
   // ── Explosive Warehouse stock and free capacity (#1685) ───────────────────
@@ -497,5 +500,260 @@ describe('SelectionBar — ramp (#1298)', () => {
     bar.show(entity('building', building.id), state);
 
     expect(root.textContent).not.toContain('kg');
+  });
+});
+
+describe('Inspector — src/main.ts wiring (#1756)', () => {
+  const mainTs = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8');
+
+  it('handles the locate action and no longer handles follow or focus', () => {
+    expect(mainTs).toContain("case 'locate':");
+    expect(mainTs).not.toContain("case 'follow':");
+    expect(mainTs).not.toContain("case 'focus':");
+  });
+
+  it('no longer references the selection bar', () => {
+    expect(mainTs).not.toContain('SelectionBar');
+    expect(mainTs).not.toContain('bs-selection-bar');
+  });
+
+  it('reports the inspector in __uiState', () => {
+    expect(mainTs).toContain('inspector');
+  });
+});
+
+describe('Inspector — window frame (#1756)', () => {
+  afterEach(() => { setLocale('en'); });
+
+  function employeeSetup() {
+    const ctx = makeBar();
+    const state = makeState();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+    return { ...ctx, state, employee };
+  }
+
+  it('root is #bs-inspector', () => {
+    const { root } = makeBar();
+    expect(root.id).toBe('bs-inspector');
+  });
+
+  it('exposes data-kind and data-id of the target while open', () => {
+    const { bar, root, state, employee } = employeeSetup();
+    bar.show(entity('employee', employee.id), state);
+    expect(root.dataset['kind']).toBe('employee');
+    expect(root.dataset['id']).toBe(String(employee.id));
+    expect(bar.open).toBe(true);
+    expect(bar.target).toEqual({ kind: 'employee', id: employee.id });
+  });
+
+  it('target is null and open is false while hidden', () => {
+    const { bar } = makeBar();
+    expect(bar.open).toBe(false);
+    expect(bar.target).toBeNull();
+  });
+
+  it('re-targets when another entity is shown, still a single root', () => {
+    const { bar, root, container, state, employee } = employeeSetup();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    bar.show(entity('employee', employee.id), state);
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(root.dataset['kind']).toBe('vehicle');
+    expect(root.dataset['id']).toBe(String(vehicle.id));
+    expect(bar.target).toEqual({ kind: 'vehicle', id: vehicle.id });
+    expect(container.querySelectorAll('#bs-inspector').length).toBe(1);
+  });
+
+  it('every kind offers a locate action that fires the handler', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.builtRamps.push({ id: 1, def: { originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 6, width: 3 }, width: 3, footprint: { minX: 9, maxX: 11, minZ: 5, maxZ: 16 } });
+    state.nextBuiltRampId = 2;
+    const onAction = vi.fn();
+    bar.setActionHandler(onAction);
+
+    for (const pick of [
+      entity('employee', employee.id), entity('vehicle', vehicle.id), entity('building', building.id),
+      entity('fragment', 42), entity('hole', holeNumericId(hole.id)), entity('ramp', 1),
+    ]) {
+      bar.show(pick, state);
+      const btn = root.querySelector<HTMLButtonElement>('[data-action="locate"]');
+      expect(btn, `${pick.kind} must offer locate`).not.toBeNull();
+      btn!.click();
+      expect(onAction).toHaveBeenLastCalledWith('locate', expect.objectContaining({ kind: pick.kind, id: pick.id }));
+    }
+  });
+
+  it('sub-line carries the id and the kind', () => {
+    const { bar, root, state, employee } = employeeSetup();
+    bar.show(entity('employee', employee.id), state);
+    expect(root.textContent).toContain(`#${employee.id}`);
+  });
+
+  it('refreshes live values on update() without a reselect, keeping action button nodes', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; hp: number } };
+    building.hp = 80;
+    bar.show(entity('building', building.id), state);
+    const before = Array.from(root.querySelectorAll('button[data-action]'));
+    expect(root.textContent).toContain('80');
+
+    building.hp = 37;
+    bar.update(state);
+
+    expect(root.textContent).toContain('37');
+    const after = Array.from(root.querySelectorAll('button[data-action]'));
+    expect(after.length).toBe(before.length);
+    after.forEach((node, i) => expect(node).toBe(before[i]));
+  });
+
+  it('update() flips a button disabled state in place when cash changes', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 0;
+    bar.show(entity('vehicle', vehicle.id), state);
+    const btn = root.querySelector<HTMLButtonElement>('[data-action="upgrade_vehicle"]')!;
+    expect(btn.disabled).toBe(true);
+
+    state.cash = 1e9;
+    bar.update(state);
+
+    expect(root.querySelector('[data-action="upgrade_vehicle"]')).toBe(btn);
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('update() refreshes occupancy as occupants enter', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; occupantIds: number[] } };
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+    bar.show(entity('building', building.id), state);
+    expect(root.textContent).toContain('0/4');
+
+    building.occupantIds = [employee.id];
+    bar.update(state);
+
+    expect(root.textContent).toContain('1/4');
+    expect(root.textContent).toContain(employee.name);
+  });
+
+  it('update() refreshes explosive warehouse stock', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'explosive_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    bar.show(entity('building', building.id), state);
+    const stock = root.querySelector('[data-info="warehouse-stock"]');
+    expect(stock).not.toBeNull();
+
+    storeExplosives(state.buildings, 'boomite', 60);
+    bar.update(state);
+
+    expect(root.querySelector('[data-info="warehouse-stock"]')!.textContent).toContain('60');
+  });
+
+  it('update() hides the window when the entity has left the state', () => {
+    const { bar, root, state, employee } = employeeSetup();
+    bar.show(entity('employee', employee.id), state);
+    state.employees.employees = state.employees.employees.filter(e => e.id !== employee.id);
+    bar.update(state);
+    expect(root.style.display).toBe('none');
+    expect(bar.open).toBe(false);
+    expect(bar.target).toBeNull();
+  });
+
+  it('update() with nothing shown is a no-op', () => {
+    const { bar, root } = makeBar();
+    bar.update(makeState());
+    expect(root.style.display).toBe('none');
+  });
+
+  it('an occupant name is a link that selects that employee', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; occupantIds: number[] } };
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+    building.occupantIds = [employee.id];
+    const onSelect = vi.fn();
+    bar.setSelectHandler(onSelect);
+    bar.show(entity('building', building.id), state);
+
+    const link = Array.from(root.querySelectorAll<HTMLElement>('a, button, [role="link"]')).find(e => e.textContent === employee.name);
+    expect(link, 'occupant name must be a clickable link').toBeDefined();
+    link!.click();
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ kind: 'employee', id: employee.id }));
+  });
+
+  it('the close button carries the shared panel-close attribute, hides and fires the close handler', () => {
+    const { bar, root, state, employee } = employeeSetup();
+    const onClose = vi.fn();
+    bar.setCloseHandler(onClose);
+    bar.show(entity('employee', employee.id), state);
+
+    const closeBtn = root.querySelector<HTMLButtonElement>(`[${PANEL_CLOSE_ATTR}]`);
+    expect(closeBtn).not.toBeNull();
+    closeBtn!.click();
+
+    expect(root.style.display).toBe('none');
+    expect(bar.open).toBe(false);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('hide() empties target and open', () => {
+    const { bar, state, employee } = employeeSetup();
+    bar.show(entity('employee', employee.id), state);
+    bar.hide();
+    expect(bar.open).toBe(false);
+    expect(bar.target).toBeNull();
+  });
+
+  it('refreshLocale() re-renders in the new language and stays open', () => {
+    const { bar, root, state, employee } = employeeSetup();
+    bar.show(entity('employee', employee.id), state);
+    setLocale('fr');
+    bar.refreshLocale();
+
+    expect(bar.open).toBe(true);
+    expect(root.style.display).not.toBe('none');
+    expect(root.textContent).toContain(t('shell.selection.detail'));
+    expect(root.textContent).toContain(t('role.driller'));
+    expect(bar.target).toEqual({ kind: 'employee', id: employee.id });
+  });
+
+  it('refreshLocale() while closed stays closed', () => {
+    const { bar, root } = makeBar();
+    bar.refreshLocale();
+    expect(root.style.display).toBe('none');
+  });
+
+  it('shows a rebuild site as Rebuilding with upgrade, move and demolish disabled', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2 } as never);
+    bar.show(entity('building', 77), state);
+    expect(root.textContent).toContain(t('shell.selection.rebuilding'));
+    for (const a of ['upgrade', 'move', 'demolish']) {
+      expect(root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!.disabled, a).toBe(true);
+    }
+  });
+
+  it('shows the vehicle status and the employee role', () => {
+    const { bar, root, state, employee } = employeeSetup();
+    bar.show(entity('employee', employee.id), state);
+    expect(root.textContent).toContain(t('role.driller'));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(root.textContent).toContain(t('vehicle_type.debris_hauler'));
+  });
+
+  it('dispose() removes the root and its layout region', () => {
+    const { bar, root, container } = makeBar();
+    bar.dispose();
+    expect(container.contains(root)).toBe(false);
   });
 });
