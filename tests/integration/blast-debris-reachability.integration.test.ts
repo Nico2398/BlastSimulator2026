@@ -778,3 +778,98 @@ describe('The same 3x3 pattern behaves alike on any bench and any desert seed (#
     expect(columnsOffFloor(grid, 36, 44, 32, 40, 8)).toEqual([]);
   }, 600000);
 });
+
+// ── A ramp ending inside an already-dug crater (#1827) ───────────────────────
+// The ramp's last segment is fill on the crater floor. Its order targets a crater cell the
+// ramp itself is what would connect, so it stayed target_unreachable and the crater stayed
+// out of reach. Repro: sandbox Easy desert_badlands seed 42, tier-1 Living Quarters (30,48),
+// 3x3 Krackle 8 kg shot at (36,32), spacing 4, depth 8, then `build_ramp start:40,12 end:40,<z> depth:8`.
+// The crater floor is 8 over x 35-45, z 31-41; z=36 ends 5 tiles inside it.
+
+interface CraterRampOutcome {
+  allDone: boolean;
+  unreachableSegments: number;
+  outOfReach: number;
+  haulOrFragmentOrders: number;
+}
+
+function rampIntoCrater(endZ: number): CraterRampOutcome {
+  const { runner, ctx } = createRunner();
+  const run = (c: string) => runner.run(c);
+  expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true')).toMatchObject({ success: true });
+  const state = ctx.state!;
+  const tickWhile = (until: () => boolean, max: number): void => {
+    for (let i = 0; i < max && !until(); i++) {
+      state.cash = Math.max(state.cash, 1_000_000);
+      state.scores.ecology = Math.max(state.scores.ecology, 50);
+      for (const e of state.employees.employees) e.fatigue = 100;
+      run('tick 1');
+    }
+  };
+  state.cash = Math.max(state.cash, 1_000_000);
+
+  expect(run('build living_quarters at:30,48')).toMatchObject({ success: true });
+  expect(run('set_policy mode:shift_8h fatigue:75')).toMatchObject({ success: true });
+  expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32')).toMatchObject({ success: true });
+  tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
+  expect(state.plannedDrillHoles).toHaveLength(0);
+  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+  state.lastBlastReport = null;
+  expect(run('blast detonate')).toMatchObject({ success: true });
+  tickWhile(() => state.lastBlastReport !== null, 400);
+  expect(state.lastBlastReport).not.toBeNull();
+
+  expect(run(`build_ramp start:40,12 end:40,${endZ} depth:8`)).toMatchObject({ success: true });
+  const rampDone = (): boolean => state.plannedRamps.every(r => r.segments.every(s => s.done));
+  tickWhile(rampDone, 2500);
+  // Classification runs at the start of each employee tick: give it a pass after the last segment.
+  for (let i = 0; i < 3; i++) run('tick 1');
+  // Stamps clear on the next sweep once the crater is connected; a ramp that never connects it keeps them.
+  const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+  if (rampDone()) tickWhile(() => stranded() === 0, 1500);
+
+  const segmentActions = state.plannedRamps.flatMap(r => r.segments.map(s => state.pendingActions.find(a => a.id === s.actionId)));
+  const debris = state.pendingActions.filter(a => a.type === 'haul_debris' || a.type === 'fragment_debris');
+  return {
+    allDone: rampDone(),
+    unreachableSegments: segmentActions.filter(a => a !== undefined && a.blockedReason === 'target_unreachable').length,
+    outOfReach: debris.filter(a => a.blockedReason === 'debris_out_of_reach').length,
+    haulOrFragmentOrders: debris.length,
+  };
+}
+
+describe('A ramp ending inside an already-dug crater finishes and connects it (#1827)', () => {
+  it(
+    'build_ramp 40,12 -> 40,36: every segment is dug, none is target_unreachable, no haul or fragment order is debris_out_of_reach',
+    () => {
+      const r = rampIntoCrater(36);
+      expect(r.unreachableSegments, 'segments stuck target_unreachable').toBe(0);
+      expect(r.allDone, 'every ramp segment dug').toBe(true);
+      expect(r.outOfReach, 'haul/fragment orders debris_out_of_reach').toBe(0);
+    },
+    600000,
+  );
+
+  it(
+    'control: ending on the crater edge (40,31) finishes with no order out of reach',
+    () => {
+      const r = rampIntoCrater(31);
+      expect(r.allDone).toBe(true);
+      expect(r.unreachableSegments).toBe(0);
+      expect(r.outOfReach).toBe(0);
+    },
+    600000,
+  );
+
+  it(
+    'control: ending 3 tiles inside (40,34) finishes with no order out of reach',
+    () => {
+      const r = rampIntoCrater(34);
+      expect(r.allDone).toBe(true);
+      expect(r.unreachableSegments).toBe(0);
+      expect(r.outOfReach).toBe(0);
+    },
+    600000,
+  );
+});
