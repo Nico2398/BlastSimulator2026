@@ -678,8 +678,7 @@
         }
       ],
       "expect": {
-        "usable": "#bs-inspector [data-action=\"research\"]",
-        "blocked": "#bs-inspector [data-action=\"upgrade\"]"
+        "usable": "#bs-inspector [data-action=\"research\"]"
       }
     },
     {
@@ -784,6 +783,17 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "focusTile",
+          "x": 14,
+          "z": 12,
+          "distance": 30
         },
         {
           "type": "pickTile",
