@@ -626,9 +626,10 @@ describe('VoxelFragmentation — floorToGrade', () => {
 
     const count = floorToGrade(f.field, f.mask);
 
-    const lowest = 10 - BLAST_GRADE_MAX_CUT_M;
-    expect(isBroken(f, 5, lowest, 5)).toBe(true);
-    expect(isBroken(f, 5, lowest - 1, 5)).toBe(false);
+    // Grade 0 is far below; the cut stops exactly at the cap under the broken rock (y=10).
+    const floor = 10 - BLAST_GRADE_MAX_CUT_M;
+    for (let y = 0; y < floor; y++) expect(isBroken(f, 5, y, 5), `y=${y}`).toBe(false);
+    for (let y = floor; y < SIZE; y++) expect(isBroken(f, 5, y, 5), `y=${y}`).toBe(true);
     expect(count).toBe(BLAST_GRADE_MAX_CUT_M);
   });
 
@@ -670,5 +671,283 @@ describe('VoxelFragmentation — floorToGrade', () => {
     const result = identifyFragmentedVoxels(field2, grid2, false);
     expect(result.gradedCount).toBeGreaterThan(0);
     expect(result.gradedCount).toBeLessThanOrEqual(result.fragmented.length);
+  });
+
+  // ── Enclosed pillars (#1825) ───────────────────────────────────────────────
+  // A column with no broken voxel, walled in on every side by broken columns,
+  // is a full-height pillar standing in the pit. Not reachable from the box
+  // shell through unbroken columns (4-connected) -> floored with the pit.
+
+  /** Broken from `fromY` up to the box top for every column of [x0..x1]x[z0..z1] not in `except`. */
+  function blockBroken(x0: number, x1: number, z0: number, z1: number, except: Array<[number, number]>, fromY = 6) {
+    const cols: Array<{ x: number; z: number; fromY: number; toY: number }> = [];
+    for (let x = x0; x <= x1; x++) {
+      for (let z = z0; z <= z1; z++) {
+        if (except.some(([ex, ez]) => ex === x && ez === z)) continue;
+        cols.push({ x, z, fromY, toY: SIZE - 1 });
+      }
+    }
+    return cols;
+  }
+
+  const expectColumnBroken = (f: ReturnType<typeof gradedField>, x: number, z: number, fromY: number, toY = SIZE - 1) => {
+    for (let y = fromY; y <= toY; y++) expect(isBroken(f, x, y, z), `${x},${y},${z}`).toBe(true);
+  };
+  const expectColumnIntact = (f: ReturnType<typeof gradedField>, x: number, z: number) => {
+    for (let y = 0; y < SIZE; y++) expect(isBroken(f, x, y, z), `${x},${y},${z}`).toBe(false);
+  };
+
+  it('a single unbroken column with eight broken neighbours is floored to grade', () => {
+    const f = gradedField(6, blockBroken(4, 6, 4, 6, [[5, 5]]));
+
+    const count = floorToGrade(f.field, f.mask);
+
+    expectColumnBroken(f, 5, 5, 6);
+    expect(isBroken(f, 5, 5, 5)).toBe(false);
+    expect(count).toBe(SIZE - 6); // y 6..11 newly broken, counted as graded
+  });
+
+  it('a 2x2 pillar inside a closed ring is floored', () => {
+    const pillar: Array<[number, number]> = [[5, 5], [6, 5], [5, 6], [6, 6]];
+    const f = gradedField(6, blockBroken(3, 8, 3, 8, pillar));
+
+    const count = floorToGrade(f.field, f.mask);
+
+    for (const [x, z] of pillar) {
+      expectColumnBroken(f, x, z, 6);
+      expect(isBroken(f, x, 5, z)).toBe(false);
+    }
+    expect(count).toBe(4 * (SIZE - 6));
+  });
+
+  it('an L-shaped pillar inside a closed ring is floored', () => {
+    const pillar: Array<[number, number]> = [[5, 5], [6, 5], [5, 6]];
+    const f = gradedField(6, blockBroken(3, 8, 3, 8, pillar));
+
+    floorToGrade(f.field, f.mask);
+
+    for (const [x, z] of pillar) expectColumnBroken(f, x, z, 6);
+  });
+
+  it('a plus-shaped pillar inside a closed ring is floored', () => {
+    const pillar: Array<[number, number]> = [[5, 5], [4, 5], [6, 5], [5, 4], [5, 6]];
+    const f = gradedField(6, blockBroken(2, 8, 2, 8, pillar));
+
+    floorToGrade(f.field, f.mask);
+
+    for (const [x, z] of pillar) {
+      expectColumnBroken(f, x, z, 6);
+      expect(isBroken(f, x, 5, z)).toBe(false);
+    }
+  });
+
+  it('four separate single-column pillars inside one broken block are all floored', () => {
+    const centres: Array<[number, number]> = [[3, 3], [3, 7], [7, 3], [7, 7]];
+    const f = gradedField(6, blockBroken(1, 9, 1, 9, centres));
+
+    floorToGrade(f.field, f.mask);
+
+    // Each pillar is walled in by the broken block.
+    for (const [x, z] of centres) expectColumnBroken(f, x, z, 6);
+  });
+
+  it('an unbroken column on the box shell stays, even with every in-box neighbour broken', () => {
+    const f = gradedField(6, [
+      { x: 1, z: 4, fromY: 6, toY: 11 }, { x: 1, z: 5, fromY: 6, toY: 11 }, { x: 1, z: 6, fromY: 6, toY: 11 },
+      { x: 0, z: 4, fromY: 6, toY: 11 }, { x: 0, z: 6, fromY: 6, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expectColumnIntact(f, 0, 5);
+  });
+
+  it('an unbroken column joined to the shell by an unbroken path stays', () => {
+    const path: Array<[number, number]> = [[0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5]];
+    const f = gradedField(6, blockBroken(1, 8, 3, 7, path));
+
+    floorToGrade(f.field, f.mask);
+
+    for (const [x, z] of path) expectColumnIntact(f, x, z);
+  });
+
+  it('a ring with one gap to the outside leaves the pillar standing', () => {
+    // Block 4..6 broken except the pillar (5,5) and the gap (4,5); (3,5) outside the block is unbroken and reaches the shell.
+    const f = gradedField(6, blockBroken(4, 6, 4, 6, [[5, 5], [4, 5]]));
+
+    floorToGrade(f.field, f.mask);
+
+    expectColumnIntact(f, 5, 5);
+    expectColumnIntact(f, 4, 5);
+  });
+
+  it('a ring broken at 4-neighbours but open only at a diagonal still encloses the pillar', () => {
+    // (4,4) is unbroken and reaches the shell, but touches the pillar only at a corner.
+    const f = gradedField(6, blockBroken(4, 6, 4, 6, [[5, 5], [4, 4]]));
+
+    floorToGrade(f.field, f.mask);
+
+    expectColumnBroken(f, 5, 5, 6);
+    expectColumnIntact(f, 4, 4);
+  });
+
+  it('an enclosed pillar is cut no deeper than BLAST_GRADE_MAX_CUT_M under the ring', () => {
+    const f = gradedField(0, blockBroken(4, 6, 4, 6, [[5, 5]], 10));
+
+    floorToGrade(f.field, f.mask);
+
+    const ringFloor = 10 - BLAST_GRADE_MAX_CUT_M;
+    expectColumnBroken(f, 5, 5, ringFloor);
+    // Never below the clamp of the (itself floored) ring, and nothing near grade 0.
+    for (let y = 0; y < 10 - 2 * BLAST_GRADE_MAX_CUT_M; y++) expect(isBroken(f, 5, y, 5), `y=${y}`).toBe(false);
+  });
+
+  it('an enclosed pillar is floored to grade when the ring ends at grade, never below', () => {
+    const f = gradedField(7, blockBroken(4, 6, 4, 6, [[5, 5]], 7));
+
+    floorToGrade(f.field, f.mask);
+
+    expectColumnBroken(f, 5, 5, 7);
+    expect(isBroken(f, 5, 6, 5)).toBe(false);
+  });
+
+  it('air voxels in an enclosed pillar are skipped and not counted', () => {
+    const f = gradedField(6, blockBroken(4, 6, 4, 6, [[5, 5]]));
+    f.field.air[indexOf(f.field, 5, 8, 5)] = 1;
+
+    const count = floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 5, 8, 5)).toBe(false);
+    expect(isBroken(f, 5, 9, 5)).toBe(true);
+    expect(count).toBe(SIZE - 6 - 1);
+  });
+
+  it('the sub-grade lift sees the floor given to an enclosed pillar: a ring broken one voxel under grade ends flush beside it', () => {
+    // Every ring column broke one voxel under grade; only the pillar, once floored, ends at grade.
+    const f = gradedField(6, blockBroken(4, 6, 4, 6, [[5, 5]], 5));
+
+    floorToGrade(f.field, f.mask);
+
+    expectColumnBroken(f, 5, 5, 6);
+    for (const [x, z] of [[4, 4], [5, 4], [6, 4], [4, 5], [6, 5], [4, 6], [5, 6], [6, 6]] as const) {
+      expect(isBroken(f, x, 5, z), `ring ${x},${z} y=5`).toBe(false);
+      expect(isBroken(f, x, 6, z), `ring ${x},${z} y=6`).toBe(true);
+    }
+  });
+
+  it('a ring broken only mid-column (no cap lifted off) leaves the pillar sealed', () => {
+    // Broken y 6..8 under an intact cap (solid top y=11): the shot never broke out.
+    const ring = blockBroken(4, 6, 4, 6, [[5, 5]]).map(c => ({ ...c, toY: 8 }));
+    const f = gradedField(6, ring);
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+    expectColumnIntact(f, 5, 5);
+  });
+
+  it('a ring with a single opened column floors the pillar (any opened border column suffices)', () => {
+    const ring = blockBroken(4, 6, 4, 6, [[5, 5]]).map(c => (c.x === 4 && c.z === 4 ? c : { ...c, toY: 8 }));
+    const f = gradedField(6, ring);
+
+    floorToGrade(f.field, f.mask);
+
+    expectColumnBroken(f, 5, 5, 6);
+    expect(isBroken(f, 5, 5, 5)).toBe(false);
+  });
+
+  it('an enclosed pillar is floored in a box reaching below y=0', () => {
+    const grid = solidGrid(SIZE);
+    const field = createEnergyField(grid, { ...wholeGrid(grid, 6), minY: -6 });
+    field.air.fill(0);
+    (field as { gradeY: number | null }).gradeY = -2;
+    const mask = new Uint8Array(field.nx * field.ny * field.nz);
+    for (let x = 4; x <= 6; x++) {
+      for (let z = 4; z <= 6; z++) {
+        if (x === 5 && z === 5) continue;
+        for (let y = -2; y < 6; y++) mask[indexOf(field, x, y, z)] = 1;
+      }
+    }
+
+    floorToGrade(field, mask);
+
+    for (let y = -2; y < 6; y++) expect(mask[indexOf(field, 5, y, 5)], `y=${y}`).toBe(1);
+    for (let y = -6; y < -2; y++) expect(mask[indexOf(field, 5, y, 5)], `y=${y}`).toBe(0);
+  });
+
+  it('a null grade leaves an enclosed pillar alone and counts nothing', () => {
+    const f = gradedField(null, blockBroken(4, 6, 4, 6, [[5, 5]]));
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+    expectColumnIntact(f, 5, 5);
+  });
+
+  // ── Real energy: 3x3 holes 4 m apart (#1825) ────────────────────────────────
+
+  /** 16^3 grid, rock up to (excluding) `surfaceY`, air above. */
+  function benchGrid(surfaceY: number): VoxelGrid {
+    const grid = new VoxelGrid(16, 16);
+    for (let z = 0; z < 16; z++) {
+      for (let y = 0; y < surfaceY; y++) {
+        for (let x = 0; x < 16; x++) grid.setVoxel(x, y, z, rockVoxel('cruite'));
+      }
+    }
+    return grid;
+  }
+
+  const HOLES = [2, 6, 10];
+  const CENTRES: Array<[number, number]> = [[4, 4], [4, 8], [8, 4], [8, 8]];
+
+  /** 3x3 holes 4 m apart, charged along their lower 7 m; the centre columns are given a threshold no charge reaches. */
+  function patternMask(surfaceY: number, hardCentres: boolean) {
+    const grid = benchGrid(surfaceY);
+    const field = createEnergyField(grid, wholeGrid(grid, 16));
+    if (hardCentres) {
+      for (const [cx, cz] of CENTRES) for (let y = 0; y < 16; y++) field.threshold[indexOf(field, cx, y, cz)] = 1e12;
+    }
+    const seeds = [];
+    for (const hx of HOLES) for (const hz of HOLES) {
+      for (let y = surfaceY - 8; y <= surfaceY - 2; y++) seeds.push({ x: hx, y, z: hz, energy: CRUITE * 60 });
+    }
+    seedEnergy(field, seeds);
+    const result = identifyFragmentedVoxels(field, grid, false);
+    return { field, result };
+  }
+
+  it('drilled from a floor already excavated 8 m down, every column between the outer holes breaks to the hole depth, centres included', () => {
+    // Rock stands y 0..7 (the second bench); holes 8 m deep, bottoms at y 0.
+    const { field, result } = patternMask(8, true);
+
+    for (let x = HOLES[0]!; x <= HOLES[2]!; x++) {
+      for (let z = HOLES[0]!; z <= HOLES[2]!; z++) {
+        for (let y = 0; y < 8; y++) {
+          expect(isFragmented(result, field, x, y, z), `x=${x} y=${y} z=${z}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('the same grid drilled from an intact surface breaks every column between the outer holes to grade and leaves the rock below', () => {
+    // Rock stands y 0..15; holes 8 m deep, bottoms at y 8: grade 8.
+    const { field, result } = patternMask(16, true);
+
+    for (let x = HOLES[0]!; x <= HOLES[2]!; x++) {
+      for (let z = HOLES[0]!; z <= HOLES[2]!; z++) {
+        for (let y = 8; y < 16; y++) {
+          expect(isFragmented(result, field, x, y, z), `x=${x} y=${y} z=${z}`).toBe(true);
+        }
+        for (let y = 0; y < 7; y++) {
+          expect(isFragmented(result, field, x, y, z), `below grade x=${x} y=${y} z=${z}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('without hardened centres the intact-surface pattern breaks the same columns (control)', () => {
+    const { field, result } = patternMask(16, false);
+
+    for (let x = HOLES[0]!; x <= HOLES[2]!; x++) {
+      for (let z = HOLES[0]!; z <= HOLES[2]!; z++) {
+        for (let y = 8; y < 16; y++) expect(isFragmented(result, field, x, y, z), `x=${x} y=${y} z=${z}`).toBe(true);
+      }
+    }
   });
 });
