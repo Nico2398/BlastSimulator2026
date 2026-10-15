@@ -1081,6 +1081,23 @@ describe('syncHaulDispatch — sealed fragments (#1774)', () => {
     expect(state.pendingActions[0]!.type).toBe('haul_debris');
   });
 
+  it('queues only the unsealed fragment when one of two sealed fragments is opened with an unchanged signature', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [
+      withY(makeFragment(1, 2.5, 2.5), 5),
+      withY(makeFragment(2, 4.5, 4.5), 5),
+    ]);
+
+    syncHaulDispatch(state, grid);
+    expect(state.pendingActions).toHaveLength(0);
+
+    openColumn(grid, 2, 2);
+    syncHaulDispatch(state, grid);
+
+    expect(debrisFragmentIds(state)).toEqual([1]);
+  });
+
   it('queues a sealed oversized fragment as fragment_debris once its column is opened', () => {
     const state = createGame({ seed: SEED });
     const grid = makeCapGrid();

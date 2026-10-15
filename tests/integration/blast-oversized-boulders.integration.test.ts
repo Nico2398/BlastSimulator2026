@@ -164,7 +164,8 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     // The undercharged blast leaves its rubble sealed under the cap, and sealed rock gets no order (#1774).
     // Rest this one boulder on the open ground of its column, as a thrown boulder would lie.
     const boulderPos = oversizedTracked!.fragment.position;
-    boulderPos.y = computeVoxelColumnSurfaceY(ctx.grid!, Math.floor(boulderPos.x), Math.floor(boulderPos.z))! + 1;
+    const restY = computeVoxelColumnSurfaceY(ctx.grid!, Math.floor(boulderPos.x), Math.floor(boulderPos.z))! + 1;
+    (boulderPos as { y: number }).y = restY;
     expect(isFragmentSealed(ctx.grid!, boulderPos)).toBe(false);
     const oversizedId = oversizedTracked!.fragment.id;
     const oversizedVolume = oversizedTracked!.fragment.volume;
