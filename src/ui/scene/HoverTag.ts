@@ -1,32 +1,16 @@
 // BlastSimulator2026 — Scene hover tag (redesign P2)
-// Small DOM tooltip anchored to a raycast hit's screen projection. Two
-// variants: entity (name/kind/status) and terrain (tile coords + known
-// survey estimate + staleness — the dead SurveyUI.showSurveyResult path's
-// per-column formatting, resurrected as tooltip data instead of a panel).
+// Small DOM tooltip anchored to a resting cursor's terrain hit. Shown only
+// for a surveyed column while the survey overlay is visible: tile coords +
+// known survey estimate + staleness. Entities and unsurveyed tiles show nothing.
 
 import * as THREE from 'three';
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
-import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import { findSurveyForColumn, surveyColumnKey } from '../../core/mining/SurveyColumn.js';
 import { oreDepthBands } from '../../core/mining/SurveyDepthProfile.js';
-import { describeRamp } from '../describeRamp.js';
-import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
-import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
-import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
-import { describeStatus } from '../fleetDetailSections.js';
-import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
-
-const ROLE_ICON: Record<string, IconName> = {
-  driller: 'blast', blaster: 'explosive', driver: 'vehicle', surveyor: 'survey', manager: 'crew',
-};
-const VEHICLE_ICON: Record<string, IconName> = {
-  debris_hauler: 'vehicle', rock_digger: 'vehicle', drill_rig: 'blast',
-  building_destroyer: 'vehicle', rock_fragmenter: 'vehicle', charging_truck: 'vehicle',
-};
 
 /** Space reserved above the anchor for the tag before it flips to render below instead. */
 const FLIP_MARGIN_PX = 90;
@@ -43,7 +27,7 @@ export class HoverTag {
   constructor(container: HTMLElement, canvas: HTMLCanvasElement, camera: THREE.Camera) {
     this.canvas = canvas;
     this.camera = camera;
-    this.root = el('div', { className: 'bsx-root' });
+    this.root = el('div', { className: 'bsx-root', attrs: { id: 'bs-hover-tag' } });
     this.root.style.cssText = [
       'position:fixed', 'z-index:var(--bsx-z-hovertag)', 'pointer-events:none',
       'padding:7px 10px', 'border-radius:var(--bsx-r-card)',
@@ -51,26 +35,30 @@ export class HoverTag {
       'box-shadow:0 6px 20px rgba(0,0,0,.4)', 'max-width:220px',
     ].join(';');
     this.root.style.display = 'none'; // set separately — jsdom's cssText parser can drop this declaration when it shares a cssText string with a var(...) value
+    this.root.dataset['visible'] = 'false';
     container.appendChild(this.root);
   }
 
-  /** Show/update/hide the tag for the current hover result. Null hides it. */
-  update(hover: PickResult | null, state: GameState, _overlayVisible?: boolean): void {
-    if (!hover || (!hover.entity && !hover.terrain)) { this.hide(); return; }
+  /**
+   * Show the tag for a resting cursor over a surveyed terrain tile while the
+   * survey overlay is visible; hide it in every other case.
+   */
+  update(hover: PickResult | null, state: GameState, overlayVisible: boolean): void {
+    const terrain = hover?.terrain;
+    if (!hover || !terrain || hover.entity || !overlayVisible) { this.hide(); return; }
 
-    const content = hover.entity
-      ? this.renderEntity(hover.entity, state)
-      : this.renderTerrain(hover.terrain!, state);
+    const content = this.renderTerrain(terrain, state);
     if (!content) { this.hide(); return; }
 
     this.root.replaceChildren(content);
-    const anchorPoint = hover.entity?.point ?? hover.terrain!.point;
-    this.position(anchorPoint);
+    this.position(terrain.point);
     this.root.style.display = '';
+    this.root.dataset['visible'] = 'true';
   }
 
   hide(): void {
     this.root.style.display = 'none';
+    this.root.dataset['visible'] = 'false';
   }
 
   dispose(): void {
@@ -94,57 +82,11 @@ export class HoverTag {
     }
   }
 
-  private row(icon: IconName, title: string, sub?: string): HTMLElement {
-    const wrap = el('div');
-    wrap.style.cssText = 'display:flex;align-items:center;gap:8px';
-    wrap.appendChild(iconEl(icon, 14));
-    const col = el('div');
-    col.style.cssText = 'display:flex;flex-direction:column;gap:1px';
-    col.appendChild(el('div', { text: title, attrs: { style: 'font:600 11px/1.2 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }));
-    if (sub) col.appendChild(el('div', { className: 'bsx-mono', text: sub, attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }));
-    wrap.appendChild(col);
-    return wrap;
-  }
+  private renderTerrain(terrain: NonNullable<PickResult['terrain']>, state: GameState): HTMLElement | null {
+    const survey = findSurveyForColumn(state.surveyResults, terrain.tileX, terrain.tileZ);
+    const colEstimates = survey?.estimates[surveyColumnKey(terrain.tileX, terrain.tileZ)];
+    if (!survey || !colEstimates || Object.keys(colEstimates).length === 0) return null;
 
-  private renderEntity(entity: NonNullable<PickResult['entity']>, state: GameState): HTMLElement | null {
-    switch (entity.kind) {
-      case 'building': {
-        const b = state.buildings.buildings.find(x => x.id === entity.id);
-        if (!b) return null;
-        const capacity = getBuildingPeopleCapacity(b.type, b.tier);
-        const sub = capacity > 0
-          ? `HP ${Math.round(b.hp)} · ${t('building.occupancy', { inside: b.occupantIds.length, capacity })}`
-          : `HP ${Math.round(b.hp)}`;
-        return this.row('build', t(`building.${b.type}.t${b.tier}.name`), sub);
-      }
-      case 'vehicle': {
-        const v = state.vehicles.vehicles.find(x => x.id === entity.id);
-        if (!v) return null;
-        const status = computeVehicleStatus(v, state.vehicles, resolveVehicleDriver(v, state.employees.employees));
-        return this.row(VEHICLE_ICON[v.type] ?? 'vehicle', t(`vehicle_type.${v.type}`), `${describeStatus(status)} · HP ${Math.round(v.hp)}`);
-      }
-      case 'employee': {
-        const e = state.employees.employees.find(x => x.id === entity.id);
-        if (!e) return null;
-        return this.row(ROLE_ICON[e.role] ?? 'crew', e.name, `${t(`role.${e.role}`)} · ${t('ui.employees.morale')} ${Math.round(e.morale)}%`);
-      }
-      case 'fragment':
-        return this.row('rock', t('shell.hovertag.fragment', { id: entity.id }));
-      case 'hole': {
-        const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
-        if (!hole) return null;
-        return this.row('blast', hole.id, `${hole.depth}m`);
-      }
-      case 'ramp': {
-        const ramp = state.builtRamps.find(r => r.id === entity.id);
-        if (!ramp) return null;
-        const { title, sub } = describeRamp(ramp);
-        return this.row('down', title, sub);
-      }
-    }
-  }
-
-  private renderTerrain(terrain: NonNullable<PickResult['terrain']>, state: GameState): HTMLElement {
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:5px';
     wrap.appendChild(el('div', {
@@ -152,13 +94,6 @@ export class HoverTag {
       text: t('shell.hovertag.tile', { x: terrain.tileX, z: terrain.tileZ }),
       attrs: { style: 'font-size:10px;color:var(--bsx-text-micro);letter-spacing:.08em' },
     }));
-
-    const survey = findSurveyForColumn(state.surveyResults, terrain.tileX, terrain.tileZ);
-    const colEstimates = survey?.estimates[surveyColumnKey(terrain.tileX, terrain.tileZ)];
-    if (!survey || !colEstimates || Object.keys(colEstimates).length === 0) {
-      wrap.appendChild(el('div', { text: t('shell.hovertag.no_survey'), attrs: { style: 'font-size:11px;color:var(--bsx-text-muted)' } }));
-      return wrap;
-    }
 
     const stale = isSurveyStale(survey);
     const ranked = Object.entries(colEstimates).sort((a, b) => b[1] - a[1]).slice(0, 3);

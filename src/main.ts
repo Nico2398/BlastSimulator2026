@@ -225,7 +225,10 @@ uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current
 // preference seeds the panel once at startup so its button state matches.
-uiManager.setSurveyOverlayToggleHandler((visible) => { gameRenderer.setSurveyOverlayVisible(visible); });
+uiManager.setSurveyOverlayToggleHandler((visible) => {
+  gameRenderer.setSurveyOverlayVisible(visible);
+  if (!visible) hoverTag.hide(); // the tag only shows with the overlay on
+});
 uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 
 // --- Persistence ---
@@ -1222,8 +1225,8 @@ uiManager.setSelectEmployeeHandler((employeeId) => {
 });
 
 // --- Scene picking wiring (redesign P2) ---
-scenePicking.setHoverChangeHandler((hover) => {
-  if (ctx.state) hoverTag.update(hover, ctx.state);
+scenePicking.setRestChangeHandler((rest) => {
+  if (ctx.state) hoverTag.update(rest, ctx.state, gameRenderer.surveyOverlayVisible);
 });
 /** Width of the selected ramp as last drawn (bar + corridor highlight); a widening that lands re-draws both (#1298). */
 let shownRampWidth: number | null = null;
@@ -1387,7 +1390,11 @@ new KeyboardShortcuts({
   // Keep the panel's own button in sync even while the panel is closed —
   // its click handler is the other path into the same preference, and the
   // two must never disagree the next time the panel opens.
-  onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
+  onToggleSurveyOverlay: () => {
+    const visible = gameRenderer.toggleSurveyOverlayVisible();
+    uiManager.setSurveyOverlayVisible(visible);
+    if (!visible) hoverTag.hide();
+  },
 }, { isSuppressed: fullScreenMenuUp, isControlLive });
 
 // --- Render loop + game tick timer ---
