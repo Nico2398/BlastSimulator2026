@@ -7,7 +7,7 @@
 // the panel the first click opened is not toggled shut again. detail 0
 // (keyboard Enter/Space or a synthetic .click()) always toggles.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { UIManager, type PanelName } from '../../../../src/ui/UIManager.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { setupEvents } from '../../../../src/core/events/index.js';
@@ -59,7 +59,7 @@ function doubleClick(btn: HTMLElement): void {
 describe('ToolRail — one real click is handled once (#1750)', () => {
   let container: HTMLElement;
   let ui: UIManager;
-  let toggle: ReturnType<typeof vi.spyOn>;
+  let toggle: MockInstance<[name: PanelName], void>;
 
   beforeEach(() => {
     // jsdom has no 2d canvas; the MiniMap draws on every update().
