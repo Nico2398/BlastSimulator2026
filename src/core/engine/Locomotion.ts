@@ -863,9 +863,12 @@ function pickIdleYieldCell(
   const grid = state.navGrid;
   const occupancy = state.agentOccupancy;
   if (!grid || !occupancy || routeCells.size === 0) return null;
-  const clearance = blocker.kind === 'vehicle'
-    ? vehicleRequiredClearanceCells(state.vehicles.vehicles.find(v => v.id === blocker.id)!)
-    : undefined;
+  let clearance: number | undefined;
+  if (blocker.kind === 'vehicle') {
+    const blockerVehicle = state.vehicles.vehicles.find(v => v.id === blocker.id);
+    if (!blockerVehicle) return null;
+    clearance = vehicleRequiredClearanceCells(blockerVehicle);
+  }
   return pickYieldCell(grid, blockerCell, routeCells, (x, z) => {
     const cell = grid.cellAt(x, z);
     if (!cell || cell.type === 'blocked' || cell.type === 'void') return false;
@@ -873,6 +876,24 @@ function pickIdleYieldCell(
     if (!occupancy.isFreeFor(blocker, x, z) || isReservedByAnotherExactLeg(state, blocker, x, z)) return false;
     return hasShortReturnRoute(grid, blockerCell.x, blockerCell.z, x, z);
   }, IDLE_YIELD_SEARCH_RADIUS_CELLS);
+}
+
+/**
+ * Where `blocker` (standing at `at`) is relocated to (#1696): the nearest free cell, unless that lies on the
+ * mover's route (or there is none) and `mayYield` — then a cell off the route. `yielded` marks the latter.
+ */
+function relocationCell(
+  state: GameState,
+  blocker: Occupant,
+  at: { x: number; z: number },
+  routeCells: (() => ReadonlySet<string>) | undefined,
+  mayYield: boolean,
+): { cell: { x: number; z: number } | null; yielded: boolean } {
+  const nearest = findNearestFreeCellForAgent(state, blocker, at.x, at.z);
+  const yieldCell = routeCells && mayYield && isOnRoute(nearest, routeCells)
+    ? pickIdleYieldCell(state, blocker, { x: Math.round(at.x), z: Math.round(at.z) }, routeCells())
+    : null;
+  return yieldCell ? { cell: yieldCell, yielded: true } : { cell: nearest, yielded: false };
 }
 
 function handleAgentOccupancyBlock(
@@ -1264,17 +1285,13 @@ function relocateIdleDestinationBlocker(
     const originZ = emp.z;
     // #1696: the nearest free cell is just the next corridor cell when it lies on the mover's route, and
     // returning there walks the idle employee back into it — so step off the route instead, no return trip.
-    const nearest = findNearestFreeCellForAgent(state, occupant, emp.x, emp.z);
-    const yieldCell = routeCells && employeeWorkState(emp) === 'idle' && isOnRoute(nearest, routeCells)
-      ? pickIdleYieldCell(state, occupant, { x: Math.round(emp.x), z: Math.round(emp.z) }, routeCells())
-      : null;
-    const freeCell = yieldCell ?? nearest;
+    const { cell: freeCell, yielded } = relocationCell(state, occupant, emp, routeCells, employeeWorkState(emp) === 'idle');
     if (!freeCell) return false;
 
     occupancy.tryMove(occupant, freeCell.x, freeCell.z);
     teleportEmployeeTo(emp, freeCell.x, freeCell.z);
     result.moved.push(emp.id);
-    if (returnAfterRelocate && !yieldCell) {
+    if (returnAfterRelocate && !yielded) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
       if (returnLeg) {
@@ -1295,11 +1312,7 @@ function relocateIdleDestinationBlocker(
   const vehicle = parked ?? idleDriven;
   if (!vehicle) return false;
 
-  const nearest = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
-  const yieldCell = routeCells && isOnRoute(nearest, routeCells)
-    ? pickIdleYieldCell(state, occupant, { x: Math.round(vehicle.x), z: Math.round(vehicle.z) }, routeCells())
-    : null;
-  const freeCell = yieldCell ?? nearest;
+  const { cell: freeCell } = relocationCell(state, occupant, vehicle, routeCells, true);
   if (!freeCell) return false;
   if (idleDriven) {
     for (const riderId of vehicle.occupantIds) {

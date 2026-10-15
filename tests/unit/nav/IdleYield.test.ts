@@ -25,7 +25,7 @@ const inBounds = (g: NavGrid, x: number, z: number) => x >= 0 && z >= 0 && x < g
 const cheb = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z));
 
 describe('pickYieldCell', () => {
-  it('returns a free cell off the route, nearest to the blocker', () => {
+  it('returns the nearest free cell once the route-covered ring is skipped', () => {
     const g = flatGrid(20, 20);
     const blocker = { x: 5, z: 5 };
     // Route covers the blocker's whole 3x3 neighbourhood.

@@ -2,7 +2,7 @@
 // Picks the cell an idle blocker steps aside to so a mover can pass in a
 // narrow corridor. Pure: no state is read or written.
 
-import type { NavGrid } from './NavGrid';
+import type { NavGrid } from './NavGrid.js';
 
 /**
  * Nearest free cell to `blockerCell`, within `maxRadius` cells (Chebyshev),

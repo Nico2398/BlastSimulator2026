@@ -12,7 +12,7 @@ import type { Employee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
-import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS } from '../../../src/core/config/balance.js';
+import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, BLOCK_EPISODE_ABANDON_LIMIT } from '../../../src/core/config/balance.js';
 import { tickLocomotion, isStationaryBusyEmployee } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import { employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
@@ -108,8 +108,7 @@ describe('idle crew / parked truck in a 1-wide corridor (#1696)', () => {
     const a = idleCrew(state, 'blaster', 5, 2);
     const b = idleCrew(state, 'driver', 8, 2);
 
-    const r = runUntil(state, () => rig.x === 12 && rig.z === 2, MAX_TICKS);
-    console.log('DBG1', r.ticks, r.abandoned.length, rig.x, a.x, b.x, truck.x);
+    runUntil(state, () => rig.x === 12 && rig.z === 2, MAX_TICKS);
 
     expect(rig.x).toBe(12);
     expect(rig.z).toBe(2);
@@ -156,8 +155,7 @@ describe('idle crew / parked truck in a 1-wide corridor (#1696)', () => {
     idleCrew(state, 'blaster', 2, 3);
     purchaseVehicle(state.vehicles, 'charging_truck', 3, 2);
 
-    const r = runUntil(state, () => rig.x === 12 && rig.z === 2, MAX_TICKS);
-    console.log('DBG4', r.ticks, r.abandoned.length);
+    runUntil(state, () => rig.x === 12 && rig.z === 2, MAX_TICKS);
 
     expect(rig.x).toBe(12);
     expect(rig.z).toBe(2);
@@ -231,7 +229,7 @@ describe('idle crew / parked truck in a 1-wide corridor (#1696)', () => {
     expect(maxStep).toBeLessThanOrEqual(AGENT_WALK_SPEED + 1e-6);
   });
 
-  it('a mover blocked by a permanently busy lane blocker gives up within the abandon ladder plus margin (no endless sidestep/return loop)', () => {
+  it('a mover blocked by a permanently busy lane blocker ends its leg within the ladder plus margin (no endless sidestep/return loop)', () => {
     const state = corridorState();
     const mover = idleCrew(state, 'driller', 1, 2);
     const busy = idleCrew(state, 'blaster', 12, 2);
@@ -239,8 +237,61 @@ describe('idle crew / parked truck in a 1-wide corridor (#1696)', () => {
     expect(moveTo(state, mover.id, { x: 12, z: 2 }).success).toBe(true);
 
     const budget = AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 30;
-    const { abandoned } = runUntil(state, () => false, budget);
+    runUntil(state, () => mover.itinerary === null, budget);
 
-    expect(abandoned.some(a => a.employeeId === mover.id) || mover.itinerary === null).toBe(true);
+    expect(mover.itinerary).toBeNull();
+    expect(mover.blockEpisode).toBeUndefined();
+    expect(busy.x).toBe(12);
+    expect(busy.z).toBe(2);
+  });
+
+  describe('blockEpisode guard', () => {
+    function blockedMover(): { state: GameState; mover: Employee } {
+      const state = corridorState();
+      const mover = idleCrew(state, 'driller', 1, 2);
+      const busy = idleCrew(state, 'blaster', 12, 2);
+      busy.activeActionId = 999;
+      expect(moveTo(state, mover.id, { x: 12, z: 2 }).success).toBe(true);
+      return { state, mover };
+    }
+
+    it('abandons the leg once the episode for its destination reaches the limit, then clears it', () => {
+      const { state, mover } = blockedMover();
+      mover.blockEpisode = { destX: 12, destZ: 2, count: BLOCK_EPISODE_ABANDON_LIMIT - 1 };
+
+      const { abandoned } = runUntil(state, () => false, AGENT_OCCUPANCY_WAIT_TICKS + 5);
+
+      expect(abandoned.some(a => a.employeeId === mover.id)).toBe(true);
+      expect(mover.itinerary).toBeNull();
+      expect(mover.blockEpisode).toBeUndefined();
+    });
+
+    it('a new destination restarts the count instead of inheriting a stale episode', () => {
+      const { state, mover } = blockedMover();
+      mover.blockEpisode = { destX: 99, destZ: 99, count: BLOCK_EPISODE_ABANDON_LIMIT - 1 };
+
+      let seen = false;
+      for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 40 && !seen; i++) {
+        const r = tickLocomotion(state);
+        const ep = mover.blockEpisode;
+        if (ep && ep.destX === 12) {
+          seen = true;
+          expect(ep.count).toBeLessThan(BLOCK_EPISODE_ABANDON_LIMIT);
+          expect(r.abandoned.some(a => a.employeeId === mover.id)).toBe(false);
+        }
+      }
+      expect(seen).toBe(true);
+    });
+
+    it('clears the episode when the leg ends by arrival', () => {
+      const { state, mover } = blockedMover();
+
+      runUntil(state, () => mover.blockEpisode !== undefined, MAX_TICKS);
+      expect(mover.blockEpisode).toBeDefined();
+      runUntil(state, () => mover.itinerary === null, MAX_TICKS);
+
+      expect(mover.itinerary).toBeNull();
+      expect(mover.blockEpisode).toBeUndefined();
+    });
   });
 });
