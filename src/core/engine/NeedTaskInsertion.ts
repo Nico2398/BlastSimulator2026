@@ -10,7 +10,8 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
-import { employeeQueueDepth, isResting } from '../entities/Employee.js';
+import { employeeQueueDepth } from '../entities/Employee.js';
+import { isResting } from '../entities/EmployeeRestState.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, isMidClaimedTaskExecution } from './RestActionHelpers.js';

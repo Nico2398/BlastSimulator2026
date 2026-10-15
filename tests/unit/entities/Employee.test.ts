@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
-import { isResting } from '../../../src/core/entities/Employee.js';
+import { isResting } from '../../../src/core/entities/EmployeeRestState.js';
 import {
   holdsRequiredSkill,
   createEmployeeState,

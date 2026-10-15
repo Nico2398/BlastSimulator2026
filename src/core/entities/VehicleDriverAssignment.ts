@@ -5,7 +5,7 @@
 // Vehicle.ts.
 
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
-import { isResting } from '../entities/Employee.js';
+import { isResting } from './EmployeeRestState.js';
 import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from './Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import { isMounted } from './EmployeeLocomotion.js';
