@@ -93,15 +93,15 @@ describe('sandboxCommand — unknown difficulty', () => {
 // ── start-success message ─────────────────────────────────────────────────
 // SANDBOX_DEFAULTS (biome: desert_badlands, difficulty: normal, seed: 12345)
 // produce the level def sandboxLevelDef(config) resolves to: 64x64 grid
-// (datum SANDBOX_DATUM), $150,000 starting cash — captured directly off a
+// (datum SANDBOX_DATUM), $210,000 starting cash — captured directly off a
 // real sandboxCommand run (#861), not re-derived from Sandbox.ts's config
 // tables by hand. #1191 dropped the message's `{gridY}x` segment entirely.
 
 describe('sandboxCommand — start-success message', () => {
   const SUCCESS_UNSTAFFED_EN =
-    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $150,000.';
+    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $210,000.';
   const SUCCESS_STAFFED_EN =
-    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $150,000. Staffed.';
+    'Sandbox started. 64x64 desert_badlands, difficulty normal, seed 12345, cash $210,000. Staffed.';
 
   describe('unstaffed', () => {
     it('matches the exact English literal with staffed:false', () => {

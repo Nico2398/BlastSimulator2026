@@ -1561,6 +1561,27 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
 };
 
 /**
+ * Opening cash per sandbox difficulty (#1747). Richer kits start with more
+ * cash, so easy has the most and hard the least.
+ *
+ * Bisected (#1747) on the standard opening (desert_badlands, seed 42, no cash
+ * injection, contracts accepted once stock covers them): tier-1 living_quarters
+ * at (30,48), then one 3x3 Krackle 8 kg pattern (spacing 4, depth 8, start
+ * 36,32), charge, clear zone, blast (~t562), haul, sell. Payroll and upkeep
+ * drain cash until the first sale, whose low point is linear in the start:
+ * normal bottoms at (start - 181.5k), hard at (start - 147.5k), so the
+ * minimum positive-cash start is ~181.6k normal / ~147.6k hard (normal 170k
+ * fails with a -11.5k low, 185k passes). Chosen with ~15% margin: 210k / 170k.
+ * Easy keeps 250k (low $36.9k, cash 681,127 at t2000) and stays strictly
+ * above normal. The old 150k / 120k went bankrupt at ~t609 / ~t582.
+ */
+export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxDifficultyId, number>> = {
+  easy: 250_000,
+  normal: 210_000,
+  hard: 170_000,
+};
+
+/**
  * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
  * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
  * operating-profit target before wellbeing collapses into a revolt (~tick
@@ -2706,6 +2727,18 @@ export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
 
 /** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
 export const BLAST_GRADE_MAX_CUT_M = 4;
+
+/**
+ * Search radius (in nav cells) when an idle blocker looks for a free cell off
+ * the mover's remaining route to yield to (#1696).
+ */
+export const IDLE_YIELD_SEARCH_RADIUS_CELLS = 10;
+
+/**
+ * Agent-occupancy block episodes on one leg before the mover abandons its
+ * movement (#1696). Same order as MOVE_STUCK_ABANDON_TICKS.
+ */
+export const BLOCK_EPISODE_ABANDON_LIMIT = MOVE_STUCK_ABANDON_TICKS;
 
 // ── Well-being score drivers (#1692) ──
 // Housed sites taper gains near the cap so one cheap Living Quarters cannot pin well-being at 100
