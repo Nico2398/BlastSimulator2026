@@ -1559,7 +1559,13 @@ describe('#1692 — well-being does not pin at the ceiling for a busy, housed cr
     const gz = 32;
     expect(placeBuilding(state.buildings, 'living_quarters', 2, 6, gx, gz, 1).success).toBe(true);
     if (extraQuartersTier !== null) {
-      expect(placeBuilding(state.buildings, 'living_quarters', 14, 6, gx, gz, extraQuartersTier).success).toBe(true);
+      // Beside the T1, on the same plateau the crew works on, so both layouts
+      // send the crew on the same short rest trip and only the tier differs.
+      // Not (14,6): that footprint sits on the slope down to the north-east
+      // (`build` refuses it as too steep), and a crew gathered on the flat
+      // rally area queues on the climb to its door, stuck-morale penalties
+      // and all, which swamped the tier effect this test is about.
+      expect(placeBuilding(state.buildings, 'living_quarters', 2, 11, gx, gz, extraQuartersTier).success).toBe(true);
     }
     // The hiring pool is finite per role: cycle roles until the crew has 8.
     const roles = ['driller', 'blaster', 'hauler', 'excavator', 'manager', 'surveyor'];

@@ -44,6 +44,26 @@
       "role": "bootstrap"
     },
     {
+      "command": "tick 25",
+      "description": "Rally-point spawns: the staffed driller now starts beside the drill_rig at the rally flag (2,8) instead of walking 5 cells to it from the (0,0) corner, so the single far hole below arrives about 8 ticks sooner and lands with fatigue at ~2.8, never reaching the hard floor. 25 idle, mounted ticks first (idle drain ~0.5/tick, nowhere near the soft threshold, so no rest is queued) take the gauge to ~87 before the drill order. That puts the hard-floor collapse at tick ~115, mid-drill: 4 ticks after the rig reaches (63,63) and 4 ticks before the hole would land.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "minFatigue"
+        ],
+        "equals": {
+          "collapsedCount": 0,
+          "holeCount": 0
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:1 cols:1 spacing:5 depth:12 diameter:0.089 start:63,63",
       "description": "#1090-followup: a single hole, both far from spawn and at the tier-1 drill rig's maximum reach (12m, DRILL_RIG_MAX_DEPTH_M[1]) — the combined walk-to-vehicle + long drive + long drill duration alone is enough to drain a fresh driller's fatigue from 99 down through the hard floor before this one hole ever lands, sandbox-confirmed (collapse fires mid-drill at tick 97, this file's own state-dump trace). diameter left at the grid tool's own real default (DRILL_HOLE_DEFAULT_DIAMETER_M) since its strip has no diameter stepper to set one differently, same reasoning the pre-#1090 version of this file already documented for its own drag.",
       "interaction": [

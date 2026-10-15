@@ -42,9 +42,9 @@ describe('BlastWorkshop', () => {
     expect(workshop.visible).toBe(false);
   });
 
-  it('renders exactly 4 step labels: Drill, Charge, Preview, Fire (no Sequence)', () => {
+  it('renders exactly 4 step labels: Drill, Charge, Preview, Blast (no Sequence)', () => {
     const { workshop } = makeWorkshop();
-    for (const label of ['Drill', 'Charge', 'Preview', 'Fire']) {
+    for (const label of ['Drill', 'Charge', 'Preview', 'Blast']) {
       expect(workshop.root.textContent).toContain(label);
     }
     expect(workshop.root.textContent).not.toContain('Sequence');
@@ -55,7 +55,7 @@ describe('BlastWorkshop', () => {
     const steps = Array.from(workshop.root.querySelectorAll('[data-step]')).map(e => e.getAttribute('data-step'));
     for (const n of ['1', '2', '3', '4']) expect(steps).toContain(n);
     expect(steps).not.toContain('5');
-    expect(workshop.root.querySelector('[data-step="4"]')!.textContent).toContain('Fire');
+    expect(workshop.root.querySelector('[data-step="4"]')!.textContent).toContain('Blast');
     expect(workshop.root.querySelector('[data-step="3"]')!.textContent).toContain('Preview');
   });
 

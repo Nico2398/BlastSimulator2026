@@ -25,8 +25,7 @@ import { moveTo } from '../../core/engine/MoveTo.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
-import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
-import { NavGrid } from '../../core/nav/NavGrid.js';
+import { rallySpawnCell } from '../../core/state/RallyPoint.js';
 import { requireGame, refusalText } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
@@ -97,27 +96,13 @@ export function vehicleCommand(
           }),
         };
       }
-      // Spawn near grid centre, staggered per fleet index so newly purchased
-      // vehicles land on distinct tiles instead of stacking on the depot
-      // point — every prior purchase overlapped at one tile, occluding all
-      // but the tallest mesh (#411).
-      const baseX = state.world ? state.world.minX + state.world.sizeX / 2 : 32;
-      const baseZ = state.world ? state.world.minZ + state.world.sizeZ / 2 : 32;
-      const fleetIndex = state.vehicles.vehicles.length;
-      const rawSpawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
-      const rawSpawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
-      // A blast can clear the grid centre down to a floorless 'void' column,
-      // wall off a pocket of "nearest" traversable tiles from the rest of the
-      // map (#437: driver boarding walks to the vehicle, and nothing can path
-      // onto an unreachable tile), or bury the point in a fragment field
-      // whose cells still read 'walkable' but that no driver can step through
-      // (#954). findNearestSpawnCell rules out all three — see its own doc
-      // for why the anchor it snaps against is derived rather than the
-      // literal corner this call site used to assume (#1151). Same call, same
-      // reasons, as the employee hire spawn point in employees.ts.
-      const { x: spawnX, z: spawnZ } = state.navGrid
-        ? NavGrid.findNearestSpawnCell(state.navGrid, rawSpawnX, rawSpawnZ)
-        : { x: rawSpawnX, z: rawSpawnZ };
+      // Spawns on the free cell nearest the site's rally point, with room to
+      // drive and clear of the rest of the fleet (#411: a shared tile occluded
+      // all but the tallest mesh). rallySpawnCell starts from
+      // findNearestSpawnCell, which rules out a floorless column (#437), a
+      // walled-off pocket and a fragment field (#954) — the same search an
+      // employee hire makes.
+      const { x: spawnX, z: spawnZ } = rallySpawnCell(state, 'vehicle');
       // Deducts the same `cost` the guard above tested, so the checked amount
       // and the charged amount can never drift apart.
       const { vehicle } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);

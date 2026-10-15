@@ -751,12 +751,12 @@
       }
     },
     {
-      "command": "tick 5",
-      "description": "#553: lets the rock_fragmenter's driver board and drive off toward its first boulder, clearing its spawn tile before the debris_hauler purchase below ever lands a vehicle there.",
+      "command": "tick 24",
+      "description": "#553: lets the rock_fragmenter's driver board and drive off toward its first boulder, clearing its spawn tile before the debris_hauler purchase below ever lands a vehicle there. 5 -> 24 ticks (rally point): the driver now spawns beside the truck at the rally flag and boards within a few ticks, so at 8x the fragmenter's purchase and boarding engine starts were both still sounding when the hauler's purchase start came (vehicle_start holds two voices at most; tests/unit/audio/crowding/denseBlast.test.ts). 24 ticks is three real seconds at 8x, enough for the first of them to end.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 5"
+          "command": "tick 24"
         }
       ],
       "role": "setup",

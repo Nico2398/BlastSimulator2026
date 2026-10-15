@@ -192,28 +192,36 @@ describe('Vehicle fleet', () => {
   it('driverId is null immediately after "vehicle driver" and only set once the employee has walked to the vehicle', () => {
     vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     const v = ctx.state!.vehicles.vehicles[0]!;
-    // Vehicle spawns near (16, 16) — the world centre for a 32×32 world (see
-    // "move vehicle" test below) — snapped to the nearest cell that's both
-    // NavGrid-reachable and on the same bench level as the map's main region
-    // (#458 T6.1/D13: NavGridReachability.findNearestReachableCell), so the
-    // exact tile can shift by a cell or two depending on terrain.
+    // Vehicle spawns beside the site's rally flag, which on this seed sits on
+    // flat ground near the world centre (16, 16) of a 32×32 world (see
+    // "move vehicle" test below), clear of the flag's own cell, so the exact
+    // tile can shift by a cell or two depending on terrain.
     expect(Math.abs(v.x - 16)).toBeLessThanOrEqual(1);
     expect(Math.abs(v.z - 16)).toBeLessThanOrEqual(1);
 
     const eid = hireOne(ctx, 'driver');
     employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
     const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
-    // First-hired employee also spawns via the same reachable-cell snap —
-    // co-located with the vehicle.
-    expect(emp.x).toBe(v.x);
-    expect(emp.z).toBe(v.z);
+    // The hire spawns on the free cell nearest the same flag — never on the
+    // vehicle's own cell, so it has a short walk to make before it can board.
+    expect(emp.x !== v.x || emp.z !== v.z, 'hire spawned on the vehicle').toBe(true);
+    expect(Math.max(Math.abs(emp.x - v.x), Math.abs(emp.z - v.z))).toBeLessThanOrEqual(3);
 
     const result = vehicleCommand(ctx, ['driver', '1', String(eid)], {});
     expect(result.success).toBe(true);
     expect(vehicleDriverId(v)).toBeNull();
 
-    tickCommand(ctx, ['1'], {});
+    // driverId stays null for every tick the employee is still on the way,
+    // and is set only once they stand on the vehicle's cell.
+    for (let i = 0; i < 50 && vehicleDriverId(v) === null; i++) {
+      tickCommand(ctx, ['1'], {});
+      if (vehicleDriverId(v) === null) {
+        expect(emp.x !== v.x || emp.z !== v.z, 'reached the vehicle without boarding').toBe(true);
+      }
+    }
     expect(vehicleDriverId(v)).toBe(eid);
+    expect(emp.x).toBe(v.x);
+    expect(emp.z).toBe(v.z);
     expectNoWorldInvariantViolations(ctx.state!);
   });
 
@@ -710,6 +718,9 @@ describe('Vehicle fleet', () => {
       const eid = hireOne(ctx, 'driver');
       employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.truck', level: '1' });
       const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+      // Hand-mounted: seat the driver on the vehicle's cell as Mount.board
+      // would — a hire spawns beside the vehicle, never on it.
+      emp.x = v.x; emp.z = v.z;
       v.occupantIds = [eid];
       emp.locomotion = { kind: 'mounted', vehicleId: v.id };
 
@@ -1132,6 +1143,9 @@ describe('Vehicle fleet', () => {
       ctx.state!.pendingActions[0]!.status = 'in_progress';
       ctx.state!.pendingActions[0]!.holderId = eid;
       emp.activeActionId = actionId;
+      // Seated on the vehicle's cell as Mount.board would — a hire spawns
+      // beside the vehicle, never on it.
+      emp.x = vehicle.x; emp.z = vehicle.z;
       vehicle.occupantIds = [eid];
       emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
       reserveVehicle(ctx.state!.vehicles, vehicle.id, actionId);

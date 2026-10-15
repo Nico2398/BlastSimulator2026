@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   tutorialHazards, chebyshevRectDistance, tutorialSiteFootprintRect, isTutorialSiteHazardClear,
-  routeDistanceToRect, REGION, tutorialVehicleSpawnPoint, TUTORIAL_POST_SURVEY_WORLD_SIZE,
+  routeDistanceToRect, REGION, tutorialRallyPoint, TUTORIAL_POST_SURVEY_WORLD_SIZE,
   type TutorialHazard,
 } from '../../../src/ui/tutorialStages.js';
 import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
@@ -29,7 +29,9 @@ import {
   // line tile distance, so the old TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES
   // bound could pass while the real walk was far longer.
   TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST,
+  RALLY_POINT_MAX_HEIGHT_SPREAD_M,
 } from '../../../src/core/config/balance.js';
+import { isFlatParkingCell } from '../../../src/core/state/RallyPoint.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import {
@@ -416,11 +418,32 @@ describe('tutorial site layout rule (#1040)', () => {
       }
     });
 
-    it('tutorialVehicleSpawnPoint(realNavGrid) equals the first real purchase position', () => {
-      const spawn = tutorialVehicleSpawnPoint(navGrid);
-      expect(spawn.x1).toBe(spawn.x2);
-      expect(spawn.z1).toBe(spawn.z2);
-      expect({ x: spawn.x1, z: spawn.z1 }).toEqual({ x: purchased[0]!.x, z: purchased[0]!.z });
+    it('the game plants the flag on tutorialRallyPoint()', () => {
+      const flag = tutorialRallyPoint();
+      expect(state.rallyPoint).toEqual({ x: flag.x1, z: flag.z1 });
+    });
+
+    it('every purchased vehicle spawns on level ground a few tiles from the flag', () => {
+      const flag = state.rallyPoint!;
+      for (const v of purchased) {
+        expect(isFlatParkingCell(navGrid, v), `${v.type} at (${v.x},${v.z})`).toBe(true);
+        expect(Math.max(Math.abs(v.x - flag.x), Math.abs(v.z - flag.z)), `${v.type} at (${v.x},${v.z})`).toBeLessThanOrEqual(6);
+      }
+    });
+
+    it('the free spoil heap stands on flat ground clear of every blast hazard', () => {
+      const heap = state.buildings.buildings.find((b) => b.type === 'spoil_heap')!;
+      expect(heap).toBeDefined();
+      const rect = tutorialSiteFootprintRect('spoil_heap', heap.tier, { x1: heap.x, z1: heap.z, x2: heap.x, z2: heap.z });
+      expect(isTutorialSiteHazardClear(rect), `heap at (${heap.x},${heap.z})`).toBe(true);
+      const ys: number[] = [];
+      for (let z = rect.z1 - 1; z <= rect.z2 + 1; z++) {
+        for (let x = rect.x1 - 1; x <= rect.x2 + 1; x++) {
+          if (x >= rect.x1 && x <= rect.x2 && z >= rect.z1 && z <= rect.z2) continue;
+          ys.push(navGrid.cellAt(x, z)!.surfaceY!);
+        }
+      }
+      expect(Math.max(...ys) - Math.min(...ys)).toBeLessThanOrEqual(RALLY_POINT_MAX_HEIGHT_SPREAD_M + 0.5);
     });
   });
 

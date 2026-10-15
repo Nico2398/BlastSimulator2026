@@ -18,7 +18,7 @@ import { Random } from '../../src/core/math/Random.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
-import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
+import { BLAST_DANGER_MARGIN_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { addFreightWarehouseToState } from '../helpers/freightWarehouse.js';
@@ -80,9 +80,12 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
  * helper's own relocation: these tests are about flyrock reaching the crew
  * crewBesideTheBlast (or a test's own explicitly hired/positioned employee)
  * places deliberately, not about whichever staffed employee happened to do
- * the charging — so only ids 1/2 (the staffed opening's driller/blaster,
- * hired before any test-specific crew) are parked clear of the pattern once
- * every charge has landed. Relocating by qualification instead of by these
+ * the charging — so the staffed opening's whole roster (ids 1..N, hired
+ * before any test-specific crew) is parked clear of the pattern once every
+ * charge has landed. That includes its idle excavator drivers: they gather
+ * around the rally flag (x 1..7, z 4..14 on this seed), inside a minimally
+ * stemmed shot's throw, where the old fixed spawn row along z=0 happened to
+ * sit just outside it. Relocating by qualification instead of by these
  * fixed ids would also sweep up a test's own deliberately-placed 'driller'-
  * role bystanders (crewBesideTheBlast, onTheBlast), which are 'blasting'-
  * qualified too (ROLE_STARTING_QUALIFICATIONS) but must stay exactly where
@@ -104,7 +107,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 1500): void 
   // Water outlives the rain that filled it (#1350): empty the holes too.
   ctx.state!.holeWater = {};
   for (const emp of ctx.state!.employees.employees) {
-    if (emp.id === 1 || emp.id === 2) {
+    if (emp.id <= STARTING_SITE_STAFFED_COMPOSITION.employees.length) {
       emp.x = 44;
       emp.z = 44;
     }

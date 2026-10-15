@@ -115,7 +115,7 @@ Time: hours = ticks, days = `days * TICKS_PER_DAY`. Timed effects register an `A
 | | `morale_shift` | morale drifts by `perHour` |
 | | `fatigue_relief` | everyone rested |
 | | `employee_leaves` (`random`/`role`/`junior`) | one employee leaves, unionised ones included (only events do this); `_alt` text when nobody matches |
-| | `employee_joins` | free hire at the hire spawn point |
+| | `employee_joins` | free hire, spawned beside the rally flag |
 | | `employee_injured` | a healthy employee is injured; `_alt` with nobody |
 | Pay | `salary` (`days: null` = permanent) | payroll and HUD cost scale for a role or all |
 | | `bonus_per_employee` | one-off cash per living employee |
