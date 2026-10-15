@@ -64,7 +64,7 @@ describe('ghost colour after a real blast (#1306)', () => {
       driver.fatigue = 100;
     };
     place(POCKET);
-    expect(run('build_ramp start:27,9 end:17,9 depth:5')).toMatchObject({ success: true });
+    expect(run('build_ramp start:12,3 end:2,3 depth:5')).toMatchObject({ success: true });
 
     const ramp = state.plannedRamps.at(-1)!;
     expect(ramp.segments.length).toBeGreaterThan(1);
