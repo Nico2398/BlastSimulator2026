@@ -396,7 +396,8 @@ describe('Employee skills', () => {
   it('employee train refuses when no school for that skill is built', () => {
     const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('geology_lab');
+    expect(result.output).toContain('Geology Lab');
+    expect(result.output).not.toContain('geology_lab');
   });
 
   it('employee train refuses when the site cannot afford the course', () => {
