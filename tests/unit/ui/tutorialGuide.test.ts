@@ -201,6 +201,66 @@ describe('resolveStageIndex — reachableWhen (#1632)', () => {
   });
 });
 
+describe('resolveStageIndex — real train-fragmenter stages (#1763)', () => {
+  const stages = TUTORIAL_STAGES['train-fragmenter']!;
+  function driverPanelToggle(): void {
+    const panel = document.createElement('div');
+    panel.id = 'bs-employee-panel';
+    const row = document.createElement('div');
+    row.setAttribute('data-employee-role', 'driver');
+    const toggle = document.createElement('button');
+    toggle.className = 'bs-detail-toggle';
+    row.appendChild(toggle);
+    panel.appendChild(row);
+    document.body.appendChild(panel);
+    withBox(toggle);
+  }
+  function inspectorDriver(child: 'bs-train-btn' | 'bs-training-active'): void {
+    const root = document.createElement('div');
+    root.id = 'bs-inspector';
+    root.setAttribute('data-kind', 'employee');
+    const detail = document.createElement('div');
+    detail.className = 'bs-employee-detail';
+    detail.setAttribute('data-employee-role', 'driver');
+    const c = document.createElement(child === 'bs-train-btn' ? 'button' : 'div');
+    c.className = child;
+    c.setAttribute('data-skill', 'driving.rock_fragmenter');
+    detail.appendChild(c);
+    root.appendChild(detail);
+    document.body.appendChild(root);
+    withBox(c);
+  }
+  function toolbar(): void {
+    const bar = document.createElement('div');
+    bar.id = 'bs-toolbar';
+    const b = document.createElement('button');
+    b.dataset['panel'] = 'employees';
+    bar.appendChild(b);
+    document.body.appendChild(bar);
+    withBox(b);
+  }
+
+  it('the inspector train button resolves the final stage', () => {
+    toolbar(); driverPanelToggle(); inspectorDriver('bs-train-btn');
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('the inspector in-training marker alone keeps the final stage', () => {
+    toolbar(); driverPanelToggle(); inspectorDriver('bs-training-active');
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('the inspector marker holds the final stage even when the crew row toggle is gone', () => {
+    toolbar(); inspectorDriver('bs-training-active');
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('only the crew row toggle resolves the toggle stage', () => {
+    toolbar(); driverPanelToggle();
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+});
+
 describe('resolveStageIndex — doneTarget fallback (#903)', () => {
   // Shaped like train-driller's final stage: `target` is the `.bs-train-btn`
   // row, which the crew panel replaces with an "in training" status view
@@ -208,12 +268,22 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
   // booked — so `target` goes unreachable at exactly the moment the step
   // should be considered DONE, not regressed. `doneTarget` is the status
   // view's own selector, checked only once `target` itself is unreachable.
+  // #1763: the train button and its status view live in the employee inspector.
+  function inspector(): HTMLElement {
+    let root = document.getElementById('bs-inspector');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'bs-inspector';
+      document.body.appendChild(root);
+    }
+    return root;
+  }
   const stages: TutorialStage[] = [
     { target: '#open', hintKey: 'a' },
     { target: '#expand', hintKey: 'b' },
     {
-      target: '.bs-train-btn[data-skill="driving.drill_rig"]',
-      doneTarget: '.bs-training-active[data-skill="driving.drill_rig"]',
+      target: '#bs-inspector .bs-train-btn[data-skill="driving.drill_rig"]',
+      doneTarget: '#bs-inspector .bs-training-active[data-skill="driving.drill_rig"]',
       hintKey: 'c',
     },
   ];
@@ -224,7 +294,7 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
     const status = document.createElement('div');
     status.className = 'bs-training-active';
     status.setAttribute('data-skill', 'driving.drill_rig');
-    document.body.appendChild(status);
+    inspector().appendChild(status);
     withBox(status);
 
     expect(resolveStageIndex(stages)).toBe(2);
@@ -236,7 +306,7 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
     const trainBtn = document.createElement('button');
     trainBtn.className = 'bs-train-btn';
     trainBtn.setAttribute('data-skill', 'driving.drill_rig');
-    document.body.appendChild(trainBtn);
+    inspector().appendChild(trainBtn);
     withBox(trainBtn);
 
     expect(resolveStageIndex(stages)).toBe(2);
@@ -255,13 +325,13 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
     const trainBtn = document.createElement('button');
     trainBtn.className = 'bs-train-btn';
     trainBtn.setAttribute('data-skill', 'driving.drill_rig');
-    document.body.appendChild(trainBtn);
+    inspector().appendChild(trainBtn);
     withBox(trainBtn);
     // A stray doneTarget element also present should not change the result.
     const status = document.createElement('div');
     status.className = 'bs-training-active';
     status.setAttribute('data-skill', 'driving.drill_rig');
-    document.body.appendChild(status);
+    inspector().appendChild(status);
     withBox(status);
 
     expect(resolveStageIndex(stages)).toBe(2);
@@ -272,9 +342,7 @@ describe('resolveStageIndex — doneTarget fallback (#903)', () => {
     // above) must survive doneTarget's addition: closing the container makes
     // BOTH target and doneTarget unreachable, and the rail must fall all the
     // way back to stage 0, not get stuck pointing at a hidden doneTarget.
-    const panel = document.createElement('div');
-    panel.id = 'bs-employee-panel';
-    document.body.appendChild(panel);
+    const panel = inspector();
 
     const open = document.createElement('button');
     open.id = 'open';
