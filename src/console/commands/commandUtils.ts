@@ -26,7 +26,7 @@ export function refusalText(refusal: { error?: string } & RefusalKey): string {
 
 /** Translated display name of a building type for refusal text. */
 export function buildingTypeName(type: BuildingType): string {
-  return type; // TODO: implement
+  return t(`building.${type}.name`);
 }
 
 /** Guard every command that needs a loaded game. */
