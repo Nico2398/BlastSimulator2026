@@ -2755,16 +2755,18 @@ export const PRODUCTION_ORE_PRICES: Record<string, number> = {
  */
 export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
 /**
- * Supply deals are the biggest ore offers, but still fillable: the kit hauls ~31 kg of ore a
- * tick into a 25 t tier-1 warehouse (`FREIGHT_WAREHOUSE_CAPACITY_KG[1]`), so a supply offer
- * must fit within its deadline at that rate. Invariant: qtyMax <= haulRate * deadlineMin
- * (12,000 <= 31 * 500 = 15,500), so every supply offer is deliverable in full on time.
+ * Supply deals are the biggest ore offers, but still fillable. A supply offer asks for one ore,
+ * and that ore is only a share of the kit's ~31 kg/tick haul into a 25 t tier-1 warehouse
+ * (`FREIGHT_WAREHOUSE_CAPACITY_KG[1]`): the measured delivered rate of one supply ore in the
+ * opening-kit scenario (#1789 sandbox-economy-balance) is ~9 kg/tick (8,353 kg in 919 ticks).
+ * Invariant: qtyMax * 1.5 <= deliveredRate * deadlineMin (8,000 * 1.5 = 12,000 <= 9 * 1,500
+ * = 13,500), so every supply offer is deliverable in full on time with a 1.5x margin.
  */
-export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 12_000 } as const;
+export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 8_000 } as const;
 /** Deadline range (ticks) of legacy-market offers. */
 export const LEGACY_OFFER_DEADLINE_TICKS = { min: 30, max: 100 } as const;
 /** Deadline range (ticks) of production-market supply offers; see the fillability invariant above. */
-export const PRODUCTION_SUPPLY_DEADLINE_TICKS = { min: 500, max: 1_000 } as const;
+export const PRODUCTION_SUPPLY_DEADLINE_TICKS = { min: 1_500, max: 2_500 } as const;
 /** Rubble is ~1,500 t per shot; disposal offers take a meaningful share of it. */
 export const PRODUCTION_RUBBLE_QTY_KG = { min: 100_000, max: 300_000 } as const;
 /** Rounding step (kg) of production offer sizes. */

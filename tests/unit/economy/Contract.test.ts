@@ -991,8 +991,8 @@ describe('production supply offers are fillable by the opening kit (#1789)', () 
   const supply = SUPPLY_SEEDS.flatMap((seed) => boardsOver('production', seed, 40).filter((c) => c.type === 'supply'));
 
   it('the supply term constants are the contract values', () => {
-    expect(PRODUCTION_SUPPLY_QTY_KG).toEqual({ min: 4_000, max: 12_000 });
-    expect(PRODUCTION_SUPPLY_DEADLINE_TICKS).toEqual({ min: 500, max: 1_000 });
+    expect(PRODUCTION_SUPPLY_QTY_KG).toEqual({ min: 4_000, max: 8_000 });
+    expect(PRODUCTION_SUPPLY_DEADLINE_TICKS).toEqual({ min: 1_500, max: 2_500 });
     expect(resolveMarket('production').supplyDeadlineTicks).toEqual(PRODUCTION_SUPPLY_DEADLINE_TICKS);
   });
 
@@ -1000,18 +1000,18 @@ describe('production supply offers are fillable by the opening kit (#1789)', () 
     expect(supply.length).toBeGreaterThan(50);
   });
 
-  it('every offer has quantity in 4000-12000 kg on the 250 kg step', () => {
+  it('every offer has quantity in 4000-8000 kg on the 250 kg step', () => {
     for (const c of supply) {
       expect(c.quantityKg).toBeGreaterThanOrEqual(4_000);
-      expect(c.quantityKg).toBeLessThanOrEqual(12_000);
+      expect(c.quantityKg).toBeLessThanOrEqual(8_000);
       expect(c.quantityKg % PRODUCTION_OFFER_QTY_STEP_KG).toBe(0);
     }
   });
 
-  it('every offer has a deadline of 500-1000 ticks', () => {
+  it('every offer has a deadline of 1500-2500 ticks', () => {
     for (const c of supply) {
-      expect(c.deadlineTicks).toBeGreaterThanOrEqual(500);
-      expect(c.deadlineTicks).toBeLessThanOrEqual(1_000);
+      expect(c.deadlineTicks).toBeGreaterThanOrEqual(1_500);
+      expect(c.deadlineTicks).toBeLessThanOrEqual(2_500);
     }
   });
 
