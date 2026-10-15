@@ -546,7 +546,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -574,7 +574,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -602,7 +602,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -630,7 +630,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -658,7 +658,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -686,7 +686,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -714,7 +714,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -738,7 +738,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -762,7 +762,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 203,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -864,7 +864,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 50.57222500000025,
+          "wellBeing": 40.30865714285731,
           "safety": 50,
           "ecology": 44.72863403876688,
           "nuisance": 36.8215850969172,
@@ -875,7 +875,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect. #1696: idle blockers yield off the route, so the crew clears the drill corridor 10 ticks later (tickCount 193 -> 203, 213 -> 223) and the shifted tick lands the random events differently (wellBeing 54.98 -> 44.77; 58.31 -> 50); re-measured. #1696 merged with main: wellBeing re-measured after the merge (50.57 -> 40.31, 43.84 -> 33.55); timing shift only, tickCount unchanged."
       }
     },
     {
@@ -1021,7 +1021,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 50.57222500000025,
+          "wellBeing": 40.30865714285731,
           "safety": 50,
           "ecology": 44.72863403876688,
           "nuisance": 36.8215850969172,
@@ -1032,7 +1032,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3)."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1696 merged with main: wellBeing re-measured after the merge (50.57 -> 40.31, 43.84 -> 33.55); timing shift only, tickCount unchanged."
       }
     },
     {
@@ -1047,7 +1047,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 213,
+          "tickCount": 223,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 4,
@@ -1073,12 +1073,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 213,
+          "tickCount": 223,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 43.83920714285735,
+          "wellBeing": 33.55217500000015,
           "safety": 0,
           "ecology": 40.53810311268534,
           "nuisance": 36.20792548458591,
@@ -1101,7 +1101,7 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 213,
+          "tickCount": 223,
           "deathCount": 4,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1121,10 +1121,10 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 213,
+          "tickCount": 223,
           "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 43.83920714285735,
+          "wellBeing": 33.55217500000015,
           "safety": 0,
           "ecology": 40.53810311268534,
           "nuisance": 36.20792548458591,
@@ -1145,10 +1145,10 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 213,
+          "tickCount": 223,
           "deathCount": 4,
           "employeeCount": 12,
-          "wellBeing": 43.83920714285735,
+          "wellBeing": 33.55217500000015,
           "safety": 0,
           "ecology": 40.53810311268534,
           "nuisance": 36.20792548458591,
