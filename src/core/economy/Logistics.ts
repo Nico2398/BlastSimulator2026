@@ -245,7 +245,9 @@ export function splitStoredFragmentMass(
 
 /**
  * Remove only `oreId` (up to `oreKg`) from one stored fragment, leaving every
- * other ore in it at its exact kg. Shrinks the fragment's volume and mass,
+ * other ore in it at its exact kg. The ore's share of volume and mass is
+ * d / max(1, sum of densities), so mixed fragments whose densities sum past 1
+ * still deliver exactly the requested kg. Shrinks the fragment's volume and mass,
  * reduces state.storedMassKg by the removed mass, and removes a pure-ore
  * fully-sold fragment via sellFragment. Returns the ore kg, mass and volume
  * actually removed, or null when the fragment is not stored, lacks the ore,
@@ -268,8 +270,12 @@ export function extractOreFromFragment(
   if (d <= 0 || !(contribution > 0)) return null;
 
   const f = Math.min(1, Math.max(0, oreKg / contribution));
-  const removedVolume = volume * d * f;
-  const removedMass = fragment.mass * d * f;
+  // Physical share of the fragment this ore occupies: densities can sum past 1,
+  // in which case volume V*d would overshoot V, so normalise by max(1, sum).
+  const densitySum = Object.values(fragment.oreDensities).reduce((a, b) => a + Math.max(0, b), 0);
+  const share = d / Math.max(1, densitySum);
+  const removedVolume = volume * share * f;
+  const removedMass = fragment.mass * share * f;
   const newVolume = volume - removedVolume;
   const removedOreKg = contribution * f;
 

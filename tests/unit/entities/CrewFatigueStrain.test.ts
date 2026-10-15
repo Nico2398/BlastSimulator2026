@@ -13,12 +13,22 @@ describe('computeCrewFatigueStrain (#1692)', () => {
     expect(computeCrewFatigueStrain([m(0, { alive: false }), m(10, { alive: false })])).toBe(0);
   });
 
-  it('is 0 when everyone is rested (fatigue >= 70)', () => {
-    expect(computeCrewFatigueStrain([m(70), m(85), m(100)])).toBe(0);
+  it('is 0 when everyone is rested (fatigue >= 50)', () => {
+    expect(computeCrewFatigueStrain([m(50), m(85), m(100)])).toBe(0);
   });
 
   it('is 1 when everyone is at fatigue 0', () => {
     expect(computeCrewFatigueStrain([m(0), m(0), m(0)])).toBe(1);
+  });
+
+  it('comfort line is 50 (#1778): 50 -> 0, 25 -> 0.5, 0 -> 1', () => {
+    expect(computeCrewFatigueStrain([m(50)])).toBe(0);
+    expect(computeCrewFatigueStrain([m(25)])).toBeCloseTo(0.5, 10);
+    expect(computeCrewFatigueStrain([m(0)])).toBe(1);
+  });
+
+  it('fatigue left by the default rest cycle (60-70) carries no strain (#1778)', () => {
+    expect(computeCrewFatigueStrain([m(60), m(65), m(70)])).toBe(0);
   });
 
   it('ignores dead members', () => {

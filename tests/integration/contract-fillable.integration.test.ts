@@ -7,6 +7,7 @@ import { contractCommand } from '../../src/console/commands/economy.js';
 import type { Contract } from '../../src/core/economy/Contract.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
 import { ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
 
 function addOffer(ctx: GameContext, materialId: string, quantityKg: number): Contract {
@@ -109,5 +110,41 @@ describe('contract fillable:true (#1338)', () => {
     const r = contractCommand(ctx, ['deliver'], { type: 'ore_sale', fillable: 'true', amount: '10' });
     expect(r.success).toBe(false);
     expect(r.output.toLowerCase()).toContain('fillable');
+  });
+
+  it('an ore_sale offer covered only by ore in a fragment whose densities sum above 1 is accepted and delivered in full (#1786)', () => {
+    // Rescaled mixed fragment: dirtite 2.85 + rustite 1.0, V=0.075, 157.5 kg.
+    const volume = 0.075;
+    const dirtiteKg = volume * 2.85 * ORE_DENSITY_KG_M3;
+    const rustiteKg = volume * 1.0 * ORE_DENSITY_KG_M3;
+    const fragment: FragmentData = {
+      id: 9786,
+      position: { x: 0, y: 0, z: 0 },
+      volume,
+      mass: 157.5,
+      rockId: 'sandite',
+      oreDensities: { dirtite: 2.85, rustite: 1.0 },
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+      shapeSeed: 1,
+      origin: { x: 0, y: 0, z: 0 },
+    };
+    ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: ensureFreightWarehouse(ctx) });
+    ctx.state!.logistics.storedMassKg += fragment.mass;
+    ctx.state!.collectedOre['dirtite'] = dirtiteKg;
+    ctx.state!.collectedOre['rustite'] = rustiteKg;
+    const offer = addOffer(ctx, 'dirtite', Math.floor(dirtiteKg));
+
+    const accept = contractCommand(ctx, ['accept'], { type: 'ore_sale', fillable: 'true' });
+    expect(accept.success).toBe(true);
+    expect(ctx.state!.contracts.active.map(c => c.id)).toEqual([offer.id]);
+
+    const deliver = contractCommand(ctx, ['deliver'], { type: 'ore_sale', fillable: 'true', amount: String(offer.quantityKg) });
+    expect(deliver.success).toBe(true);
+    expect(deliver.output).toContain('COMPLETED');
+    expect(offer.deliveredKg).toBeCloseTo(offer.quantityKg, 6);
+    expect(ctx.state!.collectedOre['dirtite']).toBeCloseTo(dirtiteKg - offer.quantityKg, 6);
+    expect(ctx.state!.collectedOre['rustite']).toBeCloseTo(rustiteKg, 6);
   });
 });

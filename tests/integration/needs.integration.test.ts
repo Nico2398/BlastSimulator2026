@@ -3,7 +3,7 @@
 // effects, collapse, and building replenishment.
 // Defines real tests against the core EmployeeNeeds API and the needs console command.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand, buildCommand } from '../../src/console/commands/entities.js';
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
@@ -615,6 +615,11 @@ describe('forced rest under an applied SitePolicy — driven through the console
     let minFatigue = 100;
 
     driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
+      // #1778: comfort-band morale recovery keeps a lone driller's morale high, which
+      // slows fatigue drain (NEED_MORALE_DRAIN_MULTIPLIERS) so proactive rest lands
+      // before collapse. The contrast models the neglected crew whose morale is
+      // already broken, as this run's drain used to be.
+      emp.morale = 0;
       sawCollapse = sawCollapse || emp.collapsing;
       minFatigue = Math.min(minFatigue, emp.fatigue);
     });
@@ -1603,6 +1608,98 @@ describe('#1692 — well-being does not pin at the ceiling for a busy, housed cr
     expect(t1t2).toBeGreaterThan(t1);
   });
 });
+
+describe('#1778 — a working crew under the default site policy keeps healthy well-being', () => {
+  const TICKS = 3000;
+  const WINDOW = 500;
+
+  interface CrewRun {
+    wellBeingWindow: number[];
+    revolt: boolean;
+    /** Employees whose morale hit 0 at any tick of the final WINDOW. */
+    zeroMoraleIds: number[];
+    levelEndReason: string | null | undefined;
+  }
+
+  /**
+   * Bare sandbox: 5 crew, optionally one tier-1 Living Quarters, a working
+   * 3000-tick run (re-dispatch only when idle, so rests happen mostly in place
+   * like the #1778 repro). Quarters sit beyond the rest search radius (64x64
+   * grid, corner) so rests happen in place and cap at NEED_REST_NO_BUILDING_CAP.
+   * No `policy` keeps the default site policy.
+   * Crowding (crew above beds) is unit-tested in ScoreManager.test.ts: the
+   * hiring pool never outgrows one T1 quarters, so it cannot be driven here.
+   */
+  function runCrew(opts: { quarters: boolean; policy?: { mode: string; fatigue?: string } }): CrewRun {
+    const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '64' });
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    state.buildings.unlockedTiers.living_quarters = 3;
+    if (opts.quarters) {
+      expect(placeBuilding(state.buildings, 'living_quarters', 56, 56, 64, 64, 1).success).toBe(true);
+    }
+    if (opts.policy) expect(setPolicyCommand(ctx, [], opts.policy).success).toBe(true);
+    // The hiring pool is finite per role: cycle roles until the crew has 5.
+    const roles = ['driller', 'blaster', 'hauler', 'excavator', 'manager', 'surveyor'];
+    for (let i = 0; state.employees.employees.length < 5 && i < 60; i++) {
+      employeeCommand(ctx, ['hire'], { role: roles[i % roles.length]! });
+    }
+    expect(state.employees.employees.length).toBe(5);
+
+    let revolt = false;
+    ctx.emitter.on('revolt:triggered', () => { revolt = true; });
+    const wellBeingWindow: number[] = [];
+    const zero = new Set<number>();
+    for (let i = 0; i < TICKS && !revolt; i++) {
+      for (const emp of state.employees.employees) {
+        if (
+          emp.alive && !emp.injured && emp.trainingState === null &&
+          emp.activeActionId === null && emp.restTicksRemaining === null && emp.pendingRestDuration === null
+        ) {
+          employeeCommand(ctx, ['dispatch', String(emp.id)], { x: String(emp.x), z: String(emp.z) });
+        }
+      }
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+      if (i >= TICKS - WINDOW) {
+        wellBeingWindow.push(state.scores.wellBeing);
+        for (const emp of state.employees.employees) if (emp.alive && emp.morale <= 0) zero.add(emp.id);
+      }
+    }
+    return { wellBeingWindow, revolt, zeroMoraleIds: [...zero], levelEndReason: state.levelEndReason };
+  }
+
+  const mean = (xs: number[]) => (xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length);
+  let base: CrewRun;
+  beforeAll(() => { base = runCrew({ quarters: true }); }, 600_000);
+
+  it('default policy + one T1 quarters: no revolt across 3000 ticks', () => {
+    expect(base.revolt).toBe(false);
+    expect(base.levelEndReason).not.toBe('worker_revolt');
+    expect(base.wellBeingWindow.length).toBe(WINDOW);
+  });
+
+  it('default policy + one T1 quarters: well-being stays at or above 60 after warm-up', () => {
+    expect(Math.min(...base.wellBeingWindow)).toBeGreaterThanOrEqual(60);
+  });
+
+  it('default policy: no crew member sits at morale 0 over the final 500 ticks', () => {
+    expect(base.zeroMoraleIds).toEqual([]);
+  });
+
+  it('the same crew under `continuous` (rest threshold 0) ends with lower well-being', () => {
+    const harsh = runCrew({ quarters: true, policy: { mode: 'continuous', fatigue: '0' } });
+    // A run that revolts before the final window leaves it empty (mean() 0), which must not
+    // pass as "lower": a revolt is itself the worse outcome; otherwise the window is full and compared.
+    if (harsh.revolt) {
+      expect(base.revolt).toBe(false);
+      return;
+    }
+    expect(harsh.wellBeingWindow.length).toBe(WINDOW);
+    expect(mean(harsh.wellBeingWindow)).toBeLessThan(mean(base.wellBeingWindow));
+  });
+}, 1_800_000);
 
 describe('#1692 — TickPipeline feeds crew fatigue strain into well-being', () => {
   const TICKS = 120;

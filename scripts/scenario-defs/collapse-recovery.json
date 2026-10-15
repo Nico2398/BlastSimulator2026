@@ -97,6 +97,24 @@
       }
     },
     {
+      "command": "tick 40",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup",
+      "description": "#1778: comfort-band morale recovery lifts the fresh hire's morale above MORALE_THRESHOLDS.high (70) while fatigue is >= 50, which applies NEED_MORALE_DRAIN_MULTIPLIERS.high (0.85) to the working drain; the first forced-work run then bottoms out at fatigue ~6 and its task completes (queuing a rest) before the gauge reaches 0. Idling 40 ticks first (idle drain only, fatigue stays far above the soft threshold so no rest is queued) starts the forced work with a lower gauge, so the genuine collapse below still lands.",
+      "expect": {
+        "decreased": ["minFatigue"],
+        "equals": {
+          "collapsedCount": 0
+        },
+        "note": "idle drain only (0.5/tick x 0.85): nowhere near the soft threshold (25), so no rest is routed and nobody collapses"
+      }
+    },
+    {
       "command": "employee dispatch 1 x:49 z:46",
       "interaction": [
         {
@@ -212,9 +230,9 @@
       "expect": {
         "equals": {
           "collapsedCount": 1,
-          "wellBeing": 0
+          "wellBeing": 1.1528749999998935
         },
-        "note": "cumulative tick 135: neglect is not a one-off — a single task dispatched into the low-fatigue productivity band runs long enough to collapse this employee again (real run: fires at absolute tick 129, well inside this batch). wellBeing is asserted flat at 0 rather than decreased — morale was already floored by the first collapse (NEED_MORALE_EFFECT_PENALTIES' repeated 'critical' penalty and clampScore's own 0 floor) and stays there; there is no further room for this second collapse to push it down."
+        "note": "#1778: wellBeing re-pinned from 0 to 1.1528749999998935 — comfort-band morale recovery (NEED_COMFORT_MORALE_RECOVERY) means the post-collapse employee is no longer latched at the 0 floor; the second collapse still happens. Cumulative tick is now 175 (the file gained a 40-tick idle step). Original note, cumulative tick 135 before that step: neglect is not a one-off — a single task dispatched into the low-fatigue productivity band runs long enough to collapse this employee again (real run: fires at absolute tick 129, well inside this batch). wellBeing is asserted flat at 0 rather than decreased — morale was already floored by the first collapse (NEED_MORALE_EFFECT_PENALTIES' repeated 'critical' penalty and clampScore's own 0 floor) and stays there; there is no further room for this second collapse to push it down."
       }
     },
     {

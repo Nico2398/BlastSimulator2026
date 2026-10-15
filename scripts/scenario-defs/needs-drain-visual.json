@@ -154,11 +154,11 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "minFatigue": 24.800000000000004
+          "minFatigue": 24.95000000000001
         },
         "note": "Over these 65 ticks the driller finishes travelling (traveling tier), arrives and completes the dispatched general_work task (working tier, the fastest drain), then goes idle again (idle tier) once the task completes -- fatigue falls from 91 to exactly 24.475, low enough to trip the proactive-queue routing (NEED_WARNING_THRESHOLDS.fatigue = 25) and start a claimed rest the very tick this batch ends (restTicksRemaining becomes non-null). Exact value pinned because this whole replay is deterministic (seed:42, no player-random choices)."
       },
-      "description": "#1151: re-baselined against a measured run -- minFatigue 24.474999999999994 -> 24.800000000000004. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so fatigue drains over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
+      "description": "#1151: re-baselined against a measured run -- minFatigue 24.474999999999994 -> 24.800000000000004. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so fatigue drains over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1778: comfort-band morale recovery lifts the crew into the high-morale drain tier (x0.85) a little earlier, so minFatigue 24.800000000000004 -> 24.95000000000001."
     },
     {
       "command": "needs",

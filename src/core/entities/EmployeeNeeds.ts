@@ -4,7 +4,7 @@
 // to (rest routing, morale, collapse).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS, WB_FATIGUE_COMFORT } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS, WB_FATIGUE_COMFORT, NEED_COMFORT_MORALE_RECOVERY } from '../config/balance.js';
 
 /** The single need gauge tracked on every Employee. */
 export type NeedKey = 'fatigue';
@@ -36,10 +36,12 @@ export function getNeedMultiplier(employee: Employee): number {
 /**
  * Pure function. Computes the tick-level morale delta from the fatigue gauge.
  *
- * The gauge contributes 0 (≥50), −0.5 (30–49), −1.5 (15–29), or −3.0 (<15).
+ * The gauge contributes the NEED_MORALE_EFFECT_PENALTIES entry for its band
+ * (0 at ≥50, then −1.5, −4.5, −9.0 as it falls).
  *
- * If fatigue is above {@link NEED_WELL_RESTED_THRESHOLD} (currently 80), a
- * well-rested bonus of +1 (NEED_WELL_RESTED_BONUS) is applied.
+ * Fatigue in the comfortable band [50, {@link NEED_WELL_RESTED_THRESHOLD}]
+ * recovers +NEED_COMFORT_MORALE_RECOVERY. Above the threshold (80) the
+ * well-rested bonus NEED_WELL_RESTED_BONUS applies instead (no stacking).
  *
  * This function does NOT mutate employee.morale — it returns a delta that the
  * caller must apply each tick.
@@ -71,9 +73,11 @@ export function needsMoraleEffect(employee: Employee): number {
     }
   }
 
-  // Well-rested bonus: fatigue strictly above threshold.
+  // Well-rested bonus above the threshold; comfort recovery in the band below it (never both).
   if (employee.fatigue > NEED_WELL_RESTED_THRESHOLD) {
     delta += NEED_WELL_RESTED_BONUS;
+  } else if (employee.fatigue >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable) {
+    delta += NEED_COMFORT_MORALE_RECOVERY;
   }
 
   return delta;
