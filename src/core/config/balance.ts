@@ -2756,6 +2756,11 @@ export const PRODUCTION_ORE_PRICES: Record<string, number> = {
 export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
 /** Supply deals are bulk and recurring: bigger than a sale. */
 export const PRODUCTION_SUPPLY_QTY_KG = { min: 60_000, max: 200_000 } as const;
+/** Deadline range (ticks) of legacy-market offers. */
+export const LEGACY_OFFER_DEADLINE_TICKS = { min: 30, max: 100 } as const;
+/** Deadline range (ticks) of production-market supply offers. */
+// TODO: implement — stub equals legacy until sized to the bulk quantities.
+export const PRODUCTION_SUPPLY_DEADLINE_TICKS = { min: 30, max: 100 } as const;
 /** Rubble is ~1,500 t per shot; disposal offers take a meaningful share of it. */
 export const PRODUCTION_RUBBLE_QTY_KG = { min: 100_000, max: 300_000 } as const;
 /** Rounding step (kg) of production offer sizes. */
