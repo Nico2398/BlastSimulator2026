@@ -227,7 +227,7 @@ export function estimateActionCost(
 /**
  * `estimateActionCost` plus the ranking bonuses it subtracted, so selection can apply them to the real cost too.
  * `cost` is a sort key: the base ore bonus clamps it at 0, the demand bonus (#1817, scaled by the optional
- * `urgency` of the ore the action's fragment carries) may take it below 0. Never a real tick count.
+ * `urgency` of the ore the action's fragment carries, weighted by its grade: #1828) may take it below 0. Never a real tick count.
  */
 function estimateWithBonus(
   state: GameState,
@@ -244,7 +244,7 @@ function estimateWithBonus(
 }
 
 /**
- * Ticks of demand bonus for `action`: 0 without urgency, for a held action, for anything but haul_debris (fragmenting is not
+ * Ticks of demand bonus for `action`, scaled by the fragment's ore grade (trace ore earns none, rich ore the full urgency; #1828): 0 without urgency, for a held action, for anything but haul_debris (fragmenting is not
  * ranked by demand), or for a non-ore haul. A loaded (in_transit) unheld haul gets the full bonus so no urgent ground fragment outbids it (#1709).
  */
 function demandBonusOf(
