@@ -688,7 +688,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 383
+          "tickCount": 377
         },
         "decreased": [
           "cash"
@@ -718,7 +718,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 383,
+          "tickCount": 377,
           "wellBeing": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -773,7 +773,7 @@
         "equals": {
           "wellBeing": 0,
           "ecology": 50,
-          "tickCount": 383,
+          "tickCount": 377,
           "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

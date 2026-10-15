@@ -29,6 +29,8 @@ function makeInputs(overrides: Partial<ScoreInputs> = {}): ScoreInputs {
     maxRecentVibration: 0,
     employeeCount: 0,
     looseRockKg: 0,
+    bedCapacity: 0,
+    crewFatigueStrain: 0,
     ...overrides,
   };
 }
@@ -403,5 +405,134 @@ describe('ecology responds to how the mine is run (#1691, #1733)', () => {
       expect(Number.isNaN(s.ecology)).toBe(false);
       expect(Number.isFinite(s.freshDustKg)).toBe(true);
     });
+  });
+});
+
+describe('Well-being model — headroom, overwork, crowding, accidents (#1692)', () => {
+  function withQuarters(tier: 1 | 2 | 3) {
+    const buildings = createBuildingState();
+    buildings.unlockedTiers.living_quarters = 3;
+    const res = placeBuilding(buildings, 'living_quarters', 0, 0, 64, 64, tier);
+    expect(res.success).toBe(true);
+    return buildings;
+  }
+
+  function settle(tier: 1 | 2 | 3, ticks = 1000, overrides: Partial<ScoreInputs> = {}): number {
+    const state = createScoreState();
+    const buildings = withQuarters(tier);
+    for (let i = 0; i < ticks; i++) updateScores(state, makeInputs({ buildings, avgMorale: 70, ...overrides }));
+    return state.wellBeing;
+  }
+
+  it('a crew larger than the beds loses well-being versus a smaller crew with the same T1 quarters', () => {
+    const buildings = withQuarters(1);
+    const small = createScoreState();
+    const crowded = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(small, makeInputs({ buildings, avgMorale: 70, employeeCount: 10, bedCapacity: 20 }));
+      updateScores(crowded, makeInputs({ buildings, avgMorale: 70, employeeCount: 40, bedCapacity: 20 }));
+    }
+    expect(crowded.wellBeing).toBeLessThan(small.wellBeing);
+  });
+
+  it('crowding drag grows with the unhoused fraction of the crew', () => {
+    const buildings = withQuarters(1);
+    const mild = createScoreState();
+    const severe = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(mild, makeInputs({ buildings, avgMorale: 70, employeeCount: 25, bedCapacity: 20 }));
+      updateScores(severe, makeInputs({ buildings, avgMorale: 70, employeeCount: 80, bedCapacity: 20 }));
+    }
+    expect(severe.wellBeing).toBeLessThan(mild.wellBeing);
+  });
+
+  it('bedCapacity 0 applies no crowding drag however large the crew', () => {
+    const a = createScoreState();
+    const b = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(a, makeInputs({ avgMorale: 70, employeeCount: 0, bedCapacity: 0 }));
+      updateScores(b, makeInputs({ avgMorale: 70, employeeCount: 50, bedCapacity: 0 }));
+    }
+    expect(b.wellBeing).toBeCloseTo(a.wellBeing, 10);
+  });
+
+  it('a crew exactly filling the beds suffers no crowding drag', () => {
+    const buildings = withQuarters(1);
+    const full = createScoreState();
+    const empty = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(full, makeInputs({ buildings, avgMorale: 70, employeeCount: 20, bedCapacity: 20 }));
+      updateScores(empty, makeInputs({ buildings, avgMorale: 70, employeeCount: 0, bedCapacity: 20 }));
+    }
+    expect(full.wellBeing).toBeCloseTo(empty.wellBeing, 10);
+  });
+
+  it('crewFatigueStrain 0.5 loses well-being versus 0', () => {
+    const buildings = withQuarters(1);
+    const rested = createScoreState();
+    const tired = createScoreState();
+    for (let i = 0; i < 20; i++) {
+      updateScores(rested, makeInputs({ buildings, avgMorale: 70, crewFatigueStrain: 0 }));
+      updateScores(tired, makeInputs({ buildings, avgMorale: 70, crewFatigueStrain: 0.5 }));
+    }
+    expect(tired.wellBeing).toBeLessThan(rested.wellBeing);
+  });
+
+  it('recentAccidents: 1 lowers well-being versus none', () => {
+    const clean = createScoreState();
+    const hurt = createScoreState();
+    updateScores(clean, makeInputs({ avgMorale: 70 }));
+    updateScores(hurt, makeInputs({ avgMorale: 70, recentAccidents: 1 }));
+    expect(hurt.wellBeing).toBeLessThan(clean.wellBeing);
+  });
+
+  it('equilibrium well-being ranks T3 > T2 > T1 quarters after 1000 ticks', () => {
+    const t1 = settle(1);
+    const t2 = settle(2);
+    const t3 = settle(3);
+    expect(t3).toBeGreaterThan(t2);
+    expect(t2).toBeGreaterThan(t1);
+  });
+
+  it('T1 quarters with no drag do not pin well-being at the ceiling (headroom slows gains)', () => {
+    expect(settle(1)).toBeLessThan(96);
+  });
+
+  it('avgMorale 0 with no quarters still drives well-being to 0, at least ~1 point per tick', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ avgMorale: 0 }));
+    // -1.0 from morale, +0.05 score decay toward neutral: 49.05 after the first tick.
+    expect(state.wellBeing).toBeLessThanOrEqual(49.1);
+    for (let i = 0; i < 60; i++) updateScores(state, makeInputs({ avgMorale: 0 }));
+    expect(state.wellBeing).toBe(0);
+  });
+
+  it('a negative building well-being effect still applies in full', () => {
+    const buildings = withQuarters(1);
+    const def = getBuildingDef('living_quarters', 1);
+    const original = { ...def.scoreEffects };
+    try {
+      def.scoreEffects = { ...original, wellBeing: -20 };
+      const state = createScoreState();
+      updateScores(state, makeInputs({ buildings, avgMorale: 50 }));
+      // -20 * WB_BUILDING_GAIN (0.1) = -2.0 undamped, plus the 0.05 decay back toward neutral.
+      expect(state.wellBeing).toBeCloseTo(50 - 2 + 0.05, 10);
+    } finally {
+      def.scoreEffects = original;
+    }
+  });
+
+  it('an unhoused site climbs undamped while a housed site tapers near the top', () => {
+    const start = 90;
+    const unhoused = createScoreState();
+    const housed = createScoreState();
+    unhoused.wellBeing = start;
+    housed.wellBeing = start;
+    updateScores(unhoused, makeInputs({ avgMorale: 100 }));
+    updateScores(housed, makeInputs({ buildings: withQuarters(1), avgMorale: 100 }));
+    // Unhoused: morale gain 50 * 0.02 = +1.0 with no headroom damping, minus 0.05 decay.
+    expect(unhoused.wellBeing).toBeCloseTo(start + 1.0 - 0.05, 10);
+    // Housed gets a building gain too, but headroom (100-90)/WB_HEADROOM_SPAN scales the whole gain down.
+    expect(housed.wellBeing).toBeLessThan(unhoused.wellBeing);
   });
 });
