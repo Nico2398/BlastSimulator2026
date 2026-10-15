@@ -48,6 +48,8 @@ needPenalty(g):
 
 Fatigue above 80 (`NEED_WELL_RESTED_THRESHOLD`) → **"well-rested" bonus**: +1 morale/tick (`NEED_WELL_RESTED_BONUS`). Fatigue in the comfortable band [50, 80] → **comfort recovery**: +0.1 morale/tick (`NEED_COMFORT_MORALE_RECOVERY`); it replaces, never stacks with, the well-rested bonus. Reason (#1778): default site policy rests at 60 and in-place rests end at 70, so a working crew never exceeded 80 and morale latched at 0. Below 50 the penalties are unchanged; injured employees stay at 0.
 
+**Rest-completion credit (#1801).** A vehicle-work cycle (debris hauler: fatigue ~70 down to ~26, rests only at the depot) never enters the comfort band long enough, netting about -41 morale per ~44-tick cycle, so its driver stayed at 0 for the whole game. When a **policy-forced** rest completes (`payload.triggeredBy === 'shift_cycle_policy'`, `ForceShiftRest.ts`), morale gains `REST_COMPLETION_MORALE_CREDIT` (+50, clamped to 100; `restCompletionMoraleCredit`, applied by `creditPolicyRestMorale` in both completion paths). Gated on `sitePolicy.fatigueRestThreshold >= NEED_MORALE_EFFECT_THRESHOLDS.comfortable` (50): `continuous` (threshold 0) gets none, so the revolt scenarios still revolt. Collapse, soft-threshold and interrupted rests, and injured employees, get nothing.
+
 ## Collapse
 
 Two threshold states exist per gauge: a **soft threshold** (`NEED_SOFT_THRESHOLDS`, see Proactive Need Queuing below) that never interrupts, and a **hard threshold** (`NEED_HARD_THRESHOLDS`) that interrupts immediately. The hard threshold is always exactly the gauge's own zero floor — not a separately tunable balance number — so a new `NeedKey` gets collapse behaviour for free at 0 without picking its own value.
