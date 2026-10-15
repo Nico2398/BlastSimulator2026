@@ -92,8 +92,12 @@ function resolveHitToEntity(hit: THREE.Intersection, renderer: GameRenderer): En
 const CLICK_MOVE_THRESHOLD_PX = 5;
 /** Hover tag appears after the cursor rests on the same target for this long (spec: 60ms). */
 const HOVER_DELAY_MS = 60;
+/** The terrain hover tag appears after the pointer rests on one pick key for this long. */
+export const HOVER_TAG_DWELL_MS = 400;
 
 export type HoverChangeHandler = (hover: PickResult | null) => void;
+/** Fires with the pick the pointer rested on, or null once the rest ends. */
+export type RestChangeHandler = (rest: PickResult | null) => void;
 export type SelectChangeHandler = (selection: EntityPick | null) => void;
 
 /**
@@ -107,6 +111,7 @@ export class ScenePicking {
   private readonly camera: THREE.Camera;
   private readonly renderer: GameRenderer;
 
+  onRestChangeHandler: RestChangeHandler | null = null;
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private lastHoverKey: string | null = null;
   private currentHover: PickResult | null = null;
@@ -154,6 +159,9 @@ export class ScenePicking {
 
   setHoverChangeHandler(cb: HoverChangeHandler): void { this.onHoverChangeHandler = cb; }
   setSelectChangeHandler(cb: SelectChangeHandler): void { this.onSelectChangeHandler = cb; }
+  setRestChangeHandler(cb: RestChangeHandler): void {
+    this.onRestChangeHandler = cb; // TODO: implement dwell timer
+  }
 
   /** Suppress hover/select while a placement tool is armed; clears any live hover on disable. */
   setEnabled(enabled: boolean): void {

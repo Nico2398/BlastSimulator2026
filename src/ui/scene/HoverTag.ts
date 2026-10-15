@@ -55,7 +55,7 @@ export class HoverTag {
   }
 
   /** Show/update/hide the tag for the current hover result. Null hides it. */
-  update(hover: PickResult | null, state: GameState): void {
+  update(hover: PickResult | null, state: GameState, _overlayVisible?: boolean): void {
     if (!hover || (!hover.entity && !hover.terrain)) { this.hide(); return; }
 
     const content = hover.entity
