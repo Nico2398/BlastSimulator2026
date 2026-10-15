@@ -3,6 +3,7 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import type { RefusalKey } from '../../core/i18n/Refusal.js';
+import type { BuildingType } from '../../core/entities/Building.js';
 import { t } from '../../core/i18n/I18n.js';
 import { resolveContractPriceMultiplier } from '../../core/campaign/Level.js';
 
@@ -21,6 +22,11 @@ export function staffedSuffix(staffed: boolean): string {
 /** Player-facing text of a core refusal: `errorKey` translated with `errorParams` when core supplied a key, else its plain English `error`. */
 export function refusalText(refusal: { error?: string } & RefusalKey): string {
   return refusal.errorKey ? t(refusal.errorKey, refusal.errorParams) : refusal.error!;
+}
+
+/** Translated display name of a building type for refusal text. */
+export function buildingTypeName(type: BuildingType): string {
+  return type; // TODO: implement
 }
 
 /** Guard every command that needs a loaded game. */
