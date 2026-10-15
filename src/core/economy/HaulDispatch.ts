@@ -295,8 +295,8 @@ export function haulActionOreDensities(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): Record<string, number> | null {
-  void state; void action; void lookup;
-  return null; // TODO: implement
+  if (!isAutoDebrisAction(action.type)) return null;
+  return resolveTrackedFragment(state, action, lookup)?.fragment.oreDensities ?? null;
 }
 
 /** True iff `action` is a haul_debris order still queued with no holder (#1370). */

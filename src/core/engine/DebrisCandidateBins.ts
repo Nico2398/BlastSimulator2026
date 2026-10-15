@@ -69,7 +69,10 @@ interface DebrisIndex {
  * `DEBRIS_SELECTION_BIN_CELLS`-square of ground. A pool with at most
  * `DEBRIS_SELECTION_BINNING_MIN` debris candidates is simply filtered by
  * `allowed` (and, for debris, `reachable`), so ordinary play ranks exactly as before. Order is not preserved
- * — callers sort.
+ * — callers sort. `isUrgent` (#1817), when given, also keeps the
+ * `DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND` nearest reachable, allowed urgent
+ * candidates whatever bin they sit in, so a far heap of demanded ore is not thinned away
+ * behind nearer barren rock; one O(1) test per candidate, the bin index is untouched.
  */
 export function thinDebrisCandidates(
   pool: DebrisPool,
@@ -79,6 +82,7 @@ export function thinDebrisCandidates(
   carriesOre: (action: PendingAction) => boolean,
   allowed: (action: PendingAction) => boolean,
   reachable: (action: PendingAction) => boolean = () => true,
+  isUrgent?: (action: PendingAction) => boolean,
 ): PendingAction[] {
   let debris = 0;
   for (const action of candidates) if (isDebris(action)) debris++;
@@ -96,9 +100,14 @@ export function thinDebrisCandidates(
   const base = index.minId;
   const marks = stamps;
   const out: PendingAction[] = [];
+  const urgent: { action: PendingAction; d: number }[] = [];
   for (const action of candidates) {
-    if (isDebris(action)) marks[action.id - base] = mark;
-    else if (allowed(action)) out.push(action);
+    if (isDebris(action)) {
+      marks[action.id - base] = mark;
+      if (isUrgent !== undefined && isUrgent(action) && reachable(action)) {
+        insertNearest(urgent, { action, d: octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) });
+      }
+    } else if (allowed(action)) out.push(action);
   }
   const isCandidate = (action: PendingAction): boolean => marks[action.id - base] === mark;
 
@@ -121,7 +130,21 @@ export function thinDebrisCandidates(
       if (allowed(near[k]!.member)) { out.push(near[k]!.member); kept++; break; }
     }
   }
+  const kept2 = new Set(out);
+  for (const { action } of urgent) {
+    if (!kept2.has(action) && allowed(action)) out.push(action);
+  }
   return out;
+}
+
+/** Insert into a list kept sorted by distance (then id) and capped at the per-kind budget. */
+function insertNearest(list: { action: PendingAction; d: number }[], entry: { action: PendingAction; d: number }): void {
+  const before = (a: typeof entry, b: typeof entry): boolean => a.d < b.d || (a.d === b.d && a.action.id < b.action.id);
+  if (list.length >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND && !before(entry, list[list.length - 1]!)) return;
+  let i = list.length;
+  while (i > 0 && before(entry, list[i - 1]!)) i--;
+  list.splice(i, 0, entry);
+  if (list.length > DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) list.pop();
 }
 
 /**
