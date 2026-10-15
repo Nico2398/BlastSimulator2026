@@ -165,7 +165,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-emp-dismiss button",
           "timeoutMs": 2000
         },
         {
@@ -175,7 +175,7 @@
         }
       ],
       "role": "player",
-      "description": "Fire the only surveyor through the crew panel's own dismiss control, leaving the queued survey with nobody on the roster who can perform it.",
+      "description": "Fire the only surveyor through the inspector's own dismiss control, leaving the queued survey with nobody on the roster who can perform it.",
       "expect": {
         "equals": {
           "employeeCount": 1,

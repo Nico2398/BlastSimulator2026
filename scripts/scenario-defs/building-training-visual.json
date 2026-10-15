@@ -286,12 +286,12 @@
           "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         },
         {
           "type": "screenshot"

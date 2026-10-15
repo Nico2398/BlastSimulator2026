@@ -140,7 +140,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-emp-dismiss button",
           "timeoutMs": 2000
         },
         {
@@ -161,7 +161,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-emp-dismiss button",
           "timeoutMs": 2000
         },
         {
@@ -182,7 +182,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"5\"] .bs-emp-dismiss button",
           "timeoutMs": 2000
         },
         {

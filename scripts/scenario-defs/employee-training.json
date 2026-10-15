@@ -181,23 +181,23 @@
     },
     {
       "command": "employee train 1 skill:driving.excavator",
-      "description": "Real click path: open the employee detail panel, confirm the excavator course is genuinely offered and clickable (#479's own concern -- \"if this control is missing or disabled with a school standing, the licence belongs to nobody\"), then enrol. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building.",
+      "description": "Real click path: open the employee in the inspector, confirm the excavator course is genuinely offered and clickable (#479's own concern -- \"if this control is missing or disabled with a school standing, the licence belongs to nobody\"), then enrol. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel .bs-detail-toggle"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         }
       ],
       "role": "player",
@@ -328,16 +328,20 @@
       "description": "Chuck Miner holds no geology (a driller's ROLE_STARTING_QUALIFICATIONS are blasting and driving.drill_rig), so the geology course is offered; the same control as the excavator course above. A held skill would render a locked 'already qualified' row instead. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount stays 0 until they actually arrive and enter the building.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"geology\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"geology\"]"
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-train-btn[data-skill=\"geology\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-train-btn[data-skill=\"geology\"]"
         }
       ],
       "role": "player",

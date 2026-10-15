@@ -60,7 +60,7 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail",
         "note": "inspector visible while a left-column panel is open"
       }
     }
