@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 size:32 cash:300000 staffed:true",
-      "description": "Staffed opening (#551). Employee 4 is the driver, who holds no rock fragmenter licence, so a Driving Center offers them a course.",
+      "description": "Staffed opening (#551). Employee 4 is the driver, who holds no drill rig licence, so a Driving Center offers them a course.",
       "interaction": [
         {
           "type": "command",
@@ -109,21 +109,21 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
         }
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
       }
     },
     {
-      "command": "employee train 4 skill:driving.rock_fragmenter building:1",
+      "command": "employee train 4 skill:driving.drill_rig building:1",
       "description": "Train from the inspector itself; enrolment sends the employee walking to the school.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"4\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
         }
       ],
       "role": "player",
@@ -221,7 +221,7 @@
       }
     },
     {
-      "command": "build living_quarters at:22,5",
+      "command": "build living_quarters at:12,15",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -242,14 +242,14 @@
         },
         {
           "type": "cameraFocus",
-          "x": 22.5,
-          "z": 5.5,
+          "x": 12.5,
+          "z": 15.5,
           "distance": 30
         },
         {
           "type": "pickTile",
-          "x": 22,
-          "z": 5
+          "x": 12,
+          "z": 15
         },
         {
           "type": "screenshot"
