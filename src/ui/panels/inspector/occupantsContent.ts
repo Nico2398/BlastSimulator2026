@@ -11,15 +11,7 @@ import {
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import type { InspectorLinks } from './InspectorContent.js';
-import { entityLink, markLive, sectionOf, setLive } from './inspectorWidgets.js';
-
-/** A building section plus its live-sync hook. */
-interface OccupantsSection {
-  readonly section: HTMLElement;
-  /** Names the row set: when it changes the section must be rebuilt, not synced in place. */
-  readonly rowSignature: string;
-  readonly sync: (root: HTMLElement) => void;
-}
+import { entityLink, liveLine, markLive, sectionOf, setLive, type InspectorSection } from './inspectorWidgets.js';
 
 const timeLeft = (ticks: number): string => t('ui.modifier.remaining', { hours: ticks });
 
@@ -27,11 +19,6 @@ const small = (node: HTMLElement): HTMLElement => {
   node.style.fontSize = '11px';
   return node;
 };
-
-/** A text line rewritten in place under `data-live` = key. */
-function liveLine(key: string, text: string): HTMLElement {
-  return markLive(small(el('div', { text, className: 'bsx-mono' })), key);
-}
 
 /** A row of a name link plus a live value node tagged `key`. */
 function personRow(name: string, id: number, key: string, text: string | null, links: InspectorLinks): HTMLElement {
@@ -67,7 +54,7 @@ const bedsText = (b: Building): string =>
   t('inspector.beds', { used: b.occupantIds.length, total: getBuildingPeopleCapacity(b.type, b.tier) });
 
 /** Who lives or is inside the building, or null when it has no residents. */
-export function residentsSection(b: Building, state: GameState, links: InspectorLinks): OccupantsSection | null {
+export function residentsSection(b: Building, state: GameState, links: InspectorLinks): InspectorSection | null {
   if (b.type !== 'living_quarters') return null;
   const residents = residentsOf(b, state);
   const over = isOvercrowded(state);
@@ -102,7 +89,7 @@ function courseRow(c: SchoolCourse): HTMLElement {
   row.dataset['course'] = c.skill;
   if (c.supersededBy) {
     row.dataset['courseSuperseded'] = String(c.supersededBy.id);
-    row.append(` · ${t('inspector.course_superseded', { school: t(`building.${c.supersededBy.type}.t${c.supersededBy.tier}.name`) })}`);
+    row.append(`${t('inspector.course_superseded', { school: t(`building.${c.supersededBy.type}.t${c.supersededBy.tier}.name`) })}`);
   }
   return row;
 }
@@ -117,7 +104,7 @@ function group(name: string, label: string | null, rows: HTMLElement[]): HTMLEle
 }
 
 /** Courses and enrolled trainees of a school, or null when the building teaches nothing. */
-export function schoolSection(b: Building, state: GameState, links: InspectorLinks): OccupantsSection | null {
+export function schoolSection(b: Building, state: GameState, links: InspectorLinks): InspectorSection | null {
   if (!isTrainingBuilding(b.type)) return null;
   const trainees = schoolTrainees(state.employees.employees, b.id);
   const courses = schoolCourses(b, availableTrainingOffers(state.buildings.buildings));

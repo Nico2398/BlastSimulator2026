@@ -155,7 +155,7 @@
     },
     {
       "command": "state",
-      "description": "Click the Driving Center in the scene: its inspector lists the trainee as a name link with the skill, level and time left. The row is read twice across ticking to prove the countdown moves.",
+      "description": "Click the Driving Center in the scene: its inspector lists the trainee as a name link with the skill, level and time left.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -182,7 +182,7 @@
     },
     {
       "command": "tick 5",
-      "description": "Let the course run; the trainee row's time left changes in place while the inspector stays open.",
+      "description": "Let the course run five ticks while the inspector stays open; the screenshot shows the trainee row's time left (no scenario action compares text, so the change is read from the image, and the training count proves the course is still running).",
       "interaction": [
         {
           "type": "command",

@@ -93,8 +93,7 @@ describe('residentsSection', () => {
     const s = makeState([b], emps);
     const mult = getLivingQuartersWellbeingMultiplier(s.buildings, s.employees.employees.filter(e => e.alive).length);
     const root = mount(residentsSection(b, s, mkLinks().links)!.section);
-    const pct = Math.round(mult * 100);
-    expect(root.textContent!.includes(String(pct)) || root.textContent!.includes(mult.toFixed(2))).toBe(true);
+    expect(root.textContent).toContain(mult.toFixed(2));
   });
 
   it('warns about overcapacity only when the crew outnumbers the beds', () => {
