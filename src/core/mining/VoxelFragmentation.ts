@@ -144,6 +144,8 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   const lowest = new Int32Array(columns).fill(-1);
   // 1 where a column holds a broken voxel (a sentinel in `lowest` would clash with negative-y boxes).
   const footprint = new Uint8Array(columns);
+  // 1 where a column's broken zone reaches its own top: the cap lifted off there.
+  const opened = new Uint8Array(columns);
   const columnOf = (x: number, z: number): number => (x - box.minX) + nx * (z - box.minZ);
 
   for (let z = box.minZ; z < box.maxZ; z++) {
@@ -159,6 +161,9 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
       if (topBroken === null) continue;
       lowest[columnOf(x, z)] = lowBroken;
       footprint[columnOf(x, z)] = 1;
+      let solidTop = box.maxY - 1;
+      while (solidTop >= box.minY && field.air[indexOf(field, x, solidTop, z)] === 1) solidTop--;
+      if (topBroken >= solidTop) opened[columnOf(x, z)] = 1;
 
       // Grade plane, held within the cut cap of this column's own floor so a
       // deep outlier hole cannot gouge the pit.
@@ -176,7 +181,7 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
     }
   }
 
-  graded += floorEnclosedPillars(field, mask, lowest, footprint, columnOf);
+  graded += floorEnclosedPillars(field, mask, lowest, footprint, opened, columnOf);
 
   // A hole breaks about one voxel under its own charge. Beside any column
   // ending at grade, whichever pass broke it, that is a 1 m pit under every
@@ -246,13 +251,16 @@ function enclosedColumns(
  * Break unbroken pillars standing wholly inside the broken footprint (the
  * centre of a square of close holes) down to grade. A region of enclosed
  * columns floors at grade, held within the cut cap of its lowest bordering
- * footprint column. Returns the voxels newly broken and lowers `lowest` there.
+ * footprint column. Only a region bordered by a column whose broken zone
+ * reached its own top is floored: where no cap lifted off, the shot failed to
+ * break out and stays sealed (#1724). Returns the voxels newly broken and lowers `lowest` there.
  */
 function floorEnclosedPillars(
   field: EnergyField,
   mask: Uint8Array,
   lowest: Int32Array,
   footprint: Uint8Array,
+  opened: Uint8Array,
   columnOf: (x: number, z: number) => number,
 ): number {
   const { box, gradeY } = field;
@@ -266,6 +274,7 @@ function floorEnclosedPillars(
       // Collect the 4-connected region and the lowest column bordering it.
       const region: number[] = [];
       let minBorderLow = Infinity;
+      let borderOpened = false;
       seen[start] = 1;
       const stack = [x0, z0];
       while (stack.length > 0) {
@@ -275,12 +284,15 @@ function floorEnclosedPillars(
         forEachNeighbourColumn(box, columnOf, x, z, (n, px, pz) => {
           if (footprint[n] === 1) {
             if (lowest[n]! < minBorderLow) minBorderLow = lowest[n]!;
+            if (opened[n] === 1) borderOpened = true;
           } else if (enclosed[n] === 1 && seen[n] === 0 && (px === x || pz === z)) {
             seen[n] = 1;
             stack.push(px, pz);
           }
         });
       }
+      // A shot whose ring never lifted its cap off stays sealed (#1724).
+      if (!borderOpened) continue;
       const floorY = Math.max(gradeY!, minBorderLow - BLAST_GRADE_MAX_CUT_M);
       for (let r = 0; r < region.length; r += 2) {
         const x = region[r]!;
