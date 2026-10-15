@@ -376,7 +376,7 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
 /**
  * A ramp layer's work target follows the digger's reach: a lead layer whose
  * band centre sits on an unreachable fill cell moves to a reachable column of
- * its own cells, so the verdict, ghost and dispatcher all read the same target.
+ * its own cells (else of the ramp's other segments), so the verdict, ghost and dispatcher all read the same target.
  */
 function retargetQueuedRampLayers(state: GameState): void {
   if (state.navGrid === null || state.plannedRamps.length === 0) return;

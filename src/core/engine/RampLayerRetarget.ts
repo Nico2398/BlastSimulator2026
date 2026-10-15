@@ -7,7 +7,9 @@ import { pickReachableColumn } from '../mining/WorkTarget.js';
  *
  * The layer's order-time target is its band centre, which can be a fill cell
  * the digger cannot reach where the ramp crosses a crater; any column of the
- * layer's own cells stands in for it. Only a never-claimed lead is moved.
+ * layer's own cells stands in for it. When none of those is reachable (a ramp
+ * ordered from intact ground ending inside a dug crater), the nearest reachable
+ * column of the ramp's other segments stands in. Only a never-claimed lead is moved.
  */
 export function retargetRampLayers(
   state: Pick<GameState, 'plannedRamps' | 'pendingActions'>,
@@ -21,19 +23,29 @@ export function retargetRampLayers(
     if (action === undefined || action.status !== 'queued') continue;
     if (canReach(action, action.targetX, action.targetZ)) continue;
 
-    const seen = new Set<string>();
-    const columns: { x: number; z: number }[] = [];
-    for (const cell of lead.cells) {
-      const key = `${cell.x},${cell.z}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      columns.push({ x: cell.x, z: cell.z });
-    }
-    const pick = pickReachableColumn(columns, { x: action.targetX, z: action.targetZ }, (x, z) => canReach(action, x, z));
+    const anchor = { x: action.targetX, z: action.targetZ };
+    const reach = (x: number, z: number) => canReach(action, x, z);
+    const own = distinctColumns(lead.cells);
+    // Fallback: the carve acts on the segment's cells wherever the digger
+    // stands, so any reachable column of the already-built part will do.
+    const pick = pickReachableColumn(own, anchor, reach)
+      ?? pickReachableColumn(distinctColumns(ramp.segments.flatMap(s => (s === lead ? [] : s.cells))), anchor, reach);
     if (pick === null) continue;
     action.targetX = pick.x;
     action.targetZ = pick.z;
     moved++;
   }
   return moved;
+}
+
+function distinctColumns(cells: readonly { x: number; z: number }[]): { x: number; z: number }[] {
+  const seen = new Set<string>();
+  const columns: { x: number; z: number }[] = [];
+  for (const cell of cells) {
+    const key = `${cell.x},${cell.z}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    columns.push({ x: cell.x, z: cell.z });
+  }
+  return columns;
 }
