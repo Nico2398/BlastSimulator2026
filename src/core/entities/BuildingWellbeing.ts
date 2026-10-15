@@ -31,11 +31,9 @@ export function getLivingQuartersWellbeingMultiplier(
     return LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent;
   }
 
-  let totalBeds = 0;
+  const totalBeds = getBedCapacity(state);
   let bestTier: BuildingTier = 1;
   for (const lq of lqs) {
-    const def = getBuildingDef(lq.type, lq.tier);
-    totalBeds += def.capacity;
     if (lq.tier > bestTier) bestTier = lq.tier as BuildingTier;
   }
 
@@ -47,4 +45,16 @@ export function getLivingQuartersWellbeingMultiplier(
   }
 
   return multiplier;
+}
+
+/**
+ * Total beds across all operating living quarters (sum of def.capacity).
+ * Shared by the overcapacity penalty and the well-being crowding drag.
+ */
+export function getBedCapacity(state: BuildingState): number {
+  let beds = 0;
+  for (const b of state.buildings) {
+    if (b.type === 'living_quarters' && isOperating(b)) beds += getBuildingDef(b.type, b.tier).capacity;
+  }
+  return beds;
 }
