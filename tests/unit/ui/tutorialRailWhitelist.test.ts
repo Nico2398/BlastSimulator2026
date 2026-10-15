@@ -73,7 +73,7 @@ function buildFixture(): Probe[] {
   const blast = add(document.body, 'div', { id: 'bs-blast-panel' });
   probe('grid tool', ['drill-plan'], add(blast, 'button', { 'data-action': 'grid-tool' }));
 
-  const sel = add(document.body, 'div', { id: 'bs-inspector' });
+  const sel = add(document.body, 'div', { id: 'bs-inspector', 'data-kind': 'employee' });
   probe('demolish', [], add(sel, 'button', { 'data-action': 'demolish' }));
   probe('fire employee', [], add(sel, 'button', { 'data-action': 'fire-employee' }));
   // #1763: the employee inspector's train buttons. Only the driver's Rock Fragmenter one is scripted.
