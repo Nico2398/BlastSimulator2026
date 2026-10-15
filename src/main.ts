@@ -843,6 +843,7 @@ window.__gameState = () => {
     // fired, rather than a scenario guessing at it from a screenshot alone.
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    insideBuildingCount: livingEmployees.filter(e => e.locomotion.kind === 'inside').length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     // An offered ore_sale the site could fill outright right now — the
