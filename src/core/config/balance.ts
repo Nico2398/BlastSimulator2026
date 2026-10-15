@@ -2711,7 +2711,7 @@ export const BLAST_GRADE_MAX_CUT_M = 4;
  * Search radius (in nav cells) when an idle blocker looks for a free cell off
  * the mover's remaining route to yield to (#1696).
  */
-export const IDLE_YIELD_SEARCH_RADIUS_CELLS = 6;
+export const IDLE_YIELD_SEARCH_RADIUS_CELLS = 10;
 
 /**
  * Agent-occupancy block episodes on one leg before the mover abandons its
