@@ -755,6 +755,89 @@ describe('blast is one stage: close the Blast Report (#1632)', () => {
   });
 });
 
+describe('train-fragmenter trains through the employee inspector (#1763)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+  const INSPECTOR_DETAIL = '#bs-inspector[data-kind="employee"] .bs-employee-detail';
+  const SKILL = 'driving.rock_fragmenter';
+  const stages = () => TUTORIAL_STAGES['train-fragmenter']!;
+
+  function inspector(role: string): HTMLElement {
+    const root = document.createElement('div');
+    root.id = 'bs-inspector';
+    root.setAttribute('data-kind', 'employee');
+    const detail = document.createElement('div');
+    detail.className = 'bs-employee-detail';
+    detail.setAttribute('data-employee-role', role);
+    root.appendChild(detail);
+    document.body.appendChild(root);
+    return detail;
+  }
+  function add(parent: HTMLElement, cls: string, skill: string): HTMLElement {
+    const e = document.createElement('button');
+    e.className = cls;
+    e.setAttribute('data-skill', skill);
+    parent.appendChild(e);
+    return e;
+  }
+
+  it('has three stages: open crew, select the driver row, train in the inspector', () => {
+    expect(stages()).toHaveLength(3);
+    expect(stages()[0]!.target).toBe(TOOLBAR_TARGET.employees);
+    expect(stages()[1]!.target).toBe('#bs-employee-panel [data-employee-role="driver"] .bs-detail-toggle');
+  });
+
+  it('the train target and done marker live under #bs-inspector', () => {
+    const last = stages()[2]!;
+    expect(last.target).toBe(`${INSPECTOR_DETAIL}[data-employee-role="driver"] .bs-train-btn[data-skill="${SKILL}"]`);
+    expect(last.doneTarget).toBe(`${INSPECTOR_DETAIL}[data-employee-role="driver"] .bs-training-active[data-skill="${SKILL}"]`);
+  });
+
+  it('no stage selector reaches .bs-train-btn / .bs-training-active through #bs-employee-panel', () => {
+    for (const st of stages()) {
+      for (const sel of [st.target, st.doneTarget ?? '']) {
+        if (sel.includes('.bs-train-btn') || sel.includes('.bs-training-active')) {
+          expect(sel).not.toContain('bs-employee-panel');
+          expect(sel).toContain('#bs-inspector');
+        }
+      }
+    }
+  });
+
+  it('the train target resolves for the driver detail and ignores a driller or another skill', () => {
+    const target = stages()[2]!.target;
+    add(inspector('driller'), 'bs-train-btn', SKILL);
+    expect(document.querySelectorAll(target)).toHaveLength(0);
+    document.body.innerHTML = '';
+    add(inspector('driver'), 'bs-train-btn', 'driving.drill_rig');
+    expect(document.querySelectorAll(target)).toHaveLength(0);
+    document.body.innerHTML = '';
+    add(inspector('driver'), 'bs-train-btn', SKILL);
+    expect(document.querySelectorAll(target)).toHaveLength(1);
+  });
+
+  it('the train target does not resolve inside the crew panel expansion', () => {
+    const panel = document.createElement('div');
+    panel.id = 'bs-employee-panel';
+    const row = document.createElement('div');
+    row.setAttribute('data-employee-role', 'driver');
+    panel.appendChild(row);
+    document.body.appendChild(panel);
+    add(row, 'bs-train-btn', SKILL);
+    expect(document.querySelectorAll(stages()[2]!.target)).toHaveLength(0);
+  });
+
+  it('the done marker resolves once the course is booked', () => {
+    const done = stages()[2]!.doneTarget!;
+    const detail = inspector('driver');
+    expect(document.querySelectorAll(done)).toHaveLength(0);
+    const marker = document.createElement('div');
+    marker.className = 'bs-training-active';
+    marker.setAttribute('data-skill', SKILL);
+    detail.appendChild(marker);
+    expect(document.querySelectorAll(done)).toHaveLength(1);
+  });
+});
+
 describe('train-fragmenter keeps a waiting line while the driver walks to the course (#1632)', () => {
   const SKILL = 'driving.rock_fragmenter';
   function stateWithDriver(patch: Record<string, unknown>): ReturnType<typeof createGame> {

@@ -5,6 +5,9 @@
 import { TOOLBAR_TARGET, hasBookedTraining } from './tutorialStepHelpers.js';
 import type { TutorialStage } from './tutorialStages.js';
 
+// The inspector's employee detail for the hired Driver (#1763).
+const DRIVER_DETAIL = '#bs-inspector[data-kind="employee"] .bs-employee-detail[data-employee-role="driver"]';
+
 export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   // #921: dropped the third (assign-driver) stage — a vehicle's driver is
   // claimed automatically now, so the step completes on purchase alone.
@@ -17,16 +20,18 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   // is employee #N depends on the order the player hired in.
   'train-fragmenter': [
     { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
-    // CrewPanel is single-expansion -- .bs-train-btn only renders once the
-    // driver's own row is expanded.
+    // The row header click selects the driver and opens the entity inspector;
+    // the training controls live in the inspector's employee detail (#1763),
+    // not in the crew panel row.
     {
       target: '#bs-employee-panel [data-employee-role="driver"] .bs-detail-toggle',
       hintKey: 'tutorial.stage.expand_driver',
     },
     {
-      target: '#bs-employee-panel [data-employee-role="driver"] .bs-train-btn[data-skill="driving.rock_fragmenter"]',
+      // The inspector shows the selected employee (the driver, after stage 2).
+      target: `${DRIVER_DETAIL} .bs-train-btn[data-skill="driving.rock_fragmenter"]`,
       // Booking the course replaces the button with a status view (#903).
-      doneTarget: '#bs-employee-panel [data-employee-role="driver"] .bs-training-active[data-skill="driving.rock_fragmenter"]',
+      doneTarget: `${DRIVER_DETAIL} .bs-training-active[data-skill="driving.rock_fragmenter"]`,
       hintKey: 'tutorial.stage.train_fragmenter',
       orderIssuedWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
       spentWhen: (state) => hasBookedTraining(state, 'driving.rock_fragmenter'),
