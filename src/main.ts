@@ -1308,6 +1308,8 @@ function reportOrderResult(title: string, result: CommandResult): void {
 }
 inspector.setSelectHandler((entity) => scenePicking.select(entity));
 inspector.setCloseHandler(() => scenePicking.clearSelection());
+inspector.setCommandHandler((command) => reportIfFailed(t('inspector.action.detail'), window.__gameConsole(command)));
+inspector.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 inspector.setActionHandler((action, entity) => {
   switch (action) {
     case 'detail':

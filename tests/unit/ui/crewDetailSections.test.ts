@@ -201,7 +201,7 @@ describe('makeHiredLocationStrip', () => {
 
   it('reports the current position, not a walk, while stuck', () => {
     const strip = makeHiredLocationStrip(makeEmployee({ x: 3, z: 4, destinationX: 12, destinationZ: 8, isMoveStuck: true }), makeState());
-    expect(strip.textContent).toContain('Stuck at (3, 4)');
+    expect(strip.textContent).toContain('Stuck for 0 ticks at (3, 4)');
     expect(strip.textContent).not.toContain('Walking to');
   });
 

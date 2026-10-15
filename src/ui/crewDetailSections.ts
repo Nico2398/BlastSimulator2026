@@ -7,7 +7,7 @@
 import { t } from '../core/i18n/I18n.js';
 import { el, gauge, button, reasonLine } from './dom.js';
 import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Employee.js';
-import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf, injuryHoursRemaining } from '../core/entities/Employee.js';
+import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf, injuryHoursRemaining, employeeQueueDepth } from '../core/entities/Employee.js';
 import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
@@ -16,7 +16,9 @@ import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, h
 import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
-import type { EntityRef } from './crewFacts.js';
+import { iconEl } from './icons.js';
+import { describeRamp } from './describeRamp.js';
+import { resolveEmployeeLocation, resolveTaskTarget, trainingSchool, type EntityRef } from './crewFacts.js';
 
 /** Builds a clickable reference to another entity; the host decides what a click does (the inspector selects it). */
 export type LinkFactory = (kind: EntityRef['kind'], id: number, label: string) => HTMLElement;
@@ -94,37 +96,77 @@ function trainingInfoBlock(title: string, detail: string): HTMLElement {
   return info;
 }
 
-// ── HIRED / LOCATION ──
+/** Stand-in for a link inside a translated sentence; splitting on it keeps the translation's word order. */
+const LINK_SENTINEL = '\u0001';
 
-export function makeHiredLocationStrip(e: Employee, state: GameState, _link?: LinkFactory): HTMLElement {
-  const hired = e.hiredAtTick !== undefined
+/** One sentence with an entity link in it; plain text when no factory is given. */
+function linkedSentence(key: string, param: string, label: string, ref: EntityRef, link: LinkFactory | undefined, params: Record<string, string | number> = {}): HTMLElement {
+  if (!link) return el('span', { text: t(key, { ...params, [param]: label }) });
+  const [before = '', after = ''] = t(key, { ...params, [param]: LINK_SENTINEL }).split(LINK_SENTINEL);
+  const span = el('span');
+  span.append(before, link(ref.kind, ref.id, label), after);
+  return span;
+}
+
+function buildingLabel(ref: EntityRef, state: Pick<GameState, 'buildings'>): string {
+  const b = state.buildings.buildings.find(x => x.id === ref.id);
+  return b ? t(`building.${b.type}.name`) : `#${ref.id}`;
+}
+
+function targetLabel(ref: EntityRef, state: Pick<GameState, 'buildings' | 'vehicles' | 'builtRamps'>): string {
+  if (ref.kind === 'building') return buildingLabel(ref, state);
+  if (ref.kind === 'vehicle') {
+    const v = state.vehicles.vehicles.find(x => x.id === ref.id);
+    return v ? `${t(`vehicle_type.${v.type}`)} #${v.id}` : `#${ref.id}`;
+  }
+  const ramp = state.builtRamps.find(r => r.id === ref.id);
+  return ramp ? describeRamp(ramp).title : `#${ref.id}`;
+}
+
+function hiredText(e: Employee): string {
+  return e.hiredAtTick !== undefined
     ? t('ui.crew.day_label', { day: Math.floor(e.hiredAtTick / 24) + 1 })
     : t('ui.crew.hired_unknown');
+}
 
+// ── HIRED / LOCATION ──
+
+export function makeHiredLocationStrip(e: Employee, state: GameState, link?: LinkFactory): HTMLElement {
+  const hired = hiredText(e);
   const activity = computeEmployeeActivity(e, state.vehicles);
-  let location: string;
-  if (activity.kind === 'driving' || activity.kind === 'driving_to_task') {
-    location = t('ui.crew.location_aboard', { vehicle: `#${activity.vehicleId}` });
-  } else if (activity.kind === 'stuck') {
-    location = t('ui.crew.location_stuck', { x: e.x, z: e.z });
-  } else if (e.destinationX !== null || e.destinationZ !== null) {
-    location = t('ui.crew.location_walking', { x: e.destinationX ?? e.x, z: e.destinationZ ?? e.z });
+  const loc = resolveEmployeeLocation(e, state);
+  let location: string | HTMLElement;
+  if (loc.kind === 'inside') {
+    location = linkedSentence('ui.crew.location_inside', 'building', buildingLabel(loc.building, state), loc.building, link);
+  } else if (loc.kind === 'aboard' || activity.kind === 'driving' || activity.kind === 'driving_to_task') {
+    const vehicle: EntityRef = loc.kind === 'aboard' ? loc.vehicle : { kind: 'vehicle', id: activity.vehicleId ?? 0 };
+    location = linkedSentence('ui.crew.location_aboard', 'vehicle', `#${vehicle.id}`, vehicle, link);
+  } else if (loc.kind === 'stuck') {
+    location = t('ui.crew.location_stuck', { n: loc.ticks, x: loc.x, z: loc.z });
+  } else if (loc.kind === 'walking') {
+    const key = loc.purpose === 'rest' ? 'ui.crew.location_walking_rest'
+      : loc.purpose === 'school' ? 'ui.crew.location_walking_school'
+      : 'ui.crew.location_walking';
+    location = t(key, { x: loc.x, z: loc.z });
+  } else if (loc.kind === 'bench') {
+    location = t('ui.crew.location_bench', { bench: loc.bench, x: loc.x, z: loc.z });
   } else {
-    const bench = state.navGrid?.cellAt(e.x, e.z)?.benchLevel;
-    location = bench !== undefined
-      ? t('ui.crew.location_bench', { bench, x: e.x, z: e.z })
-      : t('ui.crew.location_coords', { x: e.x, z: e.z });
+    location = t('ui.crew.location_coords', { x: loc.x, z: loc.z });
   }
 
   const wrap = el('div', { attrs: { style: 'display:flex;border-radius:var(--bsx-r-card);background:var(--bsx-well);overflow:hidden' } });
-  const col = (label: string, value: string, grow: number): HTMLElement => el('div', {
+  const col = (label: string, value: string | HTMLElement, grow: number): HTMLElement => el('div', {
     attrs: { style: `flex:${grow};padding:8px 9px;display:flex;flex-direction:column;gap:3px` },
-    children: [microLabel(label), el('span', { text: value, className: 'bsx-mono', attrs: { style: 'font-size:10px' } })],
+    children: [microLabel(label), typeof value === 'string' ? el('span', { text: value, className: 'bsx-mono', attrs: { style: 'font-size:10px' } }) : monoWrap(value)],
   });
   const hiredCol = col(t('ui.crew.hired'), hired, 1);
   hiredCol.style.borderRight = '1px solid var(--bsx-hairline)';
   wrap.append(hiredCol, col(t('ui.crew.location'), location, 2));
   return wrap;
+}
+
+function monoWrap(child: HTMLElement): HTMLElement {
+  return el('span', { className: 'bsx-mono', attrs: { style: 'font-size:10px' }, children: [child] });
 }
 
 // ── NEEDS ──
@@ -145,7 +187,7 @@ export function makeNeedsSection(e: Employee): HTMLElement {
 
 // ── CURRENT TASK ──
 
-export function makeCurrentTaskSection(e: Employee, state: GameState, _link?: LinkFactory): HTMLElement {
+export function makeCurrentTaskSection(e: Employee, state: GameState, link?: LinkFactory): HTMLElement {
   const activity = computeEmployeeActivity(e, state.vehicles);
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.current_task')));
@@ -163,12 +205,24 @@ export function makeCurrentTaskSection(e: Employee, state: GameState, _link?: Li
   }
 
   const children: HTMLElement[] = [headRow];
+  const target = resolveTaskTarget(e, state);
+  if (target) {
+    children.push(el('span', {
+      className: 'bs-task-target',
+      attrs: { style: 'font:400 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+      children: [linkedSentence('ui.crew.task_target', 'target', targetLabel(target, state), target, link)],
+    }));
+  }
   const fraction = taskProgressFraction(activity);
   if (fraction !== null) {
     const pct = Math.round(fraction * 100);
     const track = el('div', { attrs: { style: 'height:4px;border-radius:2px;overflow:hidden;background:#242c36' } });
     track.appendChild(el('div', { attrs: { style: `height:100%;background:var(--bsx-amber);width:${Math.max(0, Math.min(100, pct))}%` } }));
     children.push(track);
+  }
+  const queued = employeeQueueDepth(e);
+  if (queued > 0) {
+    children.push(el('span', { text: t('ui.crew.queued_tasks', { n: queued }), className: 'bsx-mono bs-task-queue', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }));
   }
   wrap.appendChild(well(children));
   const injuryHours = injuryHoursRemaining(e);
@@ -229,7 +283,11 @@ export function makeSkillsSection(e: Employee): HTMLElement {
       attrs: { style: 'font-size:10px;color:var(--bsx-positive)' },
     });
 
-    wrap.appendChild(well([headRow, xpTrack, effect]));
+    const rows = [headRow, xpTrack, effect];
+    if (isLicenceSkill(q.category)) {
+      rows.push(el('span', { text: t('ui.crew.licence_tier', { tier: q.licenceLevel ?? 1 }), className: 'bsx-mono bs-licence-tier', attrs: { style: 'font-size:10px;color:var(--bsx-text-secondary)' } }));
+    }
+    wrap.appendChild(well(rows));
   }
   return wrap;
 }
@@ -273,7 +331,7 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
 
 // ── TRAINING ──
 
-export function makeTrainingSection(e: Employee, state: GameState, onTrain: (skill: SkillCategory, buildingId: number) => void, _link?: LinkFactory): HTMLElement {
+export function makeTrainingSection(e: Employee, state: GameState, onTrain: (skill: SkillCategory, buildingId: number) => void, link?: LinkFactory): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.training')));
 
@@ -283,11 +341,12 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     // selectors resolve against once the button they replace is gone (#903).
     // Employee scoping comes from the wrapping [data-employee-id] row
     // (CrewPanel.ts) this section renders inside, same as the button.
+    const school = trainingSchool(e);
     wrap.appendChild(well([el('span', {
       className: 'bs-training-active',
       text: t('ui.crew.training_in_progress', { skill: t(`skill.${e.trainingState.skill}`), n: e.trainingState.ticksRemaining }),
       attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)', 'data-skill': e.trainingState.skill },
-    })]));
+    }), ...(link && school ? [linkedSentence('ui.crew.training_at', 'building', buildingLabel(school, state), school, link)] : [])]));
     return wrap;
   }
 
@@ -295,10 +354,13 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     // Walking to the school, not yet enrolled — distinct from the
     // in-progress block above, which only shows once they've actually
     // entered and the course countdown has started (#1203).
-    wrap.appendChild(well([el('span', {
-      text: t('ui.crew.training_walking'),
-      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
-    })]));
+    const school = trainingSchool(e);
+    wrap.appendChild(well([link && school
+      ? linkedSentence('ui.crew.training_walking_to', 'building', buildingLabel(school, state), school, link)
+      : el('span', {
+        text: t('ui.crew.training_walking'),
+        attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+      })]));
     return wrap;
   }
 
@@ -365,17 +427,63 @@ export function makeDismissSection(e: Employee, onDismiss: () => void): HTMLElem
 
 // ── INSPECTOR-ONLY BUILDERS (#1762) ──
 
+/** Role-coloured initials chip, shared by the roster card and the identity section. */
+export function makeAvatar(e: Employee): HTMLElement {
+  return el('div', { text: getInitials(e.name), attrs: { style: `width:30px;height:30px;flex:0 0 30px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${roleColorHex(e.role)};color:#12161c;font:800 11px/1 var(--bsx-font-ui)` } });
+}
+
+/** Morale bar + percentage; the `bs-crew-morale-*` classes are what the Crew panel repaints in place. */
+export function makeMoraleMeter(e: Employee): HTMLElement[] {
+  const color = moraleColor(e.morale);
+  const fill = el('div', { className: 'bs-crew-morale-fill', attrs: { style: `height:100%;background:${color};width:${e.morale}%` } });
+  const track = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;overflow:hidden;background:#242c36' }, children: [fill] });
+  const value = el('span', { className: 'bs-crew-morale-value bsx-mono', text: `${Math.round(e.morale)}%`, attrs: { style: `font-size:11px;color:${color}` } });
+  return [track, value];
+}
+
 /** Avatar, role, morale, status icons and hire day. */
-export function makeIdentitySection(_e: Employee, _state: GameState): HTMLElement {
-  throw new Error('not implemented');
+export function makeIdentitySection(e: Employee, state: GameState): HTMLElement {
+  const nameCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' } });
+  nameCol.append(
+    el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' }, children: [
+      el('span', { text: t(`role.${e.role}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
+      ...makeMoraleMeter(e),
+    ] }),
+    el('span', { text: `${t('ui.crew.hired')} ${hiredText(e)}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
+  );
+  return el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px' }, children: [makeAvatar(e), nameCol, makeStatusTags(e, state)] });
 }
 
 /** Resting at a building with time left, or walking to rest; null when neither. */
-export function makeRestSection(_e: Employee, _state: GameState, _link?: LinkFactory): HTMLElement | null {
-  throw new Error('not implemented');
+export function makeRestSection(e: Employee, state: GameState, link?: LinkFactory): HTMLElement | null {
+  let line: HTMLElement;
+  if (e.restTicksRemaining !== null) {
+    const loc = resolveEmployeeLocation(e, state);
+    line = loc.kind === 'inside'
+      ? linkedSentence('ui.crew.rest_at', 'building', buildingLabel(loc.building, state), loc.building, link, { n: e.restTicksRemaining })
+      : el('span', { text: `${t('ui.crew.task_resting')} · ${t('ui.crew.ticks_left', { n: e.restTicksRemaining })}` });
+  } else if (e.pendingRestDuration !== null) {
+    line = el('span', { text: t('ui.crew.rest_walking') });
+  } else {
+    return null;
+  }
+  line.style.cssText = 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
+  return well([line]);
 }
 
 /** Status icon chips (union, injured, collapsed, training, driving), shared by the Crew row and the inspector. */
-export function makeStatusTags(_e: Employee, _state: GameState): HTMLElement {
-  throw new Error('not implemented');
+export function makeStatusTags(e: Employee, state: GameState): HTMLElement {
+  const activity = computeEmployeeActivity(e, state.vehicles);
+  const wrap = el('div', { className: 'bs-crew-status', attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
+  const tags: Array<{ icon: Parameters<typeof iconEl>[0]; color: string; tip: string }> = [];
+  if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union') });
+  if (e.injured) tags.push({ icon: 'injured', color: 'var(--bsx-critical-text)', tip: t('ui.crew.injured_back_in', { hours: injuryHoursRemaining(e) ?? 0 }) });
+  if (e.collapsing) tags.push({ icon: 'collapse', color: 'var(--bsx-critical)', tip: t('ui.crew.tag_collapsed') });
+  if (e.trainingState) tags.push({ icon: 'training', color: 'var(--bsx-info)', tip: t('ui.crew.tag_training') });
+  if (activity.kind === 'driving') tags.push({ icon: 'drive', color: 'var(--bsx-info)', tip: t('ui.crew.tag_driving') });
+  if (activity.kind === 'driving_to_task') tags.push({ icon: 'drive', color: 'var(--bsx-amber)', tip: t('ui.crew.tag_driving_task') });
+  for (const tg of tags) {
+    wrap.appendChild(el('span', { attrs: { style: `color:${tg.color}`, title: tg.tip }, children: [iconEl(tg.icon, 13)] }));
+  }
+  return wrap;
 }

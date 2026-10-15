@@ -56,11 +56,16 @@ export function sectionOf(label: string, rows: (HTMLElement | null)[]): HTMLElem
 }
 
 /** Keep the child `className` of `root` current: rebuilt via `build` when it changed; null removes it. */
-export function syncSection(_root: HTMLElement, _className: string, _build: () => HTMLElement | null): void {
-  throw new Error('not implemented');
+export function syncSection(root: HTMLElement, className: string, build: () => HTMLElement | null): void {
+  const current = Array.from(root.children).find(c => c.classList.contains(className));
+  const next = build();
+  if (!next) { current?.remove(); return; }
+  next.classList.add(className);
+  if (!current) root.append(next);
+  else if (current.outerHTML !== next.outerHTML) current.replaceWith(next);
 }
 
 /** A LinkFactory whose links select entities through `links`. */
-export function linkFactory(_links: InspectorLinks): LinkFactory {
-  throw new Error('not implemented');
+export function linkFactory(links: InspectorLinks): LinkFactory {
+  return (kind, id, label) => entityLink(label, kind, id, links);
 }
