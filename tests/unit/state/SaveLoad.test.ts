@@ -2224,11 +2224,30 @@ describe('corruption.protections persistence (#1407)', () => {
   it('round-trips protections including dismissalsLeft', () => {
     const state = createGame({ seed: 5 });
     state.corruption.protections = [
-      { target: 'judge', expiresAtTick: 240, dismissalsLeft: 1 },
-      { target: 'inspector', expiresAtTick: 99, dismissalsLeft: 0 },
+      { target: 'judge', expiresAtTick: 240, dismissalsLeft: 1, shielded: false },
+      { target: 'inspector', expiresAtTick: 99, dismissalsLeft: 0, shielded: true },
     ];
     const loaded = deserialize(serialize(state));
     expect(loaded.corruption.protections).toEqual(state.corruption.protections);
+  });
+
+  it('legacy protection entries lacking shielded load as shielded:true (#1816)', () => {
+    const state = createGame({ seed: 5 });
+    state.corruption.protections = [
+      { target: 'judge', expiresAtTick: 240, dismissalsLeft: 1, shielded: false },
+      { target: 'inspector', expiresAtTick: 99, dismissalsLeft: 0, shielded: false },
+    ];
+    const raw = JSON.parse(serialize(state)) as { corruption: { protections: Record<string, unknown>[] } };
+    for (const p of raw.corruption.protections) delete p['shielded'];
+    const loaded = deserialize(JSON.stringify(raw));
+    expect(loaded.corruption.protections.map(p => p.shielded)).toEqual([true, true]);
+  });
+
+  it('an explicit shielded:false survives a round trip (#1816)', () => {
+    const state = createGame({ seed: 5 });
+    state.corruption.protections = [{ target: 'union_leader', expiresAtTick: 50, dismissalsLeft: 0, shielded: false }];
+    const loaded = deserialize(serialize(state));
+    expect(loaded.corruption.protections[0]!.shielded).toBe(false);
   });
 
   it('a fresh game serializes with an empty protections list', () => {

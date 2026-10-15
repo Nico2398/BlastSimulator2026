@@ -9,8 +9,16 @@ import {
   selectEvent,
   tickEventSystem,
 } from '../../../src/core/events/EventSystem.js';
-import type { ActiveProtection } from '../../../src/core/economy/BribeProtection.js';
-import { JUDGE_LAWSUIT_TIMER_STRETCH, INSPECTION_EVENT_TAG } from '../../../src/core/config/balance.js';
+import { grantProtection, type ActiveProtection } from '../../../src/core/economy/BribeProtection.js';
+import {
+  JUDGE_LAWSUIT_TIMER_STRETCH,
+  INSPECTION_EVENT_TAG,
+  BRIBE_PROTECTION_MAX_LINGER_DAYS,
+  MIN_EVENT_INTERVAL_TICKS,
+  MIN_EVENT_INTERVAL_RANDOM_RANGE,
+  MIN_EVENT_INTERVAL_ACTIONS,
+  TICKS_PER_DAY,
+} from '../../../src/core/config/balance.js';
 
 function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
   return {
@@ -31,8 +39,8 @@ function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
 
 const opts = { weight: () => 1, options: [{ cashDelta: 0 }, { cashDelta: 0 }] };
 
-function prot(target: ActiveProtection['target'], expiresAtTick: number, dismissalsLeft = 0): ActiveProtection {
-  return { target, expiresAtTick, dismissalsLeft };
+function prot(target: ActiveProtection['target'], expiresAtTick: number, dismissalsLeft = 0, shielded = true): ActiveProtection {
+  return { target, expiresAtTick, dismissalsLeft, shielded };
 }
 
 describe('selectEvent with protections (#1407)', () => {
@@ -159,5 +167,156 @@ describe('tickEventSystem with a judge protection (#1407)', () => {
     tickEventSystem(other, makeCtx({ protections: [prot('judge', 2_000_000, 0)] }), new Random(42));
     const w = (s: ReturnType<typeof armed>) => s.timers.find(t => t.category === 'weather')!.remaining;
     expect(w(other)).toBe(w(plain));
+  });
+});
+
+describe('protection granted the tick an event fires (#1816)', () => {
+  const T0 = 5_000;
+  const LONGEST_ROLL = MIN_EVENT_INTERVAL_TICKS + MIN_EVENT_INTERVAL_RANDOM_RANGE - 1;
+  const LINGER = BRIBE_PROTECTION_MAX_LINGER_DAYS * TICKS_PER_DAY;
+  /** Tick at which the action gate finally opens: past the longest cooldown roll and every paid window. */
+  const GATE_OPEN = T0 + 200;
+
+  beforeEach(() => {
+    clearEvents();
+    registerEvents([
+      ev('t_union', 'union', opts),
+      ev('t_politics', 'politics', opts),
+      ev('t_inspect', 'lawsuit', { ...opts, tags: [INSPECTION_EVENT_TAG] }),
+      ev('t_suit', 'lawsuit', opts),
+    ]);
+  });
+
+  /** State just after an event fired at T0: worst-case cooldown roll, no commands issued yet. */
+  function justFired() {
+    const state = createEventSystemState();
+    for (const t of state.timers) t.remaining = 1_000_000;
+    state.lastEventTick = T0;
+    state.actionCountSinceEvent = 0;
+    state.cooldownMinIntervalTicks = LONGEST_ROLL;
+    return state;
+  }
+
+  /** Force the category timer to be due on the next tick. */
+  function arm(state: ReturnType<typeof justFired>, category: string): void {
+    state.timers.find(t => t.category === category)!.remaining = 1;
+  }
+
+  /** Tick once per game tick in (from, to], re-arming the timer each tick; stops when something is pending. */
+  function driveTicks(
+    state: ReturnType<typeof justFired>, protections: ActiveProtection[], category: string,
+    from: number, to: number, gateOpensAt: number,
+  ): void {
+    for (let tick = from + 1; tick <= to; tick++) {
+      if (tick >= gateOpensAt) state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+      arm(state, category);
+      tickEventSystem(state, makeCtx({ protections, tickCount: tick }), new Random(tick));
+      if (state.pendingEvent) return;
+    }
+  }
+
+  it('judge: the next lawsuit selected is dismissed even though the paid window ended before the gates opened', () => {
+    const state = justFired();
+    const protections: ActiveProtection[] = [];
+    grantProtection(protections, 'judge', T0);
+    expect(protections[0]!.expiresAtTick).toBeLessThan(GATE_OPEN);
+    driveTicks(state, protections, 'lawsuit', T0, GATE_OPEN, GATE_OPEN);
+    expect(state.pendingEvent).toBeNull();
+    expect(state.firedEventIds).toHaveLength(1);
+    expect(protections[0]!.dismissalsLeft).toBe(0);
+    expect(protections[0]!.shielded).toBe(true);
+  });
+
+  it('judge: the lawsuit after the dismissed one reaches the player', () => {
+    const state = justFired();
+    const protections: ActiveProtection[] = [];
+    grantProtection(protections, 'judge', T0);
+    driveTicks(state, protections, 'lawsuit', T0, GATE_OPEN, GATE_OPEN);
+    expect(state.pendingEvent).toBeNull();
+    driveTicks(state, protections, 'lawsuit', GATE_OPEN, GATE_OPEN + 40, GATE_OPEN);
+    expect(state.pendingEvent).not.toBeNull();
+    expect(state.firedEventIds).toHaveLength(2);
+  });
+
+  const BLOCKERS: Array<{ target: ActiveProtection['target']; category: string; eventId: string }> = [
+    { target: 'union_leader', category: 'union', eventId: 't_union' },
+    { target: 'politician', category: 'politics', eventId: 't_politics' },
+    { target: 'inspector', category: 'lawsuit', eventId: 't_inspect' },
+  ];
+  // The inspector case needs the untagged lawsuit out of the pool so only the shielded kind can fire.
+  const poolFor = (eventId: string) => {
+    if (eventId === 't_inspect') { clearEvents(); registerEvents([ev('t_inspect', 'lawsuit', { ...opts, tags: [INSPECTION_EVENT_TAG] })]); }
+  };
+
+  for (const { target, category, eventId } of BLOCKERS) {
+    describe(target, () => {
+      it('the next event of its kind never becomes pending while the protection is active', () => {
+        poolFor(eventId);
+        const state = justFired();
+        const protections: ActiveProtection[] = [];
+        grantProtection(protections, target, T0);
+        expect(protections[0]!.expiresAtTick).toBeLessThan(GATE_OPEN);
+        // Gate opens at GATE_OPEN: that tick the protection shields; the next tick it has expired.
+        driveTicks(state, protections, category, T0, GATE_OPEN, GATE_OPEN);
+        expect(state.pendingEvent).toBeNull();
+        expect(state.firedEventIds).not.toContain(eventId);
+        expect(protections.map(p => p.target)).toContain(target);
+        expect(protections[0]!.shielded).toBe(true);
+      });
+
+      it('after it shielded once, the protection expires normally and the postponed event fires', () => {
+        poolFor(eventId);
+        const state = justFired();
+        const protections: ActiveProtection[] = [];
+        grantProtection(protections, target, T0);
+        driveTicks(state, protections, category, T0, GATE_OPEN, GATE_OPEN);
+        expect(state.pendingEvent).toBeNull();
+        driveTicks(state, protections, category, GATE_OPEN, GATE_OPEN + 10, GATE_OPEN);
+        expect(protections).toHaveLength(0);
+        expect(state.pendingEvent?.eventId).toBe(eventId);
+      });
+
+      it('a protection that never shielded anything ends at the linger cap', () => {
+        poolFor(eventId);
+        const state = justFired();
+        const protections: ActiveProtection[] = [];
+        const p = grantProtection(protections, target, T0)!;
+        const capTick = p.expiresAtTick + LINGER;
+        // Gate stays shut until the cap, so nothing is ever selected and the protection never shields.
+        driveTicks(state, protections, category, T0, capTick - 1, capTick + 1_000_000);
+        expect(state.pendingEvent).toBeNull();
+        expect(protections).toHaveLength(1);
+        expect(protections[0]!.shielded).toBe(false);
+        state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+        arm(state, category);
+        tickEventSystem(state, makeCtx({ protections, tickCount: capTick }), new Random(1));
+        expect(protections).toHaveLength(0);
+        expect(state.pendingEvent?.eventId).toBe(eventId);
+      });
+    });
+  }
+
+  it('selectEvent marks the blocking protection shielded when it hides an eligible event, and still returns null', () => {
+    const protections: ActiveProtection[] = [];
+    grantProtection(protections, 'union_leader', T0);
+    const ctx = makeCtx({ protections, tickCount: T0 + 150 });
+    expect(selectEvent('union', ctx, new Random(3))).toBeNull();
+    expect(protections[0]!.shielded).toBe(true);
+  });
+
+  it('selectEvent leaves the protection unshielded when it hides nothing', () => {
+    const protections: ActiveProtection[] = [];
+    grantProtection(protections, 'union_leader', T0);
+    const ctx = makeCtx({ protections, tickCount: T0 + 150 });
+    expect(selectEvent('politics', ctx, new Random(3))?.id).toBe('t_politics');
+    expect(protections[0]!.shielded).toBe(false);
+  });
+
+  it('selectEvent still picks from the open set when the protection hides the tagged event', () => {
+    const protections: ActiveProtection[] = [];
+    grantProtection(protections, 'inspector', T0);
+    const ctx = makeCtx({ protections, tickCount: T0 + 10 });
+    for (let seed = 0; seed < 10; seed++) expect(selectEvent('lawsuit', ctx, new Random(seed))?.id).toBe('t_suit');
+    expect(protections[0]!.shielded).toBe(true);
   });
 });
