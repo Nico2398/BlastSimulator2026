@@ -10,6 +10,7 @@ import {
   ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS,
   SCORE_DECAY_RATE,
   WB_BUILDING_GAIN,
+  WB_NEUTRAL_MORALE,
   WB_MORALE_GAIN_PER_POINT,
   WB_MORALE_LOSS_PER_POINT,
   WB_HEADROOM_SPAN,
@@ -97,16 +98,16 @@ function nonNegative(v: number): number {
 }
 
 /**
- * Per-tick well-being change. Once a Living Quarters is built, gains (building effect, morale above neutral) taper
- * as the score nears 100 so one cheap Living Quarters cannot pin it at the cap; losses (morale below
+ * Per-tick well-being change. While any building gives a positive well-being effect, gains (building effect, morale above
+ * neutral) taper as the score nears 100 so one cheap Living Quarters cannot pin it at the cap; losses (morale below
  * neutral, overwork, crowding, accidents) are unscaled. A negative building effect applies in full.
  */
 function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInputs): number {
   const bWb = Number.isFinite(buildingWb) ? buildingWb : 0;
-  const morale = Number.isFinite(inputs.avgMorale) ? inputs.avgMorale : 50;
-  const gain = Math.max(0, bWb * WB_BUILDING_GAIN) + Math.max(0, morale - 50) * WB_MORALE_GAIN_PER_POINT;
-  const moraleLoss = Math.max(0, 50 - morale) * WB_MORALE_LOSS_PER_POINT;
-  // Taper only once housing exists: a Living Quarters is what pinned the score at the cap. A site
+  const morale = Number.isFinite(inputs.avgMorale) ? inputs.avgMorale : WB_NEUTRAL_MORALE;
+  const gain = Math.max(0, bWb * WB_BUILDING_GAIN) + Math.max(0, morale - WB_NEUTRAL_MORALE) * WB_MORALE_GAIN_PER_POINT;
+  const moraleLoss = Math.max(0, WB_NEUTRAL_MORALE - morale) * WB_MORALE_LOSS_PER_POINT;
+  // Taper only while a building gives a positive effect: a Living Quarters is what pinned the score at the cap. A site
   // with no positive building effect keeps the undamped climb, so its early buffer against a
   // morale crash is unchanged.
   const housed = bWb > 0;

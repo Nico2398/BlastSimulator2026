@@ -2674,6 +2674,8 @@ export const BLAST_GRADE_MAX_CUT_M = 4;
 
 /** Well-being gained per tick per unit of building effect (living quarters etc.); unchanged from the old 0.1 weight. */
 export const WB_BUILDING_GAIN = 0.1;
+/** Average morale at which well-being neither gains nor loses from morale; the midpoint of the 0-100 morale scale. */
+export const WB_NEUTRAL_MORALE = 50;
 /** Well-being gain per morale point above neutral, per tick; unchanged 0.02. The cap pin is prevented by headroom damping once housing exists, not by a weaker gain, so an unhoused crew builds the same early buffer. */
 export const WB_MORALE_GAIN_PER_POINT = 0.02;
 /** Well-being loss per morale point below neutral, per tick; unchanged 0.02, so zero morale falls 1/tick and the revolt path is intact. */

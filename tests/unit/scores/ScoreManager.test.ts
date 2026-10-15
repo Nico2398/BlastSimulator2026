@@ -515,9 +515,24 @@ describe('Well-being model — headroom, overwork, crowding, accidents (#1692)',
       def.scoreEffects = { ...original, wellBeing: -20 };
       const state = createScoreState();
       updateScores(state, makeInputs({ buildings, avgMorale: 50 }));
-      expect(state.wellBeing).toBeLessThan(50);
+      // -20 * WB_BUILDING_GAIN (0.1) = -2.0 undamped, plus the 0.05 decay back toward neutral.
+      expect(state.wellBeing).toBeCloseTo(50 - 2 + 0.05, 10);
     } finally {
       def.scoreEffects = original;
     }
+  });
+
+  it('an unhoused site climbs undamped while a housed site tapers near the top', () => {
+    const start = 90;
+    const unhoused = createScoreState();
+    const housed = createScoreState();
+    unhoused.wellBeing = start;
+    housed.wellBeing = start;
+    updateScores(unhoused, makeInputs({ avgMorale: 100 }));
+    updateScores(housed, makeInputs({ buildings: withQuarters(1), avgMorale: 100 }));
+    // Unhoused: morale gain 50 * 0.02 = +1.0 with no headroom damping, minus 0.05 decay.
+    expect(unhoused.wellBeing).toBeCloseTo(start + 1.0 - 0.05, 10);
+    // Housed gets a building gain too, but headroom (100-90)/WB_HEADROOM_SPAN scales the whole gain down.
+    expect(housed.wellBeing).toBeLessThan(unhoused.wellBeing);
   });
 });

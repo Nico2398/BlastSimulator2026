@@ -1555,8 +1555,8 @@ describe('#1692 — well-being does not pin at the ceiling for a busy, housed cr
     const state = ctx.state!;
     state.cash = 1_000_000;
     state.buildings.unlockedTiers.living_quarters = 3;
-    const gx = state.voxelGrid?.sizeX ?? 32;
-    const gz = state.voxelGrid?.sizeZ ?? 32;
+    const gx = 32; // makeCtx() builds a 32x32 world
+    const gz = 32;
     expect(placeBuilding(state.buildings, 'living_quarters', 2, 6, gx, gz, 1).success).toBe(true);
     if (extraQuartersTier !== null) {
       expect(placeBuilding(state.buildings, 'living_quarters', 14, 6, gx, gz, extraQuartersTier).success).toBe(true);
@@ -1595,5 +1595,38 @@ describe('#1692 — well-being does not pin at the ceiling for a busy, housed cr
     const t1 = mean(runBusyCrew(null));
     const t1t2 = mean(runBusyCrew(2));
     expect(t1t2).toBeGreaterThan(t1);
+  });
+});
+
+describe('#1692 — TickPipeline feeds crew fatigue strain into well-being', () => {
+  const TICKS = 120;
+
+  /**
+   * One T1 quarters (20 beds), a crew of `crewSize`, every worker held at `fatigue`; returns final well-being.
+   * Crowding is not exercised here: the hiring pool (12) never outgrows one T1 quarters, so it is unit-tested only.
+   */
+  function runCrew(crewSize: number, fatigue: number): number {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    const gx = 32; // makeCtx() builds a 32x32 world
+    const gz = 32;
+    expect(placeBuilding(state.buildings, 'living_quarters', 2, 6, gx, gz, 1).success).toBe(true);
+    const roles = ['driller', 'blaster', 'hauler', 'excavator', 'manager', 'surveyor'];
+    for (let i = 0; state.employees.employees.length < crewSize && i < 200; i++) {
+      employeeCommand(ctx, ['hire'], { role: roles[i % roles.length]! });
+    }
+    expect(state.employees.employees.length).toBe(crewSize);
+    for (let i = 0; i < TICKS; i++) {
+      for (const emp of state.employees.employees) emp.fatigue = fatigue;
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+    }
+    return state.scores.wellBeing;
+  }
+
+  it('an exhausted crew ends with lower well-being than a rested one', () => {
+    expect(runCrew(8, 0)).toBeLessThan(runCrew(8, 100));
   });
 });
