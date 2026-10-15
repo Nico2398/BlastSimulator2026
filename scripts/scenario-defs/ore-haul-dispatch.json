@@ -90,13 +90,13 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "DEFAULT_AMOUNT_KG (5) and DEFAULT_STEMMING_M (2) in Charge.ts already match this command's declared amount/stemming, so no stepper clicks are needed before Charge All.",
+      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "description": "#1774: 6 kg breakout charge (BURDEN_BREAKOUT_MAX, balance.ts) -- the 5 kg shot left the rubble sealed under the cap, and sealed rock gets no haul/fragment order, so collectedOreTotal never rose. Amount is set through its stepper so interaction mode charges the same 6 kg; stemming 2 matches DEFAULT_STEMMING_M (Charge.ts).",
       "interaction": [
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
+          "value": 6
         },
         {
           "type": "setStepper",
