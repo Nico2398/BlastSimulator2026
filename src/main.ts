@@ -1195,9 +1195,11 @@ runner.register('tutorial_start', 'Start the tutorial overlay', () => {
   window.__startTutorial();
   return { success: true, output: 'Tutorial started' };
 });
-uiManager.setSpeedChangeHandler((speed) => {
-  window.__gameConsole(`time speed ${speed}`);
-});
+// Picking a speed also resumes: the speed segments and the pause segment form one radio group.
+function selectSpeedAndResume(n: number): void {
+  window.__gameConsole(`time speed ${n} resume:true`);
+}
+uiManager.setSpeedChangeHandler(selectSpeedAndResume);
 uiManager.setQuitHandler(() => {
   tutorial.suspend(); // lifts the rails so the menu is clickable; keeps progress so Resume continues guided
   levelEndScreen.hide();
@@ -1373,17 +1375,19 @@ savesModal.setOnLoad((state) => {
 });
 
 // --- Keyboard Shortcuts ---
-// Toggles between `time pause`/`time resume` — shared by the Space-bar
-// shortcut and the top bar's pause button so both reflect one source of truth.
+// Space-bar shortcut toggles `time pause`/`time resume`; the top bar's pause
+// segment only pauses (idempotent) — resuming is picking a speed.
 function togglePause(): void {
   window.__gameConsole(ctx.state?.isPaused ? 'time resume' : 'time pause');
 }
-uiManager.setTogglePauseHandler(togglePause);
+function pauseClock(): void {
+  window.__gameConsole('time pause');
+}
+uiManager.setTogglePauseHandler(pauseClock);
 new KeyboardShortcuts({
   togglePause,
-  // Was dispatching the bare `speed ${n}` command, which was never
-  // registered — every keyboard speed change (1-4) silently no-op'd.
-  setSpeed: (n) => window.__gameConsole(`time speed ${n}`),
+  // Same path as the top-bar speed segments: pick the speed and resume.
+  setSpeed: selectSpeedAndResume,
   togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { void savesModal.quickSave(); },
   onEscape: () => uiManager.handleEscape(),
