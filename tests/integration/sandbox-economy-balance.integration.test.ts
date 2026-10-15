@@ -22,6 +22,7 @@ import {
   ORE_DENSITY_KG_M3,
   SANDBOX_FLAT_PAD_SIZE,
   SANDBOX_MAX_RICHNESS_RATIO,
+  SANDBOX_STARTING_CASH,
   SANDBOX_REFERENCE_CREW_COST_PER_TICK,
   SANDBOX_REFERENCE_SHOT_CYCLE_TICKS,
   TICKS_PER_DAY,
@@ -286,5 +287,90 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     expect(cashAtMid, 'the run reached the midpoint').not.toBeNull();
     expect(state.cash, `cash at tick 1000 ${cashAtMid} vs tick ${HORIZON} ${state.cash}`).toBeGreaterThan(cashAtMid!);
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 600_000);
+});
+
+describe('sandbox economy: the standard opening on every difficulty', () => {
+  const HORIZON = 2000;
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  const SHOT_START = '36,32';
+  /**
+   * Easy's cash at tick 2000 on the scripted opening: today's run, #1747.
+   * Measured on current main behaviour (seed 42, desert_badlands).
+   */
+  const EASY_CASH_AT_HORIZON_FLOOR = 681_127;
+
+  interface OpeningTrace {
+    endedAtTick: number | null;
+    endReason: string;
+    cashAtFirstBlast: number | null;
+    cashAtHorizon: number;
+    /** First tick where cash was <= 0 while no ore sale had completed yet. */
+    brokeBeforeSaleAtTick: number | null;
+    commands: string[];
+    buildOk: boolean;
+  }
+
+  /** The scripted standard opening: bunkhouse, one 3x3 shot on the deposit, then sell to the horizon. */
+  function playOpening(difficulty: string): OpeningTrace {
+    const { run, ctx } = startSandbox(DESERT, 42, difficulty);
+    run('time resume');
+    const state = ctx.state!;
+    const commands: string[] = [];
+    const logged: Run = (c) => { commands.push(c); return run(c); };
+    const startTick = state.tickCount;
+    const elapsed = () => state.tickCount - startTick;
+    const trace: OpeningTrace = {
+      endedAtTick: null, endReason: '', cashAtFirstBlast: null, cashAtHorizon: 0,
+      brokeBeforeSaleAtTick: null, commands, buildOk: false,
+    };
+    const saleDone = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
+    const over = () => state.levelEnded || elapsed() >= HORIZON;
+    const play = () => {
+      playContracts(logged, state);
+      playTick(logged, state);
+      if (trace.brokeBeforeSaleAtTick === null && !saleDone() && state.cash <= 0) trace.brokeBeforeSaleAtTick = elapsed();
+      if (trace.endedAtTick === null && state.levelEnded) {
+        trace.endedAtTick = elapsed();
+        trace.endReason = String(state.levelEndReason);
+      }
+    };
+    const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !over() && !done(); i++) play(); };
+
+    trace.buildOk = logged(`build ${BUILD}`).success;
+    expect(trace.buildOk, 'living quarters placed').toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    if (!over()) {
+      trace.cashAtFirstBlast = state.cash;
+      expect(logged('blast').success).toBe(true);
+    }
+    playUntil(HORIZON, () => false);
+    trace.cashAtHorizon = state.cash;
+    return trace;
+  }
+
+  it('starting cash is strictly richer on easier difficulties', () => {
+    expect(SANDBOX_STARTING_CASH.easy).toBeGreaterThan(SANDBOX_STARTING_CASH.normal);
+    expect(SANDBOX_STARTING_CASH.normal).toBeGreaterThan(SANDBOX_STARTING_CASH.hard);
+  });
+
+  it.each(['normal', 'hard'] as const)('%s: survives to tick 2000 solvent, and ends richer than at the first blast', (difficulty) => {
+    const t = playOpening(difficulty);
+    expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
+    expect(t.brokeBeforeSaleAtTick, 'cash hit zero before the first ore sale completed').toBeNull();
+    expect(t.cashAtFirstBlast, 'a blast was fired').not.toBeNull();
+    expect(t.cashAtHorizon, `cash at first blast ${t.cashAtFirstBlast} vs tick ${HORIZON} ${t.cashAtHorizon}`).toBeGreaterThan(t.cashAtFirstBlast!);
+    expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 600_000);
+
+  it('easy: the same opening ends at least at the pinned cash (today\'s run, #1747)', () => {
+    const t = playOpening('easy');
+    expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
+    expect(t.cashAtHorizon).toBeGreaterThanOrEqual(EASY_CASH_AT_HORIZON_FLOOR);
+    expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 });
