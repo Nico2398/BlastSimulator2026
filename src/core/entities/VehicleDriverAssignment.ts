@@ -205,10 +205,12 @@ export function findRestingLicensedDriver(
   vehicle: Vehicle,
   vehicleState: VehicleState,
   employeeState: EmployeeState,
+  canReach: (employee: Employee, vehicle: Vehicle) => boolean = () => true,
 ): Employee | null {
   const restingIds = employeeState.employees
     .filter(e => e.alive && !e.injured && !e.collapsing
       && (e.restTicksRemaining !== null || e.pendingRestDuration !== null))
     .map(e => e.id);
-  return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, restingIds)[0] ?? null;
+  return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, restingIds)
+    .find(e => canReach(e, vehicle)) ?? null;
 }

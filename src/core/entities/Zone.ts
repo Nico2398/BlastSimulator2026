@@ -193,7 +193,7 @@ export function clearZone(
     if (!inZoneDriver && isBeingFetched(v)) continue;
     const driver = inZoneDriver ?? reachableRescuer(v);
     if (!driver) {
-      if (findRestingLicensedDriver(v, vehicles, employees) !== null) {
+      if (findRestingLicensedDriver(v, vehicles, employees, canEmployeeReachVehicle) !== null) {
         result.awaitingRescuerVehicleIds.push(v.id);
         continue;
       }
