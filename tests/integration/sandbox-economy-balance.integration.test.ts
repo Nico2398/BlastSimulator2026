@@ -416,3 +416,49 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
     expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 900_000);
 });
+
+describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => {
+  const HORIZON = 3500;
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  const SHOT_START = '36,32';
+  /** The 25 t tier-1 warehouse reads as filled from here (the repro saw 23.9 t at ~t1500, before demand-weighted hauling). */
+  const WAREHOUSE_FILLED_KG = 20_000;
+  const RUSTITE_STOCK_FLOOR_KG = 2_000;
+
+  it('easy: rustite reaches stock and sells by t3500 (whether or not the warehouse fills), dirtite keeps selling', () => {
+    let filledAt: number | null = null;
+    let rustitePeakAfterFill = 0;
+    let rustitePeak = 0;
+    let totalPeak = 0;
+    const stockKg = (ore?: string) => ore === undefined
+      ? Object.values(state.collectedOre).reduce((a, b) => a + b, 0)
+      : state.collectedOre[ore] ?? 0;
+    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON, (elapsed) => {
+      totalPeak = Math.max(totalPeak, stockKg());
+      rustitePeak = Math.max(rustitePeak, stockKg('rustite'));
+      if (filledAt === null && stockKg() >= WAREHOUSE_FILLED_KG) filledAt = elapsed;
+      if (filledAt !== null) rustitePeakAfterFill = Math.max(rustitePeakAfterFill, stockKg('rustite'));
+    });
+
+    expect(logged(`build ${BUILD}`).success).toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+    playUntil(HORIZON, () => false);
+
+    const sales = (ore: string) => state.contracts.completedHistory.filter((c) => c.type === 'ore_sale' && c.completed && c.materialId === ore);
+    expect(over() && state.levelEnded, `ended ${String(state.levelEndReason)}`).toBeFalsy();
+    // Before #1817 the warehouse filled with dirtite (>= 20 t) and rustite never got in. Demand-weighted hauling keeps rustite flowing,
+    // so the warehouse may never fill; if it does, rustite must still have stock afterwards.
+    expect(rustitePeak, `rustite stock peaked at ${rustitePeak} kg (total peak ${totalPeak} kg)`).toBeGreaterThan(RUSTITE_STOCK_FLOOR_KG);
+    if (filledAt !== null) {
+      expect(rustitePeakAfterFill, `rustite stock peaked at ${rustitePeakAfterFill} kg after the warehouse filled at t${filledAt}`).toBeGreaterThan(RUSTITE_STOCK_FLOOR_KG);
+    }
+    expect(sales('rustite').length, 'rustite ore sales completed by t3500').toBeGreaterThanOrEqual(5);
+    expect(sales('dirtite').length, 'dirtite sales continued').toBeGreaterThanOrEqual(5);
+    expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 900_000);
+});

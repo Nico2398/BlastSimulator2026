@@ -69,7 +69,10 @@ interface DebrisIndex {
  * `DEBRIS_SELECTION_BIN_CELLS`-square of ground. A pool with at most
  * `DEBRIS_SELECTION_BINNING_MIN` debris candidates is simply filtered by
  * `allowed` (and, for debris, `reachable`), so ordinary play ranks exactly as before. Order is not preserved
- * — callers sort.
+ * — callers sort. `isUrgent` (#1817), when given, also keeps the
+ * `DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND` nearest reachable, allowed urgent
+ * candidates whatever bin they sit in, so a far heap of demanded ore is not thinned away
+ * behind nearer barren rock; one O(1) test per candidate, the bin index is untouched.
  */
 export function thinDebrisCandidates(
   pool: DebrisPool,
@@ -79,6 +82,7 @@ export function thinDebrisCandidates(
   carriesOre: (action: PendingAction) => boolean,
   allowed: (action: PendingAction) => boolean,
   reachable: (action: PendingAction) => boolean = () => true,
+  isUrgent?: (action: PendingAction) => boolean,
 ): PendingAction[] {
   let debris = 0;
   for (const action of candidates) if (isDebris(action)) debris++;
@@ -96,9 +100,14 @@ export function thinDebrisCandidates(
   const base = index.minId;
   const marks = stamps;
   const out: PendingAction[] = [];
+  const urgent: DistanceEntry[] = [];
   for (const action of candidates) {
-    if (isDebris(action)) marks[action.id - base] = mark;
-    else if (allowed(action)) out.push(action);
+    if (isDebris(action)) {
+      marks[action.id - base] = mark;
+      if (isUrgent !== undefined && isUrgent(action) && reachable(action)) {
+        insertNearest(urgent, { action, distance: octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) });
+      }
+    } else if (allowed(action)) out.push(action);
   }
   const isCandidate = (action: PendingAction): boolean => marks[action.id - base] === mark;
 
@@ -114,14 +123,37 @@ export function thinDebrisCandidates(
     const members = bins[i]!.members.filter(m => isCandidate(m) && reachable(m));
     if (members.length === 0) continue;
     tried[kind]!++;
-    const near = members.map(member => ({ member, d: octileHeuristic(employee.x, employee.z, member.targetX, member.targetZ) }));
-    near.sort((a, b) => a.d - b.d || a.member.id - b.member.id);
+    const near = members.map(action => ({ action, distance: octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) }));
+    near.sort(byDistanceThenId);
     const probes = Math.min(near.length, DEBRIS_SELECTION_BIN_PROBES);
     for (let k = 0; k < probes; k++) {
-      if (allowed(near[k]!.member)) { out.push(near[k]!.member); kept++; break; }
+      if (allowed(near[k]!.action)) { out.push(near[k]!.action); kept++; break; }
     }
   }
+  const alreadyKept = new Set(out);
+  for (const { action } of urgent) {
+    if (!alreadyKept.has(action) && allowed(action)) out.push(action);
+  }
   return out;
+}
+
+/** A debris order with its distance from the searching employee. */
+interface DistanceEntry {
+  action: PendingAction;
+  distance: number;
+}
+
+function byDistanceThenId(a: DistanceEntry, b: DistanceEntry): number {
+  return a.distance - b.distance || a.action.id - b.action.id;
+}
+
+/** Insert into a list kept sorted by distance (then id) and capped at the per-kind budget. */
+function insertNearest(list: DistanceEntry[], entry: DistanceEntry): void {
+  if (list.length >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND && byDistanceThenId(entry, list[list.length - 1]!) >= 0) return;
+  let i = list.length;
+  while (i > 0 && byDistanceThenId(entry, list[i - 1]!) < 0) i--;
+  list.splice(i, 0, entry);
+  if (list.length > DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) list.pop();
 }
 
 /**

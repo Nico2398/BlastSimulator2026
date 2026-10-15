@@ -2,7 +2,7 @@
 
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
-import { deliverMaterials, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
+import { deliverMaterials, isAutoDeliverable, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 import { rubbleStockKg } from './SpoilHeaps.js';
@@ -81,7 +81,7 @@ export function autoDeliverContracts(
   const deliveries: AutoDelivery[] = [];
   // Sorted copy: completing a contract splices it out of contracts.active.
   for (const contract of sortByDeadline(contracts.active)) {
-    if (contract.held || contract.completed || contract.expired) continue;
+    if (!isAutoDeliverable(contract)) continue;
     const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.storedMassKg, buildings));
     if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
     const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick, buildings);
