@@ -57,7 +57,7 @@ export function resolveSelection(
   switch (kind) {
     case 'employee': {
       const e = world.employees.employees.find(x => x.id === id);
-      if (!e) return { exists: false };
+      if (!e || !e.alive) return { exists: false };
       if (e.locomotion.kind === 'inside') return hostOrSelf(world, 'building', e.locomotion.buildingId);
       if (e.locomotion.kind === 'mounted') return hostOrSelf(world, 'vehicle', e.locomotion.vehicleId);
       return SELF;

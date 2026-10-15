@@ -116,6 +116,19 @@ describe('resolveSelection: employee', () => {
     expect(resolveSelection(w, 'employee', 123)).toEqual({ exists: false });
   });
 
+  it('dead employee on foot is gone', () => {
+    const w = makeWorld();
+    const e = addEmployee(w, { alive: false });
+    expect(resolveSelection(w, 'employee', e.id)).toEqual({ exists: false });
+  });
+
+  it('dead employee inside a host is gone', () => {
+    const w = makeWorld();
+    addBuilding(w, 4);
+    const e = addEmployee(w, { alive: false, locomotion: { kind: 'inside', buildingId: 4 } });
+    expect(resolveSelection(w, 'employee', e.id)).toEqual({ exists: false });
+  });
+
   it('dismissed employee is gone', () => {
     const w = makeWorld();
     const e = addEmployee(w, { locomotion: { kind: 'inside', buildingId: 1 } });
