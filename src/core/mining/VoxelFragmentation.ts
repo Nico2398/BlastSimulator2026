@@ -176,32 +176,79 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   // ending at grade, whichever pass broke it, that is a 1 m pit under every
   // hole of the pattern: a step over NAV_MAX_SLOPE_DEGREES on every side, so
   // the crater floor would be a grid of islands. Leave that sub-grade voxel
-  // standing there, so the floor is flush with grade. Deeper breakage (an
-  // outlier hole) is real excavation and stays, and so does a lone hole's pit,
-  // which has no neighbour at grade. A neighbour whose cut the cap clamped ends
-  // above grade and does not count. The test reads a snapshot taken before any
-  // lifting, so adjacent breakouts do not count each other.
+  // standing there, so the floor is flush with grade. At close spacing the
+  // pocket between holes has only sub-grade neighbours, so the lift floods:
+  // a group of 8-connected one-voxel-deep columns lifts whole when any member
+  // touches a column at grade. Deeper breakage (an outlier hole) is real
+  // excavation and neither lifts nor carries the fill, and a lone hole's pit,
+  // with no group member at grade, stays. A neighbour whose cut the cap clamped
+  // ends above grade and does not count. Everything reads a snapshot taken
+  // before any lifting.
   const subGradeY = Math.ceil(gradeY) - 1;
-  const gradeCeil = Math.ceil(gradeY);
-  const snapshot = lowest.slice();
+  const lift = subGradeColumnsToLift(lowest, columnOf, box, subGradeY, Math.ceil(gradeY));
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      if (snapshot[columnOf(x, z)] !== subGradeY) continue;
-      if (!hasNeighbourAtGrade(snapshot, columnOf, box, x, z, gradeCeil)) continue;
-      mask[indexOf(field, x, subGradeY, z)] = 0;
+      if (lift[columnOf(x, z)] === 1) mask[indexOf(field, x, subGradeY, z)] = 0;
     }
   }
   return graded;
 }
 
-/** True when any of the 8 columns around (x, z) inside `box` ends at `gradeCeil`. */
-function hasNeighbourAtGrade(
+/**
+ * Flag every column ending at `subGradeY` that belongs to an 8-connected group
+ * of such columns with at least one member next to a column ending at
+ * `gradeCeil`. Linear in footprint columns.
+ */
+function subGradeColumnsToLift(
+  lowest: Int32Array,
+  columnOf: (x: number, z: number) => number,
+  box: EnergyField['box'],
+  subGradeY: number,
+  gradeCeil: number,
+): Uint8Array {
+  const lift = new Uint8Array(lowest.length);
+  const visited = new Uint8Array(lowest.length);
+  const stack: number[] = [];
+  const nx = box.maxX - box.minX;
+  // Seed from every sub-grade column beside a grade column, then spread
+  // through sub-grade columns only.
+  for (let z = box.minZ; z < box.maxZ; z++) {
+    for (let x = box.minX; x < box.maxX; x++) {
+      const c = columnOf(x, z);
+      if (lowest[c] !== subGradeY || visited[c] === 1) continue;
+      if (!touchesColumnAt(lowest, columnOf, box, x, z, gradeCeil)) continue;
+      visited[c] = 1;
+      stack.push(c);
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        lift[cur] = 1;
+        const cx = box.minX + (cur % nx);
+        const cz = box.minZ + Math.floor(cur / nx);
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const px = cx + dx;
+            const pz = cz + dz;
+            if (px < box.minX || px >= box.maxX || pz < box.minZ || pz >= box.maxZ) continue;
+            const n = columnOf(px, pz);
+            if (visited[n] === 1 || lowest[n] !== subGradeY) continue;
+            visited[n] = 1;
+            stack.push(n);
+          }
+        }
+      }
+    }
+  }
+  return lift;
+}
+
+/** True when any of the 8 columns around (x, z) inside `box` ends at `y`. */
+function touchesColumnAt(
   lowest: Int32Array,
   columnOf: (x: number, z: number) => number,
   box: EnergyField['box'],
   x: number,
   z: number,
-  gradeCeil: number,
+  y: number,
 ): boolean {
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -209,7 +256,7 @@ function hasNeighbourAtGrade(
       const nxc = x + dx;
       const nzc = z + dz;
       if (nxc < box.minX || nxc >= box.maxX || nzc < box.minZ || nzc >= box.maxZ) continue;
-      if (lowest[columnOf(nxc, nzc)] === gradeCeil) return true;
+      if (lowest[columnOf(nxc, nzc)] === y) return true;
     }
   }
   return false;
