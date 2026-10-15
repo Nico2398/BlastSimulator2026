@@ -225,10 +225,11 @@ uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current
 // preference seeds the panel once at startup so its button state matches.
-uiManager.setSurveyOverlayToggleHandler((visible) => {
+function applySurveyOverlayVisible(visible: boolean): void {
   gameRenderer.setSurveyOverlayVisible(visible);
   if (!visible) hoverTag.hide(); // the tag only shows with the overlay on
-});
+}
+uiManager.setSurveyOverlayToggleHandler(applySurveyOverlayVisible);
 uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 
 // --- Persistence ---
@@ -1391,9 +1392,9 @@ new KeyboardShortcuts({
   // its click handler is the other path into the same preference, and the
   // two must never disagree the next time the panel opens.
   onToggleSurveyOverlay: () => {
-    const visible = gameRenderer.toggleSurveyOverlayVisible();
+    const visible = !gameRenderer.surveyOverlayVisible;
+    applySurveyOverlayVisible(visible);
     uiManager.setSurveyOverlayVisible(visible);
-    if (!visible) hoverTag.hide();
   },
 }, { isSuppressed: fullScreenMenuUp, isControlLive });
 
