@@ -6,6 +6,10 @@ import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../../src/core/mining/SurveyCalc.js';
+import { SURVEY_COVERAGE_RADIUS } from '../../../../src/core/config/balance.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
+import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
+import type { NotifyInput } from '../../../../src/ui/notify/NotificationCenter.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -493,5 +497,286 @@ describe('SurveyPanel — overlay visibility toggle (#496)', () => {
     // click would report `false` (turning an already-visible overlay off)
     // instead of `true` (turning the still-hidden overlay back on).
     expect(cb).toHaveBeenCalledWith(true);
+  });
+});
+
+// ── Method click arms the target pick; blocked state is loud (#1771) ────────
+
+function makeKit() {
+  const controller = {
+    isArmed: false,
+    currentPhase: 'armed',
+    selection: { x1: 20, z1: 20, x2: 20, z2: 20 },
+    canConfirm: true,
+    refusalReason: null,
+    footprintInvalid: false,
+    refusedTile: null,
+    setConfirmHandler: vi.fn(),
+    setChangeHandler: vi.fn(),
+    cancel: vi.fn(() => { controller.isArmed = false; }),
+    arm: vi.fn(() => { controller.isArmed = true; }),
+  };
+  const overlay = { update: vi.fn(), clear: vi.fn(), flashConfirm: vi.fn() };
+  const strip = { show: vi.fn(), hide: vi.fn() };
+  return { kit: { controller, overlay, strip } as unknown as PlacementKit, controller, overlay, strip };
+}
+
+function surveyorState(cash?: number): GameState {
+  const state = makeState({ employees: { employees: [makeSurveyor()], nextId: 2 } as GameState['employees'] });
+  if (cash !== undefined) state.cash = cash;
+  return state;
+}
+
+function noSurveyorState(): GameState {
+  return makeState({ employees: { employees: [], nextId: 1, ticksSincePayday: 0 } as GameState['employees'] });
+}
+
+function method(panel: SurveyPanel, m: string): HTMLElement {
+  return panel.root.querySelector<HTMLElement>(`[data-method="${m}"]`)!;
+}
+
+function lastStripSubtitle(strip: { show: ReturnType<typeof vi.fn> }): string {
+  const calls = strip.show.mock.calls;
+  return (calls[calls.length - 1]![0] as { subtitle: string }).subtitle;
+}
+
+describe('SurveyPanel — method click arms the target pick (#1771)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  it('constructing, updating and showing the panel never arms the pick', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.show();
+    panel.update(surveyorState());
+    panel.update(surveyorState());
+    expect(controller.arm).not.toHaveBeenCalled();
+  });
+
+  it('clicking a method with a geology surveyor arms the point pick with that method\'s subtitle', () => {
+    const { panel } = makePanel();
+    const { kit, controller, strip } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    method(panel, 'core_sample').click();
+    expect(controller.arm).toHaveBeenCalledTimes(1);
+    expect(controller.arm).toHaveBeenCalledWith(expect.objectContaining({ shape: 'point' }));
+    expect(lastStripSubtitle(strip)).toBe(t('survey.core_sample'));
+  });
+
+  it('the marker radius is the clicked method\'s coverage radius', () => {
+    const { panel } = makePanel();
+    const { kit, overlay } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    method(panel, 'seismic').click();
+    const upd = overlay.update.mock.calls.at(-1)![0] as { radius?: number; tone?: string };
+    expect(upd.radius).toBe(SURVEY_COVERAGE_RADIUS.seismic);
+    expect(upd.tone).toBe('survey');
+  });
+
+  it('a core sample marker carries no radius (point only)', () => {
+    const { panel } = makePanel();
+    const { kit, overlay } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    method(panel, 'core_sample').click();
+    const upd = overlay.update.mock.calls.at(-1)![0] as { radius?: number };
+    expect(upd.radius).toBeUndefined();
+  });
+
+  it('clicking another method while armed re-arms for the new method', () => {
+    const { panel } = makePanel();
+    const { kit, controller, strip } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    method(panel, 'core_sample').click();
+    method(panel, 'aerial').click();
+    expect(controller.arm).toHaveBeenCalledTimes(2);
+    expect(controller.isArmed).toBe(true);
+    expect(lastStripSubtitle(strip)).toBe(t('survey.aerial'));
+    expect(method(panel, 'aerial').classList.contains('selected')).toBe(true);
+  });
+
+  it('the confirm handler dispatches the survey of the latest clicked method', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+    panel.setGameConsole(gameConsole as never);
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    method(panel, 'core_sample').click();
+    method(panel, 'aerial').click();
+    const confirm = controller.setConfirmHandler.mock.calls.at(-1)![0] as (s: unknown) => void;
+    confirm({ x1: 7, z1: 9, x2: 7, z2: 9 });
+    expect(gameConsole).toHaveBeenCalledWith('survey aerial x:7 z:9');
+  });
+
+  it('a method click with no placement kit does not throw', () => {
+    const { panel } = makePanel();
+    panel.update(surveyorState());
+    expect(() => method(panel, 'seismic').click()).not.toThrow();
+  });
+
+  it('a method click with no kit while blocked does not throw either', () => {
+    const { panel } = makePanel();
+    panel.update(noSurveyorState());
+    expect(() => method(panel, 'seismic').click()).not.toThrow();
+  });
+
+  it('keeps the load-bearing selectors', () => {
+    const { panel } = makePanel();
+    panel.update(surveyorState());
+    expect(panel.root.querySelector('#bs-survey-run')).not.toBeNull();
+    expect(panel.root.querySelector('.bs-survey-status')).not.toBeNull();
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(3);
+  });
+
+  it('Pick Target in Scene while already armed leaves the pick armed (no toggle-cancel)', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    method(panel, 'seismic').click();
+    expect(controller.isArmed).toBe(true);
+    panel.root.querySelector<HTMLButtonElement>('#bs-survey-run')!.click();
+    expect(controller.isArmed).toBe(true);
+  });
+
+  it('Pick Target in Scene still arms the pick when idle', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    panel.setPlacementKit(kit);
+    panel.update(surveyorState());
+    panel.root.querySelector<HTMLButtonElement>('#bs-survey-run')!.click();
+    expect(controller.arm).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SurveyPanel — no surveyor blocker (#1771)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  function visible(node: Element | null): boolean {
+    return !!node && (node as HTMLElement).style.display !== 'none' && !(node as HTMLElement).hidden;
+  }
+
+  it('shows a prominent blocker with the reason and a hire button', () => {
+    const { panel } = makePanel();
+    panel.update(noSurveyorState());
+    const blocker = panel.root.querySelector('.bs-survey-blocker');
+    expect(visible(blocker)).toBe(true);
+    expect(blocker!.textContent).toContain(t('ui.survey.no_surveyor'));
+    expect(blocker!.querySelector('#bs-survey-hire')).not.toBeNull();
+  });
+
+  it('the hire button calls the hire handler exactly once per click', () => {
+    const { panel } = makePanel();
+    const hire = vi.fn();
+    panel.setHireSurveyorHandler(hire);
+    panel.update(noSurveyorState());
+    panel.root.querySelector<HTMLElement>('#bs-survey-hire')!.click();
+    expect(hire).toHaveBeenCalledTimes(1);
+  });
+
+  it('the hire button without a handler does not throw', () => {
+    const { panel } = makePanel();
+    panel.update(noSurveyorState());
+    expect(() => panel.root.querySelector<HTMLElement>('#bs-survey-hire')!.click()).not.toThrow();
+  });
+
+  it('a method click does not arm and notifies once with a warn carrying the reason', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    const notify = vi.fn<[NotifyInput], void>();
+    panel.setPlacementKit(kit);
+    panel.setNotifyHandler(notify);
+    panel.update(noSurveyorState());
+    method(panel, 'seismic').click();
+    expect(controller.arm).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+    const n = notify.mock.calls[0]![0];
+    expect(n.severity).toBe('warn');
+    expect(`${n.title} ${n.body}`).toContain(t('ui.survey.no_surveyor'));
+  });
+
+  it('a method click without a notify handler does not throw', () => {
+    const { panel } = makePanel();
+    panel.update(noSurveyorState());
+    expect(() => method(panel, 'aerial').click()).not.toThrow();
+  });
+
+  it('a surveyor with a non-geology qualification is still blocked', () => {
+    const { panel } = makePanel();
+    const emp = makeEmployee({ qualifications: [{ category: 'drilling', proficiencyLevel: 1, xp: 0 }] as unknown as Employee['qualifications'] });
+    panel.update(makeState({ employees: { employees: [emp], nextId: 2 } as GameState['employees'] }));
+    expect(visible(panel.root.querySelector('.bs-survey-blocker'))).toBe(true);
+  });
+
+  it('the blocker is hidden or absent with a geology employee', () => {
+    const { panel } = makePanel();
+    panel.update(surveyorState());
+    expect(visible(panel.root.querySelector('.bs-survey-blocker'))).toBe(false);
+  });
+
+  it('the blocker disappears once a surveyor appears on a later update', () => {
+    const { panel } = makePanel();
+    panel.update(noSurveyorState());
+    expect(visible(panel.root.querySelector('.bs-survey-blocker'))).toBe(true);
+    panel.update(surveyorState());
+    expect(visible(panel.root.querySelector('.bs-survey-blocker'))).toBe(false);
+  });
+
+  it('Pick Target in Scene is disabled while blocked and the status line still states why', () => {
+    const { panel } = makePanel();
+    panel.update(noSurveyorState());
+    expect(panel.root.querySelector<HTMLButtonElement>('#bs-survey-run')!.disabled).toBe(true);
+    expect(panel.root.querySelector('.bs-survey-status')!.textContent).toContain('surveyor');
+  });
+
+  it('opening the panel while blocked does not notify', () => {
+    const { panel } = makePanel();
+    const notify = vi.fn();
+    panel.setNotifyHandler(notify);
+    panel.show();
+    panel.update(noSurveyorState());
+    expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe('SurveyPanel — unaffordable method click (#1771)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  it('does not arm and notifies with the funds reason', () => {
+    const { panel } = makePanel();
+    const { kit, controller } = makeKit();
+    const notify = vi.fn<[NotifyInput], void>();
+    panel.setPlacementKit(kit);
+    panel.setNotifyHandler(notify);
+    panel.update(surveyorState(0));
+    method(panel, 'seismic').click();
+    expect(controller.arm).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+    const n = notify.mock.calls[0]![0];
+    expect(n.severity).toBe('warn');
+    expect(`${n.title} ${n.body}`).toContain('Not enough cash');
+  });
+
+  it('shows no surveyor blocker for a funds shortage', () => {
+    const { panel } = makePanel();
+    panel.update(surveyorState(0));
+    const blocker = panel.root.querySelector<HTMLElement>('.bs-survey-blocker');
+    expect(blocker === null || blocker.style.display === 'none' || blocker.hidden).toBe(true);
   });
 });

@@ -1,0 +1,183 @@
+{
+  "name": "survey-sandbox-hire-visual",
+  "description": "#1771: in a fresh sandbox the Survey panel shows a prominent no-surveyor blocker with a hire action; it opens Crew hiring at the Surveyors, a hired surveyor clears the blocker, and clicking a method row arms the pick so a survey is queued and completes. Every step is a player action.",
+  "steps": [
+    {
+      "command": "sandbox start seed:42",
+      "description": "Main menu -> Sandbox -> seed 42 -> Start, all by clicking. The sandbox kit has no surveyor (#1671).",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-sandbox-start"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-sandbox-seed",
+          "value": "42"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-sandbox-start"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]",
+          "timeoutMs": 90000
+        }
+      ],
+      "timeout": 120,
+      "role": "player",
+      "expect": {
+        "equals": {
+          "seed": 42,
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1771: the open Survey panel shows a prominent blocker next to the methods (no geology-qualified employee) with a hire action. Read-only observation. Then a method-row click while blocked toasts the reason (screenshot) and arms nothing.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-survey-panel .bs-survey-blocker"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-survey-panel #bs-survey-hire"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-survey-panel #bs-survey-hire"
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "description": "#1771: the blocker's hire action must itself open the Crew panel at the Surveyor candidates (selectors deliberately unscoped by panel id and no ensurePanel, so only the product can have opened it); the player hires one with a real click.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel #bs-survey-hire"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-hiring-role=\"surveyor\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-hiring-role=\"surveyor\"] button[data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-hiring-role=\"surveyor\"] button[data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "survey core_sample x:32 z:32",
+      "description": "#1771: back in Survey the blocker is gone; clicking a method row arms the in-scene pick (no Pick Target button), pick a tile, Confirm. The next step waits for it to complete (a waitUntil replaces the step command in command mode, so it cannot share this step).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "focusTile",
+          "x": 32,
+          "z": 32
+        },
+        {
+          "type": "pickTile",
+          "x": 32,
+          "z": 32
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "timeout": 60,
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "surveys are arrival-gated (#437) -- queued and paid for, not yet completed"
+      }
+    },
+    {
+      "command": "wait_until field:surveyCount equals:1 max_ticks:1500",
+      "description": "#1771: wait for the queued core sample to complete; waits on surveyCount, never a flat delay.",
+      "timeout": 150,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 1,
+          "maxTicks": 1500,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        }
+      }
+    }
+  ]
+}
