@@ -174,7 +174,7 @@ export function findAvailableDriverForReposition(
   vehicle: Vehicle,
   vehicleState: VehicleState,
   employeeState: EmployeeState,
-  /** When given, only these employees are considered (#1648: evacuation's own rescuers). */
+  /** When given, only these employees are considered. */
   onlyAmong?: readonly number[],
 ): Employee | null {
   const candidateIds = employeeState.employees
@@ -206,7 +206,9 @@ export function findRestingLicensedDriver(
   vehicleState: VehicleState,
   employeeState: EmployeeState,
 ): Employee | null {
-  void vehicle; void vehicleState; void employeeState;
-  // TODO: implement
-  return null;
+  const restingIds = employeeState.employees
+    .filter(e => e.alive && !e.injured && !e.collapsing
+      && (e.restTicksRemaining !== null || e.pendingRestDuration !== null))
+    .map(e => e.id);
+  return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, restingIds)[0] ?? null;
 }

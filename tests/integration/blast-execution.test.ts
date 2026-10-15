@@ -422,6 +422,10 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     for (const v of s.state().vehicles.vehicles) { v.x = SAFE_XZ; v.z = SAFE_XZ; }
   }
 
+  function unlicenceCrew(s: Setup, category: string): void {
+    for (const e of s.state().employees.employees) e.qualifications = e.qualifications.filter(q => q.category !== category);
+  }
+
   function crewClear(s: Setup): void { crewAt(s, SAFE_XZ, SAFE_XZ); }
 
   /** Tick one at a time until a blast has been recorded (or the cap hits). */
@@ -608,6 +612,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     crewClear(s);
     const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
     vehicle.occupantIds = []; // driverless: cannot drive itself out
+    unlicenceCrew(s, 'driving.excavator'); // and nobody on the crew may rescue it (#1746)
     const typeName = t(`vehicle_type.${vehicle.type}`);
 
     const res = s.run('blast detonate');
@@ -633,6 +638,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     crewClear(s);
     const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
     vehicle.occupantIds = [];
+    unlicenceCrew(s, 'driving.excavator');
     s.run('blast detonate');
     expect(s.run('blast cancel').success).toBe(true);
     for (let i = 0; i < 50; i++) s.run('tick 1');

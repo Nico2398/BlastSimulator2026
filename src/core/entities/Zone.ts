@@ -8,7 +8,7 @@ import { vehicleDriverId } from './Vehicle.js';
 import { moveTo, alightOnArrival } from '../engine/MoveTo.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 import type { EvacuationDriverReachabilityCheck } from './VehicleDriverAssignment.js';
-import { findBestEvacuationDriver, findAvailableDriverForReposition } from './VehicleDriverAssignment.js';
+import { findBestEvacuationDriver, findAvailableDriverForReposition, findRestingLicensedDriver } from './VehicleDriverAssignment.js';
 
 // ── Zone bounds ──
 
@@ -97,13 +97,6 @@ export function clearZone(
   employees: EmployeeState,
   findSafeDestination: SafeDestinationFinder,
   canEmployeeReachVehicle: EvacuationDriverReachabilityCheck,
-  /**
-   * Employees this evacuation already moved out of the zone: when nobody inside
-   * can drive a driverless vehicle out, an idle, licensed one of these is sent
-   * back in for it (#1648). Employees never evacuated are left alone, so a
-   * vehicle nobody was ever near stays stranded.
-   */
-  rescuerIds: readonly number[] = [],
 ): EvacuationResult {
   const result: EvacuationResult = {
     orderedVehicleIds: [],
@@ -113,12 +106,18 @@ export function clearZone(
     awaitingRescuerVehicleIds: [],
   };
 
-  // Only consulted when nobody inside can drive `v` out (#1648).
+  // Only consulted when nobody inside can drive `v` out (#1648, #1746). Any
+  // free licensed crew member qualifies, wherever they stand: the one who
+  // parked `v` and walked off is outside the zone by then. Returns the rescuer
+  // to order, or null with `v` reported awaiting (a licence holder is resting;
+  // the periodic re-evacuation picks `v` up once the rest ends), already being
+  // fetched, or stranded by the caller.
   const reachableRescuer = (v: Vehicle): Employee | null => {
-    if (rescuerIds.length === 0) return null;
-    const rescuer = findAvailableDriverForReposition(v, vehicles, employees, rescuerIds);
+    const rescuer = findAvailableDriverForReposition(v, vehicles, employees);
     return rescuer !== null && canEmployeeReachVehicle(rescuer, v) ? rescuer : null;
   };
+  const isBeingFetched = (v: Vehicle): boolean =>
+    employees.employees.some(e => e.alive && e.pendingDriverVehicleId === v.id);
 
   // Employees picked to board a vehicle this call — tracked so a later
   // vehicle in the same zone doesn't also pick them, and so the foot-
@@ -189,9 +188,15 @@ export function clearZone(
       )
       .map(e => e.id);
 
-    const driver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle)
-      ?? reachableRescuer(v);
+    const inZoneDriver = findBestEvacuationDriver(v, vehicles, employees, candidateEmployeeIds, canEmployeeReachVehicle);
+    // A rescuer already walking to `v` keeps walking: neither re-ordered nor stranded.
+    if (!inZoneDriver && isBeingFetched(v)) continue;
+    const driver = inZoneDriver ?? reachableRescuer(v);
     if (!driver) {
+      if (findRestingLicensedDriver(v, vehicles, employees) !== null) {
+        result.awaitingRescuerVehicleIds.push(v.id);
+        continue;
+      }
       result.strandedVehicleIds.push(v.id);
       continue;
     }
