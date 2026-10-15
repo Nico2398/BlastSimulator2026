@@ -100,12 +100,12 @@ export function thinDebrisCandidates(
   const base = index.minId;
   const marks = stamps;
   const out: PendingAction[] = [];
-  const urgent: { action: PendingAction; d: number }[] = [];
+  const urgent: DistanceEntry[] = [];
   for (const action of candidates) {
     if (isDebris(action)) {
       marks[action.id - base] = mark;
       if (isUrgent !== undefined && isUrgent(action) && reachable(action)) {
-        insertNearest(urgent, { action, d: octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) });
+        insertNearest(urgent, { action, distance: octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) });
       }
     } else if (allowed(action)) out.push(action);
   }
@@ -123,26 +123,35 @@ export function thinDebrisCandidates(
     const members = bins[i]!.members.filter(m => isCandidate(m) && reachable(m));
     if (members.length === 0) continue;
     tried[kind]!++;
-    const near = members.map(member => ({ member, d: octileHeuristic(employee.x, employee.z, member.targetX, member.targetZ) }));
-    near.sort((a, b) => a.d - b.d || a.member.id - b.member.id);
+    const near = members.map(action => ({ action, distance: octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) }));
+    near.sort(byDistanceThenId);
     const probes = Math.min(near.length, DEBRIS_SELECTION_BIN_PROBES);
     for (let k = 0; k < probes; k++) {
-      if (allowed(near[k]!.member)) { out.push(near[k]!.member); kept++; break; }
+      if (allowed(near[k]!.action)) { out.push(near[k]!.action); kept++; break; }
     }
   }
-  const kept2 = new Set(out);
+  const alreadyKept = new Set(out);
   for (const { action } of urgent) {
-    if (!kept2.has(action) && allowed(action)) out.push(action);
+    if (!alreadyKept.has(action) && allowed(action)) out.push(action);
   }
   return out;
 }
 
+/** A debris order with its distance from the searching employee. */
+interface DistanceEntry {
+  action: PendingAction;
+  distance: number;
+}
+
+function byDistanceThenId(a: DistanceEntry, b: DistanceEntry): number {
+  return a.distance - b.distance || a.action.id - b.action.id;
+}
+
 /** Insert into a list kept sorted by distance (then id) and capped at the per-kind budget. */
-function insertNearest(list: { action: PendingAction; d: number }[], entry: { action: PendingAction; d: number }): void {
-  const before = (a: typeof entry, b: typeof entry): boolean => a.d < b.d || (a.d === b.d && a.action.id < b.action.id);
-  if (list.length >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND && !before(entry, list[list.length - 1]!)) return;
+function insertNearest(list: DistanceEntry[], entry: DistanceEntry): void {
+  if (list.length >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND && byDistanceThenId(entry, list[list.length - 1]!) >= 0) return;
   let i = list.length;
-  while (i > 0 && before(entry, list[i - 1]!)) i--;
+  while (i > 0 && byDistanceThenId(entry, list[i - 1]!) < 0) i--;
   list.splice(i, 0, entry);
   if (list.length > DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) list.pop();
 }

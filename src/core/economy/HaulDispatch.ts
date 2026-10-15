@@ -268,24 +268,6 @@ export function createStorageFit(state: GameState): StorageFit {
 }
 
 /**
- * True iff `action` is haul_debris/fragment_debris and its referenced
- * fragment carries any ore (some oreDensities entry > 0). False for any
- * other action type or a fragment id that no longer resolves.
- */
-export function haulActionCarriesOre(
-  state: GameState,
-  action: PendingAction,
-  lookup?: FragmentLookup,
-): boolean {
-  if (!isAutoDebrisAction(action.type)) return false;
-
-  const tracked = resolveTrackedFragment(state, action, lookup);
-  if (!tracked) return false;
-
-  return fragmentHasOre(tracked.fragment.oreDensities);
-}
-
-/**
  * The ore densities of the fragment a haul_debris/fragment_debris action
  * references, or null for any other action type or a fragment id that no
  * longer resolves (#1817).
@@ -295,8 +277,21 @@ export function haulActionOreDensities(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): Record<string, number> | null {
-  if (!isAutoDebrisAction(action.type)) return null;
-  return resolveTrackedFragment(state, action, lookup)?.fragment.oreDensities ?? null;
+  return resolveHaulFragment(state, action, lookup)?.fragment.oreDensities ?? null;
+}
+
+/**
+ * True iff `action` is haul_debris/fragment_debris and its referenced
+ * fragment carries any ore (some oreDensities entry > 0). False for any
+ * other action type or a fragment id that no longer resolves.
+ */
+export function haulActionCarriesOre(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): boolean {
+  const densities = haulActionOreDensities(state, action, lookup);
+  return densities !== null && fragmentHasOre(densities);
 }
 
 /**
@@ -308,8 +303,12 @@ export function haulActionIsLoaded(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): boolean {
-  if (!isAutoDebrisAction(action.type)) return false;
-  return resolveTrackedFragment(state, action, lookup)?.state === 'in_transit';
+  return resolveHaulFragment(state, action, lookup)?.state === 'in_transit';
+}
+
+/** The tracked fragment a haul_debris/fragment_debris action references; undefined for other types or a stale id. */
+function resolveHaulFragment(state: GameState, action: PendingAction, lookup?: FragmentLookup) {
+  return isAutoDebrisAction(action.type) ? resolveTrackedFragment(state, action, lookup) : undefined;
 }
 
 /** True iff `action` is a haul_debris order still queued with no holder (#1370). */

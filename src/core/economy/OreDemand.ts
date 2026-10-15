@@ -2,7 +2,7 @@
  * Ore demand: how urgently the open ore_sale offers need ore the mine has not
  * yet stocked, and how much of that urgency a haul fragment can relieve (#1817).
  */
-import { remainingKg, storedStockKg, type Contract } from './Contract.js';
+import { isAutoDeliverable, remainingKg, storedStockKg, type Contract } from './Contract.js';
 
 /**
  * Per-ore haul urgency in 0..1 (ore id -> urgency; absent means 0). An ore with
@@ -24,7 +24,7 @@ export function oreHaulUrgency(
     if (offer.quantityKg < prev) smallestOffer.set(offer.materialId, offer.quantityKg);
   }
   for (const c of active) {
-    if ((c.type === 'ore_sale' || c.type === 'supply') && c.held !== true && !c.completed && !c.expired) {
+    if ((c.type === 'ore_sale' || c.type === 'supply') && isAutoDeliverable(c)) {
       const kg = remainingKg(c);
       if (kg > 0) committed.set(c.materialId, (committed.get(c.materialId) ?? 0) + kg);
     }

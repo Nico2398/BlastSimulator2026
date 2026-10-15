@@ -425,7 +425,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
   const WAREHOUSE_FILLED_KG = 20_000;
   const RUSTITE_STOCK_FLOOR_KG = 2_000;
 
-  it('easy: rustite stock rises even as the warehouse fills, rustite sells by t3500, dirtite keeps selling', () => {
+  it('easy: rustite reaches stock and sells by t3500 (whether or not the warehouse fills), dirtite keeps selling', () => {
     let filledAt: number | null = null;
     let rustitePeakAfterFill = 0;
     let rustitePeak = 0;
