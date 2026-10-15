@@ -15,6 +15,8 @@ import {
 } from '../../../src/core/economy/Logistics.js';
 import {
   warehouseStoredKg,
+  warehouseStockByOre,
+  type WarehouseStock,
   warehouseFreeKg,
   pickWarehouse,
   loseOrphanedStock,
@@ -329,5 +331,116 @@ describe('loseOrphanedStock', () => {
     expect(losses[0]!.massKg).toBeCloseTo(150, 6);
     expect(l.storedMassKg).toBeCloseTo(0, 6);
     expect(ore.dirtite).toBeCloseTo(0, 6);
+  });
+});
+
+/** Fragment with a realistic rock density (2500 kg/m3) so ore kg never exceeds mass. */
+function realFrag(id: number, mass: number, oreDensities: Record<string, number>): FragmentData {
+  return { ...frag(id, mass, oreDensities), volume: mass / 2500 };
+}
+
+describe('warehouseStockByOre', () => {
+  const _shape: WarehouseStock = { storedKg: 0, oreKg: {}, barrenKg: 0 };
+  it('returns the WarehouseStock shape', () => {
+    expect(Object.keys(warehouseStockByOre(createLogisticsState(0), 1)).sort()).toEqual(Object.keys(_shape).sort());
+  });
+
+  const mixed = { dirtite: 0.3, blingite: 0.1 };
+
+  it('splits stored kg per ore and barren so that the parts sum to the stored kg', () => {
+    const ore: Record<string, number> = {};
+    const l = createLogisticsState(600);
+    addBlastFragments(l, [realFrag(1, 200, mixed), realFrag(2, 100, { dirtite: 0.2 }), realFrag(3, 50, { dirtite: 0.5 })]);
+    const roomy = [{ ...A, capacityKg: 600 }];
+    for (const id of [1, 2, 3]) expect(haul(l, id, ore, roomy)).toBe(true);
+    const stock = warehouseStockByOre(l, A.id);
+    expect(stock.storedKg).toBeCloseTo(warehouseStoredKg(l, A.id), 6);
+    expect(stock.storedKg).toBeCloseTo(350, 6);
+    expect(stock.oreKg.dirtite).toBeCloseTo(oreContributionKg(200 / 2500, 0.3) + oreContributionKg(100 / 2500, 0.2) + oreContributionKg(50 / 2500, 0.5), 6);
+    expect(stock.oreKg.blingite).toBeCloseTo(oreContributionKg(200 / 2500, 0.1), 6);
+    expect(stock.barrenKg).toBeGreaterThan(0);
+    const oreSum = Object.values(stock.oreKg).reduce((a, b) => a + b, 0);
+    expect(oreSum + stock.barrenKg).toBeCloseTo(stock.storedKg, 6);
+  });
+
+  it('reports the rock around the ore as barren', () => {
+    const ore: Record<string, number> = {};
+    const l = createLogisticsState(600);
+    addBlastFragments(l, [realFrag(1, 120, { dirtite: 0.25 })]);
+    haul(l, 1, ore, SITES);
+    const stock = warehouseStockByOre(l, A.id);
+    expect(stock.oreKg.dirtite).toBeCloseTo(30, 6);
+    expect(stock.barrenKg).toBeCloseTo(90, 6);
+    expect(stock.storedKg).toBeCloseTo(120, 6);
+  });
+
+  it('ignores loads in transit and fragments on the ground', () => {
+    const l = (() => { const x = createLogisticsState(600); addBlastFragments(x, [realFrag(1, 200, { dirtite: 0.3 }), realFrag(2, 100, { dirtite: 0.3 })]); return x; })();
+    expect(pickupFragment(l, 1, 'v1', SITES, 0, 0)).toBe(true); // in transit to A
+    const stock = warehouseStockByOre(l, A.id);
+    expect(stock).toEqual({ storedKg: 0, oreKg: {}, barrenKg: 0 });
+    expect(stock.storedKg).toBe(warehouseStoredKg(l, A.id));
+  });
+
+  it('ignores another warehouse\'s fragments', () => {
+    const ore: Record<string, number> = {};
+    const l = (() => { const x = createLogisticsState(600); addBlastFragments(x, [realFrag(1, 200, { dirtite: 0.3 }), realFrag(2, 80, { dirtite: 0.3 })]); return x; })();
+    haul(l, 1, ore, SITES); // A
+    haul(l, 2, ore, SITES, 50, 0); // B
+    const a = warehouseStockByOre(l, A.id);
+    const b = warehouseStockByOre(l, B.id);
+    expect(a.storedKg).toBeCloseTo(200, 6);
+    expect(b.storedKg).toBeCloseTo(80, 6);
+    expect(a.oreKg.dirtite).toBeCloseTo(oreContributionKg(200 / 2500, 0.3), 6);
+    expect(b.oreKg.dirtite).toBeCloseTo(oreContributionKg(80 / 2500, 0.3), 6);
+  });
+
+  it('reports the remaining ore of a partly sold fragment', () => {
+    const ore: Record<string, number> = {};
+    const l = (() => { const x = createLogisticsState(600); addBlastFragments(x, [realFrag(1, 200, { blingite: 0.5 })]); return x; })();
+    haul(l, 1, ore, SITES);
+    const full = oreContributionKg(200 / 2500, 0.5);
+    const want = full / 2;
+    expect(consumeStoredOre(l, ore, 'blingite', want, []).success).toBe(true);
+    const stock = warehouseStockByOre(l, A.id);
+    expect(stock.storedKg).toBeCloseTo(warehouseStoredKg(l, A.id), 6);
+    expect(stock.storedKg).toBeLessThan(200);
+    expect(stock.oreKg.blingite).toBeCloseTo(full - want, 4);
+    const oreSum = Object.values(stock.oreKg).reduce((x, y) => x + y, 0);
+    expect(oreSum + stock.barrenKg).toBeCloseTo(stock.storedKg, 4);
+    expect(stock.barrenKg).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns zeros for an empty or unknown warehouse', () => {
+    const l = (() => { const x = createLogisticsState(600); addBlastFragments(x, [realFrag(1, 200, { dirtite: 0.3 })]); return x; })();
+    expect(warehouseStockByOre(l, A.id)).toEqual({ storedKg: 0, oreKg: {}, barrenKg: 0 });
+    expect(warehouseStockByOre(l, 999)).toEqual({ storedKg: 0, oreKg: {}, barrenKg: 0 });
+  });
+
+  it('does not mutate the logistics state', () => {
+    const ore: Record<string, number> = {};
+    const l = (() => { const x = createLogisticsState(600); addBlastFragments(x, [realFrag(1, 200, { dirtite: 0.3 })]); return x; })();
+    haul(l, 1, ore, SITES);
+    const before = JSON.stringify(l);
+    warehouseStockByOre(l, A.id);
+    expect(JSON.stringify(l)).toBe(before);
+  });
+});
+
+describe('loseOrphanedStock result is unchanged by the shared breakdown (#1757)', () => {
+  it('reports mass and per-ore kg equal to the warehouse breakdown taken before the loss', () => {
+    const ore: Record<string, number> = {};
+    const l = createLogisticsState(600);
+    addBlastFragments(l, [realFrag(1, 200, { dirtite: 0.3, blingite: 0.1 }), realFrag(2, 60, { dirtite: 0.5 }), realFrag(3, 40, { dirtite: 0.25 })]);
+    for (const id of [1, 2, 3]) haul(l, id, ore, SITES);
+    const before = warehouseStockByOre(l, A.id);
+    const losses = loseOrphanedStock(l, ore, new Set());
+    expect(losses).toHaveLength(1);
+    expect(losses[0]!.buildingId).toBe(A.id);
+    expect(losses[0]!.massKg).toBeCloseTo(300, 6);
+    expect(losses[0]!.massKg).toBeCloseTo(before.storedKg, 6);
+    expect(losses[0]!.oreKg.dirtite).toBeCloseTo(oreContributionKg(200 / 2500, 0.3) + oreContributionKg(60 / 2500, 0.5) + oreContributionKg(40 / 2500, 0.25), 6);
+    expect(losses[0]!.oreKg.blingite).toBeCloseTo(oreContributionKg(200 / 2500, 0.1), 6);
+    for (const [id, kg] of Object.entries(before.oreKg)) expect(losses[0]!.oreKg[id]).toBeCloseTo(kg, 6);
   });
 });

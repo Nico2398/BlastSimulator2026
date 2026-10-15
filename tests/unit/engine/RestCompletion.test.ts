@@ -389,3 +389,37 @@ describe('tickGeneralRestCompletion — resets ticksWorked for every rest origin
     expect(employee.ticksWorked).toBe(before);
   });
 });
+
+// #1801: policy-forced rest completion credits morale once; other origins none.
+describe('tickGeneralRestCompletion — policy rest morale credit (#1801)', () => {
+  function setup(triggeredBy: string) {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 0, 0);
+    employee.morale = 0;
+    employee.restTicksRemaining = 1;
+    employee.restNeedKey = 'fatigue';
+    const id = state.nextPendingActionId++;
+    employee.activeActionId = id;
+    state.pendingActions.push({
+      id, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { needKey: 'fatigue', triggeredBy },
+      targetEmployeeId: employee.id, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+    return { state, employee };
+  }
+
+  it('shift_cycle_policy completion credits 50 morale exactly once', () => {
+    const { state, employee } = setup('shift_cycle_policy');
+    tickGeneralRestCompletion(state);
+    expect(employee.morale).toBe(50);
+    tickGeneralRestCompletion(state);
+    expect(employee.morale).toBe(50);
+  });
+
+  it('non-policy triggeredBy shift_cycle earns no credit', () => {
+    const { state, employee } = setup('shift_cycle');
+    tickGeneralRestCompletion(state);
+    expect(employee.morale).toBe(0);
+  });
+});

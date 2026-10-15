@@ -34,7 +34,7 @@ import { type GameContext } from '../../../src/console/commands/world.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee, assignSkill, HIRING_COSTS, type EmployeeRole } from '../../../src/core/entities/Employee.js';
-import { placeBuilding, type BuildingType, type BuildingTier } from '../../../src/core/entities/Building.js';
+import { placeBuilding, getBuildingPeopleCapacity, type BuildingType, type BuildingTier } from '../../../src/core/entities/Building.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { Random } from '../../../src/core/math/Random.js';
 import * as EmployeeTrainingModule from '../../../src/core/entities/EmployeeTraining.js';
@@ -499,7 +499,7 @@ describe('employees.ts — train_building_no_teach (named building: does not tea
 // ── train_no_building_on_site ─────────────────────────────────────────────
 
 describe('employees.ts — train_no_building_on_site (school exists in the catalog, none built)', () => {
-  const EN = 'No management_office on site. Build one to train management.';
+  const EN = 'No Management Office on site. Build one to train management.';
 
   it('matches the exact English literal by default', () => {
     const ctx = makeCtx();
@@ -579,7 +579,7 @@ describe('employees.ts — train_insufficient_funds', () => {
 
 describe('employees.ts — train success message', () => {
   function expectedEn(name: string, buildingId: number): string {
-    return `${name} enrolled at management_office #${buildingId}: management to level 1 in 20 ticks ($2500), +$5/h pay once qualified.`;
+    return `${name} enrolled at Management Office #${buildingId}: management to level 1 in 20 ticks ($2500), +$5/h pay once qualified.`;
   }
 
   it('matches the exact English literal, embedding the real name/buildingId', () => {
@@ -716,5 +716,90 @@ describe('employees.ts — cancel success message (with refund — cancel_refund
     const result = employeeCommand(ctx, ['cancel', String(actionId)], {});
     expect(result.success).toBe(true);
     expect(result.output).not.toBe(`Action #${actionId} (place_building) cancelled. $${formatMoney(5000)} refunded.`);
+  });
+});
+
+// ── #1811: training refusals/success name buildings by display name ──────────
+
+describe('employees.ts — train output names buildings by translated display name (#1811)', () => {
+  const RAW = 'management_office';
+  const NAMES = { en: 'Management Office', fr: 'Bureau de Gestion' } as const;
+  const LOCALES = ['en', 'fr'] as const;
+
+  function placeSchool(ctx: GameContext) {
+    const id = placeTestBuilding(ctx, 'management_office', 1);
+    return ctx.state!.buildings.buildings.find(b => b.id === id)!;
+  }
+
+  for (const locale of LOCALES) {
+    describe(`locale ${locale}`, () => {
+      it('closed school refusal shows display name, id and skill, not the raw type id', () => {
+        const ctx = makeCtx(10_000);
+        const emp = hireTestEmployee(ctx);
+        const school = placeSchool(ctx);
+        school.outOfService = true;
+        setLocale(locale);
+        const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain(NAMES[locale]);
+        expect(result.output).toContain(`#${school.id}`);
+        expect(result.output).toContain('management');
+        expect(result.output).not.toContain(RAW);
+      });
+
+      it('full school refusal shows display name, id and skill, not the raw type id', () => {
+        const ctx = makeCtx(10_000);
+        const emp = hireTestEmployee(ctx);
+        const school = placeSchool(ctx);
+        const capacity = getBuildingPeopleCapacity(school.type, school.tier);
+        school.occupantIds = Array.from({ length: capacity }, (_, i) => 9_000 + i);
+        setLocale(locale);
+        const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain(NAMES[locale]);
+        expect(result.output).toContain(`#${school.id}`);
+        expect(result.output).toContain('management');
+        expect(result.output).not.toContain(RAW);
+      });
+
+      it('success message shows display name, id and skill, not the raw type id', () => {
+        const ctx = makeCtx(10_000);
+        const emp = hireTestEmployee(ctx);
+        const school = placeSchool(ctx);
+        setLocale(locale);
+        const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
+        expect(result.success).toBe(true);
+        expect(result.output).toContain(NAMES[locale]);
+        expect(result.output).toContain(`#${school.id}`);
+        expect(result.output).toContain('management');
+        expect(result.output).not.toContain(RAW);
+      });
+
+      it('no-building-on-site refusal shows display name and skill, not the raw type id', () => {
+        const ctx = makeCtx(10_000);
+        const emp = hireTestEmployee(ctx);
+        setLocale(locale);
+        const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain(NAMES[locale]);
+        expect(result.output).toContain('management');
+        expect(result.output).not.toContain(RAW);
+      });
+    });
+  }
+
+  it('already-enrolled refusal (no buildingType param) still renders without crashing or leaking', () => {
+    const ctx = makeCtx(10_000);
+    const emp = hireTestEmployee(ctx);
+    placeSchool(ctx);
+    emp.trainingState = { buildingId: 1, skill: 'geology', ticksRemaining: 10, fee: 100 };
+    for (const locale of LOCALES) {
+      setLocale(locale);
+      const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
+      expect(result.success).toBe(false);
+      expect(result.output).toContain(emp.name);
+      expect(result.output).not.toContain(RAW);
+      expect(result.output).not.toMatch(/\{\w+\}/);
+    }
   });
 });

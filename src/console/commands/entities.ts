@@ -28,7 +28,7 @@ import { queueDemolition, isDemolitionOrdered } from '../../core/engine/Building
 import { findBuildingApproachCell } from '../../core/nav/BuildingApproach.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 
-import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, refusalText, buildingTypeName } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import {
   makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity,
@@ -115,7 +115,7 @@ export function buildCommand(
       }
       const nextTier = (toUpgrade.tier + 1) as BuildingTier;
       if (isPlacementBlockedByResearch(state.buildings, toUpgrade.type, nextTier)) {
-        return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: toUpgrade.type }) };
+        return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: buildingTypeName(toUpgrade.type) }) };
       }
       const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
       const newDef = getBuildingDef(toUpgrade.type, nextTier);

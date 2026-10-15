@@ -28,7 +28,7 @@ vi.mock('../../../src/ui/tutorialStages.js', async (importOriginal) => {
   const fakeTrainStages = [
     { target: '#open', hintKey: 'a' },
     { target: '#expand', hintKey: 'b' },
-    { target: '.bs-train-btn', doneTarget: '.bs-training-active', hintKey: 'c' },
+    { target: '#bs-inspector .bs-train-btn', doneTarget: '#bs-inspector .bs-training-active', hintKey: 'c' },
   ];
   return {
     ...actual,
@@ -727,6 +727,17 @@ describe('TutorialRails — doneTarget survives at the rails level (#903)', () =
   // card") — re-instructing a completed action instead of holding at the
   // stage the player just finished.
 
+  /** #1763: the train button and status view live in the employee inspector. */
+  function inspectorRoot(): HTMLElement {
+    let root = document.getElementById('bs-inspector');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'bs-inspector';
+      document.body.appendChild(root);
+    }
+    return root;
+  }
+
   function openStage(): HTMLElement {
     const btn = document.createElement('button');
     btn.id = 'open';
@@ -744,14 +755,14 @@ describe('TutorialRails — doneTarget survives at the rails level (#903)', () =
   function trainButton(): HTMLElement {
     const btn = document.createElement('button');
     btn.className = 'bs-train-btn';
-    document.body.appendChild(btn);
+    inspectorRoot().appendChild(btn);
     return withBox(btn);
   }
 
   function trainingActiveStatus(): HTMLElement {
     const div = document.createElement('div');
     div.className = 'bs-training-active';
-    document.body.appendChild(div);
+    inspectorRoot().appendChild(div);
     return withBox(div);
   }
 
@@ -764,7 +775,7 @@ describe('TutorialRails — doneTarget survives at the rails level (#903)', () =
 
     const view = rails.refresh();
     expect(view.stageIndex).toBe(2);
-    expect(view.stageTarget).toBe('.bs-train-btn');
+    expect(view.stageTarget).toBe('#bs-inspector .bs-train-btn');
   });
 
   it('does not drop back to an earlier stage once the train button is replaced by the in-training status view', () => {
@@ -782,7 +793,7 @@ describe('TutorialRails — doneTarget survives at the rails level (#903)', () =
 
     const view = rails.refresh();
     expect(view.stageIndex).toBe(2);
-    expect(view.stageTarget).toBe('.bs-train-btn');
+    expect(view.stageTarget).toBe('#bs-inspector .bs-train-btn');
   });
 });
 

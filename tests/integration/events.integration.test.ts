@@ -1041,3 +1041,95 @@ describe('failed bribe and botched mafia consequences (#1411)', () => {
     expect(ctx.state!.events.lastOutcome!.effects).toContainEqual({ kind: 'other', key: 'exposure', delta: 15 });
   });
 });
+
+describe('bribe protections shield the next event after a resolved one (#1816)', () => {
+  const IDLE_TICKS = 5 * 24; // the judge's 5-day paid window (the longest) = 120 ticks, so idling this long outlasts every paid window
+  const LONGEST_COOLDOWN_ROLL = 179;
+  /** Enough single ticks for the longest cooldown roll to elapse after the idle stretch. */
+  const SETTLE_TICKS = 100;
+
+  /**
+   * Sandbox game with an event just resolved (fired this tick, worst-case cooldown roll),
+   * a staff member so union and lawsuit events have a cause, then a successful bribe of `target`.
+   */
+  function bribedAfterEvent(target: 'judge' | 'union_leader') {
+    for (let seed = 0; seed < 200; seed++) {
+      clearEvents();
+      setupEvents();
+      const engine = createRunner();
+      runCommand(engine, 'new_game mine_type:desert seed:42 size:32');
+      const s = engine.ctx.state!;
+      s.seed = seed;
+      s.cash = 1_000_000;
+      s.finances.cash = s.cash;
+      hireEmployee(s.employees, 'driller', new Random(1), 0, 0);
+      for (const t of s.events.timers) t.remaining = 1_000_000;
+      s.events.pendingEvent = { eventId: 'weather_suspiciously_perfect', firedAtTick: s.tickCount };
+      expect(runCommand(engine, 'event choose 0').success).toBe(true);
+      s.events.lastEventTick = s.tickCount;
+      s.events.actionCountSinceEvent = 0;
+      s.events.cooldownMinIntervalTicks = LONGEST_COOLDOWN_ROLL;
+      runCommand(engine, `corrupt target:${target}`);
+      s.events.actionCountSinceEvent = 0;
+      if (s.corruption.protections.some(p => p.target === target)) return engine;
+    }
+    return expect.unreachable('no successful bribe in 200 seeds');
+  }
+
+  /** Idle past the paid window with fewer than MIN_EVENT_INTERVAL_ACTIONS commands, then open the action gate. */
+  function idleThenOpenGate(engine: ReturnType<typeof createRunner>, category: string): void {
+    const s = engine.ctx.state!;
+    runCommand(engine, 'finances');
+    runCommand(engine, `tick ${IDLE_TICKS}`);
+    expect(s.events.pendingEvent).toBeNull();
+    expect(s.events.actionCountSinceEvent).toBeLessThan(MIN_EVENT_INTERVAL_ACTIONS);
+    for (let i = s.events.actionCountSinceEvent; i < MIN_EVENT_INTERVAL_ACTIONS; i++) runCommand(engine, 'finances');
+    s.events.timers.find(t => t.category === category)!.remaining = 1;
+  }
+
+  it('judge: the next lawsuit selected after the paid window is dismissed', () => {
+    const engine = bribedAfterEvent('judge');
+    const s = engine.ctx.state!;
+    const protection = s.corruption.protections.find(p => p.target === 'judge')!;
+    idleThenOpenGate(engine, 'lawsuit');
+    expect(s.tickCount).toBeGreaterThanOrEqual(protection.expiresAtTick);
+    const firedBefore = s.events.firedEventIds.length;
+    for (let i = 0; i < SETTLE_TICKS && s.events.firedEventIds.length === firedBefore; i++) runCommand(engine, 'tick 1');
+    expect(s.events.firedEventIds).toHaveLength(firedBefore + 1);
+    expect(getEventById(s.events.firedEventIds[firedBefore]!)!.category).toBe('lawsuit');
+    expect(s.events.pendingEvent).toBeNull();
+    expect(protection.dismissalsLeft).toBe(0);
+  });
+
+  it('union_leader: the next union event never reaches the player while the protection is active', () => {
+    const engine = bribedAfterEvent('union_leader');
+    const s = engine.ctx.state!;
+    const protection = s.corruption.protections.find(p => p.target === 'union_leader')!;
+    idleThenOpenGate(engine, 'union');
+    expect(s.tickCount).toBeGreaterThanOrEqual(protection.expiresAtTick);
+    const firedBefore = s.events.firedEventIds.length;
+    // Stop on the tick it shields: the tick after, the shielding protection has expired and the event fires normally.
+    for (let i = 0; i < SETTLE_TICKS && !protection.shielded; i++) {
+      s.events.timers.find(t => t.category === 'union')!.remaining = 1;
+      runCommand(engine, 'tick 1');
+      expect(s.events.pendingEvent).toBeNull();
+    }
+    expect(s.events.firedEventIds).toHaveLength(firedBefore);
+    expect(s.corruption.protections.some(p => p.target === 'union_leader' && p.shielded)).toBe(true);
+  });
+
+  it('union_leader: once it has shielded, the postponed union event fires after the normal expiry', () => {
+    const engine = bribedAfterEvent('union_leader');
+    const s = engine.ctx.state!;
+    idleThenOpenGate(engine, 'union');
+    for (let i = 0; i < SETTLE_TICKS; i++) {
+      s.events.timers.find(t => t.category === 'union')!.remaining = 1;
+      runCommand(engine, 'tick 1');
+    }
+    s.events.timers.find(t => t.category === 'union')!.remaining = 1;
+    for (let i = 0; i < SETTLE_TICKS && !s.events.pendingEvent; i++) runCommand(engine, 'tick 1');
+    expect(s.corruption.protections.some(p => p.target === 'union_leader')).toBe(false);
+    expect(s.events.pendingEvent).not.toBeNull();
+    expect(getEventById(s.events.pendingEvent!.eventId)!.category).toBe('union');
+  });
+});

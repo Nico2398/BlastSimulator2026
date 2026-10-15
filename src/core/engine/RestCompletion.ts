@@ -10,7 +10,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
 import { completeIfOwnedRestAction } from './TaskDispatch.js';
-import { completeRestForEmployee, findPendingActionById, resolveRestBuildingId } from './RestActionHelpers.js';
+import { completeRestForEmployee, creditPolicyRestMorale, findPendingActionById, resolveRestBuildingId } from './RestActionHelpers.js';
 
 export interface GeneralRestCompletionResult {
   /** Employee/need pairs whose rest completed this tick. */
@@ -57,6 +57,8 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     const completedAction = findPendingActionById(state, completedActionId);
 
     completeRestForEmployee(state, emp, needKey, completedAction !== undefined ? resolveRestBuildingId(completedAction.payload) : undefined);
+
+    creditPolicyRestMorale(state, emp, completedAction);
     // tickCollapse/tickNeedRestoration/autoInsertNeedTasks leave the rest
     // action in pendingActions at creation (self-claimed or claimed later via
     // tickEmployees), so nothing else removes it once the rest completes.

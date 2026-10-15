@@ -72,6 +72,28 @@ describe('ShadyPanel', () => {
     panel.dispose();
   });
 
+  it('labels a protection past its paid window as waiting for the next event', () => {
+    const { container, panel } = mount();
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.tickCount = 200;
+    state.corruption.protections = [{ target: 'judge', expiresAtTick: 100, dismissalsLeft: 1, shielded: false }];
+    panel.update(state);
+    panel.show();
+    expect(container.textContent).toContain(t('ui.shady.protection_lingering'));
+    panel.dispose();
+  });
+
+  it('shows the time left for a protection inside its paid window', () => {
+    const { container, panel } = mount();
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.tickCount = 10;
+    state.corruption.protections = [{ target: 'judge', expiresAtTick: 100, dismissalsLeft: 1, shielded: false }];
+    panel.update(state);
+    panel.show();
+    expect(container.textContent).not.toContain(t('ui.shady.protection_lingering'));
+    panel.dispose();
+  });
+
   it('shows the locked services teaser before the mafia is unlocked', () => {
     const { container, panel } = mount();
     const state = createGame({ seed: 1, mineType: 'desert' });

@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { corruptCommand } from '../../../src/console/commands/corruption.js';
 import { makeGameContext, type GameContext } from '../../helpers/gameContext.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
 import {
   BRIBE_CORRUPTION_DELTA,
@@ -55,12 +56,12 @@ describe('corrupt command — protections (#1407)', () => {
     const tick = findTick(ctx, 'inspector', false);
     const s = ctx.state!;
     bribeAt(ctx, 'inspector', tick);
-    s.corruption.protections.push({ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0 });
+    s.corruption.protections.push({ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0, shielded: true });
     s.cash = 10_000_000;
     s.corruption.attempts.length = 0;
     s.tickCount = tick;
     corruptCommand(ctx, [], { target: 'inspector' });
-    expect(s.corruption.protections).toEqual([{ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0 }]);
+    expect(s.corruption.protections).toEqual([{ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0, shielded: true }]);
   });
 
   it('successful witness bribe lowers exposure by the configured amount', () => {
@@ -106,5 +107,17 @@ describe('corrupt command — protections (#1407)', () => {
     corruptCommand(ctx, [], { target: 'union_leader' });
     const out = corruptCommand(ctx, [], {}).output;
     expect(out).toContain('the union leader');
+  });
+
+  it('status line says the protection is waiting once it lingers past the paid window', () => {
+    const tick = findTick(ctx, 'union_leader', true);
+    const s = ctx.state!;
+    s.corruption = createCorruptionState();
+    s.tickCount = tick;
+    s.cash = 10_000_000;
+    corruptCommand(ctx, [], { target: 'union_leader' });
+    s.tickCount = s.corruption.protections[0]!.expiresAtTick + 1;
+    const out = corruptCommand(ctx, [], {}).output;
+    expect(out).toContain(t('corruption.protection_lingering_line', { target: t('corruption.target.union_leader') }));
   });
 });

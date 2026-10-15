@@ -7,6 +7,7 @@ import {
   BRIBE_CORRUPTION_DELTA,
   BRIBE_PRICE_PER_PROTECTION_DAY,
   BRIBE_PROTECTION_DAYS,
+  BRIBE_PROTECTION_MAX_LINGER_DAYS,
   INSPECTION_EVENT_TAG,
   JUDGE_LAWSUIT_TIMER_STRETCH,
   WITNESS_EXPOSURE_REDUCTION,
@@ -75,10 +76,29 @@ export interface ActiveProtection {
   expiresAtTick: number;
   /** Remaining auto-dismissals (for dismissNextCategory effects). */
   dismissalsLeft: number;
+  /** True once the protection has blocked or dismissed an event; false on grant and on re-bribe (#1816). */
+  shielded: boolean;
 }
 
-function isActive(p: ActiveProtection, tick: number): boolean {
+/** True while the paid window (up to expiresAtTick) is running. */
+function isWithinPaidWindow(p: ActiveProtection, tick: number): boolean {
   return tick < p.expiresAtTick;
+}
+
+/**
+ * Paid window, then (until it has shielded something) a capped linger so the bribe outlives the event gap (#1816).
+ * Timer stretch deliberately ignores the linger: `timerStretchFor` uses the paid window only.
+ */
+function isActive(p: ActiveProtection, tick: number): boolean {
+  return isWithinPaidWindow(p, tick)
+    || (!p.shielded && tick < p.expiresAtTick + BRIBE_PROTECTION_MAX_LINGER_DAYS * TICKS_PER_DAY);
+}
+
+/** True when the effect blocks an event of this category/tags. */
+function blocksEvent(p: ActiveProtection, def: Pick<EventDef, 'category' | 'tags'>): boolean {
+  const { blockCategory, blockTag } = BRIBE_PROFILES[p.target].effect;
+  return blockCategory === def.category
+    || (blockTag !== undefined && (def.tags?.includes(blockTag) ?? false));
 }
 
 /** Append a protection for a successful bribe; null when the target grants none. Re-bribing refreshes, never stacks. */
@@ -95,14 +115,15 @@ export function grantProtection(
   if (existing) {
     existing.expiresAtTick = Math.max(existing.expiresAtTick, expiresAtTick);
     existing.dismissalsLeft = dismissalsLeft;
+    existing.shielded = false;
     return existing;
   }
-  const entry: ActiveProtection = { target, expiresAtTick, dismissalsLeft };
+  const entry: ActiveProtection = { target, expiresAtTick, dismissalsLeft, shielded: false };
   list.push(entry);
   return entry;
 }
 
-/** Drop expired protections in place. */
+/** Drop expired protections in place; unshielded lingering ones are kept. */
 export function pruneProtections(list: ActiveProtection[], tick: number): void {
   for (let i = list.length - 1; i >= 0; i--) {
     if (!isActive(list[i]!, tick)) list.splice(i, 1);
@@ -115,12 +136,7 @@ export function isEventShielded(
   list: readonly ActiveProtection[],
   tick: number,
 ): boolean {
-  return list.some(p => {
-    if (!isActive(p, tick)) return false;
-    const { blockCategory, blockTag } = BRIBE_PROFILES[p.target].effect;
-    return blockCategory === def.category
-      || (blockTag !== undefined && (def.tags?.includes(blockTag) ?? false));
-  });
+  return list.some(p => isActive(p, tick) && blocksEvent(p, def));
 }
 
 /** Consume one auto-dismissal for the category; true when one was available. */
@@ -133,6 +149,7 @@ export function consumeDismissal(
     && BRIBE_PROFILES[q.target].effect.dismissNextCategory === category);
   if (!p) return false;
   p.dismissalsLeft--;
+  p.shielded = true;
   return true;
 }
 
@@ -145,7 +162,7 @@ export function timerStretchFor(
   let stretch = 1;
   for (const p of list) {
     const e = BRIBE_PROFILES[p.target].effect;
-    if (isActive(p, tick) && e.timerStretchCategory === category) stretch *= Math.max(1, e.timerStretch ?? 1);
+    if (isWithinPaidWindow(p, tick) && e.timerStretchCategory === category) stretch *= Math.max(1, e.timerStretch ?? 1);
   }
   return stretch;
 }
@@ -153,4 +170,20 @@ export function timerStretchFor(
 /** Ticks left on a protection (0 when expired). */
 export function protectionRemainingTicks(p: ActiveProtection, tick: number): number {
   return Math.max(0, p.expiresAtTick - tick);
+}
+
+/** Mark protections that would block any of these events as having shielded something (#1816). */
+export function markShielded(
+  list: ActiveProtection[],
+  events: readonly Pick<EventDef, 'category' | 'tags'>[],
+  tick: number,
+): void {
+  for (const p of list) {
+    if (isActive(p, tick) && events.some(e => blocksEvent(p, e))) p.shielded = true;
+  }
+}
+
+/** True when past the paid window (expiresAtTick) but still active on the unshielded linger. */
+export function isProtectionLingering(p: ActiveProtection, tick: number): boolean {
+  return !isWithinPaidWindow(p, tick) && isActive(p, tick);
 }

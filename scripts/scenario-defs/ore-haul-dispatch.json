@@ -142,6 +142,26 @@
       }
     },
     {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "description": "#1801: rest-completion morale shifts the crew's pace and so the weather at blast time. Boomite is water-sensitive: a wet hole fizzles and the shot no longer breaks out (measured: 9 wet holes at tick 233, none at tick 251). Waiting for the holes to dry is what a player does; blasting is unchanged.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 65,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
       "command": "blast",
       "timeout": 30,
       "interaction": [

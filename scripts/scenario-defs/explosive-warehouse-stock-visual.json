@@ -375,7 +375,7 @@
     },
     {
       "command": "state",
-      "description": "Selecting the Explosive Warehouse (the first building placed, id 1) shows its stock (20 kg) and free capacity (480 kg of 500).",
+      "description": "Selecting the Explosive Warehouse (the first building placed, id 1) shows its stock (20 kg) and free capacity (480 kg of 500), and one inspector row per explosive held: boomite 20 kg, with the detonation radius line since it is stocked.",
       "role": "player",
       "interaction": [
         {
@@ -388,9 +388,23 @@
           "selector": "#bs-inspector [data-info=\"warehouse-stock\"][data-stock-kg=\"20\"][data-free-kg=\"480\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-live=\"stock-row-boomite\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-live=\"radius\"]"
+        },
+        {
           "type": "screenshot"
         }
-      ]
+      ],
+      "expect": {
+        "usable": "#bs-inspector [data-live=\"stock-row-boomite\"]",
+        "textEquals": {
+          "#bs-inspector [data-live=\"stock-row-boomite\"]": "20 kg"
+        }
+      }
     },
     {
       "command": "state full",
