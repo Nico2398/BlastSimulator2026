@@ -35,6 +35,7 @@ export const employeeContent: KindContent = {
     const role = t(`role.${e.role}`);
     const build = (): HTMLElement => {
       const body = el('div', { className: 'bs-employee-detail' });
+      body.dataset.employeeRole = e.role;
       body.style.cssText = 'display:flex;flex-direction:column;gap:11px';
       for (const [className, make] of sectionBuilders(e, state, links)) {
         const node = make();
