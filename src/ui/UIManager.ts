@@ -39,6 +39,7 @@ import type { UiCues } from '../audio/ui/UiCues.js';
 import type { SaveBackend } from '../core/state/SaveBackend.js';
 
 import type { GameConsoleFn } from './gameConsole.js';
+import type { ListSelection } from './selectionRoute.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 
 
@@ -358,6 +359,16 @@ export class UIManager {
   /** Wire the Fleet panel's per-row click-to-select (main.ts owns ScenePicking). */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void {
     this.fleetPanel.setSelectVehicleHandler(cb);
+  }
+
+  /** Wire the Build menu's per-row click-to-select (main.ts owns ScenePicking). */
+  setSelectBuildingHandler(_cb: (buildingId: number) => void): void {
+    // TODO: implement
+  }
+
+  /** Push the scene selection to list panels so the matching row highlights. */
+  setListSelection(_sel: ListSelection): void {
+    // TODO: implement
   }
 
   /** Open the Crew panel with hiring for `role` in view. */

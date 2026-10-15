@@ -63,6 +63,7 @@ import { buildDemolishConfirm, freightOreKg } from './demolishConfirm.js';
 import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
 import { memoizedPlacementCutoff, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
+import type { ListSelection } from './selectionRoute.js';
 
 /** Footprint rect of a `sizeX` x `sizeZ` building whose origin tile is (x, z). */
 function rectAt(x: number, z: number, sizeX: number, sizeZ: number): Rect {
@@ -255,6 +256,16 @@ export class BuildMenu extends PanelBase {
     const requestConfirm = this.onConfirmRequestCb;
     if (upgrade.cutoff !== null && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(upgrade.cutoff, doUpgrade));
     else doUpgrade();
+  }
+
+  /** Wire placed-row click-to-select (main.ts owns ScenePicking). */
+  setSelectBuildingHandler(_cb: (buildingId: number) => void): void {
+    // TODO: implement
+  }
+
+  /** Mirror the scene selection so the matching placed row highlights. */
+  setSelectedEntity(_sel: ListSelection): void {
+    // TODO: implement
   }
 
   /** Routes a flow's result message somewhere visible while the panel is closed (#1758). */
