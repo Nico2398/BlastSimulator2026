@@ -20,6 +20,7 @@ import {
   SHIFT_DURATIONS_TICKS,
   MAX_NEED_GAUGE,
   NEED_REST_NO_BUILDING_CAP,
+  REST_COMPLETION_MORALE_CREDIT,
 } from '../../../src/core/config/balance.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -1193,5 +1194,68 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.pendingRestDuration).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+});
+
+// #1801: completing a rest the shift-cycle policy asked for credits morale
+// (restCompletionMoraleCredit); a collapse or other rest does not.
+describe('completeRestTick — policy rest morale credit (#1801)', () => {
+  const SEED = 42;
+
+  function restingEmployee(triggeredBy: string | undefined) {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 5, 5);
+    employee.fatigue = 10;
+    employee.morale = 0;
+    employee.restTicksRemaining = 1;
+    employee.restNeedKey = null;
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: triggeredBy === undefined ? {} : { triggeredBy },
+      targetEmployeeId: employee.id, status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+    return { state, employee };
+  }
+
+  it('a shift_cycle_policy rest completion credits morale at the default threshold (60)', () => {
+    const { state, employee } = restingEmployee('shift_cycle_policy');
+    completeRestTick(state, employee, []);
+    expect(employee.morale).toBe(REST_COMPLETION_MORALE_CREDIT);
+  });
+
+  it('morale is clamped at 100', () => {
+    const { state, employee } = restingEmployee('shift_cycle_policy');
+    employee.morale = 90;
+    completeRestTick(state, employee, []);
+    expect(employee.morale).toBe(100);
+  });
+
+  it('no credit when the policy threshold is below the comfort band', () => {
+    const { state, employee } = restingEmployee('shift_cycle_policy');
+    state.sitePolicy.fatigueRestThreshold = 0;
+    completeRestTick(state, employee, []);
+    expect(employee.morale).toBe(0);
+  });
+
+  it('a collapse rest earns no credit', () => {
+    const { state, employee } = restingEmployee('collapse');
+    completeRestTick(state, employee, []);
+    expect(employee.morale).toBe(0);
+  });
+
+  it('a rest with no trigger earns no credit', () => {
+    const { state, employee } = restingEmployee(undefined);
+    completeRestTick(state, employee, []);
+    expect(employee.morale).toBe(0);
+  });
+
+  it('an injured employee earns no credit', () => {
+    const { state, employee } = restingEmployee('shift_cycle_policy');
+    employee.injured = true;
+    completeRestTick(state, employee, []);
+    expect(employee.morale).toBe(0);
   });
 });
