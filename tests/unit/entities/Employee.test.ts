@@ -49,6 +49,7 @@ import {
   NEED_MORALE_EFFECT_THRESHOLDS,
   NEED_MORALE_EFFECT_PENALTIES,
   NEED_WELL_RESTED_THRESHOLD,
+  NEED_COMFORT_MORALE_RECOVERY,
   NEED_WELL_RESTED_BONUS,
   // ── 7.5: replenishNeed building replenish rates ──
   BUILDING_REPLENISH_RATES,
@@ -987,9 +988,9 @@ describe('Employee - needsMoraleEffect (7.4)', () => {
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.fatigue = 50;
-    // Comfortable (0) - no well-rested bonus (50 is not > 80)
+    // Comfortable band: recovery only, no well-rested bonus (50 is not > 80)
     const result = needsMoraleEffect(employee);
-    expect(result).toBe(0);
+    expect(result).toBe(NEED_COMFORT_MORALE_RECOVERY);
   });
 
   // -- Test 5 --------------------------------------------------------------
@@ -998,9 +999,9 @@ describe('Employee - needsMoraleEffect (7.4)', () => {
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.fatigue = 80;
-    // Comfortable (0) - no well-rested bonus (80 is not > 80)
+    // Comfortable band: recovery only, no well-rested bonus (80 is not > 80)
     const result = needsMoraleEffect(employee);
-    expect(result).toBe(0);
+    expect(result).toBe(NEED_COMFORT_MORALE_RECOVERY);
   });
 
   // -- Test 6 --------------------------------------------------------------
@@ -1020,9 +1021,9 @@ describe('Employee - needsMoraleEffect (7.4)', () => {
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.fatigue = 79;
-    // Comfortable (0) - no bonus because 79 is not > 80
+    // Comfortable band: recovery only, no bonus because 79 is not > 80
     const result = needsMoraleEffect(employee);
-    expect(result).toBe(0);
+    expect(result).toBe(NEED_COMFORT_MORALE_RECOVERY);
   });
 
   // -- Test 8 --------------------------------------------------------------
@@ -1089,10 +1090,10 @@ describe('Employee - needsMoraleEffect (7.4)', () => {
     const rng = new Random(1);
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.fatigue = NEED_MORALE_EFFECT_THRESHOLDS.comfortable;
-    // gauge=50 is the comfortable threshold; 50 >= 50 -> comfortable (0)
+    // gauge=50 is the comfortable threshold; 50 >= 50 -> comfortable penalty (0) + recovery
     const result = needsMoraleEffect(employee);
     expect(NEED_MORALE_EFFECT_THRESHOLDS.comfortable).toBe(50);
-    expect(result).toBe(0);
+    expect(result).toBe(NEED_MORALE_EFFECT_PENALTIES.comfortable + NEED_COMFORT_MORALE_RECOVERY);
   });
 
   // -- Test 14 -----------------------------------------------------------
@@ -1120,6 +1121,43 @@ describe('Employee - needsMoraleEffect (7.4)', () => {
     expect(NEED_MORALE_EFFECT_THRESHOLDS.uncomfortable).toBe(30);
     expect(NEED_MORALE_EFFECT_THRESHOLDS.suffering).toBe(15);
     expect(NEED_WELL_RESTED_THRESHOLD).toBe(80);
+  });
+});
+
+// #1778 — comfortable-band morale recovery: the default rest cycle leaves
+// fatigue in [50, 80], which must recover morale slowly instead of freezing it.
+describe('Employee - needsMoraleEffect comfortable-band recovery (#1778)', () => {
+  function emp(fatigue: number, injured = false) {
+    const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(1));
+    employee.fatigue = fatigue;
+    employee.injured = injured;
+    return employee;
+  }
+
+  it('NEED_COMFORT_MORALE_RECOVERY is a positive value below the well-rested bonus', () => {
+    expect(NEED_COMFORT_MORALE_RECOVERY).toBeGreaterThan(0);
+    expect(NEED_COMFORT_MORALE_RECOVERY).toBeLessThan(NEED_WELL_RESTED_BONUS);
+  });
+
+  it.each([50, 65, 80])('fatigue %i recovers NEED_COMFORT_MORALE_RECOVERY per tick', (f) => {
+    expect(needsMoraleEffect(emp(f))).toBeCloseTo(NEED_COMFORT_MORALE_RECOVERY, 10);
+    expect(needsMoraleEffect(emp(f))).toBeGreaterThan(0);
+  });
+
+  it('fatigue 81 and 100 get the well-rested bonus alone, not stacked', () => {
+    expect(needsMoraleEffect(emp(81))).toBe(NEED_WELL_RESTED_BONUS);
+    expect(needsMoraleEffect(emp(100))).toBe(NEED_WELL_RESTED_BONUS);
+  });
+
+  it('penalties below 50 are unchanged and get no recovery', () => {
+    expect(needsMoraleEffect(emp(49))).toBeCloseTo(-1.5, 10);
+    expect(needsMoraleEffect(emp(30))).toBeCloseTo(-1.5, 10);
+    expect(needsMoraleEffect(emp(29))).toBeCloseTo(-4.5, 10);
+    expect(needsMoraleEffect(emp(14))).toBeCloseTo(-9.0, 10);
+  });
+
+  it('injured employee in the comfortable band still gets 0', () => {
+    expect(needsMoraleEffect(emp(65, true))).toBe(0);
   });
 });
 

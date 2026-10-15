@@ -8,6 +8,7 @@ import {
   clampScore,
   type ScoreInputs,
 } from '../../../src/core/scores/ScoreManager.js';
+import { computeCrewFatigueStrain } from '../../../src/core/entities/EmployeeNeeds.js';
 import {
   createBuildingState,
   placeBuilding,
@@ -476,6 +477,29 @@ describe('Well-being model — headroom, overwork, crowding, accidents (#1692)',
       updateScores(tired, makeInputs({ buildings, avgMorale: 70, crewFatigueStrain: 0.5 }));
     }
     expect(tired.wellBeing).toBeLessThan(rested.wellBeing);
+  });
+
+  describe('overwork is measured against the default rest cycle (#1778)', () => {
+    const crew = (fatigue: number) =>
+      [0, 1, 2, 3, 4].map(() => ({ alive: true, injured: false, fatigue }));
+    function settleWithCrew(fatigue: number | null): number {
+      const buildings = withQuarters(1);
+      const state = createScoreState();
+      const strain = fatigue === null ? 0 : computeCrewFatigueStrain(crew(fatigue));
+      for (let i = 0; i < 1000; i++) {
+        updateScores(state, makeInputs({ buildings, avgMorale: 70, employeeCount: 5, bedCapacity: 20, crewFatigueStrain: strain }));
+      }
+      return state.wellBeing;
+    }
+
+    it.each([60, 65, 70])('a crew resting around fatigue %i carries no overwork drag', (f) => {
+      expect(computeCrewFatigueStrain(crew(f))).toBe(0);
+      expect(settleWithCrew(f)).toBeCloseTo(settleWithCrew(null), 10);
+    });
+
+    it.each([0, 10])('a crew driven down to fatigue %i loses well-being versus no strain', (f) => {
+      expect(settleWithCrew(f)).toBeLessThan(settleWithCrew(null));
+    });
   });
 
   it('recentAccidents: 1 lowers well-being versus none', () => {
