@@ -75,6 +75,8 @@ export interface ActiveProtection {
   expiresAtTick: number;
   /** Remaining auto-dismissals (for dismissNextCategory effects). */
   dismissalsLeft: number;
+  /** True once the protection has blocked or dismissed an event; false on grant and on re-bribe (#1816). */
+  shielded: boolean;
 }
 
 function isActive(p: ActiveProtection, tick: number): boolean {
@@ -95,9 +97,10 @@ export function grantProtection(
   if (existing) {
     existing.expiresAtTick = Math.max(existing.expiresAtTick, expiresAtTick);
     existing.dismissalsLeft = dismissalsLeft;
+    existing.shielded = false;
     return existing;
   }
-  const entry: ActiveProtection = { target, expiresAtTick, dismissalsLeft };
+  const entry: ActiveProtection = { target, expiresAtTick, dismissalsLeft, shielded: false };
   list.push(entry);
   return entry;
 }
@@ -153,4 +156,21 @@ export function timerStretchFor(
 /** Ticks left on a protection (0 when expired). */
 export function protectionRemainingTicks(p: ActiveProtection, tick: number): number {
   return Math.max(0, p.expiresAtTick - tick);
+}
+
+/** Mark protections that would block any of these events as having shielded something (#1816). */
+export function markShielded(
+  list: ActiveProtection[],
+  events: readonly Pick<EventDef, 'category' | 'tags'>[],
+  tick: number,
+): void {
+  // TODO: implement
+  void list; void events; void tick;
+}
+
+/** True when past the paid window (expiresAtTick) but still active on the unshielded linger. */
+export function isProtectionLingering(p: ActiveProtection, tick: number): boolean {
+  // TODO: implement
+  void p; void tick;
+  return false;
 }
