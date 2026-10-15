@@ -145,6 +145,19 @@ export const TOKENS_CSS = `
 .bsx-section-rule { flex: 1; height: 1px; background: var(--bsx-hairline); }
 .bsx-section-note { font: 500 10px/1 var(--bsx-font-mono); color: var(--bsx-text-micro); white-space: nowrap; }
 
+/* ── build panel roster rows (#1759) ── */
+.bs-build-row-info { display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: var(--bsx-text-tinted); overflow-wrap: break-word; }
+.bs-build-row-head { display: flex; align-items: center; gap: 6px; }
+.bs-build-row-name { flex: 1; min-width: 0; }
+.bs-build-row-hp { display: flex; align-items: center; gap: 6px; }
+.bs-build-hp-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--bsx-well); }
+.bs-build-hp-fill { height: 100%; border-radius: 2px; background: var(--bsx-positive); }
+.bs-build-row-hp-text, .bs-build-row-util { font-size: 9px; color: var(--bsx-text-micro); }
+.bs-build-row-badge { align-self: flex-start; padding: 1px 5px; border-radius: 3px; font: 600 9px/1.3 var(--bsx-font-ui); color: var(--bsx-amber); border: 1px solid var(--bsx-amber); }
+.bs-build-placed-row, .bs-build-site-row { cursor: pointer; }
+.bs-build-site-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 7px 8px; border: 1px dashed var(--bsx-hairline-strong); border-radius: 6px; background: var(--bsx-card); }
+.bs-build-row-selected { border-color: var(--bsx-amber) !important; background: rgba(255,176,46,.10) !important; }
+
 /* ── cards ── */
 .bsx-card {
   padding: 11px;
