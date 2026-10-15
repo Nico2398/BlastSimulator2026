@@ -36,6 +36,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.contracts.storage_value', // "{used} / {cap} kg"
   'ui.contracts.delivered_line', // "{delivered} / {total} kg"
   'ui.operations.mass_kg', // "{kg} kg"
+  'ui.build.row.util_beds', // "{inside}/{capacity}"
+  'ui.build.row.util_kg', // "{stored}/{capacity} kg"
   'ui.crew.location_coords', // "({x}, {z})"
   'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is a cognate, embedded in a format string
   'ui.fleet.load_kg', // "{kg} / {cap} kg"

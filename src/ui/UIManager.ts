@@ -59,6 +59,7 @@ export class UIManager {
   private readonly financesPanel: FinancesPanel;
   private readonly operationsPanel: OperationsPanel;
   private readonly buildMenu: BuildMenu;
+  private listSelection: ListSelection = null;
   private readonly fleetPanel: FleetPanel;
   private readonly crewPanel: CrewPanel;
   private readonly eventModal: EventModal;
@@ -362,13 +363,18 @@ export class UIManager {
   }
 
   /** Wire the Build menu's per-row click-to-select (main.ts owns ScenePicking). */
-  setSelectBuildingHandler(_cb: (buildingId: number) => void): void {
-    // TODO: implement
+  setSelectBuildingHandler(cb: (buildingId: number) => void): void {
+    this.buildMenu.setSelectBuildingHandler(cb);
   }
 
-  /** Push the scene selection to list panels so the matching row highlights. */
-  setListSelection(_sel: ListSelection): void {
-    // TODO: implement
+  /** Current scene selection for the list panels' row highlight; idempotent, re-applied on update and panel show. */
+  setListSelection(sel: ListSelection): void {
+    this.listSelection = sel;
+    this.applyListSelection();
+  }
+
+  private applyListSelection(): void {
+    this.buildMenu.setSelectedEntity(this.listSelection);
   }
 
   /** Open the Crew panel with hiring for `role` in view. */
@@ -505,6 +511,7 @@ export class UIManager {
     if (this.operationsPanel.visible) this.operationsPanel.update(state);
     this.buildMenu.observe(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
+    this.applyListSelection();
     if (this.fleetPanel.visible) this.fleetPanel.update(state);
     if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyPanel.visible) this.surveyPanel.update(state);
@@ -548,7 +555,7 @@ export class UIManager {
       case 'contracts': this.contractsPanel.show(); break;
       case 'finances': this.financesPanel.show(); break;
       case 'ops': this.operationsPanel.show(); break;
-      case 'build': this.buildMenu.show(); break;
+      case 'build': this.buildMenu.show(); this.applyListSelection(); break;
       case 'vehicles': this.fleetPanel.show(); break;
       case 'employees': this.crewPanel.show(); break;
       case 'survey': this.surveyPanel.show(); break;

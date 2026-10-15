@@ -4,7 +4,6 @@ import type { EntityPick } from './scene/ScenePicking.js';
 export type ListSelection = { kind: EntityPick['kind']; id: number } | null;
 
 /** True when `sel` names exactly the entity (`kind`, `id`). */
-export function isSelected(_sel: ListSelection, _kind: EntityPick['kind'], _id: number): boolean {
-  // TODO: implement
-  return false;
+export function isSelected(sel: ListSelection, kind: EntityPick['kind'], id: number): boolean {
+  return sel !== null && sel.kind === kind && sel.id === id;
 }
