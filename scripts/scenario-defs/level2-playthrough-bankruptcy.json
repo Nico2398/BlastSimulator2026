@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-bankruptcy",
-  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: buy a management office, a five-vehicle fleet and a ten-strong crew, blast nothing, collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- the run continues against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. That is why the funding cheat is on `new_game` here rather than on `campaign start`. The run is funded to exactly the shopping list ($185,800), so every purchase is a click a real player could make and the spree ends on exactly $0 -- under the $5,000 BANKRUPTCY_THRESHOLD from the first tick, with BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep and no income finishing the job. The named bankruptcy outcome is unchanged and still real: levelEndReason:'bankruptcy' fires at tick 100, reported by the tick-105 step. #556: the management office is ordered at tick 0 and stands from ~tick 45, when the crew hired below finally exists to build it — the file spends no ticks at all before then. Its maintenance therefore starts three tick blocks later than it used to, and every score checkpoint here has been re-measured against the real run: the safety and ecology drift the file used to record came from building-conditioned events resolving differently against a site than against a standing office, and now holds at the 50 baseline at several beats. The tick trajectory, deathCount 0, and the bankruptcy itself (tick 105, levelEndReason \"bankrupt\") are unchanged — those are what this file exists to pin.",
+  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: buy a management office, a five-vehicle fleet and a ten-strong crew, blast nothing, collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- the run continues against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. That is why the funding cheat is on `new_game` here rather than on `campaign start`. The run is funded to exactly the shopping list ($185,800), so every purchase is a click a real player could make and the spree ends on exactly $0 -- under the $5,000 BANKRUPTCY_THRESHOLD from the first tick, with BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep and no income finishing the job. The named bankruptcy outcome is unchanged and still real: levelEndReason:'bankruptcy' fires at tick 100, reported by the tick-105 step. #556: the management office is ordered at tick 0 and stands from ~tick 45, when the crew hired below finally exists to build it — the file spends no ticks at all before then. Its maintenance therefore starts three tick blocks later than it used to, and every score checkpoint here has been re-measured against the real run: the safety and ecology drift the file used to record came from building-conditioned events resolving differently against a site than against a standing office, and now holds at the 50 baseline at several beats. The tick trajectory, deathCount 0, and the bankruptcy itself (tick 105, levelEndReason \"bankrupt\") are unchanged — those are what this file exists to pin. Rally point: the crew and fleet now spawn around the rally flag at the site centre (32,32); the office stands two ticks later, so the tick-45 cash delta, the final cash and the safety checkpoints were re-measured. Tick trajectory, deathCount 0 and the tick-100 bankruptcy are unchanged.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:185800",
@@ -935,7 +935,7 @@
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 63.143989285714376,
+          "wellBeing": 63.14400000000009,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50,
@@ -967,11 +967,11 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -8043
+          "cash": -8031
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648)."
       },
-      "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -7109 -> -7121. #1200 retargets the management_office builder (employee #1) at the footprint's approach-ring cell (19,5) instead of the raw order origin (20,5), from order time -- one tile closer to employee #1's own spawn, so the construction (claimed at tick 0) completes one tick sooner than before (direct-traced: activeActionId clears at tick 39 here, tick 40-41 on main pre-#1200). That frees employee #1 for reassignment one tick earlier, which lands a small, one-time -$12 shift in this window's own cash total (direct-traced against a git-worktree run of this same command sequence on main, pre-#1200: cash -21141 identical through tick 39, then -27966/-27991/... here vs -27960/-27979/... there, a bounded -$6 then -$12 gap that never grows past -$12 for the rest of the file) -- not a growing divergence, a single early reassignment's own incidental cost."
+      "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -7109 -> -7121. #1200 retargets the management_office builder (employee #1) at the footprint's approach-ring cell (19,5) instead of the raw order origin (20,5), from order time -- one tile closer to employee #1's own spawn, so the construction (claimed at tick 0) completes one tick sooner than before (direct-traced: activeActionId clears at tick 39 here, tick 40-41 on main pre-#1200). That frees employee #1 for reassignment one tick earlier, which lands a small, one-time -$12 shift in this window's own cash total (direct-traced against a git-worktree run of this same command sequence on main, pre-#1200: cash -21141 identical through tick 39, then -27966/-27991/... here vs -27960/-27979/... there, a bounded -$6 then -$12 gap that never grows past -$12 for the rest of the file) -- not a growing divergence, a single early reassignment's own incidental cost. Rally point: cash re-measured -8043 -> -8031 (+$12) -- hires and purchases now spawn around the rally flag on flat ground at the site centre (32,32) instead of the old hire spawns near (27,48) and (51,42), so the office builder reaches (20,5) by a different route and the office stands two ticks later -- two fewer ticks of its $6/tick upkeep and its safety bonus."
     },
     {
       "command": "event choose 0",
@@ -1131,7 +1131,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 64.8500000000001,
+          "safety": 63.95000000000009,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1142,7 +1142,7 @@
           "cash": 0
         }
       },
-      "description": "#1151: re-baselined against a measured run -- safety 66.6500000000001 -> 65.3000000000001. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): safety re-measured 65.3000000000001 -> 66.2000000000001 -- same mechanism as the tick-45 cash checkpoint's own #1252 finding (employee #1 completes the management_office build one tick sooner, retargeted at the approach-ring cell (19,5) rather than the raw origin (20,5)) shifts the accumulated-exposure computation this score derives from by the same small, bounded amount."
+      "description": "#1151: re-baselined against a measured run -- safety 66.6500000000001 -> 65.3000000000001. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): safety re-measured 65.3000000000001 -> 66.2000000000001 -- same mechanism as the tick-45 cash checkpoint's own #1252 finding (employee #1 completes the management_office build one tick sooner, retargeted at the approach-ring cell (19,5) rather than the raw origin (20,5)) shifts the accumulated-exposure computation this score derives from by the same small, bounded amount. Rally point: safety re-measured 64.85 -> 63.95 -- hires and purchases now spawn around the rally flag on flat ground at the site centre (32,32) instead of the old hire spawns near (27,48) and (51,42), so the office builder reaches (20,5) by a different route and the office stands two ticks later -- two fewer ticks of its $6/tick upkeep and its safety bonus."
     },
     {
       "command": "tick 15",
@@ -1203,7 +1203,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -79648,
+          "cash": -79636,
           "tickCount": 100,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1213,7 +1213,7 @@
         },
         "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Funding the run for its shopping list did not save it and did not move the bankruptcy tick -- the spree ends on exactly $0, under the $5,000 BANKRUPTCY_THRESHOLD, so the 100-tick BANKRUPTCY_GRACE_TICKS window expires at tick 100 exactly as it did when the purchases overdrew. Payroll and upkeep against zero income do the killing now, which is a truer test than an overdraw no player could perform. #1313: the tick command stops on the tick the level ends, so this `tick 15` lands on tick 100 (not 105) and everything after it is frozen at that balance. #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648)."
       },
-      "description": "#1151: re-baselined against a measured run -- cash -70397 -> -70379. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -70379 -> -70391 -- the same bounded -$12 shift the tick-45 checkpoint's own #1252 finding documents (employee #1's management_office build completing one tick sooner at the approach-ring cell) carries forward unchanged through this checkpoint; bankruptcy itself still fires at the same tick 100, unmoved."
+      "description": "#1151: re-baselined against a measured run -- cash -70397 -> -70379. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -70379 -> -70391 -- the same bounded -$12 shift the tick-45 checkpoint's own #1252 finding documents (employee #1's management_office build completing one tick sooner at the approach-ring cell) carries forward unchanged through this checkpoint; bankruptcy itself still fires at the same tick 100, unmoved. Rally point: cash re-measured -79648 -> -79636 (the same +$12) and the later safety checkpoints 76.10 -> 75.20 -- hires and purchases now spawn around the rally flag on flat ground at the site centre (32,32) instead of the old hire spawns near (27,48) and (51,42), so the office builder reaches (20,5) by a different route and the office stands two ticks later -- two fewer ticks of its $6/tick upkeep and its safety bonus. The bankruptcy at tick 100 is unchanged."
     },
     {
       "command": "event choose 0",
@@ -1325,7 +1325,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 76.10000000000016,
+          "safety": 75.20000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1515,7 +1515,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 76.10000000000016,
+          "safety": 75.20000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1655,7 +1655,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 76.10000000000016,
+          "safety": 75.20000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1680,7 +1680,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 76.10000000000016,
+          "safety": 75.20000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1705,7 +1705,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 76.10000000000016,
+          "safety": 75.20000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,

@@ -14,7 +14,7 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -38,18 +38,18 @@ export interface SandboxDifficultyDef {
 /**
  * Named difficulty presets — starting cash and the size of the free starting kit vary (#504, #1671).
  *
- * Cash bisected (#1671) on the headless first-blast-to-first-sale playthrough in
- * tests/integration/sandbox.integration.test.ts (desert_badlands, seed 42, no
- * buying or hiring): payroll and upkeep run while the first shot is drilled, hauled
- * and sold, so too little cash ends in bankruptcy before the sale. Minimum that
- * stays solvent: hard 82k fails / 90k passes, normal 108k fails / 112k passes
- * (easy has slack at 250k). Chosen with ~30% margin: 120k / 150k / 250k, which
- * keeps easy > normal > hard strictly.
+ * Cash bisected twice. #1671 (first blast to first sale, no quarters): hard 82k fails
+ * / 90k passes, normal 108k fails / 112k passes. #1747 (standard opening: tier-1
+ * living_quarters at 30,48 first, 3x3 Krackle 8 kg pattern, sell, survive to
+ * tick 2000 with cash above the first-blast level): normal needs ~181.6k (170k
+ * fails, 185k passes), hard ~147.6k, easy has slack. Chosen with ~15% margin:
+ * 170k / 210k / 250k, which keeps easy > normal > hard strictly. Rationale beside
+ * SANDBOX_STARTING_CASH in balance.ts.
  */
 export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
-  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: 250_000 },
-  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: 150_000 },
-  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: 120_000 },
+  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: SANDBOX_STARTING_CASH.easy },
+  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: SANDBOX_STARTING_CASH.normal },
+  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: SANDBOX_STARTING_CASH.hard },
 } as const;
 
 export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy', 'normal', 'hard'];

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite, isStaffedComposition } from '../../../src/core/state/StartingBuildings.js';
+import { placeStartingBuildings, resolveStartingSite, isStaffedComposition } from '../../../src/core/state/StartingBuildings.js';
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, getSmoothTerrainSurfaceY, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { StartingBuildingSlot } from '../../../src/core/config/balance.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG, STARTING_BUILDING_STANDOFF_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG, RALLY_POINT_BUILDING_CLEARANCE, STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
 
 function solidVoxel(): VoxelData {
   return {
@@ -77,7 +77,8 @@ describe('placeStartingBuildings (#1363)', () => {
     const buildings = createBuildingState();
     const placed = placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 6, z: 20 });
     expect(placed).toBe(1);
-    expect(buildings.buildings[0]!.x).toBeGreaterThanOrEqual(24);
+    // x=21 is the first origin whose margin (20..25) spans a single level.
+    expect(buildings.buildings[0]!.x).toBeGreaterThanOrEqual(21);
   });
 
   it('places several slots without overlap', () => {
@@ -113,6 +114,45 @@ describe('placeStartingBuildings (#1363)', () => {
     }
     const buildings = createBuildingState();
     expect(placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 12, z: 12 })).toBe(0);
+  });
+});
+
+describe('placeStartingBuildings — flat surroundings and the rally point', () => {
+  it('passes over a footprint that fits a gentle slope when flat ground lies further out', () => {
+    // A steady slope west of x=24 (two levels every five columns): many 4x4
+    // footprints there span only one level and pass the placement tolerance,
+    // but every one-cell margin around them spans two — a hillside.
+    const size = 48;
+    const grid = new VoxelGrid(size, size);
+    for (let z = 0; z < size; z++) {
+      for (let x = 0; x < size; x++) {
+        const top = 1 + Math.floor(Math.min(x, 24) * 0.4);
+        for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+      }
+    }
+    const buildings = createBuildingState();
+    placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 18, z: 20 });
+    // x=21 is the first origin whose margin (20..25) spans a single level.
+    expect(buildings.buildings[0]!.x).toBeGreaterThanOrEqual(21);
+  });
+
+  it('keeps every footprint RALLY_POINT_BUILDING_CLEARANCE cells from the flag', () => {
+    const flag = { x: 20, z: 20 };
+    const buildings = createBuildingState();
+    placeStartingBuildings(buildings, makeFlatGrid(48), [WAREHOUSE, { type: 'spoil_heap', tier: 1 }], flag, flag);
+    expect(buildings.buildings).toHaveLength(2);
+    for (const b of buildings.buildings) {
+      const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
+      const dx = flag.x < b.x ? b.x - flag.x : Math.max(0, flag.x - (b.x + sizeX - 1));
+      const dz = flag.z < b.z ? b.z - flag.z : Math.max(0, flag.z - (b.z + sizeZ - 1));
+      expect(Math.max(dx, dz), `${b.type} at (${b.x},${b.z})`).toBeGreaterThanOrEqual(RALLY_POINT_BUILDING_CLEARANCE);
+      expect(Math.max(dx, dz), `${b.type} at (${b.x},${b.z})`).toBeLessThanOrEqual(RALLY_POINT_BUILDING_CLEARANCE + 4);
+    }
+  });
+
+  it('still places a building beside the flag on a site with no room to keep its clearance', () => {
+    const buildings = createBuildingState();
+    expect(placeStartingBuildings(buildings, makeFlatGrid(8), [WAREHOUSE], { x: 4, z: 4 }, { x: 4, z: 4 })).toBe(1);
   });
 });
 
@@ -164,26 +204,6 @@ describe('placeStartingBuildings levels the footprint (#1583)', () => {
       const heights = footprintHeights(grid, b);
       expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1e-6);
     }
-  });
-});
-
-describe('startingBuildingAnchor (#1363)', () => {
-  const bounds = { minX: 0, maxX: 100, minZ: 0, maxZ: 100 };
-
-  it('stands off from the crew centroid toward the site centre by the standoff distance', () => {
-    const anchor = startingBuildingAnchor([{ x: 10, z: 50 }, { x: 20, z: 50 }], bounds);
-    expect(anchor.x).toBeCloseTo(15 + STARTING_BUILDING_STANDOFF_M);
-    expect(anchor.z).toBeCloseTo(50);
-  });
-
-  it('stands off east of the site centre for an empty crew (#1574)', () => {
-    const anchor = startingBuildingAnchor([], bounds);
-    expect(anchor.x).toBeCloseTo(50 + STARTING_BUILDING_STANDOFF_M);
-    expect(anchor.z).toBeCloseTo(50);
-  });
-
-  it('does not move a crew already at the centre', () => {
-    expect(startingBuildingAnchor([{ x: 50, z: 50 }], bounds)).toEqual({ x: 50, z: 50 });
   });
 });
 

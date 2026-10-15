@@ -43,6 +43,7 @@ import type { WorldBorderWall } from './WorldBorderWall.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
+import type { RallyFlagMesh } from './RallyFlagMesh.js';
 import type { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
@@ -112,6 +113,7 @@ export class GameRenderer {
   private ghosts: GhostMesh | null = null;
   private rampArrows: RampArrowLayer | null = null;
   private trafficJamMarkers: TrafficJamMarkerLayer | null = null;
+  private rallyFlag: RallyFlagMesh | null = null;
   private taskProgress: TaskProgressBar | null = null;
   private pictograms: EmployeePictograms | null = null;
   private buildingOccupancyLabels: BuildingOccupancyLabels | null = null;
@@ -310,6 +312,7 @@ export class GameRenderer {
       lastGhostRevision: this.lastGhostRevision,
       rampArrows: this.rampArrows,
       trafficJamMarkers: this.trafficJamMarkers,
+      rallyFlag: this.rallyFlag,
       terrainMeshRevision: this.terrainMeshRevision,
       lastSyncedTerrainRevision: this.lastSyncedTerrainRevision,
       taskProgress: this.taskProgress,
@@ -518,12 +521,6 @@ export class GameRenderer {
     this.surveyOverlayPreference = visible;
     if (!this.lastState) return;
     this.syncSurveyOverlay(buildSurveyOverlayOptions(this.lastState, this.lastGrid));
-  }
-
-  /** Flip the survey confidence overlay's visibility preference (#496) and return the new value, so callers (e.g. the keyboard shortcut) don't have to read-flip-set by hand. */
-  toggleSurveyOverlayVisible(): boolean {
-    this.setSurveyOverlayVisible(!this.surveyOverlayPreference);
-    return this.surveyOverlayPreference;
   }
 
   /**
@@ -809,6 +806,7 @@ export class GameRenderer {
       ghosts: this.ghosts,
       rampArrows: this.rampArrows,
       trafficJamMarkers: this.trafficJamMarkers,
+      rallyFlag: this.rallyFlag,
       lastGrid: this.lastGrid,
       lastCutBounds: this.lastCutBounds,
       terrainMeshRevision: this.terrainMeshRevision,
@@ -871,6 +869,7 @@ export class GameRenderer {
     this.ghosts = deps.ghosts;
     this.rampArrows = deps.rampArrows;
     this.trafficJamMarkers = deps.trafficJamMarkers;
+    this.rallyFlag = deps.rallyFlag;
     this.lastGrid = deps.lastGrid;
     this.lastCutBounds = deps.lastCutBounds;
     this.terrainMeshRevision = deps.terrainMeshRevision;
