@@ -23,12 +23,10 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
-import { injuryHoursRemaining } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
-import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import {
-  roleColorHex, getInitials, moraleColor, makeHiredLocationStrip, makeNeedsSection,
+  moraleColor, makeAvatar, makeRoleMoraleLine, raiseCommand, trainCommand, dismissConfirmConfig, makeStatusTags, makeHiredLocationStrip, makeNeedsSection,
   makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection, makeManagerEffect,
 } from '../crewDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
@@ -177,7 +175,7 @@ export class CrewPanel extends PanelBase {
       if (fill) fill.style.background = color;
       if (value) { value.textContent = `${Math.round(e.morale)}%`; value.style.color = color; }
 
-      row.querySelector('.bs-crew-status')?.replaceWith(this.makeStatusTags(e, state));
+      row.querySelector('.bs-crew-status')?.replaceWith(makeStatusTags(e, state));
 
       if (e.id !== this.expandedId) continue;
       const detail = row.querySelector<HTMLElement>('.bs-crew-detail');
@@ -229,9 +227,10 @@ export class CrewPanel extends PanelBase {
       this.expandedId = expanded ? null : e.id;
       this.lastSignature = '';
       if (this.lastState) this.update(this.lastState);
+      this.onSelectEmployeeCb?.(e.id);
     });
 
-    const avatar = el('div', { text: getInitials(e.name), attrs: { style: `width:30px;height:30px;flex:0 0 30px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${roleColorHex(e.role)};color:#12161c;font:800 11px/1 var(--bsx-font-ui)` } });
+    const avatar = makeAvatar(e);
 
     const nameLine = el('div', { attrs: { style: 'display:flex;align-items:baseline;gap:6px' } });
     nameLine.append(
@@ -239,20 +238,12 @@ export class CrewPanel extends PanelBase {
       el('span', { text: `#${e.id}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
     );
 
-    const moraleFill = el('div', { className: 'bs-crew-morale-fill', attrs: { style: `height:100%;background:${moraleColor(e.morale)};width:${e.morale}%` } });
-    const moraleTrack = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;overflow:hidden;background:#242c36' }, children: [moraleFill] });
-    const moraleValue = el('span', { className: 'bs-crew-morale-value bsx-mono', text: `${Math.round(e.morale)}%`, attrs: { style: `font-size:11px;color:${moraleColor(e.morale)}` } });
-
-    const roleLine = el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' } });
-    roleLine.append(
-      el('span', { text: t(`role.${e.role}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
-      moraleTrack, moraleValue,
-    );
+    const roleLine = makeRoleMoraleLine(e);
 
     const managerEffect = makeManagerEffect(e);
     const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: managerEffect ? [nameLine, roleLine, managerEffect] : [nameLine, roleLine] });
 
-    toggle.append(avatar, col, this.makeStatusTags(e, state), iconEl('chev', 12, 0.4));
+    toggle.append(avatar, col, makeStatusTags(e, state), iconEl('chev', 12, 0.4));
     const locateBtn = makeLocateButton({
       title: t('ui.crew.locate'),
       onClick: () => this.locateEmployee(e.id),
@@ -269,30 +260,13 @@ export class CrewPanel extends PanelBase {
         this.tag(makeNeedsSection(e), 'bs-crew-needs'),
         this.tag(makeCurrentTaskSection(e, state), 'bs-crew-task'),
         this.tag(makeSkillsSection(e), 'bs-crew-skills'),
-        this.tag(makePaySection(e, amount => this.gameConsole?.(`employee raise ${e.id} amount:${amount}`)), 'bs-crew-pay'),
-        this.tag(makeTrainingSection(e, state, (skill, buildingId) => this.gameConsole?.(`employee train ${e.id} skill:${skill} building:${buildingId}`)), 'bs-crew-training'),
+        this.tag(makePaySection(e, amount => this.gameConsole?.(raiseCommand(e, amount))), 'bs-crew-pay'),
+        this.tag(makeTrainingSection(e, state, (skill, buildingId) => this.gameConsole?.(trainCommand(e, skill, buildingId))), 'bs-crew-training'),
         this.tag(makeDismissSection(e, () => this.requestDismiss(e)), 'bs-crew-dismiss'),
       );
       row.appendChild(detail);
     }
     return row;
-  }
-
-  private makeStatusTags(e: Employee, state: GameState): HTMLElement {
-    const activity = computeEmployeeActivity(e, state.vehicles);
-    const wrap = el('div', { className: 'bs-crew-status', attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
-    const tags: Array<{ icon: Parameters<typeof iconEl>[0]; color: string; tip: string }> = [];
-    if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union') });
-    if (e.injured) tags.push({ icon: 'injured', color: 'var(--bsx-critical-text)', tip: t('ui.crew.injured_back_in', { hours: injuryHoursRemaining(e) ?? 0 }) });
-    if (e.collapsing) tags.push({ icon: 'collapse', color: 'var(--bsx-critical)', tip: t('ui.crew.tag_collapsed') });
-    if (e.trainingState) tags.push({ icon: 'training', color: 'var(--bsx-info)', tip: t('ui.crew.tag_training') });
-    if (activity.kind === 'driving') tags.push({ icon: 'drive', color: 'var(--bsx-info)', tip: t('ui.crew.tag_driving') });
-    if (activity.kind === 'driving_to_task') tags.push({ icon: 'drive', color: 'var(--bsx-amber)', tip: t('ui.crew.tag_driving_task') });
-    for (const tg of tags) {
-      const chip = el('span', { attrs: { style: `color:${tg.color}`, title: tg.tip }, children: [iconEl(tg.icon, 13)] });
-      wrap.appendChild(chip);
-    }
-    return wrap;
   }
 
   /**
@@ -301,12 +275,6 @@ export class CrewPanel extends PanelBase {
    * overlay rather than firing on the first click.
    */
   private requestDismiss(e: Employee): void {
-    this.onConfirmRequestCb?.({
-      icon: 'injured',
-      title: t('ui.crew.dismiss_confirm_title'),
-      body: t('ui.crew.dismiss_confirm_body', { name: e.name }),
-      confirmLabel: t('ui.crew.dismiss'),
-      onConfirm: () => this.gameConsole?.(`employee fire ${e.id}`),
-    });
+    this.onConfirmRequestCb?.(dismissConfirmConfig(e, command => this.gameConsole?.(command)));
   }
 }

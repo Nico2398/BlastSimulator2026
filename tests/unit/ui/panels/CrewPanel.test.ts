@@ -804,3 +804,38 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
     expect(moraleText).toBe('20%');
   });
 });
+
+describe('CrewPanel — row header selects the employee (#1762)', () => {
+  it('clicking .bs-detail-toggle calls the select handler with the employee id', () => {
+    const { panel } = makePanel();
+    const picked: number[] = [];
+    panel.setSelectEmployeeHandler(id => picked.push(id));
+    panel.update(makeState([makeEmployee({ id: 1 }), makeEmployee({ id: 2, name: 'Bea Rock' })]));
+    (panel.root.querySelector('[data-employee-id="2"] .bs-detail-toggle') as HTMLButtonElement).click();
+    expect(picked).toEqual([2]);
+  });
+
+  it('the row still expands on the same click', () => {
+    const { panel } = makePanel();
+    panel.setSelectEmployeeHandler(() => {});
+    panel.update(makeState([makeEmployee({ id: 1 })]));
+    (panel.root.querySelector('[data-employee-id="1"] .bs-detail-toggle') as HTMLButtonElement).click();
+    expect(panel.root.querySelector('[data-employee-id="1"] .bs-employee-detail')).not.toBeNull();
+  });
+
+  it('collapsing an expanded row also selects', () => {
+    const { panel } = makePanel();
+    const picked: number[] = [];
+    panel.setSelectEmployeeHandler(id => picked.push(id));
+    panel.update(makeState([makeEmployee({ id: 1 })]));
+    toggle(panel, 1);
+    toggle(panel, 1);
+    expect(picked).toEqual([1, 1]);
+  });
+
+  it('works without a select handler wired', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({ id: 1 })]));
+    expect(() => toggle(panel, 1)).not.toThrow();
+  });
+});

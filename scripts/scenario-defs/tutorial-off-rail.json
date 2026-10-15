@@ -107,7 +107,7 @@
     {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
-      "description": "#1597: survey dispatched, the surveyor is working (waitsOnWork step). Space is the pause shortcut and would drive the Pause button, which the rails make inert to the pointer; the keyboard must not reach it either, so the clock stays running. Cash and vehicles unchanged.",
+      "description": "#1597: survey dispatched (clicking the method row arms the picker itself, #1771 -- the Run button is already rail-locked by then), the surveyor is working (waitsOnWork step). Space is the pause shortcut and would drive the Pause button, which the rails make inert to the pointer; the keyboard must not reach it either, so the clock stays running. Cash and vehicles unchanged.",
       "role": "player",
       "interaction": [
         {
@@ -118,10 +118,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"seismic\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-survey-run"
         },
         {
           "type": "waitForSelector",
