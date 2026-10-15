@@ -27,8 +27,8 @@ interface Model {
   /** Plain text lines rewritten in place (`data-live` = key). */
   lines: { key: string; text: string }[];
   note: string | null;
+  /** Hook data carried by the gauge value (`data-info="warehouse-stock"`). */
   stockAttrs: { stockKg: number; freeKg: number } | null;
-  stockText: string;
 }
 
 const kgText = (kg: number): string => `${Math.round(kg).toLocaleString('en-US')} kg`;
@@ -60,7 +60,6 @@ function explosiveModel(b: Building, closed: boolean): Model {
     ],
     note: closed ? t('inspector.stock_unavailable') : null,
     stockAttrs: { stockKg, freeKg },
-    stockText: t('inspector.warehouse_stock', { stock: stockKg, free: freeKg }),
   };
 }
 
@@ -85,7 +84,6 @@ function freightModel(b: Building, state: GameState): Model {
     lines: [{ key: 'free', text: t('inspector.free_kg', { kg: kgText(Math.max(0, capacity - storedKg - reservedKg)) }) }],
     note: storedKg > MIN_ROW_KG ? null : t('inspector.stock_empty'),
     stockAttrs: null,
-    stockText: '',
   };
 }
 
@@ -96,7 +94,6 @@ function spoilModel(b: Building): Model {
     lines: [],
     note: t('inspector.spoil_no_cap'),
     stockAttrs: null,
-    stockText: '',
   };
 }
 
@@ -122,18 +119,17 @@ function noteOf(text: string): HTMLElement {
   return note;
 }
 
+function applyStockAttrs(node: HTMLElement, a: { stockKg: number; freeKg: number }): void {
+  node.dataset['info'] = 'warehouse-stock';
+  node.dataset['stockKg'] = String(a.stockKg);
+  node.dataset['freeKg'] = String(a.freeKg);
+}
+
 function buildSection(m: Model): HTMLElement {
   const rows: HTMLElement[] = [];
-  if (m.stockAttrs) {
-    const row = liveRow(t('inspector.stock'), 'stock', m.stockText);
-    const value = liveValue(row);
-    value.dataset['info'] = 'warehouse-stock';
-    value.dataset['stockKg'] = String(m.stockAttrs.stockKg);
-    value.dataset['freeKg'] = String(m.stockAttrs.freeKg);
-    rows.push(row);
-  }
   if (m.gauge) {
     const row = liveRow(t('inspector.stock'), 'gauge', m.gauge.text);
+    if (m.stockAttrs) applyStockAttrs(liveValue(row), m.stockAttrs);
     const bar = el('div');
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-label', m.gauge.aria);
@@ -189,12 +185,9 @@ export function storageContents(b: Building, state: GameState, closed: boolean):
     sync(root) {
       const cur = modelOf(b, state, closed);
       if (!cur) return;
-      if (cur.stockAttrs) {
-        const node = setLive(root, 'stock', cur.stockText);
-        if (node) { node.dataset['stockKg'] = String(cur.stockAttrs.stockKg); node.dataset['freeKg'] = String(cur.stockAttrs.freeKg); }
-      }
       if (cur.gauge) {
-        setLive(root, 'gauge', cur.gauge.text);
+        const node = setLive(root, 'gauge', cur.gauge.text);
+        if (node && cur.stockAttrs) applyStockAttrs(node, cur.stockAttrs);
         const fill = root.querySelector<HTMLElement>('[data-live="gauge-bar"]');
         if (fill) fill.style.width = `${Math.round(cur.gauge.fraction * 100)}%`;
       }

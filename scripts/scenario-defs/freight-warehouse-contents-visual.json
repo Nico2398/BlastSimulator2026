@@ -354,7 +354,7 @@
       ]
     },
     {
-      "command": "tick 400",
+      "command": "tick 150",
       "timeout": 130,
       "description": "Haulers keep unloading with the inspector open; the gauge and per-ore rows refresh in place as loads arrive, so the stored mass grows.",
       "role": "setup",
@@ -366,7 +366,7 @@
       "interaction": [
         {
           "type": "command",
-          "command": "tick 400"
+          "command": "tick 150"
         },
         {
           "type": "waitForSelector",

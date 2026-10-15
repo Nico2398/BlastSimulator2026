@@ -3405,7 +3405,6 @@
   "inspector.inside": "À l'intérieur :",
   "inspector.operating": "En service",
   "inspector.stock": "Stock",
-  "inspector.warehouse_stock": "{stock} kg · {free} libres",
   "inspector.status": "État",
   "inspector.role": "Rôle",
   "inspector.depth_value": "{depth}m",
