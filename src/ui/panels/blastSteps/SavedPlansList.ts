@@ -17,7 +17,7 @@
 // a scenario can click it directly.
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, emptyState, scrollBoundedSection } from '../../dom.js';
+import { el, emptyState, fieldStyle, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import type { SavedBlastPlan } from '../../../core/state/GameState.js';
@@ -72,7 +72,7 @@ export class SavedPlansList {
     this.nameInput = el('input', {
       attrs: { type: 'text', maxlength: '24', 'data-field': 'plan-name' },
     }) as HTMLInputElement;
-    this.nameInput.style.cssText = 'flex:1;min-width:0;height:28px;padding:0 8px;border-width:1px;border-style:solid;border-color:var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:400 11px/1 var(--bsx-font-mono)';
+    this.nameInput.style.cssText = `flex:1;min-width:0;${fieldStyle({ height: 28, padX: 8, fontWeight: 400 })}`;
     this.applyPlaceholder();
 
     const saveBtn = el('button', { className: 'bsx-btn' });

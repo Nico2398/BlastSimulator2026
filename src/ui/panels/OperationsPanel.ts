@@ -15,7 +15,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, emptyState, chip, button, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, fieldStyle, card, sectionHeader, emptyState, chip, button, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -357,7 +357,7 @@ export class OperationsPanel extends PanelBase {
 
   private makeThresholdInput(id: string): HTMLInputElement {
     const input = el('input', { attrs: { id, type: 'number', min: '0', max: '100', step: '5' } }) as HTMLInputElement;
-    input.style.cssText = 'width:100%;height:28px;padding:0 8px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';
+    input.style.cssText = `width:100%;${fieldStyle({ height: 28, padX: 8 })}`;
     input.addEventListener('input', () => { this.policyDirty = true; });
     return input;
   }

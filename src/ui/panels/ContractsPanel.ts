@@ -20,7 +20,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
+import { el, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
@@ -269,7 +269,7 @@ export class ContractsPanel extends PanelBase {
     const amountInput = el('input', { className: 'bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(amountValue), 'data-preserve-key': `contract-amount-${c.id}` } }) as HTMLInputElement;
     amountInput.max = String(amountValue);
     amountInput.disabled = maxDeliverable <= 0;
-    amountInput.style.cssText = 'flex:1;height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';
+    amountInput.style.cssText = `flex:1;${fieldStyle({ height: 30, padX: 10 })}`;
 
     const maxBtn = button('ghost', t('ui.contracts.max'), {
       dataAction: 'deliver-max',

@@ -12,6 +12,7 @@ import { t } from '../core/i18n/I18n.js';
 import { ORE_DEPTH_UNBOUNDED } from '../core/world/OreCatalog.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import { buildingDisplayName, vehicleDisplayName } from './fleetDetailSections.js';
+import { fieldStyle } from './dom.js';
 import {
   SANDBOX_DEFAULTS,
   SANDBOX_FIELDS,
@@ -30,12 +31,8 @@ export type OnSandboxBack = () => void;
 const ROW_STYLE = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0';
 const LABEL_STYLE = 'font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1';
 // Same field look as the Contracts amount and Operations threshold inputs.
-const INPUT_STYLE = [
-  'height:30px;padding:0 10px;border-radius:4px;border-style:solid;border-width:1px;border-color:var(--bsx-hairline-strong)',
-  'background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)',
-  // Native select popups and number spinners follow the dark scheme.
-  'color-scheme:dark',
-].join(';');
+// Native select popups and number spinners follow the dark scheme.
+const INPUT_STYLE = `${fieldStyle({ height: 30, padX: 10 })};color-scheme:dark`;
 const NUMBER_INPUT_STYLE = `width:120px;${INPUT_STYLE}`;
 // Choice labels ("Desert Badlands", French names) must fit unclipped at 1280x720.
 const SELECT_STYLE = `min-width:180px;width:auto;max-width:240px;${INPUT_STYLE}`;
