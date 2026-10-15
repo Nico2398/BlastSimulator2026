@@ -176,7 +176,7 @@ export class SurveyPanel extends PanelBase {
     this.runBtn.replaceChildren();
     this.runBtn.appendChild(iconEl('locate', 12));
     this.runBtn.appendChild(el('span', { text: t('ui.survey.pick_target_scene') }));
-    this.blockerTextEl.textContent = t('ui.survey.no_surveyor_prominent');
+    this.blockerTextEl.textContent = t('ui.survey.no_surveyor');
     this.hireBtn.textContent = t('ui.survey.hire_surveyor');
     this.methodsEl.replaceChildren();
     this.buildMethodList();
@@ -202,7 +202,7 @@ export class SurveyPanel extends PanelBase {
     const hasSurveyor = this.hasSurveyor(state);
     const reason = this.blockReason(state);
     this.runBtn.disabled = reason !== null;
-    this.blockerTextEl.textContent = t('ui.survey.no_surveyor_prominent');
+    this.blockerTextEl.textContent = t('ui.survey.no_surveyor');
     this.blockerEl.style.display = hasSurveyor ? 'none' : 'flex';
 
     // Deliberately not filtered by status like OperationsPanel's `unclaimed`

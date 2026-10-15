@@ -2815,7 +2815,6 @@
   "ui.survey.no_surveyor": "Embauchez d’abord un prospecteur qualifié.",
   "ui.survey.insufficient_funds": "Fonds insuffisants — ce sondage coûte {cost} $.",
   "ui.survey.blocked_title": "Sondage bloqué",
-  "ui.survey.no_surveyor_prominent": "Aucun prospecteur sur le site. Embauchez un employé qualifié en géologie pour lancer des sondages.",
   "ui.survey.hire_surveyor": "Embaucher un prospecteur",
   "ui.survey.results": "Résultats",
   "ui.survey.results_none": "Aucun sondage pour le moment.",

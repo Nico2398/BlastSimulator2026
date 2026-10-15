@@ -101,7 +101,7 @@ export class CrewPanel extends PanelBase {
 
   /** Show the hiring section with candidates of `role` in view. */
   revealHiring(role: EmployeeRole): void {
-    if (!this.lastState || !this.visible) {
+    if (!this.lastState) {
       this.pendingHiringRole = role;
       return;
     }
@@ -206,7 +206,7 @@ export class CrewPanel extends PanelBase {
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`)),
     ]);
-    if (this.pendingHiringRole && this.visible) {
+    if (this.pendingHiringRole) {
       this.scrollToHiring(this.pendingHiringRole);
       this.pendingHiringRole = null;
     }

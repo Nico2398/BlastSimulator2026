@@ -133,7 +133,7 @@ describe('CrewPanel — revealHiring (#1771)', () => {
     const group = panel.root.querySelector(SURVEYOR_GROUP)!;
     expect(group).not.toBeNull();
     expect(spy).toHaveBeenCalled();
-    expect(spy.mock.contexts.some(c => c === group)).toBe(true);
+    expect(spy.mock.instances.some(c => c === group)).toBe(true);
   });
 
   it('scrolls the group of the requested role, not another', () => {
@@ -142,7 +142,7 @@ describe('CrewPanel — revealHiring (#1771)', () => {
     panel.update(makeState([]));
     panel.revealHiring('driller');
     const drillerGroup = panel.root.querySelector('[data-hiring-role="driller"]')!;
-    expect(spy.mock.contexts.every(c => c === drillerGroup)).toBe(true);
+    expect(spy.mock.instances.every(c => c === drillerGroup)).toBe(true);
     expect(spy).toHaveBeenCalled();
   });
 
@@ -153,7 +153,7 @@ describe('CrewPanel — revealHiring (#1771)', () => {
     expect(spy).not.toHaveBeenCalled();
     panel.update(makeState([]));
     const group = panel.root.querySelector(SURVEYOR_GROUP)!;
-    expect(spy.mock.contexts.some(c => c === group)).toBe(true);
+    expect(spy.mock.instances.some(c => c === group)).toBe(true);
   });
 
   it('a pending reveal fires once, not on every later update', () => {

@@ -2815,7 +2815,6 @@
   "ui.survey.no_surveyor": "Hire a surveyor with a geology qualification first.",
   "ui.survey.insufficient_funds": "Not enough cash — this survey costs ${cost}.",
   "ui.survey.blocked_title": "Survey blocked",
-  "ui.survey.no_surveyor_prominent": "No surveyor on site. Hire an employee with a geology qualification to run surveys.",
   "ui.survey.hire_surveyor": "Hire a surveyor",
   "ui.survey.results": "Results",
   "ui.survey.results_none": "No surveys yet.",

@@ -695,7 +695,7 @@ describe('SurveyPanel — no surveyor blocker (#1771)', () => {
   it('a method click does not arm and notifies once with a warn carrying the reason', () => {
     const { panel } = makePanel();
     const { kit, controller } = makeKit();
-    const notify = vi.fn<(n: NotifyInput) => void>();
+    const notify = vi.fn<[NotifyInput], void>();
     panel.setPlacementKit(kit);
     panel.setNotifyHandler(notify);
     panel.update(noSurveyorState());
@@ -715,7 +715,7 @@ describe('SurveyPanel — no surveyor blocker (#1771)', () => {
 
   it('a surveyor with a non-geology qualification is still blocked', () => {
     const { panel } = makePanel();
-    const emp = makeEmployee({ qualifications: [{ category: 'drilling', proficiencyLevel: 1, xp: 0 }] as Employee['qualifications'] });
+    const emp = makeEmployee({ qualifications: [{ category: 'drilling', proficiencyLevel: 1, xp: 0 }] as unknown as Employee['qualifications'] });
     panel.update(makeState({ employees: { employees: [emp], nextId: 2 } as GameState['employees'] }));
     expect(visible(panel.root.querySelector('.bs-survey-blocker'))).toBe(true);
   });
@@ -761,7 +761,7 @@ describe('SurveyPanel — unaffordable method click (#1771)', () => {
   it('does not arm and notifies with the funds reason', () => {
     const { panel } = makePanel();
     const { kit, controller } = makeKit();
-    const notify = vi.fn<(n: NotifyInput) => void>();
+    const notify = vi.fn<[NotifyInput], void>();
     panel.setPlacementKit(kit);
     panel.setNotifyHandler(notify);
     panel.update(surveyorState(0));

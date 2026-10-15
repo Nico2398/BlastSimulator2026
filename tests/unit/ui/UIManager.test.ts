@@ -371,6 +371,7 @@ describe('UIManager — showCrewHiring (#1771)', () => {
   });
 
   it('the Survey panel hire button opens Crew hiring for surveyors', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {}); // jsdom has no canvas backend
     const spy = vi.spyOn(CrewPanel.prototype, 'revealHiring');
     uiManager = new UIManager(container);
     uiManager.showPanel('survey');
