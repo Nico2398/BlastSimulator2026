@@ -89,6 +89,15 @@ function toolRailBounds(viewport: Viewport): Rect {
   };
 }
 
+/**
+ * True when a click continues a multi-click gesture (2nd+ click of a rapid
+ * double-click, `detail > 1`). Such a click must not toggle the panel again.
+ * Keyboard activation and synthetic `.click()` report `detail` 0 and never count.
+ */
+function isRepeatClick(e: MouseEvent): boolean {
+  return e.detail > 1;
+}
+
 export class ToolRail {
   private readonly el: HTMLElement;
   private readonly locale = new LocaleTextRegistry();
@@ -126,7 +135,12 @@ export class ToolRail {
         this.locale.bindText(label, entry.labelKey);
         btn.appendChild(label);
       }
-      btn.addEventListener('click', () => onSelect(entry.panel));
+      btn.addEventListener('click', (e) => {
+        if (isRepeatClick(e)) return;
+        onSelect(entry.panel);
+        // A pointer click leaves stale focus that Space/Enter would re-activate.
+        if (e.detail >= 1) btn.blur();
+      });
       btn.addEventListener('mouseenter', () => { if (this.activePanel !== entry.panel) btn.style.background = 'rgba(255,255,255,.07)'; });
       btn.addEventListener('mouseleave', () => { if (this.activePanel !== entry.panel) btn.style.background = 'transparent'; });
       this.el.appendChild(btn);
