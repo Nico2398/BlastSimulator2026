@@ -226,6 +226,8 @@ describe('sandbox economy: reference shot vs crew cost', () => {
 
 describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   const HORIZON = 2000;
+  /** Bound on how long an ordered charge may wait behind debris hauling (#1742). */
+  const CHARGE_WAIT_TICKS = 300;
   const MIDPOINT = 1000;
   // Seed 42's ore deposit sits near (40,33) (#1682): the first shot opens it, a ramp from the west
   // joins the crater floor to the haul network (#1719) and the bunkhouse keeps the crew's morale up.
@@ -233,8 +235,8 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   const SECOND_SHOT = '16,22';
   const RAMP = 'start:12,34 end:34,34 depth:6';
   const BUNKHOUSE = 'living_quarters at:6,14 tier:1';
-  /** Contracts filled before the player can afford a second blaster. */
-  const CONTRACTS_BEFORE_HIRE = 3;
+  /** Contracts filled before the second shot is ordered (income proven). */
+  const CONTRACTS_BEFORE_SECOND_SHOT = 3;
 
   it('Normal, opening kit only, fires two blasts and grows cash from tick 1000 to tick 2000', () => {
     const { run, ctx } = startSandbox(DESERT, 42, 'normal');
@@ -263,17 +265,15 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
     expect(logged(`build_ramp ${RAMP}`).success).toBe(true);
     expect(logged(`build ${BUNKHOUSE}`).success).toBe(true);
 
-    // Sell what the haul brings. Once income is proven, a second blaster takes the charge orders
-    // while the first stays on the debris hauler, and the second shot is fired.
-    // TODO(#1742): the only blaster holds the debris hauler for good, so charge orders starve; hire a
-    // second one, and drop the hire once charge orders outrank hauling.
-    playUntil(HORIZON, () => filled() >= CONTRACTS_BEFORE_HIRE);
+    // Sell what the haul brings. Once income is proven, the second shot is drilled and charged by the
+    // opening crew alone: the only blaster keeps hauling debris, yet its charge orders outrank hauling (#1742).
+    playUntil(HORIZON, () => filled() >= CONTRACTS_BEFORE_SECOND_SHOT);
     if (!over()) {
-      expect(logged('employee hire role:blaster').success).toBe(true);
       expect(logged(`drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:${SECOND_SHOT}`).success).toBe(true);
       playUntil(800, () => state.plannedDrillHoles.length === 0);
       logged('charge hole:* explosive:krackle amount:6 stemming:2');
-      playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+      playUntil(CHARGE_WAIT_TICKS, () => Object.keys(state.plannedChargesByHole).length === 0);
+      expect(Object.keys(state.plannedChargesByHole), `second pattern still uncharged ${CHARGE_WAIT_TICKS} ticks after ordering`).toEqual([]);
       clearBlastZone(logged, state);
       logged('blast');
     }
