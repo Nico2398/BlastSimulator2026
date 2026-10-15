@@ -1,6 +1,7 @@
 // BlastSimulator2026 — UI Manager (10.x, redesign P1)
 // Orchestrates all UI panels. Wires game console, handles panel routing, drives per-tick updates.
 
+import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { IDLE_BLAST_PLAYBACK, type BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import { injectStyles } from './styles.js';
 import { injectTokens } from './tokens.js';
@@ -189,6 +190,18 @@ export class UIManager {
 
   private onSpeedChangeCb?: (speed: number) => void;
   private onTogglePauseCb?: () => void;
+
+  moveBuilding(_buildingId: number): void {
+    // TODO: implement
+  }
+
+  upgradeBuilding(_buildingId: number): void {
+    // TODO: implement
+  }
+
+  queueBuildingResearch(_type: BuildingType, _tier: BuildingTier): void {
+    // TODO: implement
+  }
 
   /** Reveal HUD chrome once a game exists. Idempotent — safe to call every frame/command. */
   show(): void {

@@ -224,12 +224,32 @@ export class BuildMenu extends PanelBase {
   }
 
 
+  /** Latest state feed for the inspector-driven flows (#1758). */
+  observe(_state: GameState): void {
+    // TODO: implement
+  }
+
+  /** Arm the move placement tool for a placed building (#1758). */
+  armMove(_buildingId: number): void {
+    // TODO: implement
+  }
+
+  /** Request a tier upgrade of a placed building (#1758). */
+  requestUpgrade(_buildingId: number): void {
+    // TODO: implement
+  }
+
+  /** Receive the player-facing result message of a flow (#1758). */
+  setFlowResultHandler(_cb: (message: string) => void): void {
+    // TODO: implement
+  }
+
   /**
    * Queue a Research Center task for `type` tier `tier` and report progress.
    * Shared by the catalog row (place-blocked) and the placed-row (upgrade-blocked)
    * "Queue Research" buttons — the only in-game path to unlock tier 2/3.
    */
-  private queueResearch(type: BuildingType, tier: BuildingTier): void {
+  queueResearch(type: BuildingType, tier: BuildingTier): void {
     if (tier === 1) return;
     const cmdResult = this.gameConsole?.(`research queue type:${type} tier:${tier}`);
     if (!cmdResult?.success) {
