@@ -87,6 +87,90 @@ describe('TopBar (redesign P1)', () => {
     topBar.dispose();
   });
 
+  describe('pause as a segment of the speed group (#1751)', () => {
+    function setup(configure: (s: ReturnType<typeof makeState>) => void) {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const topBar = new TopBar(container);
+      const state = makeState();
+      configure(state);
+      topBar.update(state, new NotificationCenter());
+      const pauseBtn = container.querySelector<HTMLButtonElement>('button[data-action="pause-toggle"]')!;
+      const speedBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[data-speed]'));
+      return { container, topBar, state, pauseBtn, speedBtns };
+    }
+    const lit = (b: HTMLElement) => b.style.background.includes('--bsx-amber');
+
+    it('paused: the pause segment is amber and no speed segment is', () => {
+      const { topBar, pauseBtn, speedBtns } = setup(s => { s.isPaused = true; });
+      expect(lit(pauseBtn)).toBe(true);
+      expect(speedBtns.length).toBe(4);
+      expect(speedBtns.filter(lit)).toHaveLength(0);
+      topBar.dispose();
+    });
+
+    it('running at 4x: only the 4x segment is amber, pause is not', () => {
+      const { topBar, pauseBtn, speedBtns } = setup(s => { s.isPaused = false; s.timeScale = 4; });
+      expect(lit(pauseBtn)).toBe(false);
+      expect(speedBtns.filter(lit).map(b => b.dataset['speed'])).toEqual(['4']);
+      topBar.dispose();
+    });
+
+    it('the first update() on a fresh running game lights 1x', () => {
+      const { topBar, pauseBtn, speedBtns } = setup(s => { s.isPaused = false; s.timeScale = 1; });
+      expect(speedBtns.filter(lit).map(b => b.dataset['speed'])).toEqual(['1']);
+      expect(lit(pauseBtn)).toBe(false);
+      topBar.dispose();
+    });
+
+    it('the first update() on a paused game lights pause', () => {
+      const { topBar, pauseBtn, speedBtns } = setup(s => { s.isPaused = true; s.timeScale = 1; });
+      expect(lit(pauseBtn)).toBe(true);
+      expect(speedBtns.filter(lit)).toHaveLength(0);
+      topBar.dispose();
+    });
+
+    it('the highlight moves from pause to a speed when the game resumes', () => {
+      const { topBar, state, pauseBtn, speedBtns } = setup(s => { s.isPaused = true; s.timeScale = 2; });
+      state.isPaused = false;
+      topBar.update(state, new NotificationCenter());
+      expect(lit(pauseBtn)).toBe(false);
+      expect(speedBtns.filter(lit).map(b => b.dataset['speed'])).toEqual(['2']);
+      topBar.dispose();
+    });
+
+    it('a paused top bar shows no Paused chip or text', () => {
+      const { container, topBar } = setup(s => { s.isPaused = true; });
+      expect(container.querySelector('#bs-hud-top')?.textContent ?? '').not.toMatch(/paused/i);
+      expect(container.textContent ?? '').not.toContain(t('shell.topbar.paused'));
+      topBar.dispose();
+    });
+
+    it('clicking pause fires the pause handler and not the speed handler', () => {
+      const { topBar, pauseBtn } = setup(() => {});
+      const onPause = vi.fn();
+      const onSpeed = vi.fn();
+      topBar.setTogglePauseHandler(onPause);
+      topBar.setSpeedChangeHandler(onSpeed);
+      pauseBtn.click();
+      expect(onPause).toHaveBeenCalledOnce();
+      expect(onSpeed).not.toHaveBeenCalled();
+      topBar.dispose();
+    });
+
+    it('clicking a speed fires the speed handler and not the pause handler, also while paused', () => {
+      const { topBar, speedBtns } = setup(s => { s.isPaused = true; });
+      const onPause = vi.fn();
+      const onSpeed = vi.fn();
+      topBar.setTogglePauseHandler(onPause);
+      topBar.setSpeedChangeHandler(onSpeed);
+      speedBtns.find(b => b.dataset['speed'] === '2')!.click();
+      expect(onSpeed).toHaveBeenCalledWith(2);
+      expect(onPause).not.toHaveBeenCalled();
+      topBar.dispose();
+    });
+  });
+
   it('score bars reflect GameState scores', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
