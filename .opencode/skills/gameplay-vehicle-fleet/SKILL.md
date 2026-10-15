@@ -303,6 +303,8 @@ Vehicles cannot share a cell. A driver whose next drive step is occupied waits a
 attempts one vehicle-avoiding reroute, then reports stuck. Rock debris after a blast marks cells
 blocked until cleared.
 
+An idle parked vehicle (or idle driver's rig) that walls off a 1-wide pocket or corridor is moved to a free cell off the blocked mover's route (`pickYieldCell`, #1696) rather than the next corridor cell; see `gameplay-navmesh` (Path Following & Stuck State).
+
 ### Jams and chokepoints (`TrafficJams.ts`, #1208)
 
 `findTrafficJams(ramps, employees, silencedUntil?, tick?)` is the one detector; the event, the Fleet

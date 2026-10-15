@@ -2728,6 +2728,18 @@ export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
 /** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
 export const BLAST_GRADE_MAX_CUT_M = 4;
 
+/**
+ * Search radius (in nav cells) when an idle blocker looks for a free cell off
+ * the mover's remaining route to yield to (#1696).
+ */
+export const IDLE_YIELD_SEARCH_RADIUS_CELLS = 10;
+
+/**
+ * Agent-occupancy block episodes on one leg before the mover abandons its
+ * movement (#1696). Same order as MOVE_STUCK_ABANDON_TICKS.
+ */
+export const BLOCK_EPISODE_ABANDON_LIMIT = MOVE_STUCK_ABANDON_TICKS;
+
 // ── Well-being score drivers (#1692) ──
 // Housed sites taper gains near the cap so one cheap Living Quarters cannot pin well-being at 100
 // (T1 < T2 < T3 equilibria, all below 98 for a busy crew of 8); unhoused sites climb undamped as
