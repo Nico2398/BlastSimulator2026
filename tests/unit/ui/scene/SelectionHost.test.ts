@@ -1,6 +1,8 @@
 // Selection lifetime follows game state, not mesh presence (#1755).
 import { describe, it, expect } from 'vitest';
 import {
+  anchorFootprint,
+  buildingFootprint,
   isHostResolvedKind,
   isUnderRebuild,
   resolveSelection,
@@ -271,5 +273,25 @@ describe('isUnderRebuild', () => {
     const w = makeWorld();
     addSite(w, 5);
     expect(isUnderRebuild(w, 6)).toBe(false);
+  });
+});
+
+describe('anchorFootprint', () => {
+  it('returns the site footprint for a site anchor', () => {
+    const footprint = { minX: 1, maxX: 2, minZ: 3, maxZ: 4 };
+    expect(anchorFootprint({ type: 'site', footprint }, makeWorld())).toBe(footprint);
+  });
+  it('returns the live building footprint for a building host', () => {
+    const w = makeWorld();
+    const b = addBuilding(w, 7);
+    expect(anchorFootprint({ type: 'host', kind: 'building', id: 7 }, w)).toEqual(buildingFootprint(b));
+  });
+  it('null for a building host that is gone', () => {
+    expect(anchorFootprint({ type: 'host', kind: 'building', id: 7 }, makeWorld())).toBeNull();
+  });
+  it('null for vehicle host and self anchors', () => {
+    const w = makeWorld();
+    expect(anchorFootprint({ type: 'host', kind: 'vehicle', id: 1 }, w)).toBeNull();
+    expect(anchorFootprint({ type: 'self' }, w)).toBeNull();
   });
 });

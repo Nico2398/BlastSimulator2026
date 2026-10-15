@@ -2,6 +2,7 @@
 // Exports the game engine's pure logic without browser dependencies.
 
 import { getMaxBuildingTier } from './core/entities/Building.js';
+import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { createRunner, type RunnerWithContext } from './console/createRunner.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
@@ -225,7 +226,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     trainingCount: livingEmployees.filter(e => e.trainingState !== null).length,
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
-    insideBuildingCount: livingEmployees.filter(e => e.locomotion.kind === 'inside').length,
+    insideBuildingCount: livingEmployees.filter(e => isInsideBuilding(e.locomotion)).length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),

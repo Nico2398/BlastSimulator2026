@@ -26,6 +26,7 @@ import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
 import { canAffordVehicleUpgrade } from './core/entities/VehicleUpgrade.js';
 import { getMaxBuildingTier } from './core/entities/Building.js';
+import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
@@ -62,7 +63,7 @@ import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { formatGameDuration } from './ui/formatGameDuration.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
-import { buildingFootprint, isHostResolvedKind, resolveSelection, type SelectionAnchor, type SiteFootprint } from './ui/scene/SelectionHost.js';
+import { anchorFootprint, isHostResolvedKind, resolveSelection, type SelectionAnchor } from './ui/scene/SelectionHost.js';
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
@@ -844,7 +845,7 @@ window.__gameState = () => {
     // fired, rather than a scenario guessing at it from a screenshot alone.
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
-    insideBuildingCount: livingEmployees.filter(e => e.locomotion.kind === 'inside').length,
+    insideBuildingCount: livingEmployees.filter(e => isInsideBuilding(e.locomotion)).length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     // An offered ore_sale the site could fill outright right now — the
@@ -1249,18 +1250,19 @@ function anchorKey(anchor: SelectionAnchor): string {
   const f = anchor.footprint;
   return `site:${f.minX},${f.maxX},${f.minZ},${f.maxZ}`;
 }
-/** Tile rectangle to outline for an anchor: a planned site, or the live building hosting the selection. Vehicles and self keep the ring. */
-function anchorFootprint(anchor: SelectionAnchor, state: GameState): SiteFootprint | null {
-  if (anchor.type === 'site') return anchor.footprint;
-  if (anchor.type !== 'host' || anchor.kind !== 'building') return null;
-  const b = state.buildings.buildings.find(x => x.id === anchor.id);
-  return b ? buildingFootprint(b) : null;
-}
 function anchorWorldPosition(entity: EntityPick, anchor: SelectionAnchor, state: GameState): THREE.Vector3 | null {
   const f = anchorFootprint(anchor, state);
   if (!f) return gameRenderer.entityWorldPosition(anchor.type === 'host' ? anchor.kind : entity.kind, anchor.type === 'host' ? anchor.id : entity.id);
   const x = (f.minX + f.maxX + 1) / 2, z = (f.minZ + f.maxZ + 1) / 2;
   return new THREE.Vector3(x, gameRenderer.smoothSurfaceYAt(x, z), z);
+}
+/**
+ * Whether the selected entity no longer exists. Host-resolved kinds answer from their resolution
+ * (null when no state yet: not gone); other kinds are gone when the renderer has no position for them.
+ */
+function isSelectionGone(resolvedExists: boolean | null, hostResolved: boolean, pos: THREE.Vector3 | null): boolean {
+  if (resolvedExists !== null) return !resolvedExists;
+  return !hostResolved && !pos;
 }
 function showSelection(entity: EntityPick, state: GameState): void {
   selectionBar.show(entity, state);
@@ -1447,19 +1449,20 @@ scene.start((dt) => {
   // the select-change handler above then hides the ring and the bar.
   const selection = scenePicking.selection;
   if (selection) {
-    const resolved = ctx.state && isHostResolvedKind(selection.kind)
-      ? resolveSelection(ctx.state, selection.kind, selection.id)
-      : null;
-    const hostResolved = isHostResolvedKind(selection.kind);
-    const pos = resolved?.exists ? anchorWorldPosition(selection, resolved.anchor, ctx.state!)
+    const state = ctx.state;
+    const kind = selection.kind;
+    const hostResolved = isHostResolvedKind(kind);
+    const resolved = state && hostResolved ? resolveSelection(state, kind, selection.id) : null;
+    const pos = state && resolved
+      ? (resolved.exists ? anchorWorldPosition(selection, resolved.anchor, state) : null)
       : hostResolved ? null : gameRenderer.entityWorldPosition(selection.kind, selection.id);
-    if (resolved ? !resolved.exists : !hostResolved && !pos) scenePicking.clearSelection();
-    else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === selection.id)?.width !== shownRampWidth) {
-      showSelection(selection, ctx.state!);
-    } else if (shownVehicleKey !== null && ctx.state && vehicleSelectionKey(selection, ctx.state) !== shownVehicleKey) {
-      showSelection(selection, ctx.state);
-    } else if (resolved?.exists && anchorKey(resolved.anchor) !== shownAnchorKey) {
-      showSelection(selection, ctx.state!);
+    if (isSelectionGone(resolved ? resolved.exists : null, hostResolved, pos)) scenePicking.clearSelection();
+    else if (shownRampWidth !== null && state?.builtRamps.find(r => r.id === selection.id)?.width !== shownRampWidth) {
+      showSelection(selection, state!);
+    } else if (shownVehicleKey !== null && state && vehicleSelectionKey(selection, state) !== shownVehicleKey) {
+      showSelection(selection, state);
+    } else if (state && resolved?.exists && anchorKey(resolved.anchor) !== shownAnchorKey) {
+      showSelection(selection, state);
     } else if (pos) entityHighlight.setPosition(pos);
   }
 
