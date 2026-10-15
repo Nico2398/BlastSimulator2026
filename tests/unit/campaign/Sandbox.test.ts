@@ -35,8 +35,8 @@ const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
 describe('SANDBOX_DIFFICULTIES', () => {
   it('maps each named difficulty to its documented starting cash', () => {
     expect(SANDBOX_DIFFICULTIES.easy.startingCash).toBe(250_000);
-    expect(SANDBOX_DIFFICULTIES.normal.startingCash).toBe(150_000);
-    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(120_000);
+    expect(SANDBOX_DIFFICULTIES.normal.startingCash).toBe(210_000);
+    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(170_000);
   });
 
   it('carries the difficulty id and order consistently', () => {
@@ -395,8 +395,8 @@ describe('sandbox starting site per difficulty (#1671)', () => {
 
   it('keeps cash at 250k / 150k / 120k alongside the kit', () => {
     expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'easy' })).startingCash).toBe(250_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'normal' })).startingCash).toBe(150_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(120_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'normal' })).startingCash).toBe(210_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(170_000);
   });
 
   it('a hostile difficulty falls back to the default difficulty kit', () => {

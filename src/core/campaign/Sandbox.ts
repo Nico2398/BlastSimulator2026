@@ -38,13 +38,13 @@ export interface SandboxDifficultyDef {
 /**
  * Named difficulty presets — starting cash and the size of the free starting kit vary (#504, #1671).
  *
- * Cash bisected (#1671) on the headless first-blast-to-first-sale playthrough in
- * tests/integration/sandbox.integration.test.ts (desert_badlands, seed 42, no
- * buying or hiring): payroll and upkeep run while the first shot is drilled, hauled
- * and sold, so too little cash ends in bankruptcy before the sale. Minimum that
- * stays solvent: hard 82k fails / 90k passes, normal 108k fails / 112k passes
- * (easy has slack at 250k). Chosen with ~30% margin: 120k / 150k / 250k, which
- * keeps easy > normal > hard strictly.
+ * Cash bisected twice. #1671 (first blast to first sale, no quarters): hard 82k fails
+ * / 90k passes, normal 108k fails / 112k passes. #1747 (standard opening: tier-1
+ * living_quarters at 30,48 first, 3x3 Krackle 8 kg pattern, sell, survive to
+ * tick 2000 with cash above the first-blast level): normal needs ~181.6k (170k
+ * fails, 185k passes), hard ~147.6k, easy has slack. Chosen with ~15% margin:
+ * 170k / 210k / 250k, which keeps easy > normal > hard strictly. Rationale beside
+ * SANDBOX_STARTING_CASH in balance.ts.
  */
 export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
   easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: SANDBOX_STARTING_CASH.easy },
