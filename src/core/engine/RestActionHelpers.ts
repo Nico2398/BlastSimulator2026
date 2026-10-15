@@ -213,15 +213,18 @@ export function resolveRestBuildingId(payload: Record<string, unknown>): number 
   return typeof value === 'number' ? value : undefined;
 }
 
+/** payload.triggeredBy marker ForceShiftRest.ts stamps on policy-forced rests; read by creditPolicyRestMorale. */
+export const POLICY_REST_TRIGGER = 'shift_cycle_policy';
+
 /**
  * #1801: a completed policy-forced rest (payload.triggeredBy
- * 'shift_cycle_policy', ForceShiftRest.ts) credits morale via
+ * POLICY_REST_TRIGGER, ForceShiftRest.ts) credits morale via
  * restCompletionMoraleCredit, clamped to 100. Collapse, soft-threshold and
  * interrupted rests get nothing; injured employees get nothing. Shared by both
  * rest-completion paths (RestCompletion.ts, ShiftCycle.ts).
  */
 export function creditPolicyRestMorale(state: GameState, emp: Employee, completedAction: PendingAction | undefined): void {
-  if (completedAction?.payload['triggeredBy'] !== 'shift_cycle_policy') return;
+  if (completedAction?.payload['triggeredBy'] !== POLICY_REST_TRIGGER) return;
   if (!emp.alive || emp.injured) return;
   const credit = restCompletionMoraleCredit(state.sitePolicy.fatigueRestThreshold);
   emp.morale = Math.min(100, emp.morale + credit);

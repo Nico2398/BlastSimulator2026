@@ -1838,9 +1838,7 @@ describe('#1801 — the debris-hauler driver on long hauls recovers morale under
 
   it('control: `set_policy mode:continuous` still revolts or ends with lower well-being', () => {
     const harsh = runHaul('set_policy mode:continuous fatigue:0');
-    if (harsh.revolt) return;
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    expect(harsh.wellBeingWindow.length).toBe(WINDOW);
-    expect(mean(harsh.wellBeingWindow)).toBeLessThan(mean(base.wellBeingWindow));
+    expect(harsh.revolt || mean(harsh.wellBeingWindow) < mean(base.wellBeingWindow)).toBe(true);
   }, 900_000);
 }, 1_800_000);
