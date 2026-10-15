@@ -58,6 +58,7 @@ import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { getProfitShortfall } from './core/campaign/LevelObjective.js';
 import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { isActive } from './core/events/ActiveModifiers.js';
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -861,6 +862,7 @@ window.__gameState = () => {
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors
     // console-api.ts's own field so both modes read the same thing.
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount), // mirrors serializeGameState
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
