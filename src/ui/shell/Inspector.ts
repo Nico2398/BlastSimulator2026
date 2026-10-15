@@ -140,12 +140,13 @@ export class Inspector {
       this.shownIcon = view.icon;
     }
 
-    const signature = `${view.signature}|${view.actions.map(a => `${a.action}:${a.disabled ? 0 : 1}`).join(',')}`;
+    const signature = `${view.signature}|${view.actions.map(a => a.action).join(',')}`;
     if (signature !== this.shownSignature) {
       this.shownSignature = signature;
       this.rebuild(view);
     } else {
       view.sync(this.bodyEl);
+      this.syncDisabled(view);
     }
     this.root.style.display = 'flex';
   }
@@ -155,6 +156,14 @@ export class Inspector {
     this.actionsEl.replaceChildren(...view.actions.map(a => button(a.variant, t(a.labelKey), {
       icon: a.icon, dataAction: a.action, disabled: a.disabled === true, onClick: () => this.fire(a.action),
     })));
+  }
+
+  /** Flip each action button's disabled state in place, keeping the node. */
+  private syncDisabled(view: InspectorView): void {
+    for (const a of view.actions) {
+      const btn = this.actionsEl.querySelector<HTMLButtonElement>(`[data-action="${a.action}"]`);
+      if (btn && btn.disabled !== (a.disabled === true)) btn.disabled = a.disabled === true;
+    }
   }
 
   private write(node: HTMLElement, text: string): void {

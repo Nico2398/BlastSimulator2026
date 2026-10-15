@@ -8,7 +8,7 @@ import { LEFT_COL_RIGHT_EDGE_PX } from '../../shell/LeftColumn.js';
 import type { Rect, Viewport } from '../../shell/LayoutRegistry.js';
 
 /** Gap between the left panel column's right edge and the inspector. */
-export const INSPECTOR_LEFT_GAP_PX = 8;
+const INSPECTOR_LEFT_GAP_PX = 8;
 /** Left edge: just right of the left column. */
 export const INSPECTOR_LEFT_PX = LEFT_COL_RIGHT_EDGE_PX + INSPECTOR_LEFT_GAP_PX;
 /** Height of the modifier chip strip (ModifierChips.ts), which the inspector sits below. */

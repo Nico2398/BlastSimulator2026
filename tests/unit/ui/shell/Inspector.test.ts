@@ -374,7 +374,7 @@ describe('Inspector move_here — the command src/main.ts dispatches', () => {
     // originally required `hover` and so locked the bug in.
     expect(body).toContain('scenePicking.aim?.terrain');
     expect(body).not.toContain('scenePicking.hover?.terrain');
-    expect(body).toContain("t('shell.selection.no_move_target')");
+    expect(body).toContain("t('inspector.no_move_target')");
     expect(body).toContain("severity: 'warn'");
   });
 
@@ -720,7 +720,7 @@ describe('Inspector — window frame (#1756)', () => {
 
     expect(bar.open).toBe(true);
     expect(root.style.display).not.toBe('none');
-    expect(root.textContent).toContain(t('shell.selection.detail'));
+    expect(root.textContent).toContain(t('inspector.section.details'));
     expect(root.textContent).toContain(t('role.driller'));
     expect(bar.target).toEqual({ kind: 'employee', id: employee.id });
   });
@@ -736,7 +736,7 @@ describe('Inspector — window frame (#1756)', () => {
     const state = makeState();
     state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2 } as never);
     bar.show(entity('building', 77), state);
-    expect(root.textContent).toContain(t('shell.selection.rebuilding'));
+    expect(root.textContent).toContain(t('inspector.rebuilding'));
     for (const a of ['upgrade', 'move', 'demolish']) {
       expect(root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!.disabled, a).toBe(true);
     }
