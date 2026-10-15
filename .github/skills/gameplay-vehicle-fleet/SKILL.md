@@ -213,6 +213,10 @@ Two behaviours follow and are never special-cased:
   `level_ground` goals are excluded: their target cell becomes NavGrid-blocked once construction
   completes, which would strand a vehicle left standing on it.
 
+## Evacuation rescue of a parked vehicle (#1746)
+
+When a blast is armed, a driverless vehicle in the danger zone is driven out by a free, licensed crew member drawn from the **whole roster**, wherever they stand: the licence holder counts as the crew member who parked it, so the driller who left the rig on the pattern and walked to the quarters is fetched back (`clearZone`, `Zone.ts`; `moveTo` + `planItinerary`, no separate path). Order of preference: an in-zone candidate, then the nearest idle licensed employee who can reach it. A rescuer already walking to the vehicle (`pendingDriverVehicleId`) is left alone and the vehicle is not stranded; an employee mid-walk to another vehicle or busy with work is never picked. A licensed employee who is resting is **awaited**: the vehicle goes in `awaitingRescuerVehicleIds` (neither ordered nor stranded) and the periodic re-evacuation orders them once the rest ends. Rest is never cut. A vehicle nobody can drive or reach, or with no safe destination, stays stranded, and Fire anyway still works.
+
 ## Board, Alight, and the 3D Model
 
 | | Rule |

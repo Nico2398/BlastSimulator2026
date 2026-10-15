@@ -115,6 +115,10 @@ Injury (#1382) is a timed state, not a permanent one. `injureEmployee` sets `inj
 - **Work:** injured employees are not dispatched; queued non-rest work returns to the pool (`releaseInjuredEmployeesQueues`, #1381).
 - **Tunables** (`balance.ts`): `INJURY_RECOVERY_TICKS`, `INJURY_MORALE_PENALTY`, `INJURY_ON_FOOT_RECOVERY_RATE`, `INJURY_RECOVERY_RATE_BY_LQ_TIER`.
 
+## Rest and the evacuation rescue (#1746)
+
+An armed blast fetches a licensed employee to drive a parked vehicle out of the danger zone, but never cuts their rest: a resting licence holder (`restTicksRemaining` or `pendingRestDuration` set) is awaited and ordered by the next periodic re-evacuation after the rest ends. An employee busy with work is not awaited; another free licence holder is used or the vehicle stays stranded. Detail in `gameplay-vehicle-fleet`.
+
 ## Cost of Needs
 
 Flat per-visit cost, not tier-scaled (`NEED_REST_COSTS` in `src/core/config/balance.ts`):
