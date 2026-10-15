@@ -28,8 +28,11 @@ export function retargetRampLayers(
     const own = distinctColumns(lead.cells);
     // Fallback: the carve acts on the segment's cells wherever the digger
     // stands, so any reachable column of the already-built part will do.
-    const pick = pickReachableColumn(own, anchor, reach)
-      ?? pickReachableColumn(distinctColumns(ramp.segments.flatMap(s => (s === lead ? [] : s.cells))), anchor, reach);
+    // Own columns were already probed, so they are left out of the fallback.
+    const probed = new Set(own.map(c => `${c.x},${c.z}`));
+    const others = distinctColumns(ramp.segments.flatMap(s => (s === lead ? [] : s.cells)))
+      .filter(c => !probed.has(`${c.x},${c.z}`));
+    const pick = pickReachableColumn(own, anchor, reach) ?? pickReachableColumn(others, anchor, reach);
     if (pick === null) continue;
     action.targetX = pick.x;
     action.targetZ = pick.z;
