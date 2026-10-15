@@ -52,12 +52,12 @@
       "description": "#1261/#1207: this campaign start used to opt into agent occupancy explicitly; occupancy is unconditional since #1207, so the wait_until conversions below now genuinely exercise it. Latent occupancy-contention risk worth flagging: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278)."
     },
     {
-      "command": "set_policy mode:continuous fatigue:0",
-      "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
+      "command": "set_policy mode:continuous",
+      "description": "Neutralise the default site policy's shift trigger (shift_8h), which is in force from tick 0 (#1379): this scenario is not about shifts. Continuous mode drops the shift-length rest and keeps the fatigue threshold (60). It used to be `fatigue:0` (never force a rest), but then nobody rests: well-being hits 0 around tick 230, so a worker_revolt lands 120 ticks later (REVOLT_TICKS), at about tick 351. The lone driller's 4 charges only finished just before it: tick 342 on main and 352 with the rally flag, because the charging truck now waits at the flag (48,46) and the driller walks back for it after drilling at (20,20). On the tree merged with #1743/#1770/#1773, H2 was still loading when the revolt ended the level. With the threshold kept, the crew rests at 60, well-being stays near 96 and no revolt clock runs. The survey counts and timings asserted above are unchanged, and the blast still stales all three (20,20) surveys.",
       "interaction": [
         {
           "type": "command",
-          "command": "set_policy mode:continuous fatigue:0"
+          "command": "set_policy mode:continuous"
         }
       ],
       "role": "bootstrap"
