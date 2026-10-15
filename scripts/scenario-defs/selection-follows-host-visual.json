@@ -234,6 +234,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
