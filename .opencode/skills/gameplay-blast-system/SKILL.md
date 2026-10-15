@@ -157,6 +157,22 @@ rock is abandoned mid-arc.
   fell, whatever the terrain beside it does — otherwise flyrock trickles back into the pit it was
   thrown out of, and where flyrock lands is the whole reason it is dangerous.
 
+**Rock that fails to break out stays sealed (#1724).** A fragment whose origin lies in a void with
+an intact solid voxel above it in its column never leaves it: it does not fly (`thrown: false`,
+never a projectile) and settles inside the void, on the first empty layer above the ground at or
+below where it broke, never above the cap. Piles are keyed by (column, layer); a column filled to the
+ceiling, or past the angle of repose, spills sideways into the lowest column of the same void. Rock
+thrown in from elsewhere still lands on top of the cap, and open columns resolve exactly as before.
+`BlastResult.brokeOut` is true when some cleared voxel sat at or above its column's pre-blast top;
+a blast that cleared rock but never broke out is reported (`mining.blast.no_breakout`,
+`BlastReport.brokeOut`) and capped to bad (`no_breakout`).
+
+**Defaults break out (#1724).** `CHARGE_DEFAULT_AMOUNT_KG` (7) with `CHARGE_DEFAULT_STEMMING_M` (2.5)
+in the default 8 m, 4 m-spaced 3x3 pattern is the smallest charge that opens a crater with every
+hole's column lowered on the sandbox flat pad and on `tutorial_pit`, rating at least good, and it
+fits the hole (`amount / CHARGE_KG_PER_METRE + stemming <= depth`). The measured sweep sits beside
+the constants in `balance.ts`; 4 kg stays under `BURDEN_BREAKOUT_MAX` of cap and fails to break out.
+
 **Placement is physics-only (#1302).** Where fragments and debris land is decided by blast physics
 alone and is never adjusted, rejected or relocated for reachability. No reachability query lives in
 `src/core/mining` or fragment/physics code. Debris stranded outside the ground crew's reachable set
@@ -206,6 +222,7 @@ Caps only lower; precedence, most severe first:
 | `casualty_or_destruction` | any injury, or any destroyed building (union by id of `result.destroyedBuildings` and `building_destroyed` accidents) | bad |
 | `fizzled_failure` | fizzled charges / charged holes >= `BLAST_FIZZLE_SHARE_FAILURE` (0.75; `fizzleShare`, 0 charged = 0) | bad |
 | `fizzled_partial` | same share >= `BLAST_FIZZLE_SHARE_PARTIAL` (0.25) | mediocre |
+| `no_breakout` | rock was cleared but no cleared voxel reached its column's pre-blast top (`BlastResult.brokeOut` false) | bad |
 | `wet_holes` | wet holes with at least one fizzled charge (wet holes whose charges fired no longer cap) | good |
 | `oversize` | oversized fragments / fragments strictly above `BLAST_OVERSIZE_SHARE_CAP` (0.30, 0 fragments = 0 share) | good |
 

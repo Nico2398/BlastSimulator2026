@@ -2455,7 +2455,7 @@
         "changedBy": {
           "tickCount": 0
         },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged.  #1723 merged with #1691/#1722: blasts now break the crater floor down to grade, and with main's two spoil heaps the muck from pattern 1 is cleared along different routes, so this blast catches one more person (3 deaths, not 2); every later death, headcount and score pin was re-measured from the merged run (command mode, deterministic)."
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged.  #1723 merged with #1691/#1722: blasts now break the crater floor down to grade, and with main's two spoil heaps the muck from pattern 1 is cleared along different routes, so this blast catches one more person (3 deaths, not 2); every later death, headcount and score pin was re-measured from the merged run (command mode, deterministic). #1724: rock that breaks under an intact cap now stays sealed in its void instead of piling on open ground, so haulers clear the pit differently and one fewer person stands in the zone (2 deaths, not 3); later death (9, 11), hole-in-progress (6), wellBeing, safety, ecology and nuisance pins re-measured from the run (command mode, deterministic)."
       },
       "description": "#1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above."
     },
@@ -3111,7 +3111,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 4,
+          "holeCount": 7,
           "chargedCount": 0
         },
         "changedBy": {
@@ -3198,7 +3198,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3223,7 +3223,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3245,7 +3245,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3266,51 +3266,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ],
-        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3333,7 +3289,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3354,7 +3310,51 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 7,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ],
+        "note": "#1667: re-measured, see the note on the first drifted step of this file.  #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1603: debris hauling now weighs one piece per spatial bin, so haulers work the muck pile in a slightly different order and who is still in the zone when the shot fires anyway shifts; casualties and the scores they feed re-measured. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3382,7 +3382,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3402,7 +3402,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3432,7 +3432,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3473,7 +3473,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3495,14 +3495,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 57.77615384615396,
+          "wellBeing": 80.35846153846165,
           "safety": 0,
-          "ecology": 69.88649351566372,
-          "nuisance": 26.737573851438505
+          "ecology": 47.537423425414765,
+          "nuisance": 21.510199932527886
         },
         "changedBy": {
           "tickCount": 0
@@ -3521,7 +3521,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3543,7 +3543,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3689,7 +3689,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3743,7 +3743,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3765,7 +3765,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3787,7 +3787,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3874,7 +3874,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 7,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3966,7 +3966,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3991,7 +3991,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4013,7 +4013,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4035,7 +4035,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4056,7 +4056,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4079,7 +4079,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4100,7 +4100,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4128,7 +4128,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4147,7 +4147,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4170,7 +4170,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4200,7 +4200,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4242,9 +4242,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
@@ -4266,14 +4266,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 91.4216083916092,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 50,
-          "nuisance": 28.835185938417652
+          "ecology": 32.70528529460687,
+          "nuisance": 21.335185938418014
         },
         "changedBy": {
           "tickCount": 0
@@ -4292,14 +4292,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 7,
+          "deathCount": 9,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 91.4216083916092,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 50,
-          "nuisance": 28.835185938417652
+          "ecology": 32.70528529460687,
+          "nuisance": 21.335185938418014
         },
         "changedBy": {
           "tickCount": 0

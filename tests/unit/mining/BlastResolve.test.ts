@@ -286,3 +286,113 @@ describe('BlastResolve — origin is never rewritten by landing (#1355)', () => 
     expect(f.position.x).not.toBe(10);
   });
 });
+
+// ── Rock broken under an intact cap stays in the void (#1724) ────────────────
+
+/**
+ * Solid to y=12, with a void of cleared voxels y=4..6 under columns x,z in [min,max].
+ * The cap above it is 6 m thick (y=7..12), thicker than BURDEN_BREAKOUT_MAX (4 m), so the void
+ * is sealed: floor top at y=4, lowest solid cap voxel starts at y=7.
+ */
+const VOID_FLOOR_Y = 4;
+const CAP_BOTTOM_Y = 7;
+function sealedVoid(min = 6, max = 13): VoxelGrid {
+  const grid = flatGround(20, 12);
+  for (let z = min; z <= max; z++) {
+    for (let y = VOID_FLOOR_Y; y < CAP_BOTTOM_Y; y++) {
+      for (let x = min; x <= max; x++) grid.clearVoxel(x, y, z);
+    }
+  }
+  return grid;
+}
+
+describe('BlastResolve — sealed void under an intact cap (#1724)', () => {
+  it('the fixture is a sealed void: cap solid above, floor solid below, air between', () => {
+    const grid = sealedVoid();
+    expect(grid.isSolidAt(10, CAP_BOTTOM_Y, 10)).toBe(true);
+    expect(grid.isSolidAt(10, CAP_BOTTOM_Y - 1, 10)).toBe(false);
+    expect(grid.isSolidAt(10, VOID_FLOOR_Y, 10)).toBe(false);
+    expect(grid.isSolidAt(10, VOID_FLOOR_Y - 1, 10)).toBe(true);
+  });
+
+  it('rock that dropped inside the void rests below the cap, not on top of it', () => {
+    const f = fragment(0, [10, 5.5, 10]);
+    const { flights } = resolve([f], sealedVoid());
+
+    expect(flights).toHaveLength(1);
+    expect(flights[0]!.to.y).toBeLessThan(CAP_BOTTOM_Y);
+    expect(flights[0]!.to.y).toBeGreaterThanOrEqual(VOID_FLOOR_Y);
+    expect(flights[0]!.thrown).toBe(false);
+    expect(f.position.y).toBeLessThan(CAP_BOTTOM_Y);
+  });
+
+  it('rock rests on the void floor, not on the unchanged surface of its column', () => {
+    const f = fragment(0, [10, 5.5, 10]);
+    resolve([f], sealedVoid());
+    // The old landing: first empty layer above ground = 13 (+ half a rise).
+    expect(f.position.y).toBeLessThan(VOID_FLOOR_Y + 2);
+  });
+
+  it('more rock than the void holds is clamped to the ceiling, never past the cap', () => {
+    // 2x2 columns x 3 m = 12 m3 of void; 30 one-m3 lumps swell to 42 m3 of rubble.
+    const grid = sealedVoid(9, 10);
+    const fragments = Array.from({ length: 30 }, (_, i) => fragment(i, [9.5 + (i % 2), 5.5, 9.5 + (Math.floor(i / 2) % 2)], [0, 0, 0], 1));
+    const { flights } = resolve(fragments, grid);
+
+    expect(flights).toHaveLength(30);
+    for (const fl of flights) {
+      expect(fl.to.y).toBeLessThanOrEqual(CAP_BOTTOM_Y);
+      expect(fl.to.y).toBeGreaterThanOrEqual(VOID_FLOOR_Y);
+      expect(fl.thrown).toBe(false);
+    }
+  });
+
+  it('a fast fragment from a sealed origin does not fly: it stays in the void, unthrown', () => {
+    const f = fragment(0, [10, 5.5, 10], [30, 22, 0]);
+    expect(f.isProjection).toBe(true);
+    const { flights, maxThrowDistance } = resolve([f], sealedVoid());
+
+    expect(flights[0]!.thrown).toBe(false);
+    expect(flights[0]!.to.y).toBeLessThan(CAP_BOTTOM_Y);
+    expect(flights[0]!.to.y).toBeGreaterThanOrEqual(VOID_FLOOR_Y);
+    expect(f.isProjection).toBe(false);
+    expect(maxThrowDistance).toBeLessThan(5);
+  });
+
+  it('a fast sealed fragment mixed with a slow one: neither ends above the cap', () => {
+    const fast = fragment(0, [8, 5.5, 8], [0, 40, 0]);
+    const slow = fragment(1, [11, 5.5, 11]);
+    const { flights } = resolve([fast, slow], sealedVoid());
+    for (const fl of flights) expect(fl.to.y).toBeLessThan(CAP_BOTTOM_Y);
+  });
+
+  it('open columns resolve exactly as before, with a sealed void elsewhere in the grid', () => {
+    const open = (): LandableFragment[] => [fragment(0, [2, 12, 2]), fragment(1, [3, 9, 17], [0, 0, 0], 0.6)];
+    const baseline = open();
+    const rb = resolve(baseline, flatGround(20, 12));
+    const withVoid = open();
+    const rv = resolve(withVoid, sealedVoid());
+
+    expect(rv.flights).toEqual(rb.flights);
+    expect(withVoid.map(f => f.position)).toEqual(baseline.map(f => f.position));
+  });
+
+  it('a void open to the sky (no cap) behaves as plain ground: rock falls to the floor', () => {
+    const grid = flatGround(20, 12);
+    for (let z = 6; z <= 13; z++) for (let y = 4; y <= 12; y++) for (let x = 6; x <= 13; x++) grid.clearVoxel(x, y, z);
+    const f = fragment(0, [10, 9, 10]);
+    const ref = fragment(0, [10, 9, 10]);
+    resolve([f], grid);
+    resolve([ref], flatGround(20, 3));
+
+    expect(f.position.y).toBeCloseTo(ref.position.y, 6);
+    expect(f.position.y).toBeGreaterThan(VOID_FLOOR_Y);
+  });
+
+  it('is deterministic', () => {
+    const build = (): LandableFragment[] => [fragment(0, [10, 5.5, 10], [30, 22, 0]), fragment(1, [9, 5.5, 9], [0, 0, 0], 1)];
+    const a = build(); const ra = resolve(a, sealedVoid());
+    const b = build(); const rb = resolve(b, sealedVoid());
+    expect(rb.flights).toEqual(ra.flights);
+  });
+});

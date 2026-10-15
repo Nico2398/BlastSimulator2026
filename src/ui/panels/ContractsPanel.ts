@@ -25,11 +25,12 @@ import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
+import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { contractAcceptBlocker, isFillableSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { contractAcceptBlocker, isFillableSaleOffer, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -415,6 +416,11 @@ export class ContractsPanel extends PanelBase {
     const onSite = offSiteBadge === null;
     cardEl.dataset['contractOnsite'] = String(onSite);
     cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, stateRubbleStockKg(state)));
+    // Whether this sale alone lifts operating profit to the level's target, so a click can be
+    // scoped to the offer that wins (the pool's fillable offers differ widely in payout, #1724).
+    cardEl.dataset['contractWins'] = String(
+      isWinningSaleOffer(c, state.collectedOre, getProfitShortfall(state.campaign.activeLevelId, state.finances)),
+    );
     return cardEl;
   }
 
