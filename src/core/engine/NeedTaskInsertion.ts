@@ -11,6 +11,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
 import { employeeQueueDepth } from '../entities/Employee.js';
+import { isResting } from '../entities/EmployeeRestState.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, isMidClaimedTaskExecution } from './RestActionHelpers.js';
@@ -114,7 +115,7 @@ export function autoInsertNeedTasks(
     // and are caught by the hasRestAction check below; a rest claimed through
     // tickEmployees is consumed from the queue, so only restTicksRemaining/
     // pendingRestDuration still mark it.
-    if (emp.restTicksRemaining !== null || emp.pendingRestDuration !== null) continue;
+    if (isResting(emp)) continue;
 
     // Already arrived and mid-execution of a claimed task (e.g.
     // dig_ramp_segment) — wait for it to finish rather than queuing a rest
