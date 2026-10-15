@@ -46,7 +46,7 @@ needPenalty(g):
 
 (`needsMoraleEffect`, `NEED_MORALE_EFFECT_THRESHOLDS`, `NEED_MORALE_EFFECT_PENALTIES` — rescaled 3× at #928 so the single gauge's per-tick range stays comparable to the old three-gauge sum.)
 
-Fatigue above 80 (`NEED_WELL_RESTED_THRESHOLD`) → **"well-rested" bonus**: +1 morale/tick (`NEED_WELL_RESTED_BONUS`). Fatigue in the comfortable band [50, 80] → **comfort recovery**: +0.5 morale/tick (`NEED_COMFORT_MORALE_RECOVERY`); it replaces, never stacks with, the well-rested bonus. Reason (#1778): default site policy rests at 60 and in-place rests end at 70, so a working crew never exceeded 80 and morale latched at 0. Below 50 the penalties are unchanged; injured employees stay at 0.
+Fatigue above 80 (`NEED_WELL_RESTED_THRESHOLD`) → **"well-rested" bonus**: +1 morale/tick (`NEED_WELL_RESTED_BONUS`). Fatigue in the comfortable band [50, 80] → **comfort recovery**: +0.1 morale/tick (`NEED_COMFORT_MORALE_RECOVERY`); it replaces, never stacks with, the well-rested bonus. Reason (#1778): default site policy rests at 60 and in-place rests end at 70, so a working crew never exceeded 80 and morale latched at 0. Below 50 the penalties are unchanged; injured employees stay at 0.
 
 ## Collapse
 

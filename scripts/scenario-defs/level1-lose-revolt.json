@@ -693,12 +693,12 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 376
+          "tickCount": 379
         },
         "decreased": [
           "cash"
         ],
-        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 335->375). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt. Rally point: the crew and every hire now spawn around the rally flag (~29,27) instead of the origin corner, so the walks to pattern 1 at (6,4) change; the revolt lands at tick 381 (was 383). The level still ends in worker_revolt. #1773 (well-being stays a managed score; overwork/crowding/accident drags): on the rally-point spawns the revolt lands at tick 376 (was 381), re-measured; still worker_revolt, no blast fired (deathCount 0)."
+        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 335->375). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt. Rally point: the crew and every hire now spawn around the rally flag (~29,27) instead of the origin corner, so the walks to pattern 1 at (6,4) change; the revolt lands at tick 381 (was 383). The level still ends in worker_revolt. #1778 (comfort-band morale recovery +0.1/tick): the revolt lands at tick 379 (was 376) -- the continuous crew spends a little time in the 50-80 band and recovers; re-measured, still worker_revolt. #1773 (well-being stays a managed score; overwork/crowding/accident drags): on the rally-point spawns the revolt lands at tick 376 (was 381), re-measured; still worker_revolt, no blast fired (deathCount 0)."
       }
     },
     {
@@ -723,7 +723,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 376,
+          "tickCount": 379,
           "wellBeing": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -778,7 +778,7 @@
         "equals": {
           "wellBeing": 0,
           "ecology": 50,
-          "tickCount": 376,
+          "tickCount": 379,
           "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

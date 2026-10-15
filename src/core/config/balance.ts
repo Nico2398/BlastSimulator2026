@@ -1923,11 +1923,14 @@ export const NEED_WELL_RESTED_BONUS = 1;
  * (NEED_MORALE_EFFECT_THRESHOLDS.comfortable up to NEED_WELL_RESTED_THRESHOLD).
  * In-place rests end at 70 (NEED_REST_NO_BUILDING_CAP), so the well-rested
  * bonus above 80 is never reached by a crew on the default site policy and
- * morale latched at 0 (#1778). Half the well-rested +1: a comfortable crew
- * recovers, but resting to 80+ in a building still pays twice as much. Does
- * not stack with the well-rested bonus.
+ * morale latched at 0 (#1778). A tenth of the well-rested +1: just enough that
+ * a crew held in the band recovers (0.05 still left a worker at 0), small enough
+ * that a crew under `continuous` (rest threshold 0), which spends most of its
+ * time below 50, still collapses to a worker revolt (level1-lose-revolt,
+ * level1-playthrough-revolt; 0.2 and above kept playthrough-revolt solvent and
+ * ended it in bankruptcy). Does not stack with the well-rested bonus.
  */
-export const NEED_COMFORT_MORALE_RECOVERY = 0.5;
+export const NEED_COMFORT_MORALE_RECOVERY = 0.1;
 
 /** Soft threshold per gauge: below this, proactive rest routing queues a rest action but does not yet force one. */
 export const NEED_SOFT_THRESHOLDS: Record<NeedKey, number> = {

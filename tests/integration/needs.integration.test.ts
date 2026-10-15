@@ -615,6 +615,11 @@ describe('forced rest under an applied SitePolicy — driven through the console
     let minFatigue = 100;
 
     driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
+      // #1778: comfort-band morale recovery keeps a lone driller's morale high, which
+      // slows fatigue drain (NEED_MORALE_DRAIN_MULTIPLIERS) so proactive rest lands
+      // before collapse. The contrast models the neglected crew whose morale is
+      // already broken, as this run's drain used to be.
+      emp.morale = 0;
       sawCollapse = sawCollapse || emp.collapsing;
       minFatigue = Math.min(minFatigue, emp.fatigue);
     });
