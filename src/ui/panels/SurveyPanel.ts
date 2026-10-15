@@ -31,6 +31,7 @@ import type { MarketId } from '../../core/economy/Market.js';
 import { summarizeSurveyOres } from '../../core/mining/SurveyOreSummary.js';
 import { buildOreRows } from './surveyOreRows.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import type { NotifyInput } from '../notify/NotificationCenter.js';
 
 
 /** Qualification a surveyor needs before any survey can be dispatched. */
@@ -52,6 +53,9 @@ export class SurveyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly methodsEl: HTMLElement;
   private readonly runBtn: HTMLButtonElement;
+  private readonly blockerEl: HTMLElement;
+  private readonly blockerTextEl: HTMLElement;
+  private readonly hireBtn: HTMLButtonElement;
   private readonly statusEl: HTMLElement;
   private readonly resultsEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
@@ -59,6 +63,8 @@ export class SurveyPanel extends PanelBase {
   /** Player-facing visibility preference for the survey confidence overlay (#496), mirrored from GameRenderer via UIManager. */
   private overlayVisible = true;
   private onToggleOverlayCb?: (visible: boolean) => void;
+  private notifyCb?: (n: NotifyInput) => void;
+  private hireSurveyorCb?: () => void;
   private placementKit: PlacementKit | null = null;
   private selectedMethod: SurveyMethod = 'seismic';
   private worldSizeX = 40;
@@ -105,7 +111,20 @@ export class SurveyPanel extends PanelBase {
 
     this.resultsEl = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:8px' } });
 
+    // Prominent no-surveyor block above the method list; shown only while blocked on that.
+    this.blockerTextEl = el('div', { attrs: { style: 'font:600 12px/1.4 var(--bsx-font-ui);color:var(--bsx-critical-text)' } });
+    this.hireBtn = button('primary', t('ui.survey.hire_surveyor'));
+    this.hireBtn.id = 'bs-survey-hire';
+    this.hireBtn.style.cssText = 'width:100%;height:34px';
+    this.hireBtn.addEventListener('click', () => this.hireSurveyorCb?.());
+    this.blockerEl = el('div', {
+      className: 'bs-survey-blocker',
+      attrs: { style: 'display:none;flex-direction:column;gap:8px;padding:10px 11px;border:1px solid var(--bsx-critical-text);border-radius:5px;background:var(--bsx-card)' },
+    });
+    this.blockerEl.append(this.blockerTextEl, this.hireBtn);
+
     this.bodyEl.append(
+      this.blockerEl,
       sectionHeader(t('ui.survey.method')),
       this.methodsEl,
       this.runBtn,
@@ -142,11 +161,23 @@ export class SurveyPanel extends PanelBase {
   }
 
 
+  /** Wire the notification sink used when a blocked method is clicked. */
+  setNotifyHandler(cb: (n: NotifyInput) => void): void {
+    this.notifyCb = cb;
+  }
+
+  /** Wire the blocker's hire button (opens Crew hiring for the surveyor role). */
+  setHireSurveyorHandler(cb: () => void): void {
+    this.hireSurveyorCb = cb;
+  }
+
   refreshLocale(): void {
     this.locale.refresh();
     this.runBtn.replaceChildren();
     this.runBtn.appendChild(iconEl('locate', 12));
     this.runBtn.appendChild(el('span', { text: t('ui.survey.pick_target_scene') }));
+    this.blockerTextEl.textContent = t('ui.survey.no_surveyor');
+    this.hireBtn.textContent = t('ui.survey.hire_surveyor');
     this.methodsEl.replaceChildren();
     this.buildMethodList();
     this.lastResultCount = -1;
@@ -168,12 +199,11 @@ export class SurveyPanel extends PanelBase {
       this.worldOriginZ = state.world.minZ;
     }
 
-    const hasSurveyor = state.employees.employees.some(
-      e => e.alive && e.qualifications.some(q => q.category === SURVEYOR_SKILL),
-    );
-    const cost = this.costOf(this.selectedMethod, state);
-    const affordable = state.cash >= cost;
-    this.runBtn.disabled = !hasSurveyor || !affordable;
+    const hasSurveyor = this.hasSurveyor(state);
+    const reason = this.blockReason(state);
+    this.runBtn.disabled = reason !== null;
+    this.blockerTextEl.textContent = t('ui.survey.no_surveyor');
+    this.blockerEl.style.display = hasSurveyor ? 'none' : 'flex';
 
     // Deliberately not filtered by status like OperationsPanel's `unclaimed`
     // count (status === 'queued') — this is meant to span the whole
@@ -189,10 +219,8 @@ export class SurveyPanel extends PanelBase {
     // Blockers outrank progress: the player needs to know *why* Run is greyed
     // out. A message the panel itself just set (queued, or a command error)
     // wins over both until it expires — otherwise this would wipe it next frame.
-    if (!hasSurveyor) {
-      this.showStatus(t('ui.survey.no_surveyor'));
-    } else if (!affordable) {
-      this.showStatus(t('ui.survey.insufficient_funds', { cost: String(cost) }));
+    if (reason !== null) {
+      this.showStatus(reason);
     } else if (pending > 0) {
       this.showStatus(t('ui.survey.in_progress', { count: String(pending) }));
     } else if (!this.statusIsTransient) {
@@ -312,9 +340,42 @@ export class SurveyPanel extends PanelBase {
     this.methodsEl.replaceChildren();
     this.buildMethodList();
     if (this.lastState) this.update(this.lastState);
+
+    const kit = this.placementKit;
+    if (!kit) return;
+    const reason = this.lastState ? this.blockReason(this.lastState) : null;
+    if (reason !== null) {
+      this.notifyCb?.({ severity: 'warn', title: t('ui.survey.blocked_title'), body: reason });
+      this.showStatus(reason);
+      return;
+    }
+    // Armed already: cancel so armPointPick re-arms for the newly chosen method.
+    if (kit.controller.isArmed) kit.controller.cancel();
+    this.armPick();
   }
 
+  private hasSurveyor(state: GameState): boolean {
+    return state.employees.employees.some(
+      e => e.alive && e.qualifications.some(q => q.category === SURVEYOR_SKILL),
+    );
+  }
+
+  /** Reason no survey can run now (no geology-qualified employee, or cash short), or null when unblocked. */
+  private blockReason(state: GameState): string | null {
+    if (!this.hasSurveyor(state)) return t('ui.survey.no_surveyor');
+    const cost = this.costOf(this.selectedMethod, state);
+    if (state.cash < cost) return t('ui.survey.insufficient_funds', { cost: String(cost) });
+    return null;
+  }
+
+  /** Run button: arms the pick, but leaves an already-armed pick alone (armPointPick would toggle it off). */
   private pickTargetAndRun(): void {
+    if (this.placementKit?.controller.isArmed) return;
+    this.armPick();
+  }
+
+  /** Arm the point pick for the selected method. */
+  private armPick(): void {
     const kit = this.placementKit;
     if (!kit) return;
 
