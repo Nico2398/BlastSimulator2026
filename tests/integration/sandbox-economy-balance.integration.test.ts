@@ -462,3 +462,59 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 900_000);
 });
+
+describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#1828)', () => {
+  const HORIZON = 3550;
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  const SHOT_START = '36,32';
+  /** The player takes any rustite offer this small as it appears (the #1828 repro), stock or no stock. */
+  const MAX_OFFER_KG = 2_000;
+  /** Rustite share of a fragment from which it counts as high-grade. */
+  const HIGH_GRADE = 0.5;
+  /** "Most" accepted rustite contracts complete rather than expire. */
+  const MIN_COMPLETED_SHARE = 0.7;
+  /** Rustite kg (fragment mass x rustite share) in high-grade fragments still on the ground at the horizon: 152 t measured before the fix. */
+  const HIGH_GRADE_GROUND_CEILING_KG = 100_000;
+
+  it('easy: accepted rustite contracts mostly complete, rustite and dirtite sell, high-grade rustite leaves the ground', () => {
+    const acceptedRustite = new Set<number>();
+    const rustiteActive = () => state.contracts.active.some((c) => c.type === 'ore_sale' && c.materialId === 'rustite');
+    let armed = false; // offers are taken only once the shot is fired: rock must exist before a deadline runs against it
+    const acceptSmallRustite = (run: Run) => {
+      if (!armed || rustiteActive()) return;
+      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && c.materialId === 'rustite' && c.quantityKg <= MAX_OFFER_KG);
+      if (offer && run(`contract accept ${offer.id}`).success) acceptedRustite.add(offer.id);
+    };
+    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON, () => acceptSmallRustite(logged));
+
+    expect(logged(`build ${BUILD}`).success).toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+    armed = true;
+    playUntil(HORIZON, () => false);
+
+    expect(over() && state.levelEnded, `ended ${String(state.levelEndReason)}`).toBeFalsy();
+    const rustiteContracts = state.contracts.completedHistory.filter((c) => c.type === 'ore_sale' && c.materialId === 'rustite' && acceptedRustite.has(c.id));
+    const completed = rustiteContracts.filter((c) => c.completed).length;
+    const expired = rustiteContracts.filter((c) => c.expired && !c.completed).length;
+    expect(acceptedRustite.size, 'rustite offers accepted').toBeGreaterThanOrEqual(10);
+    // Before the fix 35 of 38 accepted rustite contracts expired (18 of 41 completed once stock-covered ones are counted).
+    expect(completed / Math.max(1, completed + expired), `${completed} completed vs ${expired} expired of ${acceptedRustite.size} accepted`).toBeGreaterThanOrEqual(MIN_COMPLETED_SHARE);
+
+    const sales = (ore: string) => state.contracts.completedHistory.filter((c) => c.type === 'ore_sale' && c.completed && c.materialId === ore).length;
+    expect(sales('rustite'), 'rustite ore sales').toBeGreaterThan(5);
+    expect(sales('dirtite'), 'dirtite sales continued').toBeGreaterThanOrEqual(5);
+
+    let highGradeRustiteKg = 0;
+    for (const t of state.logistics.fragments) {
+      const share = t.fragment.oreDensities['rustite'] ?? 0;
+      if (t.state === 'on_ground' && share >= HIGH_GRADE) highGradeRustiteKg += t.fragment.mass * share;
+    }
+    expect(highGradeRustiteKg, `high-grade rustite still on the ground: ${Math.round(highGradeRustiteKg / 1000)} t`).toBeLessThan(HIGH_GRADE_GROUND_CEILING_KG);
+    expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 900_000);
+});
