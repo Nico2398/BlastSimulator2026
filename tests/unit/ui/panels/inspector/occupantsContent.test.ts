@@ -133,7 +133,7 @@ describe('residentsSection', () => {
     const sig = sec.rowSignature;
     const before = root.textContent;
     e.restTicksRemaining = 11;
-    sec.sync();
+    sec.sync(root);
     expect(links_(root, 1)[0]).toBe(link);
     expect(root.textContent).not.toBe(before);
     expect(sec.rowSignature).toBe(sig);
@@ -231,7 +231,7 @@ describe('schoolSection', () => {
     const link = links_(root, 1)[0]!;
     const before = root.textContent;
     e.trainingState = course(3, 7);
-    sec.sync();
+    sec.sync(root);
     expect(links_(root, 1)[0]).toBe(link);
     expect(root.textContent).not.toBe(before);
     expect(root.textContent).toContain('7');
@@ -310,7 +310,7 @@ describe('researchSection', () => {
     const node = root.querySelector('[data-live="research-running"]')!;
     const before = node.textContent;
     s.buildings.researchQueue[0]!.ticksRemaining = 33;
-    sec.sync();
+    sec.sync(root);
     expect(root.querySelector('[data-live="research-running"]')).toBe(node);
     expect(node.textContent).not.toBe(before);
     expect(node.textContent).toContain('33');

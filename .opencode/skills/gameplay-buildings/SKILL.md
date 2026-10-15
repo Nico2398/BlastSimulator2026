@@ -95,6 +95,9 @@ from before they existed loads with every building empty.
 Overcapacity (more employees than beds) → well-being penalty for all residents.
 
 Well-being score (#1692): the tier's `wellBeing` effect (+2 / +4 / +6) is a per-tick gain damped as the score nears 100, so a higher tier settles at a higher equilibrium and no tier pins it at the cap. Beds come from `getBedCapacity` (sum of capacity over operating Living Quarters); a crew beyond the beds adds a crowding drag proportional to the unhoused share, on top of the productivity penalty. Overwork and accidents drag it too; see `gameplay-employee-needs`.
+Inspector occupants (#1760): a Living Quarters shows beds used/total, resident rows (name link, rest time left), the site-wide housing multiplier and an overcapacity warning when the crew outnumbers the beds.
+Inspector schools: the four training buildings show seats used/total, trainee rows (skill, level, time left), who is walking in, and the courses taught at the tier; a course whose skill a higher-tier school on site offers instead (`availableTrainingOffers`) is marked superseded.
+Inspector Research Center: shows the running task (target tier name, percent, ticks left), pending tasks with their cost, "paused" while the centre is closed, and an idle line when the queue is empty.
 
 ## Warehouses
 

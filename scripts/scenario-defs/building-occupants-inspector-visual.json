@@ -154,7 +154,7 @@
       }
     },
     {
-      "command": "building info 1",
+      "command": "state",
       "description": "Click the Driving Center in the scene: its inspector lists the trainee as a name link with the skill, level and time left. The row is read twice across ticking to prove the countdown moves.",
       "interaction": [
         {
@@ -310,7 +310,7 @@
       }
     },
     {
-      "command": "building info 2",
+      "command": "state",
       "description": "Click the Living Quarters while someone rests: a resident row with a name link appears.",
       "interaction": [
         {

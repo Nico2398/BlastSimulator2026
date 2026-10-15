@@ -307,9 +307,9 @@ describe('building inspector — people and activity sections (#1760)', () => {
     expect(rRoot.querySelector('[data-live="research-idle"]')).not.toBeNull();
   });
 
-  it('a plain office carries none of the three sections', () => {
+  it('a building that is neither home, school nor lab carries none of the three sections', () => {
     const root = document.createElement('div');
-    root.append(...viewOf(stateWith(makeBuilding())).sections);
+    root.append(...viewOf(stateWith(makeBuilding({ type: 'freight_warehouse' }))).sections);
     expect(root.querySelector('[data-course], [data-live="research-idle"], [data-live="seats"]')).toBeNull();
   });
 
