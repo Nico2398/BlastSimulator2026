@@ -625,6 +625,15 @@ export const CONFINEMENT_FULL_DEPTH = 6.0;
  *  what makes an over-buried charge fail to. */
 export const FREE_FACE_BIAS = 2.0;
 
+/** Metres from a side or lower free face within which rock still pulls overflow
+ *  toward it. Farther out, only air above keeps its pull. A lateral void (an
+ *  access ramp dug to a pattern's edge before the shot) otherwise drags energy
+ *  away from the charges that are nowhere near it and leaves full-height
+ *  pillars between holes that the same shot breaks cleanly without the void
+ *  (#1793). Set to one hole spacing: a charge that sits at a face keeps its
+ *  bench behaviour, rock a spacing further in is served by the sky as before. */
+export const FREE_FACE_LATERAL_RANGE_M = 4;
+
 /** Thickest cap of intact rock (metres) that a blast can lift off an excavation
  *  it has undermined. Thicker burden bridges the gap and stays standing, which is
  *  what makes a charge buried too deep fail to break out to surface. */

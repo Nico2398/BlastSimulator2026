@@ -27,6 +27,7 @@ import {
   UNCONFINED_THRESHOLD_FACTOR,
   CONFINEMENT_FULL_DEPTH,
   FREE_FACE_BIAS,
+  FREE_FACE_LATERAL_RANGE_M,
   BLAST_SLICE_CELLS,
 } from '../config/balance.js';
 
@@ -88,6 +89,17 @@ const NEIGHBOUR_DY = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[1]);
 const NEIGHBOUR_DZ = Int32Array.from(NEIGHBOUR_OFFSETS, o => o[2]);
 /** `1 / dist` per neighbour — the same double the loop used to compute inline. */
 const NEIGHBOUR_INV_DIST = Float64Array.from(NEIGHBOUR_OFFSETS, o => 1 / o[3]);
+
+/**
+ * Spread weight toward one neighbour: 1/distance, boosted by the relief it gains
+ * toward a free face. Air above (`rising`) always pulls; a side or lower face
+ * pulls only from within `FREE_FACE_LATERAL_RANGE_M`, so a distant excavation
+ * cannot steal energy from charges it does not serve (#1793).
+ */
+export function freeFaceWeight(invDist: number, ownDistAir: number, neighbourDistAir: number, rising: boolean): number {
+  if (!rising && ownDistAir > FREE_FACE_LATERAL_RANGE_M) return invDist;
+  return invDist * (1 + FREE_FACE_BIAS * Math.max(0, ownDistAir - neighbourDistAir));
+}
 
 /**
  * Per-voxel blast state over one bounding box.
@@ -531,8 +543,7 @@ export function* seedEnergySteps(field: EnergyField, seeds: readonly EnergySeed[
         // every direction makes the blast a sphere that dies at a fixed radius
         // and never reaches the surface, however large the charge — the burden
         // has to fail *toward* the free face, the way a real bench blast does.
-        const relief = Math.max(0, ownDistAir - field.distAir[ni]!);
-        const w = NEIGHBOUR_INV_DIST[k]! * (1 + FREE_FACE_BIAS * relief);
+        const w = freeFaceWeight(NEIGHBOUR_INV_DIST[k]!, ownDistAir, field.distAir[ni]!, NEIGHBOUR_DY[k]! > 0);
         targetScratch[targetCount] = ni;
         weightScratch[targetCount] = w;
         targetCount++;
