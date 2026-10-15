@@ -277,6 +277,13 @@ export interface Employee {
    * original name (27 dependent call sites) despite covering both cases.
    */
   vehicleWaitingTicks: number;
+  /**
+   * Occupancy-block ladder steps taken for one leg destination (#1696). Unlike
+   * the stuck counters it survives a sidestep, reroute or relocation, so a
+   * block loop that keeps resetting them still reaches BLOCK_EPISODE_ABANDON_LIMIT.
+   * Absent = 0; cleared on arrival and when the destination changes.
+   */
+  blockEpisode?: { destX: number; destZ: number; count: number };
 }
 
 // ── Employee state ──

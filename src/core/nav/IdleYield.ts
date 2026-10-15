@@ -5,9 +5,11 @@
 import type { NavGrid } from './NavGrid';
 
 /**
- * Nearest free cell to `blockerCell`, within `maxRadius` cells, that is not on
- * the mover's remaining route. `routeCells` holds "x,z" keys. `isFree` decides
- * whether a cell may be stood on. Returns null when no such cell exists.
+ * Nearest free cell to `blockerCell`, within `maxRadius` cells (Chebyshev),
+ * that is not on the mover's remaining route and not the blocker's own cell.
+ * `routeCells` holds "x,z" keys. `isFree` decides whether a cell may be stood
+ * on. Rings are searched inner to outer; within a ring the lowest z then
+ * lowest x wins, so the result is deterministic. Returns null when none.
  */
 export function pickYieldCell(
   grid: NavGrid,
@@ -16,11 +18,18 @@ export function pickYieldCell(
   isFree: (x: number, z: number) => boolean,
   maxRadius: number,
 ): { x: number; z: number } | null {
-  void grid;
-  void blockerCell;
-  void routeCells;
-  void isFree;
-  void maxRadius;
-  // TODO: implement
+  for (let r = 1; r <= maxRadius; r++) {
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const x = blockerCell.x + dx;
+        const z = blockerCell.z + dz;
+        if (!grid.containsCell(x, z)) continue;
+        if (routeCells.has(`${x},${z}`)) continue;
+        if (!isFree(x, z)) continue;
+        return { x, z };
+      }
+    }
+  }
   return null;
 }

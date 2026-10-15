@@ -18,8 +18,9 @@ import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult } from '../nav/Pathfinding.js';
-import { isStepClimbable, type NavGrid } from '../nav/NavGrid.js';
+import { isStepClimbable, hasClearance, type NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, inFlightHopOrigin, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
+import { pickYieldCell } from '../nav/IdleYield.js';
 import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
 import {
   AGENT_WALK_SPEED,
@@ -28,6 +29,8 @@ import {
   AGENT_OCCUPANCY_WAIT_TICKS,
   AGENT_FREE_CELL_SEARCH_MAX_RADIUS,
   AGENT_FREE_CELL_MAX_RETURN_COST,
+  IDLE_YIELD_SEARCH_RADIUS_CELLS,
+  BLOCK_EPISODE_ABANDON_LIMIT,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { employeeWorkState } from './EmployeeDispatch.js';
@@ -289,6 +292,7 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
       emp.moveConsecutiveFailures = 0;
     }
 
+    delete emp.blockEpisode;
     const ok = applyArrivalStep(state, emp, leg, itinerary, emitter);
 
     // A board arrival step's post-board handling (evacuation redrive,
@@ -820,6 +824,57 @@ function idleDrivenVehicleOf(state: GameState, occupant: Occupant): Vehicle | un
   return vehicle;
 }
 
+/** Counts one occupancy-ladder step against `leg`'s destination (a new destination restarts the count). */
+function noteBlockEpisodeStep(emp: Employee, leg: Leg): number {
+  const ep = emp.blockEpisode;
+  const count = ep && ep.destX === leg.destX && ep.destZ === leg.destZ ? ep.count + 1 : 1;
+  emp.blockEpisode = { destX: leg.destX, destZ: leg.destZ, count };
+  return count;
+}
+
+/** True when there is no free cell at all or `cell` lies on the route (`routeCells` is computed on demand). */
+function isOnRoute(cell: { x: number; z: number } | null, routeCells: () => ReadonlySet<string>): boolean {
+  return cell === null || routeCells().has(`${cell.x},${cell.z}`);
+}
+
+/** Cells ("x,z") of the mover's remaining direct route to its leg destination; empty when none is found. */
+function remainingRouteCells(state: GameState, emp: Employee, leg: Leg, requiredClearance: number | undefined): Set<string> {
+  const cells = new Set<string>();
+  if (!state.navGrid) return cells;
+  const route = findPath(state.navGrid, {
+    agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+    avoidVehicles: false, ...(requiredClearance !== undefined && { requiredClearance }),
+  });
+  for (const w of route.waypoints) cells.add(`${w.x},${w.z}`);
+  cells.add(`${leg.destX},${leg.destZ}`);
+  return cells;
+}
+
+/**
+ * Nearest cell off the mover's remaining route that `blocker` can stand on and walk back from (#1696).
+ * Null when none is within IDLE_YIELD_SEARCH_RADIUS_CELLS, so the caller keeps its nearest-free-cell fallback.
+ */
+function pickIdleYieldCell(
+  state: GameState,
+  blocker: Occupant,
+  blockerCell: { x: number; z: number },
+  routeCells: ReadonlySet<string>,
+): { x: number; z: number } | null {
+  const grid = state.navGrid;
+  const occupancy = state.agentOccupancy;
+  if (!grid || !occupancy || routeCells.size === 0) return null;
+  const clearance = blocker.kind === 'vehicle'
+    ? vehicleRequiredClearanceCells(state.vehicles.vehicles.find(v => v.id === blocker.id)!)
+    : undefined;
+  return pickYieldCell(grid, blockerCell, routeCells, (x, z) => {
+    const cell = grid.cellAt(x, z);
+    if (!cell || cell.type === 'blocked' || cell.type === 'void') return false;
+    if (clearance !== undefined && !hasClearance(cell, clearance)) return false;
+    if (!occupancy.isFreeFor(blocker, x, z) || isReservedByAnotherExactLeg(state, blocker, x, z)) return false;
+    return hasShortReturnRoute(grid, blockerCell.x, blockerCell.z, x, z);
+  }, IDLE_YIELD_SEARCH_RADIUS_CELLS);
+}
+
 function handleAgentOccupancyBlock(
   state: GameState,
   emp: Employee,
@@ -837,6 +892,14 @@ function handleAgentOccupancyBlock(
 
   const isDrive = mover.kind === 'vehicle';
   const vehicle = isDrive ? state.vehicles.vehicles.find(v => v.id === mover.id) : undefined;
+
+  // #1696: a sidestep/reroute/relocation resets the stuck counters, so a loop of them never reached
+  // the abandon above. Count ladder steps per leg destination instead; the count survives those resets.
+  if (noteBlockEpisodeStep(emp, leg) >= BLOCK_EPISODE_ABANDON_LIMIT) {
+    delete emp.blockEpisode;
+    abandonStuckMovement(state, emp, vehicle, result, emitter);
+    return 'blocked';
+  }
   // The vehicle vanished (reassigned/destroyed) out from under this block —
   // advanceLeg's own occupant-mismatch check aborts the leg cleanly next
   // tick; nothing more to do with a mover that no longer resolves.
@@ -871,7 +934,11 @@ function handleAgentOccupancyBlock(
   // this requester need contest with, just clear out of the way
   // (`relocateIdleDestinationBlocker`, below), via AgentOccupancy rather than
   // a live vehicle-position scan.
-  if (destinationHeldByOther && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, result)) {
+  let cachedRouteCells: Set<string> | undefined;
+  const routeCells = (): ReadonlySet<string> =>
+    cachedRouteCells ??= remainingRouteCells(state, emp, leg, requiredClearance);
+  if (destinationHeldByOther
+    && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, result, false, routeCells)) {
     return 'blocked';
   }
 
@@ -927,7 +994,7 @@ function handleAgentOccupancyBlock(
       : undefined;
     if (corridorOccupant?.kind === 'employee'
       && (!corridorBlockerEmp?.isMoveStuck || (corridorBlockerEmp && isOnReturnTripLeg(corridorBlockerEmp)))
-      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, result, true)
+      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, result, true, routeCells)
       && state.navGrid) {
       const direct = findPath(state.navGrid, {
         agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
@@ -1174,6 +1241,7 @@ function relocateIdleDestinationBlocker(
   destZ: number,
   result: LocomotionResult,
   returnAfterRelocate = false,
+  routeCells?: () => ReadonlySet<string>,
 ): boolean {
   const occupant = occupancy.holderOf(destX, destZ);
   if (!occupant) return false;
@@ -1194,13 +1262,19 @@ function relocateIdleDestinationBlocker(
 
     const originX = emp.x;
     const originZ = emp.z;
-    const freeCell = findNearestFreeCellForAgent(state, occupant, emp.x, emp.z);
+    // #1696: the nearest free cell is just the next corridor cell when it lies on the mover's route, and
+    // returning there walks the idle employee back into it — so step off the route instead, no return trip.
+    const nearest = findNearestFreeCellForAgent(state, occupant, emp.x, emp.z);
+    const yieldCell = routeCells && employeeWorkState(emp) === 'idle' && isOnRoute(nearest, routeCells)
+      ? pickIdleYieldCell(state, occupant, { x: Math.round(emp.x), z: Math.round(emp.z) }, routeCells())
+      : null;
+    const freeCell = yieldCell ?? nearest;
     if (!freeCell) return false;
 
     occupancy.tryMove(occupant, freeCell.x, freeCell.z);
     teleportEmployeeTo(emp, freeCell.x, freeCell.z);
     result.moved.push(emp.id);
-    if (returnAfterRelocate) {
+    if (returnAfterRelocate && !yieldCell) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
       if (returnLeg) {
@@ -1221,7 +1295,11 @@ function relocateIdleDestinationBlocker(
   const vehicle = parked ?? idleDriven;
   if (!vehicle) return false;
 
-  const freeCell = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
+  const nearest = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
+  const yieldCell = routeCells && isOnRoute(nearest, routeCells)
+    ? pickIdleYieldCell(state, occupant, { x: Math.round(vehicle.x), z: Math.round(vehicle.z) }, routeCells())
+    : null;
+  const freeCell = yieldCell ?? nearest;
   if (!freeCell) return false;
   if (idleDriven) {
     for (const riderId of vehicle.occupantIds) {
