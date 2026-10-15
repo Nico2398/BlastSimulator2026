@@ -92,8 +92,12 @@ function resolveHitToEntity(hit: THREE.Intersection, renderer: GameRenderer): En
 const CLICK_MOVE_THRESHOLD_PX = 5;
 /** Hover tag appears after the cursor rests on the same target for this long (spec: 60ms). */
 const HOVER_DELAY_MS = 60;
+/** The terrain hover tag appears after the pointer rests on one pick key for this long. */
+export const HOVER_TAG_DWELL_MS = 400;
 
 export type HoverChangeHandler = (hover: PickResult | null) => void;
+/** Fires with the pick the pointer rested on, or null once the rest ends. */
+type RestChangeHandler = (rest: PickResult | null) => void;
 export type SelectChangeHandler = (selection: EntityPick | null) => void;
 
 /**
@@ -107,6 +111,9 @@ export class ScenePicking {
   private readonly camera: THREE.Camera;
   private readonly renderer: GameRenderer;
 
+  private onRestChangeHandler: RestChangeHandler | null = null;
+  private restTimer: ReturnType<typeof setTimeout> | null = null;
+  private currentRest: PickResult | null = null;
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private lastHoverKey: string | null = null;
   private currentHover: PickResult | null = null;
@@ -154,6 +161,7 @@ export class ScenePicking {
 
   setHoverChangeHandler(cb: HoverChangeHandler): void { this.onHoverChangeHandler = cb; }
   setSelectChangeHandler(cb: SelectChangeHandler): void { this.onSelectChangeHandler = cb; }
+  setRestChangeHandler(cb: RestChangeHandler): void { this.onRestChangeHandler = cb; }
 
   /** Suppress hover/select while a placement tool is armed; clears any live hover on disable. */
   setEnabled(enabled: boolean): void {
@@ -191,11 +199,17 @@ export class ScenePicking {
     if (key === this.lastHoverKey) return; // still resting on the same target
     this.lastHoverKey = key;
     if (this.hoverTimer !== null) clearTimeout(this.hoverTimer);
+    this.clearRest();
 
     if (!pick.entity && !pick.terrain) {
       this.clearHover();
       return;
     }
+    this.restTimer = setTimeout(() => {
+      this.restTimer = null;
+      this.currentRest = pick;
+      this.onRestChangeHandler?.(pick);
+    }, HOVER_TAG_DWELL_MS);
     this.hoverTimer = setTimeout(() => {
       this.currentHover = pick;
       // Latch the aim too. Only a new pick replaces it — clearHover() must not,
@@ -212,7 +226,17 @@ export class ScenePicking {
    */
   get aim(): PickResult | null { return this.lastAim; }
 
+  /** Cancel a pending dwell and end a rest that is showing. */
+  private clearRest(): void {
+    if (this.restTimer !== null) { clearTimeout(this.restTimer); this.restTimer = null; }
+    if (this.currentRest !== null) {
+      this.currentRest = null;
+      this.onRestChangeHandler?.(null);
+    }
+  }
+
   private clearHover(): void {
+    this.clearRest();
     if (this.hoverTimer !== null) { clearTimeout(this.hoverTimer); this.hoverTimer = null; }
     this.lastHoverKey = null;
     this.canvas.style.cursor = '';
@@ -224,6 +248,7 @@ export class ScenePicking {
 
   private onMouseDown(e: MouseEvent): void {
     if (!this.enabled) return;
+    this.clearRest();
     this.pointerDown = true; // suppresses hover during any drag — left orbit, right/middle pan alike
     if (e.button !== 0) return; // only the left button drives selection — right/middle pan the camera
     this.downX = e.clientX;
@@ -245,6 +270,7 @@ export class ScenePicking {
 
   dispose(): void {
     if (this.hoverTimer !== null) clearTimeout(this.hoverTimer);
+    if (this.restTimer !== null) clearTimeout(this.restTimer);
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);
     this.canvas.removeEventListener('mousedown', this.handleMouseDown);
     this.canvas.removeEventListener('mouseup', this.handleMouseUp);

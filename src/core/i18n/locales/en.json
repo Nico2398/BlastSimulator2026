@@ -3375,7 +3375,6 @@
   "shell.log.empty": "Nothing yet. It won't stay that way.",
   "shell.minimap.nav_tip": "Toggle nav-grid overlay — N",
   "shell.hovertag.tile": "Tile ({x}, {z})",
-  "shell.hovertag.no_survey": "No survey data",
   "shell.hovertag.stale": "STALE",
   "shell.hovertag.fresh": "FRESH",
   "shell.hovertag.depth_range": "{from}-{to} m",
