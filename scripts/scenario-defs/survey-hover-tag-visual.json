@@ -177,7 +177,7 @@
       }
     },
     {
-      "command": "build management_office at:10,13 tier:1",
+      "command": "build management_office at:15,17 tier:1",
       "description": "Order a management office at a tile away from the surveyed centre; it is the entity the building beat rests on.",
       "role": "player",
       "timeout": 30,
@@ -195,9 +195,15 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "cameraFocus",
+          "x": 15,
+          "z": 17,
+          "distance": 20
+        },
+        {
           "type": "pickTile",
-          "x": 10,
-          "z": 13
+          "x": 15,
+          "z": 17
         },
         {
           "type": "clickSelector",
@@ -259,13 +265,9 @@
           "y": 360
         },
         {
-          "type": "waitForProperty",
-          "selector": "#bs-hover-tag",
-          "property": "dataset",
-          "expectedValue": {
-            "visible": "true"
-          },
-          "timeoutMs": 10000
+          "type": "waitForSelector",
+          "selector": "#bs-hover-tag[data-visible=\"true\"]",
+          "timeout": 10000
         },
         {
           "type": "screenshot"
@@ -284,13 +286,9 @@
           "y": 500
         },
         {
-          "type": "waitForProperty",
-          "selector": "#bs-hover-tag",
-          "property": "dataset",
-          "expectedValue": {
-            "visible": "false"
-          },
-          "timeoutMs": 10000
+          "type": "waitForSelector",
+          "selector": "#bs-hover-tag[data-visible=\"false\"]",
+          "timeout": 10000
         },
         {
           "type": "screenshot"
@@ -323,13 +321,9 @@
           "durationMs": 700
         },
         {
-          "type": "waitForProperty",
-          "selector": "#bs-hover-tag",
-          "property": "dataset",
-          "expectedValue": {
-            "visible": "false"
-          },
-          "timeoutMs": 10000
+          "type": "waitForSelector",
+          "selector": "#bs-hover-tag[data-visible=\"false\"]",
+          "timeout": 10000
         },
         {
           "type": "screenshot"
@@ -342,14 +336,14 @@
     },
     {
       "command": "state",
-      "description": "Rest on the management office (11,14), entity hover: no tag even though the overlay is on. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
+      "description": "Rest on the management office (16,18), entity hover: no tag even though the overlay is on. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
       "role": "player",
       "timeout": 60,
       "interaction": [
         {
           "type": "cameraFocus",
-          "x": 11,
-          "z": 14,
+          "x": 16,
+          "z": 18,
           "distance": 15
         },
         {
@@ -362,13 +356,9 @@
           "durationMs": 700
         },
         {
-          "type": "waitForProperty",
-          "selector": "#bs-hover-tag",
-          "property": "dataset",
-          "expectedValue": {
-            "visible": "false"
-          },
-          "timeoutMs": 10000
+          "type": "waitForSelector",
+          "selector": "#bs-hover-tag[data-visible=\"false\"]",
+          "timeout": 10000
         },
         {
           "type": "screenshot"
@@ -385,6 +375,14 @@
       "role": "player",
       "timeout": 60,
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-role=\"overlay-toggle\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "[data-role=\"overlay-toggle\"]"
@@ -405,13 +403,9 @@
           "durationMs": 700
         },
         {
-          "type": "waitForProperty",
-          "selector": "#bs-hover-tag",
-          "property": "dataset",
-          "expectedValue": {
-            "visible": "false"
-          },
-          "timeoutMs": 10000
+          "type": "waitForSelector",
+          "selector": "#bs-hover-tag[data-visible=\"false\"]",
+          "timeout": 10000
         },
         {
           "type": "screenshot"
