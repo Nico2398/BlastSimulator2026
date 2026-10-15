@@ -18,6 +18,9 @@ import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
 import { DEBRIS_DISPATCH_PER_TICK } from '../config/balance.js';
 import { findById } from '../state/IdIndex.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
+import type { Vec3 } from '../math/Vec3.js';
+import { isFragmentSealed } from './SealedFragments.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -32,6 +35,10 @@ export interface HaulActionPayload {
  * `DEBRIS_DISPATCH_PER_TICK` are queued per call; a large blast's pile is
  * queued over the next few ticks (#1603).
  *
+ * With a `grid`, a fragment sealed in a void under intact ground (#1724) gets
+ * no order until the void opens; it is skipped before the per-tick budget, so
+ * it never consumes any. Without one, every on-ground fragment is eligible.
+ *
  * requiredSkill is deliberately left null on both action types — the actual
  * qualification a haul/break vehicle needs (the truck/excavator licence
  * ROLE_LICENCE_REQUIRED maps each role to) is enforced at claim time via
@@ -42,13 +49,18 @@ export interface HaulActionPayload {
  * site with no hauler or no licensed driver yet must let the action sit
  * queued silently instead.
  */
-export function syncHaulDispatch(state: GameState): void {
+export function syncHaulDispatch(state: GameState, grid?: VoxelGrid | null): void {
   // Nothing to queue unless an order or an on-ground fragment came or went
   // since the last pass: after a large blast both lists run to thousands, and
   // rebuilding the covered set every tick to find nothing was a frame's
   // millisecond of its own (#1603).
   const signature = haulDispatchSignature(state);
-  if (lastHaulDispatch.get(state) === signature) return;
+  if (lastHaulDispatch.get(state) === signature) {
+    // The signature ignores terrain: a blast can open a void and unseal
+    // fragments without touching the lists. Re-test only the sealed ones.
+    const sealed = lastSealedPositions.get(state);
+    if (!grid || !sealed || !hasUnsealedPosition(grid, sealed)) return;
+  }
 
   const coveredFragmentIds = new Set<number>();
   for (const action of state.pendingActions) {
@@ -57,10 +69,15 @@ export function syncHaulDispatch(state: GameState): void {
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
 
+  const sealedPositions: Vec3[] = [];
   let queued = 0;
   for (const tracked of state.logistics.fragments) {
     if (tracked.state !== 'on_ground') continue;
     if (coveredFragmentIds.has(tracked.fragment.id)) continue;
+    if (grid && isFragmentSealed(grid, tracked.fragment.position)) {
+      sealedPositions.push(tracked.fragment.position);
+      continue;
+    }
     // The rest wait for the next tick's pass (DEBRIS_DISPATCH_PER_TICK).
     if (queued++ === DEBRIS_DISPATCH_PER_TICK) return;
 
@@ -92,10 +109,27 @@ export function syncHaulDispatch(state: GameState): void {
     coveredFragmentIds.add(tracked.fragment.id);
   }
   lastHaulDispatch.set(state, haulDispatchSignature(state));
+  lastSealedPositions.set(state, sealedPositions);
 }
 
-/** Signature of the last `syncHaulDispatch` pass per game — derived, never serialized. */
+/**
+ * Signature of the last `syncHaulDispatch` pass per game — derived, never
+ * serialized. Updated together with `lastSealedPositions`, from one full pass.
+ */
 const lastHaulDispatch = new WeakMap<GameState, string>();
+
+/**
+ * Positions of the fragments that pass skipped as sealed (#1774) — kept so the
+ * unchanged-signature path re-tests only those, walking the sealed set and
+ * needing no fragment lookup. A fragment that has since left the ground at
+ * most triggers one extra (safe) full pass, via the signature.
+ */
+const lastSealedPositions = new WeakMap<GameState, Vec3[]>();
+
+/** True when any of the previously sealed positions no longer sits under intact ground. */
+function hasUnsealedPosition(grid: VoxelGrid, positions: readonly Vec3[]): boolean {
+  return positions.some(position => !isFragmentSealed(grid, position));
+}
 
 /**
  * Everything a dispatch pass's outcome depends on: the order list's length and

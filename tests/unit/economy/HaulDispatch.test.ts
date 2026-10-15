@@ -25,6 +25,7 @@ import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragme
 import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { isHaulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { refreshLogisticsCapacity } from '../../../src/core/engine/BuildingTaskHelpers.js';
 
 const SEED = 42;
@@ -977,5 +978,167 @@ describe('syncHaulDispatch — a large pile is queued over several ticks (#1603)
     expect(state.pendingActions).toHaveLength(total);
     syncHaulDispatch(state);
     expect(state.pendingActions).toHaveLength(total);
+  });
+});
+
+
+// ── syncHaulDispatch — rock sealed under an intact cap (#1774) ──────────────
+
+const SEALED_FILL = 10;
+
+/** A 6x6 grid solid up to y=9 everywhere; a fragment at y<9 sits buried under the cap. */
+function makeCapGrid(): VoxelGrid {
+  const grid = new VoxelGrid(6, 6);
+  for (let y = 0; y < SEALED_FILL; y++) {
+    for (let z = 0; z < 6; z++) {
+      for (let x = 0; x < 6; x++) {
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+      }
+    }
+  }
+  return grid;
+}
+
+function withY(f: FragmentData, y: number): FragmentData {
+  return { ...f, position: { ...f.position, y } };
+}
+
+function openColumn(grid: VoxelGrid, x: number, z: number): void {
+  for (let y = 2; y < SEALED_FILL; y++) grid.clearVoxel(x, y, z);
+}
+
+function debrisFragmentIds(state: ReturnType<typeof createGame>): number[] {
+  return state.pendingActions
+    .filter(a => isAutoDebrisAction(a.type))
+    .map(a => (a.payload as { fragmentId: number }).fragmentId)
+    .sort((a, b) => a - b);
+}
+
+describe('syncHaulDispatch — sealed fragments (#1774)', () => {
+  it('creates no haul_debris order for a fragment buried under an intact cap', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [withY(makeFragment(1, 2.5, 2.5), 4)]);
+
+    syncHaulDispatch(state, grid);
+
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  it('creates no fragment_debris order for a sealed oversized fragment', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [withY(makeOversizedFragment(1, 2.5, 2.5), 4)]);
+
+    syncHaulDispatch(state, grid);
+
+    expect(state.pendingActions.filter(a => a.type === 'fragment_debris')).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  it('queues the open fragments and skips only the sealed ones', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [
+      withY(makeFragment(1, 2.5, 2.5), 4),    // sealed
+      withY(makeFragment(2, 4.5, 4.5), 12),   // resting above the cap
+      withY(makeOversizedFragment(3, 1.5, 1.5), 3), // sealed
+      withY(makeOversizedFragment(4, 0.5, 4.5), 11), // above the cap
+    ]);
+
+    syncHaulDispatch(state, grid);
+
+    expect(debrisFragmentIds(state)).toEqual([2, 4]);
+    expect(state.pendingActions.find(a => a.payload['fragmentId'] === 2)!.type).toBe('haul_debris');
+    expect(state.pendingActions.find(a => a.payload['fragmentId'] === 4)!.type).toBe('fragment_debris');
+  });
+
+  it('sealed fragments do not consume the per-tick dispatch budget', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    const sealed: FragmentData[] = [];
+    for (let i = 1; i <= DEBRIS_DISPATCH_PER_TICK + 1; i++) sealed.push(withY(makeFragment(i, 2.5, 2.5), 4));
+    const openId = DEBRIS_DISPATCH_PER_TICK + 2;
+    addBlastFragments(state.logistics, [...sealed, withY(makeFragment(openId, 4.5, 4.5), 12)]);
+
+    syncHaulDispatch(state, grid);
+
+    expect(debrisFragmentIds(state)).toEqual([openId]);
+  });
+
+  it('queues a sealed fragment once its cap column is cleared, even with an unchanged signature', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [withY(makeFragment(1, 2.5, 2.5), 5)]);
+
+    syncHaulDispatch(state, grid);
+    expect(state.pendingActions).toHaveLength(0);
+
+    openColumn(grid, 2, 2);
+    syncHaulDispatch(state, grid);
+
+    expect(debrisFragmentIds(state)).toEqual([1]);
+    expect(state.pendingActions[0]!.type).toBe('haul_debris');
+  });
+
+  it('queues only the unsealed fragment when one of two sealed fragments is opened with an unchanged signature', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [
+      withY(makeFragment(1, 2.5, 2.5), 5),
+      withY(makeFragment(2, 4.5, 4.5), 5),
+    ]);
+
+    syncHaulDispatch(state, grid);
+    expect(state.pendingActions).toHaveLength(0);
+
+    openColumn(grid, 2, 2);
+    syncHaulDispatch(state, grid);
+
+    expect(debrisFragmentIds(state)).toEqual([1]);
+  });
+
+  it('queues a sealed oversized fragment as fragment_debris once its column is opened', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [withY(makeOversizedFragment(1, 2.5, 2.5), 5)]);
+
+    syncHaulDispatch(state, grid);
+    expect(state.pendingActions).toHaveLength(0);
+
+    openColumn(grid, 2, 2);
+    syncHaulDispatch(state, grid);
+
+    expect(state.pendingActions.map(a => a.type)).toEqual(['fragment_debris']);
+  });
+
+  it('is idempotent across repeated calls once the column is open', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeCapGrid();
+    addBlastFragments(state.logistics, [withY(makeFragment(1, 2.5, 2.5), 5)]);
+    openColumn(grid, 2, 2);
+
+    syncHaulDispatch(state, grid);
+    syncHaulDispatch(state, grid);
+
+    expect(state.pendingActions).toHaveLength(1);
+  });
+
+  it('without a grid argument treats a low fragment as ordinary debris (unchanged behaviour)', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [withY(makeFragment(1, 2.5, 2.5), 4)]);
+
+    syncHaulDispatch(state);
+
+    expect(debrisFragmentIds(state)).toEqual([1]);
+  });
+
+  it('with a null grid treats a low fragment as ordinary debris', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [withY(makeFragment(1, 2.5, 2.5), 4)]);
+
+    syncHaulDispatch(state, null);
+
+    expect(debrisFragmentIds(state)).toEqual([1]);
   });
 });

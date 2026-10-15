@@ -5,6 +5,7 @@ import { expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 
 /** Keeps every living employee's fatigue topped up so a long drill/haul run is never derailed by a needs collapse mid-drive (mirrors blast-report-modal-save-load.integration.test.ts's fireBlast helper). */
@@ -113,7 +114,7 @@ export function drillGridChargeAndBlast(opts: {
 }
 
 /** Single-hole (1x1, spacing 3) form of `drillGridChargeAndBlast` at (startX, startZ). */
-export function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState } {
-  const { run, state } = drillGridChargeAndBlast({ rows: 1, cols: 1, spacing: 3, startX, startZ, amount, cash, tickCap: 400 });
-  return { run, state };
+export function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState; grid: VoxelGrid } {
+  const { run, state, ctx } = drillGridChargeAndBlast({ rows: 1, cols: 1, spacing: 3, startX, startZ, amount, cash, tickCap: 400 });
+  return { run, state, grid: ctx.grid! };
 }

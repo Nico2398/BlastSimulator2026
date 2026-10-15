@@ -17,6 +17,33 @@ import { expectWorldWithinBudget, worldPlays } from './worldBudget.js';
 const BUSIEST = 'vibration-budget';
 const SCENARIOS = [BUSIEST, 'survey-then-blast-playthrough', 'rock-fragmenter-breaking', 'weather-flood'] as const;
 
+/**
+ * rock-fragmenter-breaking fires a 5 kg breakout charge since #1774 (a 2 kg shot left all rubble sealed under the cap,
+ * and sealed rock gets no fragment order). That shot breaks the cap open, so its rubble flies (debris sounds) and
+ * the fragmenter has far more boulders to break (31 boulder_break instead of about 13). Stemming 1 m or 4.5 kg
+ * change nothing material (15.2 to 16.4 world sounds a minute, 12 to 14 boulder_break in 30 s); no charge that opens
+ * the cap is sound-neutral. Its own limits are measured below; every other scenario keeps the shared ones.
+ */
+const BREAKOUT = 'rock-fragmenter-breaking';
+const isBreakout = (name: string): boolean => name === BREAKOUT;
+const WORLD_PER_MINUTE = 15;
+const BREAKOUT_WORLD_PER_MINUTE = 18;
+const BUSIEST_SECOND = 16;
+const BREAKOUT_BUSIEST_SECOND = 23;
+const WORLD_PER_SECOND = 4;
+const MAX_VOICES = 12;
+/**
+ * Measured on the breakout game after #1787 (flush crater floors) moved its random-event clock: 5 world sounds in
+ * one second (t=320 s: a politics event's alert lands beside a hammer, a vehicle start and a boulder break) and 13
+ * voices at once in the shot second (21 sounds, see above). Events are not the shot's doing, only its timing.
+ * Re-measured after merging main's flush crater floors (#1787/#1795) and #1774's sealed-rock hauling: peaks at 14 voices, as the
+ * floors it flattens leave a little more rubble to voice. Limit 14; the engine cap is 32.
+ */
+const BREAKOUT_WORLD_PER_SECOND = 5;
+const WORLD_PER_30S = 21;
+const BREAKOUT_WORLD_PER_30S = 22; // 22 measured in the window around that same burst
+const BREAKOUT_MAX_VOICES = 14;
+
 const RUN_TIMEOUT_MS = 90_000;
 const SECONDS_PER_MINUTE = 60;
 
@@ -43,20 +70,23 @@ describe.each(SCENARIOS)('%s at 1x', (name) => {
   });
 
   it('plays the world (no blast, no player command) at most 15 times a minute', () => {
-    // Measured 8.7, 8.5, 10.2, 10.0.
-    expect(worldPlays(sim()).length / minutes(sim())).toBeLessThan(15);
+    // Measured 8.7, 8.5, 10.2, 10.0; 16.8 for the breakout shot (rock-fragmenter-breaking, see BREAKOUT), limit 18.
+    expect(worldPlays(sim()).length / minutes(sim())).toBeLessThan(isBreakout(name) ? BREAKOUT_WORLD_PER_MINUTE : WORLD_PER_MINUTE);
   });
 
   it('never asks for more than 4 world sounds in a second, 12 in ten, 21 in thirty', () => {
     // Measured worst second 3, ten seconds 9, thirty seconds 16 (rock-fragmenter-breaking).
-    expectWorldWithinBudget(sim(), { per1s: 4, per10s: 12, per30s: 21 });
+    // The breakout game breaks 13 boulders in 30 s (the shared ceiling is 12): its own ceiling is 14.
+    expectWorldWithinBudget(sim(), { per1s: isBreakout(name) ? BREAKOUT_WORLD_PER_SECOND : WORLD_PER_SECOND, per10s: 12, per30s: isBreakout(name) ? BREAKOUT_WORLD_PER_30S : WORLD_PER_30S }, isBreakout(name) ? { boulder_break: 14 } : {});
   });
 
-  it('keeps the busiest second, a blast, under 16 sounds and 12 voices at once', () => {
-    // Measured 12 sounds in a second (weather-flood's blast), 9 voices at most; the engine caps at 32.
+  it('keeps the busiest second, a blast, under 16 sounds (23 for the breakout shot) and 12 voices at once', () => {
+    // Measured 12 sounds in a second (weather-flood's blast), 9 voices at most; the engine caps at 32. The breakout
+    // shot of rock-fragmenter-breaking has flying rubble to voice (13 debris_pebble, 2 debris_hit, 2 vehicle_scrap,
+    // an alert in its first second): 21 sounds, limit 23.
     const stats = summarize(sim().recorder.plays, sim().realS);
-    expect(stats.maxPerSecond).toBeLessThanOrEqual(16);
-    expect(stats.maxVoices).toBeLessThanOrEqual(12);
+    expect(stats.maxPerSecond).toBeLessThanOrEqual(isBreakout(name) ? BREAKOUT_BUSIEST_SECOND : BUSIEST_SECOND);
+    expect(stats.maxVoices).toBeLessThanOrEqual(isBreakout(name) ? BREAKOUT_MAX_VOICES : MAX_VOICES);
   });
 
   it('asks the engine only for sounds it will admit', () => {

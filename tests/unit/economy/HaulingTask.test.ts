@@ -24,6 +24,7 @@ import {
   findHaulDepotApproach,
   isHaulEligibleVehicle,
 } from '../../../src/core/economy/HaulingTask.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
@@ -468,6 +469,27 @@ describe('findReachableGroundFragment — selection', () => {
     state.logistics.fragments[0]!.state = 'in_transit';
 
     expect(findReachableGroundFragment(state, vehicle.id)).toBeNull();
+  });
+
+  it('skips a fragment sealed under an intact cap when a grid is passed, finds it without one (#1774)', () => {
+    const state = createGame({ seed: SEED });
+    setFreightRoom(state, 5000);
+    state.navGrid = makeFlatNavGrid(20);
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    const voxelGrid = new VoxelGrid(6, 6);
+    for (let y = 0; y < 10; y++) {
+      for (let z = 0; z < 6; z++) {
+        for (let x = 0; x < 6; x++) {
+          voxelGrid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+        }
+      }
+    }
+    const base = makeFragment(1, 2, 2);
+    const sealed = { ...base, position: { ...base.position, y: 4 } }; // buried under the cap
+    addBlastFragments(state.logistics, [sealed]);
+
+    expect(findReachableGroundFragment(state, vehicle.id, voxelGrid)).toBeNull();
+    expect(findReachableGroundFragment(state, vehicle.id)).toBe(1);
   });
 });
 

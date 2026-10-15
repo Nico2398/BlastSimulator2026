@@ -51,6 +51,13 @@ interface Shot {
  */
 const REFERENCE_CHARGE_KG = 2.2;
 
+/**
+ * Boomite (kg) of the single-hole shot the hauling test fires. The 2 kg reference shot only cracks the rock loose
+ * under its intact cap, where it is sealed and gets no haul order (#1774); this one breaks out to the surface, so
+ * the rubble is reachable and gets hauled.
+ */
+const BREAKOUT_CHARGE_KG = 4;
+
 /** Ticks of hauling the verification slice runs (enough for several trips). */
 const HAUL_SLICE_TICKS = 400;
 
@@ -66,7 +73,8 @@ function crewRockFragmenter(run: Run, state: GameState): void {
   expect(run(`vehicle driver ${fragmenter.id} ${driver.id}`).success).toBe(true);
 }
 
-beforeAll(() => {
+/** Fires the reference Dusty Hollow shot with `cols` holes of `chargeKg` boomite each and reads off its ore. */
+function fireReferenceShot(cols: number, chargeKg: number): Shot {
   const { runner, ctx } = createRunner();
   const run: Run = (cmd) => runner.run(cmd);
   recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
@@ -82,9 +90,9 @@ beforeAll(() => {
   const rig = state.vehicles.vehicles.find((v) => v.type === 'drill_rig')!;
   const x = Math.round(rig.x) + 14;
   const z = Math.round(rig.z) + 13;
-  expect(run(`drill_plan grid rows:1 cols:2 spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
+  expect(run(`drill_plan grid rows:1 cols:${cols} spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
   tickUntil(run, state, 600, () => state.plannedDrillHoles.length === 0);
-  run(`charge hole:* explosive:boomite amount:${REFERENCE_CHARGE_KG} stemming:2`);
+  run(`charge hole:* explosive:boomite amount:${chargeKg} stemming:2`);
   tickUntil(run, state, 600, () => Object.keys(state.plannedChargesByHole).length === 0);
   run('sequence auto');
   clearBlastZone(run, state);
@@ -94,13 +102,17 @@ beforeAll(() => {
   expect(run('blast').success).toBe(true);
 
   const ore = state.logistics.fragments.filter((t) => !isBarrenFragment(t.fragment.oreDensities));
-  shot = {
+  return {
     run,
     state,
     oreMassKg: ore.reduce((sum, t) => sum + t.fragment.mass, 0),
     largestOreKg: Math.max(0, ...ore.map((t) => t.fragment.mass)),
     oreIds: ore.map((t) => t.fragment.id),
   };
+}
+
+beforeAll(() => {
+  shot = fireReferenceShot(2, REFERENCE_CHARGE_KG);
 }, 120_000);
 
 describe('freight warehouse capacity vs the reference Dusty Hollow blast (#1531)', () => {
@@ -133,7 +145,7 @@ describe('freight warehouse capacity vs the reference Dusty Hollow blast (#1531)
   });
 
   it('with a tier-2 warehouse, a spoil heap and a crewed hauler the ore hauled so far is stored, never blocked on storage, and the rest still fits', () => {
-    const { run, state } = shot;
+    const { run, state } = fireReferenceShot(1, BREAKOUT_CHARGE_KG);
     state.cash = 5_000_000; // wages over the haul must not bankrupt the mine and freeze it
     expect(state.logistics.storageCapacityKg).toBe(cap(2));
     expect(run('build spoil_heap at:30,30').success).toBe(true);

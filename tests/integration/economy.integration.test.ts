@@ -13,6 +13,7 @@ import {
   chargeCommand,
   blastCommand,
 } from '../../src/console/commands/mining.js';
+import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
 import { releaseVehicleReservation } from '../../src/core/engine/VehicleReservation.js';
 import { getVehicleReservation } from '../../src/core/entities/Vehicle.js';
@@ -795,7 +796,7 @@ describe('Economy', () => {
     const chargeResult = chargeCommand(ctx as any, [], {
       hole: '*',
       explosive: 'boomite',
-      amount: '5kg',
+      amount: '8kg',
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
@@ -891,7 +892,7 @@ describe('Economy', () => {
     probeDriver.z = probeVehicle.z;
 
     // 4. Reachability-aware fragment selection — the fix under test.
-    const fragmentId = findReachableGroundFragment(ctx.state!, vehicleId);
+    const fragmentId = findReachableGroundFragment(ctx.state!, vehicleId, ctx.grid);
     expect(fragmentId).not.toBeNull();
 
     // 5. Issue the haul.
@@ -988,9 +989,11 @@ describe('Economy', () => {
     // which is exactly why the full-economy-loop test above had to fall
     // back to a rubble_disposal contract instead. (18,19) matches that same
     // test's proven-reachable landing column for this seed/size fixture.
+    // Rests on the open ground of its column: below the surface it would be sealed rock, which gets no order (#1774).
+    const restY = computeVoxelColumnSurfaceY(ctx.grid!, 18, 19)! + 1;
     const fragment: FragmentData = {
       id: 9001,
-      position: { x: 18, y: 0, z: 19 },
+      position: { x: 18, y: restY, z: 19 },
       volume: 0.43,
       mass: 1075,
       rockId: 'sandite',
@@ -999,7 +1002,7 @@ describe('Economy', () => {
       isProjection: false,
       halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
       shapeSeed: 9001,
-      origin: { x: 18, y: 0, z: 19 },
+      origin: { x: 18, y: restY, z: 19 },
     };
     ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null, warehouseId: null });
 
@@ -1068,15 +1071,16 @@ describe('Economy', () => {
 
   it('collects ore automatically once ore-priority ranking lets ore-bearing fragments jump a full warehouse queue (#671)', () => {
     ctx = makeGameContext({ mineType: 'desert', seed: '20', size: '64', staffed: true, cash: '200000' });
+    // Krackle 10 kg, spacing 4: a charge that breaks out (#1724). A weaker one leaves the rock sealed, which gets no haul order (#1774).
 
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
-      origin: '18,19', rows: '3', cols: '3', spacing: '3', depth: '8',
+      origin: '18,19', rows: '3', cols: '3', spacing: '4', depth: '8',
     });
     expect(drillResult.success).toBe(true);
     driveDrillPlanToCompletion(ctx);
 
     const chargeResult = chargeCommand(ctx as any, [], {
-      hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m',
+      hole: '*', explosive: 'krackle', amount: '10kg', stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
     driveChargePlanToCompletion(ctx);

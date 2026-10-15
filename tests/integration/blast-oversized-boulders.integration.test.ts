@@ -8,6 +8,8 @@
 // blast-undercharge.json's charge parameters (small charge = oversized
 // fragments, zero projections).
 
+import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext } from '../../src/console/commands/world.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
@@ -159,6 +161,12 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
 
     const oversizedTracked = ctx.state!.logistics.fragments.find(f => isOversized(f.fragment.volume));
     expect(oversizedTracked).toBeDefined();
+    // The undercharged blast leaves its rubble sealed under the cap, and sealed rock gets no order (#1774).
+    // Rest this one boulder on the open ground of its column, as a thrown boulder would lie.
+    const boulderPos = oversizedTracked!.fragment.position;
+    const restY = computeVoxelColumnSurfaceY(ctx.grid!, Math.floor(boulderPos.x), Math.floor(boulderPos.z))! + 1;
+    (boulderPos as { y: number }).y = restY;
+    expect(isFragmentSealed(ctx.grid!, boulderPos)).toBe(false);
     const oversizedId = oversizedTracked!.fragment.id;
     const oversizedVolume = oversizedTracked!.fragment.volume;
 
