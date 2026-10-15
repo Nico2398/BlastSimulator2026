@@ -1932,6 +1932,16 @@ export const NEED_WELL_RESTED_BONUS = 1;
  */
 export const NEED_COMFORT_MORALE_RECOVERY = 0.1;
 
+/**
+ * One-off morale credit when a policy-forced rest completes (#1801). A
+ * debris-hauler cycle nets about -41 morale per ~44-tick cycle because fatigue
+ * stays under the 50-80 comfort band; +50 rewards finishing a rest the policy
+ * asked for. Gated on the policy rest threshold being at least
+ * NEED_MORALE_EFFECT_THRESHOLDS.comfortable, so `continuous` and other
+ * low-threshold policies get none.
+ */
+export const REST_COMPLETION_MORALE_CREDIT = 50;
+
 /** Soft threshold per gauge: below this, proactive rest routing queues a rest action but does not yet force one. */
 export const NEED_SOFT_THRESHOLDS: Record<NeedKey, number> = {
   fatigue: 25,

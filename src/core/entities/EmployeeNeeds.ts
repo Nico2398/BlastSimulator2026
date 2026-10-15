@@ -189,3 +189,13 @@ export function computeCrewFatigueStrain(
   }
   return n > 0 ? sum / n : 0;
 }
+
+/**
+ * Morale credit granted when a policy-forced rest completes (#1801).
+ * Zero for policies whose rest threshold is below the comfort band.
+ */
+export function restCompletionMoraleCredit(policyRestThreshold: number): number {
+  // TODO: implement
+  void policyRestThreshold;
+  return 0;
+}
