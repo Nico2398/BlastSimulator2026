@@ -142,6 +142,8 @@ export class UIManager {
     this.crewPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.surveyPanel = new SurveyPanel(leftCol);
     this.surveyPanel.setCloseHandler(() => this.hideAllPanels());
+    this.surveyPanel.setNotifyHandler(n => this.notify(n));
+    this.surveyPanel.setHireSurveyorHandler(() => this.showCrewHiring('surveyor'));
     this.shadyPanel = new ShadyPanel(leftCol);
     this.shadyPanel.setCloseHandler(() => this.hideAllPanels());
     this.shadyPanel.setConfirmHandler(config => this.confirmModal.show(config));
@@ -350,8 +352,8 @@ export class UIManager {
 
   /** Open the Crew panel with hiring for `role` in view. */
   showCrewHiring(role: EmployeeRole): void {
-    void role;
-    // TODO: implement
+    this.showPanel('employees');
+    this.crewPanel.revealHiring(role);
   }
 
   /** Register a notification: appears as a toast now, stays in the activity log. */

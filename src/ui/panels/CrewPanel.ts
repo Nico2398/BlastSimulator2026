@@ -41,6 +41,8 @@ export class CrewPanel extends PanelBase {
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private expandedId: number | null = null;
   private lastSignature = '';
+  /** Role to scroll into view once the hiring section next renders (revealHiring before first render/show). */
+  private pendingHiringRole: EmployeeRole | null = null;
   private lastState: GameState | null = null;
   private onSelectEmployeeCb?: (employeeId: number) => void;
   private readonly locale = new LocaleTextRegistry();
@@ -99,8 +101,15 @@ export class CrewPanel extends PanelBase {
 
   /** Show the hiring section with candidates of `role` in view. */
   revealHiring(role: EmployeeRole): void {
-    void role;
-    // TODO: implement
+    if (!this.lastState || !this.visible) {
+      this.pendingHiringRole = role;
+      return;
+    }
+    this.scrollToHiring(role);
+  }
+
+  private scrollToHiring(role: EmployeeRole): void {
+    this.bodyEl.querySelector<HTMLElement>(`[data-hiring-role="${role}"]`)?.scrollIntoView?.({ block: 'start' });
   }
 
   update(state: GameState): void {
@@ -197,6 +206,10 @@ export class CrewPanel extends PanelBase {
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`)),
     ]);
+    if (this.pendingHiringRole && this.visible) {
+      this.scrollToHiring(this.pendingHiringRole);
+      this.pendingHiringRole = null;
+    }
   }
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
