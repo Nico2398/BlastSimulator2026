@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
-import { findAvailableDriverForReposition } from '../../../src/core/entities/VehicleDriverAssignment.js';
+import { findAvailableDriverForReposition, findRestingLicensedDriver } from '../../../src/core/entities/VehicleDriverAssignment.js';
 import { createEmployeeState, hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
@@ -215,5 +215,68 @@ describe('findAvailableDriverForReposition — ranking', () => {
     addLicensedDriver(es, rng, 22, 22).restTicksRemaining = 5;
 
     expect(findAvailableDriverForReposition(vehicle, vs, es)).toBeNull();
+  });
+});
+
+describe('findRestingLicensedDriver (#1746)', () => {
+  it('returns null when the roster is empty (boundary)', () => {
+    const { vs, es, vehicle } = makeFixture(240);
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)).toBeNull();
+  });
+
+  it('picks a licensed employee resting (restTicksRemaining set)', () => {
+    const { vs, es, vehicle, rng } = makeFixture(241);
+    const driver = addLicensedDriver(es, rng, 40, 40);
+    driver.restTicksRemaining = 12;
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)?.id).toBe(driver.id);
+  });
+
+  it('picks a licensed employee about to rest (pendingRestDuration set)', () => {
+    const { vs, es, vehicle, rng } = makeFixture(242);
+    const driver = addLicensedDriver(es, rng, 40, 40);
+    driver.pendingRestDuration = 12;
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)?.id).toBe(driver.id);
+  });
+
+  it('returns null for a licensed employee who is not resting (rejection)', () => {
+    const { vs, es, vehicle, rng } = makeFixture(243);
+    addLicensedDriver(es, rng, 21, 21);
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)).toBeNull();
+  });
+
+  it('returns null for a resting employee without the licence (rejection)', () => {
+    const { vs, es, vehicle, rng } = makeFixture(244);
+    const { employee } = hireEmployee(es, 'driller', rng, 21, 21);
+    employee.restTicksRemaining = 12;
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)).toBeNull();
+  });
+
+  it('skips dead and injured resting licensed employees', () => {
+    const { vs, es, vehicle, rng } = makeFixture(245);
+    const dead = addLicensedDriver(es, rng, 20, 21);
+    dead.restTicksRemaining = 12;
+    dead.alive = false;
+    const hurt = addLicensedDriver(es, rng, 21, 20);
+    hurt.restTicksRemaining = 12;
+    hurt.injured = true;
+    const ok = addLicensedDriver(es, rng, 60, 60);
+    ok.restTicksRemaining = 12;
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)?.id).toBe(ok.id);
+  });
+
+  it('picks the nearest among several resting licensed employees', () => {
+    const { vs, es, vehicle, rng } = makeFixture(246);
+    const far = addLicensedDriver(es, rng, 0, 0);
+    const near = addLicensedDriver(es, rng, 22, 20);
+    far.restTicksRemaining = 5;
+    near.pendingRestDuration = 5;
+
+    expect(findRestingLicensedDriver(vehicle, vs, es)?.id).toBe(near.id);
   });
 });
