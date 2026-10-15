@@ -1777,7 +1777,7 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 2 })]));
       const row = findPlacedRow(container, 4);
       expect(row.textContent).toContain('#4');
-      expect(row.querySelector('svg, img, [data-icon]')).not.toBeNull();
+      expect(row.querySelector('svg, img, bs-icon, [data-icon]')).not.toBeNull();
     });
 
     it('the HP bar width is round(hp / maxHp * 100)%', () => {

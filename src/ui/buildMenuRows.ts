@@ -72,10 +72,12 @@ export function syncPlacedRow(row: HTMLElement, model: PlacedRowModel): void {
   const hp = liveNode(row, 'hp');
   if (hp) writeText(hp, model.hpText);
   syncOptional(row, 'util', model.utilization?.text ?? null, () => live(el('div', { className: 'bsx-mono bs-build-row-util' }), 'util'));
-  syncOptional(row, 'badge', model.badge === null ? null : t(`ui.build.row.badge.${model.badge}`),
-    () => live(el('span', { className: 'bs-build-row-badge' }), 'badge'));
-  const badge = liveNode(row, 'badge');
-  if (badge) badge.dataset['badge'] = model.badge ?? '';
+  // The badge node always exists on a placed row so a status change later writes in place.
+  let badge = liveNode(row, 'badge');
+  if (!badge) { badge = live(el('span', { className: 'bs-build-row-badge' }), 'badge'); row.append(badge); }
+  writeText(badge, model.badge === null ? '' : t(`ui.build.row.badge.${model.badge}`));
+  badge.hidden = model.badge === null;
+  badge.dataset['badge'] = model.badge ?? '';
 }
 
 function progressText(progress: number | null): string {

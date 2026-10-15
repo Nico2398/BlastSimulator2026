@@ -495,8 +495,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1662: +1 key (ui.settings.audio.credits): 3977.
     // #1675: +4 keys (rating_cap_fizzled_failure / _fizzled_partial in ui.blast_workshop.report and mining.blast): 3981.
     // #1676: depth_full + depth_surface removed, depth_metres added, net -1: 3980. #1678: +6 explosive-stock keys: 3986. #1679: +4 drill-reach keys: 3990. #1686: +10 sandbox keys: 4000. #1683: +4 survey-depth keys: 4004. #1683: +1 depth-log row key: 4005. #1685: +14 explosive-stock UI keys: 4019. #1684: +5 survey ore-row keys: 4024. #1684: +4 compact-number keys (ui.survey.compact_lt1/k/m/b): 4028. #1714: +1 order-blocked key: 4029. #1731: +2 sandbox detail depth keys: 4031. #1726: +5 training-level keys, -1 unused (train_already_qualified): 4035. #1724: +3 breakout report keys: 4038. #1752: -1 hovertag no_survey key: 4037. #1751: -1 shell.topbar.paused: 4036. #1771: +2 survey blocker keys (blocked_title, hire_surveyor): 4038. #1756: +33 inspector.* keys, -15 shell.selection.* keys: 4056. #1758: +20 inspector building status/action keys: 4076, -1 unused inspector.rebuilding: 4075. #1762: +10 employee-inspector crew keys: 4085, +1 inspector.command_failed: 4086.
-    // #1808: +8 research.queue_* keys (main baseline 4097 after other merges). #1757: +10 inspector storage-contents keys: 4107. #1816: +2 protection-lingering keys: 4109.
-    expect(Object.keys(en).length).toBe(4109);
+    // #1808: +8 research.queue_* keys (main baseline 4097 after other merges). #1757: +10 inspector storage-contents keys: 4107. #1816: +2 protection-lingering keys: 4109. #1759: +12 ui.build.row.* / site_section keys: 4121.
+    expect(Object.keys(en).length).toBe(4121);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
