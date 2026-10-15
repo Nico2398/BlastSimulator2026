@@ -44,43 +44,6 @@ export function buyChargingTruck(run: (cmd: string) => unknown, state: GameState
   expect(state.vehicles.vehicles.some(v => v.type === 'charging_truck')).toBe(true);
 }
 
-/**
- * Hires a driller, licenses them for the drill_rig, drills+charges
- * a single hole at (startX, startZ) with the given charge amount (spacing:3
- * depth:6 diameter:0.089, stemming:2 — this file's own verified parameters),
- * then detonates it. Returns the runner/state plus a bound `run` so callers
- * can continue driving ticks afterward.
- */
-export function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState } {
-  const { runner, ctx } = createRunner();
-  const run = (cmd: string) => runner.run(cmd);
-
-  expect(run(`campaign start level:tutorial_pit cash:${cash}`)).toMatchObject({ success: true });
-  const state = ctx.state!;
-
-  expect(run('employee hire role:driller')).toMatchObject({ success: true });
-  const driller = state.employees.employees.find(e => e.role === 'driller')!;
-
-  expect(run('vehicle buy drill_rig')).toMatchObject({ success: true });
-  expect(run(`employee assign_skill ${driller.id} skill:driving.drill_rig level:1`)).toMatchObject({ success: true });
-  // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
-  buyChargingTruck(run, state, driller.id);
-
-  expect(run(`drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:${startX},${startZ} diameter:0.089`)).toMatchObject({ success: true });
-  tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 400);
-  expect(state.plannedDrillHoles.length).toBe(0);
-  expect(state.drillHoles.length).toBe(1);
-
-  expect(run(`charge hole:* explosive:boomite amount:${amount} stemming:2`)).toMatchObject({ success: true });
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 400);
-  expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
-
-  expect(run('blast')).toMatchObject({ success: true });
-  expect(state.lastBlastReport).not.toBeNull();
-
-  return { run, state };
-}
-
 /** Hires an excavator-licensed driver, buys a rock_digger and crews it, so a built ramp actually gets carved. */
 export function crewRockDigger(run: (cmd: string) => unknown, state: GameState): void {
   hireDriver(run, state);
@@ -109,14 +72,17 @@ export function makeRubbleFragment(id: number, massKg: number, origin: { x: numb
 }
 
 /**
- * Like `drillChargeAndBlast`, for a rows x cols grid pattern (#1740): drills every hole,
- * charges them all with `amount` kg and detonates. `flatten` runs on the fresh level's
- * grid before any drilling, so a test can level the site the pattern sits on.
+ * Hires a driller, licenses them for the drill_rig, drills+charges a rows x cols grid pattern
+ * (depth:6 diameter:0.089, boomite, stemming:2 — this file's own verified parameters) with `amount` kg
+ * per hole, then detonates it. Returns the runner/state plus a bound `run` so callers can continue
+ * driving ticks afterward. `flatten` runs on the fresh level's grid before any drilling, so a test
+ * can level the site the pattern sits on (#1740).
  */
 export function drillGridChargeAndBlast(opts: {
   rows: number; cols: number; spacing: number; startX: number; startZ: number; amount: number;
-  cash?: number; flatten?: (ctx: MiningContext) => void;
+  cash?: number; tickCap?: number; flatten?: (ctx: MiningContext) => void;
 }): { run: (cmd: string) => unknown; state: GameState; ctx: MiningContext } {
+  const tickCap = opts.tickCap ?? 3000;
   const { runner, ctx } = createRunner();
   const run = (cmd: string) => runner.run(cmd);
 
@@ -128,19 +94,26 @@ export function drillGridChargeAndBlast(opts: {
   const driller = state.employees.employees.find(e => e.role === 'driller')!;
   expect(run('vehicle buy drill_rig')).toMatchObject({ success: true });
   expect(run(`employee assign_skill ${driller.id} skill:driving.drill_rig level:1`)).toMatchObject({ success: true });
+  // Charging is worked from a charging truck by a blasting + driving.truck crew member (#1649).
   buyChargingTruck(run, state, driller.id);
 
   const holeCount = opts.rows * opts.cols;
   expect(run(`drill_plan grid rows:${opts.rows} cols:${opts.cols} spacing:${opts.spacing} depth:6 start:${opts.startX},${opts.startZ} diameter:0.089`)).toMatchObject({ success: true });
-  tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 3000);
+  tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, tickCap);
   expect(state.plannedDrillHoles.length).toBe(0);
   expect(state.drillHoles.length).toBe(holeCount);
 
   expect(run(`charge hole:* explosive:boomite amount:${opts.amount} stemming:2`)).toMatchObject({ success: true });
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, tickCap);
   expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
   expect(run('blast')).toMatchObject({ success: true });
   expect(state.lastBlastReport).not.toBeNull();
   return { run, state, ctx };
+}
+
+/** Single-hole (1x1, spacing 3) form of `drillGridChargeAndBlast` at (startX, startZ). */
+export function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState } {
+  const { run, state } = drillGridChargeAndBlast({ rows: 1, cols: 1, spacing: 3, startX, startZ, amount, cash, tickCap: 400 });
+  return { run, state };
 }

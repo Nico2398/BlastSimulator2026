@@ -313,7 +313,7 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
         const strandedInCrater = (): number =>
           state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach' && inCrater(a)).length;
         tickUntilFresh(run, state, () => false, 2);
-        tickUntilFresh(run, state, () => strandedInCrater() === 0, 1500); // the crew classifies a few pieces per tick // the crew classifies a few pieces per tick
+        tickUntilFresh(run, state, () => strandedInCrater() === 0, 1500); // the crew classifies a few pieces per tick
         expect(debrisActions(state).filter(inCrater).length).toBeGreaterThan(0);
         expect(strandedInCrater(), 'crater debris still stamped debris_out_of_reach after the ramp').toBe(0);
       },
