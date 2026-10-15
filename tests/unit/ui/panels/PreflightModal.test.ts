@@ -484,7 +484,7 @@ describe('PreflightModal — button names (#1749)', () => {
     const { modal } = makeModal();
     modal.show();
     modal.update(chargedPlan(), 'sunny');
-    expect(buttonText(modal.root, 'preflight-detonate')).toContain(detonate);
+    expect(buttonText(modal.root, 'preflight-detonate')).toBe(detonate);
   });
 
   it.each(cases)('[%s] the waiting buttons read "%s" / "%s"', (locale, _d, fireAnyway, cancel) => {
@@ -496,16 +496,5 @@ describe('PreflightModal — button names (#1749)', () => {
     modal.update(state, 'sunny');
     expect(buttonText(modal.root, 'preflight-fire-anyway')).toBe(fireAnyway);
     expect(buttonText(modal.root, 'preflight-cancel-detonation')).toBe(cancel);
-  });
-
-  it('en button text never says Fire or Detonate', () => {
-    const { modal } = makeModal();
-    modal.show();
-    const state = chargedPlan();
-    state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
-    modal.update(state, 'sunny');
-    for (const a of ['preflight-fire-anyway', 'preflight-cancel-detonation']) {
-      expect(buttonText(modal.root, a)).not.toMatch(/fire|detonat/i);
-    }
   });
 });

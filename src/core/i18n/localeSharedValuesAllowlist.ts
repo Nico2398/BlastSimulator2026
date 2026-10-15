@@ -54,9 +54,9 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.settings.french',  // "Français"
 
   // ── Product term: the game's own word for the action ──
-  'ui.blast_workshop.step.fire',       // "Blast"
-  'ui.blast_workshop.footer.fire',     // "Blast"
-  'ui.blast_workshop.preflight.detonate', // "Blast"
+  'ui.blast_workshop.step.fire',                // "Blast"
+  'ui.blast_workshop.footer.fire',              // "Blast"
+  'ui.blast_workshop.preflight.detonate',       // "Blast"
 
   // ── True French/English cognates ──
   'need.fatigue',               // "Fatigue"
