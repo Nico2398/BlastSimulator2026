@@ -726,6 +726,8 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate (#555)', 
       maxRecentVibration: 0,
       employeeCount: 0,
       looseRockKg: 0,
+      bedCapacity: 0,
+      crewFatigueStrain: 0,
     });
 
     expect(Number.isNaN(restored.scores.wellBeing)).toBe(false);
@@ -2342,6 +2344,8 @@ describe('deserialize — ScoreState dust fields absent from an old save (#1733)
       maxRecentVibration: 0,
       employeeCount: 0,
       looseRockKg: 2_000_000,
+      bedCapacity: 0,
+      crewFatigueStrain: 0,
     });
 
     expect(Number.isNaN(restored.scores.ecology)).toBe(false);
