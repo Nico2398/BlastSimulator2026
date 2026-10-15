@@ -62,7 +62,7 @@ import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { formatGameDuration } from './ui/formatGameDuration.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
-import { isHostResolvedKind, resolveSelection, type SelectionAnchor } from './ui/scene/SelectionHost.js';
+import { buildingFootprint, isHostResolvedKind, resolveSelection, type SelectionAnchor, type SiteFootprint } from './ui/scene/SelectionHost.js';
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
@@ -1249,10 +1249,16 @@ function anchorKey(anchor: SelectionAnchor): string {
   const f = anchor.footprint;
   return `site:${f.minX},${f.maxX},${f.minZ},${f.maxZ}`;
 }
-function anchorWorldPosition(entity: EntityPick, anchor: SelectionAnchor): THREE.Vector3 | null {
-  if (anchor.type === 'self') return gameRenderer.entityWorldPosition(entity.kind, entity.id);
-  if (anchor.type === 'host') return gameRenderer.entityWorldPosition(anchor.kind, anchor.id);
-  const f = anchor.footprint;
+/** Tile rectangle to outline for an anchor: a planned site, or the live building hosting the selection. Vehicles and self keep the ring. */
+function anchorFootprint(anchor: SelectionAnchor, state: GameState): SiteFootprint | null {
+  if (anchor.type === 'site') return anchor.footprint;
+  if (anchor.type !== 'host' || anchor.kind !== 'building') return null;
+  const b = state.buildings.buildings.find(x => x.id === anchor.id);
+  return b ? buildingFootprint(b) : null;
+}
+function anchorWorldPosition(entity: EntityPick, anchor: SelectionAnchor, state: GameState): THREE.Vector3 | null {
+  const f = anchorFootprint(anchor, state);
+  if (!f) return gameRenderer.entityWorldPosition(anchor.type === 'host' ? anchor.kind : entity.kind, anchor.type === 'host' ? anchor.id : entity.id);
   const x = (f.minX + f.maxX + 1) / 2, z = (f.minZ + f.maxZ + 1) / 2;
   return new THREE.Vector3(x, gameRenderer.smoothSurfaceYAt(x, z), z);
 }
@@ -1261,12 +1267,13 @@ function showSelection(entity: EntityPick, state: GameState): void {
   const resolved = isHostResolvedKind(entity.kind) ? resolveSelection(state, entity.kind, entity.id) : null;
   const anchor: SelectionAnchor = resolved?.exists ? resolved.anchor : { type: 'self' };
   shownAnchorKey = anchorKey(anchor);
-  const pos = anchorWorldPosition(entity, anchor);
+  const pos = anchorWorldPosition(entity, anchor, state);
+  const footprint = anchorFootprint(anchor, state);
   const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
   shownRampWidth = ramp?.width ?? null;
   shownVehicleKey = vehicleSelectionKey(entity, state);
   if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
-  else if (pos && anchor.type === 'site') entityHighlight.showFootprint(anchor.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
+  else if (pos && footprint) entityHighlight.showFootprint(footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
   else if (pos) entityHighlight.show(pos, anchor.type === 'host' ? anchor.kind : entity.kind);
   else entityHighlight.hide();
 }
@@ -1444,7 +1451,7 @@ scene.start((dt) => {
       ? resolveSelection(ctx.state, selection.kind, selection.id)
       : null;
     const hostResolved = isHostResolvedKind(selection.kind);
-    const pos = resolved?.exists ? anchorWorldPosition(selection, resolved.anchor)
+    const pos = resolved?.exists ? anchorWorldPosition(selection, resolved.anchor, ctx.state!)
       : hostResolved ? null : gameRenderer.entityWorldPosition(selection.kind, selection.id);
     if (resolved ? !resolved.exists : !hostResolved && !pos) scenePicking.clearSelection();
     else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === selection.id)?.width !== shownRampWidth) {

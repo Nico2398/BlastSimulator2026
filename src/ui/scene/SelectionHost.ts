@@ -1,11 +1,12 @@
 import type { GameState } from '../../core/state/GameState.js';
+import type { Building } from '../../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../../core/entities/Building.js';
 
 /** Selection kinds whose on-screen anchor may be a host (building, vehicle, site) rather than the entity itself. */
 type HostResolvedKind = 'employee' | 'vehicle' | 'building' | 'fragment';
 
 /** Inclusive tile rectangle. */
-interface SiteFootprint {
+export interface SiteFootprint {
   minX: number;
   maxX: number;
   minZ: number;
@@ -26,6 +27,12 @@ type SelectionWorld = Pick<
 
 export function isHostResolvedKind(kind: string): kind is HostResolvedKind {
   return kind === 'employee' || kind === 'vehicle' || kind === 'building' || kind === 'fragment';
+}
+
+/** Inclusive tile rectangle a building (or its planned site) covers. */
+export function buildingFootprint(b: Pick<Building, 'type' | 'tier' | 'x' | 'z'>): SiteFootprint {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
+  return { minX: b.x, maxX: b.x + sizeX - 1, minZ: b.z, maxZ: b.z + sizeZ - 1 };
 }
 
 const SELF: SelectionResolution = { exists: true, anchor: { type: 'self' } };
@@ -61,14 +68,7 @@ export function resolveSelection(
       if (world.buildings.buildings.some(b => b.id === id)) return SELF;
       const site = world.plannedBuildings.find(pb => pb.buildingId === id);
       if (!site) return { exists: false };
-      const { sizeX, sizeZ } = getDefSize(getBuildingDef(site.type, site.tier));
-      return {
-        exists: true,
-        anchor: {
-          type: 'site',
-          footprint: { minX: site.x, maxX: site.x + sizeX - 1, minZ: site.z, maxZ: site.z + sizeZ - 1 },
-        },
-      };
+      return { exists: true, anchor: { type: 'site', footprint: buildingFootprint(site) } };
     }
     case 'fragment': {
       const f = world.logistics.fragments.find(x => x.fragment.id === id);
