@@ -25,6 +25,10 @@
 import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
+import { createRunner } from '../../src/console/createRunner.js';
+import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
+import { isAutoDebrisAction } from '../../src/core/economy/HaulDispatch.js';
 import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import {
@@ -208,5 +212,121 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
         expect(action.blockedReason).not.toBe('debris_out_of_reach');
       }
     },
+  );
+});
+
+// ── Rock sealed in a failed blast's void is not debris (#1774) ──────────────
+//
+// #1724 leaves a charge that fails to break out sealed under its intact cap.
+// The dispatcher used to treat that rock as ordinary surface debris, so crews
+// drove onto the cap and hauled the ore out through solid ground.
+
+const SEALED_SEED = 42;
+const SEALED_SHOT_START = '28,18';
+const SEALED_WATCH_TICKS = 500;
+const SEALED_DEPOT_AT = '10,10';
+const SEALED_HEAP_AT = '10,16';
+
+function topUp(state: GameState): void {
+  state.cash = Math.max(state.cash, 5_000_000);
+  for (const e of state.employees.employees) e.fatigue = 100;
+}
+
+function tickTopped(run: (cmd: string) => unknown, state: GameState, ticks: number, each?: () => void): void {
+  for (let i = 0; i < ticks; i++) { topUp(state); run('tick 1'); each?.(); }
+}
+
+function tickToppedUntil(run: (cmd: string) => unknown, state: GameState, until: () => boolean, max: number): void {
+  for (let i = 0; i < max && !until(); i++) { topUp(state); run('tick 1'); }
+}
+
+/** Drills, charges and fires a 3x3 Krackle pattern (spacing 4, depth 8) at SEALED_SHOT_START. */
+function fireKrackleShot(run: (cmd: string) => unknown, state: GameState, amountKg: number): void {
+  state.lastBlastReport = null;
+  expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SEALED_SHOT_START}`)).toMatchObject({ success: true });
+  tickToppedUntil(run, state, () => state.plannedDrillHoles.length === 0, 1500);
+  expect(state.plannedDrillHoles).toHaveLength(0);
+  const chargeResult = run(`charge hole:* explosive:krackle amount:${amountKg} stemming:2`);
+  expect(chargeResult).toMatchObject({ success: true });
+  tickToppedUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
+  expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+  expect(run('blast detonate')).toMatchObject({ success: true });
+  tickToppedUntil(run, state, () => state.lastBlastReport !== null, 600);
+  expect(state.lastBlastReport).not.toBeNull();
+}
+
+/** Ids of the fragments currently on the ground below their column's intact surface. */
+function sealedFragmentIds(state: GameState, grid: VoxelGrid): Set<number> {
+  const ids = new Set<number>();
+  for (const f of state.logistics.fragments) {
+    if (f.state === 'on_ground' && isFragmentSealed(grid, f.fragment.position)) ids.add(f.fragment.id);
+  }
+  return ids;
+}
+
+function ordersTargeting(state: GameState, fragmentIds: ReadonlySet<number>): PendingAction[] {
+  return debrisActions(state).filter(a => fragmentIds.has(a.payload['fragmentId'] as number));
+}
+
+describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
+  it(
+    'queues no haul or fragment order for the sealed rock, stores nothing, and hauls the rock of a later breakout blast',
+    () => {
+      const { runner, ctx } = createRunner();
+      const run = (cmd: string) => runner.run(cmd);
+      expect(run(`sandbox start biome:desert_badlands difficulty:normal seed:${SEALED_SEED} staffed:true`)).toMatchObject({ success: true });
+      const state = ctx.state!;
+      const grid = ctx.grid!;
+      topUp(state);
+
+      // Warehouse and spoil heap: staffed:true brings the crew, hauler and fragmenter but no buildings.
+      const buildResult = run(`build freight_warehouse at:${SEALED_DEPOT_AT}`);
+      expect(buildResult).toMatchObject({ success: true });
+      tickToppedUntil(run, state, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 600);
+      expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
+      expect(run(`build spoil_heap at:${SEALED_HEAP_AT}`)).toMatchObject({ success: true });
+
+      // Sealed blast: 4 kg Krackle never breaks out of the 8 m holes.
+      fireKrackleShot(run, state, 4);
+      expect(state.lastBlastReport!.ratingCap).toBe('no_breakout');
+
+      const sealed = sealedFragmentIds(state, grid);
+      expect(sealed.size).toBeGreaterThan(0);
+      // #1724's own criterion: every fragment sits under its column's surface.
+      const onGround = state.logistics.fragments.filter(f => f.state === 'on_ground');
+      expect(sealed.size).toBe(onGround.length);
+
+      // Crew, hauler, fragmenter and warehouse run for 500 ticks; the sealed rock is never touched.
+      let ordersSeen = 0;
+      tickTopped(run, state, SEALED_WATCH_TICKS, () => { ordersSeen += ordersTargeting(state, sealed).length; });
+      expect(state.vehicles.vehicles.some(v => v.type === 'debris_hauler')).toBe(true);
+      expect(state.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(true);
+      expect(ordersSeen).toBe(0);
+      expect(state.pendingActions.filter(a => isAutoDebrisAction(a.type) && sealed.has(a.payload['fragmentId'] as number))).toHaveLength(0);
+      expect(state.logistics.storedMassKg).toBe(0);
+      expect(Object.values(state.collectedOre).reduce((a, b) => a + b, 0)).toBe(0);
+      expect(state.logistics.fragments.filter(f => sealed.has(f.fragment.id) && f.state !== 'on_ground')).toHaveLength(0);
+
+      // A breakout blast over the same void opens it: its rock is ordinary debris.
+      const idsBefore = new Set(state.logistics.fragments.map(f => f.fragment.id));
+      fireKrackleShot(run, state, 10);
+      expect(state.lastBlastReport!.ratingCap).not.toBe('no_breakout');
+      const fresh = state.logistics.fragments.filter(f => !idsBefore.has(f.fragment.id) && f.state === 'on_ground');
+      expect(fresh.length).toBeGreaterThan(0);
+      const open = new Set(fresh.filter(f => !isFragmentSealed(grid, f.fragment.position)).map(f => f.fragment.id));
+      expect(open.size).toBeGreaterThan(0);
+
+      tickTopped(run, state, 5);
+      expect(ordersTargeting(state, open).length).toBeGreaterThan(0);
+      // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both.
+      const hauledKg = (): number => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
+      tickToppedUntil(run, state, () => hauledKg() > 0, 1500);
+      expect(hauledKg()).toBeGreaterThan(0);
+      // Some of the breakout blast's own rock was picked up (or split by the fragmenter).
+      const freshIds = new Set(fresh.map(f => f.fragment.id));
+      const freshStillOnGround = state.logistics.fragments.filter(f => freshIds.has(f.fragment.id) && f.state === 'on_ground').length;
+      expect(freshStillOnGround).toBeLessThan(fresh.length);
+    },
+    600000,
   );
 });
