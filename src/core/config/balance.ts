@@ -6,6 +6,7 @@ import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
+import type { ActionType } from '../state/GameState.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -1088,6 +1089,20 @@ export const EVACUATION_DRIVER_MAX_PATH_ATTEMPTS = 5;
 // entire default site, so a very distant ore fragment still loses to a truly
 // nearby plain one rather than winning unconditionally regardless of distance.
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
+
+/**
+ * Rank tier per action type: a HIGHER tier is considered before any lower one,
+ * and cost only orders candidates within a tier (#1742). Without it a cheap
+ * haul_debris trip chain starves a dearer charge_hole that gates the next
+ * shot. Unlisted types are tier 0. A new time-critical order type is one
+ * entry here; no ranking code changes.
+ */
+export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = { charge_hole: 1 };
+
+/** Rank tier of an action type (see ACTION_RANK_TIER). */
+export function actionRankTier(type: ActionType): number {
+  return ACTION_RANK_TIER[type] ?? 0;
+}
 
 /**
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
