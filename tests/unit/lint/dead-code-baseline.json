@@ -46,7 +46,6 @@
     "src/core/engine/GameLoop.ts:NeedRestorationResult",
     "src/core/engine/GameLoop.ts:SelectedAction",
     "src/core/engine/GameLoop.ts:ShiftCycleResult",
-    "src/core/engine/GameLoop.ts:SpeedMultiplier",
     "src/core/engine/GameLoop.ts:TaskProgressLevelUp",
     "src/core/engine/GameLoop.ts:TickEmployeesResult",
     "src/core/engine/GameLoop.ts:VALID_SPEEDS",

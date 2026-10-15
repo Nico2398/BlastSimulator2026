@@ -290,7 +290,7 @@ export function createRunner(): RunnerWithContext {
   runner.register('mafia', 'Mafia ops (status|accident|frame|smuggle)', (args, named) =>
     mafiaCommand(ctx, args, named),
   );
-  runner.register('time', 'Time control (status|pause|resume|speed 4)', (args, named) =>
+  runner.register('time', 'Time control (status|pause|resume|speed 4 [resume:true])', (args, named) =>
     timeCommand(ctx, args, named),
   );
 
