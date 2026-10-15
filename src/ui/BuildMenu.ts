@@ -64,7 +64,7 @@ import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
 import { memoizedPlacementCutoff, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
 import type { ListSelection } from './selectionRoute.js';
-import { placedRowModel, siteRowModel } from './panels/placedRowModel.js';
+import { placedRowModel, siteRowModel, type SiteRowModel } from './panels/placedRowModel.js';
 import { focusCameraOn } from './locateButton.js';
 import {
   applyRowSelection, makeSiteRow, onRowBodyClick, placedInfoBlock, siteSignature, syncPlacedRow, syncSiteRow,
@@ -220,8 +220,9 @@ export class BuildMenu extends PanelBase {
       this.lastPlacedSignature = placedSig;
       this.refreshPlacedList(state.buildings.buildings);
     }
-    this.syncSites(state);
-    this.syncLiveRows(state);
+    const siteModels = new Map(state.plannedBuildings.map((pb) => [pb.buildingId, siteRowModel(pb, state)]));
+    this.syncSites(state, siteModels);
+    this.syncLiveRows(state, siteModels);
     if (unlockedChanged || queueChanged) this.refreshCatalogButtons(state.cash);
     else if (state.buildings.researchQueue.length > 0) this.refreshResearchProgress();
 
@@ -233,31 +234,33 @@ export class BuildMenu extends PanelBase {
   }
 
   /** Rebuild the site rows when the planned set (or a site turning into a rebuild) changed. */
-  private syncSites(state: GameState): void {
-    const sig = siteSignature(state.plannedBuildings, (pb) => siteRowModel(pb, state).rebuild);
+  private syncSites(state: GameState, models: ReadonlyMap<number, SiteRowModel>): void {
+    const sig = siteSignature(state.plannedBuildings, (pb) => models.get(pb.buildingId)?.rebuild ?? false);
     if (sig === this.lastSiteSignature) return;
     this.lastSiteSignature = sig;
-    this.refreshSiteList();
+    this.refreshSiteList(models);
   }
 
-  private refreshSiteList(): void {
+  /** Rebuild the site rows; without `models` they are computed from the last observed state. */
+  private refreshSiteList(models?: ReadonlyMap<number, SiteRowModel>): void {
     const state = this.lastState;
     const sites = state?.plannedBuildings ?? [];
     this.siteWrapEl.style.display = state && sites.length > 0 ? 'flex' : 'none';
     this.siteEl.replaceChildren(...(state ? sites : []).map((pb) =>
-      makeSiteRow(pb, siteRowModel(pb, state!), () => this.selectBuildingCb?.(pb.buildingId))));
+      makeSiteRow(pb, models?.get(pb.buildingId) ?? siteRowModel(pb, state!), () => this.selectBuildingCb?.(pb.buildingId))));
     this.applySelection();
   }
 
   /** Write HP, utilization, badge and site progress into the existing rows. */
-  private syncLiveRows(state: GameState): void {
+  private syncLiveRows(state: GameState, siteModels: ReadonlyMap<number, SiteRowModel>): void {
+    const byId = new Map(state.buildings.buildings.map((b) => [b.id, b]));
     for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
-      const b = state.buildings.buildings.find((bb) => bb.id === Number(row.dataset['buildingId']));
+      const b = byId.get(Number(row.dataset['buildingId']));
       if (b) syncPlacedRow(row, placedRowModel(b, state));
     }
     for (const row of Array.from(this.siteEl.children) as HTMLElement[]) {
-      const pb = state.plannedBuildings.find((p) => p.buildingId === Number(row.dataset['buildingId']));
-      if (pb) syncSiteRow(row, siteRowModel(pb, state));
+      const model = siteModels.get(Number(row.dataset['buildingId']));
+      if (model) syncSiteRow(row, model);
     }
   }
 

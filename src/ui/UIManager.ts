@@ -367,7 +367,7 @@ export class UIManager {
     this.buildMenu.setSelectBuildingHandler(cb);
   }
 
-  /** Current scene selection for the list panels' row highlight; idempotent, re-applied on update and panel show. */
+  /** Current scene selection for the list panels' row highlight; idempotent, re-applied on update (the Build menu re-applies it itself on show). */
   setListSelection(sel: ListSelection): void {
     this.listSelection = sel;
     this.applyListSelection();
@@ -555,7 +555,7 @@ export class UIManager {
       case 'contracts': this.contractsPanel.show(); break;
       case 'finances': this.financesPanel.show(); break;
       case 'ops': this.operationsPanel.show(); break;
-      case 'build': this.buildMenu.show(); this.applyListSelection(); break;
+      case 'build': this.buildMenu.show(); break;
       case 'vehicles': this.fleetPanel.show(); break;
       case 'employees': this.crewPanel.show(); break;
       case 'survey': this.surveyPanel.show(); break;

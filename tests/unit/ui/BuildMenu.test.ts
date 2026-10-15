@@ -1777,6 +1777,7 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 2 })]));
       const row = findPlacedRow(container, 4);
       expect(row.textContent).toContain('#4');
+      expect(row.querySelector('.bs-build-row-name')!.textContent).toContain('Bureaucracy Box');
       expect(row.querySelector('svg, img, bs-icon, [data-icon]')).not.toBeNull();
     });
 
@@ -1827,7 +1828,7 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
     it('a spoil heap shows no utilization text', () => {
       menu.update(stateWith([makeBuilding({ id: 4, type: 'spoil_heap', tier: 1 })]));
       const util = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="util"]');
-      expect((util?.textContent ?? '').trim()).toBe('');
+      expect(util).toBeNull();
     });
   });
 
@@ -1963,6 +1964,25 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       const text = siteRow(7)!.textContent ?? '';
       expect(text).not.toContain('NaN');
       expect(siteRow(7)!.querySelector('[data-live="progress"]')!.textContent!.trim()).not.toBe('');
+    });
+
+    it('a rebuild site row shows the rebuilding badge, and flipping the flag rebuilds the row', () => {
+      const s = stateWith([]);
+      addSite(s, 8, true);
+      menu.update(s);
+      const badgeOf = (): HTMLElement | null => siteRow(8)!.querySelector<HTMLElement>('[data-live="badge"]');
+      expect(badgeOf()).not.toBeNull();
+      expect(badgeOf()!.textContent).toContain('Rebuilding');
+
+      const before = siteRow(8)!;
+      delete s.plannedBuildings[0]!.rebuild;
+      menu.update(s);
+      expect(siteRow(8)).not.toBe(before);
+      expect(badgeOf()).toBeNull();
+
+      s.plannedBuildings[0]!.rebuild = true;
+      menu.update(s);
+      expect(badgeOf()!.textContent).toContain('Rebuilding');
     });
 
     it('removes the site row once the planned entry is gone', () => {

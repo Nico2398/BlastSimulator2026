@@ -27,9 +27,20 @@ export function liveRow(label: string, key: string, text: string): HTMLElement {
   return row;
 }
 
+/** The descendant of `root` tagged `data-live="key"`, or null. */
+export function findLive(root: HTMLElement, key: string): HTMLElement | null {
+  return root.querySelector<HTMLElement>(`[data-live="${key}"]`);
+}
+
+/** Tag `node` as live under `key` and return it. */
+export function markLive(node: HTMLElement, key: string): HTMLElement {
+  node.dataset['live'] = key;
+  return node;
+}
+
 /** Write a live value in place; a no-op when unchanged so a steady frame touches no DOM. */
 export function setLive(root: HTMLElement, key: string, text: string): HTMLElement | null {
-  const node = root.querySelector<HTMLElement>(`[data-live="${key}"]`);
+  const node = findLive(root, key);
   if (node) writeText(node, text);
   return node;
 }

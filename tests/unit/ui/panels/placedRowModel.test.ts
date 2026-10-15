@@ -128,7 +128,7 @@ describe('placedRowModel — badge (#1759)', () => {
     expect(placedRowModel(b, s).badge).toBe('demolition_ordered');
   });
 
-  it('a standing building whose rebuild site exists reports rebuilding', () => {
+  it('a building id with only a rebuild site left in plannedBuildings reports rebuilding', () => {
     const b = mk({ id: 1, type: 'management_office' });
     const s = stateWith(b);
     s.buildings.buildings = [];

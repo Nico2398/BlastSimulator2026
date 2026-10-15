@@ -6,6 +6,7 @@ import { secondaryBlastRadiusM } from '../../../core/entities/SecondaryBlast.js'
 import type { GameState } from '../../../core/state/GameState.js';
 import { getOre } from '../../../core/world/OreCatalog.js';
 import { el } from '../../dom.js';
+import { fractionOf } from '../../../core/math/Fraction.js';
 import { liveRow, liveValue, sectionOf, setLive } from './inspectorWidgets.js';
 
 /** Rows at or below this mass are noise and stay hidden. */
@@ -41,7 +42,7 @@ function gaugeOf(stored: number, capacity: number): NonNullable<Model['gauge']> 
   const params = { stored: kgNumber(stored), capacity: kgNumber(capacity) };
   return {
     text: t('inspector.stock_capacity', params),
-    fraction: capacity > 0 ? Math.min(1, Math.max(0, stored / capacity)) : 0,
+    fraction: fractionOf(stored, capacity),
     aria: t('inspector.stock_gauge_aria', params),
   };
 }

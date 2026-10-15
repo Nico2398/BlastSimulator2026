@@ -1,3 +1,4 @@
+import { fractionOf } from '../../core/math/Fraction.js';
 import { t } from '../../core/i18n/I18n.js';
 import { warehouseStoredKg } from '../../core/economy/FreightWarehouses.js';
 import { getBuildingDef, getBuildingPeopleCapacity, warehouseStockKg, type Building } from '../../core/entities/Building.js';
@@ -21,12 +22,10 @@ export interface SiteRowModel {
   rebuild: boolean;
 }
 
-const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
-
 function kgUtilization(storedKg: number, capacity: number): NonNullable<PlacedRowModel['utilization']> {
   return {
     text: t('ui.build.row.util_kg', { stored: Math.round(storedKg), capacity: Math.round(capacity) }),
-    fraction: capacity > 0 ? clamp01(storedKg / capacity) : 0,
+    fraction: fractionOf(storedKg, capacity),
   };
 }
 
@@ -35,7 +34,7 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
   const beds = getBuildingPeopleCapacity(b.type, b.tier);
   if (beds > 0) {
     const inside = b.occupantIds.length;
-    return { text: t('ui.build.row.util_beds', { inside, capacity: beds }), fraction: clamp01(inside / beds) };
+    return { text: t('ui.build.row.util_beds', { inside, capacity: beds }), fraction: fractionOf(inside, beds) };
   }
   switch (b.type) {
     case 'explosive_warehouse': return kgUtilization(warehouseStockKg(b), capacity);
@@ -53,7 +52,7 @@ export function placedRowModel(b: Building, state: RowModelState): PlacedRowMode
   const kind = computeBuildingStatus(state, b.id)?.kind;
   const badge = kind === 'out_of_service' || kind === 'demolition_ordered' || kind === 'rebuilding' ? kind : null;
   return {
-    hpFraction: maxHp > 0 ? clamp01(b.hp / maxHp) : 0,
+    hpFraction: fractionOf(b.hp, maxHp),
     hpText: t('ui.build.row.hp', { hp: Math.round(b.hp), max: maxHp }),
     utilization: utilizationOf(b, state),
     badge,
