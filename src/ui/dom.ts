@@ -380,3 +380,20 @@ export function flashStatus(statusEl: HTMLElement, msg: string): void {
   statusEl.textContent = msg;
   setTimeout(() => { if (statusEl.textContent === msg) statusEl.textContent = ''; }, 3000);
 }
+
+interface FieldStyleOptions {
+  height: number;
+  padX: number;
+  fontWeight?: 400 | 600;
+}
+
+/**
+ * Inline style of a bsx text/number/select field: well background, strong hairline border, mono font.
+ * Border longhands (not the `border` shorthand) because jsdom drops a shorthand holding `var(...)`.
+ */
+export function fieldStyle({ height, padX, fontWeight = 600 }: FieldStyleOptions): string {
+  return [
+    `height:${height}px;padding:0 ${padX}px;border-radius:4px;border-style:solid;border-width:1px;border-color:var(--bsx-hairline-strong)`,
+    `background:var(--bsx-well);color:var(--bsx-text-primary);font:${fontWeight} 11px/1 var(--bsx-font-mono)`,
+  ].join(';');
+}

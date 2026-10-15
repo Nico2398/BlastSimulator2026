@@ -410,7 +410,7 @@ describe('Zone clearing and evacuation', () => {
     expect(employee.pendingDriverVehicleId).toBeNull();
   });
 
-  it('sends back a licensed idle employee this evacuation already moved out, to drive out a driverless vehicle nobody inside can take (#1648)', () => {
+  it('sends a licensed idle employee from outside the zone to drive out a driverless vehicle nobody inside can take (#1648, #1746)', () => {
     const state = makeState(36);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
@@ -418,13 +418,14 @@ describe('Zone clearing and evacuation', () => {
     const { employee } = hireEmployee(employees, 'driver', rng, 40, 40);
     assignSkill(employees, employee.id, 'driving.excavator', 1);
 
-    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true, [employee.id]);
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
     expect(result.orderedVehicleIds).toContain(vehicle.id);
     expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(result.awaitingRescuerVehicleIds).not.toContain(vehicle.id);
   });
 
-  it('leaves that vehicle stranded when the outside employee was never evacuated by this sequence (#1648)', () => {
+  it('draws the rescuer from the whole roster, not only employees who were in the zone when armed (#1746)', () => {
     const state = makeState(38);
     const { vehicles, employees } = state;
     const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
@@ -434,7 +435,11 @@ describe('Zone clearing and evacuation', () => {
 
     const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
 
-    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+    // Same rescue as #1648: walk to the vehicle, board, drive clear (via).
+    expect(employee.itinerary).not.toBeNull();
+    expect(employee.itinerary!.legs.some(l => l.mode === 'drive')).toBe(true);
   });
 
   it('still strands that vehicle when the idle outside employee cannot reach it (#1648)', () => {
@@ -445,9 +450,121 @@ describe('Zone clearing and evacuation', () => {
     const { employee } = hireEmployee(employees, 'driver', rng, 40, 40);
     assignSkill(employees, employee.id, 'driving.excavator', 1);
 
-    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => false, [employee.id]);
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => false);
 
     expect(result.strandedVehicleIds).toContain(vehicle.id);
+  });
+
+  // ── #1746: the crew parked the rig on the pattern and went to rest.
+
+  function restingDriverFixture(seed: number, rest: 'ticks' | 'pending') {
+    const state = makeState(seed);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee } = hireEmployee(employees, 'driller', new Random(seed), 40, 40);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+    if (rest === 'ticks') employee.restTicksRemaining = 30;
+    else employee.pendingRestDuration = 30;
+    return { state, vehicles, employees, vehicle, employee };
+  }
+
+  for (const rest of ['ticks', 'pending'] as const) {
+    it(`a licensed employee resting outside (${rest}) is not pulled off the rest: the vehicle awaits a rescuer, neither ordered nor stranded (#1746)`, () => {
+      const { state, vehicles, employees, vehicle, employee } = restingDriverFixture(rest === 'ticks' ? 60 : 61, rest);
+
+      const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+      expect(result.awaitingRescuerVehicleIds).toEqual([vehicle.id]);
+      expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+      expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+      expect(employee.itinerary).toBeNull();
+      expect(employee.pendingDriverVehicleId).toBeNull();
+      if (rest === 'ticks') expect(employee.restTicksRemaining).toBe(30);
+      else expect(employee.pendingRestDuration).toBe(30);
+    });
+  }
+
+  it('once the rest ends the next evacuation orders the employee and the vehicle no longer awaits (#1746)', () => {
+    const { state, vehicles, employees, vehicle, employee } = restingDriverFixture(62, 'ticks');
+    expect(clearZone(zone, state, vehicles, employees, findSafeDestination, () => true).awaitingRescuerVehicleIds).toContain(vehicle.id);
+
+    employee.restTicksRemaining = null;
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.awaitingRescuerVehicleIds).toHaveLength(0);
+    expect(result.orderedVehicleIds).toContain(vehicle.id);
+    expect(result.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+  });
+
+  it('a resting licensed employee who cannot reach the vehicle leaves it stranded, not awaiting (#1746)', () => {
+    const { state, vehicles, employees, vehicle } = restingDriverFixture(63, 'ticks');
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => false);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.awaitingRescuerVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('a resting licensed employee does not keep the vehicle awaiting when no safe destination exists (#1746)', () => {
+    const { state, vehicles, employees, vehicle } = restingDriverFixture(64, 'ticks');
+
+    const result = clearZone(zone, state, vehicles, employees, noSafeDestination, () => true);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.awaitingRescuerVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('a vehicle nobody is licensed for stays stranded, resting crew or not (#1746)', () => {
+    const state = makeState(65);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const rng = new Random(65);
+    // driller holds 'blasting', not driving.excavator.
+    hireEmployee(employees, 'driller', rng, 40, 40);
+    const { employee: resting } = hireEmployee(employees, 'driller', rng, 41, 41);
+    resting.restTicksRemaining = 30;
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(result.awaitingRescuerVehicleIds).toHaveLength(0);
+    expect(result.orderedVehicleIds).not.toContain(vehicle.id);
+  });
+
+  it('a rescuer already walking to this vehicle is not re-ordered and the vehicle is not stranded (#1746)', () => {
+    const state = makeState(66);
+    const { vehicles, employees } = state;
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee } = hireEmployee(employees, 'driver', new Random(66), 40, 40);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+    clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+    const itinerary = employee.itinerary;
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+
+    const again = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(again.strandedVehicleIds).not.toContain(vehicle.id);
+    expect(again.awaitingRescuerVehicleIds).not.toContain(vehicle.id);
+    expect(employee.itinerary).toBe(itinerary);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+  });
+
+  it('an employee mid-walk to a different vehicle is not picked as rescuer (#1746)', () => {
+    const state = makeState(67);
+    const { vehicles, employees } = state;
+    const { vehicle: other } = purchaseVehicle(vehicles, 'rock_digger', 50, 50);
+    const { vehicle } = purchaseVehicle(vehicles, 'rock_digger', 15, 15);
+    const { employee } = hireEmployee(employees, 'driver', new Random(67), 40, 40);
+    assignSkill(employees, employee.id, 'driving.excavator', 1);
+    employee.pendingDriverVehicleId = other.id;
+    const itinerary = employee.itinerary;
+
+    const result = clearZone(zone, state, vehicles, employees, findSafeDestination, () => true);
+
+    expect(result.strandedVehicleIds).toContain(vehicle.id);
+    expect(employee.pendingDriverVehicleId).toBe(other.id);
+    expect(employee.itinerary).toBe(itinerary);
   });
 
   it('strands a driverless vehicle when no safe destination exists, even with a qualified reachable employee — driver assignment must not happen without one (#1042)', () => {

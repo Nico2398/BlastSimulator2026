@@ -14,8 +14,10 @@ import { tickUntilFresh } from '../helpers/blastFixtures.js';
 import { buildPlanEnergyField } from '../../src/core/mining/BlastExecution.js';
 import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import { detonationPhase } from '../../src/core/engine/DetonationSequence.js';
+import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
 import {
-  NAV_MAX_SLOPE_RATIO,
+  BLAST_DANGER_MARGIN_M, NAV_MAX_SLOPE_RATIO,
   DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M,
   CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M,
 } from '../../src/core/config/balance.js';
@@ -425,6 +427,10 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     for (const v of s.state().vehicles.vehicles) { v.x = SAFE_XZ; v.z = SAFE_XZ; }
   }
 
+  function unlicenceCrew(s: Setup, category: string): void {
+    for (const e of s.state().employees.employees) e.qualifications = e.qualifications.filter(q => q.category !== category);
+  }
+
   function crewClear(s: Setup): void { crewAt(s, SAFE_XZ, SAFE_XZ); }
 
   /** Tick one at a time until a blast has been recorded (or the cap hits). */
@@ -611,6 +617,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     crewClear(s);
     const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
     vehicle.occupantIds = []; // driverless: cannot drive itself out
+    unlicenceCrew(s, 'driving.excavator'); // and nobody on the crew may rescue it (#1746)
     const typeName = t(`vehicle_type.${vehicle.type}`);
 
     const res = s.run('blast detonate');
@@ -636,6 +643,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     crewClear(s);
     const { vehicle } = purchaseVehicle(s.state().vehicles, 'rock_digger', 16, 16);
     vehicle.occupantIds = [];
+    unlicenceCrew(s, 'driving.excavator');
     s.run('blast detonate');
     expect(s.run('blast cancel').success).toBe(true);
     for (let i = 0; i < 50; i++) s.run('tick 1');
@@ -768,6 +776,125 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(res.success).toBe(false);
     expect(ctx.state!.pendingDetonation).toBeNull();
   });
+
+  // ── #1746: the crew parks the rig on the pattern and walks off to rest ──
+
+  /**
+   * Bare sandbox (Easy, desert_badlands, seed 42): optional quarters, a 3x3
+   * krackle 8 kg pattern (4 m, depth 8) at (36,32), fully drilled and charged.
+   * Cash is topped up so time, not money, is the limit.
+   */
+  function sandboxRigRepro(quarters: string | null) {
+    const engine = createRunner();
+    const { runner, ctx } = engine;
+    const run = (cmd: string) => runner.run(cmd);
+    const state = () => ctx.state!;
+    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42').success).toBe(true);
+    const topUp = () => { state().cash = Math.max(state().cash, 250000); };
+    topUp();
+    if (quarters !== null) expect(run(`build living_quarters at:${quarters}`).success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
+    for (let i = 0; i < 2500 && !(state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9); i++) { topUp(); run('tick 1'); }
+    expect(state().drillHoles.length).toBeGreaterThanOrEqual(9);
+    expect(run('charge hole:* explosive:krackle amount:8 stemming:2').success).toBe(true);
+    for (let i = 0; i < 3000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
+    expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
+    return { run, state, topUp };
+  }
+
+  type RigRepro = ReturnType<typeof sandboxRigRepro>;
+
+  /** Ticks until the blast fires; records whether the detonation ever read 'stranded'. */
+  function tickToBlast(s: RigRepro, cap: number): { ticks: number; everStranded: boolean } {
+    let everStranded = false;
+    let ticks = 0;
+    while (ticks < cap && s.state().damage.blastCount === 0) {
+      s.topUp();
+      s.run('tick 1');
+      ticks++;
+      if (s.state().pendingDetonation !== null && detonationPhase(s.state()).kind === 'stranded') everStranded = true;
+    }
+    return { ticks, everStranded };
+  }
+
+  it('quarters ~30 m away: the parked rig is driven out by its driller, the blast fires on its own, rig unharmed, safety unchanged (#1746)', () => {
+    const s = sandboxRigRepro('12,44');
+    const rig = s.state().vehicles.vehicles.find(v => v.type === 'drill_rig')!;
+    const maxHp = rig.hp;
+    const safetyBefore = s.state().scores.safety;
+
+    const res = s.run('blast detonate');
+    expect(res.success, res.output).toBe(true);
+    const { everStranded } = tickToBlast(s, 800);
+
+    expect(everStranded).toBe(false);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(s.state().pendingDetonation).toBeNull();
+    const after = s.state().vehicles.vehicles.find(v => v.id === rig.id);
+    expect(after, 'rig must survive').toBeDefined();
+    expect(after!.hp).toBe(maxHp);
+    expect(s.state().damage.accidents.some(a => a.type === 'vehicle_destroyed')).toBe(false);
+    expect(s.state().scores.safety).toBe(safetyBefore);
+  }, 240_000);
+
+  it('quarters ~30 m away: the rig ends outside the danger zone before the shot (#1746)', () => {
+    const s = sandboxRigRepro('12,44');
+    const rig = s.state().vehicles.vehicles.find(v => v.type === 'drill_rig')!;
+    s.run('blast detonate');
+    const zone = computeDangerZone(s.state().drillHoles, BLAST_DANGER_MARGIN_M)!;
+    tickToBlast(s, 800);
+
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(isInZone(rig.x, rig.z, zone)).toBe(false);
+  }, 240_000);
+
+  it('quarters beside the pattern: the blast still fires within about 20 ticks of arming (#1746)', () => {
+    const s = sandboxRigRepro('30,48');
+    s.run('blast detonate');
+
+    const { ticks, everStranded } = tickToBlast(s, 200);
+
+    expect(everStranded).toBe(false);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(ticks).toBeLessThanOrEqual(30);
+  }, 240_000);
+
+  it('no quarters: the blast still fires within about 20 ticks of arming (#1746)', () => {
+    const s = sandboxRigRepro(null);
+    s.run('blast detonate');
+
+    const { ticks, everStranded } = tickToBlast(s, 200);
+
+    expect(everStranded).toBe(false);
+    expect(s.state().damage.blastCount).toBe(1);
+    expect(ticks).toBeLessThanOrEqual(30);
+  }, 240_000);
+
+  it('a rig nobody is licensed for ends stranded and Fire anyway still fires (#1746)', () => {
+    const s = sandboxRigRepro('12,44');
+    const rig = s.state().vehicles.vehicles.find(v => v.type === 'drill_rig')!;
+    // Nobody on the roster may hold the rig's licence.
+    for (const e of s.state().employees.employees) {
+      e.qualifications = e.qualifications.filter(q => q.category !== 'driving.drill_rig');
+    }
+    rig.occupantIds = [];
+    rig.x = 40; rig.z = 36;
+    expect(s.state().employees.employees.some(e => e.qualifications.some(q => q.category === 'driving.drill_rig'))).toBe(false);
+
+    expect(s.run('blast detonate').success).toBe(true);
+    let stranded = false;
+    for (let i = 0; i < 250; i++) {
+      s.topUp();
+      s.run('tick 1');
+      if (detonationPhase(s.state()).kind === 'stranded') stranded = true;
+    }
+
+    expect(stranded).toBe(true);
+    expect(s.state().damage.blastCount).toBe(0);
+    const fired = s.run('blast');
+    expect(fired.success, fired.output).toBe(true);
+    expect(s.state().damage.blastCount).toBe(1);
+  }, 240_000);
 });
 
 // ── #1723: a blast breaks its floor down to grade, so the crater is drivable ──
