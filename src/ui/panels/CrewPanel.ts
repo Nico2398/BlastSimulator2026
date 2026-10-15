@@ -22,7 +22,7 @@ import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSect
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Employee } from '../../core/entities/Employee.js';
+import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
 import { injuryHoursRemaining } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
@@ -95,6 +95,12 @@ export class CrewPanel extends PanelBase {
     // Optional chained on the method itself, not just the element — jsdom
     // (unit tests) doesn't implement scrollIntoView at all.
     this.bodyEl.querySelector<HTMLElement>(`[data-employee-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  /** Show the hiring section with candidates of `role` in view. */
+  revealHiring(role: EmployeeRole): void {
+    void role;
+    // TODO: implement
   }
 
   update(state: GameState): void {

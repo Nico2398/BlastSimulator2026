@@ -31,6 +31,7 @@ import type { MarketId } from '../../core/economy/Market.js';
 import { summarizeSurveyOres } from '../../core/mining/SurveyOreSummary.js';
 import { buildOreRows } from './surveyOreRows.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import type { NotifyInput } from '../notify/NotificationCenter.js';
 
 
 /** Qualification a surveyor needs before any survey can be dispatched. */
@@ -59,6 +60,8 @@ export class SurveyPanel extends PanelBase {
   /** Player-facing visibility preference for the survey confidence overlay (#496), mirrored from GameRenderer via UIManager. */
   private overlayVisible = true;
   private onToggleOverlayCb?: (visible: boolean) => void;
+  protected notifyCb?: (n: NotifyInput) => void;
+  protected hireSurveyorCb?: () => void;
   private placementKit: PlacementKit | null = null;
   private selectedMethod: SurveyMethod = 'seismic';
   private worldSizeX = 40;
@@ -141,6 +144,16 @@ export class SurveyPanel extends PanelBase {
     this.syncOverlayButton();
   }
 
+
+  /** Wire the notification sink used when a blocked method is clicked. */
+  setNotifyHandler(cb: (n: NotifyInput) => void): void {
+    this.notifyCb = cb;
+  }
+
+  /** Wire the blocker's hire button (opens Crew hiring for the surveyor role). */
+  setHireSurveyorHandler(cb: () => void): void {
+    this.hireSurveyorCb = cb;
+  }
 
   refreshLocale(): void {
     this.locale.refresh();
@@ -312,6 +325,17 @@ export class SurveyPanel extends PanelBase {
     this.methodsEl.replaceChildren();
     this.buildMethodList();
     if (this.lastState) this.update(this.lastState);
+  }
+
+  /** Arm the point pick for the selected method. */
+  protected armPick(): void {
+    // TODO: implement
+  }
+
+  /** Reason no survey can run now (no geology-qualified employee), or null when unblocked. */
+  protected blockReason(state: GameState): string | null {
+    void state;
+    return null; // TODO: implement
   }
 
   private pickTargetAndRun(): void {

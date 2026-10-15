@@ -17,6 +17,7 @@ import { OperationsPanel } from './panels/OperationsPanel.js';
 import { BuildMenu } from './BuildMenu.js';
 import { FleetPanel } from './panels/FleetPanel.js';
 import { CrewPanel } from './panels/CrewPanel.js';
+import type { EmployeeRole } from '../core/entities/Employee.js';
 import { EventModal } from './panels/EventModal.js';
 import { SurveyPanel } from './panels/SurveyPanel.js';
 import { ShadyPanel } from './panels/ShadyPanel.js';
@@ -345,6 +346,12 @@ export class UIManager {
   /** Wire the Fleet panel's per-row click-to-select (main.ts owns ScenePicking). */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void {
     this.fleetPanel.setSelectVehicleHandler(cb);
+  }
+
+  /** Open the Crew panel with hiring for `role` in view. */
+  showCrewHiring(role: EmployeeRole): void {
+    void role;
+    // TODO: implement
   }
 
   /** Register a notification: appears as a toast now, stays in the activity log. */
