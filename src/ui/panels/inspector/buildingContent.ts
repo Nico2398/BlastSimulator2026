@@ -1,7 +1,7 @@
 /** Inspector content for building selections (#1756, #1758). */
 import { t } from '../../../core/i18n/I18n.js';
 import {
-  getBuildingDef, getBuildingPeopleCapacity, warehouseStockKg, warehouseFreeKg,
+  getBuildingDef, getBuildingPeopleCapacity,
   type Building,
 } from '../../../core/entities/Building.js';
 import { computeBuildingStatus, type BuildingStatus } from '../../../core/entities/BuildingStatus.js';
@@ -11,7 +11,8 @@ import type { GameState } from '../../../core/state/GameState.js';
 import { buildingActionRules, REASON_CASH, type BuildingActionRules } from '../../buildingActionRules.js';
 import { el } from '../../dom.js';
 import type { ActionSpec, InspectorLinks, InspectorView, KindContent } from './InspectorContent.js';
-import { entityLink, kindLabel, liveRow, liveValue, sectionOf, setLive } from './inspectorWidgets.js';
+import { storageContents } from './storageContent.js';
+import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
 /** Lifecycle status line: operating, closed by an event, demolition ordered, rebuilding or under construction. */
 function statusText(status: BuildingStatus): string {
@@ -154,10 +155,7 @@ export const buildingContent: KindContent = {
     const text = statusText(status);
     const upkeep = upkeepText(state, b);
     const capacity = getBuildingPeopleCapacity(b.type, b.tier);
-    const isExplosiveWarehouse = b.type === 'explosive_warehouse';
-    const stockKg = isExplosiveWarehouse ? Math.round(warehouseStockKg(b)) : 0;
-    const freeKg = isExplosiveWarehouse ? Math.round(warehouseFreeKg(b)) : 0;
-    const stockText = t('inspector.warehouse_stock', { stock: stockKg, free: freeKg });
+    const storage = storageContents(b, state, status.kind === 'out_of_service');
     const occupants = b.occupantIds
       .map(id => ({ id, name: state.employees.employees.find(e => e.id === id)?.name }))
       .filter((o): o is { id: number; name: string } => o.name !== undefined);
@@ -168,7 +166,7 @@ export const buildingContent: KindContent = {
       sub: `#${b.id} · ${kindLabel('building')} · ${t('inspector.tier', { tier: b.tier })}`,
       icon: 'build',
       status: text,
-      signature: `${b.type}:${b.tier}:${status.kind}:${capacity}:${b.occupantIds.join(',')}:${occupants.map(o => o.name).join('|')}`,
+      signature: `${b.type}:${b.tier}:${status.kind}:${capacity}:${b.occupantIds.join(',')}:${occupants.map(o => o.name).join('|')}:${storage?.rowSignature ?? ''}`,
       get sections() {
         const rows: HTMLElement[] = [
           liveRow(t('inspector.status'), 'status', text),
@@ -192,15 +190,8 @@ export const buildingContent: KindContent = {
             rows.push(inside);
           }
         }
-        if (isExplosiveWarehouse) {
-          const row = liveRow(t('inspector.stock'), 'stock', stockText);
-          const value = liveValue(row);
-          value.dataset['info'] = 'warehouse-stock';
-          value.dataset['stockKg'] = String(stockKg);
-          value.dataset['freeKg'] = String(freeKg);
-          rows.push(row);
-        }
-        return [sectionOf(t('inspector.section.details'), rows)];
+        const details = sectionOf(t('inspector.section.details'), rows);
+        return storage ? [details, storage.section] : [details];
       },
       actions: standingActions(state, buildingActionRules(state, b)),
       sync(root) {
@@ -210,8 +201,7 @@ export const buildingContent: KindContent = {
         if (fill) fill.style.width = `${Math.round(hpFraction * 100)}%`;
         setLive(root, 'upkeep', upkeep);
         setLive(root, 'occupancy', t('building.occupancy', { inside: b.occupantIds.length, capacity }));
-        const stock = setLive(root, 'stock', stockText);
-        if (stock) { stock.dataset['stockKg'] = String(stockKg); stock.dataset['freeKg'] = String(freeKg); }
+        storage?.sync(root);
       },
     };
   },

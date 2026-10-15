@@ -3415,7 +3415,6 @@
   "inspector.inside": "Inside:",
   "inspector.operating": "Operating",
   "inspector.stock": "Stock",
-  "inspector.warehouse_stock": "{stock} kg · {free} free",
   "inspector.status": "Status",
   "inspector.role": "Role",
   "inspector.depth_value": "{depth}m",
@@ -4095,5 +4094,16 @@
   "inspector.reason.demolition_ordered": "A demolition is already ordered",
   "inspector.reason.under_construction": "Still being built",
   "inspector.tip.upgrade": "Orders the next tier: the building is demolished and rebuilt by a builder",
-  "ui.build.demolish_confirm_loses_ore": "Stored ore ({kg} kg) is lost."
+  "ui.build.demolish_confirm_loses_ore": "Stored ore ({kg} kg) is lost.",
+  "inspector.section.contents": "Contents",
+  "inspector.stock_capacity": "{stored} / {capacity} kg",
+  "inspector.free_kg": "{kg} free",
+  "inspector.reserved_in_transit": "Reserved (in transit)",
+  "inspector.stock_empty": "Empty",
+  "inspector.stock_unavailable": "Stock unavailable while the building is closed",
+  "inspector.detonation_radius": "Detonation radius: {radius} m",
+  "inspector.barren": "Barren rock",
+  "inspector.spoil": "Spoil",
+  "inspector.spoil_no_cap": "No capacity limit",
+  "inspector.stock_gauge_aria": "Storage used: {stored} of {capacity} kg"
 }

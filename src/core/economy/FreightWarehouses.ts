@@ -22,6 +22,36 @@ export function warehouseStoredKg(l: LogisticsState, warehouseId: number): numbe
   return total;
 }
 
+/** Stored contents of one warehouse: total, kg per ore id, and the barren remainder. */
+export interface WarehouseStock {
+  storedKg: number;
+  oreKg: Record<string, number>;
+  barrenKg: number;
+}
+
+/** Stored kg of one warehouse by ore, plus barren remainder. Same fragments as warehouseStoredKg. */
+export function warehouseStockByOre(l: LogisticsState, warehouseId: number): WarehouseStock {
+  const oreKg: Record<string, number> = {};
+  let storedKg = 0;
+  for (const f of l.fragments) {
+    if (f.state !== 'stored' || f.warehouseId !== warehouseId) continue;
+    storedKg += f.fragment.mass;
+    accumulateOreMass(oreKg, f.fragment.volume, f.fragment.oreDensities);
+  }
+  let oreSum = 0;
+  for (const kg of Object.values(oreKg)) oreSum += kg;
+  return { storedKg, oreKg, barrenKg: Math.max(0, storedKg - oreSum) };
+}
+
+/** Mass (kg) in transit to one warehouse, reserved but not yet stored. */
+export function warehouseReservedKg(l: LogisticsState, warehouseId: number): number {
+  let total = 0;
+  for (const f of l.fragments) {
+    if (f.state === 'in_transit' && f.warehouseId === warehouseId) total += f.fragment.mass;
+  }
+  return total;
+}
+
 /** Mass (kg) stored or in transit per warehouse id, in one pass over the fragments. */
 export function warehouseUsedKgMap(l: LogisticsState): Map<number, number> {
   const used = new Map<number, number>();
@@ -66,26 +96,27 @@ export function loseOrphanedStock(
   collectedOre: Record<string, number>,
   liveIds: ReadonlySet<number>,
 ): WarehouseLoss[] {
-  const losses = new Map<number, WarehouseLoss>();
+  const orphanIds = new Set<number>();
+  for (const f of l.fragments) {
+    const id = f.warehouseId;
+    if (f.state === 'stored' && id !== null && !liveIds.has(id)) orphanIds.add(id);
+  }
+  if (orphanIds.size === 0) return [];
+  const losses: WarehouseLoss[] = [...orphanIds].sort((a, b) => a - b).map(id => {
+    const { storedKg, oreKg } = warehouseStockByOre(l, id);
+    return { buildingId: id, massKg: storedKg, oreKg };
+  });
   const kept: TrackedFragment[] = [];
   for (const f of l.fragments) {
     const id = f.warehouseId;
-    if (f.state !== 'stored' || id === null || liveIds.has(id)) {
+    if (f.state !== 'stored' || id === null || !orphanIds.has(id)) {
       kept.push(f);
       continue;
     }
-    let loss = losses.get(id);
-    if (!loss) {
-      loss = { buildingId: id, massKg: 0, oreKg: {} };
-      losses.set(id, loss);
-    }
-    loss.massKg += f.fragment.mass;
-    accumulateOreMass(loss.oreKg, f.fragment.volume, f.fragment.oreDensities);
     decrementCollectedOre(collectedOre, f.fragment);
     l.storedMassKg = Math.max(0, l.storedMassKg - f.fragment.mass);
   }
-  if (losses.size === 0) return [];
   l.fragments = kept;
   clampCollectedOre(collectedOre);
-  return [...losses.values()].sort((a, b) => a.buildingId - b.buildingId);
+  return losses;
 }
