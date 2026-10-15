@@ -3398,6 +3398,7 @@
   "inspector.warehouse_stock": "{stock} kg · {free} libres",
   "inspector.status": "État",
   "inspector.role": "Rôle",
+  "inspector.depth_value": "{depth}m",
   "inspector.depth": "Profondeur",
   "inspector.description": "Description",
   "inspector.status_hole": "Trou foré",

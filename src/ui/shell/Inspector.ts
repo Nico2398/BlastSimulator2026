@@ -16,13 +16,10 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { el, button, panelRoot, panelHeader, panelHeaderButton, panelBody, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
-import { contentFor, type InspectorView, type InspectorLinks } from '../panels/inspector/InspectorContent.js';
+import { contentFor, type InspectorAction, type InspectorView, type InspectorLinks } from '../panels/inspector/InspectorContent.js';
 import { shellLayoutRegistry } from './LayoutRegistry.js';
+import { writeText } from '../panels/inspector/inspectorWidgets.js';
 import { inspectorBounds } from '../panels/inspector/inspectorLayout.js';
-
-export type InspectorAction =
-  | 'detail' | 'dispatch_here' | 'train' | 'move_here' | 'upgrade_vehicle'
-  | 'upgrade' | 'move' | 'demolish' | 'widen' | 'locate';
 
 export class Inspector {
   private readonly root: HTMLElement;
@@ -132,9 +129,9 @@ export class Inspector {
     this.root.dataset['id'] = String(entity.id);
     this.locateBtn.title = t('inspector.locate');
     this.locateBtn.setAttribute('aria-label', t('inspector.locate'));
-    this.write(this.titleEl, view.title);
-    this.write(this.subEl, view.sub);
-    this.write(this.statusEl, view.status);
+    writeText(this.titleEl, view.title);
+    writeText(this.subEl, view.sub);
+    writeText(this.statusEl, view.status);
     if (this.shownIcon !== view.icon) {
       this.iconChip.replaceChildren(iconEl(view.icon, 15));
       this.shownIcon = view.icon;
@@ -164,9 +161,5 @@ export class Inspector {
       const btn = this.actionsEl.querySelector<HTMLButtonElement>(`[data-action="${a.action}"]`);
       if (btn && btn.disabled !== (a.disabled === true)) btn.disabled = a.disabled === true;
     }
-  }
-
-  private write(node: HTMLElement, text: string): void {
-    if (node.textContent !== text) node.textContent = text;
   }
 }

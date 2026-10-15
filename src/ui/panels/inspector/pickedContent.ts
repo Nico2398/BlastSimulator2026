@@ -12,7 +12,7 @@ export const pickedContent: KindContent = {
       case 'hole': {
         const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
         if (!hole) return null;
-        const depth = `${hole.depth}m`;
+        const depth = t('inspector.depth_value', { depth: hole.depth });
         return {
           title: hole.id,
           sub: `#${entity.id} · ${kindLabel('hole')}`,

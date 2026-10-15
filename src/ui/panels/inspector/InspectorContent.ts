@@ -1,13 +1,17 @@
-/** Per-kind content model for the Inspector window (#1756). Types and dispatch stub only. */
+/** Per-kind content model for the Inspector window (#1756). View types and the kind-to-content dispatch. */
 import type { GameState } from '../../../core/state/GameState.js';
 import type { EntityPick } from '../../scene/ScenePicking.js';
-import type { InspectorAction } from '../../shell/Inspector.js';
 import { buildingContent } from './buildingContent.js';
 import { vehicleContent } from './vehicleContent.js';
 import { employeeContent } from './employeeContent.js';
 import { pickedContent } from './pickedContent.js';
 
 export type InspectorKind = EntityPick['kind'];
+
+/** Every action an Inspector button can fire; main.ts decides what each does. */
+export type InspectorAction =
+  | 'detail' | 'dispatch_here' | 'train' | 'move_here' | 'upgrade_vehicle'
+  | 'upgrade' | 'move' | 'demolish' | 'widen' | 'locate';
 
 /** One action button the Inspector renders for the current entity. */
 export interface ActionSpec {

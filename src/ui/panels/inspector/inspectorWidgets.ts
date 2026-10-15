@@ -3,6 +3,16 @@ import { t } from '../../../core/i18n/I18n.js';
 import { el, sectionHeader } from '../../dom.js';
 import type { InspectorKind, InspectorLinks } from './InspectorContent.js';
 
+/** Set a node's text only when it differs, so a steady frame touches no DOM. */
+export function writeText(node: HTMLElement, text: string): void {
+  if (node.textContent !== text) node.textContent = text;
+}
+
+/** The value node of a `liveRow`; `setLive` finds it by `data-live`. */
+export function liveValue(row: HTMLElement): HTMLElement {
+  return row.lastElementChild as HTMLElement;
+}
+
 /** Label + value row whose value is rewritten in place by `setLive` (key = `data-live`). */
 export function liveRow(label: string, key: string, text: string): HTMLElement {
   const row = el('div', { className: 'bsx-mono' });
@@ -18,7 +28,7 @@ export function liveRow(label: string, key: string, text: string): HTMLElement {
 /** Write a live value in place; a no-op when unchanged so a steady frame touches no DOM. */
 export function setLive(root: HTMLElement, key: string, text: string): HTMLElement | null {
   const node = root.querySelector<HTMLElement>(`[data-live="${key}"]`);
-  if (node && node.textContent !== text) node.textContent = text;
+  if (node) writeText(node, text);
   return node;
 }
 

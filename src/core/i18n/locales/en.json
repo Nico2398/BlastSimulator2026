@@ -3398,6 +3398,7 @@
   "inspector.warehouse_stock": "{stock} kg · {free} free",
   "inspector.status": "Status",
   "inspector.role": "Role",
+  "inspector.depth_value": "{depth}m",
   "inspector.depth": "Depth",
   "inspector.description": "Description",
   "inspector.status_hole": "Drilled hole",

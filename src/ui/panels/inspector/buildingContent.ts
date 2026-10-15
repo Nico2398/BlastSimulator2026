@@ -3,7 +3,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { getBuildingPeopleCapacity, warehouseStockKg, warehouseFreeKg } from '../../../core/entities/Building.js';
 import { el } from '../../dom.js';
 import type { ActionSpec, KindContent } from './InspectorContent.js';
-import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
+import { entityLink, kindLabel, liveRow, liveValue, sectionOf, setLive } from './inspectorWidgets.js';
 
 function buildingActions(disabled: boolean): ActionSpec[] {
   return [
@@ -64,7 +64,7 @@ export const buildingContent: KindContent = {
         }
         if (isExplosiveWarehouse) {
           const row = liveRow(t('inspector.stock'), 'stock', stockText);
-          const value = row.querySelector<HTMLElement>('[data-live="stock"]')!;
+          const value = liveValue(row);
           value.dataset['info'] = 'warehouse-stock';
           value.dataset['stockKg'] = String(stockKg);
           value.dataset['freeKg'] = String(freeKg);

@@ -101,4 +101,5 @@ export const GAME_STATE_SCHEMA: Schema = {
 export const UI_STATE_SCHEMA: Schema = {
   panels: { type: 'object', description: 'Per-panel visibility and pointer-events' },
   blastPanelButtons: { type: 'array', description: 'Blast panel controls with computed styles' },
+  inspector: { type: 'object', description: 'Entity inspector: { open: boolean, kind: string | null, id: number | null } (#1756)' },
 };

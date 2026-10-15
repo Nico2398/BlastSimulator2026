@@ -335,7 +335,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Close the inspector — its own close (x) button is the only one of the shared panel-close attribute",
+      "description": "Close the inspector with its own close (x) button; it is the only element carrying the panel-close attribute",
       "interaction": [
         {
           "type": "command",
