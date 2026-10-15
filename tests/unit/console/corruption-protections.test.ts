@@ -55,12 +55,12 @@ describe('corrupt command — protections (#1407)', () => {
     const tick = findTick(ctx, 'inspector', false);
     const s = ctx.state!;
     bribeAt(ctx, 'inspector', tick);
-    s.corruption.protections.push({ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0 });
+    s.corruption.protections.push({ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0, shielded: true });
     s.cash = 10_000_000;
     s.corruption.attempts.length = 0;
     s.tickCount = tick;
     corruptCommand(ctx, [], { target: 'inspector' });
-    expect(s.corruption.protections).toEqual([{ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0 }]);
+    expect(s.corruption.protections).toEqual([{ target: 'inspector', expiresAtTick: tick + 5, dismissalsLeft: 0, shielded: true }]);
   });
 
   it('successful witness bribe lowers exposure by the configured amount', () => {

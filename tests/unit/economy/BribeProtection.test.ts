@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   BRIBE_CORRUPTION_DELTA,
   BRIBE_PROTECTION_DAYS,
+  BRIBE_PROTECTION_MAX_LINGER_DAYS,
   INSPECTION_EVENT_TAG,
   JUDGE_LAWSUIT_TIMER_STRETCH,
   TICKS_PER_DAY,
@@ -15,12 +16,16 @@ import {
   consumeDismissal,
   timerStretchFor,
   protectionRemainingTicks,
+  markShielded,
+  isProtectionLingering,
   type ActiveProtection,
 } from '../../../src/core/economy/BribeProtection.js';
 import type { CorruptionTarget } from '../../../src/core/economy/Corruption.js';
 import type { EventCategory } from '../../../src/core/events/EventPool.js';
 
 const TIMED: CorruptionTarget[] = ['judge', 'union_leader', 'inspector', 'politician'];
+
+const LINGER = BRIBE_PROTECTION_MAX_LINGER_DAYS * TICKS_PER_DAY;
 
 function days(t: CorruptionTarget): number {
   return BRIBE_PROTECTION_DAYS[t] * TICKS_PER_DAY;
@@ -84,9 +89,9 @@ describe('grantProtection (#1407)', () => {
 describe('pruneProtections (#1407)', () => {
   it('drops entries at or past expiry, keeps live ones', () => {
     const list: ActiveProtection[] = [
-      { target: 'inspector', expiresAtTick: 50, dismissalsLeft: 0 },
-      { target: 'judge', expiresAtTick: 51, dismissalsLeft: 1 },
-      { target: 'politician', expiresAtTick: 10, dismissalsLeft: 0 },
+      { target: 'inspector', expiresAtTick: 50, dismissalsLeft: 0, shielded: true },
+      { target: 'judge', expiresAtTick: 51, dismissalsLeft: 1, shielded: true },
+      { target: 'politician', expiresAtTick: 10, dismissalsLeft: 0, shielded: true },
     ];
     pruneProtections(list, 50);
     expect(list.map(p => p.target)).toEqual(['judge']);
@@ -100,7 +105,7 @@ describe('pruneProtections (#1407)', () => {
 });
 
 describe('protectionRemainingTicks (#1407)', () => {
-  const p: ActiveProtection = { target: 'inspector', expiresAtTick: 100, dismissalsLeft: 0 };
+  const p: ActiveProtection = { target: 'inspector', expiresAtTick: 100, dismissalsLeft: 0, shielded: true };
   it('counts down to expiry', () => {
     expect(protectionRemainingTicks(p, 40)).toBe(60);
   });
@@ -112,7 +117,7 @@ describe('protectionRemainingTicks (#1407)', () => {
 
 describe('isEventShielded (#1407)', () => {
   const entry = (target: CorruptionTarget, expiresAtTick = 100): ActiveProtection =>
-    ({ target, expiresAtTick, dismissalsLeft: 0 });
+    ({ target, expiresAtTick, dismissalsLeft: 0, shielded: true });
 
   it('union_leader shields union events', () => {
     expect(isEventShielded({ category: 'union' }, [entry('union_leader')], 10)).toBe(true);
@@ -162,7 +167,7 @@ describe('consumeDismissal (#1407)', () => {
   it('does nothing after the protection expired', () => {
     const list: ActiveProtection[] = [];
     grantProtection(list, 'judge', 0);
-    expect(consumeDismissal(list, 'lawsuit', days('judge'))).toBe(false);
+    expect(consumeDismissal(list, 'lawsuit', days('judge') + LINGER)).toBe(false);
   });
   it('false with no protections', () => {
     expect(consumeDismissal([], 'lawsuit', 0)).toBe(false);
@@ -170,7 +175,7 @@ describe('consumeDismissal (#1407)', () => {
 });
 
 describe('timerStretchFor (#1407)', () => {
-  const judge = (expiresAtTick = 100): ActiveProtection => ({ target: 'judge', expiresAtTick, dismissalsLeft: 0 });
+  const judge = (expiresAtTick = 100): ActiveProtection => ({ target: 'judge', expiresAtTick, dismissalsLeft: 0, shielded: true });
   it('judge stretches the lawsuit timer', () => {
     expect(timerStretchFor('lawsuit', [judge()], 10)).toBe(JUDGE_LAWSUIT_TIMER_STRETCH);
   });
@@ -184,7 +189,7 @@ describe('timerStretchFor (#1407)', () => {
   });
   it('never drops below 1', () => {
     const cats: EventCategory[] = ['union', 'politics', 'weather', 'mafia', 'lawsuit'];
-    const all: ActiveProtection[] = TIMED.map(target => ({ target, expiresAtTick: 100, dismissalsLeft: 1 }));
+    const all: ActiveProtection[] = TIMED.map(target => ({ target, expiresAtTick: 100, dismissalsLeft: 1, shielded: true }));
     for (const c of cats) expect(timerStretchFor(c, all, 10)).toBeGreaterThanOrEqual(1);
   });
 });
@@ -205,5 +210,136 @@ describe('BRIBE_PROFILES balance (#1407)', () => {
     for (let i = 1; i < sorted.length; i++) {
       expect(BRIBE_PROFILES[sorted[i]!].price).toBeGreaterThan(BRIBE_PROFILES[sorted[i - 1]!].price);
     }
+  });
+});
+
+describe('linger until first shield (#1816)', () => {
+  const fresh = (target: CorruptionTarget, expiresAtTick = 100, dismissalsLeft = 0): ActiveProtection =>
+    ({ target, expiresAtTick, dismissalsLeft, shielded: false });
+  const shieldedEntry = (target: CorruptionTarget, expiresAtTick = 100): ActiveProtection =>
+    ({ target, expiresAtTick, dismissalsLeft: 0, shielded: true });
+
+  it('grantProtection starts unshielded', () => {
+    const list: ActiveProtection[] = [];
+    expect(grantProtection(list, 'union_leader', 0)!.shielded).toBe(false);
+  });
+
+  it('re-bribe resets shielded to false', () => {
+    const list: ActiveProtection[] = [];
+    const p = grantProtection(list, 'inspector', 0)!;
+    p.shielded = true;
+    expect(grantProtection(list, 'inspector', 10)!.shielded).toBe(false);
+  });
+
+  it('an unshielded protection still shields past expiresAtTick, until the linger cap', () => {
+    const list = [fresh('union_leader')];
+    expect(isEventShielded({ category: 'union' }, list, 100)).toBe(true);
+    expect(isEventShielded({ category: 'union' }, list, 100 + LINGER - 1)).toBe(true);
+    expect(isEventShielded({ category: 'union' }, list, 100 + LINGER)).toBe(false);
+  });
+
+  it('a shielded protection expires at its normal expiresAtTick', () => {
+    const list = [shieldedEntry('union_leader')];
+    expect(isEventShielded({ category: 'union' }, list, 99)).toBe(true);
+    expect(isEventShielded({ category: 'union' }, list, 100)).toBe(false);
+  });
+
+  it('pruneProtections keeps a lingering unshielded entry, drops it at the cap', () => {
+    const list = [fresh('politician')];
+    pruneProtections(list, 100 + LINGER - 1);
+    expect(list).toHaveLength(1);
+    pruneProtections(list, 100 + LINGER);
+    expect(list).toHaveLength(0);
+  });
+
+  it('pruneProtections drops a shielded entry at expiresAtTick', () => {
+    const list = [shieldedEntry('politician')];
+    pruneProtections(list, 100);
+    expect(list).toHaveLength(0);
+  });
+
+  it('consumeDismissal works while lingering and marks the protection shielded', () => {
+    const list = [fresh('judge', 100, 1)];
+    expect(consumeDismissal(list, 'lawsuit', 150)).toBe(true);
+    expect(list[0]!.shielded).toBe(true);
+    expect(list[0]!.dismissalsLeft).toBe(0);
+  });
+
+  it('consumeDismissal for the wrong category leaves shielded false', () => {
+    const list = [fresh('judge', 100, 1)];
+    expect(consumeDismissal(list, 'union', 50)).toBe(false);
+    expect(list[0]!.shielded).toBe(false);
+  });
+
+  it('consumeDismissal refuses once the linger cap passed', () => {
+    expect(consumeDismissal([fresh('judge', 100, 1)], 'lawsuit', 100 + LINGER)).toBe(false);
+  });
+
+  it('timerStretchFor uses the paid window only: no stretch while lingering', () => {
+    const list = [fresh('judge', 100)];
+    expect(timerStretchFor('lawsuit', list, 99)).toBe(JUDGE_LAWSUIT_TIMER_STRETCH);
+    expect(timerStretchFor('lawsuit', list, 100)).toBe(1);
+    expect(timerStretchFor('lawsuit', list, 500)).toBe(1);
+  });
+
+  describe('markShielded', () => {
+    it('marks a union_leader protection when a union event is among the events', () => {
+      const list = [fresh('union_leader')];
+      markShielded(list, [{ category: 'union' }], 50);
+      expect(list[0]!.shielded).toBe(true);
+    });
+
+    it('marks by tag for the inspector', () => {
+      const list = [fresh('inspector')];
+      markShielded(list, [{ category: 'lawsuit', tags: [INSPECTION_EVENT_TAG] }], 50);
+      expect(list[0]!.shielded).toBe(true);
+    });
+
+    it('marks while lingering (past expiresAtTick)', () => {
+      const list = [fresh('politician')];
+      markShielded(list, [{ category: 'politics' }], 100 + 5);
+      expect(list[0]!.shielded).toBe(true);
+    });
+
+    it('leaves protections whose effect matches none of the events', () => {
+      const list = [fresh('union_leader'), fresh('inspector'), fresh('politician')];
+      markShielded(list, [{ category: 'lawsuit' }, { category: 'weather' }], 50);
+      expect(list.map(p => p.shielded)).toEqual([false, false, false]);
+    });
+
+    it('does not mark a protection past the linger cap', () => {
+      const list = [fresh('union_leader')];
+      markShielded(list, [{ category: 'union' }], 100 + LINGER);
+      expect(list[0]!.shielded).toBe(false);
+    });
+
+    it('does not touch a judge protection (dismissal, not block)', () => {
+      const list = [fresh('judge', 100, 1)];
+      markShielded(list, [{ category: 'lawsuit' }], 50);
+      expect(list[0]!.shielded).toBe(false);
+    });
+
+    it('empty events or empty list is a no-op', () => {
+      const list = [fresh('union_leader')];
+      markShielded(list, [], 50);
+      expect(list[0]!.shielded).toBe(false);
+      expect(() => markShielded([], [{ category: 'union' }], 50)).not.toThrow();
+    });
+  });
+
+  describe('isProtectionLingering', () => {
+    it('false inside the paid window', () => {
+      expect(isProtectionLingering(fresh('union_leader'), 99)).toBe(false);
+    });
+    it('true at expiresAtTick and until the cap while unshielded', () => {
+      expect(isProtectionLingering(fresh('union_leader'), 100)).toBe(true);
+      expect(isProtectionLingering(fresh('union_leader'), 100 + LINGER - 1)).toBe(true);
+    });
+    it('false at the cap (no longer active)', () => {
+      expect(isProtectionLingering(fresh('union_leader'), 100 + LINGER)).toBe(false);
+    });
+    it('false once shielded', () => {
+      expect(isProtectionLingering(shieldedEntry('union_leader'), 150)).toBe(false);
+    });
   });
 });
