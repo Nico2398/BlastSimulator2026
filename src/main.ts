@@ -1267,7 +1267,7 @@ function showSelection(entity: EntityPick, state: GameState): void {
   shownVehicleKey = vehicleSelectionKey(entity, state);
   if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
   else if (pos && anchor.type === 'site') entityHighlight.showFootprint(anchor.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
-  else if (pos) entityHighlight.show(pos, entity.kind);
+  else if (pos) entityHighlight.show(pos, anchor.type === 'host' ? anchor.kind : entity.kind);
   else entityHighlight.hide();
 }
 scenePicking.setSelectChangeHandler((entity) => {
