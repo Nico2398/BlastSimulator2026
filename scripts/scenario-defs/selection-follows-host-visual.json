@@ -156,7 +156,7 @@
         }
       ],
       "expect": {
-        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail",
         "equals": {
           "insideBuildingCount": 1
         },
@@ -178,7 +178,7 @@
         "increased": [
           "tickCount"
         ],
-        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail",
         "note": "Inspector still showing the hidden employee after the ticks"
       }
     },
@@ -200,7 +200,7 @@
         "equals": {
           "insideBuildingCount": 0
         },
-        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail",
         "note": "Still selected after stepping out"
       }
     },

@@ -30,13 +30,13 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"detail\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail"
         }
       ],
       "role": "player",
       "timeout": 60,
       "expect": {
-        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail",
         "changedBy": {
           "cash": 0
         }
@@ -113,7 +113,7 @@
       "role": "observe",
       "timeout": 30,
       "expect": {
-        "blocked": "#bs-inspector [data-action=\"detail\"]",
+        "blocked": "#bs-inspector .bs-employee-detail",
         "equals": {
           "levelEnded": false
         }
