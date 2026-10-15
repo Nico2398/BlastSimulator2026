@@ -108,11 +108,12 @@ describe('Tutorial Level — Contract Delivery', () => {
     expect(drillResult.output).toContain('4 holes');
     driveDrillPlanToCompletion(ctx);
 
-    // 5. Charge all holes with boomite 3kg/hole, stemming 2m
+    // 5. Charge all holes with boomite 5kg/hole, stemming 2m. 3kg no longer breaks out of the 8m
+    // holes (#1793): its rock stays sealed under the cap and is never hauled (#1774).
     const chargeResult = chargeCommand(ctx as any, [], {
       hole: '*',
       explosive: 'boomite',
-      amount: '3kg',
+      amount: '5kg',
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);

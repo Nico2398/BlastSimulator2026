@@ -560,8 +560,10 @@ function blastRampScenario(rampFirst: boolean): RampShot {
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
-      // Money and rest are not what this probes: wages must not freeze the mine, and a crew asleep never clears the rubble.
+      // Money, rest and ecology are not what this probes: wages must not freeze the mine, a crew asleep never clears the rubble,
+      // and a long dig under a blast's rubble must not end in an ecological shutdown that stops every tick.
       state.cash = Math.max(state.cash, 1_000_000);
+      state.scores.ecology = Math.max(state.scores.ecology, 50);
       for (const e of state.employees.employees) e.fatigue = 100;
       run('tick 1');
     }
