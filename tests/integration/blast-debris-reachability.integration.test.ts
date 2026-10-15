@@ -25,12 +25,17 @@
 import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
+import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
+import type { MiningContext } from '../../src/console/commands/mining/types.js';
+import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import {
   tickUntilFresh,
   isPocketCell,
   drillChargeAndBlast,
+  drillGridChargeAndBlast,
   crewRockDigger,
   hireDriver,
 } from '../helpers/blastFixtures.js';
@@ -209,4 +214,110 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       }
     },
   );
+});
+
+// ── Floor to grade across a pattern (#1740) ──────────────────────────────────
+// floorToGrade used to lift a hole's one-voxel breakout only beside a column floored in
+// the SAME pass. At 4 m spacing the rock between holes is broken to grade by earlier
+// passes, so every hole left a 1 m pit; at 3 m spacing breakout lines stayed as
+// trenches. Both strand debris in pockets the crew cannot climb out of.
+
+const FLAT_ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
+
+/** Levels the whole site to the surface found at (18,10), so the blast starts from a flat site the crew can drive across. */
+function flattenSite(ctx: MiningContext): number {
+  const grid = ctx.grid!;
+  const { minX, minZ, sizeX, sizeZ } = ctx.state!.world;
+  const maxX = minX + sizeX - 1;
+  const maxZ = minZ + sizeZ - 1;
+  const top = computeVoxelColumnSurfaceY(grid, 18, 10)!;
+  for (let z = minZ; z <= maxZ; z++) {
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) {
+        if (y <= top) grid.setVoxel(x, y, z, FLAT_ROCK);
+        else grid.clearVoxel(x, y, z);
+      }
+    }
+  }
+  // The NavGrid learns about a carve through this event, exactly as after a real blast.
+  ctx.emitter.emit('terrain:updated', {
+    region: { minX, maxX, minZ, maxZ, minY: 0, maxY: GENERATED_TERRAIN_GRID_SIZE_Y - 1 },
+  });
+  return top;
+}
+
+interface PatternBlast {
+  run: (cmd: string) => unknown;
+  state: GameState;
+  grid: VoxelGrid;
+  preSurfaceY: number;
+  /** Post-blast surface Y of every column inside the pattern's bounding rectangle. */
+  footprintSurfaces: number[];
+}
+
+function blastFlatPattern(spacing: number, amount: number): PatternBlast {
+  let preSurfaceY = 0;
+  const startX = 18 - spacing;
+  const startZ = 10 - spacing;
+  const { run, state, ctx } = drillGridChargeAndBlast({
+    rows: 3, cols: 3, spacing, startX, startZ, amount,
+    flatten: c => { preSurfaceY = flattenSite(c); },
+  });
+  const grid = ctx.grid!;
+  const footprintSurfaces: number[] = [];
+  for (let z = startZ; z <= startZ + 2 * spacing; z++) {
+    for (let x = startX; x <= startX + 2 * spacing; x++) {
+      footprintSurfaces.push(computeVoxelColumnSurfaceY(grid, x, z)!);
+    }
+  }
+  return { run, state, grid, preSurfaceY, footprintSurfaces };
+}
+
+/** The crater floor: the surface height most footprint columns share. */
+function craterFloorY(surfaces: number[]): number {
+  const counts = new Map<number, number>();
+  for (const y of surfaces) counts.set(y, (counts.get(y) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+}
+
+describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => {
+  // Charge per hole is sized so each spacing breaks one continuous crater (a lighter charge leaves unbroken pillars between holes).
+  for (const { spacing, amount } of [{ spacing: 4, amount: 8 }, { spacing: 3, amount: 6 }]) {
+    it(
+      `${spacing} m spacing: no footprint column ends below the crater floor, and no debris is out of reach once a ramp reaches the crater`,
+      () => {
+        const { run, state, grid, preSurfaceY, footprintSurfaces } = blastFlatPattern(spacing, amount);
+        // Pattern-edge columns the blast never reached still stand at the original surface; every column it did break must sit on one floor.
+        const crater = footprintSurfaces.filter(y => y < preSurfaceY);
+        const floorY = craterFloorY(crater);
+
+        expect(floorY).toBeLessThan(preSurfaceY); // the blast really dug a crater
+        const pits = crater.filter(y => y !== floorY);
+        expect(pits, `columns off the crater floor ${floorY}: ${pits.join(',')}`).toHaveLength(0);
+
+        // A ramp from the flat rim down to the floor: nothing in the crater may stay stamped out of reach.
+        expect(computeVoxelColumnSurfaceY(grid, 18, 10)).toBe(floorY);
+        crewHaulingAndBuildDepot(run, state);
+        crewRockDigger(run, state);
+        // The site is 32 m square: the ramp climbs out of the crater to the south rim, ending on the crater's last floor row.
+        let rampEndZ = 10;
+        while (computeVoxelColumnSurfaceY(grid, 18, rampEndZ + 1) === floorY) rampEndZ++;
+        expect(run(`build_ramp start:18,${rampEndZ + 12} end:18,${rampEndZ} depth:${preSurfaceY - floorY}`)).toMatchObject({ success: true });
+        tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 1500);
+        expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toHaveLength(0);
+
+        // Classification runs at the start of each employee tick: give it a pass after the last segment.
+        // Debris thrown outside the pattern may land on the surrounding site; the ramp must serve the crater itself.
+        const inCrater = (a: PendingAction): boolean =>
+          a.targetX >= 18 - spacing && a.targetX <= 18 + spacing && a.targetZ >= 10 - spacing && a.targetZ <= 10 + spacing;
+        const strandedInCrater = (): number =>
+          state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach' && inCrater(a)).length;
+        tickUntilFresh(run, state, () => false, 2);
+        tickUntilFresh(run, state, () => strandedInCrater() === 0, 1500); // the crew classifies a few pieces per tick // the crew classifies a few pieces per tick
+        expect(debrisActions(state).filter(inCrater).length).toBeGreaterThan(0);
+        expect(strandedInCrater(), 'crater debris still stamped debris_out_of_reach after the ramp').toBe(0);
+      },
+      600000,
+    );
+  }
 });
