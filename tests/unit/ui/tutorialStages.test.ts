@@ -1181,3 +1181,17 @@ describe('buy-charging-truck stages (#1648)', () => {
     expect(step.tickBudget).toBe(1);
   });
 });
+
+describe('survey pick stage keeps Run clickable', () => {
+  it('Run stays on the pick stage allow list, since choosing a method already armed the pick', () => {
+    const stages = TUTORIAL_STAGES['survey']!;
+    const pick = stages.find(s => s.target === 'body.bs-placement-armed #game-canvas')!;
+    expect(pick.also).toContain('#bs-survey-run');
+    expect(pick.also).toContain(PICKER_CANCEL);
+  });
+
+  it('other picker steps do not widen their allow list', () => {
+    const pick = TUTORIAL_STAGES['build-living-quarters']?.find(s => s.target === 'body.bs-placement-armed #game-canvas');
+    if (pick) expect(pick.also).toEqual([PICKER_CANCEL]);
+  });
+});
