@@ -2,7 +2,7 @@
 // ore a good Dusty Hollow blast actually produces (#1531).
 //
 // Reference shot: `campaign start level:dusty_hollow seed:1138`, a 1x2 grid
-// (spacing 3, depth 6) at rig+(14,13), boomite 2 kg (see REFERENCE_CHARGE_KG), stemming 2, auto
+// (spacing 3, depth 6) at rig+(14,13), boomite 2.2 kg (see REFERENCE_CHARGE_KG), stemming 2, auto
 // sequence, holes dry. Barren rock goes to a spoil heap (#1530), so only the
 // ORE-BEARING mass has to fit a warehouse. Measured on that shot (re-measured
 // after the #1740 floor-to-grade change): ~65,627 kg ore-bearing.
@@ -44,11 +44,12 @@ interface Shot {
 /**
  * Boomite per hole (kg) of the reference shot. A truly dry 1x2 pattern at 5 kg
  * clears ~115 voxels (~240 t of ore-bearing rock, #1648 measurement) — the
- * ~30 t the depots were sized on was a wet-hole fizzle. 2 kg dry keeps the
- * shot a good one (24 voxels cracked loose) at the order of magnitude a
+ * ~30 t the depots were sized on was a wet-hole fizzle. 2.2 kg dry keeps the
+ * shot a good one (24 voxels cracked loose; #1792 flush breakouts lift one-voxel rim
+ * pockets back, so 2 kg no longer leaves a partial tier-1 depot) at the order of magnitude a
  * tier-1/2 depot is meant to take.
  */
-const REFERENCE_CHARGE_KG = 2;
+const REFERENCE_CHARGE_KG = 2.2;
 
 /** Ticks of hauling the verification slice runs (enough for several trips). */
 const HAUL_SLICE_TICKS = 400;
