@@ -69,6 +69,11 @@
       "command": "build freight_warehouse at:33,26",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -158,6 +163,11 @@
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
       "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"

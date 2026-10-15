@@ -25,6 +25,11 @@
       "description": "Two increment clicks on the spacing stepper raise it 3->5m before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

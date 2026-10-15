@@ -91,6 +91,11 @@
       "description": "Ordered far from the surveyor's spawn so several ticks of travel remain before arrival -- the cancel below must land while the surveyor is still walking, not after the survey has resolved.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -239,6 +244,11 @@
       "command": "survey core_sample x:6 z:6",
       "description": "Re-order a survey with the same surveyor now that the cancel released them -- proves the employee is not stuck holding the cancelled action.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"

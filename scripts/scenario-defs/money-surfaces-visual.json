@@ -56,6 +56,11 @@
       "description": "Split out of the original bundled setup step (issue #479). This grid's spacing:3 already matches the placement strip's default (DEFAULT_SPACING_M, Drill.ts) — unlike blast-drill-plan-ui.json/blast-drill-plan-visual.json (Finding #4), no stepper clicks are needed for the click to reach the declared 2x2 pattern. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
@@ -257,6 +262,11 @@
       "command": "build freight_warehouse at:12,17",
       "description": "#1372: ore_sale contracts need a Freight Warehouse standing before they can be accepted (ore is stored per warehouse), so the player builds one first.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"

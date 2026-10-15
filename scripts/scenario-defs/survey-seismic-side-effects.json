@@ -137,6 +137,11 @@
       "command": "build living_quarters at:21,23",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -195,6 +200,11 @@
     {
       "command": "survey seismic x:20 z:20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"

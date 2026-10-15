@@ -105,6 +105,11 @@
       "description": "Queues the vehicle-gated task: drill_plan orders 9 drill_hole PendingActions, each with requiredVehicleRole:'drill_rig' (Drill.ts) -- none are drilled yet, so holeCount stays 0 right after this confirms. 10,10 to 16,16 at the tool's own default 3m spacing (DEFAULT_SPACING_M, Drill.ts) computes exactly the declared 3x3 grid (round(6/3)+1 = 3 per side), so no spacing-stepper click is needed before dragging.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

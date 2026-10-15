@@ -37,6 +37,11 @@
       "description": "West wall of the doorway: management_office T1's 2x2 footprint covers (20,20)-(21,21). Real BuildMenu click flow — role: player, per level-ground-then-build.json's identical pattern.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -69,6 +74,11 @@
       "command": "build management_office at:23,20",
       "description": "East wall of the doorway: management_office T1's 2x2 footprint covers (23,20)-(24,21). Leaves exactly column x=22 (rows z=20-21) open between the two buildings — the 1-cell-wide gap.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"

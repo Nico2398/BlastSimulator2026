@@ -110,6 +110,11 @@
       "description": "Method 1/3: seismic.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -280,6 +285,11 @@
       "description": "Method 2/3: core_sample.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
@@ -435,6 +445,11 @@
       "command": "survey aerial x:20 z:20",
       "description": "Method 3/3: aerial.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"aerial\"]"

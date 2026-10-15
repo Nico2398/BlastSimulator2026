@@ -68,6 +68,11 @@
       "command": "build spoil_heap at:80,80",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -103,6 +108,11 @@
     {
       "command": "build spoil_heap at:84,80",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -292,6 +302,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10 diameter:0.089",
       "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix. #557: position deliberately left at (10,10), not relocated -- moving grid 1 to escape its own padded danger zone (computeDangerZone, Zone.ts) was tried first (start:34,10 and start:10,36, both still clear of grid 2 (20,10) / grid 3 (30,10)'s own hole footprints) and rejected empirically, not on arithmetic: direct command-mode probing (createRunner+runCommand, tick-by-tick, scripts/_probe1.ts-style harness) showed x:34 wedges the lone driller/drill_rig solid (`isMoveStuck:true`, holeCount stalled at 0 for the full 600-tick budget) -- pristine terrain past x:30 in this z:10-12 band is a hard reachability cliff (x:30 drills fine solo, x:31 already wedges), and grid 3's own real run only ever reaches x:30-32 because grid 1's and grid 2's blasts have already carved a path there by the time it runs, which a first-drilled grid 1 can't borrow. z:36 drills fine solo (no stuck flag, well inside budget) but breaks grid 3 a different way: grid 1's blast at z:36-38 no longer clears any terrain along the z:10-12 corridor, so grid 3 at (30,10) -- reachable in the original file only because grid 1's and grid 2's blasts jointly carve that corridor open -- stalls at holeCount:0 exactly like the x:34 attempt did, confirmed by direct full-scenario run. The real fix is relocating living_quarters instead (see that step's own note) -- every viable grid 1/2/3 arrangement shares this z:10-12 band, so their own padded boxes (`x:[-5,27]`/`[5,37]`/`[15,47]`, all `z:[-5,27]`) union into one corridor no on-corridor living_quarters position can be safe from during all 3 cycles; only a z escape works, which is living_quarters' own call to make (#556's central-commute tuning covers all three grids, not grid 1's own drill_plan) and grid 1 stays exactly where every other grid's own reachability depends on it having been. Relocating living_quarters is necessary but not sufficient on its own, though: idle-time dispatch (`claimOnePoolCandidate`, EmployeeDispatchSteps.ts) can still route any idle blasting-qualified employee into grid 1's own charge_hole pool work regardless of where they'd otherwise be resting, so employee #2's own survival also needs the targeted `employee dispatch`/`employee cancel` pair a few steps below, not living_quarters' relocation alone -- confirmed empirically: a living_quarters move by itself still lost employee #2 to grid 1's blast in a live run, exactly this way.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
@@ -619,6 +634,11 @@
       "description": "#557: living_quarters, built here (after blast 1, not before it) so grid 1's own drill/charge cycle runs with nobody resting near a soon-to-fire zone, and at (21,30) rather than the file's old (16,15) so the building itself -- which cannot evacuate -- sits outside every remaining grid's own padded danger zone (grid 2's is x:[5,37] z:[-5,27], grid 3's is x:[15,47] z:[-5,27]; both share z:[-5,27], so only a z escape clears both at once, matching the drill_plan step's own note on why the corridor can't be dodged in x). z:30 clears that shared z:27 boundary with real margin: a bare-minimum z:28 was tried and rejected empirically -- the building's own 3x3 (T1) approach ring dips back to z:27, still inside the zone, so an employee whose own rest-need routes them back to living_quarters (as any employee's eventually does) walks straight back into danger, undoing the whole point. x:21 balances round-trip commute to grid 2 (centre ~21,11) and grid 3 (centre ~31,11) roughly the way the original (16,15) balanced all three grids before #557 widened the danger radius past what any close-in position could survive.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -734,6 +754,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10 diameter:0.089",
       "description": "Grid 2/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: added the toolbar blast-panel click as the first action here (Grid 1/3's own drill_plan step above has one; this one never did) -- by this point in the file the active panel is \"vehicles\" (opened by the `vehicle buy drill_rig` step just above), not \"blast\", so `#bs-blast-panel [data-step=\"1\"]` was zero-size until the blast panel was actually opened. Also dropped the spacing-decrement click that used to run here: DrillStep.gridSpacing (Drill.ts) is a single instance field, mutated only by the stepper's onDec/onInc and never reset between grid cycles -- Grid 1/3's own decrement already took it from the 3m default down to 2m, and that persists across this whole scenario (BlastPanel/DrillStep is never recreated), so decrementing again here dropped it to 1m (Math.max(1, 2-1)) and turned this rectangle's 2x2 grid into a 3x3 (round(2/1)+1 = 3 per side, 9 holes) -- exactly the `orderedHoleCount should be 4 but is 9` failure. Leaving spacing untouched at its already-correct 2m.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
@@ -1088,6 +1113,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:30,10 diameter:0.089",
       "description": "Grid 3/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: same fix as Grid 2/3's own drill_plan step above -- added the toolbar blast-panel click as the first action (active panel here is \"vehicles\", from the `vehicle buy drill_rig` step just above, not \"blast\"), and dropped the spacing-decrement click: DrillStep.gridSpacing (Drill.ts) persists across the whole scenario (never reset between grid cycles), so it's already sitting at the correct 2m left behind by Grid 1/3's own single decrement -- decrementing again here would have clamped at Math.max(1, ...) same as Grid 2/3's own bug, and (with Grid 2/3's own decrement now also removed) it never dropped below 2m in the first place.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"

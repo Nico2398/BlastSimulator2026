@@ -58,6 +58,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -199,6 +204,11 @@
       "description": "A second survey is run while the toggle is off. The Survey panel is already open (from the first survey, never closed since), so this reuses the run flow directly rather than reopening the panel.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-run"

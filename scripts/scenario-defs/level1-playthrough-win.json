@@ -47,6 +47,11 @@
       "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

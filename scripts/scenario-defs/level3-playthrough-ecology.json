@@ -259,6 +259,11 @@
       "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

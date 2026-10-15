@@ -71,6 +71,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -208,6 +213,11 @@
       "description": "Arms a living_quarters placement — Build panel, buy button, tile picker — while the seismic survey's confidence overlay from the step above is still on screen and rendered right beside the placement footprint (4 tiles from the surveyed column). The screenshot right after the tile picker opens is the whole point of this scenario: both ground-tint overlays (survey confidence and the placement's selection tint/picker ring) conforming to the same sloped terrain at once, rather than two flat plates floating at their own fixed Y and clipping through each other or the ground (#1006). Only confirms the order lands (orderedBuildingCount increases); construction itself is out of scope for this scenario.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"

@@ -50,6 +50,11 @@
       "description": "Setup: a single drill hole (H1) at a known position — its own position is the click target. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. #553: confirming the grid queues one drill_hole PendingAction and orders H1 (plannedDrillHoles) — it is not drilled yet, so holeCount stays 0 here.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },
