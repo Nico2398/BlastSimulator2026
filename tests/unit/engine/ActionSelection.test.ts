@@ -34,7 +34,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { DEBRIS_SELECTION_BINNING_MIN, ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
+import { actionRankTier, DEBRIS_SELECTION_BINNING_MIN, ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
 import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
@@ -2003,5 +2003,113 @@ describe('computeActionWorkTicks — charge_hole scales with the reserved chargi
     reserveVehicle(state.vehicles, purchaseVehicle(state.vehicles, 'charging_truck', 0, 0, 3).vehicle.id, action.id);
 
     expect(computeActionWorkTicks(state, employee, action)).toBe(11);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Rank tiers: a charge order outranks nearer debris hauling (#1742)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('selectBestActionForEmployee — rank tiers (#1742)', () => {
+  // Debris itineraries need fragments, a depot and a vehicle; what is under test is the ranking,
+  // so the planner is stubbed to a straight-line cost. Orders in `unplannable` have no route.
+  let unplannable: Set<number>;
+  beforeEach(() => {
+    unplannable = new Set();
+    vi.spyOn(PlanItineraryModule, 'planItinerary').mockImplementation((_state, employee, _goal, _fidelity, opts) => (
+      unplannable.has(opts!.action!.id) ? null
+        : { estTotalTicks: Math.hypot(opts!.action!.targetX - employee.x, opts!.action!.targetZ - employee.z) }
+    ) as unknown as ReturnType<typeof PlanItineraryModule.planItinerary>);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  function blaster(state: GameState, x = 0, z = 0): Employee {
+    const emp = makeEmployee(state, x, z);
+    assignSkill(state.employees, emp.id, 'blasting', 1);
+    return emp;
+  }
+
+  it('ranks charge_hole in a higher tier than haul_debris', () => {
+    expect(actionRankTier('charge_hole')).toBeGreaterThan(actionRankTier('haul_debris'));
+    expect(actionRankTier('haul_debris')).toBe(actionRankTier('general_work'));
+  });
+
+  it('a blaster with a near haul_debris and a far charge_hole picks the charge_hole', () => {
+    const state = makeState();
+    const emp = blaster(state);
+    const haul = makeAction({ id: 1, type: 'haul_debris', targetX: 2, targetZ: 0 });
+    const charge = makeAction({ id: 2, type: 'charge_hole', requiredSkill: 'blasting', targetX: 25, targetZ: 25 });
+    state.pendingActions.push(haul, charge);
+
+    expect(selectBestActionForEmployee(state, emp, [haul, charge])!.action.id).toBe(2);
+  });
+
+  it('takes the charge order within a bounded wait however much debris is queued', () => {
+    const state = makeState();
+    const emp = blaster(state);
+    const hauls = Array.from({ length: 12 }, (_, i) => makeAction({ id: 1 + i, type: 'haul_debris', targetX: 1 + i, targetZ: 0 }));
+    const charge = makeAction({ id: 100, type: 'charge_hole', requiredSkill: 'blasting', targetX: 28, targetZ: 28 });
+    state.pendingActions.push(...hauls, charge);
+    const pool = [...hauls, charge];
+
+    let picksUntilCharge = 0;
+    for (let n = 0; n < pool.length; n++) {
+      const sel = selectBestActionForEmployee(state, emp, pool.filter(a => a.status === 'queued'))!;
+      picksUntilCharge++;
+      if (sel.action.type === 'charge_hole') break;
+      sel.action.status = 'assigned';
+    }
+    expect(picksUntilCharge).toBe(1);
+  });
+
+  it('falls through to the haul when the higher-tier charge_hole is not claimable', () => {
+    const state = makeState();
+    const emp = blaster(state);
+    const haul = makeAction({ id: 1, type: 'haul_debris', targetX: 2, targetZ: 0 });
+    const charge = makeAction({ id: 2, type: 'charge_hole', requiredSkill: 'blasting', targetX: 25, targetZ: 25 });
+
+    const sel = selectBestActionForEmployee(state, emp, [haul, charge], a => a.type !== 'charge_hole');
+    expect(sel!.action.id).toBe(1);
+  });
+
+  it('falls through to the haul when the higher-tier charge_hole is unreachable', () => {
+    const state = makeState();
+    const emp = blaster(state);
+    const haul = makeAction({ id: 1, type: 'haul_debris', targetX: 2, targetZ: 0 });
+    const charge = makeAction({ id: 2, type: 'charge_hole', requiredSkill: 'blasting', targetX: 25, targetZ: 5 });
+    unplannable.add(charge.id);
+
+    const sel = selectBestActionForEmployee(state, emp, [haul, charge]);
+    expect(sel).not.toBeNull();
+    expect(sel!.action.id).toBe(1);
+  });
+
+  it('leaves an employee without blasting on plain cost order among tier-equal actions', () => {
+    const state = makeState();
+    const emp = makeEmployee(state);
+    const near = makeAction({ id: 2, type: 'haul_debris', targetX: 2, targetZ: 0 });
+    const far = makeAction({ id: 1, type: 'general_work', targetX: 20, targetZ: 20 });
+
+    expect(selectBestActionForEmployee(state, emp, [far, near])!.action.id).toBe(2);
+  });
+
+  it('ranks two charge_hole orders by cost, then lowest id', () => {
+    const state = makeState();
+    const emp = blaster(state);
+    const nearC = makeAction({ id: 5, type: 'charge_hole', requiredSkill: 'blasting', targetX: 4, targetZ: 0 });
+    const farC = makeAction({ id: 3, type: 'charge_hole', requiredSkill: 'blasting', targetX: 20, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [farC, nearC])!.action.id).toBe(5);
+
+    const tieA = makeAction({ id: 8, type: 'charge_hole', requiredSkill: 'blasting', targetX: 10, targetZ: 0 });
+    const tieB = makeAction({ id: 7, type: 'charge_hole', requiredSkill: 'blasting', targetX: 10, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [tieA, tieB])!.action.id).toBe(7);
+  });
+
+  it('keeps cost order among haul orders when no higher tier is present', () => {
+    const state = makeState();
+    const emp = blaster(state);
+    const near = makeAction({ id: 2, type: 'haul_debris', targetX: 2, targetZ: 0 });
+    const far = makeAction({ id: 1, type: 'haul_debris', targetX: 20, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [far, near])!.action.id).toBe(2);
   });
 });
