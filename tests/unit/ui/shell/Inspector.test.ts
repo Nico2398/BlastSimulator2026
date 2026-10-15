@@ -721,7 +721,7 @@ describe('Inspector — window frame (#1756)', () => {
 
     expect(bar.open).toBe(true);
     expect(root.style.display).not.toBe('none');
-    expect(root.textContent).toContain(t('inspector.section.details'));
+    expect(root.textContent).toContain(t('ui.crew.needs'));
     expect(root.textContent).toContain(t('role.driller'));
     expect(bar.target).toEqual({ kind: 'employee', id: employee.id });
   });

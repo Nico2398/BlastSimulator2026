@@ -6,7 +6,7 @@
 // were all unreached that way. These test the exported units directly, one
 // call per branch.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   getInitials,
   roleColorHex,
@@ -15,6 +15,12 @@ import {
   describeActivity,
   makeHiredLocationStrip,
   makePaySection,
+  makeSkillsSection,
+  makeCurrentTaskSection,
+  makeRestSection,
+  makeStatusTags,
+  makeIdentitySection,
+  type LinkFactory,
 } from '../../../src/ui/crewDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -195,7 +201,7 @@ describe('makeHiredLocationStrip', () => {
 
   it('reports the current position, not a walk, while stuck', () => {
     const strip = makeHiredLocationStrip(makeEmployee({ x: 3, z: 4, destinationX: 12, destinationZ: 8, isMoveStuck: true }), makeState());
-    expect(strip.textContent).toContain('Stuck at (3, 4)');
+    expect(strip.textContent).toContain('Stuck for 0 ticks at (3, 4)');
     expect(strip.textContent).not.toContain('Walking to');
   });
 
@@ -347,5 +353,210 @@ describe('makePaySection raises line (#1383)', () => {
 
   it('shows $0 raises when raises is absent', () => {
     expect(pay(withParts(undefined))).toContain('+ raises $0/h');
+  });
+});
+
+
+// ── #1762: inspector-facing location, task target, licence tier, rest ──
+
+type LinkCall = { kind: string; id: number; label: string };
+
+function recordingLinks(): { link: LinkFactory; calls: LinkCall[] } {
+  const calls: LinkCall[] = [];
+  const link: LinkFactory = (kind, id, label) => {
+    calls.push({ kind, id, label });
+    const a = document.createElement('a');
+    a.dataset['selectKind'] = kind;
+    a.dataset['selectId'] = String(id);
+    a.textContent = label;
+    return a;
+  };
+  return { link, calls };
+}
+
+function stateWithBuilding(type: 'living_quarters' | 'blasting_academy', id = 4): GameState {
+  const s = makeState();
+  s.buildings.buildings = [{ id, type, tier: 1, x: 8, z: 8, hp: 100, active: true, occupantIds: [] }];
+  return s;
+}
+
+describe('makeHiredLocationStrip — inside / aboard links (#1762)', () => {
+  it('inside a building with a link factory: a building link, label names the building', () => {
+    const s = stateWithBuilding('living_quarters');
+    const e = makeEmployee({ locomotion: { kind: 'inside', buildingId: 4 } });
+    const { link, calls } = recordingLinks();
+    const strip = makeHiredLocationStrip(e, s, link);
+    const a = strip.querySelector('[data-select-kind="building"]') as HTMLElement;
+    expect(a).not.toBeNull();
+    expect(a.dataset['selectId']).toBe('4');
+    expect(calls).toHaveLength(1);
+    expect(strip.textContent).toContain(t('building.living_quarters.name'));
+    expect(strip.textContent).not.toMatch(/ui\.crew\./);
+  });
+
+  it('inside a building without a factory: plain text naming the building, no links', () => {
+    const s = stateWithBuilding('living_quarters');
+    const e = makeEmployee({ locomotion: { kind: 'inside', buildingId: 4 } });
+    const strip = makeHiredLocationStrip(e, s);
+    expect(strip.querySelector('[data-select-kind]')).toBeNull();
+    expect(strip.textContent).toContain(t('building.living_quarters.name'));
+  });
+
+  it('mounted with a link factory: a vehicle link', () => {
+    const s = makeState([makeVehicle({ id: 9, occupantIds: [1] })]);
+    const e = makeEmployee({ locomotion: { kind: 'mounted', vehicleId: 9 } });
+    const { link } = recordingLinks();
+    const strip = makeHiredLocationStrip(e, s, link);
+    const a = strip.querySelector('[data-select-kind="vehicle"]') as HTMLElement;
+    expect(a).not.toBeNull();
+    expect(a.dataset['selectId']).toBe('9');
+  });
+
+  it('mounted without a factory keeps the plain Aboard text (Crew row unchanged)', () => {
+    const s = makeState([makeVehicle({ id: 9, occupantIds: [1] })]);
+    const e = makeEmployee({ locomotion: { kind: 'mounted', vehicleId: 9 } });
+    const strip = makeHiredLocationStrip(e, s);
+    expect(strip.querySelector('[data-select-kind]')).toBeNull();
+    expect(strip.textContent).toContain(t('ui.crew.location_aboard', { vehicle: '#9' }));
+  });
+
+  it('stuck reports the number of ticks', () => {
+    const e = makeEmployee({ isMoveStuck: true, moveConsecutiveFailures: 23, destinationX: 9, destinationZ: 9 });
+    const text = makeHiredLocationStrip(e, makeState()).textContent ?? '';
+    expect(text).toContain('23');
+    expect(text).not.toMatch(/^ui\./);
+  });
+
+  it('walking to rest reads differently from plain walking', () => {
+    const plain = makeEmployee({ destinationX: 9, destinationZ: 9 });
+    const rest = makeEmployee({ destinationX: 9, destinationZ: 9, pendingRestDuration: 30 });
+    const a = makeHiredLocationStrip(plain, makeState()).textContent;
+    const b = makeHiredLocationStrip(rest, makeState()).textContent;
+    expect(b).not.toBe(a);
+    expect(b).not.toMatch(/ui\.crew\.location/);
+  });
+
+  it('walking to school reads differently from plain walking', () => {
+    const plain = makeEmployee({ destinationX: 9, destinationZ: 9 });
+    const school = makeEmployee({
+      destinationX: 9, destinationZ: 9,
+      pendingTrainingState: { buildingId: 4, skill: 'geology', ticksRemaining: 10, fee: 1 },
+    });
+    const a = makeHiredLocationStrip(plain, makeState()).textContent;
+    const b = makeHiredLocationStrip(school, stateWithBuilding('blasting_academy')).textContent;
+    expect(b).not.toBe(a);
+  });
+
+  it('plain bench / coordinate output is unchanged without a factory', () => {
+    const s = makeState();
+    s.navGrid = makeFlatNavGrid(16, 3);
+    const text = makeHiredLocationStrip(makeEmployee({ x: 5, z: 5 }), s).textContent ?? '';
+    expect(text).toContain(t('ui.crew.location_bench', { bench: 3, x: 5, z: 5 }));
+  });
+});
+
+describe('makeSkillsSection — driving licence tier (#1762)', () => {
+  const driving = (licenceLevel?: 1 | 2 | 3) => makeEmployee({
+    qualifications: [{ category: 'driving.truck', proficiencyLevel: 2, xp: 0, ...(licenceLevel ? { licenceLevel } : {}) }],
+  });
+
+  it('shows tier 3 for a tier-3 licence', () => {
+    expect(makeSkillsSection(driving(3)).textContent).toContain(t('ui.crew.licence_tier', { tier: 3 }));
+  });
+
+  it('an absent licenceLevel reads as tier 1', () => {
+    expect(makeSkillsSection(driving()).textContent).toContain(t('ui.crew.licence_tier', { tier: 1 }));
+  });
+
+  it('a non-driving skill shows no licence tier', () => {
+    const e = makeEmployee({ qualifications: [{ category: 'blasting' as never, proficiencyLevel: 1, xp: 0 }] });
+    expect(makeSkillsSection(e).textContent).not.toContain(t('ui.crew.licence_tier', { tier: 1 }));
+  });
+});
+
+describe('makeCurrentTaskSection — target link and queued count (#1762)', () => {
+  const working = (payload: Record<string, unknown> | null, extra: Partial<Employee> = {}) => makeEmployee({
+    activeActionId: 5, taskTicksRemaining: 10, activeTaskTotalTicks: 20, pendingActionType: 'repair_vehicle' as never,
+    pendingActionPayload: payload, ...extra,
+  });
+
+  it('links the task target vehicle', () => {
+    const s = makeState([makeVehicle({ id: 9 })]);
+    const { link } = recordingLinks();
+    const sec = makeCurrentTaskSection(working({ vehicleId: 9 }), s, link);
+    const a = sec.querySelector('[data-select-kind="vehicle"]') as HTMLElement;
+    expect(a).not.toBeNull();
+    expect(a.dataset['selectId']).toBe('9');
+  });
+
+  it('no link when the target is gone', () => {
+    const { link } = recordingLinks();
+    const sec = makeCurrentTaskSection(working({ vehicleId: 9 }), makeState(), link);
+    expect(sec.querySelector('[data-select-kind]')).toBeNull();
+  });
+
+  it('no link without a factory', () => {
+    const s = makeState([makeVehicle({ id: 9 })]);
+    expect(makeCurrentTaskSection(working({ vehicleId: 9 }), s).querySelector('[data-select-kind]')).toBeNull();
+  });
+
+  it('shows the queued task count when follow-ups are queued', () => {
+    const e = working(null, { taskQueue: [7, 8] });
+    const text = makeCurrentTaskSection(e, makeState()).textContent ?? '';
+    expect(text).toContain(t('ui.crew.queued_tasks', { n: 3 }));
+  });
+
+  it('shows no queued line for an idle employee', () => {
+    const text = makeCurrentTaskSection(makeEmployee(), makeState()).textContent ?? '';
+    expect(text).not.toContain(t('ui.crew.queued_tasks', { n: 0 }));
+    expect(text).not.toContain(t('ui.crew.queued_tasks', { n: 1 }));
+  });
+});
+
+describe('makeRestSection (#1762)', () => {
+  it('null when neither resting nor walking to rest', () => {
+    expect(makeRestSection(makeEmployee(), makeState())).toBeNull();
+  });
+
+  it('resting inside a building: building link and time left', () => {
+    const s = stateWithBuilding('living_quarters');
+    const e = makeEmployee({ locomotion: { kind: 'inside', buildingId: 4 }, restTicksRemaining: 14 });
+    const { link } = recordingLinks();
+    const sec = makeRestSection(e, s, link)!;
+    expect(sec).not.toBeNull();
+    expect(sec.querySelector('[data-select-kind="building"]')).not.toBeNull();
+    expect(sec.textContent).toContain('14');
+  });
+
+  it('walking to rest reads differently from resting', () => {
+    const s = stateWithBuilding('living_quarters');
+    const walking = makeEmployee({ destinationX: 8, destinationZ: 8, pendingRestDuration: 30 });
+    const resting = makeEmployee({ locomotion: { kind: 'inside', buildingId: 4 }, restTicksRemaining: 14 });
+    const w = makeRestSection(walking, s)!;
+    expect(w).not.toBeNull();
+    expect(w.textContent).not.toBe(makeRestSection(resting, s)!.textContent);
+  });
+});
+
+describe('makeStatusTags / makeIdentitySection (#1762)', () => {
+  it('status tags show a union chip only for unionized employees', () => {
+    const plain = makeStatusTags(makeEmployee(), makeState());
+    const union = makeStatusTags(makeEmployee({ unionized: true }), makeState());
+    expect(union.textContent!.length + union.querySelectorAll('*').length)
+      .toBeGreaterThan(plain.textContent!.length + plain.querySelectorAll('*').length);
+  });
+
+  it('identity shows name initials, role and morale', () => {
+    const sec = makeIdentitySection(makeEmployee({ morale: 42, hiredAtTick: 48 }), makeState());
+    const text = sec.textContent ?? '';
+    expect(text).toContain('WD');
+    expect(text).toContain(t('role.driller'));
+    expect(text).toContain('42');
+    expect(text).toContain(t('ui.crew.day_label', { day: 3 }));
+  });
+
+  it('identity does not throw for a legacy employee without hiredAtTick', () => {
+    const fn = vi.fn(() => makeIdentitySection(makeEmployee(), makeState()));
+    expect(fn).not.toThrow();
   });
 });

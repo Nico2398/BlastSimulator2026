@@ -2,6 +2,7 @@
 import { t } from '../../../core/i18n/I18n.js';
 import { el, sectionHeader } from '../../dom.js';
 import type { InspectorKind, InspectorLinks } from './InspectorContent.js';
+import type { LinkFactory } from '../../crewDetailSections.js';
 
 /** Set a node's text only when it differs, so a steady frame touches no DOM. */
 export function writeText(node: HTMLElement, text: string): void {
@@ -52,4 +53,19 @@ export function sectionOf(label: string, rows: (HTMLElement | null)[]): HTMLElem
   const wrap = el('div', { children: [sectionHeader(label), ...rows] });
   wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
   return wrap;
+}
+
+/** Keep the child `className` of `root` current: rebuilt via `build` when it changed; null removes it. */
+export function syncSection(root: HTMLElement, className: string, build: () => HTMLElement | null): void {
+  const current = Array.from(root.children).find(c => c.classList.contains(className));
+  const next = build();
+  if (!next) { current?.remove(); return; }
+  next.classList.add(className);
+  if (!current) root.append(next);
+  else if (current.outerHTML !== next.outerHTML) current.replaceWith(next);
+}
+
+/** A LinkFactory whose links select entities through `links`. */
+export function linkFactory(links: InspectorLinks): LinkFactory {
+  return (kind, id, label) => entityLink(label, kind, id, links);
 }

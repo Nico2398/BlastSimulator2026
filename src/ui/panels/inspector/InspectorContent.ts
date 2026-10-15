@@ -5,6 +5,7 @@ import { buildingContent } from './buildingContent.js';
 import { vehicleContent } from './vehicleContent.js';
 import { employeeContent } from './employeeContent.js';
 import { pickedContent } from './pickedContent.js';
+import type { ConfirmModalConfig } from '../ConfirmModal.js';
 
 export type InspectorKind = EntityPick['kind'];
 
@@ -29,6 +30,10 @@ export interface ActionSpec {
 /** Callbacks a view uses to navigate to other entities (host, occupant, driver...). */
 export interface InspectorLinks {
   readonly select: (kind: InspectorKind, id: number) => void;
+  /** Run a console command line (raise, train, fire...). */
+  readonly run: (command: string) => void;
+  /** Ask the shared confirm overlay. */
+  readonly confirm: (config: ConfirmModalConfig) => void;
 }
 
 /** Everything the Inspector shows for one entity at one moment. */
