@@ -9,10 +9,10 @@
 // position breaks the moment a field is inserted.
 
 import { t } from '../core/i18n/I18n.js';
-import { getBuildingDef } from '../core/entities/Building.js';
 import { ORE_DEPTH_UNBOUNDED } from '../core/world/OreCatalog.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
-import { vehicleDisplayName } from './fleetDetailSections.js';
+import { buildingDisplayName, vehicleDisplayName } from './fleetDetailSections.js';
+import { fieldStyle } from './dom.js';
 import {
   SANDBOX_DEFAULTS,
   SANDBOX_FIELDS,
@@ -29,17 +29,14 @@ export type OnSandboxStart = (config: SandboxConfig) => void;
 export type OnSandboxBack = () => void;
 
 const ROW_STYLE = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0';
-const LABEL_STYLE = 'font-size:12px;color:#c0a060;flex:1';
-const INPUT_STYLE = [
-  'padding:4px 6px;font-size:12px;font-family:monospace',
-  // Order matters for jsdom's cssText parser: rgba background before rgba border drops the whole string.
-  'color:#ffe0a0;border:1px solid rgba(200,160,60,0.35);border-radius:4px',
-  'background:rgba(0,0,0,0.5)',
-].join(';');
+const LABEL_STYLE = 'font:600 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1';
+// Same field look as the Contracts amount and Operations threshold inputs.
+// Native select popups and number spinners follow the dark scheme.
+const INPUT_STYLE = `${fieldStyle({ height: 30, padX: 10 })};color-scheme:dark`;
 const NUMBER_INPUT_STYLE = `width:120px;${INPUT_STYLE}`;
 // Choice labels ("Desert Badlands", French names) must fit unclipped at 1280x720.
 const SELECT_STYLE = `min-width:180px;width:auto;max-width:240px;${INPUT_STYLE}`;
-const DETAIL_BLOCK_STYLE = 'display:flex;flex-direction:column;gap:3px;margin-top:6px;font-size:11px;line-height:1.5;color:#c0a060;overflow-wrap:anywhere';
+const DETAIL_BLOCK_STYLE = 'display:flex;flex-direction:column;gap:3px;margin-top:6px;font:400 11px/1.5 var(--bsx-font-ui);color:var(--bsx-text-muted);overflow-wrap:anywhere';
 
 export class SandboxPanel {
   private readonly overlay: HTMLElement;
@@ -52,6 +49,8 @@ export class SandboxPanel {
   /** Biome and difficulty detail blocks, refreshed in place when a selection changes (#1686). */
   private biomeBlock!: HTMLElement;
   private difficultyBlock!: HTMLElement;
+  /** Header title, retranslated on every open so a locale switch in the menu shows. */
+  private titleEl!: HTMLElement;
   /** Injectable RNG for the seed, so tests stay deterministic (#504). */
   private readonly rand: () => number;
 
@@ -59,25 +58,26 @@ export class SandboxPanel {
     this.rand = rand;
     this.overlay = document.createElement('div');
     this.overlay.id = 'bs-sandbox-panel';
+    this.overlay.className = 'bsx-root';
     this.overlay.style.cssText = [
       'position:fixed;inset:0;z-index:10000;display:none',
       'flex-direction:column;align-items:center;justify-content:center;gap:12px',
-      'background:#060402',
+      'background:var(--bsx-app)',
     ].join(';');
 
     const box = document.createElement('div');
     box.style.cssText = [
       'display:flex;flex-direction:column;gap:6px;min-width:420px;max-width:560px',
-      'background:rgba(8,6,3,0.9);border:1px solid rgba(200,160,60,0.25)',
-      'border-radius:12px;padding:20px 24px',
-      'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+      'background:var(--bsx-panel);border:1px solid var(--bsx-hairline-strong)',
+      'border-radius:9px;padding:0 0 18px',
+      'box-shadow:0 30px 80px rgba(0,0,0,.7)',
       'max-height:86vh;overflow-y:auto',
     ].join(';');
 
     this.body = document.createElement('div');
-    this.body.style.cssText = 'display:flex;flex-direction:column;gap:2px';
+    this.body.style.cssText = 'display:flex;flex-direction:column;gap:2px;padding:0 24px';
 
-    box.append(this.body);
+    box.append(this.header(), this.body);
     this.overlay.append(box);
     container.appendChild(this.overlay);
   }
@@ -104,22 +104,30 @@ export class SandboxPanel {
 
   // ---- Internal ----
 
+  /** Header bar matching the Settings and Saved games modals. */
+  private header(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.style.cssText = [
+      'flex:0 0 auto;display:flex;align-items:center;height:46px;padding:0 24px',
+      'background:#1a2028;border-bottom:1px solid var(--bsx-hairline)',
+    ].join(';');
+    const title = document.createElement('div');
+    title.style.cssText = 'font:700 12px/1 var(--bsx-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--bsx-text-primary)';
+    this.titleEl = title;
+    bar.append(title);
+    return bar;
+  }
+
   private render(): void {
+    this.titleEl.textContent = t('sandbox.title');
     this.body.innerHTML = '';
     this.inputs.clear();
 
-    const title = document.createElement('div');
-    title.style.cssText = [
-      'font-weight:700;font-size:13px;letter-spacing:0.06em;text-transform:uppercase',
-      'color:#ffc840;margin-bottom:2px;border-bottom:1px solid rgba(200,160,60,0.25);padding-bottom:8px',
-    ].join(';');
-    title.textContent = t('sandbox.title');
-
     const blurb = document.createElement('div');
-    blurb.style.cssText = 'font-size:11px;color:#6a5030;margin:4px 0 8px;line-height:1.5';
+    blurb.style.cssText = 'font:400 11px/1.5 var(--bsx-font-ui);color:var(--bsx-text-micro);margin:12px 0 8px';
     blurb.textContent = t('sandbox.blurb');
 
-    this.body.append(title, blurb);
+    this.body.append(blurb);
 
     for (const field of SANDBOX_FIELDS) this.body.appendChild(this.renderField(field));
 
@@ -135,15 +143,15 @@ export class SandboxPanel {
 
     const backBtn = document.createElement('button');
     backBtn.id = 'bs-sandbox-back';
-    backBtn.className = 'bs-btn';
-    backBtn.style.cssText = 'flex:1;padding:9px 12px;font-size:12px';
+    backBtn.className = 'bsx-btn';
+    backBtn.style.cssText = 'flex:1';
     backBtn.textContent = '← ' + t('ui.back');
     backBtn.addEventListener('click', () => { this.hide(); this.onBack?.(); });
 
     const startBtn = document.createElement('button');
     startBtn.id = 'bs-sandbox-start';
-    startBtn.className = 'bs-btn bs-btn-primary';
-    startBtn.style.cssText = 'flex:2;padding:9px 12px;font-size:12px;font-weight:700';
+    startBtn.className = 'bsx-btn bsx-btn-primary';
+    startBtn.style.cssText = 'flex:2';
     startBtn.textContent = t('sandbox.start');
     startBtn.addEventListener('click', () => {
       this.hide();
@@ -173,8 +181,8 @@ export class SandboxPanel {
       wrap.style.cssText = 'display:flex;gap:6px;align-items:center';
       const dice = document.createElement('button');
       dice.id = 'bs-sandbox-randomize';
-      dice.className = 'bs-btn';
-      dice.style.cssText = 'padding:4px 9px;font-size:13px;line-height:1';
+      dice.className = 'bsx-btn';
+      dice.style.cssText = 'width:34px;padding:0;font-size:13px';
       dice.title = t('sandbox.randomize');
       dice.setAttribute('aria-label', t('sandbox.randomize'));
       dice.textContent = '🎲';
@@ -260,7 +268,7 @@ export class SandboxPanel {
     const opening = t('sandbox.detail.opens_with', {
       crew: list(diff.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
       vehicles: list(diff.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
-      buildings: list(diff.buildings.map(b => `${b.count}× ${t(getBuildingDef(b.type, b.tier).nameKey)}`)),
+      buildings: list(diff.buildings.map(b => `${b.count}× ${buildingDisplayName(b.type, b.tier)}`)),
     });
     this.difficultyBlock.replaceChildren(
       detailLine('bs-sandbox-difficulty-cash', t('sandbox.detail.cash', { cash: formatMoney(diff.startingCash) })),
