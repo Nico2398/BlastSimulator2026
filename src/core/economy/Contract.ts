@@ -350,7 +350,9 @@ export function hasWinningOreSaleOffer(
  * True when `offer` is a sale the site can fill in full today: an `ore_sale`
  * asking no more of its ore than `collectedOre` holds, or a `rubble_disposal`
  * asking no more than the raw `storedMassKg` (rubble has no material of its
- * own). `supply` is a recurring bulk deal, never a one-click sale (#1338).
+ * own). `supply` is never a one-click sale (#1338): it is a bulk deal completed by delivery
+ * over time. On the production market it is sized so the kit can deliver it in full by its
+ * deadline (#1789), so it is fillable that way, just not by this predicate.
  */
 export function isFillableSaleOffer(
   offer: Contract,

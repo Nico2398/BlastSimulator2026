@@ -32,6 +32,7 @@ import {
   PRODUCTION_SUPPLY_QTY_KG,
   PRODUCTION_SUPPLY_DEADLINE_TICKS,
   PRODUCTION_OFFER_QTY_STEP_KG,
+  CONTRACT_PENALTY_RATE,
 } from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 import { resolveMarket, oreContractBasePrice } from '../../../src/core/economy/Market.js';
@@ -1044,8 +1045,8 @@ describe('production supply offers are fillable by the opening kit (#1789)', () 
 
   it('the penalty stays on the unmultiplied base value (#959)', () => {
     for (const c of supply.slice(0, 40)) {
-      expect(c.penaltyAmount).toBeGreaterThan(0);
-      expect(c.penaltyAmount).toBeLessThanOrEqual(c.quantityKg * c.pricePerKg);
+      // boardsOver's multiplier is 1, so pricePerKg is the unmultiplied base price.
+      expect(c.penaltyAmount).toBe(Math.round(c.quantityKg * c.pricePerKg * CONTRACT_PENALTY_RATE));
     }
   });
 });

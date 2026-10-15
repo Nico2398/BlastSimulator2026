@@ -2763,7 +2763,10 @@ export const PRODUCTION_ORE_SALE_QTY_KG = { min: 250, max: 2_000 } as const;
  * = 13,500), so every supply offer is deliverable in full on time with a 1.5x margin.
  */
 export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 8_000 } as const;
-/** Deadline range (ticks) of legacy-market offers. */
+/**
+ * Default deadline range (ticks) for every non-supply offer on any market, plus supply on the
+ * legacy market. Production-market supply uses `PRODUCTION_SUPPLY_DEADLINE_TICKS` instead.
+ */
 export const LEGACY_OFFER_DEADLINE_TICKS = { min: 30, max: 100 } as const;
 /** Deadline range (ticks) of production-market supply offers; see the fillability invariant above. */
 export const PRODUCTION_SUPPLY_DEADLINE_TICKS = { min: 1_500, max: 2_500 } as const;
