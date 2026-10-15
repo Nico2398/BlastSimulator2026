@@ -80,7 +80,7 @@ Unionized employees cannot be fired. Affected by well-being score.
 ### Scores (0-100 each)
 | Score | Affected by |
 |-------|------------|
-| **Worker Well-being** | Quarters quality, breaks, overwork, raises, accidents |
+| **Worker Well-being** | Quarters quality (higher tiers settle higher, gains taper near 100), bed crowding, overwork (fatigue strain), morale, accidents; drags are applied per tick (`gameplay-employee-needs`) |
 | **Safety** | Equipment investment, accident rate, evacuation, PPE |
 | **Ecology** | Waste management: each active spoil heap +0.2/tick (inactive none). Dust (settling model, `updateScores`): a blast's new loose rubble is fresh dust (`ScoreState.freshDustKg`), costing `ECOLOGY_DUST_PER_TONNE_PER_TICK` (0.0002) per tonne per tick and settling with half-life `ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS` (150); settled rubble costs only `ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK` (0.000004). No cap. One heap carries ordinary play (a ~2,344 t pile, blast every ~600 ticks: visible dip to the mid 30s, then recovery); rapid blasting with rubble left lying (3 heaps, a blast every 100 ticks, no hauling) still reaches 0 within 3000 ticks. Hauling rock away shrinks the settled term and the next pulse. Blast vibration/projections and events lower it. At 0 `applyDecay` does not lift it, but a net-positive delta (heap gain minus dust/vibration) does, so the shutdown warning leaves room to act; neglect (no heaps) still reaches 0 and shuts down. The ecology star is earned by play, not neutral drift. |
 | **Neighbour Relations** | High = good. Lowered by blast vibrations, noise, dust, projections, traffic, failed bribes; raised by events that please the village |
