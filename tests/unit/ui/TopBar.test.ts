@@ -141,8 +141,11 @@ describe('TopBar (redesign P1)', () => {
 
     it('a paused top bar shows no Paused chip or text', () => {
       const { container, topBar } = setup(s => { s.isPaused = true; });
-      expect(container.querySelector('#bs-hud-top')?.textContent ?? '').not.toMatch(/paused/i);
-      expect(container.textContent ?? '').not.toContain(t('shell.topbar.paused'));
+      const bar = container.querySelector('#bs-hud-top');
+      expect(bar).not.toBeNull();
+      const text = bar!.textContent ?? '';
+      expect(text).not.toMatch(/paused|en pause/i);
+      expect(bar!.querySelector('[data-chip="paused"], .bs-paused-chip, [data-testid="paused-chip"]')).toBeNull();
       topBar.dispose();
     });
 

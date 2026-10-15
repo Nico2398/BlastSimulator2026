@@ -1192,10 +1192,10 @@ runner.register('tutorial_start', 'Start the tutorial overlay', () => {
   return { success: true, output: 'Tutorial started' };
 });
 // Picking a speed also resumes: the speed segments and the pause segment form one radio group.
-function selectSpeed(n: number): void {
+function selectSpeedAndResume(n: number): void {
   window.__gameConsole(`time speed ${n} resume:true`);
 }
-uiManager.setSpeedChangeHandler(selectSpeed);
+uiManager.setSpeedChangeHandler(selectSpeedAndResume);
 uiManager.setQuitHandler(() => {
   tutorial.suspend(); // lifts the rails so the menu is clickable; keeps progress so Resume continues guided
   levelEndScreen.hide();
@@ -1383,7 +1383,7 @@ uiManager.setTogglePauseHandler(pauseClock);
 new KeyboardShortcuts({
   togglePause,
   // Same path as the top-bar speed segments: pick the speed and resume.
-  setSpeed: selectSpeed,
+  setSpeed: selectSpeedAndResume,
   togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { void savesModal.quickSave(); },
   onEscape: () => uiManager.handleEscape(),
