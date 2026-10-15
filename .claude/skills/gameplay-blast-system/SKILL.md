@@ -93,7 +93,7 @@ Four passes, in order:
    than `BLAST_GRADE_MAX_CUT_M` below that column's lowest broken voxel, so a deep outlier hole
    cannot gouge the pit. A hole's one-voxel breakout under grade is left standing beside any column
    ending at grade, whichever pass broke it (neighbours read from a pre-lift snapshot; a cut clamped
-   above grade does not count), so the floor is flush; a lone hole keeps its pit. It returns the voxels it added (`FragmentationResult.gradedCount`). The
+   above grade does not count), so the floor is flush; a lone hole keeps its pit. The lift floods: an 8-connected group of columns all ending exactly one voxel under grade lifts whole when any member neighbours a column at grade (pre-lift snapshot), so pockets between close holes (3 m spacing) are flush too; a group with no grade neighbour stays, and deeper columns neither lift nor carry the fill. It returns the voxels it added (`FragmentationResult.gradedCount`). The
    marks join the mask, so fragments, cleared voxels, the pre-blast estimate and the ore report
    follow the real broken volume; energy is untouched. Without it a pattern leaves pits under the
    holes and 1-4 m ridges between them, steeper than `NAV_MAX_SLOPE_DEGREES`, and one ramp into the

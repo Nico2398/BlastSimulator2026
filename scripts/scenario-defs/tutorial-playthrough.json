@@ -1463,7 +1463,7 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "deathCount": 5
+          "deathCount": 4
         },
         "note": "Rally point (tutorial spoil heap moved from (28,16) to (4,19)): deathCount is 4, not 5 -- the debris_hauler now parks beside the heap at (6,20) with its driver #4 at (6,19) (it stood at (10,11) before), and blast 2's flyrock no longer reaches it there: direct trace (command mode) shows #5 (14,24) and #6 (26,24) die, #3 and #4 survive, and the hauler is the one vehicle left. Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on — see the campaign-status step's own note.",
         "decreased": [
@@ -1542,7 +1542,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 4,
           "activeContractCount": 0,
           "employeeCount": 6,
           "holeCount": 0
