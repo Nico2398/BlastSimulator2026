@@ -728,8 +728,9 @@ describe('A second bench drilled from a crater floor leaves no pillar at the cen
       const off = columnsOffFloor(grid, 36, 44, 32, 40, 0);
       expect(off, `second bench columns off floor 0 (centres are 38,34 42,34 38,38 42,38): ${off.join(' ')}`).toEqual([]);
 
-      // A ramp from the north rim down to the second floor: slope 16/31 stays under NAV_MAX_SLOPE_DEGREES.
-      digRamp(run, state, tickWhile, 'build_ramp start:40,0 end:40,31 depth:16');
+      // A ramp from the north rim down to the second floor. The rim reads 13 at (40,0) and the ramp bottoms out `depth` below its start
+      // surface, so depth 13 lands flush on floor 0 at z=31 (depth 16 dug 3 below it, a cliff the crew cannot climb back out of).
+      digRamp(run, state, tickWhile, 'build_ramp start:40,0 end:40,31 depth:13');
 
       // Classification runs at the start of each employee tick: give it a pass after the last segment, then wait for the sweep.
       tickWhile(() => false, 2);
