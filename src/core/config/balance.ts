@@ -1371,10 +1371,10 @@ export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
 /**
  * Freight Warehouse storage capacity in kg, by tier (#1531). BuildingDefs reads it for `capacity`.
  *
- * Sized against a measured blast: the level-1 Dusty Hollow 1x2 boomite 2 kg reference shot (seed 1138)
- * yields 65,627 kg of ore-bearing rock (re-measured after the #1740 floor-to-grade breakout change; the
- * historic 2x2 shot read 57,061 kg). Tier 1 (25,000) holds ~38% of that blast; tier 2 (72,000) holds all
- * of it with ~10% margin; tier 3 (200,000) holds more than 3 such blasts. To re-measure, fire that shot
+ * Sized against a measured blast: the level-1 Dusty Hollow 1x2 boomite 2.2 kg reference shot (seed 1138)
+ * yields 45,888 kg of ore-bearing rock (re-measured after the #1792 flush-breakout change; the
+ * historic 2x2 shot read 57,061 kg). Tier 1 (25,000) holds ~54% of that blast; tier 2 (72,000) holds all
+ * of it with ~57% margin; tier 3 (200,000) holds more than 4 such blasts. To re-measure, fire that shot
  * headlessly (console, seed 1138) and sum the mass of fragments with ore density above
  * SPOIL_BARREN_ORE_FRACTION_THRESHOLD.
  */

@@ -330,41 +330,56 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
 // Repro: sandbox desert_badlands seed 42, 3x3 Krackle 8 kg, spacing 3, depth 8,
 // stemming 2.5 at (28,18); the pocket is cells (29-30, 22-23).
 
+interface SandboxShot {
+  run: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']>;
+  state: GameState;
+  grid: VoxelGrid;
+  tickWhile: (until: () => boolean, max: number) => void;
+  /** Post-blast surface Y of every column the blast lowered. */
+  craterSurfaces: number[];
+}
+
+/** Sandbox seed 42: 3x3 Krackle 8 kg, spacing 3, depth 8, stemming 2.5, starting at (startX, startZ). */
+function blastSandboxPattern(biome: string, startX: number, startZ: number): SandboxShot {
+  const { runner, ctx } = createRunner();
+  const run = (c: string) => runner.run(c);
+  expect(run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`)).toMatchObject({ success: true });
+  const state = ctx.state!;
+  const grid = ctx.grid!;
+  const refresh = (): void => {
+    state.cash = Math.max(state.cash, 1_000_000);
+    for (const e of state.employees.employees) e.fatigue = 100;
+  };
+  const tickWhile = (until: () => boolean, max: number): void => {
+    for (let i = 0; i < max && !until(); i++) { refresh(); run('tick 1'); }
+  };
+  refresh();
+
+  expect(run(`drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
+  tickWhile(() => state.plannedDrillHoles.length === 0, 800);
+  expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 800);
+
+  const before = new Map<string, number>();
+  for (let z = startZ - 8; z < startZ + 22; z++) for (let x = startX - 10; x < startX + 22; x++) before.set(`${x},${z}`, computeVoxelColumnSurfaceY(grid, x, z)!);
+  expect(run('blast detonate')).toMatchObject({ success: true });
+  tickWhile(() => state.lastBlastReport !== null, 400);
+  expect(state.lastBlastReport).not.toBeNull();
+
+  const craterSurfaces: number[] = [];
+  for (const [key, y0] of before) {
+    const [x, z] = key.split(',').map(Number) as [number, number];
+    const y = computeVoxelColumnSurfaceY(grid, x, z)!;
+    if (y0 - y > 0) craterSurfaces.push(y);
+  }
+  return { run, state, grid, tickWhile, craterSurfaces };
+}
+
 describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stranded debris (#1792)', () => {
   it(
     'no crater column ends under its neighbours\' floor, and no order stays debris_out_of_reach once a ramp reaches the crater',
     () => {
-      const { runner, ctx } = createRunner();
-      const run = (c: string) => runner.run(c);
-      expect(run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true')).toMatchObject({ success: true });
-      const state = ctx.state!;
-      const grid = ctx.grid!;
-      const refresh = (): void => {
-        state.cash = Math.max(state.cash, 1_000_000);
-        for (const e of state.employees.employees) e.fatigue = 100;
-      };
-      const tickWhile = (until: () => boolean, max: number): void => {
-        for (let i = 0; i < max && !until(); i++) { refresh(); run('tick 1'); }
-      };
-      refresh();
-
-      expect(run('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:28,18')).toMatchObject({ success: true });
-      tickWhile(() => state.plannedDrillHoles.length === 0, 800);
-      expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-      tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 800);
-
-      const before = new Map<string, number>();
-      for (let z = 10; z < 40; z++) for (let x = 18; x < 50; x++) before.set(`${x},${z}`, computeVoxelColumnSurfaceY(grid, x, z)!);
-      expect(run('blast detonate')).toMatchObject({ success: true });
-      tickWhile(() => state.lastBlastReport !== null, 400);
-      expect(state.lastBlastReport).not.toBeNull();
-
-      const craterSurfaces: number[] = [];
-      for (const [key, y0] of before) {
-        const [x, z] = key.split(',').map(Number) as [number, number];
-        const y = computeVoxelColumnSurfaceY(grid, x, z)!;
-        if (y0 - y > 0) craterSurfaces.push(y);
-      }
+      const { run, state, grid, tickWhile, craterSurfaces } = blastSandboxPattern('desert_badlands', 28, 18);
       expect(craterSurfaces.length).toBeGreaterThan(20);
       const floorY = craterFloorY(craterSurfaces);
       const pits = craterSurfaces.filter(y => y < floorY);
@@ -386,4 +401,13 @@ describe('A 3 m pattern on desert seed 42 leaves no one-voxel pocket and no stra
     },
     600000,
   );
+
+  it('green foothills seed 42 at (28,28): every crater column reads one floor', () => {
+    const { craterSurfaces } = blastSandboxPattern('green_foothills', 28, 28);
+    expect(craterSurfaces.length).toBeGreaterThan(20);
+    const floorY = craterFloorY(craterSurfaces);
+    const off = craterSurfaces.filter(y => y !== floorY);
+    expect(off, `crater columns off the floor ${floorY}: ${off.join(',')}`).toHaveLength(0);
+    expect(floorY).toBe(9);
+  }, 600000);
 });

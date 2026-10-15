@@ -11,6 +11,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX, BLAST_SLICE_CELLS, BLAST_GRADE_MAX_CUT_M } from '../config/balance.js';
 import { type EnergyField, indexOf, contains } from './EnergyPropagation.js';
 import { drain, type Steps } from '../engine/Steps.js';
+import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 
 /** Face-adjacent offsets — connectivity for the support flood fill. */
 const FACE_OFFSETS: ReadonlyArray<readonly [number, number, number]> = [
@@ -194,6 +195,22 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   return graded;
 }
 
+/** Visit the in-box 8-neighbours of footprint cell (x, z) as (column, x, z). */
+function forEachNeighbourColumn(
+  box: EnergyField['box'],
+  columnOf: (x: number, z: number) => number,
+  x: number,
+  z: number,
+  visit: (column: number, nx: number, nz: number) => void,
+): void {
+  for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+    const px = x + dx;
+    const pz = z + dz;
+    if (px < box.minX || px >= box.maxX || pz < box.minZ || pz >= box.maxZ) continue;
+    visit(columnOf(px, pz), px, pz);
+  }
+}
+
 /**
  * Flag every column ending at `subGradeY` that belongs to an 8-connected group
  * of such columns with at least one member next to a column ending at
@@ -208,58 +225,38 @@ function subGradeColumnsToLift(
 ): Uint8Array {
   const lift = new Uint8Array(lowest.length);
   const visited = new Uint8Array(lowest.length);
-  const stack: number[] = [];
-  const nx = box.maxX - box.minX;
+  // Flood stack holds footprint coordinates, so column layout stays in columnOf.
+  const stackX: number[] = [];
+  const stackZ: number[] = [];
+  const enqueue = (c: number, x: number, z: number): void => {
+    visited[c] = 1;
+    stackX.push(x);
+    stackZ.push(z);
+  };
   // Seed from every sub-grade column beside a grade column, then spread
   // through sub-grade columns only.
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
       const c = columnOf(x, z);
       if (lowest[c] !== subGradeY || visited[c] === 1) continue;
-      if (!touchesColumnAt(lowest, columnOf, box, x, z, gradeCeil)) continue;
-      visited[c] = 1;
-      stack.push(c);
-      while (stack.length > 0) {
-        const cur = stack.pop()!;
-        lift[cur] = 1;
-        const cx = box.minX + (cur % nx);
-        const cz = box.minZ + Math.floor(cur / nx);
-        for (let dz = -1; dz <= 1; dz++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const px = cx + dx;
-            const pz = cz + dz;
-            if (px < box.minX || px >= box.maxX || pz < box.minZ || pz >= box.maxZ) continue;
-            const n = columnOf(px, pz);
-            if (visited[n] === 1 || lowest[n] !== subGradeY) continue;
-            visited[n] = 1;
-            stack.push(n);
-          }
-        }
+      let touchesGrade = false;
+      forEachNeighbourColumn(box, columnOf, x, z, (n) => {
+        if (lowest[n] === gradeCeil) touchesGrade = true;
+      });
+      if (!touchesGrade) continue;
+      enqueue(c, x, z);
+      while (stackX.length > 0) {
+        const cx = stackX.pop()!;
+        const cz = stackZ.pop()!;
+        lift[columnOf(cx, cz)] = 1;
+        forEachNeighbourColumn(box, columnOf, cx, cz, (n, px, pz) => {
+          if (visited[n] === 1 || lowest[n] !== subGradeY) return;
+          enqueue(n, px, pz);
+        });
       }
     }
   }
   return lift;
-}
-
-/** True when any of the 8 columns around (x, z) inside `box` ends at `y`. */
-function touchesColumnAt(
-  lowest: Int32Array,
-  columnOf: (x: number, z: number) => number,
-  box: EnergyField['box'],
-  x: number,
-  z: number,
-  y: number,
-): boolean {
-  for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dz === 0) continue;
-      const nxc = x + dx;
-      const nzc = z + dz;
-      if (nxc < box.minX || nxc >= box.maxX || nzc < box.minZ || nzc >= box.maxZ) continue;
-      if (lowest[columnOf(nxc, nzc)] === y) return true;
-    }
-  }
-  return false;
 }
 
 /**

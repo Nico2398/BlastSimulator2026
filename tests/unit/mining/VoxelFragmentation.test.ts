@@ -499,7 +499,7 @@ describe('VoxelFragmentation — floorToGrade', () => {
     expect(isBroken(f, 6, 5, 5)).toBe(true);
   });
 
-  it('a 2x2 one-voxel breakout at the centre of four holes 3 m apart ends flush when only sub-grade pocket cells touch it (#1792)', () => {
+  it('a 2x2 one-voxel breakout at the centre of four holes 3 m apart ends flush when it sits beside the grade-ending line cells between the holes (#1792)', () => {
     const pocket = [5, 6].flatMap(x => [5, 6].map(z => ({ x, z, fromY: 5, toY: 11 })));
     const lineAtGrade = [
       { x: 5, z: 4 }, { x: 6, z: 4 }, { x: 5, z: 7 }, { x: 6, z: 7 },
@@ -516,7 +516,7 @@ describe('VoxelFragmentation — floorToGrade', () => {
     for (const c of pocket) expect(isBroken(f, c.x, 6, c.z), `pocket ${c.x},${c.z}`).toBe(true);
   });
 
-  it('a single one-voxel breakout on the line between two holes 3 m apart ends flush (#1792)', () => {
+  it('a single one-voxel breakout on the line between two holes 3 m apart, its neighbours at grade, ends flush (#1792)', () => {
     const f = gradedField(6, [
       { x: 4, z: 5, fromY: 6, toY: 11 },
       { x: 7, z: 5, fromY: 6, toY: 11 },
