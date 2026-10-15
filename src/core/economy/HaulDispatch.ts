@@ -18,6 +18,7 @@ import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
 import { DEBRIS_DISPATCH_PER_TICK } from '../config/balance.js';
 import { findById } from '../state/IdIndex.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -42,7 +43,7 @@ export interface HaulActionPayload {
  * site with no hauler or no licensed driver yet must let the action sit
  * queued silently instead.
  */
-export function syncHaulDispatch(state: GameState): void {
+export function syncHaulDispatch(state: GameState, _grid?: VoxelGrid | null): void {
   // Nothing to queue unless an order or an on-ground fragment came or went
   // since the last pass: after a large blast both lists run to thousands, and
   // rebuilding the covered set every tick to find nothing was a frame's
