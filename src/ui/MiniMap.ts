@@ -72,12 +72,18 @@ export class MiniMap {
     this.el.style.cssText = [
       'position:fixed', `right:${MINIMAP_EDGE_OFFSET_PX}px`, `bottom:${MINIMAP_EDGE_OFFSET_PX}px`,
       `width:${MINIMAP_WIDTH_PX}px`, 'padding:0', 'overflow:hidden',
-      'border-radius:var(--bsx-r-card)', 'background:rgba(16,20,26,.95)',
-      'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 4px 24px rgba(0,0,0,.5)',
+      'border-radius:var(--bsx-r-card)', 'box-shadow:0 4px 24px rgba(0,0,0,.5)',
       // Layering and pointer behaviour: the #bs-ui-root children rule is zero-specificity, so state it here.
       'z-index:100', 'pointer-events:auto', 'flex-shrink:0', 'user-select:none',
       'font-size:13px', 'color:var(--bsx-text-primary)',
     ].join(';');
+    // jsdom (cssstyle) drops the whole style string for `border:… var(…)` and for any
+    // declaration appended after an rgba() background or expanded border longhands, so
+    // these go on separately, background and border longhands last.
+    this.el.style.background = 'rgba(16,20,26,.95)';
+    this.el.style.borderWidth = '1px';
+    this.el.style.borderStyle = 'solid';
+    this.el.style.borderColor = 'var(--bsx-hairline-strong)';
 
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:7px;height:26px;padding:0 8px;border-bottom:1px solid var(--bsx-hairline)';

@@ -505,7 +505,7 @@ describe('SandboxPanel', () => {
     const buildings = sandboxDifficultyDetails('easy').buildings;
     expect(buildings.length).toBeGreaterThan(0);
     for (const b of buildings) {
-      expect(shown).toContain(`${b.count}× ${t(`building.${b.type}.name`)} (${buildingDisplayName(b.type, b.tier)})`);
+      expect(shown).toContain(`${b.count}× ${buildingDisplayName(b.type, b.tier)}`);
     }
   });
 

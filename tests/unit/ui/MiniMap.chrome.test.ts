@@ -30,7 +30,11 @@ describe('MiniMap chrome', () => {
 
   it('outlines itself with the bsx hairline like the other docked surfaces', () => {
     const el = mount();
-    expect(el.getAttribute('style')).toMatch(/border:\s*1px solid var\(--bsx-hairline-strong\)/);
+    // Longhands: jsdom drops a style string holding `border:… var(…)`.
+    const style = el.getAttribute('style') ?? '';
+    expect(style).toMatch(/border-width:\s*1px/);
+    expect(style).toMatch(/border-style:\s*solid/);
+    expect(style).toMatch(/border-color:\s*var\(--bsx-hairline-strong\)/);
   });
 
   it('keeps its fixed position, layering inputs and dimensions', () => {

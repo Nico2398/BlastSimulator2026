@@ -85,9 +85,9 @@ describe('NoLegacyUiStyles helpers (seeded violations)', () => {
   });
 
   it('arm (b) flags a legacy literal regardless of case and spacing', () => {
-    expect(legacyPaletteHits('src/ui/X.ts', `color:#E8E0D0`)).toEqual(['#e8e0d0']);
-    expect(legacyPaletteHits('src/ui/X.ts', `background: rgba( 8, 6, 3, .9)`)).toEqual(['rgba(8,6,3,']);
-    expect(legacyPaletteHits('src/ui/X.ts', `border:1px solid var(--bsx-hairline)`)).toEqual([]);
+    expect(legacyPaletteHits('src/ui/MiniMap.ts', `color:#E8E0D0`)).toEqual(['#e8e0d0']);
+    expect(legacyPaletteHits('src/ui/MiniMap.ts', `background: rgba( 8, 6, 3, .9)`)).toEqual(['rgba(8,6,3,']);
+    expect(legacyPaletteHits('src/ui/MiniMap.ts', `border:1px solid var(--bsx-hairline)`)).toEqual([]);
   });
 
   it('#ffc840 counts only inside styles.ts', () => {
