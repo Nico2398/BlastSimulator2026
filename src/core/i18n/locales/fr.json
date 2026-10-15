@@ -4085,5 +4085,16 @@
   "inspector.reason.demolition_ordered": "Une démolition est déjà ordonnée",
   "inspector.reason.under_construction": "Encore en chantier",
   "inspector.tip.upgrade": "Commande le niveau suivant : le bâtiment est démoli puis reconstruit par un ouvrier",
-  "ui.build.demolish_confirm_loses_ore": "Le minerai stocké ({kg} kg) est perdu."
+  "ui.build.demolish_confirm_loses_ore": "Le minerai stocké ({kg} kg) est perdu.",
+  "inspector.section.contents": "Contenu",
+  "inspector.stock_capacity": "{stored} sur {capacity} kg",
+  "inspector.free_kg": "{kg} libres",
+  "inspector.reserved_in_transit": "Réservé (en transit)",
+  "inspector.stock_empty": "Vide",
+  "inspector.stock_unavailable": "Stock indisponible tant que le bâtiment est fermé",
+  "inspector.detonation_radius": "Rayon de détonation : {radius} m",
+  "inspector.barren": "Roche stérile",
+  "inspector.spoil": "Déblais",
+  "inspector.spoil_no_cap": "Aucune limite de capacité",
+  "inspector.stock_gauge_aria": "Stockage utilisé : {stored} sur {capacity} kg"
 }
