@@ -1,6 +1,6 @@
 {
   "name": "crew-locate-selects-employee",
-  "description": "Crew cards offer a Locate button (#1422): clicking it selects that employee in the scene (inspector shows DETAIL), and DETAIL expands their crew row.",
+  "description": "Crew cards offer a Locate button (#1422): clicking it selects that employee in the scene (the inspector shows their detail).",
   "steps": [
     {
       "command": "new_game seed:42 size:32 staffed:true",
@@ -22,7 +22,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click Locate on a crew card (#1422) \u2014 selects that employee in the scene, so the inspector offers DETAIL",
+      "description": "Click Locate on a crew card (#1422) \u2014 selects that employee in the scene, so the inspector shows their detail",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -39,28 +39,24 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail",
         "note": "Locate must select the employee in the scene, not merely move the camera"
       }
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click DETAIL in the inspector \u2014 opens the Crew panel with that employee's row expanded",
+      "description": "The inspector itself carries the located employee's skills (no DETAIL hop)",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"detail\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"detail\"]"
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-emp-skills"
         }
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-employee-panel [data-employee-id] .bs-employee-detail",
-        "note": "the selected employee's detail must be expanded"
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-emp-skills",
+        "note": "the selected employee's detail must be shown in the inspector"
       }
     }
   ]
