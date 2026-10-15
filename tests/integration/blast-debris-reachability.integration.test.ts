@@ -649,3 +649,132 @@ describe('A 4 m pattern shot after its access ramp was dug leaves no pillar and 
     600000,
   );
 });
+
+// ── The centre of a square of four holes (#1825) ─────────────────────────────
+// floorToGrade only floored columns that already had a broken voxel. A column
+// entirely under its threshold, walled in by broken columns (the centre of four
+// holes 4 m apart, on a second bench or harder rock), stood as a full-height pillar.
+// Repro: sandbox desert_badlands seed 42, Krackle 8 kg, stemming 2.5, 4 m spacing, depth 8.
+
+interface BenchSession {
+  run: SandboxShot['run'];
+  state: GameState;
+  grid: VoxelGrid;
+  tickWhile: SandboxShot['tickWhile'];
+  /** Drills, charges and fires a Krackle 8 kg pattern at 4 m spacing, depth 8, from the current surface. */
+  shoot: (rows: number, cols: number, startX: number, startZ: number) => void;
+}
+
+function startBenchSession(biome: string, seed: number): BenchSession {
+  const { runner, ctx } = createRunner();
+  const run = (c: string) => runner.run(c);
+  expect(run(`sandbox start biome:${biome} difficulty:normal seed:${seed} staffed:true`)).toMatchObject({ success: true });
+  const state = ctx.state!;
+  const grid = ctx.grid!;
+  const tickWhile = (until: () => boolean, max: number): void => {
+    for (let i = 0; i < max && !until(); i++) {
+      state.cash = Math.max(state.cash, 1_000_000);
+      state.scores.ecology = Math.max(state.scores.ecology, 50);
+      for (const e of state.employees.employees) e.fatigue = 100;
+      run('tick 1');
+    }
+  };
+  const shoot = (rows: number, cols: number, startX: number, startZ: number): void => {
+    expect(run(`drill_plan grid rows:${rows} cols:${cols} spacing:4 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
+    tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
+    tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    state.lastBlastReport = null;
+    expect(run('blast detonate')).toMatchObject({ success: true });
+    tickWhile(() => state.lastBlastReport !== null, 400);
+    expect(state.lastBlastReport).not.toBeNull();
+  };
+  return { run, state, grid, tickWhile, shoot };
+}
+
+/** Orders a ramp and waits until the crew has dug every segment. */
+function digRamp(run: BenchSession['run'], state: GameState, tickWhile: BenchSession['tickWhile'], command: string): void {
+  expect(run(command)).toMatchObject({ success: true });
+  tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
+  expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toEqual([]);
+}
+
+/** Surface height of every column of [x0..x1] x [z0..z1] that does not read `floorY`, as "x,z=y". */
+function columnsOffFloor(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, floorY: number): string[] {
+  const off: string[] = [];
+  for (let z = z0; z <= z1; z++) {
+    for (let x = x0; x <= x1; x++) {
+      const y = computeVoxelColumnSurfaceY(grid, x, z)!;
+      if (y !== floorY) off.push(`${x},${z}=${y}`);
+    }
+  }
+  return off;
+}
+
+describe('A second bench drilled from a crater floor leaves no pillar at the centre of four holes (#1825)', () => {
+  it(
+    'two 3x3 shots at (36,32): the first floors to 8, the second to 0 with no column left above it, and no order is debris_out_of_reach once a ramp reaches the floor',
+    () => {
+      const { run, state, grid, tickWhile, shoot } = startBenchSession('desert_badlands', 42);
+
+      shoot(3, 3, 36, 32);
+      expect(columnsOffFloor(grid, 36, 44, 32, 40, 8), 'first bench columns off floor 8').toEqual([]);
+
+      // The crew reaches the first crater floor by a ramp from the north (#1825's in-play opening) before drilling the second bench.
+      digRamp(run, state, tickWhile, 'build_ramp start:40,12 end:40,31 depth:8');
+      shoot(3, 3, 36, 32);
+      const off = columnsOffFloor(grid, 36, 44, 32, 40, 0);
+      expect(off, `second bench columns off floor 0 (centres are 38,34 42,34 38,38 42,38): ${off.join(' ')}`).toEqual([]);
+
+      // A ramp from the north rim down to the second floor. The rim reads 13 at (40,0) and the ramp bottoms out `depth` below its start
+      // surface, so depth 13 lands flush on floor 0 at z=31 (depth 16 dug 3 below it, a cliff the crew cannot climb back out of).
+      digRamp(run, state, tickWhile, 'build_ramp start:40,0 end:40,31 depth:13');
+
+      // Classification runs at the start of each employee tick: give it a pass after the last segment, then wait for the sweep.
+      tickWhile(() => false, 2);
+      const inPit = (a: PendingAction): boolean => a.targetX >= 36 && a.targetX <= 44 && a.targetZ >= 32 && a.targetZ <= 40;
+      const stranded = (): number => state.pendingActions.filter(a => a.blockedReason === 'debris_out_of_reach' && inPit(a)).length;
+      tickWhile(() => stranded() === 0, 1500);
+      expect(debrisActions(state).filter(inPit).length).toBeGreaterThan(0);
+      expect(stranded(), 'pit orders still stamped debris_out_of_reach after the ramp').toBe(0);
+    },
+    600000,
+  );
+
+  it(
+    'a 2x2 second bench at (38,34) on the first crater floor reads 0 at its centre (40,36) and everywhere between its holes',
+    () => {
+      const { run, state, grid, tickWhile, shoot } = startBenchSession('desert_badlands', 42);
+
+      shoot(3, 3, 36, 32);
+      digRamp(run, state, tickWhile, 'build_ramp start:40,12 end:40,31 depth:8');
+      shoot(2, 2, 38, 34);
+
+      expect(computeVoxelColumnSurfaceY(grid, 40, 36), 'the centre of the four holes').toBe(0);
+      const off = columnsOffFloor(grid, 38, 42, 34, 38, 0);
+      expect(off, `columns off floor 0: ${off.join(' ')}`).toEqual([]);
+    },
+    600000,
+  );
+});
+
+describe('The same 3x3 pattern behaves alike on any bench and any desert seed (#1825)', () => {
+  it('desert seed 7, first bench: every column between the outer holes reads the floor 8', () => {
+    const { grid, shoot } = startBenchSession('desert_badlands', 7);
+
+    shoot(3, 3, 36, 32);
+
+    const off = columnsOffFloor(grid, 36, 44, 32, 40, 8);
+    expect(off, `columns off floor 8 (centres 38,34 and 38,38 stood at 16): ${off.join(' ')}`).toEqual([]);
+  }, 600000);
+
+  it('desert seed 42, first bench (regression guard): still reads 8 throughout', () => {
+    const { grid, shoot } = startBenchSession('desert_badlands', 42);
+
+    shoot(3, 3, 36, 32);
+
+    expect(columnsOffFloor(grid, 36, 44, 32, 40, 8)).toEqual([]);
+  }, 600000);
+});
