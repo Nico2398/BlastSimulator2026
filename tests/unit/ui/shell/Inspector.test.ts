@@ -495,7 +495,7 @@ describe('Inspector — ramp (#1298)', () => {
   it('shows no stock figures for other buildings', () => {
     const { bar, root } = makeBar();
     const state = makeState();
-    const { building } = placeBuilding(state.buildings, 'freight_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
     storeExplosives(state.buildings, 'boomite', 100);
 
     bar.show(entity('building', building.id), state);
