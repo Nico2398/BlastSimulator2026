@@ -74,6 +74,7 @@ describe('Inspector', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    state.buildings.unlockedTiers['management_office'] = 2; // a locked next tier shows Research instead (#1758)
 
     bar.show(entity('building', building.id), state);
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
@@ -125,7 +126,7 @@ describe('Inspector', () => {
     bar.show(entity('building', building.id), state);
 
     expect(root.textContent).toContain(String(Math.round(building.hp)));
-    expect(root.textContent).not.toContain('/');
+    expect(root.textContent).not.toContain(t('inspector.occupancy'));
     expect(root.textContent).not.toContain('Inside:');
   });
 
@@ -734,9 +735,9 @@ describe('Inspector — window frame (#1756)', () => {
   it('shows a rebuild site as Rebuilding with upgrade, move and demolish disabled', () => {
     const { bar, root } = makeBar();
     const state = makeState();
-    state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2 } as never);
+    state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2, rebuild: true } as never);
     bar.show(entity('building', 77), state);
-    expect(root.textContent).toContain(t('inspector.rebuilding'));
+    expect(root.textContent).toContain(t('inspector.status.rebuilding_waiting', { tier: 2 }));
     for (const a of ['upgrade', 'move', 'demolish']) {
       expect(root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!.disabled, a).toBe(true);
     }
@@ -755,5 +756,127 @@ describe('Inspector — window frame (#1756)', () => {
     const { bar, root, container } = makeBar();
     bar.dispose();
     expect(container.contains(root)).toBe(false);
+  });
+});
+
+describe('Inspector building action strip (#1758)', () => {
+  function placed(state: ReturnType<typeof makeState>): number {
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    return building.id;
+  }
+  const actions = (root: HTMLElement): string[] =>
+    Array.from(root.querySelectorAll('button[data-action]')).map(b => b.getAttribute('data-action')!).filter(a => a !== 'locate');
+  const btn = (root: HTMLElement, a: string): HTMLButtonElement => root.querySelector(`button[data-action="${a}"]`) as HTMLButtonElement;
+
+  it('a locked next tier swaps Upgrade for Research; unlocking swaps it back', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const id = placed(state);
+    state.cash = 1e9;
+    bar.show(entity('building', id), state);
+    expect(actions(root)).toEqual(['research', 'move', 'demolish']);
+
+    state.buildings.unlockedTiers['management_office'] = 2;
+    bar.update(state);
+    expect(actions(root)).toEqual(['upgrade', 'move', 'demolish']);
+  });
+
+  it('the research button shows its literal label, not a translation key', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    state.cash = 1e9;
+    bar.show(entity('building', placed(state)), state);
+    const text = btn(root, 'research').textContent ?? '';
+    expect(text.trim().length).toBeGreaterThan(0);
+    expect(text).not.toMatch(/^(inspector|ui)\./);
+  });
+
+  it('a disabled action carries its reason as the tooltip', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const id = placed(state);
+    state.cash = 0;
+    state.buildings.unlockedTiers['management_office'] = 2;
+    bar.show(entity('building', id), state);
+    for (const a of ['upgrade', 'move', 'demolish']) {
+      expect(btn(root, a).disabled, a).toBe(true);
+      expect(btn(root, a).title, a).not.toBe('');
+    }
+  });
+
+  it('cash arriving enables the buttons in place, keeping the same nodes', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const id = placed(state);
+    state.cash = 0;
+    state.buildings.unlockedTiers['management_office'] = 2;
+    bar.show(entity('building', id), state);
+    const upgrade = btn(root, 'upgrade');
+    expect(upgrade.disabled).toBe(true);
+
+    state.cash = 1e9;
+    bar.update(state);
+    expect(btn(root, 'upgrade')).toBe(upgrade);
+    expect(upgrade.disabled).toBe(false);
+    expect(upgrade.title).not.toBe('');
+  });
+
+  it('queued research updates the Research button text in place as it progresses', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    state.cash = 1e9;
+    bar.show(entity('building', placed(state)), state);
+    const research = btn(root, 'research');
+    const before = research.textContent;
+    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 2, ticksRemaining: 5, cost: 1, conditions: [] });
+    bar.update(state);
+    expect(btn(root, 'research')).toBe(research);
+    expect(research.textContent).not.toBe(before);
+    expect(research.disabled).toBe(true);
+  });
+
+  it('a building with a demolition ordered shows every action disabled', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const id = placed(state);
+    state.cash = 1e9;
+    state.pendingActions.push({
+      id: 50, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
+      targetX: 2, targetZ: 2, targetY: 0, payload: { buildingId: id }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+    bar.show(entity('building', id), state);
+    for (const a of actions(root)) expect(btn(root, a).disabled, a).toBe(true);
+  });
+});
+
+describe('Inspector building actions — what src/main.ts routes them to (#1758)', () => {
+  const mainTs = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8');
+  /** Source of one `case 'name':` arm, up to the next arm of the same switch. */
+  function caseBody(name: string): string {
+    const start = mainTs.indexOf(`case '${name}':`);
+    expect(start, `src/main.ts has no case '${name}'`).toBeGreaterThan(-1);
+    const next = mainTs.indexOf("\n    case '", start + 1);
+    return mainTs.slice(start, next === -1 ? start + 1200 : next);
+  }
+
+  it('move arms the placement tool through the UI manager and no longer opens the Build panel', () => {
+    const body = caseBody('move');
+    expect(body).toContain('uiManager.moveBuilding(');
+    expect(body).not.toContain("showPanel('build')");
+  });
+
+  it('upgrade goes through the shared upgrade flow, not a bare console command', () => {
+    const body = caseBody('upgrade');
+    expect(body).toContain('uiManager.upgradeBuilding(');
+    expect(body).not.toContain('build upgrade');
+  });
+
+  it('research queues through the UI manager', () => {
+    expect(caseBody('research')).toContain('uiManager.queueBuildingResearch(');
+  });
+
+  it('the demolish confirm is handed the freight ore stored in the warehouse', () => {
+    expect(caseBody('demolish')).toContain('storedOreKg');
   });
 });
