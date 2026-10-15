@@ -756,8 +756,31 @@ describe('resolveEventIfPendingOnPage (issue #699)', () => {
     const resolved = await resolveEventIfPendingOnPage(page, 8000);
 
     expect(resolved).toBe(true);
-    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice', { button: 'left' });
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice:nth-child(1)', { button: 'left' });
     expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss', { button: 'left' });
+  });
+
+  it('clicks the requested choice when given an option index', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(true)   // pendingEvent
+      .mockResolvedValueOnce(false)  // level still running
+      .mockResolvedValueOnce(null)   // choice usable
+      .mockResolvedValueOnce(null);  // dismiss usable
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+
+    expect(await resolveEventIfPendingOnPage(page, 8000, 1)).toBe(true);
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice:nth-child(2)', { button: 'left' });
+  });
+
+  it('resolves the requested option through the console once the level has ended', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(true)       // pendingEvent
+      .mockResolvedValueOnce(true)       // level already over
+      .mockResolvedValueOnce(undefined); // __gameConsole
+    const page = fakePage({ evaluate });
+
+    expect(await resolveEventIfPendingOnPage(page, 8000, 2)).toBe(true);
+    expect(evaluate).toHaveBeenLastCalledWith(expect.any(Function), 2);
   });
 
   it('resolves via the console (not a dialog click) and returns true when the level has already ended', async () => {

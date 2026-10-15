@@ -988,14 +988,15 @@
     },
     {
       "command": "set_policy mode:shift_8h",
+      "description": "Rally point (#1772 CI): the click now selects the shift_8h mode button before Apply. It used to press Apply alone, which re-applied the panel's current selection -- the continuous mode the bootstrap step at the top of this file set -- so the browser ran the rest of the file under continuous while command mode switched to shift_8h. Every figure after this step drifted apart from there (the second drill pattern landed 8 ticks apart), and with the crew now gathered around the rally flag the drift reached blast 2's casualty count: 5 in the browser, 4 in command mode. The fatigue input is left as the panel shows it (0), matching the command, which sets no threshold.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+          "type": "ensurePanel",
+          "panel": "ops"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-policy-apply"
+          "type": "clickSelector",
+          "selector": "#bs-operations-panel [data-shift-mode=\"shift_8h\"]"
         },
         {
           "type": "clickSelector",

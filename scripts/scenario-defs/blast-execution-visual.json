@@ -424,7 +424,8 @@
       "command": "event choose 1",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "resolveEventIfPending",
+          "option": 1
         }
       ],
       "role": "player",
