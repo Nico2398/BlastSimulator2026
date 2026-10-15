@@ -33,7 +33,8 @@ import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
-import { tickNeedGauges, needsMoraleEffect } from '../entities/EmployeeNeeds.js';
+import { getBedCapacity } from '../entities/BuildingWellbeing.js';
+import { tickNeedGauges, needsMoraleEffect, computeCrewFatigueStrain } from '../entities/EmployeeNeeds.js';
 import {
   tickCollapse,
   autoInsertNeedTasks,
@@ -252,6 +253,8 @@ export function runTick(
     maxRecentVibration: recentVillageVibration(state),
     employeeCount: state.employees.employees.length,
     looseRockKg: onGroundMassKg(state.logistics),
+    bedCapacity: getBedCapacity(state.buildings),
+    crewFatigueStrain: computeCrewFatigueStrain(state.employees.employees),
   };
   updateScores(state.scores, scoreInputs);
 

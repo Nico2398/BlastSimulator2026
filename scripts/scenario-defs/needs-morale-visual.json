@@ -138,11 +138,11 @@
       "role": "observe"
     },
     {
-      "command": "tick 150",
+      "command": "tick 110",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 150"
+          "command": "tick 110"
         }
       ],
       "role": "setup",

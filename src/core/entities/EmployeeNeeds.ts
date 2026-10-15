@@ -4,7 +4,7 @@
 // to (rest routing, morale, collapse).
 
 import { type Employee } from './Employee.js';
-import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS } from '../config/balance.js';
+import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, MORALE_THRESHOLDS, NEED_MORALE_DRAIN_MULTIPLIERS, NEED_MORALE_EFFECT_THRESHOLDS, NEED_MORALE_EFFECT_PENALTIES, NEED_WELL_RESTED_THRESHOLD, NEED_WELL_RESTED_BONUS, BUILDING_REPLENISH_RATES, NEED_HARD_THRESHOLDS, WB_FATIGUE_COMFORT } from '../config/balance.js';
 
 /** The single need gauge tracked on every Employee. */
 export type NeedKey = 'fatigue';
@@ -166,4 +166,22 @@ export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState)
     const actualDrain = baseRate * multiplier;
     employee[gauge] = Math.max(0, employee[gauge] - actualDrain);
   }
+}
+
+/**
+ * Mean fatigue strain (0-1) over living, non-injured crew; 0 for an empty crew.
+ * Per employee: clamp((WB_FATIGUE_COMFORT - fatigue) / WB_FATIGUE_COMFORT, 0, 1).
+ */
+export function computeCrewFatigueStrain(
+  crew: readonly Pick<Employee, 'alive' | 'injured' | 'fatigue'>[],
+): number {
+  let sum = 0;
+  let n = 0;
+  for (const e of crew) {
+    if (!e.alive || e.injured) continue;
+    const fatigue = Number.isFinite(e.fatigue) ? e.fatigue : WB_FATIGUE_COMFORT;
+    sum += Math.min(1, Math.max(0, (WB_FATIGUE_COMFORT - fatigue) / WB_FATIGUE_COMFORT));
+    n++;
+  }
+  return n > 0 ? sum / n : 0;
 }

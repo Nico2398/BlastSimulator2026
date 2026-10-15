@@ -1023,10 +1023,10 @@ describe('tutorialSteps', () => {
       ]);
     });
 
-    it('charge orders 4kg with 2.5m stemming, not the old 5kg/2m under-stemmed order', () => {
+    it('charge orders 7kg with 2.5m stemming, enough to break out (#1724), not the old 5kg/2m under-stemmed order', () => {
       const step = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
       expect(step.commands).toEqual([
-        'charge hole:* explosive:boomite amount:4 stemming:2.5',
+        'charge hole:* explosive:boomite amount:7 stemming:2.5',
       ]);
     });
 

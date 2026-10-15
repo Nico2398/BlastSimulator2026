@@ -9,6 +9,14 @@ import {
   ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK,
   ECOLOGY_DUST_SETTLE_HALF_LIFE_TICKS,
   SCORE_DECAY_RATE,
+  WB_BUILDING_GAIN,
+  WB_NEUTRAL_MORALE,
+  WB_MORALE_GAIN_PER_POINT,
+  WB_MORALE_LOSS_PER_POINT,
+  WB_HEADROOM_SPAN,
+  WB_OVERWORK_DRAG_MAX,
+  WB_CROWDING_DRAG_MAX,
+  WB_ACCIDENT_DRAG,
 } from '../config/balance.js';
 
 // ── Score state ──
@@ -56,6 +64,10 @@ export interface ScoreInputs {
   employeeCount: number;
   /** Mass of loose rock lying on the ground (kg). */
   looseRockKg: number;
+  /** Total beds across operating living quarters. */
+  bedCapacity: number;
+  /** Mean fatigue strain (0-1) of living, non-injured crew. */
+  crewFatigueStrain: number;
 }
 
 // ── Update logic ──
@@ -80,6 +92,37 @@ function advanceDustAndEcologyLoss(state: ScoreState, looseKg: number): number {
   );
 }
 
+/** Non-finite or negative input reads as 0. */
+function nonNegative(v: number): number {
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+/**
+ * Per-tick well-being change. While any building gives a positive well-being effect, gains (building effect, morale above
+ * neutral) taper as the score nears 100 so one cheap Living Quarters cannot pin it at the cap; losses (morale below
+ * neutral, overwork, crowding, accidents) are unscaled. A negative building effect applies in full.
+ */
+function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInputs): number {
+  const bWb = Number.isFinite(buildingWb) ? buildingWb : 0;
+  const morale = Number.isFinite(inputs.avgMorale) ? inputs.avgMorale : WB_NEUTRAL_MORALE;
+  const gain = Math.max(0, bWb * WB_BUILDING_GAIN) + Math.max(0, morale - WB_NEUTRAL_MORALE) * WB_MORALE_GAIN_PER_POINT;
+  const moraleLoss = Math.max(0, WB_NEUTRAL_MORALE - morale) * WB_MORALE_LOSS_PER_POINT;
+  // Taper only while a building gives a positive effect: a Living Quarters is what pinned the score at the cap. A site
+  // with no positive building effect keeps the undamped climb, so its early buffer against a
+  // morale crash is unchanged.
+  const housed = bWb > 0;
+  const headroom = housed ? Math.min(1, Math.max(0, (100 - wellBeing) / WB_HEADROOM_SPAN)) : 1;
+  const beds = nonNegative(inputs.bedCapacity);
+  const crew = nonNegative(inputs.employeeCount);
+  const crowding = beds > 0 && crew > beds ? (crew - beds) / crew : 0;
+  const drag =
+    WB_OVERWORK_DRAG_MAX * nonNegative(inputs.crewFatigueStrain) +
+    WB_CROWDING_DRAG_MAX * crowding +
+    WB_ACCIDENT_DRAG * nonNegative(inputs.recentAccidents);
+  const negativeBuilding = Math.min(0, bWb * WB_BUILDING_GAIN);
+  return gain * headroom + negativeBuilding - moraleLoss - drag;
+}
+
 /**
  * Update scores based on current inputs. Mutates state.
  * Each tick, building effects are applied and then scores decay towards neutral.
@@ -88,10 +131,7 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   const buildingEffects = getBuildingScoreEffects(inputs.buildings);
 
   // ── Well-being ──
-  // Buildings + employee morale
-  let wbDelta = buildingEffects.wellBeing * 0.1;
-  wbDelta += (inputs.avgMorale - 50) * 0.02;
-  state.wellBeing = clampScore(state.wellBeing + wbDelta);
+  state.wellBeing = clampScore(state.wellBeing + wellBeingDelta(state.wellBeing, buildingEffects.wellBeing, inputs));
 
   // ── Safety ──
   // Buildings + accidents + equipment

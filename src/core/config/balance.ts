@@ -493,12 +493,32 @@ export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
  *  never under-stem what a player could ever click. */
 export const MIN_STEMMING_M = 0.5;
 
-/** Default explosive amount (kg) the Charge panel opens with. Equal to the
- *  tutorial's scripted plan, which rates PERFECT (#1330). */
-export const CHARGE_DEFAULT_AMOUNT_KG = 4;
+/** Default explosive amount (kg) the Charge panel opens with, and the tutorial's
+ *  scripted charge (#1330, #1724). Chosen as the smallest charge that breaks out
+ *  of an 8 m, 4 m-spaced 3x3 pattern with every hole's column lowered, on both
+ *  the sandbox flat pad and the tutorial pit, rating at least good. Measured with
+ *  boomite and 2.5 m stemming (executeBlast; sandbox desert_badlands seed 42 pad at
+ *  28,18, tutorial_pit after the seismic survey, build_ramp 10,23-10,35 depth 6 and
+ *  drill_plan at 14,24):
+ *    kg    sandbox lowered/9, rating      tutorial lowered/9, rating
+ *    4     0   bad (no_breakout)          0   good (2 columns open at the edge)
+ *    4.5   0   bad (no_breakout)          0   good
+ *    5     9   good                       5   good
+ *    6     9   good                       5   good (1 projection)
+ *    6.5   9   good                       6   good
+ *    7     9   good                       9   good (1 projection, 5.5 m throw)
+ *    8     9   good                       9   mediocre (8 projections)
+ *  4 kg in a 8 m hole is a 2 m column under 6 m of burden: more than
+ *  BURDEN_BREAKOUT_MAX of cap, so the rock stays sealed in the ground (#1724). 7 kg
+ *  is the first charge the tutorial pit needs; it fits the hole (3.5 m column +
+ *  2.5 m stemming <= 8 m). */
+export const CHARGE_DEFAULT_AMOUNT_KG = 7;
 
-/** Default stemming column (m) the Charge panel opens with. Equal to the
- *  tutorial's scripted plan, which rates PERFECT (#1330). */
+/** Default stemming column (m) the Charge panel opens with, and the tutorial's
+ *  scripted stemming (#1330, #1724). Stemming works fully from 30 % of the hole depth
+ *  (`stemmingFactor`: 2.4 m of an 8 m hole), so 2.5 m is the shortest round column
+ *  that gives full confinement: 1.5 m and 2 m throw rock, and anything longer
+ *  changed no measured result (sweep 2-5 m at 5-7 kg). */
 export const CHARGE_DEFAULT_STEMMING_M = 2.5;
 
 /**
@@ -679,6 +699,11 @@ export const MIN_PILE_RISE = 0.05;
  *  from growing into a tower where a lot of rock lands on one spot. */
 export const PILE_SPILL_STEPS = 24;
 export const PILE_REPOSE_STEP = 0.7;
+
+/** How many voxel layers below a fragment's origin the search for the floor of its
+ *  void goes before giving up (#1724). Voids a blast opens under a cap are a few
+ *  metres deep; the bound only stops a scan down an unbounded empty column. */
+export const PILE_VOID_SCAN_MAX_LAYERS = 64;
 
 /** How far (metres) a settled fragment's underside may sit above the ground
  *  before it counts as floating. Loose rock perches on the pieces below it, so a
@@ -2681,3 +2706,27 @@ export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
 
 /** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
 export const BLAST_GRADE_MAX_CUT_M = 4;
+
+// ── Well-being score drivers (#1692) ──
+// Housed sites taper gains near the cap so one cheap Living Quarters cannot pin well-being at 100
+// (T1 < T2 < T3 equilibria, all below 98 for a busy crew of 8); unhoused sites climb undamped as
+// before. Zero morale still falls 1/tick (49.05 after the first tick once the 0.05 decay is added).
+
+/** Well-being gained per tick per unit of building effect (living quarters etc.); unchanged from the old 0.1 weight. */
+export const WB_BUILDING_GAIN = 0.1;
+/** Average morale at which well-being neither gains nor loses from morale; the midpoint of the 0-100 morale scale. */
+export const WB_NEUTRAL_MORALE = 50;
+/** Well-being gain per morale point above neutral, per tick; unchanged 0.02. The cap pin is prevented by headroom damping once housing exists, not by a weaker gain, so an unhoused crew builds the same early buffer. */
+export const WB_MORALE_GAIN_PER_POINT = 0.02;
+/** Well-being loss per morale point below neutral, per tick; unchanged 0.02, so zero morale falls 1/tick and the revolt path is intact. */
+export const WB_MORALE_LOSS_PER_POINT = 0.02;
+/** Score distance from the cap over which gains taper off (headroom damping), applied only while a Living Quarters gives a positive building effect; gives each housing tier its own equilibrium below 100. */
+export const WB_HEADROOM_SPAN = 50;
+/** Fatigue gauge level at or above which a worker feels no overwork strain; below it strain rises linearly to 1 at fatigue 0. */
+export const WB_FATIGUE_COMFORT = 70;
+/** Max well-being drag from a fully fatigued crew; a typical busy crew (strain ~0.1-0.3) costs 0.015-0.05/tick; kept gentle so the no-housing scenarios that run an exhausted crew still finish before the revolt lands. */
+export const WB_OVERWORK_DRAG_MAX = 0.15;
+/** Max well-being drag when the whole crew lacks beds; scaled by the unhoused share of the crew. */
+export const WB_CROWDING_DRAG_MAX = 0.8;
+/** Well-being drag per tick per accident of the last 10 ticks (about 1.5 points per accident in total); a blast that kills the crew must dent well-being, not zero it. */
+export const WB_ACCIDENT_DRAG = 0.15;

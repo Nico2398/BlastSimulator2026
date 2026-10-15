@@ -168,6 +168,22 @@ describe('ContractsPanel', () => {
       .getAttribute('data-contract-fillable')).toBe('false');
   });
 
+  it('marks data-contract-wins only on a fillable offer whose payout covers the profit target (#1724)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.campaign.activeLevelId = 'tutorial_pit'; // target $5,000, no profit yet
+    state.collectedOre['dirtite'] = 100;
+    state.contracts.available.push(
+      makeContract({ id: 7, materialId: 'dirtite', quantityKg: 100, pricePerKg: 49 }),
+      makeContract({ id: 9, materialId: 'dirtite', quantityKg: 100, pricePerKg: 50 }),
+    );
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="7"]')!.getAttribute('data-contract-wins')).toBe('false');
+    expect(panel.root.querySelector('[data-contract-id="9"]')!.getAttribute('data-contract-wins')).toBe('true');
+  });
+
   it('marks a rubble offer fillable from raw stored mass, which carries no ore breakdown', () => {
     const { panel } = makePanel();
     const state = makeState();
