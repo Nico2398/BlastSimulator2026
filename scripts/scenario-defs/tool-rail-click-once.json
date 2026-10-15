@@ -1,0 +1,442 @@
+{
+  "name": "tool-rail-click-once",
+  "description": "#1750: one real mouse click on each tool rail button (blast, survey, contracts, ops, build, vehicles, employees, settings) opens its panel and leaves it open; a second click closes it. Interaction mode, real clicks, condition waits only.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 30,
+      "description": "Setup: a staffed site so every rail panel has content; nothing is open yet.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the blast rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-panel-close]",
+        "note": "blast panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the blast rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-blast-panel [data-panel-close]",
+        "note": "blast panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the survey rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-survey-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-survey-panel [data-panel-close]",
+        "note": "survey panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the survey rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-survey-panel [data-panel-close]",
+        "note": "survey panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the contracts rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-contract-panel [data-panel-close]",
+        "note": "contracts panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the contracts rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-contract-panel [data-panel-close]",
+        "note": "contracts panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the ops rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-operations-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-operations-panel [data-panel-close]",
+        "note": "ops panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the ops rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-operations-panel [data-panel-close]",
+        "note": "ops panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the build rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"build\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-build-panel [data-panel-close]",
+        "note": "build panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the build rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"build\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-build-panel [data-panel-close]",
+        "note": "build panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the vehicles rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-vehicle-panel [data-panel-close]",
+        "note": "vehicles panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the vehicles rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-vehicle-panel [data-panel-close]",
+        "note": "vehicles panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the employees rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-employee-panel [data-panel-close]",
+        "note": "employees panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the employees rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-employee-panel [data-panel-close]",
+        "note": "employees panel closed by the second click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: one real mouse click on the settings rail button opens its panel and the panel stays open -- the click is handled once, not toggled shut by a repeat. Waits on the pressed state and the panel's own close control, never a fixed delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]",
+          "property": "ariaPressed",
+          "expectedValue": "true",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-settings-panel [data-panel-close]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-settings-panel [data-panel-close]",
+        "note": "settings panel visible after a single real click"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "#1750: a second, separate click on the settings rail button closes the panel.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]",
+          "property": "ariaPressed",
+          "expectedValue": "false",
+          "timeoutMs": 10000
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-settings-panel [data-panel-close]",
+        "note": "settings panel closed by the second click"
+      }
+    }
+  ]
+}
