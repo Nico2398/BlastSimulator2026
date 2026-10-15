@@ -207,3 +207,24 @@ describe('savedPlansSignature', () => {
     expect(savedPlansSignature({ alpha: makePlan(2, 1) })).toBe(savedPlansSignature({ alpha: makePlan(2, 1) }));
   });
 });
+
+describe('DrillStep — plan-name field styling (#1739)', () => {
+  it('draws like the other bsx text fields: bsx text colour and well fill, no legacy palette inline', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+    const field = nameField(step);
+    const style = field.getAttribute('style') ?? '';
+
+    expect(style).toMatch(/(^|;)\s*color:\s*var\(--bsx-text-primary\)/);
+    expect(style).toMatch(/background(-color)?:\s*var\(--bsx-well\)/);
+    expect(style).not.toMatch(/#e8e0d0|#ffc840|rgba\(\s*255\s*,\s*200\s*,\s*64|rgba\(\s*200\s*,\s*160\s*,\s*60/i);
+  });
+
+  it('keeps its behavioural hooks: data-field, text type and 24-char limit', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+    const field = nameField(step);
+    expect(field.type).toBe('text');
+    expect(field.maxLength).toBe(24);
+  });
+});
