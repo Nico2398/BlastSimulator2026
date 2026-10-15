@@ -119,6 +119,8 @@ export const BRIBE_PROTECTION_DAYS = {
   inspector: 3,
   witness: 0,
 } as const;
+/** Cap (days) on how long a protection that has not yet shielded anything outlives its paid window (#1816). */
+export const BRIBE_PROTECTION_MAX_LINGER_DAYS = 30;
 /** Bribe price per protection day ($), by target; witness is a flat price (#1407). */
 export const BRIBE_PRICE_PER_PROTECTION_DAY = {
   judge: 10000,

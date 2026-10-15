@@ -111,10 +111,10 @@ describe('Corruption system', () => {
       const probe = createCorruptionState();
       if (attemptCorruption(probe, 'judge', 1, new Random(seed)).success) continue;
       const state = createCorruptionState();
-      state.protections.push({ target: 'judge', expiresAtTick: 40, dismissalsLeft: 1 });
+      state.protections.push({ target: 'judge', expiresAtTick: 40, dismissalsLeft: 1, shielded: true });
       const result = attemptCorruption(state, 'judge', 1, new Random(seed));
       expect(result.success).toBe(false);
-      expect(state.protections).toEqual([{ target: 'judge', expiresAtTick: 40, dismissalsLeft: 1 }]);
+      expect(state.protections).toEqual([{ target: 'judge', expiresAtTick: 40, dismissalsLeft: 1, shielded: true }]);
       return;
     }
     expect.unreachable('No failed corruption in 100 seeds');
