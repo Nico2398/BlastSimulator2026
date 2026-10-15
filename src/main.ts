@@ -26,6 +26,7 @@ import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
 import { canAffordVehicleUpgrade } from './core/entities/VehicleUpgrade.js';
 import { getMaxBuildingTier } from './core/entities/Building.js';
+import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
@@ -62,6 +63,7 @@ import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { formatGameDuration } from './ui/formatGameDuration.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
+import { anchorFootprint, isHostResolvedKind, resolveSelection, type SelectionAnchor } from './ui/scene/SelectionHost.js';
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
@@ -843,6 +845,7 @@ window.__gameState = () => {
     // fired, rather than a scenario guessing at it from a screenshot alone.
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    insideBuildingCount: livingEmployees.filter(e => isInsideBuilding(e.locomotion)).length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     // An offered ore_sale the site could fill outright right now — the
@@ -1241,14 +1244,42 @@ function vehicleSelectionKey(entity: EntityPick, state: GameState): string | nul
   if (!v) return null;
   return `${v.tier}:${canAffordVehicleUpgrade(v, state.cash)}`;
 }
+/** Anchor the selection outline was last drawn on; a change (employee steps out, fragment loaded, site finished) re-draws it. */
+let shownAnchorKey: string | null = null;
+function anchorKey(anchor: SelectionAnchor): string {
+  if (anchor.type === 'self') return 'self';
+  if (anchor.type === 'host') return `host:${anchor.kind}:${anchor.id}`;
+  const f = anchor.footprint;
+  return `site:${f.minX},${f.maxX},${f.minZ},${f.maxZ}`;
+}
+function anchorWorldPosition(entity: EntityPick, anchor: SelectionAnchor, state: GameState): THREE.Vector3 | null {
+  const f = anchorFootprint(anchor, state);
+  if (!f) return gameRenderer.entityWorldPosition(anchor.type === 'host' ? anchor.kind : entity.kind, anchor.type === 'host' ? anchor.id : entity.id);
+  const x = (f.minX + f.maxX + 1) / 2, z = (f.minZ + f.maxZ + 1) / 2;
+  return new THREE.Vector3(x, gameRenderer.smoothSurfaceYAt(x, z), z);
+}
+/**
+ * Whether the selected entity no longer exists. Host-resolved kinds answer from their resolution
+ * (null when no state yet: not gone); other kinds are gone when the renderer has no position for them.
+ */
+function isSelectionGone(resolvedExists: boolean | null, hostResolved: boolean, pos: THREE.Vector3 | null): boolean {
+  if (resolvedExists !== null) return !resolvedExists;
+  return !hostResolved && !pos;
+}
 function showSelection(entity: EntityPick, state: GameState): void {
   selectionBar.show(entity, state);
-  const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+  const resolved = isHostResolvedKind(entity.kind) ? resolveSelection(state, entity.kind, entity.id) : null;
+  const anchor: SelectionAnchor = resolved?.exists ? resolved.anchor : { type: 'self' };
+  shownAnchorKey = anchorKey(anchor);
+  const pos = anchorWorldPosition(entity, anchor, state);
+  const footprint = anchorFootprint(anchor, state);
   const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
   shownRampWidth = ramp?.width ?? null;
   shownVehicleKey = vehicleSelectionKey(entity, state);
   if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
-  else if (pos) entityHighlight.show(pos, entity.kind);
+  else if (pos && footprint) entityHighlight.showFootprint(footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
+  else if (pos) entityHighlight.show(pos, anchor.type === 'host' ? anchor.kind : entity.kind);
+  else entityHighlight.hide();
 }
 scenePicking.setSelectChangeHandler((entity) => {
   if (entity && ctx.state) {
@@ -1257,6 +1288,7 @@ scenePicking.setSelectChangeHandler((entity) => {
   } else {
     shownRampWidth = null;
     shownVehicleKey = null;
+    shownAnchorKey = null;
     selectionBar.hide();
     entityHighlight.hide();
   }
@@ -1419,14 +1451,23 @@ scene.start((dt) => {
   // Keep the selection ring on a moving vehicle/employee; if the selected
   // entity is gone (destroyed, hauled away, collected), deselect it —
   // the select-change handler above then hides the ring and the bar.
-  if (scenePicking.selection) {
-    const pos = gameRenderer.entityWorldPosition(scenePicking.selection.kind, scenePicking.selection.id);
-    if (!pos) scenePicking.clearSelection();
-    else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === scenePicking.selection?.id)?.width !== shownRampWidth) {
-      showSelection(scenePicking.selection, ctx.state!);
-    } else if (shownVehicleKey !== null && ctx.state && vehicleSelectionKey(scenePicking.selection, ctx.state) !== shownVehicleKey) {
-      showSelection(scenePicking.selection, ctx.state);
-    } else entityHighlight.setPosition(pos);
+  const selection = scenePicking.selection;
+  if (selection) {
+    const state = ctx.state;
+    const kind = selection.kind;
+    const hostResolved = isHostResolvedKind(kind);
+    const resolved = state && hostResolved ? resolveSelection(state, kind, selection.id) : null;
+    const pos = state && resolved
+      ? (resolved.exists ? anchorWorldPosition(selection, resolved.anchor, state) : null)
+      : hostResolved ? null : gameRenderer.entityWorldPosition(selection.kind, selection.id);
+    if (isSelectionGone(resolved ? resolved.exists : null, hostResolved, pos)) scenePicking.clearSelection();
+    else if (shownRampWidth !== null && state?.builtRamps.find(r => r.id === selection.id)?.width !== shownRampWidth) {
+      showSelection(selection, state!);
+    } else if (shownVehicleKey !== null && state && vehicleSelectionKey(selection, state) !== shownVehicleKey) {
+      showSelection(selection, state);
+    } else if (state && resolved?.exists && anchorKey(resolved.anchor) !== shownAnchorKey) {
+      showSelection(selection, state);
+    } else if (pos) entityHighlight.setPosition(pos);
   }
 
   // Advance game time. A blast resolving in slices holds the clock until it lands (#1603).

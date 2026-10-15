@@ -1,0 +1,464 @@
+{
+  "name": "selection-follows-host-visual",
+  "description": "A selection lasts as long as its entity exists in state, not as long as it has a mesh (#1755). A player clicks Locate on the Crew row of an employee resting inside Living Quarters and the selection bar keeps showing them across ticks and after they step out; then selects a building, orders its upgrade, and it stays selected through demolition (Rebuilding, actions disabled) until the new tier stands.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:200000",
+      "description": "Unstaffed site with generous cash: one hired driller is the only employee, so 'inside a building' means exactly them.",
+      "timeout": 40,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:200000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "employeeCount": 0,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Hire the driller through the Crew panel.",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1000
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:2,8 tier:1",
+      "description": "Order Living Quarters through the Build panel (2,8 is flat for every tier's footprint, see building-demolish-upgrade-visual).",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 8
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:600",
+      "description": "Wait for the driller to finish the Living Quarters site.",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:insideBuildingCount equals:1 max_ticks:3000",
+      "description": "Wait on state for the driller to go inside the Living Quarters to rest (shift clock or fatigue threshold). While inside they have no character mesh.",
+      "timeout": 130,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "insideBuildingCount",
+          "equals": 1,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "insideBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Click Locate on the driller's Crew row while they rest inside Living Quarters (#1755): previously selected for one frame, then dropped because no mesh. The selection bar must offer DETAIL.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"] [data-action=\"locate\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"] [data-action=\"locate\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "equals": {
+          "insideBuildingCount": 1
+        },
+        "note": "Locate on a hidden employee must select them"
+      }
+    },
+    {
+      "command": "tick 25",
+      "description": "Simulated time passes with the employee still inside; the render loop runs each tick. A fixed span is the thing under test (selection must outlive many frames); nothing observable to poll for 'many frames'.",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ],
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "note": "Selection bar still showing the hidden employee after the ticks"
+      }
+    },
+    {
+      "command": "wait_until field:insideBuildingCount equals:0 max_ticks:1500",
+      "description": "Wait on state for the driller to step out of the building; the selection moves back onto them.",
+      "timeout": 130,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "insideBuildingCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "insideBuildingCount": 0
+        },
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "note": "Still selected after stepping out"
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "description": "Hire a driver via the Crew panel (needed to crew the Wrecking Rascal).",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -800
+        }
+      }
+    },
+    {
+      "command": "build research_center at:26,14",
+      "description": "Order the Research Center (prerequisite for tier-2 research).",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 26,
+          "z": 14
+        },
+        {
+          "type": "pickTile",
+          "x": 26,
+          "z": 14
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:600",
+      "description": "Wait for the Research Center to land.",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 600,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "research queue type:living_quarters tier:2",
+      "description": "Queue tier-2 Living Quarters research from the Build panel row (building #1).",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-research-btn"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -5000
+        },
+        "increased": [
+          "researchQueueLength"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:researchQueueLength equals:0 max_ticks:400",
+      "description": "Wait on the research queue draining.",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "researchQueueLength",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "researchQueueLength": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle buy building_destroyer tier:1",
+      "description": "Buy the Wrecking Rascal through the Fleet panel; demolition for the upgrade needs it. Done before selecting a building because opening the Fleet panel clears the scene selection.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ],
+        "changedBy": {
+          "cash": -30000
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Player clicks the Living Quarters (building #1) in the scene; the selection bar offers Upgrade.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"upgrade\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"upgrade\"]"
+      }
+    },
+    {
+      "command": "build upgrade 1",
+      "description": "Click Upgrade in the selection bar. The old building keeps standing until the Wrecking Rascal demolishes it.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"upgrade\"]"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 2
+        },
+        "usable": "#bs-selection-bar",
+        "note": "Upgrade ordered; building still standing"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:1200",
+      "description": "Wait on state for demolition to finish: building #1 leaves state.buildings but is held by a planned site. It must stay selected, showing Rebuilding.",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 1200,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 1
+        },
+        "usable": "#bs-selection-bar",
+        "blocked": "#bs-selection-bar [data-action=\"demolish\"]",
+        "note": "Bar still visible (no mesh, held by site) and its Demolish button is disabled by the Rebuilding state"
+      }
+    },
+    {
+      "command": "wait_until field:maxBuildingTier equals:2 max_ticks:1500",
+      "description": "Wait on state for the tier-2 building to finish; the selection is back on the new building.",
+      "timeout": 95,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "maxBuildingTier",
+          "equals": 2,
+          "maxTicks": 1500,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "maxBuildingTier": 2,
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
+        },
+        "usable": "#bs-selection-bar [data-action=\"demolish\"]",
+        "note": "Bar still showing, Demolish usable again: selected building is the new tier"
+      }
+    }
+  ]
+}

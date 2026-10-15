@@ -2,6 +2,7 @@
 // Exports the game engine's pure logic without browser dependencies.
 
 import { getMaxBuildingTier } from './core/entities/Building.js';
+import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { createRunner, type RunnerWithContext } from './console/createRunner.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
@@ -88,6 +89,8 @@ export interface SerializableGameState {
   collapsedCount: number;
   /** Lowest `fatigue` (0-100, 100 = fully rested) across the roster — the employee closest to collapse. 100 with no employees. */
   minFatigue: number;
+  /** Employees currently inside a building (locomotion `inside`) — resting or training; they have no character mesh (#1755). */
+  insideBuildingCount: number;
   /** Employees currently in the `isMoveStuck` state — pathfinding has failed STUCK_THRESHOLD consecutive times (EntityMovementTick.ts). */
   stuckEmployeeCount: number;
   /** Contracts currently accepted and in progress (state.contracts.active) — proves accept/deliver-completion actually moved a contract, not just clicked at. */
@@ -223,6 +226,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     trainingCount: livingEmployees.filter(e => e.trainingState !== null).length,
     collapsedCount: livingEmployees.filter(e => e.collapsing).length,
     minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    insideBuildingCount: livingEmployees.filter(e => isInsideBuilding(e.locomotion)).length,
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
