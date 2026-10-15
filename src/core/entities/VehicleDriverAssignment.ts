@@ -5,6 +5,7 @@
 // Vehicle.ts.
 
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
+import { isResting } from './EmployeeRestState.js';
 import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from './Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import { isMounted } from './EmployeeLocomotion.js';
@@ -174,11 +175,9 @@ export function findAvailableDriverForReposition(
   vehicle: Vehicle,
   vehicleState: VehicleState,
   employeeState: EmployeeState,
-  /** When given, only these employees are considered (#1648: evacuation's own rescuers). */
-  onlyAmong?: readonly number[],
 ): Employee | null {
   const candidateIds = employeeState.employees
-    .filter(e => (onlyAmong === undefined || onlyAmong.includes(e.id)) && isIdleForReposition(e, vehicle))
+    .filter(e => isIdleForReposition(e, vehicle))
     .map(e => e.id);
 
   return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, candidateIds)[0] ?? null;
@@ -188,10 +187,29 @@ export function findAvailableDriverForReposition(
 function isIdleForReposition(employee: Employee, vehicle: Vehicle): boolean {
   if (!employee.alive || employee.injured || employee.collapsing) return false;
   if (employee.activeActionId !== null || employee.itinerary !== null) return false;
-  if (employee.restTicksRemaining !== null || employee.pendingRestDuration !== null) return false;
+  if (isResting(employee)) return false;
   if (employee.taskTicksRemaining !== null) return false;
   if (employee.destinationX !== null || employee.destinationZ !== null) return false;
   if (employee.pendingDriverVehicleId !== null && employee.pendingDriverVehicleId !== vehicle.id) return false;
   if (isMounted(employee.locomotion)) return false;
   return true;
+}
+
+/**
+ * Nearest alive, licensed employee (not injured or collapsing) who is resting
+ * or about to rest and so could be fetched to drive `vehicle` (#1746); null
+ * when none.
+ */
+export function findRestingLicensedDriver(
+  vehicle: Vehicle,
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+  canReach: (employee: Employee, vehicle: Vehicle) => boolean = () => true,
+): Employee | null {
+  const restingIds = employeeState.employees
+    .filter(e => e.alive && !e.injured && !e.collapsing
+      && isResting(e))
+    .map(e => e.id);
+  return rankQualifiedDriversByDistance(vehicle, vehicleState, employeeState, restingIds)
+    .find(e => canReach(e, vehicle)) ?? null;
 }
