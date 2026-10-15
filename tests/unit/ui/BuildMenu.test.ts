@@ -225,6 +225,34 @@ describe('BuildMenu — placed-row affordability guard (issue #511)', () => {
     menu.update(state);
     expect(findPlacedRow(container, 2).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
   });
+
+  it('cash that dropped while only observe() saw the state still disables Move and Demolish on the next update()', () => {
+    const building = makeBuilding({ id: 3, type: 'management_office', tier: 1 });
+    const rich = makeMockState();
+    rich.buildings.buildings = [building];
+    rich.cash = 99999;
+    menu.update(rich);
+    const row = findPlacedRow(container, 3);
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(false);
+
+    const poor = makeMockState();
+    poor.buildings.buildings = [building];
+    poor.cash = 1500;
+    menu.observe(poor);
+    menu.update(poor);
+    const after = findPlacedRow(container, 3);
+    expect(after.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
+    expect(after.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(true);
+  });
+
+  it('placed-row Upgrade of a research-locked tier is disabled when cash is short of the upgrade cost', () => {
+    const building = makeBuilding({ id: 4, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [building];
+    state.cash = 1500;
+    menu.update(state);
+    expect(findPlacedRow(container, 4).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.disabled).toBe(true);
+  });
 });
 
 // ── #1009 coverage: catalog placement, terrain tools (ramp/level-ground),

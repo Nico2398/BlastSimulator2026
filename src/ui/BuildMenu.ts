@@ -219,10 +219,12 @@ export class BuildMenu extends PanelBase {
   }
 
 
-  /** Latest state feed for the inspector-driven flows (#1758); the panel itself only refreshes while open. */
+  /**
+   * Latest state feed for the inspector-driven flows (#1758); the panel itself only refreshes while open.
+   * Leaves `lastCash` alone: `update` compares against it to re-apply affordability on the rendered rows.
+   */
   observe(state: GameState): void {
     this.lastState = state;
-    this.lastCash = state.cash;
   }
 
   /** Arm the footprint placement tool that moves placed building `buildingId` (the placed row's Move, #1758). */
@@ -383,7 +385,8 @@ export class BuildMenu extends PanelBase {
     btn.title = refused && upgrade.reasonKey !== REASON_CASH
       ? t(upgrade.reasonKey!, upgrade.reasonParams)
       : `$${upgrade.cost}`;
-    btn.disabled = refused;
+    // A locked tier is not refused (Research is the way forward) but short cash still disables the button.
+    btn.disabled = refused || (upgrade.cost !== null && this.lastState.cash < upgrade.cost);
   }
 
   /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
