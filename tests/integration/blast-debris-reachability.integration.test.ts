@@ -227,7 +227,7 @@ const FLAT_ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0
 /** Levels the whole site to the surface found at (18,10), so the blast starts from a flat site the crew can drive across. */
 function flattenSite(ctx: MiningContext): number {
   const grid = ctx.grid!;
-  const { minX, minZ, sizeX, sizeZ } = ctx.state!.world;
+  const { minX, minZ, sizeX, sizeZ } = ctx.state!.world!;
   const maxX = minX + sizeX - 1;
   const maxZ = minZ + sizeZ - 1;
   const top = computeVoxelColumnSurfaceY(grid, 18, 10)!;
