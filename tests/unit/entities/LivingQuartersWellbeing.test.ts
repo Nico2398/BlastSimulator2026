@@ -15,6 +15,7 @@ import {
   getBuildingDef,
   getLivingQuartersWellbeingMultiplier,
 } from '../../../src/core/entities/Building.js';
+import { getBedCapacity } from '../../../src/core/entities/BuildingWellbeing.js';
 
 // ─── BuildingDef sanity checks (already implemented — verify capacity values) ──
 
@@ -207,5 +208,56 @@ describe('getLivingQuartersWellbeingMultiplier', () => {
       placeBuilding(state, 'living_quarters', 10, 0, 64, 64, 3);
       expect(getLivingQuartersWellbeingMultiplier(state, 101)).toBe(1.00);
     });
+  });
+});
+
+// ─── getBedCapacity (#1692) ───────────────────────────────────────────────────
+
+describe('getBedCapacity', () => {
+  function stateWith(...tiers: Array<1 | 2 | 3>) {
+    const state = createBuildingState();
+    state.unlockedTiers.living_quarters = 3;
+    tiers.forEach((tier, i) => {
+      const res = placeBuilding(state, 'living_quarters', i * 20, 0, 128, 128, tier);
+      expect(res.success).toBe(true);
+    });
+    return state;
+  }
+
+  it('is 0 with no buildings', () => {
+    expect(getBedCapacity(createBuildingState())).toBe(0);
+  });
+
+  it('is 20 for one tier-1 quarters', () => {
+    expect(getBedCapacity(stateWith(1))).toBe(20);
+  });
+
+  it('sums beds across quarters (T1 + T2 = 60)', () => {
+    expect(getBedCapacity(stateWith(1, 2))).toBe(60);
+  });
+
+  it('ignores non-quarters buildings', () => {
+    const state = stateWith(1);
+    placeBuilding(state, 'geology_lab', 60, 60, 128, 128);
+    expect(getBedCapacity(state)).toBe(20);
+  });
+
+  it('ignores inactive quarters', () => {
+    const state = stateWith(1, 2);
+    state.buildings[1]!.active = false;
+    expect(getBedCapacity(state)).toBe(20);
+  });
+
+  it('ignores out-of-service quarters', () => {
+    const state = stateWith(1, 2);
+    state.buildings[0]!.outOfService = true;
+    expect(getBedCapacity(state)).toBe(40);
+  });
+
+  it('agrees with the overcapacity test in getLivingQuartersWellbeingMultiplier', () => {
+    const state = stateWith(1);
+    const beds = getBedCapacity(state);
+    expect(getLivingQuartersWellbeingMultiplier(state, beds)).toBe(0.9);
+    expect(getLivingQuartersWellbeingMultiplier(state, beds + 1)).toBeCloseTo(0.8, 10);
   });
 });

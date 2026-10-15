@@ -2757,3 +2757,27 @@ export const BLAST_GRADE_FLOOR_OFFSET_M = 0;
 
 /** Max depth in metres a blast may cut below its grade plane, so a deep outlier hole cannot gouge the pit floor. */
 export const BLAST_GRADE_MAX_CUT_M = 4;
+
+// ── Well-being score drivers (#1692) ──
+// Housed sites taper gains near the cap so one cheap Living Quarters cannot pin well-being at 100
+// (T1 < T2 < T3 equilibria, all below 98 for a busy crew of 8); unhoused sites climb undamped as
+// before. Zero morale still falls 1/tick (49.05 after the first tick once the 0.05 decay is added).
+
+/** Well-being gained per tick per unit of building effect (living quarters etc.); unchanged from the old 0.1 weight. */
+export const WB_BUILDING_GAIN = 0.1;
+/** Average morale at which well-being neither gains nor loses from morale; the midpoint of the 0-100 morale scale. */
+export const WB_NEUTRAL_MORALE = 50;
+/** Well-being gain per morale point above neutral, per tick; unchanged 0.02. The cap pin is prevented by headroom damping once housing exists, not by a weaker gain, so an unhoused crew builds the same early buffer. */
+export const WB_MORALE_GAIN_PER_POINT = 0.02;
+/** Well-being loss per morale point below neutral, per tick; unchanged 0.02, so zero morale falls 1/tick and the revolt path is intact. */
+export const WB_MORALE_LOSS_PER_POINT = 0.02;
+/** Score distance from the cap over which gains taper off (headroom damping), applied only while a Living Quarters gives a positive building effect; gives each housing tier its own equilibrium below 100. */
+export const WB_HEADROOM_SPAN = 50;
+/** Fatigue gauge level at or above which a worker feels no overwork strain; below it strain rises linearly to 1 at fatigue 0. */
+export const WB_FATIGUE_COMFORT = 70;
+/** Max well-being drag from a fully fatigued crew; a typical busy crew (strain ~0.1-0.3) costs 0.015-0.05/tick; kept gentle so the no-housing scenarios that run an exhausted crew still finish before the revolt lands. */
+export const WB_OVERWORK_DRAG_MAX = 0.15;
+/** Max well-being drag when the whole crew lacks beds; scaled by the unhoused share of the crew. */
+export const WB_CROWDING_DRAG_MAX = 0.8;
+/** Well-being drag per tick per accident of the last 10 ticks (about 1.5 points per accident in total); a blast that kills the crew must dent well-being, not zero it. */
+export const WB_ACCIDENT_DRAG = 0.15;
