@@ -356,7 +356,7 @@ export class OperationsPanel extends PanelBase {
   // ── Site policy ──
 
   private makeThresholdInput(id: string): HTMLInputElement {
-    const input = el('input', { className: 'bs-input', attrs: { id, type: 'number', min: '0', max: '100', step: '5' } }) as HTMLInputElement;
+    const input = el('input', { attrs: { id, type: 'number', min: '0', max: '100', step: '5' } }) as HTMLInputElement;
     input.style.cssText = 'width:100%;height:28px;padding:0 8px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';
     input.addEventListener('input', () => { this.policyDirty = true; });
     return input;

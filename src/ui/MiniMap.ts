@@ -65,7 +65,7 @@ export class MiniMap {
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
     this.el.id = 'bs-minimap';
-    this.el.classList.add('bs-ui', 'bs-panel', 'bsx-root');
+    this.el.classList.add('bsx-root');
     // Placement lives here rather than in styles.ts's `#bs-minimap` rule so
     // the painted box and the declared region (miniMapBounds above) read the
     // same constants.
@@ -73,6 +73,10 @@ export class MiniMap {
       'position:fixed', `right:${MINIMAP_EDGE_OFFSET_PX}px`, `bottom:${MINIMAP_EDGE_OFFSET_PX}px`,
       `width:${MINIMAP_WIDTH_PX}px`, 'padding:0', 'overflow:hidden',
       'border-radius:var(--bsx-r-card)', 'background:rgba(16,20,26,.95)',
+      'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 4px 24px rgba(0,0,0,.5)',
+      // Layering and pointer behaviour: the #bs-ui-root children rule is zero-specificity, so state it here.
+      'z-index:100', 'pointer-events:auto', 'flex-shrink:0', 'user-select:none',
+      'font-size:13px', 'color:var(--bsx-text-primary)',
     ].join(';');
 
     const header = document.createElement('div');

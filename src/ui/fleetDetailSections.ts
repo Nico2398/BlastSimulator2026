@@ -8,7 +8,7 @@ import { el, chip, gauge, button, type ChipTone } from './dom.js';
 import { iconEl } from './icons.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
 import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, vehicleCargoMassKg } from '../core/entities/Vehicle.js';
-import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
+import { getBuildingDef, type BuildingType, type BuildingTier } from '../core/entities/Building.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
@@ -18,8 +18,9 @@ export function vehicleDisplayName(type: Vehicle['type'], tier: VehicleTier): st
   return t(getVehicleDefByTier(type, tier).nameKey);
 }
 
-export function buildingDisplayName(_type: BuildingType, _tier: BuildingTier): string {
-  return ''; // TODO: implement
+/** "<type name> (<joke name>)", the vehicle-kit convention: a joke name alone does not say what the building is. */
+export function buildingDisplayName(type: BuildingType, tier: BuildingTier): string {
+  return `${t(`building.${type}.name`)} (${t(getBuildingDef(type, tier).nameKey)})`;
 }
 
 const STATUS_TONE: Record<VehicleStatus['kind'], ChipTone> = {

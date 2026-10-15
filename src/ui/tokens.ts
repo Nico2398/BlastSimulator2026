@@ -1,9 +1,10 @@
 // BlastSimulator2026 — Design tokens (redesign P0)
 //
 // CSS custom properties + shared component classes ported 1:1 from
-// docs/BlastSim game UI design/BlastSim Design System.dc.html. Injected
-// alongside the legacy stylesheet (styles.ts) — surfaces migrate to the
-// `bsx-` classes phase by phase; nothing here removes legacy `bs-` classes.
+// docs/BlastSim game UI design/BlastSim Design System.dc.html. The
+// migration is complete: every surface renders in `bsx-` terms, and the legacy
+// stylesheet (styles.ts) is no longer a migration source — it keeps only layering,
+// tutorial and rail rules, written against these tokens (NoLegacyUiStyles holds it).
 //
 // Font note: the design specifies Archivo + IBM Plex Mono from Google Fonts.
 // That CDN is policy-blocked in this environment (fonts.gstatic.com returns
@@ -124,6 +125,8 @@ export const TOKENS_CSS = `
 .bsx-root { color: var(--bsx-text-primary); }
 /* Zero specificity: form controls default to buttontext/fieldtext, not the inherited colour; component class rules and :disabled colours still win. */
 :where(.bsx-root) :where(button, input, select, textarea) { color: inherit; }
+/* Text fields focus with the info ring, never the retired gold. Outline, not border: fields carry their border inline. */
+:where(.bsx-root) :where(input, select, textarea):focus-visible { outline: 1px solid var(--bsx-info); outline-offset: 0; }
 .bsx-mono { font-family: var(--bsx-font-mono); font-variant-numeric: tabular-nums; }
 
 /* ── section header: micro-label + hairline rule ── */

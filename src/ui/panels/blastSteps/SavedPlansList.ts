@@ -70,10 +70,9 @@ export class SavedPlansList {
     );
 
     this.nameInput = el('input', {
-      className: 'bs-input',
       attrs: { type: 'text', maxlength: '24', 'data-field': 'plan-name' },
     }) as HTMLInputElement;
-    this.nameInput.style.cssText = 'flex:1;height:28px;font:400 11px/1 var(--bsx-font-mono)';
+    this.nameInput.style.cssText = 'flex:1;min-width:0;height:28px;padding:0 8px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:400 11px/1 var(--bsx-font-mono)';
     this.applyPlaceholder();
 
     const saveBtn = el('button', { className: 'bsx-btn' });
