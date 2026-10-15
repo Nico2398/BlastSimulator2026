@@ -1604,3 +1604,377 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     expect(subtitle).toBe(`$${getMoveCost(b).toLocaleString('en-US')}`);
   });
 });
+
+// ── Placed buildings as a master list (#1759) ────────────────────────────────
+
+describe('BuildMenu — placed rows are a selectable master list (#1759)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+    delete (window as unknown as { __cameraFocus?: unknown }).__cameraFocus;
+  });
+
+  function stateWith(buildings: Building[]): GameState {
+    const s = makeMockState();
+    s.buildings.buildings = buildings;
+    return s;
+  }
+
+  function siteRow(id: number): HTMLElement | null {
+    return container.querySelector<HTMLElement>(`.bs-build-site-row[data-building-id="${id}"]`);
+  }
+
+  function addSite(s: GameState, buildingId: number, rebuild = false): void {
+    s.plannedBuildings.push({
+      id: 900 + buildingId, buildingId, type: 'management_office', tier: 1, x: 17, z: 23,
+      actionId: 60 + buildingId, cost: 1000, ...(rebuild ? { rebuild: true } : {}),
+    });
+  }
+
+  describe('click to select', () => {
+    it('a click on the row body calls the select handler once with the building id', () => {
+      const cb = vi.fn();
+      menu.setSelectBuildingHandler(cb);
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+      findPlacedRow(container, 4).click();
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(4);
+    });
+
+    it('a click on the info text inside the row also selects', () => {
+      const cb = vi.fn();
+      menu.setSelectBuildingHandler(cb);
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+      findPlacedRow(container, 4).querySelector<HTMLElement>('div')!.click();
+      expect(cb).toHaveBeenCalledWith(4);
+    });
+
+    it.each(['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn'])(
+      'a click on %s does not select',
+      (sel) => {
+        const cb = vi.fn();
+        menu.setSelectBuildingHandler(cb);
+        const s = stateWith([makeBuilding({ id: 4, type: 'research_center', tier: 1 })]);
+        s.cash = 1e9;
+        menu.update(s);
+        findPlacedRow(container, 4).querySelector<HTMLButtonElement>(sel)!.click();
+        expect(cb).not.toHaveBeenCalled();
+      },
+    );
+
+    it('clicking a row does not close the panel', () => {
+      menu.setSelectBuildingHandler(vi.fn());
+      menu.show();
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+      findPlacedRow(container, 4).click();
+      expect(menu.visible).toBe(true);
+    });
+
+    it('a click without a handler wired does not throw', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+      expect(() => findPlacedRow(container, 4).click()).not.toThrow();
+    });
+  });
+
+  describe('Locate', () => {
+    it('the row Locate button focuses the camera on the building and does not select', () => {
+      const focus = vi.fn();
+      window.__cameraFocus = focus;
+      const cb = vi.fn();
+      menu.setSelectBuildingHandler(cb);
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1, x: 7, z: 9 })]));
+      const btn = findPlacedRow(container, 4).querySelector<HTMLButtonElement>('[data-action="locate"]');
+      expect(btn).not.toBeNull();
+      expect(btn!.title).not.toBe('');
+      btn!.click();
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(focus.mock.calls[0]![0]).toBeGreaterThanOrEqual(7);
+      expect(focus.mock.calls[0]![1]).toBeGreaterThanOrEqual(9);
+      expect(cb).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('highlight follows the selection', () => {
+    const two = () => [
+      makeBuilding({ id: 1, type: 'management_office', tier: 1 }),
+      makeBuilding({ id: 2, type: 'living_quarters', tier: 1, x: 9 }),
+    ];
+
+    it('setSelectedEntity building marks that row selected with aria-selected', () => {
+      menu.update(stateWith(two()));
+      menu.setSelectedEntity({ kind: 'building', id: 2 });
+      const row = findPlacedRow(container, 2);
+      expect(row.classList.contains('bs-build-row-selected')).toBe(true);
+      expect(row.getAttribute('aria-selected')).toBe('true');
+      expect(findPlacedRow(container, 1).classList.contains('bs-build-row-selected')).toBe(false);
+    });
+
+    it('the highlight moves with a new selection', () => {
+      menu.update(stateWith(two()));
+      menu.setSelectedEntity({ kind: 'building', id: 1 });
+      menu.setSelectedEntity({ kind: 'building', id: 2 });
+      expect(findPlacedRow(container, 1).classList.contains('bs-build-row-selected')).toBe(false);
+      expect(findPlacedRow(container, 2).classList.contains('bs-build-row-selected')).toBe(true);
+      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(1);
+    });
+
+    it('null clears the highlight', () => {
+      menu.update(stateWith(two()));
+      menu.setSelectedEntity({ kind: 'building', id: 1 });
+      menu.setSelectedEntity(null);
+      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+      expect(findPlacedRow(container, 1).getAttribute('aria-selected')).not.toBe('true');
+    });
+
+    it('a non-building selection clears the highlight', () => {
+      menu.update(stateWith(two()));
+      menu.setSelectedEntity({ kind: 'building', id: 1 });
+      menu.setSelectedEntity({ kind: 'vehicle', id: 1 });
+      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+    });
+
+    it('a vehicle selection with the same id does not highlight a building row', () => {
+      menu.update(stateWith(two()));
+      menu.setSelectedEntity({ kind: 'vehicle', id: 1 });
+      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+    });
+
+    it('selecting before the rows exist highlights them once built', () => {
+      menu.setSelectedEntity({ kind: 'building', id: 2 });
+      menu.update(stateWith(two()));
+      expect(findPlacedRow(container, 2).classList.contains('bs-build-row-selected')).toBe(true);
+    });
+
+    it('survives a list rebuild (a new building changes the row signature)', () => {
+      const s = stateWith(two());
+      menu.update(s);
+      menu.setSelectedEntity({ kind: 'building', id: 2 });
+      s.buildings.buildings = [...s.buildings.buildings, makeBuilding({ id: 3, type: 'geology_lab', tier: 1, x: 12 })];
+      menu.update(s);
+      expect(findPlacedRow(container, 2).classList.contains('bs-build-row-selected')).toBe(true);
+      expect(findPlacedRow(container, 3).classList.contains('bs-build-row-selected')).toBe(false);
+    });
+
+    it('a construction-site row with the selected id is highlighted', () => {
+      const s = stateWith([]);
+      addSite(s, 7);
+      menu.update(s);
+      menu.setSelectedEntity({ kind: 'building', id: 7 });
+      expect(siteRow(7)!.classList.contains('bs-build-row-selected')).toBe(true);
+      expect(siteRow(7)!.getAttribute('aria-selected')).toBe('true');
+    });
+  });
+
+  describe('row content', () => {
+    it('shows the tier name, #id and an icon', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 2 })]));
+      const row = findPlacedRow(container, 4);
+      expect(row.textContent).toContain('#4');
+      expect(row.querySelector('svg, img, [data-icon]')).not.toBeNull();
+    });
+
+    it('the HP bar width is round(hp / maxHp * 100)%', () => {
+      const maxHp = getBuildingDef('management_office', 1).maxHp;
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1, hp: maxHp / 4 })]));
+      const bar = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="hp-bar"]');
+      expect(bar).not.toBeNull();
+      expect(bar!.style.width).toBe('25%');
+    });
+
+    it('a full-HP building shows a 100% bar', () => {
+      const maxHp = getBuildingDef('management_office', 1).maxHp;
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1, hp: maxHp })]));
+      expect(findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="hp-bar"]')!.style.width).toBe('100%');
+    });
+
+    it('maxHp 0 gives a 0% bar and no NaN anywhere in the row', () => {
+      const def = getBuildingDef('management_office', 1);
+      const original = def.maxHp;
+      (def as { maxHp: number }).maxHp = 0;
+      try {
+        menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1, hp: 0 })]));
+        const row = findPlacedRow(container, 4);
+        expect(row.querySelector<HTMLElement>('[data-live="hp-bar"]')!.style.width).toBe('0%');
+        expect(row.textContent).not.toContain('NaN');
+        expect(row.innerHTML).not.toContain('NaN');
+      } finally {
+        (def as { maxHp: number }).maxHp = original;
+      }
+    });
+
+    it('exposes data-live hooks for hp-bar and hp', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+      const row = findPlacedRow(container, 4);
+      expect(row.querySelector('[data-live="hp-bar"]')).not.toBeNull();
+      expect(row.querySelector('[data-live="hp"]')).not.toBeNull();
+    });
+
+    it('a people building shows utilization in place', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'living_quarters', tier: 1, occupantIds: [1, 2] })]));
+      const util = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="util"]');
+      expect(util).not.toBeNull();
+      expect(util!.textContent).toContain('2');
+      expect(util!.textContent).toContain(String(getBuildingDef('living_quarters', 1).capacity));
+    });
+
+    it('a spoil heap shows no utilization text', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'spoil_heap', tier: 1 })]));
+      const util = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="util"]');
+      expect((util?.textContent ?? '').trim()).toBe('');
+    });
+  });
+
+  describe('live in-place updates', () => {
+    it('HP change rewrites the bar without replacing the row node', () => {
+      const maxHp = getBuildingDef('management_office', 1).maxHp;
+      const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1, hp: maxHp })]);
+      menu.update(s);
+      const rowBefore = findPlacedRow(container, 4);
+      const barBefore = rowBefore.querySelector<HTMLElement>('[data-live="hp-bar"]')!;
+      s.buildings.buildings[0]!.hp = maxHp / 2;
+      menu.update(s);
+      const rowAfter = findPlacedRow(container, 4);
+      expect(rowAfter).toBe(rowBefore);
+      expect(rowAfter.querySelector('[data-live="hp-bar"]')).toBe(barBefore);
+      expect(barBefore.style.width).toBe('50%');
+    });
+
+    it('a click fired after an HP-only update still selects', () => {
+      const cb = vi.fn();
+      menu.setSelectBuildingHandler(cb);
+      const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]);
+      menu.update(s);
+      const row = findPlacedRow(container, 4);
+      s.buildings.buildings[0]!.hp = 1;
+      menu.update(s);
+      row.click();
+      expect(cb).toHaveBeenCalledWith(4);
+    });
+
+    it('utilization updates in place when occupants change', () => {
+      const s = stateWith([makeBuilding({ id: 4, type: 'living_quarters', tier: 1, occupantIds: [] })]);
+      menu.update(s);
+      const row = findPlacedRow(container, 4);
+      s.buildings.buildings[0]!.occupantIds = [1, 2, 3];
+      menu.update(s);
+      expect(findPlacedRow(container, 4)).toBe(row);
+      expect(row.querySelector('[data-live="util"]')!.textContent).toContain('3');
+    });
+  });
+
+  describe('status badge', () => {
+    it('shows no badge on an operating building', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]));
+      const badge = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="badge"]');
+      expect((badge?.textContent ?? '').trim()).toBe('');
+    });
+
+    it('shows a badge when the building is out of service', () => {
+      const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]);
+      s.events.activeModifiers.push({
+        id: 801, kind: 'out_of_service', sourceEventId: 'evt_flood', role: null, targetId: 4,
+        targetKind: 'building', category: null, magnitude: 1, startTick: 0, endTick: null,
+      });
+      menu.update(s);
+      const badge = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="badge"]')!;
+      expect(badge.textContent!.trim()).not.toBe('');
+    });
+
+    it('shows a badge when demolition is ordered, and clears it in place', () => {
+      const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]);
+      s.pendingActions.push({
+        id: 50, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
+        targetX: 5, targetZ: 5, targetY: 0, payload: { buildingId: 4 }, targetEmployeeId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0,
+      });
+      menu.update(s);
+      const row = findPlacedRow(container, 4);
+      const badge = row.querySelector<HTMLElement>('[data-live="badge"]')!;
+      expect(badge.textContent!.trim()).not.toBe('');
+      s.pendingActions = [];
+      menu.update(s);
+      expect(findPlacedRow(container, 4)).toBe(row);
+      expect(row.querySelector<HTMLElement>('[data-live="badge"]')!.textContent!.trim()).toBe('');
+    });
+  });
+
+  describe('construction-site rows', () => {
+    it('each planned building gets a site row that is not a placed row', () => {
+      const s = stateWith([]);
+      addSite(s, 7);
+      addSite(s, 8, true);
+      menu.update(s);
+      expect(siteRow(7)).not.toBeNull();
+      expect(siteRow(8)).not.toBeNull();
+      expect(siteRow(7)!.classList.contains('bs-build-placed-row')).toBe(false);
+      expect(container.querySelector('.bs-build-placed-row[data-building-id="7"]')).toBeNull();
+    });
+
+    it('site rows live outside the #bs-build-placed container', () => {
+      const s = stateWith([]);
+      addSite(s, 7);
+      menu.update(s);
+      const placed = container.querySelector('#bs-build-placed');
+      expect(placed).not.toBeNull();
+      expect(placed!.contains(siteRow(7))).toBe(false);
+    });
+
+    it('clicking a site row selects its building id', () => {
+      const cb = vi.fn();
+      menu.setSelectBuildingHandler(cb);
+      const s = stateWith([]);
+      addSite(s, 7);
+      menu.update(s);
+      siteRow(7)!.click();
+      expect(cb).toHaveBeenCalledWith(7);
+    });
+
+    it('writes progress in place from the building status', () => {
+      const s = stateWith([]);
+      addSite(s, 7);
+      s.employees.employees.push({ id: 5, activeTaskTotalTicks: 100, taskTicksRemaining: 75 } as never);
+      s.pendingActions.push({
+        id: 67, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
+        targetX: 17, targetZ: 23, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'in_progress', holderId: 5, queuedAtTick: 0,
+      } as never);
+      menu.update(s);
+      const row = siteRow(7)!;
+      const progress = row.querySelector<HTMLElement>('[data-live="progress"]');
+      expect(progress).not.toBeNull();
+      expect(progress!.textContent).toContain('25');
+      s.employees.employees[0]!.taskTicksRemaining = 50;
+      menu.update(s);
+      expect(siteRow(7)).toBe(row);
+      expect(row.querySelector('[data-live="progress"]')!.textContent).toContain('50');
+    });
+
+    it('shows waiting text, not NaN, when no one has started the site', () => {
+      const s = stateWith([]);
+      addSite(s, 7);
+      menu.update(s);
+      const text = siteRow(7)!.textContent ?? '';
+      expect(text).not.toContain('NaN');
+      expect(siteRow(7)!.querySelector('[data-live="progress"]')!.textContent!.trim()).not.toBe('');
+    });
+
+    it('removes the site row once the planned entry is gone', () => {
+      const s = stateWith([]);
+      addSite(s, 7);
+      menu.update(s);
+      expect(siteRow(7)).not.toBeNull();
+      s.plannedBuildings = [];
+      s.buildings.buildings = [makeBuilding({ id: 7, type: 'management_office', tier: 1 })];
+      menu.update(s);
+      expect(siteRow(7)).toBeNull();
+      expect(findPlacedRow(container, 7)).not.toBeNull();
+    });
+  });
+});
