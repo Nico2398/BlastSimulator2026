@@ -18,6 +18,7 @@ import {
   NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS, MAX_NEED_GAUGE,
   AGENT_WALK_SPEED, NEED_DRAIN_RATES, BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS,
 } from '../config/balance.js';
+import { restCompletionMoraleCredit } from '../entities/EmployeeNeeds.js';
 import { moveTo, alightOnArrival } from './MoveTo.js';
 import { leaveBuildingIfInside, alightIfMounted } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -210,6 +211,23 @@ export function isRestBuildingFull(state: GameState, building: Building): boolea
 export function resolveRestBuildingId(payload: Record<string, unknown>): number | undefined {
   const value = payload['buildingId'];
   return typeof value === 'number' ? value : undefined;
+}
+
+/** payload.triggeredBy marker ForceShiftRest.ts stamps on policy-forced rests; read by creditPolicyRestMorale. */
+export const POLICY_REST_TRIGGER = 'shift_cycle_policy';
+
+/**
+ * #1801: a completed policy-forced rest (payload.triggeredBy
+ * POLICY_REST_TRIGGER, ForceShiftRest.ts) credits morale via
+ * restCompletionMoraleCredit, clamped to 100. Collapse, soft-threshold and
+ * interrupted rests get nothing; injured employees get nothing. Shared by both
+ * rest-completion paths (RestCompletion.ts, ShiftCycle.ts).
+ */
+export function creditPolicyRestMorale(state: GameState, emp: Employee, completedAction: PendingAction | undefined): void {
+  if (completedAction?.payload['triggeredBy'] !== POLICY_REST_TRIGGER) return;
+  if (!emp.alive || emp.injured) return;
+  const credit = restCompletionMoraleCredit(state.sitePolicy.fatigueRestThreshold);
+  emp.morale = Math.min(100, emp.morale + credit);
 }
 
 /**

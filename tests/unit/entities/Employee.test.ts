@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
+import { restCompletionMoraleCredit } from '../../../src/core/entities/EmployeeNeeds.js';
 import { isResting } from '../../../src/core/entities/EmployeeRestState.js';
 import {
   holdsRequiredSkill,
@@ -57,6 +58,7 @@ import {
   PROFICIENCY_MULTIPLIERS,
   // ── 7.6: checkCollapse hard threshold ──
   NEED_HARD_THRESHOLDS,
+  REST_COMPLETION_MORALE_CREDIT,
 } from '../../../src/core/config/balance.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
@@ -1715,5 +1717,58 @@ describe('isResting', () => {
   });
   it('is false when neither is set', () => {
     expect(isResting({ restTicksRemaining: null, pendingRestDuration: null })).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1801 — a long vehicle-work cycle (fatigue 70 -> 26) never reaches the comfort
+// band's recovery, so a policy-forced rest completion credits morale instead.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Employee - restCompletionMoraleCredit (#1801)', () => {
+  it('a threshold inside the comfort band credits REST_COMPLETION_MORALE_CREDIT', () => {
+    expect(restCompletionMoraleCredit(60)).toBe(REST_COMPLETION_MORALE_CREDIT);
+    expect(restCompletionMoraleCredit(60)).toBe(50);
+  });
+
+  it('the comfort threshold itself (50) still credits', () => {
+    expect(restCompletionMoraleCredit(NEED_MORALE_EFFECT_THRESHOLDS.comfortable)).toBe(50);
+  });
+
+  it('one below the comfort threshold (49) credits nothing', () => {
+    expect(restCompletionMoraleCredit(NEED_MORALE_EFFECT_THRESHOLDS.comfortable - 1)).toBe(0);
+  });
+
+  it('a continuous policy (threshold 0) credits nothing', () => {
+    expect(restCompletionMoraleCredit(0)).toBe(0);
+  });
+
+  describe('a worker cycling fatigue 70 -> 26 on vehicle work', () => {
+    const DRAIN_PER_TICK = 1.2;
+    const CYCLES = 10;
+
+    /** Morale after CYCLES haul cycles; the policy's credit lands when each rest completes. */
+    function moraleAfterCycles(policyThreshold: number): number {
+      const state = createEmployeeState();
+      const { employee } = hireEmployee(state, 'blaster', new Random(1));
+      employee.morale = 0;
+      for (let c = 0; c < CYCLES; c++) {
+        employee.fatigue = 70;
+        while (employee.fatigue > 26) {
+          employee.fatigue = Math.max(0, employee.fatigue - DRAIN_PER_TICK);
+          employee.morale = Math.min(100, Math.max(0, employee.morale + needsMoraleEffect(employee)));
+        }
+        employee.fatigue = 100; // rest completes
+        employee.morale = Math.min(100, employee.morale + restCompletionMoraleCredit(policyThreshold));
+      }
+      return employee.morale;
+    }
+
+    it('default threshold 60: morale climbs from 0 to above 30 within 10 cycles', () => {
+      expect(moraleAfterCycles(60)).toBeGreaterThan(30);
+    });
+
+    it('continuous (threshold 0): morale stays at 0', () => {
+      expect(moraleAfterCycles(0)).toBe(0);
+    });
   });
 });
