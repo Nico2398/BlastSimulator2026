@@ -21,6 +21,8 @@ import { freightWarehouseSites, nearestSite, spoilHeapSites } from '../entities/
 import { isBarrenFragment, type HaulDestination } from './SpoilHeaps.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
+import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { isFragmentSealed } from './SealedFragments.js';
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
@@ -81,9 +83,11 @@ export function requestHaulFragment(
  * nearest 'on_ground' fragment that is actually path-connected to the
  * vehicle's current position (via NavGrid.computeClimbReachableSet), rather
  * than plain nearest-distance — a full-clear blast leaves most fragments in
- * unreachable 'void' NavGrid cells. Returns null when none qualify.
+ * unreachable 'void' NavGrid cells. With a `grid`, rock sealed under an intact
+ * cap (#1774) is skipped, as syncHaulDispatch skips it: it has no order to
+ * claim. Returns null when none qualify.
  */
-export function findReachableGroundFragment(state: GameState, vehicleId: number): number | null {
+export function findReachableGroundFragment(state: GameState, vehicleId: number, grid?: VoxelGrid | null): number | null {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!isHaulEligibleVehicle(vehicle, state.vehicles)) return null;
 
@@ -96,6 +100,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     // breaks it into sub-fragments first (#484) — offering it here would
     // dispatch a hauler that requestHaulFragment immediately rejects.
     if (isOversized(tracked.fragment.volume)) return false;
+    if (grid && isFragmentSealed(grid, tracked.fragment.position)) return false;
     // A fragment heavier than the room left in storage can never be delivered:
     // the hauler would drive to it, load it, drive to the depot and be turned
     // away every tick from then on. Blasts throw off boulders far heavier than

@@ -5,6 +5,7 @@ import { expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 
 /** Keeps every living employee's fatigue topped up so a long drill/haul run is never derailed by a needs collapse mid-drive (mirrors blast-report-modal-save-load.integration.test.ts's fireBlast helper). */
 function refreshFatigue(state: GameState): void {
@@ -50,7 +51,7 @@ export function buyChargingTruck(run: (cmd: string) => unknown, state: GameState
  * then detonates it. Returns the runner/state plus a bound `run` so callers
  * can continue driving ticks afterward.
  */
-export function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState } {
+export function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState; grid: VoxelGrid } {
   const { runner, ctx } = createRunner();
   const run = (cmd: string) => runner.run(cmd);
 
@@ -77,7 +78,7 @@ export function drillChargeAndBlast(startX: number, startZ: number, amount: numb
   expect(run('blast')).toMatchObject({ success: true });
   expect(state.lastBlastReport).not.toBeNull();
 
-  return { run, state };
+  return { run, state, grid: ctx.grid! };
 }
 
 /** Hires an excavator-licensed driver, buys a rock_digger and crews it, so a built ramp actually gets carved. */

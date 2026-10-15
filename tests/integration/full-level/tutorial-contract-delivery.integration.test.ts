@@ -5,6 +5,7 @@
 // collected/stored, and contract delivery is gated on that stored inventory
 // rather than paying out unconditionally.
 
+import { isFragmentSealed } from '../../../src/core/economy/SealedFragments.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
@@ -317,7 +318,7 @@ describe('Tutorial Level — Contract Delivery', () => {
     // this test for a reason unrelated to what it means to exercise.
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const oreBearingId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
-      !isOversized(tracked.fragment.volume) && Object.values(tracked.fragment.oreDensities).some(d => d > 0),
+      !isOversized(tracked.fragment.volume) && !isFragmentSealed(ctx.grid!, tracked.fragment.position) && Object.values(tracked.fragment.oreDensities).some(d => d > 0),
     );
     expect(oreBearingId, 'blast produced no reachable ore-bearing fragment to haul').not.toBeNull();
 
@@ -345,7 +346,7 @@ describe('Tutorial Level — Contract Delivery', () => {
     // stay so.
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const haulableId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
-      !isOversized(tracked.fragment.volume),
+      !isOversized(tracked.fragment.volume) && !isFragmentSealed(ctx.grid!, tracked.fragment.position),
     );
     expect(haulableId, 'blast produced no reachable haulable (non-oversized) fragment').not.toBeNull();
     haulFragmentToStorage(vehicleId, haulableId!);

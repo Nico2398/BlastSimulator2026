@@ -191,26 +191,25 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
   );
 
   it(
-    'stamps nothing on the SAME (18,10) site with a smaller charge (amount:1) whose entire debris field is reachable (non-regression)',
+    'stamps nothing on the SAME (18,10) site with a smaller charge (amount:1) that never breaks out (non-regression)',
     () => {
-      const { run, state } = drillChargeAndBlast(18, 10, 1);
+      // Since #1774 the 1 kg charge's rock stays sealed under its cap and gets no order at all, so
+      // nothing can be stamped out of reach; and no 3 kg+ charge here is free of the pocket.
+      const { run, state, grid } = drillChargeAndBlast(18, 10, 1);
       crewHaulingAndBuildDepot(run, state);
+      const onGround = state.logistics.fragments.filter(f => f.state === 'on_ground');
+      expect(onGround.length).toBeGreaterThan(0);
+      expect(onGround.every(f => isFragmentSealed(grid, f.fragment.position))).toBe(true);
 
-      tickUntilFresh(run, state, () => false, 3);
-
-      const actions = debrisActions(state);
-      expect(actions.length).toBeGreaterThan(0);
-      for (const action of actions) {
-        expect(action.blockedReason).not.toBe('target_unreachable');
-        expect(action.blockedReason).not.toBe('debris_out_of_reach');
+      for (let i = 0; i < 200; i++) {
+        tickUntilFresh(run, state, () => false, 1);
+        for (const action of state.pendingActions) {
+          expect(action.blockedReason).not.toBe('target_unreachable');
+          expect(action.blockedReason).not.toBe('debris_out_of_reach');
+        }
       }
-
-      tickUntilFresh(run, state, () => state.logistics.storedMassKg > 0, 400);
-      expect(state.logistics.storedMassKg).toBeGreaterThan(0);
-
-      for (const action of debrisActions(state)) {
-        expect(action.blockedReason).not.toBe('debris_out_of_reach');
-      }
+      expect(debrisActions(state)).toHaveLength(0);
+      expect(state.logistics.storedMassKg).toBe(0);
     },
   );
 });
