@@ -1141,6 +1141,12 @@ export const EVACUATION_DRIVER_MAX_PATH_ATTEMPTS = 5;
 // nearby plain one rather than winning unconditionally regardless of distance.
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 
+// Extra haul-priority bonus for an ore-bearing fragment whose ore an open
+// ore_sale offer is short of (#1817). Derived as the tick-cost of crossing
+// DEFAULT_GRID_SIZE (64 cells) at AGENT_WALK_SPEED (2 cells/tick) one-way
+// (32 ticks), doubled = 64 ticks: 4x the base ore bonus, scaled by urgency.
+export const ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS: number = 64;
+
 /**
  * Rank tier per action type: a HIGHER tier is considered before any lower one,
  * and cost only orders candidates within a tier (#1742). Without it a cheap

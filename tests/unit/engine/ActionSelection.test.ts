@@ -42,6 +42,9 @@ import { computeChargeDurationTicks } from '../../../src/core/mining/ChargePlan.
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
 import { computeLevelVolume } from '../../../src/core/mining/LevelGround.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import type { Contract } from '../../../src/core/economy/Contract.js';
 
 // ── NavGrid helpers (mirrors tests/unit/nav/Pathfinding.test.ts) ───────────
 
@@ -2111,5 +2114,125 @@ describe('selectBestActionForEmployee — rank tiers (#1742)', () => {
     const near = makeAction({ id: 2, type: 'haul_debris', targetX: 2, targetZ: 0 });
     const far = makeAction({ id: 1, type: 'haul_debris', targetX: 20, targetZ: 0 });
     expect(selectBestActionForEmployee(state, emp, [far, near])!.action.id).toBe(2);
+  });
+});
+
+describe('selectBestActionForEmployee — demand-weighted haul ranking (#1817)', () => {
+  // Planner stubbed to straight-line cost (as in the rank-tier suite): only the ranking is under test.
+  beforeEach(() => {
+    vi.spyOn(PlanItineraryModule, 'planItinerary').mockImplementation((_state, employee, _goal, _fidelity, opts) => (
+      { estTotalTicks: Math.hypot(opts!.action!.targetX - employee.x, opts!.action!.targetZ - employee.z) }
+    ) as unknown as ReturnType<typeof PlanItineraryModule.planItinerary>);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  function fragment(id: number, x: number, ores: Record<string, number>): FragmentData {
+    return {
+      id, position: { x, y: 0, z: 0 }, volume: 0.3, mass: 1000, rockId: 'cruite', oreDensities: ores,
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x, y: 0, z: 0 },
+    };
+  }
+
+  function haul(id: number, x: number): PendingAction {
+    return makeAction({ id, type: 'haul_debris', requiredVehicleRole: 'debris_hauler', targetX: x, targetZ: 0, payload: { fragmentId: id } });
+  }
+
+  function offer(materialId: string, quantityKg = 1000, type: 'ore_sale' | 'rubble_disposal' = 'ore_sale'): Contract {
+    return {
+      id: 900 + state.contracts.available.length, type, materialId, description: '', quantityKg, deliveredKg: 0,
+      pricePerKg: 20, deadlineTicks: 5000, acceptedAtTick: 0, penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false,
+    };
+  }
+
+  let state: GameState;
+  let emp: Employee;
+  beforeEach(() => {
+    state = makeState(60, 60);
+    emp = makeEmployee(state, 0, 0);
+  });
+
+  /** Fragments: id 1 dirtite at `nearX`, id 2 rustite at `farX`. */
+  function twoOres(nearX: number, farX: number): PendingAction[] {
+    addBlastFragments(state.logistics, [fragment(1, nearX, { dirtite: 0.3 }), fragment(2, farX, { rustite: 0.3 })]);
+    return [haul(1, nearX), haul(2, farX)];
+  }
+
+  it('full of dirtite with a rustite offer on the board: the far rustite haul beats the near dirtite one', () => {
+    state.collectedOre = { dirtite: 25_000 };
+    state.contracts.available.push(offer('rustite'));
+    const pool = twoOres(5, 40);
+
+    const sel = selectBestActionForEmployee(state, emp, pool);
+
+    expect(sel!.action.id).toBe(2);
+    // The demand bonus ranks only: the reported duration stays the real cost.
+    expect(sel!.totalTicks).toBeCloseTo(40, 10);
+    expect(resolveActionCost(state, emp, pool[1]!)!.totalTicks).toBeCloseTo(40, 10);
+  });
+
+  it('the same site with no rustite offer still hauls the nearer dirtite', () => {
+    state.collectedOre = { dirtite: 25_000 };
+    state.contracts.available.push(offer('dirtite', 1000));
+    const pool = twoOres(5, 40);
+
+    expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(1);
+  });
+
+  it('a rustite offer already covered by stock does not pull the far rustite haul ahead', () => {
+    state.collectedOre = { dirtite: 25_000, rustite: 1000 };
+    state.contracts.available.push(offer('rustite', 1000));
+
+    expect(selectBestActionForEmployee(state, emp, twoOres(5, 40))!.action.id).toBe(1);
+  });
+
+  it('rubble_disposal offers do not create ore demand', () => {
+    state.collectedOre = { dirtite: 25_000 };
+    state.contracts.available.push(offer('rustite', 1000, 'rubble_disposal'));
+
+    expect(selectBestActionForEmployee(state, emp, twoOres(5, 40))!.action.id).toBe(1);
+  });
+
+  it('both ores short: the one with the lower coverage wins even when farther', () => {
+    state.collectedOre = { dirtite: 700, rustite: 100 };
+    state.contracts.available.push(offer('dirtite', 1000), offer('rustite', 1000));
+
+    expect(selectBestActionForEmployee(state, emp, twoOres(5, 30))!.action.id).toBe(2);
+  });
+
+  it('both ores short: the nearer one wins when it also has the lower coverage', () => {
+    state.collectedOre = { dirtite: 100, rustite: 700 };
+    state.contracts.available.push(offer('dirtite', 1000), offer('rustite', 1000));
+
+    expect(selectBestActionForEmployee(state, emp, twoOres(5, 30))!.action.id).toBe(1);
+  });
+
+  it('single-ore site: the ore haul still outranks a nearer barren one (#671), with demand open', () => {
+    state.contracts.available.push(offer('rustite'));
+    addBlastFragments(state.logistics, [fragment(1, 3, {}), fragment(2, 30, { rustite: 0.3 })]);
+
+    expect(selectBestActionForEmployee(state, emp, [haul(1, 3), haul(2, 30)])!.action.id).toBe(2);
+  });
+
+  it('single-ore site: the ore haul outranks a nearer barren one (#671) with no demand at all', () => {
+    addBlastFragments(state.logistics, [fragment(1, 5, {}), fragment(2, 12, { rustite: 0.3 })]);
+
+    expect(selectBestActionForEmployee(state, emp, [haul(1, 5), haul(2, 12)])!.action.id).toBe(2);
+  });
+
+  it('a barren fragment never gets the demand bonus', () => {
+    state.contracts.available.push(offer('rustite'));
+    addBlastFragments(state.logistics, [fragment(1, 5, { dirtite: 0.3 }), fragment(2, 40, {})]);
+
+    expect(selectBestActionForEmployee(state, emp, [haul(1, 5), haul(2, 40)])!.action.id).toBe(1);
+  });
+
+  it('a loaded in-transit haul is not abandoned for a farther, urgent ground fragment (#1709)', () => {
+    state.collectedOre = { dirtite: 25_000 };
+    state.contracts.available.push(offer('rustite'));
+    const pool = twoOres(2, 40);
+    state.logistics.fragments[0]!.state = 'in_transit';
+
+    expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(1);
   });
 });
