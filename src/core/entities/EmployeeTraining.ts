@@ -382,3 +382,47 @@ export function tickTraining(
 }
 
 export type { TrainingState };
+
+/** Duration and fee of a course at a school of this tier. */
+export function courseTerms(tier: BuildingTier): { ticks: number; fee: number } {
+  // TODO: implement
+  void tier;
+  return { ticks: 0, fee: 0 };
+}
+
+/** One employee enrolled at a school, for the inspector's school section. */
+export interface SchoolTrainee {
+  employeeId: number;
+  name: string;
+  skill: SkillCategory;
+  grantsLevel: ProficiencyLevel | undefined;
+  ticksRemaining: number;
+  fee: number;
+  phase: 'inside' | 'walking_in';
+}
+
+/** Employees enrolled at the school `buildingId`, inside or on their way in. */
+export function schoolTrainees(employees: readonly Employee[], buildingId: number): SchoolTrainee[] {
+  // TODO: implement
+  void employees;
+  void buildingId;
+  return [];
+}
+
+/** One course a school teaches, with the terms it runs on. */
+export interface SchoolCourse {
+  skill: SkillCategory;
+  level: BuildingTier;
+  ticks: number;
+  fee: number;
+  /** A better school on site that teaches this course instead, or null. */
+  supersededBy: Building | null;
+}
+
+/** Courses taught at `building`, given the best-school offers on site. */
+export function schoolCourses(building: Building, offers: readonly SkillOffer[]): SchoolCourse[] {
+  // TODO: implement
+  void building;
+  void offers;
+  return [];
+}
