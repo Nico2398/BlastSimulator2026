@@ -578,7 +578,7 @@
         ],
         "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect — nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) — not the fabricated fine (see file description)"
       },
-      "description": "#1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above."
+      "description": "#1362: Blast anyway in the waiting state (people still in the zone), the armed zone having been evacuated by BLAST above."
     },
     {
       "command": "time resume",
@@ -1242,7 +1242,7 @@
     },
     {
       "command": "blast",
-      "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check). #1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above.",
+      "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check). #1362: Blast anyway in the waiting state (people still in the zone), the armed zone having been evacuated by BLAST above.",
       "interaction": [
         {
           "type": "waitForSelector",

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
 import { wetAllHoles } from '../../../helpers/holeWater.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
@@ -7,7 +7,7 @@ import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { readFileSync } from 'node:fs';
-import { t } from '../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -307,7 +307,7 @@ describe('PreflightModal — armed detonation waiting body (#1362)', () => {
     expect(modal.root.querySelector(CANCEL_DET)).toBeNull();
   });
 
-  it('shows the waiting title, the remaining count and both Fire anyway / Cancel buttons while evacuating', () => {
+  it('shows the waiting title, the remaining count and both Blast anyway / Cancel blast buttons while evacuating', () => {
     const { modal } = makeModal();
     modal.show();
     modal.update(armedState().state, 'sunny');
@@ -345,7 +345,7 @@ describe('PreflightModal — armed detonation waiting body (#1362)', () => {
     expect(modal.root.querySelector(CANCEL_DET)).not.toBeNull();
   });
 
-  it('Fire anyway dispatches a plain `blast`', () => {
+  it('Blast anyway dispatches a plain `blast`', () => {
     const { modal, gameConsole } = makeModal();
     modal.show();
     modal.update(armedState().state, 'sunny');
@@ -356,7 +356,7 @@ describe('PreflightModal — armed detonation waiting body (#1362)', () => {
     expect(gameConsole).toHaveBeenCalledWith('blast');
   });
 
-  it('Cancel detonation dispatches `blast cancel`, never `blast`', () => {
+  it('Cancel blast dispatches `blast cancel`, never `blast`', () => {
     const { modal, gameConsole } = makeModal();
     modal.show();
     modal.update(armedState().state, 'sunny');
@@ -463,5 +463,38 @@ describe('PreflightModal cost net of stock (#1685)', () => {
     modal.update(stockedPlan(5), 'sunny');
     expect(modal.root.textContent).toContain('$0');
     expect(modal.root.textContent).not.toContain('$60');
+  });
+});
+
+// ── #1749: player-facing buttons are named "Blast" ───────────────────────────
+
+describe('PreflightModal — button names (#1749)', () => {
+  afterEach(() => { setLocale('en'); });
+
+  const buttonText = (root: HTMLElement, action: string): string =>
+    (root.querySelector(`[data-action="${action}"]`) as HTMLElement).textContent!.trim();
+
+  const cases: Array<['en' | 'fr', string, string, string]> = [
+    ['en', 'Blast', 'Blast anyway', 'Cancel blast'],
+    ['fr', 'Blast', 'Blast quand même', 'Annuler le blast'],
+  ];
+
+  it.each(cases)('[%s] the pre-flight confirm button reads "%s"', (locale, detonate) => {
+    setLocale(locale);
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(chargedPlan(), 'sunny');
+    expect(buttonText(modal.root, 'preflight-detonate')).toBe(detonate);
+  });
+
+  it.each(cases)('[%s] the waiting buttons read "%s" / "%s"', (locale, _d, fireAnyway, cancel) => {
+    setLocale(locale);
+    const { modal } = makeModal();
+    modal.show();
+    const state = chargedPlan();
+    state.pendingDetonation = { armedTick: 0, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 0 };
+    modal.update(state, 'sunny');
+    expect(buttonText(modal.root, 'preflight-fire-anyway')).toBe(fireAnyway);
+    expect(buttonText(modal.root, 'preflight-cancel-detonation')).toBe(cancel);
   });
 });
