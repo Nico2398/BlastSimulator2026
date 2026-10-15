@@ -11,6 +11,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { FRAGMENTATION_MULTIPLIER, CRACKED_VOXEL_ENERGY_RATIO, CRACKED_VOXEL_WEAKENING, BURDEN_BREAKOUT_MAX, BLAST_SLICE_CELLS, BLAST_GRADE_MAX_CUT_M } from '../config/balance.js';
 import { type EnergyField, indexOf, contains } from './EnergyPropagation.js';
 import { drain, type Steps } from '../engine/Steps.js';
+import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 
 /** Face-adjacent offsets — connectivity for the support flood fill. */
 const FACE_OFFSETS: ReadonlyArray<readonly [number, number, number]> = [
@@ -176,43 +177,86 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   // ending at grade, whichever pass broke it, that is a 1 m pit under every
   // hole of the pattern: a step over NAV_MAX_SLOPE_DEGREES on every side, so
   // the crater floor would be a grid of islands. Leave that sub-grade voxel
-  // standing there, so the floor is flush with grade. Deeper breakage (an
-  // outlier hole) is real excavation and stays, and so does a lone hole's pit,
-  // which has no neighbour at grade. A neighbour whose cut the cap clamped ends
-  // above grade and does not count. The test reads a snapshot taken before any
-  // lifting, so adjacent breakouts do not count each other.
+  // standing there, so the floor is flush with grade. At close spacing the
+  // pocket between holes has only sub-grade neighbours, so the lift floods:
+  // a group of 8-connected one-voxel-deep columns lifts whole when any member
+  // touches a column at grade. Deeper breakage (an outlier hole) is real
+  // excavation and neither lifts nor carries the fill, and a lone hole's pit,
+  // with no group member at grade, stays. A neighbour whose cut the cap clamped
+  // ends above grade and does not count. Everything reads a snapshot taken
+  // before any lifting.
   const subGradeY = Math.ceil(gradeY) - 1;
-  const gradeCeil = Math.ceil(gradeY);
-  const snapshot = lowest.slice();
+  const lift = subGradeColumnsToLift(lowest, columnOf, box, subGradeY, Math.ceil(gradeY));
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      if (snapshot[columnOf(x, z)] !== subGradeY) continue;
-      if (!hasNeighbourAtGrade(snapshot, columnOf, box, x, z, gradeCeil)) continue;
-      mask[indexOf(field, x, subGradeY, z)] = 0;
+      if (lift[columnOf(x, z)] === 1) mask[indexOf(field, x, subGradeY, z)] = 0;
     }
   }
   return graded;
 }
 
-/** True when any of the 8 columns around (x, z) inside `box` ends at `gradeCeil`. */
-function hasNeighbourAtGrade(
+/** Visit the in-box 8-neighbours of footprint cell (x, z) as (column, x, z). */
+function forEachNeighbourColumn(
+  box: EnergyField['box'],
+  columnOf: (x: number, z: number) => number,
+  x: number,
+  z: number,
+  visit: (column: number, nx: number, nz: number) => void,
+): void {
+  for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+    const px = x + dx;
+    const pz = z + dz;
+    if (px < box.minX || px >= box.maxX || pz < box.minZ || pz >= box.maxZ) continue;
+    visit(columnOf(px, pz), px, pz);
+  }
+}
+
+/**
+ * Flag every column ending at `subGradeY` that belongs to an 8-connected group
+ * of such columns with at least one member next to a column ending at
+ * `gradeCeil`. Linear in footprint columns.
+ */
+function subGradeColumnsToLift(
   lowest: Int32Array,
   columnOf: (x: number, z: number) => number,
   box: EnergyField['box'],
-  x: number,
-  z: number,
+  subGradeY: number,
   gradeCeil: number,
-): boolean {
-  for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dz === 0) continue;
-      const nxc = x + dx;
-      const nzc = z + dz;
-      if (nxc < box.minX || nxc >= box.maxX || nzc < box.minZ || nzc >= box.maxZ) continue;
-      if (lowest[columnOf(nxc, nzc)] === gradeCeil) return true;
+): Uint8Array {
+  const lift = new Uint8Array(lowest.length);
+  const visited = new Uint8Array(lowest.length);
+  // Flood stack holds footprint coordinates, so column layout stays in columnOf.
+  const stackX: number[] = [];
+  const stackZ: number[] = [];
+  const enqueue = (c: number, x: number, z: number): void => {
+    visited[c] = 1;
+    stackX.push(x);
+    stackZ.push(z);
+  };
+  // Seed from every sub-grade column beside a grade column, then spread
+  // through sub-grade columns only.
+  for (let z = box.minZ; z < box.maxZ; z++) {
+    for (let x = box.minX; x < box.maxX; x++) {
+      const c = columnOf(x, z);
+      if (lowest[c] !== subGradeY || visited[c] === 1) continue;
+      let touchesGrade = false;
+      forEachNeighbourColumn(box, columnOf, x, z, (n) => {
+        if (lowest[n] === gradeCeil) touchesGrade = true;
+      });
+      if (!touchesGrade) continue;
+      enqueue(c, x, z);
+      while (stackX.length > 0) {
+        const cx = stackX.pop()!;
+        const cz = stackZ.pop()!;
+        lift[columnOf(cx, cz)] = 1;
+        forEachNeighbourColumn(box, columnOf, cx, cz, (n, px, pz) => {
+          if (visited[n] === 1 || lowest[n] !== subGradeY) return;
+          enqueue(n, px, pz);
+        });
+      }
     }
   }
-  return false;
+  return lift;
 }
 
 /**

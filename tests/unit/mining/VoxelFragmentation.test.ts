@@ -499,6 +499,96 @@ describe('VoxelFragmentation — floorToGrade', () => {
     expect(isBroken(f, 6, 5, 5)).toBe(true);
   });
 
+  it('a 2x2 one-voxel breakout at the centre of four holes 3 m apart ends flush when it sits beside the grade-ending line cells between the holes (#1792)', () => {
+    const pocket = [5, 6].flatMap(x => [5, 6].map(z => ({ x, z, fromY: 5, toY: 11 })));
+    const lineAtGrade = [
+      { x: 5, z: 4 }, { x: 6, z: 4 }, { x: 5, z: 7 }, { x: 6, z: 7 },
+      { x: 4, z: 5 }, { x: 4, z: 6 }, { x: 7, z: 5 }, { x: 7, z: 6 },
+    ].map(c => ({ ...c, fromY: 6, toY: 11 }));
+    const holes = [{ x: 4, z: 4 }, { x: 7, z: 4 }, { x: 4, z: 7 }, { x: 7, z: 7 }].map(c => ({ ...c, fromY: 6, toY: 11 }));
+    const f = gradedField(6, [...pocket, ...lineAtGrade, ...holes]);
+
+    floorToGrade(f.field, f.mask);
+
+    for (let x = 0; x < SIZE; x++) {
+      for (let z = 0; z < SIZE; z++) expect(isBroken(f, x, 5, z), `x=${x} z=${z}`).toBe(false);
+    }
+    for (const c of pocket) expect(isBroken(f, c.x, 6, c.z), `pocket ${c.x},${c.z}`).toBe(true);
+  });
+
+  it('a single one-voxel breakout on the line between two holes 3 m apart, its neighbours at grade, ends flush (#1792)', () => {
+    const f = gradedField(6, [
+      { x: 4, z: 5, fromY: 6, toY: 11 },
+      { x: 7, z: 5, fromY: 6, toY: 11 },
+      { x: 5, z: 5, fromY: 5, toY: 11 }, // line cell: one voxel under grade
+      { x: 6, z: 5, fromY: 6, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 5, 5, 5)).toBe(false);
+    expect(isBroken(f, 5, 6, 5)).toBe(true);
+  });
+
+  it('a 2x2 pocket, the lines and the holes all one voxel under grade lift together when one member touches grade (#1792)', () => {
+    // Holes (4,4)(7,4)(4,7)(7,7) 3 m apart; the lines and the 2x2 pocket between them broke one voxel under grade too.
+    const sub: Array<{ x: number; z: number; fromY: number; toY: number }> = [];
+    for (let x = 4; x <= 7; x++) for (let z = 4; z <= 7; z++) sub.push({ x, z, fromY: 5, toY: 11 });
+    // Only the outer ring touches a column ending at grade; the pocket (5-6, 5-6) has sub-grade neighbours alone.
+    const f = gradedField(6, [...sub, { x: 3, z: 3, fromY: 6, toY: 11 }]);
+
+    floorToGrade(f.field, f.mask);
+
+    for (let x = 0; x < SIZE; x++) {
+      for (let z = 0; z < SIZE; z++) expect(isBroken(f, x, 5, z), `x=${x} z=${z}`).toBe(false);
+    }
+    for (const c of sub) expect(isBroken(f, c.x, 6, c.z), `lifted ${c.x},${c.z}`).toBe(true);
+  });
+
+  it('a one-voxel line cell with only sub-grade neighbours lifts through the chain to a hole touching grade (#1792)', () => {
+    const f = gradedField(6, [
+      { x: 4, z: 5, fromY: 5, toY: 11 }, // hole
+      { x: 5, z: 5, fromY: 5, toY: 11 }, // line cell
+      { x: 6, z: 5, fromY: 5, toY: 11 }, // line cell
+      { x: 7, z: 5, fromY: 5, toY: 11 }, // hole
+      { x: 3, z: 5, fromY: 6, toY: 11 }, // ends at grade, beside the first hole only
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    for (const x of [4, 5, 6, 7]) {
+      expect(isBroken(f, x, 5, 5), `x=${x}`).toBe(false);
+      expect(isBroken(f, x, 6, 5), `x=${x} y=6`).toBe(true);
+    }
+  });
+
+  it('a chain of one-voxel breakout columns with no member beside a grade-ending column keeps its pit (#1792)', () => {
+    const f = gradedField(6, [
+      { x: 4, z: 5, fromY: 5, toY: 11 },
+      { x: 5, z: 5, fromY: 5, toY: 11 },
+      { x: 6, z: 5, fromY: 5, toY: 11 },
+    ]);
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+
+    for (const x of [4, 5, 6]) expect(isBroken(f, x, 5, 5), `x=${x}`).toBe(true);
+  });
+
+  it('the flood does not cross a deeper column: a chain member two voxels under grade stays and stops it (#1792)', () => {
+    const f = gradedField(6, [
+      { x: 4, z: 5, fromY: 5, toY: 11 },
+      { x: 5, z: 5, fromY: 4, toY: 11 }, // real excavation, not a one-voxel breakout
+      { x: 6, z: 5, fromY: 5, toY: 11 },
+      { x: 3, z: 5, fromY: 6, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 4, 5, 5)).toBe(false); // beside the grade-ending column
+    expect(isBroken(f, 5, 4, 5)).toBe(true);
+    expect(isBroken(f, 6, 5, 5)).toBe(true); // only reachable through the deeper column
+  });
+
   it('a neighbour whose cut was clamped above grade does not lift the breakout (#1740)', () => {
     const f = gradedField(2, [
       { x: 5, z: 5, fromY: 1, toY: 11 }, // breakout one voxel under grade 2
