@@ -1,0 +1,219 @@
+{
+  "name": "employee-inspector-visual",
+  "description": "The employee inspector carries the full detail (#1762). A player clicks an employee in the scene and sees every section, trains them from the inspector, follows the school link while the course runs (the inspector switches to the Blasting Academy), then clicks another employee's Crew row header and the inspector switches to them.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 cash:300000 staffed:true",
+      "description": "Staffed opening (#551): employee 3 is the driver, who holds no blasting qualification, so the Blasting Academy offers them a course. Employee 2 (the blaster) is the roster row clicked at the end.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 cash:300000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 300000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build blasting_academy at:10,3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"blasting_academy\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 10.5,
+          "z": 3.5,
+          "distance": 25
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 3
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Drive the academy site to completion (#556); it becomes building 1.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Clicking employee 3 in the scene opens the inspector with the full detail: identity, location, now, needs, skills, pay, training with a Train button for the academy's course, and dismiss. The command-mode stand-in is a read-only list; the click is what interaction mode proves.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 3
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-employee-detail"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-train-btn[data-skill=\"blasting\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-train-btn[data-skill=\"blasting\"]"
+      }
+    },
+    {
+      "command": "employee train 3 skill:blasting building:1",
+      "description": "Train from the inspector itself. Enrolment sends the employee walking to the school (#1203), so trainingCount stays 0 until they enter it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-train-btn[data-skill=\"blasting\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "description": "Wait for the walk to the school to end and the course to start, rather than a fixed tick pad.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "While training, the inspector's training section shows the course in progress with the school as a link; clicking the link switches the inspector to the academy.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] .bs-training-active[data-skill=\"blasting\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] [data-select-kind=\"building\"][data-select-id=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"3\"] [data-select-kind=\"building\"][data-select-id=\"1\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"]"
+      }
+    },
+    {
+      "command": "employee list",
+      "description": "Open Crew and click another employee's row header: it still expands the row, and now also selects the employee, so the inspector switches to employee 2.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"] .bs-detail-toggle"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"2\"] .bs-employee-detail"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"][data-id=\"2\"] .bs-employee-detail"
+      }
+    }
+  ]
+}

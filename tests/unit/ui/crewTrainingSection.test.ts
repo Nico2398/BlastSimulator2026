@@ -4,7 +4,7 @@
 // raise, and a skill the employee already holds is a locked row with no button.
 
 import { describe, it, expect } from 'vitest';
-import { makeTrainingSection, perHour } from '../../../src/ui/crewDetailSections.js';
+import { makeTrainingSection, perHour, type LinkFactory } from '../../../src/ui/crewDetailSections.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
@@ -167,5 +167,58 @@ describe('makeTrainingSection — refused courses (#1726)', () => {
     assignSkill(state.employees, employee.id, 'geology', 1);
     const section = makeTrainingSection(employee, state, () => {});
     expect(section.querySelectorAll('.bs-train-btn:not([disabled])')).toHaveLength(0);
+  });
+});
+
+
+// ── #1762: school link while training or walking to school ──
+
+const schoolLink: LinkFactory = (kind, id, label) => {
+  const a = document.createElement('a');
+  a.dataset['selectKind'] = kind;
+  a.dataset['selectId'] = String(id);
+  a.textContent = label;
+  return a;
+};
+
+describe('makeTrainingSection — school link (#1762)', () => {
+  it('in progress: links the school and keeps .bs-training-active[data-skill]', () => {
+    const { state, employee } = setup();
+    const school = state.buildings.buildings.find(b => b.type === 'blasting_academy')!;
+    employee.trainingState = { buildingId: school.id, skill: 'geology', ticksRemaining: 7, fee: 100 };
+    const section = makeTrainingSection(employee, state, () => {}, schoolLink);
+    const active = section.querySelector('.bs-training-active[data-skill="geology"]');
+    expect(active).not.toBeNull();
+    const a = section.querySelector('[data-select-kind="building"]') as HTMLElement;
+    expect(a).not.toBeNull();
+    expect(a.dataset['selectId']).toBe(String(school.id));
+    expect(section.textContent).toContain('7');
+  });
+
+  it('in progress without a factory: no link, active marker intact', () => {
+    const { state, employee } = setup();
+    const school = state.buildings.buildings[0]!;
+    employee.trainingState = { buildingId: school.id, skill: 'geology', ticksRemaining: 7, fee: 100 };
+    const section = makeTrainingSection(employee, state, () => {});
+    expect(section.querySelector('[data-select-kind]')).toBeNull();
+    expect(section.querySelector('.bs-training-active[data-skill="geology"]')).not.toBeNull();
+  });
+
+  it('walking to school: links the pending school, no active marker', () => {
+    const { state, employee } = setup();
+    const school = state.buildings.buildings.find(b => b.type === 'blasting_academy')!;
+    employee.pendingTrainingState = { buildingId: school.id, skill: 'geology', ticksRemaining: 7, fee: 100 };
+    const section = makeTrainingSection(employee, state, () => {}, schoolLink);
+    const a = section.querySelector('[data-select-kind="building"]') as HTMLElement;
+    expect(a).not.toBeNull();
+    expect(a.dataset['selectId']).toBe(String(school.id));
+    expect(section.querySelector('.bs-training-active')).toBeNull();
+  });
+
+  it('idle with offers: still renders train buttons and no school link', () => {
+    const { state, employee } = setup();
+    const section = makeTrainingSection(employee, state, () => {}, schoolLink);
+    expect(section.querySelector('.bs-train-btn[data-skill="geology"]')).not.toBeNull();
+    expect(section.querySelector('[data-select-kind]')).toBeNull();
   });
 });
