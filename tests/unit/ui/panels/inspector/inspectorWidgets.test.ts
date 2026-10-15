@@ -26,6 +26,24 @@ describe('syncSection', () => {
     expect(root.querySelector('.x-sec')).toBe(first);
   });
 
+  it('keeps a section whose only difference is tutorial rail marks', () => {
+    const build = (): HTMLElement => {
+      const sec = div('x-sec', 'a');
+      const btn = document.createElement('button');
+      btn.className = 'train';
+      sec.append(btn);
+      return sec;
+    };
+    const root = document.createElement('div');
+    syncSection(root, 'x-sec', build);
+    const first = root.querySelector('.x-sec')!;
+    const btn = first.querySelector('button')!;
+    btn.classList.add('bs-tutorial-allowed', 'bsx-highlight');
+    syncSection(root, 'x-sec', build);
+    expect(root.querySelector('.x-sec')).toBe(first);
+    expect(first.querySelector('button')!.classList.contains('bs-tutorial-allowed')).toBe(true);
+  });
+
   it('swaps the node when the markup differs', () => {
     const root = document.createElement('div');
     syncSection(root, 'x-sec', () => div('x-sec', 'a'));
