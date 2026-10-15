@@ -136,7 +136,7 @@ describe('research queue usage, funds and success messages — translated (#1808
       expect(result.code).toBe('insufficient_funds');
       expect(result.output).toMatch(/\d/);
       expect(result.output).not.toBe('research.queue_insufficient_funds');
-      expect(result.output.startsWith(t('research.queue_insufficient_funds', { cost: 0 }).split('0')[0])).toBe(true);
+      expect(result.output.startsWith(t('research.queue_insufficient_funds', { cost: 0 }).split('0')[0]!)).toBe(true);
     });
 
     it(`queue_queued (${locale}) prints t() with name, tier, ticks and cost`, () => {
@@ -146,7 +146,7 @@ describe('research queue usage, funds and success messages — translated (#1808
       const cashBefore = ctx.state!.cash;
       const result = researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '2' });
       expect(result.success).toBe(true);
-      const task = ctx.state!.buildings.researchQueue[0];
+      const task = ctx.state!.buildings.researchQueue[0]!;
       const cost = cashBefore - ctx.state!.cash;
       const key = task.ticksRemaining > 0 ? 'research.queue_queued' : 'research.queue_queued_instant';
       expect(result.output).toBe(
