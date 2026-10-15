@@ -14,7 +14,7 @@ import { Vector3 } from 'three';
 import { t } from '../../core/i18n/I18n.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
-import { el, button, panelRoot, panelHeader, panelHeaderButton, panelBody, replaceChildrenKeepingScroll } from '../dom.js';
+import { el, button, reasonLine, panelRoot, panelHeader, panelHeaderButton, panelBody, replaceChildrenKeepingScroll } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { contentFor, type InspectorAction, type InspectorView, type InspectorLinks } from '../panels/inspector/InspectorContent.js';
 import { shellLayoutRegistry } from './LayoutRegistry.js';
@@ -150,16 +150,40 @@ export class Inspector {
 
   private rebuild(view: InspectorView): void {
     replaceChildrenKeepingScroll(this.bodyEl, view.sections);
-    this.actionsEl.replaceChildren(...view.actions.map(a => button(a.variant, t(a.labelKey), {
+    this.actionsEl.replaceChildren(...view.actions.map(a => button(a.variant, a.label ?? t(a.labelKey), {
       icon: a.icon, dataAction: a.action, disabled: a.disabled === true, onClick: () => this.fire(a.action),
+      ...(a.title !== undefined ? { title: a.title } : {}),
     })));
+    this.syncReasons(view);
   }
 
-  /** Flip each action button's disabled state in place, keeping the node. */
+  /** Flip each action button's label, tooltip and disabled state in place, keeping the node. */
   private syncDisabled(view: InspectorView): void {
     for (const a of view.actions) {
-      const btn = this.actionsEl.querySelector<HTMLButtonElement>(`[data-action="${a.action}"]`);
-      if (btn && btn.disabled !== (a.disabled === true)) btn.disabled = a.disabled === true;
+      const btn = this.actionsEl.querySelector<HTMLButtonElement>(`button[data-action="${a.action}"]`);
+      if (!btn) continue;
+      if (btn.disabled !== (a.disabled === true)) btn.disabled = a.disabled === true;
+      const label = btn.lastElementChild as HTMLElement | null;
+      if (label) writeText(label, a.label ?? t(a.labelKey));
+      const title = a.title ?? '';
+      if (btn.title !== title) btn.title = title;
+    }
+    this.syncReasons(view);
+  }
+
+  /** One inline reason line under the strip per disabled action that names why (the tooltip alone is invisible to touch). */
+  private syncReasons(view: InspectorView): void {
+    const wanted = view.actions.filter(a => a.disabled === true && a.title !== undefined);
+    const shown = Array.from(this.actionsEl.querySelectorAll<HTMLElement>('[data-reason]'));
+    const unchanged = shown.length === wanted.length
+      && wanted.every((a, i) => shown[i]!.dataset['reason'] === a.action && shown[i]!.textContent === a.title);
+    if (unchanged) return;
+    for (const node of shown) node.remove();
+    for (const a of wanted) {
+      const line = reasonLine(a.title!);
+      line.dataset['reason'] = a.action;
+      line.style.flex = '1 1 100%';
+      this.actionsEl.append(line);
     }
   }
 }

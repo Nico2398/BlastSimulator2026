@@ -56,7 +56,7 @@ export function queueDemolition(state: GameState, building: Building, opts: Demo
 }
 
 /** True when a demolish_building action for `buildingId` is already pending or in progress. */
-export function isDemolitionOrdered(state: GameState, buildingId: number): boolean {
+export function isDemolitionOrdered(state: Pick<GameState, 'pendingActions'>, buildingId: number): boolean {
   return state.pendingActions.some(a => a.type === 'demolish_building' && a.payload['buildingId'] === buildingId);
 }
 

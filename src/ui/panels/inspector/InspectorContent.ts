@@ -11,7 +11,7 @@ export type InspectorKind = EntityPick['kind'];
 /** Every action an Inspector button can fire; main.ts decides what each does. */
 export type InspectorAction =
   | 'detail' | 'dispatch_here' | 'train' | 'move_here' | 'upgrade_vehicle'
-  | 'upgrade' | 'move' | 'demolish' | 'widen' | 'locate';
+  | 'upgrade' | 'move' | 'demolish' | 'widen' | 'locate' | 'research';
 
 /** One action button the Inspector renders for the current entity. */
 export interface ActionSpec {
@@ -20,6 +20,10 @@ export interface ActionSpec {
   readonly icon: string;
   readonly variant: 'ghost' | 'danger';
   readonly disabled?: boolean;
+  /** Literal label overriding `labelKey` (#1758). */
+  readonly label?: string;
+  /** Tooltip text (#1758). */
+  readonly title?: string;
 }
 
 /** Callbacks a view uses to navigate to other entities (host, occupant, driver...). */

@@ -67,7 +67,7 @@ import { anchorFootprint, isHostResolvedKind, resolveSelection, type SelectionAn
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
-import { buildDemolishConfirm } from './ui/demolishConfirm.js';
+import { buildDemolishConfirm, freightOreKg } from './ui/demolishConfirm.js';
 import { Inspector } from './ui/shell/Inspector.js';
 import { formatBalance } from './ui/shell/TopBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
@@ -1354,12 +1354,14 @@ inspector.setActionHandler((action, entity) => {
       break;
     }
     case 'upgrade':
-      reportOrderResult(t('inspector.action.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
+      // The Build panel's own flow (research guard, cutoff confirm) without opening the panel (#1758).
+      uiManager.upgradeBuilding(entity.id);
+      break;
+    case 'research':
+      uiManager.queueBuildingResearch(entity.id);
       break;
     case 'move':
-      // Move needs a tile picker — the in-scene placement layer is P3's job.
-      // Until then this routes to the Build panel's own move flow.
-      uiManager.showPanel('build');
+      uiManager.moveBuilding(entity.id);
       break;
     case 'widen': {
       const ramp = ctx.state?.builtRamps.find(r => r.id === entity.id);
@@ -1370,9 +1372,10 @@ inspector.setActionHandler((action, entity) => {
     case 'demolish': {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;
+      const storedOreKg = ctx.state ? freightOreKg(ctx.state.logistics, placedBuilding) : 0;
       uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
         reportOrderResult(t('inspector.action.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
-      }));
+      }, { storedOreKg }));
       break;
     }
   }

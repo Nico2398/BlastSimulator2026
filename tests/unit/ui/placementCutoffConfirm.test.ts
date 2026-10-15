@@ -9,7 +9,7 @@ vi.mock('../../../src/core/entities/Building.js', async (orig) => ({
 }));
 
 import {
-  placementCutoffFor, cutoffLine, cutoffStateKey, buildPlacementCutoffConfirm,
+  placementCutoffFor, memoizedPlacementCutoff, cutoffLine, cutoffStateKey, buildPlacementCutoffConfirm,
 } from '../../../src/ui/placementCutoffConfirm.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
@@ -53,6 +53,68 @@ describe('placementCutoffFor', () => {
   });
 });
 
+describe('memoizedPlacementCutoff', () => {
+  const verdict = { cells: 3, benches: 1, holes: 0, orders: 0 };
+  beforeEach(() => { computeMock.mockReset(); computeMock.mockReturnValue(verdict); });
+  const gridState = (revision: number, over: Record<string, unknown> = {}) =>
+    makeState({ navGrid: { revision }, ...over });
+
+  it('returns null without a nav grid and does not compute', () => {
+    expect(memoizedPlacementCutoff(makeState({ navGrid: undefined }), RECT)).toBeNull();
+    expect(computeMock).not.toHaveBeenCalled();
+  });
+
+  it('hits the cache on identical grid, state and rects', () => {
+    const state = gridState(1);
+    expect(memoizedPlacementCutoff(state, RECT)).toBe(verdict);
+    expect(memoizedPlacementCutoff(state, { ...RECT })).toBe(verdict);
+    expect(computeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches a null verdict too', () => {
+    computeMock.mockReturnValue(null);
+    const state = gridState(1);
+    expect(memoizedPlacementCutoff(state, RECT)).toBeNull();
+    expect(memoizedPlacementCutoff(state, RECT)).toBeNull();
+    expect(computeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('misses when the nav revision changes', () => {
+    const state = gridState(1);
+    memoizedPlacementCutoff(state, RECT);
+    (state.navGrid as unknown as { revision: number }).revision = 2;
+    memoizedPlacementCutoff(state, RECT);
+    expect(computeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('misses when the state key changes', () => {
+    const state = gridState(1);
+    memoizedPlacementCutoff(state, RECT);
+    state.pendingActions = [];
+    memoizedPlacementCutoff(state, RECT);
+    expect(computeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('misses when the new rect or freed rect changes', () => {
+    const state = gridState(1);
+    memoizedPlacementCutoff(state, RECT);
+    memoizedPlacementCutoff(state, { ...RECT, maxX: 4 });
+    expect(computeMock).toHaveBeenCalledTimes(2);
+    memoizedPlacementCutoff(state, { ...RECT, maxX: 4 }, RECT);
+    expect(computeMock).toHaveBeenCalledTimes(3);
+    memoizedPlacementCutoff(state, { ...RECT, maxX: 4 }, RECT);
+    expect(computeMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps separate memos per nav grid', () => {
+    const a = gridState(1);
+    const b = gridState(1);
+    memoizedPlacementCutoff(a, RECT);
+    memoizedPlacementCutoff(b, RECT);
+    expect(computeMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('cutoffStateKey', () => {
   it('changes with crew position, holes and pending actions; ignores dead crew', () => {
     const base = cutoffStateKey(makeState());
@@ -74,6 +136,13 @@ describe('cutoffLine', () => {
     expect(line).toBe(t('ui.build.cutoff_line', {
       parts: `${t('ui.build.cutoff_benches', { count: 2 })} / ${t('ui.build.cutoff_orders', { count: 1 })}`,
     }));
+  });
+});
+
+describe('cutoffLine holes', () => {
+  it('includes the holes part when holes > 0', () => {
+    expect(cutoffLine({ cells: 1, benches: 0, holes: 3, orders: 0 }))
+      .toContain(t('ui.build.cutoff_holes', { count: 3 }));
   });
 });
 

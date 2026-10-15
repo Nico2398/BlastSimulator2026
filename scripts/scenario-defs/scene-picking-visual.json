@@ -1,6 +1,6 @@
 {
   "name": "scene-picking-visual",
-  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the inspector should show Upgrade/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the inspector's DETAIL action.",
+  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the inspector should show Research (tier 2 locked)/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the inspector's DETAIL action.",
   "shots": [
     {
       "name": "overview",
@@ -187,7 +187,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the building — a dashed selection ring appears on the ground and the inspector shows Upgrade/Move/Demolish",
+      "description": "Click the building — a dashed selection ring appears on the ground and the inspector shows Research (tier 2 is still locked, so Upgrade is replaced by it)/Move/Demolish",
       "interaction": [
         {
           "type": "command",
@@ -210,7 +210,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-inspector [data-action=\"upgrade\"]"
+          "selector": "#bs-inspector [data-action=\"research\"]"
         },
         {
           "type": "screenshot"
@@ -218,7 +218,7 @@
       ],
       "role": "observe",
       "expect": {
-        "usable": "#bs-inspector [data-action=\"upgrade\"]",
+        "usable": "#bs-inspector [data-action=\"research\"]",
         "note": "waitForSelector above only proved the button exists in the DOM; usable proves it is genuinely clickable, not covered/hidden"
       }
     },
@@ -251,7 +251,7 @@
       ],
       "role": "observe",
       "expect": {
-        "blocked": "#bs-inspector [data-action=\"upgrade\"]",
+        "blocked": "#bs-inspector [data-action=\"move\"]",
         "note": "Esc hides the inspector entirely, so its buttons must no longer be reachable"
       }
     },
