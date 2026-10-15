@@ -142,6 +142,8 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   // Per footprint column: the lowest broken voxel once flooring is done (-1
   // when none), whichever pass broke it.
   const lowest = new Int32Array(columns).fill(-1);
+  // 1 where a column holds a broken voxel (a sentinel in `lowest` would clash with negative-y boxes).
+  const footprint = new Uint8Array(columns);
   const columnOf = (x: number, z: number): number => (x - box.minX) + nx * (z - box.minZ);
 
   for (let z = box.minZ; z < box.maxZ; z++) {
@@ -156,6 +158,7 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
       }
       if (topBroken === null) continue;
       lowest[columnOf(x, z)] = lowBroken;
+      footprint[columnOf(x, z)] = 1;
 
       // Grade plane, held within the cut cap of this column's own floor so a
       // deep outlier hole cannot gouge the pit.
@@ -172,6 +175,8 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
       }
     }
   }
+
+  graded += floorEnclosedPillars(field, mask, lowest, footprint, columnOf);
 
   // A hole breaks about one voxel under its own charge. Beside any column
   // ending at grade, whichever pass broke it, that is a 1 m pit under every
@@ -190,6 +195,107 @@ export function floorToGrade(field: EnergyField, mask: Uint8Array): number {
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
       if (lift[columnOf(x, z)] === 1) mask[indexOf(field, x, subGradeY, z)] = 0;
+    }
+  }
+  return graded;
+}
+
+/**
+ * Flag every non-footprint column that no 4-connected path of non-footprint
+ * columns joins to the box shell: an unbroken pillar ringed by broken columns.
+ * Linear in footprint columns.
+ */
+function enclosedColumns(
+  footprint: Uint8Array,
+  columnOf: (x: number, z: number) => number,
+  box: EnergyField['box'],
+): Uint8Array {
+  const open = new Uint8Array(footprint.length);
+  const stack: number[] = [];
+  const reach = (x: number, z: number): void => {
+    if (x < box.minX || x >= box.maxX || z < box.minZ || z >= box.maxZ) return;
+    const c = columnOf(x, z);
+    if (footprint[c] === 1 || open[c] === 1) return;
+    open[c] = 1;
+    stack.push(x, z);
+  };
+  for (let x = box.minX; x < box.maxX; x++) {
+    reach(x, box.minZ);
+    reach(x, box.maxZ - 1);
+  }
+  for (let z = box.minZ; z < box.maxZ; z++) {
+    reach(box.minX, z);
+    reach(box.maxX - 1, z);
+  }
+  while (stack.length > 0) {
+    const z = stack.pop()!;
+    const x = stack.pop()!;
+    reach(x + 1, z);
+    reach(x - 1, z);
+    reach(x, z + 1);
+    reach(x, z - 1);
+  }
+  const enclosed = new Uint8Array(footprint.length);
+  for (let c = 0; c < footprint.length; c++) {
+    if (footprint[c] === 0 && open[c] === 0) enclosed[c] = 1;
+  }
+  return enclosed;
+}
+
+/**
+ * Break unbroken pillars standing wholly inside the broken footprint (the
+ * centre of a square of close holes) down to grade. A region of enclosed
+ * columns floors at grade, held within the cut cap of its lowest bordering
+ * footprint column. Returns the voxels newly broken and lowers `lowest` there.
+ */
+function floorEnclosedPillars(
+  field: EnergyField,
+  mask: Uint8Array,
+  lowest: Int32Array,
+  footprint: Uint8Array,
+  columnOf: (x: number, z: number) => number,
+): number {
+  const { box, gradeY } = field;
+  const enclosed = enclosedColumns(footprint, columnOf, box);
+  const seen = new Uint8Array(enclosed.length);
+  let graded = 0;
+  for (let z0 = box.minZ; z0 < box.maxZ; z0++) {
+    for (let x0 = box.minX; x0 < box.maxX; x0++) {
+      const start = columnOf(x0, z0);
+      if (enclosed[start] === 0 || seen[start] === 1) continue;
+      // Collect the 4-connected region and the lowest column bordering it.
+      const region: number[] = [];
+      let minBorderLow = Infinity;
+      seen[start] = 1;
+      const stack = [x0, z0];
+      while (stack.length > 0) {
+        const z = stack.pop()!;
+        const x = stack.pop()!;
+        region.push(x, z);
+        forEachNeighbourColumn(box, columnOf, x, z, (n, px, pz) => {
+          if (footprint[n] === 1) {
+            if (lowest[n]! < minBorderLow) minBorderLow = lowest[n]!;
+          } else if (enclosed[n] === 1 && seen[n] === 0 && (px === x || pz === z)) {
+            seen[n] = 1;
+            stack.push(px, pz);
+          }
+        });
+      }
+      const floorY = Math.max(gradeY!, minBorderLow - BLAST_GRADE_MAX_CUT_M);
+      for (let r = 0; r < region.length; r += 2) {
+        const x = region[r]!;
+        const z = region[r + 1]!;
+        let y = box.maxY - 1;
+        while (y >= box.minY && field.air[indexOf(field, x, y, z)] === 1) y--;
+        for (; y >= floorY && y >= box.minY; y--) {
+          const i = indexOf(field, x, y, z);
+          if (field.air[i] === 1 || mask[i] === 1) continue;
+          mask[i] = 1;
+          graded++;
+          const c = columnOf(x, z);
+          if (lowest[c]! === -1 || y < lowest[c]!) lowest[c] = y;
+        }
+      }
     }
   }
   return graded;
