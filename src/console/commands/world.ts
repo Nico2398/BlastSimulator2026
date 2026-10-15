@@ -4,8 +4,9 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { refreshOrderReachability } from '../../core/engine/OrderReachability.js';
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
-import { placeStartingCrew, relocateVehiclesOffNarrowGround } from '../../core/state/SpawnPlacement.js';
-import { placeStartingBuildings, startingBuildingAnchor } from '../../core/state/StartingBuildings.js';
+import { placeStartingCrew, relocateVehiclesOffNarrowGround, meanPosition } from '../../core/state/SpawnPlacement.js';
+import { ensureRallyPoint } from '../../core/state/RallyPoint.js';
+import { placeStartingBuildings } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
@@ -245,6 +246,14 @@ export function regenerateGrid(
     fleetMustStayMobile?: boolean;
     /** Buildings to place near the crew on a game's first grid (#1363). */
     startingBuildings?: readonly StartingBuildingSlot[];
+    /**
+     * With `startingCrew`: where the level wants its rally point. The flag
+     * goes on the flat ground nearest it; omitted, nearest the starting crew,
+     * or the site centre for a game with no crew.
+     */
+    rallyPoint?: { x: number; z: number };
+    /** With `startingBuildings`: where their placement search starts; omitted, the flag itself (they keep their clearance from it). */
+    startingBuildingsNear?: { x: number; z: number };
   },
 ): void {
   if (!ctx.state) return;
@@ -278,24 +287,34 @@ export function regenerateGrid(
   buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   // Terrain only exists now, so this is the first moment a spawn point picked
   // blind (staffed roster, campaign level literals) can be checked against it.
-  // On a game's first grid the whole crew is regrouped onto one patch of
-  // mutually climb-connected ground (#1166); the navgrid is then rebuilt
-  // because the vehicles carried their own `vehicleOccupied` cells with them.
-  // Everywhere else — a save load — only genuinely stranded agents move.
-  if (params.startingCrew && placeStartingCrew(ctx.state)) {
-    buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
-  }
-  // A level's opening buildings go next to the crew, free of charge. Only
-  // after the crew is placed, so the spiral starts from where they stand.
-  // placeStartingBuildings levels each footprint, so the navgrid rebuild below
-  // sees the levelled ground and the agent snap after it moves anyone stranded.
-  if (params.startingCrew && params.startingBuildings && params.startingBuildings.length > 0) {
+  // On a game's first grid the rally point is chosen on flat ground near where
+  // the level wanted its crew; a save from before the flag existed gets one
+  // here too. Every later hire and purchase spawns around it.
+  if (params.startingCrew) {
     const crew = [...ctx.state.employees.employees, ...ctx.state.vehicles.vehicles];
-    const near = startingBuildingAnchor(crew, ctx.grid);
-    if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near) > 0) {
+    delete ctx.state.rallyPoint;
+    ensureRallyPoint(ctx.state, params.rallyPoint ?? (crew.length > 0 ? meanPosition(crew) : undefined));
+  } else {
+    ensureRallyPoint(ctx.state);
+  }
+  // A level's opening buildings go near the flag, free of charge, on flat
+  // ground kept clear of the flag's own spawn area. placeStartingBuildings
+  // levels each footprint, so the navgrid rebuild below sees the levelled
+  // ground before the crew is laid out around the flag.
+  const flag = ctx.state.rallyPoint;
+  if (params.startingCrew && params.startingBuildings && params.startingBuildings.length > 0 && flag) {
+    const near = params.startingBuildingsNear ?? flag;
+    if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near, flag) > 0) {
       refreshLogisticsCapacity(ctx.state);
       buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
     }
+  }
+  // The whole crew gathers on one patch of mutually climb-connected ground
+  // around the flag (#1166); the navgrid is then rebuilt because the vehicles
+  // carried their own `vehicleOccupied` cells with them. Everywhere else — a
+  // save load — only genuinely stranded agents move.
+  if (params.startingCrew && placeStartingCrew(ctx.state)) {
+    buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   snapAgentsToNavigableGround(ctx.state);
   if (params.startingCrew && relocateVehiclesOffNarrowGround(ctx.state, { fleetMustStayMobile: params.fleetMustStayMobile === true })) {
@@ -357,6 +376,8 @@ function restoreGrid(ctx: GameContext, grid: VoxelGrid): void {
   ctx.playableArea = config ? new PlayableArea(ctx.grid, config) : null;
   syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
+  // A save from before the rally point existed picks its flag now.
+  ensureRallyPoint(ctx.state);
   // Saves from before #1306 carry no building info on their ghosts; colours
   // are derived, so they are recomputed here rather than saved (#1306).
   backfillGhostBuildings(ctx.state);

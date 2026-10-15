@@ -365,6 +365,15 @@ export interface PlannedBuilding {
 }
 
 /**
+ * The site's rally point: the tile its flag stands on, where new hires,
+ * purchased vehicles and a level's starting crew arrive (RallyPoint.ts).
+ */
+export interface RallyPoint {
+  x: number;
+  z: number;
+}
+
+/**
  * The full game state — a single serializable object.
  * Every system reads/writes to this. Save/load serializes this to JSON.
  */
@@ -521,6 +530,12 @@ export interface GameState {
   nextPlannedBuildingId: number;
   /** Weather cycle, ticked by the pipeline and persisted with the save (#1403). */
   weather: WeatherCycleState;
+  /**
+   * Where the site's flag stands and newcomers spawn. Chosen on flat ground
+   * once the site's first grid exists; absent before that, and in a save from
+   * before the flag existed, which picks one on load (`ensureRallyPoint`).
+   */
+  rallyPoint?: RallyPoint;
 }
 
 export interface WorldState {

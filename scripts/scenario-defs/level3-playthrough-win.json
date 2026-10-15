@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-win",
-  "description": "Level 3 (Treranium Depths) playthrough: 3 surveys, a fleet purchase, four far-flung living quarters and one real 24-hole blast (PERFECT rating, heavy casualties and fleet losses) plus a contract cycle on a funded ($1,500,000) mine that stays solvent and revolt-free, ending as a real win. #1431 (rebuilt after #1313 froze the mine at level end): the original $220,000 opening went bankrupt at tick 139 and the file played on over a lost game. `campaign start level:treranium_depths` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:treranium_depths`, which activates level 3 and ends it 'completed' with profit at the $800,000 threshold. Patterns 2-5 of the original $800k plan stay dropped. #1649: charging is truck-worked (staffed charging truck + dual-qualified blaster), so fewer crew stand in the blast zone and deathCount is 1 (re-measured; was 7).",
+  "description": "Level 3 (Treranium Depths) playthrough: 3 surveys, a fleet purchase, four far-flung living quarters and one real 24-hole blast (PERFECT rating, heavy casualties and fleet losses) plus a contract cycle on a funded ($1,500,000) mine that stays solvent and revolt-free, ending as a real win. #1431 (rebuilt after #1313 froze the mine at level end): the original $220,000 opening went bankrupt at tick 139 and the file played on over a lost game. `campaign start level:treranium_depths` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:treranium_depths`, which activates level 3 and ends it 'completed' with profit at the $800,000 threshold. Patterns 2-5 of the original $800k plan stay dropped. #1649: charging is truck-worked (staffed charging truck + dual-qualified blaster), so fewer crew stand in the blast zone and deathCount is 1 (re-measured; was 7). Rally point: hires now spawn at the rally flag beside the starting crew (13,2) instead of the site centre (32,32), so the surveyors walk three times as far to (25,25); a wait on the third survey replaces the assumption that four tick-8 pads cover all three, and the tick, cash and score pins downstream were re-measured in command mode. Same blast, same win.",
   "steps": [
     {
       "command": "new_game seed:3666 cash:1500000 staffed:true",
@@ -722,7 +722,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 0
         }
       },
       "description": "#553: sandbox-measured -- staffed:true's 15-person roster (vs. the pre-#553 file's 10) shifts payroll-cycle boundaries, so these four cash figures no longer match the pre-#553 file's own (202700/195550/188400/181250). No events fire in any of these four chunks either way (all four 'event choose 0' steps below are harmless no-ops, matching the pre-#553 file)."
@@ -744,7 +744,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 0
         }
       },
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
@@ -769,7 +769,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 0
         }
       }
     },
@@ -790,7 +790,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 0
         }
       },
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1262-followup: surveyCount re-derived 2 -> 1, same one-tick occupancy shift as the tick step above.",
@@ -814,7 +814,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 3
+          "surveyCount": 0
         }
       }
     },
@@ -835,7 +835,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 3
+          "surveyCount": 0
         }
       },
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
@@ -859,7 +859,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 3
+          "surveyCount": 2
         }
       }
     },
@@ -880,11 +880,34 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 3
+          "surveyCount": 2
         }
       },
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:surveyCount equals:3 max_ticks:200",
+      "description": "Rally point: the surveyors are hired at the rally flag on flat ground beside the starting crew (13,2), not at the site centre (32,32) they used to appear at, so their walk to the survey point (25,25) is three times longer and the four tick-8 pads above no longer cover all three surveys. Wait on the third survey itself rather than re-guessing a pad, so the vehicle purchases and the drill plan below still run on a fully surveyed block.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 3,
+          "maxTicks": 200,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "surveyCount": 3,
+          "deathCount": 0,
+          "employeeCount": 15,
+          "activeContractCount": 0
+        }
+      }
     },
     {
       "command": "survey show",
@@ -900,7 +923,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -922,7 +945,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -944,7 +967,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -966,7 +989,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -996,7 +1019,7 @@
           "cash": -50000
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1023,7 +1046,7 @@
           "cash": -25000
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1050,7 +1073,7 @@
           "cash": -35000
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1077,7 +1100,7 @@
           "cash": -30000
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1104,7 +1127,7 @@
           "cash": -25000
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1127,7 +1150,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1149,7 +1172,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1171,7 +1194,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1194,7 +1217,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 32,
+          "tickCount": 44,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1445,14 +1468,15 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 107,
+          "tickCount": 94,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "orderedHoleCount": 24,
           "holeCount": 0
-        }
+        },
+        "note": "Rally point: tickCount re-measured (107 -> 94) -- the surveys finish later (tick 44, see the wait above) but the hires that build the quarters now start from the rally flag."
       },
       "description": "#553: confirming the grid only orders the 24 holes -- they are ghosts until a driller drives a drill_rig to each one, so holeCount is 0 here and the wait is the tick block below."
     },
@@ -1722,7 +1746,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 747800,
+          "cash": 751956,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1733,7 +1757,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged. Rally point: cash re-measured (747,800 -> 751,752) -- hires spawn at the rally flag, so walk and payroll timing shift; no behaviour change. #1777 (idle trucks and crew yield to a drill rig in a 1-wide pocket): the pattern is drilled sooner (24 holes by tick 280 instead of 23, 16 instead of 14 at tick 230), so fuel and wear accrue differently; cash re-measured 751,752 -> 751,956. No behaviour change in this file beyond that."
       }
     },
     {
@@ -1984,11 +2008,12 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 58.89220377391592,
+          "wellBeing": 56.11474080321829,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
-        }
+        },
+        "note": "#1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged."
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
     },

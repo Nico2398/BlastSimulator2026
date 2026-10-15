@@ -19,8 +19,8 @@ import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
-import { TUTORIAL_HIRING_SCRIPT, TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
-import { NavGrid } from '../core/nav/NavGrid.js';
+import { TUTORIAL_HIRING_SCRIPT, TUTORIAL_RALLY_POINT, TUTORIAL_SITE_HAZARD_CLEARANCE_TILES } from '../core/config/balance.js';
+import type { NavGrid } from '../core/nav/NavGrid.js';
 import { findPath } from '../core/nav/Pathfinding.js';
 
 import { PLACEMENT_CANCEL_SELECTOR } from './scene/placementSelectors.js';
@@ -254,25 +254,22 @@ export const TUTORIAL_POST_SURVEY_WORLD_SIZE = 48;
 export type TutorialHazard = TileRegion;
 
 /**
- * The tutorial's first-vehicle spawn point. Raw point is the post-survey world
- * centre (the first purchase happens after the survey grew the world to
- * `TUTORIAL_POST_SURVEY_WORLD_SIZE`); given a grid it is snapped with
- * `NavGrid.findNearestSpawnCell` exactly as a real purchase does
- * (`src/console/commands/vehicle.ts`), yielding the real spawn tile.
+ * The tutorial's rally point (`TUTORIAL_RALLY_POINT`), as a single-tile
+ * hazard: every hire and every vehicle the tutorial buys spawns around it
+ * (`rallySpawnCell`), so a building pin crowding it would crowd the fleet.
  */
-export function tutorialVehicleSpawnPoint(navGrid?: NavGrid): TutorialHazard {
-  const raw = Math.floor(TUTORIAL_POST_SURVEY_WORLD_SIZE / 2);
-  const { x, z } = navGrid ? NavGrid.findNearestSpawnCell(navGrid, raw, raw) : { x: raw, z: raw };
+export function tutorialRallyPoint(): TutorialHazard {
+  const { x, z } = TUTORIAL_RALLY_POINT;
   return { x1: x, z1: z, x2: x, z2: z, exact: true };
 }
 
 /**
  * Every fixed hazard a tutorial building pin must clear by
  * `TUTORIAL_SITE_HAZARD_CLEARANCE_TILES`: the box-cut corridor, the drill
- * grid, and the vehicle spawn point.
+ * grid, and the rally point.
  */
 export function tutorialHazards(): readonly TutorialHazard[] {
-  return [tutorialVehicleSpawnPoint(), REGION.boxcut, REGION.drill];
+  return [tutorialRallyPoint(), REGION.boxcut, REGION.drill];
 }
 
 /** Chebyshev (chessboard) distance between the closest corners of two rects. */

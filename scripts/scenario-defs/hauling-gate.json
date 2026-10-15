@@ -1,20 +1,20 @@
 {
   "name": "hauling-gate",
-  "description": "Self-dispatching debris hauling (issue #552, superseding the manual 'vehicle haul <id> fragment:<id>' flow from #437): once a debris_hauler and a truck-licensed driver exist, an on-ground blast fragment spawns its own haul_debris PendingAction with no player command at all — the driver claims it, boards the free hauler, drives to the fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. There is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happened at claim time instead), so this file only advances ticks and asserts on the automatic outcome: logistics.storedMassKg must rise, and by the final tick block the hauled fragment must read state:stored.",
+  "description": "Self-dispatching debris hauling (issue #552, superseding the manual 'vehicle haul <id> fragment:<id>' flow from #437): once a debris_hauler and a truck-licensed driver exist, an on-ground blast fragment spawns its own haul_debris PendingAction with no player command at all — the driver claims it, boards the free hauler, drives to the fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. There is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happened at claim time instead), so this file only advances ticks and asserts on the automatic outcome: ore must reach the warehouse (logistics.storedMassKg rises) and, once the warehouse is full, barren rock must reach the spoil heap (storedSpoilKg rises).",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000 staffed:true",
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. This puts 5 employees and 4 vehicles on the roster before this file's own driver/debris_hauler purchase later — not a drilling-specific concern (see the drill_plan step below), just something the file's own employee/vehicle-id references had to account for. Cash bumped from $100,000 to $150,000 to cover the drilling wait's payroll/upkeep on top of the original shopping list.",
+      "command": "new_game seed:42 cash:200000 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. This puts 5 employees and 4 vehicles on the roster before this file's own driver/debris_hauler purchase later — not a drilling-specific concern (see the drill_plan step below), just something the file's own employee/vehicle-id references had to account for. Cash bumped from $100,000 to $150,000 to cover the drilling wait's payroll/upkeep on top of the original shopping list. Rally point (#1772 CI): $150,000 -> $200,000 -- the spoil block added at the end runs the site to tick 410, and on $150,000 that payroll took cash to -$5,353, under BANKRUPTCY_THRESHOLD ($5,000). Cash is incidental here, so the remedy is a bigger cushion; every later cash assertion is a direction (decreased), unaffected.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000 staffed:true"
+          "command": "new_game seed:42 cash:200000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
+          "cash": 200000,
           "buildingCount": 0
         }
       }
@@ -239,7 +239,8 @@
       }
     },
     {
-      "command": "blast",
+      "command": "blast detonate",
+      "description": "Rally point (#1772 CI): the Fire step's real click path is DETONATE then Fire anyway (PreflightModal: `blast detonate`, then `blast`), and DETONATE orders the crew out of the danger zone (computeDangerZone, here (5,5)-(37,37)) before the shot. The single bare `blast` this step used to be fired without that evacuation, so command mode and the click took two different trajectories from here on: with the crew now gathered around the rally flag, the click's evacuation walks the free drivers out to the zone edge, and the haulers' first loads become ore instead of the barren rock command mode hauled first. Split into DETONATE and Fire anyway, the shape blast-detonate-fire-anyway.json already uses, so both modes arm, evacuate and fire the same way.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -255,16 +256,34 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
-          "type": "clickIfPresent",
-          "selector": "[data-action=\"preflight-fire-anyway\"]",
-          "timeoutMs": 3000
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-fire-anyway\"]",
+        "equals": {
+          "holeCount": 4,
+          "chargedCount": 4,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "description": "Fire anyway, unevacuated: the shot goes off with the charging crew still at the pattern, as the bare `blast` always did -- the vehicle step below counts the two vehicles it destroys.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "waitForSelector",
@@ -434,7 +453,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: this blast leaves only barren rock, so the delivery shows up as spoil on the heap (storedSpoilKg), not in the warehouse (storedMassKg). #1649: the new hauler's driver now starts hauling later in the run (the charging crew and truck died in the blast), so the first delivery lands in the 60-tick block below, not this one. #1723 merged with #1691/#1722: blasts now break the crater floor down to grade, so the muck pile lies on different, more reachable cells and the hauler's first pick is a nearby barren fragment: the first spoil delivery lands inside this block again (tick ~223), so it is asserted here.",
+      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: ore is delivered to the warehouse (storedMassKg), barren rock to the spoil heap (storedSpoilKg). Rally point (#1772 CI): now that both modes arm and evacuate before the shot (see the `blast detonate` step), the haulers' first loads are ore -- the first warehouse delivery lands inside this block (tick ~230) and the heap receives nothing until the warehouse is full (see the tick 80 block below). This step asserts the first delivery happened, not which kind of rock was nearest.",
       "interaction": [
         {
           "type": "command",
@@ -447,7 +466,7 @@
           "cash"
         ],
         "increased": [
-          "storedSpoilKg"
+          "storedMassKg"
         ]
       }
     },
@@ -464,7 +483,7 @@
     },
     {
       "command": "tick 60",
-      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable on every seed/timing here, and the first delivery to a depot lands inside this block (#1649). #1722: ore (to the warehouse) and spoil (to the heap) are different orders and which lands first depends on which reachable rock bin the hauler weighs first; reachable bins are now picked ahead of walled-off ones, so ore arrives first here and the first spoil delivery moves to the 40-tick block below. Asserting stored ore keeps this step about 'hauling delivers' rather than which kind of rock was nearest. #1723: still holds after the crater-floor grading; the ore deliveries begin inside this block (tick ~248).",
+      "description": "Automatic hauling keeps running; cash's continuing upkeep drain is checkable here, and the haulers keep filling the warehouse (~1.0t to ~13.9t at tick 290 on the aligned trajectory). #1722/#1723: ore and spoil are different orders; which lands first depends on which reachable rock bin the hauler weighs first. Asserting stored ore keeps this step about 'hauling keeps delivering'.",
       "interaction": [
         {
           "type": "command",
@@ -514,7 +533,7 @@
     },
     {
       "command": "tick 40",
-      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke. #1722 put the first spoil delivery inside this block; #1723 (crater floor graded, merged with #1691/#1722) moved it back to the tick 20 block above, and this block is the ore run that follows it, the hauler filling the warehouse (~9.6t to ~20.5t) before it returns to the heap (tick ~358). Asserting stored ore keeps this step about 'hauling keeps delivering', not about which kind of rock was nearest. #1709: workers due a rest during vehicle work now park a slow vehicle and walk to the rest building (chooseRestTrip), which shifts delivery timing; this step asserts storedMassKg increased, not storedSpoilKg.",
+      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position. #553: cash is not asserted decreased either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent). The warehouse keeps filling (~13.9t to ~20.8t); it tops out at ~24.4t of its 25t around tick 365, when no further ore fragment fits. #1709: workers due a rest during vehicle work now park a slow vehicle and walk to the rest building (chooseRestTrip), which shifts delivery timing.",
       "interaction": [
         {
           "type": "command",
@@ -525,6 +544,33 @@
       "expect": {
         "increased": [
           "storedMassKg"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "Idempotent (resolveEventIfPending -- no-op when nothing is pending): a bare `tick` refuses outright while an event is pending, so clearing one here keeps the spoil block below from stopping short.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 80",
+      "description": "Rally point (#1772 CI): barren rock reaches the spoil heap once the warehouse is full. Measured on the aligned trajectory (both modes): the warehouse tops out at ~24.4t around tick 365, the first spoil delivery lands at tick ~375 (~3.4t), and the heap holds ~10.5t by tick 410 -- so this 80-tick block (330 -> 410) holds the first spoil delivery with ~35 ticks to spare. Together with the ore blocks above, this proves self-dispatching hauling delivers to both depots: ore to the warehouse, spoil to the heap.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 80"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedSpoilKg"
         ]
       }
     },
