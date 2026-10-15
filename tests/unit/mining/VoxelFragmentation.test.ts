@@ -444,6 +444,73 @@ describe('VoxelFragmentation — floorToGrade', () => {
     expect(isBroken(f, 5, 6, 5)).toBe(true);
   });
 
+  it('a hole\'s breakout is lifted beside a column already broken to grade by an earlier pass (#1740)', () => {
+    const f = gradedField(6, [
+      { x: 5, z: 5, fromY: 5, toY: 11 }, // hole column: one voxel under grade
+      { x: 6, z: 5, fromY: 6, toY: 11 }, // already ends at grade; floorToGrade floors nothing here
+    ]);
+
+    expect(floorToGrade(f.field, f.mask)).toBe(0);
+
+    expect(isBroken(f, 5, 5, 5)).toBe(false);
+    expect(isBroken(f, 5, 6, 5)).toBe(true);
+    expect(isBroken(f, 6, 6, 5)).toBe(true);
+  });
+
+  it('two holes 3 m apart leave no breakout line when the columns between them end at grade (#1740)', () => {
+    const f = gradedField(6, [
+      { x: 4, z: 5, fromY: 5, toY: 11 },
+      { x: 7, z: 5, fromY: 5, toY: 11 },
+      { x: 5, z: 5, fromY: 6, toY: 11 },
+      { x: 6, z: 5, fromY: 6, toY: 11 },
+      { x: 4, z: 6, fromY: 6, toY: 11 },
+      { x: 7, z: 6, fromY: 6, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    for (let x = 0; x < SIZE; x++) {
+      for (let z = 0; z < SIZE; z++) expect(isBroken(f, x, 5, z), `x=${x} z=${z}`).toBe(false);
+    }
+    expect(isBroken(f, 4, 6, 5)).toBe(true);
+    expect(isBroken(f, 7, 6, 5)).toBe(true);
+  });
+
+  it('a diagonal neighbour ending at grade also lifts the breakout (#1740)', () => {
+    const f = gradedField(6, [
+      { x: 5, z: 5, fromY: 5, toY: 11 },
+      { x: 6, z: 6, fromY: 6, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 5, 5, 5)).toBe(false);
+  });
+
+  it('adjacent breakout columns do not lift each other: both keep their pit (#1740)', () => {
+    const f = gradedField(6, [
+      { x: 5, z: 5, fromY: 5, toY: 11 },
+      { x: 6, z: 5, fromY: 5, toY: 11 },
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 5, 5, 5)).toBe(true);
+    expect(isBroken(f, 6, 5, 5)).toBe(true);
+  });
+
+  it('a neighbour whose cut was clamped above grade does not lift the breakout (#1740)', () => {
+    const f = gradedField(2, [
+      { x: 5, z: 5, fromY: 1, toY: 11 }, // breakout one voxel under grade 2
+      { x: 6, z: 5, fromY: 10, toY: 11 }, // floored only BLAST_GRADE_MAX_CUT_M down: ends at y=6, above grade
+    ]);
+
+    floorToGrade(f.field, f.mask);
+
+    expect(isBroken(f, 6, 10 - BLAST_GRADE_MAX_CUT_M, 5)).toBe(true);
+    expect(isBroken(f, 5, 1, 5)).toBe(true);
+  });
+
   it('a lone hole keeps its breakout under grade: nothing was floored beside it', () => {
     const f = gradedField(6, [{ x: 5, z: 5, fromY: 5, toY: 11 }]);
 

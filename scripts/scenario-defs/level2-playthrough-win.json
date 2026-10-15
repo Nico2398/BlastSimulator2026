@@ -3499,10 +3499,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 50.960193471833406,
+          "wellBeing": 63.38241432882544,
           "safety": 0,
-          "ecology": 94.32996897080196,
-          "nuisance": 46.529588149423496
+          "ecology": 79.18103834818648,
+          "nuisance": 11.767366844551818
         },
         "changedBy": {
           "tickCount": 0
@@ -3986,7 +3986,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4011,7 +4011,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4033,7 +4033,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4055,7 +4055,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4076,7 +4076,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4099,7 +4099,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4120,7 +4120,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4148,7 +4148,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4167,7 +4167,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4190,7 +4190,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4220,7 +4220,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4262,7 +4262,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4286,14 +4286,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 46.80438326194688,
+          "wellBeing": 61.91280455317426,
           "safety": 0,
-          "ecology": 99.02690369147354,
-          "nuisance": 45.65235992480058
+          "ecology": 41.95708979211914,
+          "nuisance": 9.64472676935254
         },
         "changedBy": {
           "tickCount": 0
@@ -4312,14 +4312,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
+          "deathCount": 4,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 46.80438326194688,
+          "wellBeing": 61.91280455317426,
           "safety": 0,
-          "ecology": 99.02690369147354,
-          "nuisance": 45.65235992480058
+          "ecology": 41.95708979211914,
+          "nuisance": 9.64472676935254
         },
         "changedBy": {
           "tickCount": 0
@@ -4342,7 +4342,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "increased": [
           "cash"
@@ -4366,7 +4366,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "changedBy": {
           "cash": 0,
