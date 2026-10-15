@@ -54,6 +54,9 @@ This section originally read as "the before picture": every pre-redesign surface
 | §3.14 `TutorialOverlay.ts` (bottom-docked card) | Re-skinned in place (P10) — same file, `src/ui/TutorialOverlay.ts`; DOM rebuilt in `tutorialOverlayDom.ts` | §6.17; rails, tick budget and every `highlightTarget`/stage selector unchanged (audited clean, zero stale selectors found); highlight class repointed from the pre-redesign pulsing `bs-tutorial-highlight` to the design system's static three-ring `bsx-highlight` (P0 had ported the token, nothing pointed the rails at it until now) |
 | §3.15 Toasts + no game-over screen | `src/ui/notify/NotificationCenter.ts`, `Toasts.ts`, `ActivityLog.ts` (severity, icons, log) + `src/ui/screens/LevelEndScreen.ts` (P8, new) | §6.11 |
 | §3.16 3D scene, camera-only | Scene selection/hover/placement added (P2/P3) — `src/ui/scene/`; picking, hover tags, selection action bar | §6.9 |
+| Sandbox setup panel (not in the original inventory) | `src/ui/SandboxPanel.ts` | Composed from existing components, no design mock: bsx header, field controls styled like the Contracts amount and Operations threshold fields, `bsx-btn` Back / primary Start; the opening kit names buildings `<type> (<joke name>)` as it does vehicles |
+
+The migration is complete: every reachable surface renders on the `bsx` design system, and `styles.ts` keeps no pre-redesign styling (the `NoLegacyUiStyles` lint test holds it).
 
 Corruption/mafia (`src/ui/panels/ShadyPanel.ts`, reveal wired through `ToolRail.ts`) and the Finances/Operations split (`FinancesPanel.ts`, `OperationsPanel.ts`) didn't exist pre-redesign at all — see §6.12–§6.14.
 
