@@ -30,16 +30,18 @@ const NEIGHBOUR_OFFSETS: ReadonlyArray<readonly [number, number]> = [
   [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
 ];
 
-function key(cell: Cell): string {
+/** A cell's string key, for set membership. */
+export function cellKey(cell: Cell): string {
   return `${cell.x},${cell.z}`;
 }
 
-function chebyshev(a: Cell, b: Cell): number {
+/** Chebyshev (chessboard) distance between two cells. */
+export function chebyshev(a: Cell, b: Cell): number {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z));
 }
 
 /** A cell an agent may stand on at spawn: walkable or a gentle ramp, never a building, hole or void. */
-function isStandable(cell: NavCell | undefined): cell is NavCell {
+export function isStandable(cell: NavCell | undefined): cell is NavCell {
   return cell !== undefined && (cell.type === 'walkable' || cell.type === 'ramp');
 }
 
@@ -126,15 +128,18 @@ export function ensureRallyPoint(state: Pick<GameState, 'navGrid' | 'rallyPoint'
 }
 
 /**
- * Cells reachable on foot from `start` over standable ground, nearest first,
- * capped at `limit`. Every cell returned is connected to `start`, which is
- * the point of spawning from this list. `start` itself is always expanded,
+ * Cells reachable on foot from `start` over standable ground by legal climbs,
+ * in breadth-first discovery order — nearest first — capped at `limit`. Every
+ * cell returned is connected to `start`, and to every other cell in it, by a
+ * route `findPath` can resolve: the point of spawning from this list rather
+ * than from fixed coordinates. Bounded because only the first handful of
+ * cells is ever used. `start` itself is always expanded,
  * even when it cannot be stood on (a drill hole beside the flag), so a flag
  * next to one still finds the ground around it.
  */
 export function rallyConnectedCells(navGrid: NavGrid, start: Cell, limit: number = RALLY_POINT_SPAWN_SEARCH_LIMIT): Cell[] {
   const found: Cell[] = [];
-  const seen = new Set<string>([key(start)]);
+  const seen = new Set<string>([cellKey(start)]);
   const queue: Cell[] = [start];
   for (let head = 0; head < queue.length && found.length < limit; head++) {
     const current = queue[head] as Cell;
@@ -144,11 +149,11 @@ export function rallyConnectedCells(navGrid: NavGrid, start: Cell, limit: number
     else if (head > 0) continue;
     for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
       const next = { x: current.x + dx, z: current.z + dz };
-      if (seen.has(key(next))) continue;
+      if (seen.has(cellKey(next))) continue;
       const nextCell = navGrid.cellAt(next.x, next.z);
       if (!isStandable(nextCell)) continue;
       if (!isStepClimbable(currentCell.surfaceY, nextCell.surfaceY, dx !== 0 && dz !== 0 ? Math.SQRT2 : 1)) continue;
-      seen.add(key(next));
+      seen.add(cellKey(next));
       queue.push(next);
     }
   }
@@ -189,12 +194,12 @@ export function rallySpawnCell(
 
   const vehicleCells = state.vehicles.vehicles.map(v => ({ x: Math.round(v.x), z: Math.round(v.z) }));
   const taken = new Set<string>([
-    ...vehicleCells.map(key),
-    ...state.employees.employees.map(e => key({ x: Math.round(e.x), z: Math.round(e.z) })),
+    ...vehicleCells.map(cellKey),
+    ...state.employees.employees.map(e => cellKey({ x: Math.round(e.x), z: Math.round(e.z) })),
   ]);
   const minFromFlag = kind === 'vehicle' ? RALLY_POINT_VEHICLE_STANDOFF : 1;
   const isFree = (cell: Cell): boolean => {
-    if (taken.has(key(cell)) || chebyshev(cell, flag) < minFromFlag) return false;
+    if (taken.has(cellKey(cell)) || chebyshev(cell, flag) < minFromFlag) return false;
     const navCell = navGrid.cellAt(cell.x, cell.z) as NavCell;
     if (navCell.vehicleOccupied || (navCell.fragmentOccupancy ?? 0) > 0) return false;
     if (kind === 'employee') return true;

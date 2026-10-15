@@ -152,7 +152,7 @@ describe('rallySpawnCell', () => {
     const state = siteOn(flat());
     state.rallyPoint = { x: 10, z: 10 };
     const first = rallySpawnCell(state, 'employee');
-    state.employees.employees.push({ ...({} as never), id: 1, x: first.x, z: first.z } as never);
+    state.employees.employees.push({ id: 1, x: first.x, z: first.z } as never);
     const second = rallySpawnCell(state, 'employee');
     expect(second).not.toEqual(first);
   });

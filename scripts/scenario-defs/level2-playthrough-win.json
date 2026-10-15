@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four far-flung living quarters, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig. #1649: charging is worked from a charging truck by a blasting + driving.truck employee. Each blast destroys the truck, so patterns 2-4 each buy a fresh charging truck; no licence step is needed because a hired Blaster arrives with blasting + driving.truck level 1 (#1667), so the former per-pattern `employee assign_skill ... driving.truck` bootstrap steps are gone; death counts and ecology/nuisance figures were re-measured, and the closing profit reads 250000 (#1660 shifted charging timing by a few ticks, so a random employee_joins event now lands earlier and the figures here were re-measured; the old 250000.00000000023 float residue is gone).",
+  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four living quarters clear of every blast pattern, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig. #1649: charging is worked from a charging truck by a blasting + driving.truck employee. Each blast destroys the truck, so patterns 2-4 each buy a fresh charging truck; no licence step is needed because a hired Blaster arrives with blasting + driving.truck level 1 (#1667), so the former per-pattern `employee assign_skill ... driving.truck` bootstrap steps are gone; death counts and ecology/nuisance figures were re-measured, and the closing profit reads 250000 (#1660 shifted charging timing by a few ticks, so a random employee_joins event now lands earlier and the figures here were re-measured; the old 250000.00000000023 float residue is gone). Rally point: every hire and vehicle purchase now spawns at the site's rally flag, on flat ground beside the starting crew at (7,2), instead of the old mid-site hire spawn near (27,48); the quarters moved from the (48..52, 48..52) block to (32..36, 0..4), the same clearance from the blast patterns (blast 1 is 14 cells away) but beside the base rather than 60 cells from it, so their construction no longer stalls the clock for 200 ticks and shifts every seeded event draw. Survey, tick, death (1, 2, 7, 8) and score pins re-measured in command mode; the run still completes as a win with no refused command.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:3000000 staffed:true",
@@ -702,7 +702,7 @@
           "deathCount": 0,
           "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         }
       },
       "description": "#1151: re-baselined against a measured run -- surveyCount 0 -> 2. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths."
@@ -721,7 +721,7 @@
           "deathCount": 0,
           "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         }
       },
       "role": "player",
@@ -742,7 +742,7 @@
           "deathCount": 0,
           "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         }
       },
       "description": "#1151: re-baselined against a measured run -- surveyCount 2 -> 3. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths."
@@ -761,7 +761,7 @@
           "deathCount": 0,
           "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         }
       },
       "role": "player",
@@ -1134,8 +1134,8 @@
       }
     },
     {
-      "command": "build living_quarters at:48,48",
-      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "command": "build living_quarters at:32,0",
+      "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1151,16 +1151,16 @@
         },
         {
           "type": "focusTile",
-          "x": 48,
-          "z": 48,
+          "x": 32,
+          "z": 0,
           "distance": 45,
           "pitch": 60,
           "yaw": 180
         },
         {
           "type": "pickTile",
-          "x": 48,
-          "z": 48
+          "x": 32,
+          "z": 0
         },
         {
           "type": "clickSelector",
@@ -1175,8 +1175,8 @@
       }
     },
     {
-      "command": "build living_quarters at:52,48",
-      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "command": "build living_quarters at:36,0",
+      "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1192,16 +1192,16 @@
         },
         {
           "type": "focusTile",
-          "x": 52,
-          "z": 48,
+          "x": 36,
+          "z": 0,
           "distance": 45,
           "pitch": 60,
           "yaw": 180
         },
         {
           "type": "pickTile",
-          "x": 52,
-          "z": 48
+          "x": 36,
+          "z": 0
         },
         {
           "type": "clickSelector",
@@ -1216,8 +1216,8 @@
       }
     },
     {
-      "command": "build living_quarters at:48,52",
-      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "command": "build living_quarters at:32,4",
+      "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1233,16 +1233,16 @@
         },
         {
           "type": "focusTile",
-          "x": 48,
-          "z": 52,
+          "x": 32,
+          "z": 4,
           "distance": 45,
           "pitch": 60,
           "yaw": 180
         },
         {
           "type": "pickTile",
-          "x": 48,
-          "z": 52
+          "x": 32,
+          "z": 4
         },
         {
           "type": "clickSelector",
@@ -1257,8 +1257,8 @@
       }
     },
     {
-      "command": "build living_quarters at:52,52",
-      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "command": "build living_quarters at:36,4",
+      "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1274,16 +1274,16 @@
         },
         {
           "type": "focusTile",
-          "x": 52,
-          "z": 52,
+          "x": 36,
+          "z": 4,
           "distance": 45,
           "pitch": 60,
           "yaw": 180
         },
         {
           "type": "pickTile",
-          "x": 52,
-          "z": 52
+          "x": 36,
+          "z": 4
         },
         {
           "type": "clickSelector",
@@ -1418,7 +1418,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 103,
+          "tickCount": 153,
           "deathCount": 0,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1427,7 +1427,7 @@
           "holeCount": 0,
           "chargedCount": 0
         },
-        "note": "#553: confirming the grid only orders the 24 holes -- they are ghosts until the 2 driller/drill_rig pairs drive out to each one, so holeCount is 0 here and the wait is the 3 tick steps below."
+        "note": "#553: confirming the grid only orders the 24 holes -- they are ghosts until the 2 driller/drill_rig pairs drive out to each one, so holeCount is 0 here and the wait is the 3 tick steps below. Rally point: tickCount re-measured (103 -> 153) -- hires now spawn at the rally flag (7,2) and build the quarters beside it, and the surveyors walk from there to (20,20)."
       }
     },
     {
@@ -1809,10 +1809,10 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 99.47000000000016,
           "safety": 50,
-          "ecology": 98.53524933152728,
-          "nuisance": 46.46312332881822
+          "ecology": 99.62524933152729,
+          "nuisance": 49.18812332881822
         },
         "changedBy": {
           "tickCount": 0
@@ -2445,7 +2445,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2470,7 +2470,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2492,7 +2492,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2514,7 +2514,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2536,12 +2536,12 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
-          "safety": 49.54999999999933,
+          "safety": 0,
           "ecology": 99.55611269906477,
           "nuisance": 49.0152817476619
         },
@@ -2562,7 +2562,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2585,7 +2585,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2608,7 +2608,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2629,7 +2629,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2652,7 +2652,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2682,7 +2682,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2723,7 +2723,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2745,7 +2745,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2891,7 +2891,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2945,7 +2945,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2967,7 +2967,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2989,7 +2989,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3107,11 +3107,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 4,
+          "holeCount": 8,
           "chargedCount": 0
         },
         "changedBy": {
@@ -3499,10 +3499,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 63.88666666666683,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 73.93969533748135,
-          "nuisance": 46.237573851438476
+          "ecology": 89.11720673026535,
+          "nuisance": 10.685977496987674
         },
         "changedBy": {
           "tickCount": 0
@@ -3966,7 +3966,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3991,7 +3991,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4013,7 +4013,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4035,7 +4035,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4056,7 +4056,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4079,7 +4079,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4100,7 +4100,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4128,7 +4128,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4147,7 +4147,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4170,7 +4170,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4200,7 +4200,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4242,7 +4242,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4266,14 +4266,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 82.75809523809558,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 77.20442871954222,
-          "nuisance": 44.68518593841762
+          "ecology": 52.47874830881939,
+          "nuisance": 9.794726769352561
         },
         "changedBy": {
           "tickCount": 0
@@ -4292,14 +4292,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 10,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 82.75809523809558,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 77.20442871954222,
-          "nuisance": 44.68518593841762
+          "ecology": 52.47874830881939,
+          "nuisance": 9.794726769352561
         },
         "changedBy": {
           "tickCount": 0
@@ -4322,7 +4322,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "increased": [
           "cash"
@@ -4346,7 +4346,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "changedBy": {
           "cash": 0,

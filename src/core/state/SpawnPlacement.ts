@@ -3,11 +3,11 @@
 // work from, once terrain exists. Pure core: no side effects beyond the
 // GameState it is handed.
 
-import { NavGrid, isStepClimbable, type NavCell } from '../nav/NavGrid.js';
+import { NavGrid, type NavCell } from '../nav/NavGrid.js';
 import { findNearestNavigableCell, countLegalStepNeighbours, computeClimbComponents } from '../nav/NavGridReachability.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { routeInflation, isRouteAcceptable } from './SpawnRoute.js';
-import { isFlatParkingCell } from './RallyPoint.js';
+import { isFlatParkingCell, rallyConnectedCells, isStandable as isSpawnable, cellKey as key, chebyshev } from './RallyPoint.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
   CREW_SPAWN_SEARCH_LIMIT_FACTOR,
@@ -24,73 +24,7 @@ import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 
-/** 8-directional neighbour order — fixed, so a placement is reproducible rather than seed-dependent. */
-const NEIGHBOUR_OFFSETS: ReadonlyArray<readonly [number, number]> = [
-  [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1],
-];
-
 interface Cell { x: number; z: number }
-
-function isSpawnable(cell: NavCell | undefined): cell is NavCell {
-  return cell !== undefined && (cell.type === 'walkable' || cell.type === 'ramp');
-}
-
-function key(cell: Cell): string {
-  return `${cell.x},${cell.z}`;
-}
-
-function chebyshev(a: Cell, b: Cell): number {
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z));
-}
-
-/**
- * Cells reachable from `anchor` by legal climbs, in breadth-first discovery
- * order — nearest first. Every cell in the result is therefore connected to
- * the anchor, and to every other cell in it, by a route `findPath` can
- * resolve: that mutual connectivity is the whole point of drawing crew
- * positions from this list rather than from fixed coordinates.
- *
- * Bounded by `limit` because only the first handful of cells is ever used;
- * the flood fill must not walk a 64x64 site to place nine agents.
- */
-function climbConnectedCells(
-  navGrid: NavGrid,
-  anchor: Cell,
-  limit: number,
-  /**
-   * Cells to walk through although the grid calls them blocked — the crew's
-   * own vehicles. `buildNavGrid` marks the cell a parked vehicle stands on
-   * blocked, so without this the fill can never reach a crew's own fleet and
-   * every staffed site reads as split.
-   */
-  alsoPassable: ReadonlySet<string> = new Set(),
-): Cell[] {
-  const found: Cell[] = [];
-  const seen = new Set<string>([key(anchor)]);
-  const queue: Cell[] = [anchor];
-  const passable = (cell: NavCell | undefined, at: Cell): cell is NavCell =>
-    isSpawnable(cell) || (cell !== undefined && alsoPassable.has(key(at)));
-
-  while (queue.length > 0 && found.length < limit) {
-    const current = queue.shift() as Cell;
-    const currentCell = navGrid.cellAt(current.x, current.z);
-    if (!passable(currentCell, current)) continue;
-    found.push(current);
-
-    for (const [dx, dz] of NEIGHBOUR_OFFSETS) {
-      const next = { x: current.x + dx, z: current.z + dz };
-      if (seen.has(key(next))) continue;
-      const nextCell = navGrid.cellAt(next.x, next.z);
-      if (!passable(nextCell, next)) continue;
-      const run = dx !== 0 && dz !== 0 ? Math.SQRT2 : 1;
-      if (!isStepClimbable(currentCell.surfaceY, nextCell.surfaceY, run)) continue;
-      seen.add(key(next));
-      queue.push(next);
-    }
-  }
-
-  return found;
-}
 
 /**
  * The vehicle-reachability tolerance check (#1179), bound to
@@ -463,7 +397,7 @@ function regroupWalledInCrew(
   const authoredAnchor = findNearestNavigableCell(navGrid, authored.x, authored.z);
   if (isRouteAcceptable(navGrid, authoredAnchor, centre)) return false;
   const anchor = selectAnchor(navGrid, authored, centre);
-  const candidates = climbConnectedCells(navGrid, anchor, searchLimit);
+  const candidates = rallyConnectedCells(navGrid, anchor, searchLimit);
   return layOutCrew(employees, vehicles, candidates, candidates);
 }
 
@@ -524,7 +458,7 @@ export function placeStartingCrew(state: GameState): boolean {
     // already stands on flat main ground (chooseRallyPoint). The flag's own
     // cell stays clear, and vehicles keep their standoff so none is parked on it.
     const anchor = findNearestNavigableCell(navGrid, flag.x, flag.z);
-    const candidates = climbConnectedCells(navGrid, anchor, searchLimit + (2 * RALLY_POINT_VEHICLE_STANDOFF + 1) ** 2)
+    const candidates = rallyConnectedCells(navGrid, anchor, searchLimit + (2 * RALLY_POINT_VEHICLE_STANDOFF + 1) ** 2)
       .filter(c => c.x !== flag.x || c.z !== flag.z);
     const vehicleCandidates = candidates.filter(c => chebyshev(c, flag) >= RALLY_POINT_VEHICLE_STANDOFF);
     // Vehicles park on level ground where the patch has room for the whole fleet.
