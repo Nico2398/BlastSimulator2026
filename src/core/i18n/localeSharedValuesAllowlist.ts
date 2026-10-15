@@ -86,6 +86,9 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.portfolio.back', // "MENU" — identical in French UI convention
   'ui.portfolio.star_progress', // "{earned} / {total} ★" — format-only, no natural-language content
   'ui.portfolio.biome.tropical', // "TROPICAL" — true cognate
+  'inspector.description', // "Description"
+  'inspector.kind.fragment', // "Fragment"
+  'inspector.stock', // "Stock"
   'ui.operations.fragment_count', // "{count} fragments"
   'ui.operations.incidents', // "Incidents"
   'ui.crew.need_fatigue', // "Fatigue" — same cognate as need.fatigue
@@ -95,6 +98,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.shady.arrangements_label', // "ARRANGEMENTS"
   'ui.shady.smuggling_inactive', // "Inactive" — correctly-spelled French (fem. of "inactif", agreeing with "la contrebande")
   'ui.card.line', // "{desc} · {cost}" — separator-only format
+  'inspector.depth_value', // "{depth}m" — unit-only format, identical in French
   'ui.build.unit.kg', // "kg" — SI symbol
   'ui.fleet.unit.m3_per_hour', // "m³/h" — SI symbol
   'ui.fleet.unit.kg_per_hour', // "kg/h" — SI symbol

@@ -145,6 +145,11 @@
       "description": "Survey 1/4. Surveys are arrival-gated PendingActions (#437), not instant — the surveyor must walk to the site before the result completes, so surveyCount stays 0 through all 4 of these clicks. Each queued survey does cost its SURVEY_COSTS entry immediately, though, which is the real proof this click actually landed.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -188,6 +193,11 @@
       "description": "Survey 2/4.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
@@ -224,6 +234,11 @@
       "description": "Survey 3/4.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"aerial\"]"
         },
@@ -259,6 +274,11 @@
       "command": "survey seismic x:30 z:30",
       "description": "Survey 4/4.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"seismic\"]"

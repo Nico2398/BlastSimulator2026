@@ -57,6 +57,11 @@
       "description": "The only school that teaches driving.rock_fragmenter — no role starts with it (ROLE_STARTING_QUALIFICATIONS).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },

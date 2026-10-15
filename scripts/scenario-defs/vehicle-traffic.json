@@ -290,7 +290,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -309,7 +309,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         }
       ],
       "role": "player",
@@ -324,7 +324,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -343,7 +343,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         }
       ],
       "role": "player",
@@ -358,7 +358,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -377,7 +377,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         }
       ],
       "role": "player",
@@ -402,7 +402,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -421,7 +421,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         }
       ],
       "role": "player",
@@ -436,7 +436,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -455,7 +455,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         }
       ],
       "role": "player",
@@ -470,7 +470,7 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
           "type": "cameraFocus",
@@ -489,7 +489,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         }
       ],
       "role": "player",

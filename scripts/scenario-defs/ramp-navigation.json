@@ -37,6 +37,11 @@
       "description": "Finding #13: buildRampCommand deducted ctx.state!.cash directly but never called addExpense on ctx.state!.finances — finances.cash silently diverged from the flat cash field the moment any ramp was built (every other cash-spending command, hire/buy/build/train/demolish/upgrade/relocate, pairs the two correctly). The flat cash field is what the Finances panel and every prior scenario assertion actually read, so this was invisible to players and to every earlier verification pass — caught only by dumping both fields side by side while writing this file's assertions. Fixed at the root (mining.ts) rather than worked around in the scenario. Explicit depth:5 added (#1151): the 10m length's max legal depth is length / 1.8 ≈ 5.77, so the default depth:8 (grade 0.8) is now too steep — 5 keeps every per-column step within NAV_MAX_SLOPE_RATIO, and stays comfortably under RAMP_CUT_SLOPE_RATIO too (#1152, ratio 0.5 vs cap ~0.566). Ordering only queues dig_ramp_segment work (#555/#925) — the crewed rock_digger below carves it over the following ticks, it isn't carved instantly by this command.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },

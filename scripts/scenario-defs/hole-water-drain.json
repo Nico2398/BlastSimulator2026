@@ -25,6 +25,11 @@
       "description": "One hole: a zero-size drag over a single tile (15,15) computes round(0/5)+1 = 1 row and column, so a 1x1 grid. A single hole keeps the install and drain clicks one-to-one with their console commands.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

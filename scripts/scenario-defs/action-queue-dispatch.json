@@ -94,6 +94,11 @@
       "description": "Target B -- clearly nearer surveyor #2 (spawned at ~18,16) than surveyor #1 (~16,16). Queued BEFORE Target A on purpose: array/insertion order (B, then A) is the opposite of roster order (surveyor #1, then #2) -- a first-come-first-served dispatcher (today's tickEmployees) would walk pendingActions in this order and had the FIRST idle roster employee (surveyor #1) claim Target B, which is actually far from them. Cost-based dispatch must ignore this ordering entirely and still hand Target B to surveyor #2.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
         },
@@ -133,6 +138,11 @@
       "command": "survey core_sample x:2 z:16",
       "description": "Target A -- clearly nearer surveyor #1 (spawned at ~16,16) than surveyor #2 (~18,16). Queued second, after Target B -- see Target B's description for why the order matters.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
@@ -174,6 +184,11 @@
       "command": "survey core_sample x:16 z:30",
       "description": "Target C -- far from both surveyors (~14 cells from each), strictly farther than either's own near target -- nobody's cheapest choice at first dispatch, so it should stay queued until whichever surveyor frees first.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"

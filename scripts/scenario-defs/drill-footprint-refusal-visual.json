@@ -39,6 +39,11 @@
       "description": "Player orders living quarters at (16,16) through the Build panel. A construction site counts as a footprint at once, so no wait for completion is needed.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -117,6 +122,11 @@
       "timeout": 60,
       "description": "Player cancels Add Hole, arms the Grid tool and drags across a row at z=16 from x=10 to x=22 (5 cells at spacing 3: 10,13,16,19,22). Preview shows the skipped count; Confirm orders only cells outside the footprint and the drill-notice line reports the skip.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "keypress",
           "key": "Escape"

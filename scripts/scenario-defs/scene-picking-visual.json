@@ -1,6 +1,6 @@
 {
   "name": "scene-picking-visual",
-  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the bottom selection bar should show Upgrade/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the selection bar's DETAIL action.",
+  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the inspector should show Upgrade/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the inspector's DETAIL action.",
   "shots": [
     {
       "name": "overview",
@@ -124,7 +124,7 @@
     },
     {
       "command": "employee dispatch 1 x:20 z:20",
-      "description": "Walk the driller clear of the office it just built (#556). Construction relocates the builder off the finished footprint onto the nearest walkable tile — right up against the building — and the employee pick further down then lands on the office instead of the crew member, so the selection bar never offers DETAIL at all.",
+      "description": "Walk the driller clear of the office it just built (#556). Construction relocates the builder off the finished footprint onto the nearest walkable tile — right up against the building — and the employee pick further down then lands on the office instead of the crew member, so the inspector never offers DETAIL at all.",
       "interaction": [
         {
           "type": "command",
@@ -187,7 +187,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the building — a dashed selection ring appears on the ground and the bottom selection bar shows Upgrade/Move/Demolish",
+      "description": "Click the building — a dashed selection ring appears on the ground and the inspector shows Upgrade/Move/Demolish",
       "interaction": [
         {
           "type": "command",
@@ -210,7 +210,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-selection-bar [data-action=\"upgrade\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
         },
         {
           "type": "screenshot"
@@ -218,14 +218,14 @@
       ],
       "role": "observe",
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"upgrade\"]",
+        "usable": "#bs-inspector [data-action=\"upgrade\"]",
         "note": "waitForSelector above only proved the button exists in the DOM; usable proves it is genuinely clickable, not covered/hidden"
       }
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Esc deselects — the ring and the selection bar both disappear",
+      "description": "Esc deselects — the ring and the inspector both disappear",
       "interaction": [
         {
           "type": "command",
@@ -251,8 +251,8 @@
       ],
       "role": "observe",
       "expect": {
-        "blocked": "#bs-selection-bar [data-action=\"upgrade\"]",
-        "note": "Esc hides the selection bar entirely, so its buttons must no longer be reachable"
+        "blocked": "#bs-inspector [data-action=\"upgrade\"]",
+        "note": "Esc hides the inspector entirely, so its buttons must no longer be reachable"
       }
     },
     {
@@ -288,7 +288,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the hired driller in the 3D scene (clickEntity by kind+id, not a panel row) — the selection bar should show Detail/Dispatch Here/Train for this employee",
+      "description": "Click the hired driller in the 3D scene (clickEntity by kind+id, not a panel row) — the inspector should show Detail/Dispatch Here/Train for this employee",
       "interaction": [
         {
           "type": "command",
@@ -305,14 +305,14 @@
       ],
       "role": "observe",
       "expect": {
-        "usable": "#bs-selection-bar [data-action=\"detail\"]",
-        "note": "a dashed selection ring should appear on the ground and the bottom selection bar should show Detail/Dispatch Here/Train for the clicked employee"
+        "usable": "#bs-inspector [data-action=\"detail\"]",
+        "note": "a dashed selection ring should appear on the ground and the inspector should show Detail/Dispatch Here/Train for the clicked employee"
       }
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Open the crew detail from the selection bar's DETAIL action — must expand this exact employee's row, not just bring the panel to the front",
+      "description": "Open the crew detail from the inspector's DETAIL action — must expand this exact employee's row, not just bring the panel to the front",
       "interaction": [
         {
           "type": "command",
@@ -320,7 +320,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+          "selector": "#bs-inspector [data-action=\"detail\"]"
         },
         {
           "type": "screenshot"
@@ -335,7 +335,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Close the selection bar — its own close (x) button is the only one of the bar's buttons without a data-action",
+      "description": "Close the inspector with its own close (x) button; it is the only element carrying the panel-close attribute",
       "interaction": [
         {
           "type": "command",
@@ -343,7 +343,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-selection-bar button:not([data-action])"
+          "selector": "#bs-inspector [data-panel-close]"
         },
         {
           "type": "screenshot"
@@ -351,8 +351,8 @@
       ],
       "role": "observe",
       "expect": {
-        "blocked": "#bs-selection-bar [data-action=\"detail\"]",
-        "note": "closing the selection bar must make its actions unreachable again, same invariant as the Esc-deselects building check above"
+        "blocked": "#bs-inspector [data-action=\"detail\"]",
+        "note": "closing the inspector must make its actions unreachable again, same invariant as the Esc-deselects building check above"
       }
     }
   ]

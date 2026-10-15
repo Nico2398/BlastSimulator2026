@@ -454,6 +454,11 @@
       "command": "survey seismic x:20 z:20",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "survey"
         },
@@ -508,6 +513,11 @@
       "command": "survey core_sample x:20 z:20",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
@@ -557,6 +567,11 @@
     {
       "command": "survey aerial x:20 z:20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"aerial\"]"
@@ -890,6 +905,11 @@
       "command": "build freight_warehouse at:6,0",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -941,6 +961,11 @@
       "command": "build spoil_heap at:12,0",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -980,6 +1005,11 @@
     {
       "command": "build spoil_heap at:16,0",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1138,6 +1168,11 @@
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1178,6 +1213,11 @@
       "command": "build living_quarters at:36,0",
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1220,6 +1260,11 @@
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1260,6 +1305,11 @@
       "command": "build living_quarters at:36,4",
       "description": "#1431: living quarters, clear of every blast pattern (14+ cells from the nearest), keep wellBeing above zero so no worker revolt ends the level early. Rally point: placed beside the base at the rally flag (7,2) rather than across the site, so the crew that builds them and later rests in them does not walk 60 cells each way.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1321,6 +1371,11 @@
       "command": "build_ramp start:24,6 end:24,19 depth:7",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1366,6 +1421,11 @@
     {
       "command": "drill_plan grid rows:4 cols:6 spacing:3 depth:6 diameter:0.089 start:20,20",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -2132,6 +2192,11 @@
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,35",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "blast"
         },
@@ -2849,6 +2914,11 @@
     {
       "command": "drill_plan grid rows:5 cols:6 spacing:3 depth:6 diameter:0.089 start:15,25",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -3647,6 +3717,11 @@
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:10,25",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"

@@ -124,6 +124,11 @@
       "description": "Real UI training gap (parity with the deleted playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (20,20)-(23,23).",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -263,6 +268,11 @@
       "description": "Second school: prove a skill the trainee lacks is obtainable via real clicks from a second school type. Courses grant new qualifications only (#1388) -- the driller already holds blasting and driving.drill_rig (ROLE_STARTING_QUALIFICATIONS), so the course taught here is geology, which no driller starts with. #553: placed at (5,15), far enough from driving_center at (3,5) and the drill grid at (20,20)-(23,23) that the trainee is never stranded on another school's footprint.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
@@ -396,6 +406,11 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
       "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) -- confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles, none drilled yet, so holeCount stays 0 right after confirm. A single driller/drill_rig lands roughly one hole every 40-45 ticks door-to-door (walk to vehicle, drive, drill, return for the next); 9 holes risked the site's own cash burn (no income anywhere in this file) outrunning the plan.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"

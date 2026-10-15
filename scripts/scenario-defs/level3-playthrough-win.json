@@ -510,6 +510,11 @@
       "command": "survey seismic x:25 z:25",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "survey"
         },
@@ -564,6 +569,11 @@
       "command": "survey core_sample x:25 z:25",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },
@@ -613,6 +623,11 @@
     {
       "command": "survey aerial x:25 z:25",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"aerial\"]"
@@ -1231,6 +1246,11 @@
       "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1271,6 +1291,11 @@
       "command": "build living_quarters at:44,48",
       "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1313,6 +1338,11 @@
       "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "ensurePanel",
           "panel": "build"
         },
@@ -1353,6 +1383,11 @@
       "command": "build living_quarters at:44,52",
       "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"
@@ -1413,6 +1448,11 @@
     {
       "command": "drill_plan grid rows:4 cols:6 spacing:3 depth:6 diameter:0.089 start:25,25",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -2091,6 +2131,11 @@
       "command": "build freight_warehouse at:48,44",
       "description": "#1372: ore_sale contracts are only accepted with a Freight Warehouse standing (ore is stored per warehouse), so the player builds one before accepting. Placed beside the living quarters, far from the blast pattern.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "ensurePanel",
           "panel": "build"

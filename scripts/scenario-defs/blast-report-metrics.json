@@ -25,6 +25,11 @@
       "description": "One decrement click on the spacing stepper (data-field=\"spacing\") lowers it 3->2m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(19,19) rectangle computes the declared 3x3. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's total drilling time inside the site's own bankruptcy-grace window (no income anywhere in this file) -- sandbox-measured: 9 holes at spacing 5 go bankrupt around tick 259, at spacing 2 they land around tick 130 with over $12,000 still in hand.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

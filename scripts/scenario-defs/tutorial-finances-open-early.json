@@ -158,6 +158,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"seismic\"]"
         },
@@ -333,6 +338,11 @@
       "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (2,12) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((8,15) pin, picked at margin tile (10,17)); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
@@ -647,6 +657,11 @@
       "role": "player",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "waitForTutorialStep",
           "stepId": "box-cut",
           "timeout": 30000
@@ -694,6 +709,11 @@
       "description": "drill-plan, click half: grid tool dragged over the 14,24-22,32 rectangle the card asks for, confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below. #554-followup (issue #586 CI, rounds 4-5): round 4 corrected the command from rows:3 cols:3 spacing:5 (9 holes) to rows:4 cols:4 spacing:3 (16 holes), reasoning the spacing stepper is unreachable this early in the rail (confirmed live, still true) so the declared spacing:5 could never be real. That was half right: spacing really is stuck at the tool's own DEFAULT_SPACING_M=3, but the drag rectangle producing 16 holes at that spacing was itself a latent bug in the region the tutorial rail snaps this drag to (REGION.drill, tutorialStages.ts), sized for a spacing of 5 that Drill.ts has never actually used since #479 -- nothing caught it because charging was instant until #553/#554, so the extra holes never cost real time. Round 5 fixes REGION.drill directly (20-30 -> 20-26), restoring the tutorial's originally-intended 3x3/9-hole workload for a lone early-tutorial employee with no living quarters yet; a 16-hole grid drove that same employee into a full worker revolt partway through charging (see the charging step's own note below). Command and drag corrected back in step to match the fixed region. #949: spacing/depth/start retuned again, from 3/6/(20,20) to 4/8/(22,20) -- mirrors tutorialSteps.ts's own 'drill-plan' stage retune, which fixes the tutorial's scripted plan so it rates good-or-better instead of catastrophic (verified live against the real engine to rate PERFECT with zero casualties/destruction). `dragTiles` moved to (14,24)-(22,32) to match. #949-followup: added the spacing (3->4, one increment click) and depth (6->8, two increment clicks) stepper clicks before the drag, plus tightened `expect` from `increased: [orderedHoleCount]` to an exact `equals` -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), reachable the instant the grid tool arms, but were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix, tutorialStages.ts). Without these clicks the drag alone produced a 4x4/spacing:3/depth:6 grid at the panel's own defaults, and the old loose `increased` expectation passed on that wrong result by coincidence. This file's own downstream tick/cash figures against the new 4/8/(22,20) plan were verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
@@ -969,6 +989,11 @@
       "description": "#1339: build-driving-center, click half -- ordered after the first blast, which leaves oversized boulders only a rock fragmenter can break; the Driving Center teaches its licence. Every role arrives able to do its own job, so the old drill-rig and excavator courses are gone. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((6,15) pin, picked at margin tile (6,13), clear of the already-built living quarters); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
@@ -1269,6 +1294,11 @@
       "description": "build-storage, click half: warehouse ordered by clicking the step's outlined tile (2,12) in the Build panel picker. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually. #556/#816: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (a genuine success, not refused: ordering is valid, successful work under #556); the wait step right below drives the site to completion, matching build-living-quarters above. #1594: the player clicks a tile inside the exact region's live margin, not the pin itself ((2,12) pin, picked at margin tile (4,14)); the picker snaps to the pin, so the order still lands on it.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"

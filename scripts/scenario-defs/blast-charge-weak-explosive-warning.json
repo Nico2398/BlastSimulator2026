@@ -26,6 +26,11 @@
       "description": "Plan a 3x3 grid by dragging (15,15)-(19,19) at 2m spacing.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
         },

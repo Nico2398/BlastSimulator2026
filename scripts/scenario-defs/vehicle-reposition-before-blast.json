@@ -25,6 +25,11 @@
       "description": "Vehicle #2 is the staffed debris_hauler (STARTING_SITE_STAFFED_COMPOSITION order: drill_rig, debris_hauler, rock_digger, rock_fragmenter), spawned at (3,2) -- close to the drill_rig's own spawn and well inside range of the reckless overcharge fired later in this file. (2,30) is far south of both the (15,15)-(21,21) drilled footprint and the (0,2)-(9,2) spawn row. No `vehicle` console command reaches the game here -- Reposition arms the shared placement tool (PlacementKit, same pattern as SurveyPanel's Run Survey button), a scene-tile click picks the destination, and the confirm button dispatches the command internally.",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         },
@@ -92,6 +97,11 @@
       "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 diameter:0.089 start:15,15",
       "description": "Identical pattern to blast-unevacuated-casualties.json: 3x3 grid at the grid tool's own default spacing (DEFAULT_SPACING_M=3), so the (15,15)-(21,21) drag needs no spacing-stepper click. diameter:0.089 matches the Charge panel's fixed UI diameter (no stepper exists for it); the depth stepper is raised from the tool's 6m default to the declared 8m before dragging, same as that file's own fix.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
