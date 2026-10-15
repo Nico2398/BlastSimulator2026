@@ -429,6 +429,13 @@
           "equals": 1,
           "maxTicks": 1200,
           "timeoutMs": 90000
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-inspector [data-action=\"demolish\"]",
+          "property": "disabled",
+          "expectedValue": true,
+          "timeoutMs": 10000
         }
       ],
       "expect": {
