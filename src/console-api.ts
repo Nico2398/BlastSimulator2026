@@ -15,6 +15,7 @@ import { getProfitShortfall } from './core/campaign/LevelObjective.js';
 import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
+import { isActive } from './core/events/ActiveModifiers.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -123,6 +124,8 @@ export interface SerializableGameState {
    * stock against, so mere presence in the pool is the whole condition.
    */
   rubbleDisposalOffered: boolean;
+  /** An event's blasting ban is in force (#1414): `blast` is refused until it lapses, so a scenario waits for `false` before firing instead of padding ticks. */
+  blastBanned: boolean;
   /** An `ore_sale` for blingite is on the board at any quantity (`hasOreSaleOffer`, #1586): the wait before accepting a sale storage cannot fill yet. */
   blingiteSaleOffered: boolean;
   /**
@@ -230,6 +233,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     fillableRustiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite'),
     winningRustiteSaleOffered: hasWinningOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite', getProfitShortfall(s.campaign.activeLevelId, s.finances)),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount),
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
