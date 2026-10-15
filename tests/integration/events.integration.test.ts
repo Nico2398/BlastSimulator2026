@@ -1043,7 +1043,7 @@ describe('failed bribe and botched mafia consequences (#1411)', () => {
 });
 
 describe('bribe protections shield the next event after a resolved one (#1816)', () => {
-  const IDLE_TICKS = 5 * 24; // past every paid window except the judge's 5 days
+  const IDLE_TICKS = 5 * 24; // the judge's 5-day paid window (the longest) = 120 ticks, so idling this long outlasts every paid window
   const LONGEST_COOLDOWN_ROLL = 179;
   /** Enough single ticks for the longest cooldown roll to elapse after the idle stretch. */
   const SETTLE_TICKS = 100;

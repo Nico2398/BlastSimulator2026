@@ -80,9 +80,17 @@ export interface ActiveProtection {
   shielded: boolean;
 }
 
-/** Paid window, then (until it has shielded something) a capped linger so the bribe outlives the event gap (#1816). */
+/** True while the paid window (up to expiresAtTick) is running. */
+function isWithinPaidWindow(p: ActiveProtection, tick: number): boolean {
+  return tick < p.expiresAtTick;
+}
+
+/**
+ * Paid window, then (until it has shielded something) a capped linger so the bribe outlives the event gap (#1816).
+ * Timer stretch deliberately ignores the linger: `timerStretchFor` uses the paid window only.
+ */
 function isActive(p: ActiveProtection, tick: number): boolean {
-  return tick < p.expiresAtTick
+  return isWithinPaidWindow(p, tick)
     || (!p.shielded && tick < p.expiresAtTick + BRIBE_PROTECTION_MAX_LINGER_DAYS * TICKS_PER_DAY);
 }
 
@@ -115,7 +123,7 @@ export function grantProtection(
   return entry;
 }
 
-/** Drop expired protections in place. */
+/** Drop expired protections in place; unshielded lingering ones are kept. */
 export function pruneProtections(list: ActiveProtection[], tick: number): void {
   for (let i = list.length - 1; i >= 0; i--) {
     if (!isActive(list[i]!, tick)) list.splice(i, 1);
@@ -154,7 +162,7 @@ export function timerStretchFor(
   let stretch = 1;
   for (const p of list) {
     const e = BRIBE_PROFILES[p.target].effect;
-    if (tick < p.expiresAtTick && e.timerStretchCategory === category) stretch *= Math.max(1, e.timerStretch ?? 1);
+    if (isWithinPaidWindow(p, tick) && e.timerStretchCategory === category) stretch *= Math.max(1, e.timerStretch ?? 1);
   }
   return stretch;
 }
@@ -177,5 +185,5 @@ export function markShielded(
 
 /** True when past the paid window (expiresAtTick) but still active on the unshielded linger. */
 export function isProtectionLingering(p: ActiveProtection, tick: number): boolean {
-  return tick >= p.expiresAtTick && isActive(p, tick);
+  return !isWithinPaidWindow(p, tick) && isActive(p, tick);
 }

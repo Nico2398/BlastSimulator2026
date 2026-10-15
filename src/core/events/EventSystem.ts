@@ -253,6 +253,8 @@ export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventCon
 /**
  * Select an event from a category using weighted random selection.
  * Weight = event.weightCoeff(scores). Higher weight = more likely.
+ * Side effect: protections in `ctx.protections` that shield an eligible event are marked
+ * `shielded` (mutates ctx.protections), which ends their linger (#1816).
  */
 export function selectEvent(
   category: EventCategory,

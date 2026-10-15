@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { corruptCommand } from '../../../src/console/commands/corruption.js';
 import { makeGameContext, type GameContext } from '../../helpers/gameContext.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
 import {
   BRIBE_CORRUPTION_DELTA,
@@ -106,5 +107,17 @@ describe('corrupt command — protections (#1407)', () => {
     corruptCommand(ctx, [], { target: 'union_leader' });
     const out = corruptCommand(ctx, [], {}).output;
     expect(out).toContain('the union leader');
+  });
+
+  it('status line says the protection is waiting once it lingers past the paid window', () => {
+    const tick = findTick(ctx, 'union_leader', true);
+    const s = ctx.state!;
+    s.corruption = createCorruptionState();
+    s.tickCount = tick;
+    s.cash = 10_000_000;
+    corruptCommand(ctx, [], { target: 'union_leader' });
+    s.tickCount = s.corruption.protections[0]!.expiresAtTick + 1;
+    const out = corruptCommand(ctx, [], {}).output;
+    expect(out).toContain(t('corruption.protection_lingering_line', { target: t('corruption.target.union_leader') }));
   });
 });

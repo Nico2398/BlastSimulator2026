@@ -495,8 +495,10 @@ function backfillProtections(obj: Record<string, unknown>): void {
   if (corruption && !Array.isArray(corruption['protections'])) corruption['protections'] = [];
   // #1816: entries saved before the linger rule count as already shielded (no retroactive linger).
   if (corruption && Array.isArray(corruption['protections'])) {
-    for (const p of corruption['protections'] as Record<string, unknown>[]) {
-      if (typeof p['shielded'] !== 'boolean') p['shielded'] = true;
+    for (const p of corruption['protections'] as unknown[]) {
+      if (typeof p !== 'object' || p === null) continue;
+      const entry = p as Record<string, unknown>;
+      if (typeof entry['shielded'] !== 'boolean') entry['shielded'] = true;
     }
   }
 }
