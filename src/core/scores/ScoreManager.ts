@@ -97,8 +97,8 @@ function nonNegative(v: number): number {
 }
 
 /**
- * Per-tick well-being change. Gains (positive building effect, morale above neutral) taper as the
- * score nears 100 so one cheap Living Quarters cannot pin it at the cap; losses (morale below
+ * Per-tick well-being change. Once a Living Quarters is built, gains (building effect, morale above neutral) taper
+ * as the score nears 100 so one cheap Living Quarters cannot pin it at the cap; losses (morale below
  * neutral, overwork, crowding, accidents) are unscaled. A negative building effect applies in full.
  */
 function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInputs): number {
@@ -106,7 +106,11 @@ function wellBeingDelta(wellBeing: number, buildingWb: number, inputs: ScoreInpu
   const morale = Number.isFinite(inputs.avgMorale) ? inputs.avgMorale : 50;
   const gain = Math.max(0, bWb * WB_BUILDING_GAIN) + Math.max(0, morale - 50) * WB_MORALE_GAIN_PER_POINT;
   const moraleLoss = Math.max(0, 50 - morale) * WB_MORALE_LOSS_PER_POINT;
-  const headroom = Math.min(1, Math.max(0, (100 - wellBeing) / WB_HEADROOM_SPAN));
+  // Taper only once housing exists: a Living Quarters is what pinned the score at the cap. A site
+  // with no positive building effect keeps the undamped climb, so its early buffer against a
+  // morale crash is unchanged.
+  const housed = bWb > 0;
+  const headroom = housed ? Math.min(1, Math.max(0, (100 - wellBeing) / WB_HEADROOM_SPAN)) : 1;
   const beds = nonNegative(inputs.bedCapacity);
   const crew = nonNegative(inputs.employeeCount);
   const crowding = beds > 0 && crew > beds ? (crew - beds) / crew : 0;

@@ -593,12 +593,10 @@
           "tickCount": 40
         },
         "decreased": [
-          "cash"
+          "cash",
+          "wellBeing"
         ],
-        "note": "employee #12/vehicle #6 has reached the pattern and started drilling in command mode; vehicle #1 (see #591 note above) contributes too. #596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 215->255), same as the other non-interrupted batches in this file, but pinning the running total still couples this step to every batch before it. #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above; wellBeing is still falling toward its floor here (see tick 290 below), so `decreased` is the correct direction. holeCount/orderedHoleCount stay dropped entirely here, and at every remaining tick checkpoint through the revolt below -- pre-#591 direct evidence (two consecutive full local interaction-mode runs of this file, `--mode interaction --port 5246`, both showed employee #12/vehicle #5 never actually landing a single hole through the revolt while command mode lands holes) motivated this relaxation, but #591 changes vehicle #1's own behavior in both modes -- this pairing has not been re-verified against a live interaction-mode run since #591 landed, so the relaxation is left in place rather than re-pinned on an unconfirmed number. The level's own outcome (worker_revolt, same deathCount/employeeCount/revolted/levelEnded/levelEndReason) was unaffected by the mode divergence pre-#591 and remains unaffected post-#591 (sandbox-measured, command mode) -- so this stays a checkpoint relaxation, not a production-code fix, per this batch's own remit. #1692: well-being now drags with overwork and its gains taper near the cap, so a crew with no housing hits 0 earlier (sandbox-measured: floor around tick 219, revolt at tick 339 instead of 383); the level still ends in worker_revolt and nothing here is loosened.",
-        "equals": {
-          "wellBeing": 0
-        }
+        "note": "employee #12/vehicle #6 has reached the pattern and started drilling in command mode; vehicle #1 (see #591 note above) contributes too. #596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 215->255), same as the other non-interrupted batches in this file, but pinning the running total still couples this step to every batch before it. #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above; wellBeing is still falling toward its floor here (see tick 290 below), so `decreased` is the correct direction. holeCount/orderedHoleCount stay dropped entirely here, and at every remaining tick checkpoint through the revolt below -- pre-#591 direct evidence (two consecutive full local interaction-mode runs of this file, `--mode interaction --port 5246`, both showed employee #12/vehicle #5 never actually landing a single hole through the revolt while command mode lands holes) motivated this relaxation, but #591 changes vehicle #1's own behavior in both modes -- this pairing has not been re-verified against a live interaction-mode run since #591 landed, so the relaxation is left in place rather than re-pinned on an unconfirmed number. The level's own outcome (worker_revolt, same deathCount/employeeCount/revolted/levelEnded/levelEndReason) was unaffected by the mode divergence pre-#591 and remains unaffected post-#591 (sandbox-measured, command mode) -- so this stays a checkpoint relaxation, not a production-code fix, per this batch's own remit."
       }
     },
     {
@@ -655,14 +653,16 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 40
+        },
         "equals": {
-          "wellBeing": 0,
-          "tickCount": 339
+          "wellBeing": 0
         },
         "decreased": [
           "cash"
         ],
-        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 295->335). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1692: well-being now drags with overwork and its gains taper near the cap, so a crew with no housing hits 0 earlier (sandbox-measured: floor around tick 219, revolt at tick 339 instead of 383); the level still ends in worker_revolt and nothing here is loosened. The tick command stops on the tick the level ends, so this batch ends at the revolt."
+        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 295->335). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding)."
       }
     },
     {
@@ -688,9 +688,12 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 339
+          "tickCount": 377
         },
-        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 335->375). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt. #1692: well-being now drags with overwork and its gains taper near the cap, so a crew with no housing hits 0 earlier (sandbox-measured: floor around tick 219, revolt at tick 339 instead of 383); the level still ends in worker_revolt and nothing here is loosened."
+        "decreased": [
+          "cash"
+        ],
+        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 335->375). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt."
       }
     },
     {
@@ -715,7 +718,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 339,
+          "tickCount": 377,
           "wellBeing": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -723,7 +726,7 @@
           "levelEnded": true,
           "levelEndReason": "worker_revolt"
         },
-        "note": "REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapses here. #596/#597: the revolt's own tick moved 410->415 (sandbox-measured) -- setupEvents idempotency + cooldown-threshold caching shifted when the mid-scenario batches above get interrupted (net +5 ticks by this point), which shifts every tick this level runs including the revolt itself; this is a genuine terminal checkpoint (issue #596's own carve-out: 'tickCount at a shutdown... stays equals, always re-verified against the real numbers') so it stays a pinned absolute, just updated to the real current number rather than converted. The level still ends in an actual worker revolt -- deathCount/employeeCount/revolted/levelEnded/levelEndReason unaffected by the timing shift (sandbox-measured). deathCount stays 0: nobody has ever stood in a blast, since none has fired. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1313: the tick command stops on the tick the level ends -- the revolt lands at tick 386 and the rest of this batch (to 415) is not run; the terminal tickCount is the real revolt tick (previously masked because ticking kept going to 415). #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-175 random event is union_eco_committee (an ecology bonus) instead of union_food_trucks; wellBeing hits 0 five ticks earlier, so the revolt lands at tick 380 (was 386) and ecology closes at 51.85 (was exactly 50). The level still ends in worker_revolt. #1339: roles arrive able to do their job, the revolt lands at tick 378 (was 380); the level still ends in worker_revolt. #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt. #1692: well-being now drags with overwork and its gains taper near the cap, so a crew with no housing hits 0 earlier (sandbox-measured: floor around tick 219, revolt at tick 339 instead of 383); the level still ends in worker_revolt and nothing here is loosened."
+        "note": "REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapses here. #596/#597: the revolt's own tick moved 410->415 (sandbox-measured) -- setupEvents idempotency + cooldown-threshold caching shifted when the mid-scenario batches above get interrupted (net +5 ticks by this point), which shifts every tick this level runs including the revolt itself; this is a genuine terminal checkpoint (issue #596's own carve-out: 'tickCount at a shutdown... stays equals, always re-verified against the real numbers') so it stays a pinned absolute, just updated to the real current number rather than converted. The level still ends in an actual worker revolt -- deathCount/employeeCount/revolted/levelEnded/levelEndReason unaffected by the timing shift (sandbox-measured). deathCount stays 0: nobody has ever stood in a blast, since none has fired. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1313: the tick command stops on the tick the level ends -- the revolt lands at tick 386 and the rest of this batch (to 415) is not run; the terminal tickCount is the real revolt tick (previously masked because ticking kept going to 415). #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-175 random event is union_eco_committee (an ecology bonus) instead of union_food_trucks; wellBeing hits 0 five ticks earlier, so the revolt lands at tick 380 (was 386) and ecology closes at 51.85 (was exactly 50). The level still ends in worker_revolt. #1339: roles arrive able to do their job, the revolt lands at tick 378 (was 380); the level still ends in worker_revolt. #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt."
       }
     },
     {
@@ -770,14 +773,14 @@
         "equals": {
           "wellBeing": 0,
           "ecology": 50,
-          "tickCount": 339,
+          "tickCount": 377,
           "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 0,
           "employeeCount": 12
         },
-        "note": "final state confirms the new, real conclusion under #553: crewing the free staffed rig (required so it's actually usable) puts employee #1 to continuous work with no living quarters on this level to replenish its needs (#591: no longer via a permanent deadlock, but the outcome is the same), the working crew's own unmet needs crash wellBeing to its floor, and the site genuinely revolts -- the opposite of this file's pre-#553 finding, where wellBeing only ever rose because nobody was ever physically dispatched anywhere. This is now the file's real, verified premise instead of an unreachable one. #596/#597: tickCount updated 410->415, matching the revolt step above -- same genuine-terminal-checkpoint reasoning, stays a pinned absolute. cash dropped entirely here (no ticks run between the revolt step above and this one, only a no-op event-resolve and two read-only observe steps, so cash is flat across this step by construction and `decreased` would fail deterministically regardless of drift; it already carries the revolt step's own `decreased` assertion). wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-175 random event is union_eco_committee (an ecology bonus) instead of union_food_trucks; wellBeing hits 0 five ticks earlier, so the revolt lands at tick 380 (was 386) and ecology closes at 51.85 (was exactly 50). The level still ends in worker_revolt. #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt. #1692: well-being now drags with overwork and its gains taper near the cap, so a crew with no housing hits 0 earlier (sandbox-measured: floor around tick 219, revolt at tick 339 instead of 383); the level still ends in worker_revolt and nothing here is loosened."
+        "note": "final state confirms the new, real conclusion under #553: crewing the free staffed rig (required so it's actually usable) puts employee #1 to continuous work with no living quarters on this level to replenish its needs (#591: no longer via a permanent deadlock, but the outcome is the same), the working crew's own unmet needs crash wellBeing to its floor, and the site genuinely revolts -- the opposite of this file's pre-#553 finding, where wellBeing only ever rose because nobody was ever physically dispatched anywhere. This is now the file's real, verified premise instead of an unreachable one. #596/#597: tickCount updated 410->415, matching the revolt step above -- same genuine-terminal-checkpoint reasoning, stays a pinned absolute. cash dropped entirely here (no ticks run between the revolt step above and this one, only a no-op event-resolve and two read-only observe steps, so cash is flat across this step by construction and `decreased` would fail deterministically regardless of drift; it already carries the revolt step's own `decreased` assertion). wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-175 random event is union_eco_committee (an ecology bonus) instead of union_food_trucks; wellBeing hits 0 five ticks earlier, so the revolt lands at tick 380 (was 386) and ecology closes at 51.85 (was exactly 50). The level still ends in worker_revolt. #1385 (hiring pool): a `tick 24` pad now precedes the 4th driller hire (pool holds 3 per role), so every absolute tickCount below moves +24 and the random-event draws shift; values re-measured, the level still ends in worker_revolt."
       },
       "description": " #1339: ecology closes at 51.91 (was 51.85) after the 2-tick-earlier revolt."
     }

@@ -1809,7 +1809,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 54.23271908011377,
           "safety": 50,
           "ecology": 98.53524933152728,
           "nuisance": 46.46312332881822
@@ -2540,7 +2540,7 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 51.57799824732952,
           "safety": 49.54999999999933,
           "ecology": 99.55611269906477,
           "nuisance": 49.0152817476619
@@ -3499,9 +3499,9 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 63.88666666666683,
+          "wellBeing": 8.353939309628839,
           "safety": 0,
-          "ecology": 73.93969533748135,
+          "ecology": 65.93969533748135,
           "nuisance": 46.237573851438476
         },
         "changedBy": {
@@ -4270,9 +4270,9 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 82.75809523809558,
+          "wellBeing": 19.811911418472416,
           "safety": 0,
-          "ecology": 77.20442871954222,
+          "ecology": 69.20442871954222,
           "nuisance": 44.68518593841762
         },
         "changedBy": {
@@ -4296,9 +4296,9 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 82.75809523809558,
+          "wellBeing": 19.811911418472416,
           "safety": 0,
-          "ecology": 77.20442871954222,
+          "ecology": 69.20442871954222,
           "nuisance": 44.68518593841762
         },
         "changedBy": {

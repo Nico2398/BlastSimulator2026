@@ -501,7 +501,8 @@ describe('Well-being model — headroom, overwork, crowding, accidents (#1692)',
   it('avgMorale 0 with no quarters still drives well-being to 0, at least ~1 point per tick', () => {
     const state = createScoreState();
     updateScores(state, makeInputs({ avgMorale: 0 }));
-    expect(state.wellBeing).toBeLessThanOrEqual(49);
+    // -1.0 from morale, +0.05 score decay toward neutral: 49.05 after the first tick.
+    expect(state.wellBeing).toBeLessThanOrEqual(49.1);
     for (let i = 0; i < 60; i++) updateScores(state, makeInputs({ avgMorale: 0 }));
     expect(state.wellBeing).toBe(0);
   });
