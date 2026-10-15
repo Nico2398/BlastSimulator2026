@@ -22,6 +22,19 @@ export function warehouseStoredKg(l: LogisticsState, warehouseId: number): numbe
   return total;
 }
 
+/** Stored contents of one warehouse: total, kg per ore id, and the barren remainder. */
+export interface WarehouseStock {
+  storedKg: number;
+  oreKg: Record<string, number>;
+  barrenKg: number;
+}
+
+/** Stored kg of one warehouse by ore, plus barren remainder. Same fragments as warehouseStoredKg. */
+export function warehouseStockByOre(_l: LogisticsState, _warehouseId: number): WarehouseStock {
+  // TODO: implement
+  return { storedKg: 0, oreKg: {}, barrenKg: 0 };
+}
+
 /** Mass (kg) stored or in transit per warehouse id, in one pass over the fragments. */
 export function warehouseUsedKgMap(l: LogisticsState): Map<number, number> {
   const used = new Map<number, number>();
