@@ -309,7 +309,7 @@ export function runTick(
   // and queue one. Idempotent, run before 8d so a fragment that becomes
   // eligible this tick (a blast, or a break that finished on a prior tick)
   // can be claimed the same tick it is queued.
-  syncHaulDispatch(state);
+  syncHaulDispatch(state, grid);
 
   // 8c-4. Repair dispatch (#1393): one repair_vehicle order per idle damaged
   // vehicle, queued until someone trained in repair is free. An unqualified

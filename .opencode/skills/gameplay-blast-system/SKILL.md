@@ -172,6 +172,8 @@ thrown in from elsewhere still lands on top of the cap, and open columns resolve
 a blast that cleared rock but never broke out is reported (`mining.blast.no_breakout`,
 `BlastReport.brokeOut`) and capped to bad (`no_breakout`).
 
+Sealed rock gets no `haul_debris`/`fragment_debris` order (#1774) until its void opens to the surface (the column's top solid no longer above it); then it is ordinary debris.
+
 **Defaults break out (#1724).** `CHARGE_DEFAULT_AMOUNT_KG` (7) with `CHARGE_DEFAULT_STEMMING_M` (2.5)
 in the default 8 m, 4 m-spaced 3x3 pattern is the smallest charge that opens a crater with every
 hole's column lowered on the sandbox flat pad and on `tutorial_pit`, rating at least good, and it

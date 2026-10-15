@@ -26,6 +26,8 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
+import { isFragmentSealed } from '../../src/core/economy/SealedFragments.js';
+import { isAutoDebrisAction } from '../../src/core/economy/HaulDispatch.js';
 import { computeVoxelColumnSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
@@ -193,27 +195,144 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
   );
 
   it(
-    'stamps nothing on the SAME (18,10) site with a smaller charge (amount:1) whose entire debris field is reachable (non-regression)',
+    'stamps nothing on the SAME (18,10) site with a smaller charge (amount:1) that never breaks out (non-regression)',
     () => {
-      const { run, state } = drillChargeAndBlast(18, 10, 1);
+      // Since #1774 the 1 kg charge's rock stays sealed under its cap and gets no order at all, so
+      // nothing can be stamped out of reach; and no 3 kg+ charge here is free of the pocket.
+      const { run, state, grid } = drillChargeAndBlast(18, 10, 1);
       crewHaulingAndBuildDepot(run, state);
+      const onGround = state.logistics.fragments.filter(f => f.state === 'on_ground');
+      expect(onGround.length).toBeGreaterThan(0);
+      expect(onGround.every(f => isFragmentSealed(grid, f.fragment.position))).toBe(true);
 
-      tickUntilFresh(run, state, () => false, 3);
-
-      const actions = debrisActions(state);
-      expect(actions.length).toBeGreaterThan(0);
-      for (const action of actions) {
-        expect(action.blockedReason).not.toBe('target_unreachable');
-        expect(action.blockedReason).not.toBe('debris_out_of_reach');
+      for (let i = 0; i < 200; i++) {
+        tickUntilFresh(run, state, () => false, 1);
+        for (const action of state.pendingActions) {
+          expect(action.blockedReason).not.toBe('target_unreachable');
+          expect(action.blockedReason).not.toBe('debris_out_of_reach');
+        }
       }
-
-      tickUntilFresh(run, state, () => state.logistics.storedMassKg > 0, 400);
-      expect(state.logistics.storedMassKg).toBeGreaterThan(0);
-
-      for (const action of debrisActions(state)) {
-        expect(action.blockedReason).not.toBe('debris_out_of_reach');
-      }
+      expect(debrisActions(state)).toHaveLength(0);
+      expect(state.logistics.storedMassKg).toBe(0);
     },
+  );
+});
+
+// ── Rock sealed in a failed blast's void is not debris (#1774) ──────────────
+//
+// #1724 leaves a charge that fails to break out sealed under its intact cap.
+// The dispatcher used to treat that rock as ordinary surface debris, so crews
+// drove onto the cap and hauled the ore out through solid ground.
+
+const SEALED_SEED = 42;
+const SEALED_SHOT_START = '28,18';
+const SEALED_WATCH_TICKS = 500;
+const SEALED_DEPOT_AT = '10,10';
+const SEALED_HEAP_AT = '10,16';
+
+function topUp(state: GameState): void {
+  state.cash = Math.max(state.cash, 5_000_000);
+  for (const e of state.employees.employees) e.fatigue = 100;
+}
+
+function tickTopped(run: (cmd: string) => unknown, state: GameState, ticks: number, each?: () => void): void {
+  for (let i = 0; i < ticks; i++) { topUp(state); run('tick 1'); each?.(); }
+}
+
+function tickToppedUntil(run: (cmd: string) => unknown, state: GameState, until: () => boolean, max: number): void {
+  for (let i = 0; i < max && !until(); i++) { topUp(state); run('tick 1'); }
+}
+
+/** Drills, charges and fires a 3x3 Krackle pattern (spacing 4, depth 8) at SEALED_SHOT_START. */
+function fireKrackleShot(run: (cmd: string) => unknown, state: GameState, amountKg: number): void {
+  state.lastBlastReport = null;
+  expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SEALED_SHOT_START}`)).toMatchObject({ success: true });
+  tickToppedUntil(run, state, () => state.plannedDrillHoles.length === 0, 1500);
+  expect(state.plannedDrillHoles).toHaveLength(0);
+  const chargeResult = run(`charge hole:* explosive:krackle amount:${amountKg} stemming:2`);
+  expect(chargeResult).toMatchObject({ success: true });
+  tickToppedUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
+  expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+  expect(run('blast detonate')).toMatchObject({ success: true });
+  tickToppedUntil(run, state, () => state.lastBlastReport !== null, 600);
+  expect(state.lastBlastReport).not.toBeNull();
+}
+
+/** Ids of the fragments currently on the ground below their column's intact surface. */
+function sealedFragmentIds(state: GameState, grid: VoxelGrid): Set<number> {
+  const ids = new Set<number>();
+  for (const f of state.logistics.fragments) {
+    if (f.state === 'on_ground' && isFragmentSealed(grid, f.fragment.position)) ids.add(f.fragment.id);
+  }
+  return ids;
+}
+
+function ordersTargeting(state: GameState, fragmentIds: ReadonlySet<number>): PendingAction[] {
+  return debrisActions(state).filter(a => fragmentIds.has(a.payload['fragmentId'] as number));
+}
+
+describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
+  it(
+    'queues no haul or fragment order for the sealed rock, stores nothing, and hauls the rock of a later breakout blast',
+    () => {
+      const { runner, ctx } = createRunner();
+      const run = (cmd: string) => runner.run(cmd);
+      expect(run(`sandbox start biome:desert_badlands difficulty:normal seed:${SEALED_SEED} staffed:true`)).toMatchObject({ success: true });
+      const state = ctx.state!;
+      const grid = ctx.grid!;
+      topUp(state);
+
+      // Warehouse and spoil heap: staffed:true brings the crew, hauler and fragmenter but no buildings.
+      const buildResult = run(`build freight_warehouse at:${SEALED_DEPOT_AT}`);
+      expect(buildResult).toMatchObject({ success: true });
+      tickToppedUntil(run, state, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 600);
+      expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
+      expect(run(`build spoil_heap at:${SEALED_HEAP_AT}`)).toMatchObject({ success: true });
+
+      // Sealed blast: 4 kg Krackle never breaks out of the 8 m holes.
+      fireKrackleShot(run, state, 4);
+      expect(state.lastBlastReport!.ratingCap).toBe('no_breakout');
+
+      const sealed = sealedFragmentIds(state, grid);
+      expect(sealed.size).toBeGreaterThan(0);
+      // #1724's own criterion: every fragment sits under its column's surface.
+      const onGround = state.logistics.fragments.filter(f => f.state === 'on_ground');
+      expect(sealed.size).toBe(onGround.length);
+
+      // Crew, hauler, fragmenter and warehouse run for 500 ticks; the sealed rock is never touched.
+      let ordersSeen = 0;
+      tickTopped(run, state, SEALED_WATCH_TICKS, () => { ordersSeen += ordersTargeting(state, sealed).length; });
+      expect(state.vehicles.vehicles.some(v => v.type === 'debris_hauler')).toBe(true);
+      expect(state.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(true);
+      expect(ordersSeen).toBe(0);
+      expect(state.pendingActions.filter(a => isAutoDebrisAction(a.type) && sealed.has(a.payload['fragmentId'] as number))).toHaveLength(0);
+      expect(state.logistics.storedMassKg).toBe(0);
+      expect(Object.values(state.collectedOre).reduce((a, b) => a + b, 0)).toBe(0);
+      expect(state.logistics.fragments.filter(f => sealed.has(f.fragment.id) && f.state !== 'on_ground')).toHaveLength(0);
+
+      // A breakout blast over the same void opens it: its rock is ordinary debris.
+      // Fragment ids restart at 0 every blast, so earlier rock is told apart by identity, not id.
+      const trackedBefore = new Set(state.logistics.fragments);
+      fireKrackleShot(run, state, 10);
+      expect(state.lastBlastReport!.ratingCap).not.toBe('no_breakout');
+      const fresh = state.logistics.fragments.filter(f => !trackedBefore.has(f) && f.state === 'on_ground');
+      expect(fresh.length).toBeGreaterThan(0);
+      const open = new Set(fresh.filter(f => !isFragmentSealed(grid, f.fragment.position)).map(f => f.fragment.id));
+      expect(open.size).toBeGreaterThan(0);
+
+      tickTopped(run, state, 5);
+      expect(ordersTargeting(state, open).length).toBeGreaterThan(0);
+      // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both.
+      const hauledKg = (): number => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
+      // The opened void also holds the earlier sealed rock, so wait on the breakout blast's own rock being picked up (or split by the fragmenter), not on any haul.
+      const freshTracked = new Set(fresh);
+      const freshStillOnGroundCount = (): number => state.logistics.fragments.filter(f => freshTracked.has(f) && f.state === 'on_ground').length;
+      tickToppedUntil(run, state, () => hauledKg() > 0 && freshStillOnGroundCount() < fresh.length, 3000);
+      expect(hauledKg()).toBeGreaterThan(0);
+      const freshStillOnGround = freshStillOnGroundCount();
+      expect(freshStillOnGround).toBeLessThan(fresh.length);
+    },
+    600000,
   );
 });
 
@@ -441,8 +560,10 @@ function blastRampScenario(rampFirst: boolean): RampShot {
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
-      // Money and rest are not what this probes: wages must not freeze the mine, and a crew asleep never clears the rubble.
+      // Money, rest and ecology are not what this probes: wages must not freeze the mine, a crew asleep never clears the rubble,
+      // and a long dig under a blast's rubble must not end in an ecological shutdown that stops every tick.
       state.cash = Math.max(state.cash, 1_000_000);
+      state.scores.ecology = Math.max(state.scores.ecology, 50);
       for (const e of state.employees.employees) e.fatigue = 100;
       run('tick 1');
     }

@@ -5,6 +5,7 @@
 // collected/stored, and contract delivery is gated on that stored inventory
 // rather than paying out unconditionally.
 
+import { isFragmentSealed } from '../../../src/core/economy/SealedFragments.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
@@ -107,11 +108,12 @@ describe('Tutorial Level — Contract Delivery', () => {
     expect(drillResult.output).toContain('4 holes');
     driveDrillPlanToCompletion(ctx);
 
-    // 5. Charge all holes with boomite 3kg/hole, stemming 2m
+    // 5. Charge all holes with boomite 5kg/hole, stemming 2m. 3kg no longer breaks out of the 8m
+    // holes (#1793): its rock stays sealed under the cap and is never hauled (#1774).
     const chargeResult = chargeCommand(ctx as any, [], {
       hole: '*',
       explosive: 'boomite',
-      amount: '3kg',
+      amount: '5kg',
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
@@ -322,7 +324,7 @@ describe('Tutorial Level — Contract Delivery', () => {
     // this test for a reason unrelated to what it means to exercise.
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const oreBearingId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
-      !isOversized(tracked.fragment.volume) && Object.values(tracked.fragment.oreDensities).some(d => d > 0),
+      !isOversized(tracked.fragment.volume) && !isFragmentSealed(ctx.grid!, tracked.fragment.position) && Object.values(tracked.fragment.oreDensities).some(d => d > 0),
     );
     expect(oreBearingId, 'blast produced no reachable ore-bearing fragment to haul').not.toBeNull();
 
@@ -355,7 +357,9 @@ describe('Tutorial Level — Contract Delivery', () => {
     // barren one.
     const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const haulableId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
-      !isOversized(tracked.fragment.volume) && haulDestinationOf(tracked.fragment) === 'warehouse',
+      !isOversized(tracked.fragment.volume) &&
+      !isFragmentSealed(ctx.grid!, tracked.fragment.position) &&
+      haulDestinationOf(tracked.fragment) === 'warehouse',
     );
     expect(haulableId, 'blast produced no reachable haulable (non-oversized) warehouse-bound fragment').not.toBeNull();
     haulFragmentToStorage(vehicleId, haulableId!);

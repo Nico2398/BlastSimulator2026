@@ -1,6 +1,6 @@
 {
   "name": "rock-fragmenter-breaking",
-  "description": "Chapter 5/2 (#484), superseded by #552's self-dispatching hauling/fragmenting: an undercharged blast leaves an oversized boulder that auto-dispatch routes to a crewed rock_fragmenter (fragment_debris PendingAction) rather than a debris_hauler (haul_debris) -- no player command or button picks which vehicle goes where any more, and there is no rejection to test either, since an oversized fragment simply never spawns a haul_debris action in the first place. A resulting sub-fragment is then hauled and stored automatically once a freight_warehouse exists. Buy/driver-assign purchases still go through real Vehicles-panel clicks; the break/haul actions themselves are proven by ticking forward and reading the automatic outcome.",
+  "description": "Chapter 5/2 (#484), superseded by #552's self-dispatching hauling/fragmenting: a blast with a breakout charge (#1774) leaves an unsealed oversized boulder that auto-dispatch routes to a crewed rock_fragmenter (fragment_debris PendingAction) rather than a debris_hauler (haul_debris) -- no player command or button picks which vehicle goes where any more, and there is no rejection to test either, since an oversized fragment simply never spawns a haul_debris action in the first place. A resulting sub-fragment is then hauled and stored automatically once a freight_warehouse exists. Buy/driver-assign purchases still go through real Vehicles-panel clicks; the break/haul actions themselves are proven by ticking forward and reading the automatic outcome.",
   "steps": [
     {
       "command": "new_game seed:42 cash:210000",
@@ -222,8 +222,8 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:2 stemming:2",
-      "description": "#1090-followup root-cause fix: leading `setStepper` on the amount field added -- stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), but amount had no equivalent stepper adjustment, so the real Charge All click was silently charging at the panel's own DEFAULT_AMOUNT_KG=5 the whole time (same documented gotcha Charge.ts's own comment on `data-field=\"amount\"` names, and the exact fix blast-undercharge.json's own analogous step already applies). #1090's dispatch-timing change didn't create this divergence -- `compare-scenario-traces.ts` shows it was always there (chargesByHole amountKg 5 vs the declared 2) -- but it meant this file's blast in interaction mode was never actually the deliberately undercharged 2kg/5m-spacing shot the file's own description claims, just a heavier, better-fragmented one whose different RNG trajectory needed enough extra ticks to build both freight_warehouses that the file's cash cushion (last sized for a different divergence, #556) ran out into bankruptcy first. Charging at the intended 2kg fixes the actual blast outcome to match command mode's own trace.",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "#1090-followup root-cause fix: leading `setStepper` on the amount field -- stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), but amount needs an explicit stepper adjustment to match the command's amount, otherwise the real Charge All click charges at the panel's own DEFAULT_AMOUNT_KG=5 (the documented gotcha Charge.ts's comment on `data-field=\"amount\"` names). Since #1774 the intended charge is that same 5 kg breakout charge (a 2 kg shot left all rubble sealed under the cap, where no fragment order reaches it), so the stepper keeps interaction mode on the same blast outcome as command mode's trace.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -232,7 +232,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 2
+          "value": 5
         },
         {
           "type": "setStepper",
@@ -315,12 +315,12 @@
           "holeCount": 0,
           "chargedCount": 0
         },
-        "note": "a fired blast clears the plan back to zero; undercharged 2kg boomite at wide 5m spacing leaves oversized boulders on the ground (verified via the fragments step below), setting up the fragmenter's real job"
+        "note": "a fired blast clears the plan back to zero; 5kg boomite at wide 5m spacing breaks the cap open and leaves unsealed oversized boulders on the ground (#1774: a 2kg shot left all rubble sealed under the cap, and sealed rock gets no fragment order) (verified via the fragments step below), setting up the fragmenter's real job"
       }
     },
     {
       "command": "fragments",
-      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens — otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
+      "description": "5kg boomite (#1774: 2kg leaves the rubble sealed under the cap, where no fragment order reaches it) at wide 5m spacing reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens — otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
       "interaction": [
         {
           "type": "command",
@@ -398,7 +398,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed sitting inside its own hole's blast radius — see the blast step above) — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed with the charging truck by the 5kg breakout charge, #1774) — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -412,12 +412,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 2
+          "vehicleCount": 1
         },
         "changedBy": {
           "cash": -25000
         },
-        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts); vehicleCount is 2 (charging truck + hauler), not 3, because the blast above destroyed vehicle #1 (the drill_rig)"
+        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts); vehicleCount is 1 (hauler only), because the 5kg breakout charge (#1774) destroyed both the drill_rig and the charging truck"
       }
     },
     {
@@ -561,7 +561,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 3
+          "vehicleCount": 2
         },
         "decreased": [
           "cash"

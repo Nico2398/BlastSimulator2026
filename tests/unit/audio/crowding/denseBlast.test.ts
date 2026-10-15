@@ -13,11 +13,11 @@ const COLLAPSE = 'ore-haul-dispatch';
 const HAULING = 'blast-debris-stranded-ramp';
 const RUN_TIMEOUT_MS = 60_000;
 /**
- * The shot is fired 32 s in (37 s before the rally point put the crew beside the drill grid), and the 3 s after it
+ * The shot is fired 37 s in (#1774: the 6 kg breakout charge takes the crew longer to load than the 5 kg that left the rubble sealed; 32 s before), and the 3 s after it
  * are the shot's own; the hauling after it is not needed here. The next step runs to 41 s and sets the new warehouse,
  * the first load and the first dump going in one second: that is HAULING's budget, not the collapse's.
  */
-const THROUGH_THE_SHOT_S = 35;
+const THROUGH_THE_SHOT_S = 40;
 
 beforeAll(() => {
   scenarioRun(COLLAPSE, 8, THROUGH_THE_SHOT_S);
