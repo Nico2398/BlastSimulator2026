@@ -5,7 +5,7 @@ import { managementLevelOf, type Employee } from '../../../core/entities/Employe
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import {
-  describeActivity, makeCurrentTaskSection, makeDismissSection, makeHiredLocationStrip, makeIdentitySection,
+  describeActivity, raiseCommand, trainCommand, dismissConfirmConfig, makeCurrentTaskSection, makeDismissSection, makeHiredLocationStrip, makeIdentitySection,
   makeManagerEffect, makeNeedsSection, makePaySection, makeRestSection, makeSkillsSection, makeTrainingSection,
 } from '../../crewDetailSections.js';
 import type { InspectorLinks, KindContent } from './InspectorContent.js';
@@ -21,22 +21,11 @@ function sectionBuilders(e: Employee, state: GameState, links: InspectorLinks): 
     ['bs-emp-rest', () => makeRestSection(e, state, link)],
     ['bs-emp-needs', () => makeNeedsSection(e)],
     ['bs-emp-skills', () => makeSkillsSection(e)],
-    ['bs-emp-pay', () => makePaySection(e, amount => links.run(`employee raise ${e.id} amount:${amount}`))],
-    ['bs-emp-training', () => makeTrainingSection(e, state, (skill, buildingId) => links.run(`employee train ${e.id} skill:${skill} building:${buildingId}`), link)],
+    ['bs-emp-pay', () => makePaySection(e, amount => links.run(raiseCommand(e, amount)))],
+    ['bs-emp-training', () => makeTrainingSection(e, state, (skill, buildingId) => links.run(trainCommand(e, skill, buildingId)), link)],
     ['bs-emp-manager', () => makeManagerEffect(e)],
-    ['bs-emp-dismiss', () => makeDismissSection(e, () => requestDismiss(e, links))],
+    ['bs-emp-dismiss', () => makeDismissSection(e, () => links.confirm(dismissConfirmConfig(e, links.run)))],
   ];
-}
-
-/** Dismissal is permanent, so it always goes through the shared confirm overlay (same config as the Crew row). */
-function requestDismiss(e: Employee, links: InspectorLinks): void {
-  links.confirm({
-    icon: 'injured',
-    title: t('ui.crew.dismiss_confirm_title'),
-    body: t('ui.crew.dismiss_confirm_body', { name: e.name }),
-    confirmLabel: t('ui.crew.dismiss'),
-    onConfirm: () => links.run(`employee fire ${e.id}`),
-  });
 }
 
 export const employeeContent: KindContent = {

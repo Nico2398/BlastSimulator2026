@@ -3414,6 +3414,7 @@
   "inspector.status_fragment": "Loose fragment",
   "inspector.no_move_target": "Point at the ground to pick a destination",
   "inspector.action.detail": "Detail",
+  "inspector.command_failed": "Action failed",
   "inspector.action.dispatch_here": "Dispatch Here",
   "inspector.action.train": "Train",
   "inspector.action.move_here": "Move Here",

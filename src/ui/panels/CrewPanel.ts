@@ -26,7 +26,7 @@ import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import {
-  moraleColor, makeAvatar, makeMoraleMeter, makeStatusTags, makeHiredLocationStrip, makeNeedsSection,
+  moraleColor, makeAvatar, makeRoleMoraleLine, raiseCommand, trainCommand, dismissConfirmConfig, makeStatusTags, makeHiredLocationStrip, makeNeedsSection,
   makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection, makeManagerEffect,
 } from '../crewDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
@@ -238,11 +238,7 @@ export class CrewPanel extends PanelBase {
       el('span', { text: `#${e.id}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
     );
 
-    const roleLine = el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' } });
-    roleLine.append(
-      el('span', { text: t(`role.${e.role}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
-      ...makeMoraleMeter(e),
-    );
+    const roleLine = makeRoleMoraleLine(e);
 
     const managerEffect = makeManagerEffect(e);
     const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: managerEffect ? [nameLine, roleLine, managerEffect] : [nameLine, roleLine] });
@@ -264,8 +260,8 @@ export class CrewPanel extends PanelBase {
         this.tag(makeNeedsSection(e), 'bs-crew-needs'),
         this.tag(makeCurrentTaskSection(e, state), 'bs-crew-task'),
         this.tag(makeSkillsSection(e), 'bs-crew-skills'),
-        this.tag(makePaySection(e, amount => this.gameConsole?.(`employee raise ${e.id} amount:${amount}`)), 'bs-crew-pay'),
-        this.tag(makeTrainingSection(e, state, (skill, buildingId) => this.gameConsole?.(`employee train ${e.id} skill:${skill} building:${buildingId}`)), 'bs-crew-training'),
+        this.tag(makePaySection(e, amount => this.gameConsole?.(raiseCommand(e, amount))), 'bs-crew-pay'),
+        this.tag(makeTrainingSection(e, state, (skill, buildingId) => this.gameConsole?.(trainCommand(e, skill, buildingId))), 'bs-crew-training'),
         this.tag(makeDismissSection(e, () => this.requestDismiss(e)), 'bs-crew-dismiss'),
       );
       row.appendChild(detail);
@@ -279,12 +275,6 @@ export class CrewPanel extends PanelBase {
    * overlay rather than firing on the first click.
    */
   private requestDismiss(e: Employee): void {
-    this.onConfirmRequestCb?.({
-      icon: 'injured',
-      title: t('ui.crew.dismiss_confirm_title'),
-      body: t('ui.crew.dismiss_confirm_body', { name: e.name }),
-      confirmLabel: t('ui.crew.dismiss'),
-      onConfirm: () => this.gameConsole?.(`employee fire ${e.id}`),
-    });
+    this.onConfirmRequestCb?.(dismissConfirmConfig(e, command => this.gameConsole?.(command)));
   }
 }

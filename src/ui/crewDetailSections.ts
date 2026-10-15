@@ -17,6 +17,7 @@ import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 import { iconEl } from './icons.js';
+import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { describeRamp } from './describeRamp.js';
 import { resolveEmployeeLocation, resolveTaskTarget, trainingSchool, type EntityRef } from './crewFacts.js';
 
@@ -139,8 +140,11 @@ export function makeHiredLocationStrip(e: Employee, state: GameState, link?: Lin
   if (loc.kind === 'inside') {
     location = linkedSentence('ui.crew.location_inside', 'building', buildingLabel(loc.building, state), loc.building, link);
   } else if (loc.kind === 'aboard' || activity.kind === 'driving' || activity.kind === 'driving_to_task') {
-    const vehicle: EntityRef = loc.kind === 'aboard' ? loc.vehicle : { kind: 'vehicle', id: activity.vehicleId ?? 0 };
-    location = linkedSentence('ui.crew.location_aboard', 'vehicle', `#${vehicle.id}`, vehicle, link);
+    const vehicle: EntityRef | null = loc.kind === 'aboard' ? loc.vehicle
+      : activity.vehicleId !== undefined && activity.vehicleId !== null ? { kind: 'vehicle', id: activity.vehicleId } : null;
+    location = vehicle
+      ? linkedSentence('ui.crew.location_aboard', 'vehicle', `#${vehicle.id}`, vehicle, link)
+      : t('ui.crew.location_aboard', { vehicle: '' }).trim();
   } else if (loc.kind === 'stuck') {
     location = t('ui.crew.location_stuck', { n: loc.ticks, x: loc.x, z: loc.z });
   } else if (loc.kind === 'walking') {
@@ -413,6 +417,26 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   return wrap;
 }
 
+// ── CONSOLE COMMANDS / CONFIRM (shared by the Crew row and the inspector) ──
+
+export const raiseCommand = (e: Employee, amount: number): string => `employee raise ${e.id} amount:${amount}`;
+export const trainCommand = (e: Employee, skill: SkillCategory, buildingId: number): string => `employee train ${e.id} skill:${skill} building:${buildingId}`;
+const fireCommand = (e: Employee): string => `employee fire ${e.id}`;
+
+/**
+ * Dismissal removes the employee permanently (no severance, no reversal), so every host routes it
+ * through the shared confirm overlay; `run` receives the fire command on confirmation.
+ */
+export function dismissConfirmConfig(e: Employee, run: (command: string) => void): ConfirmModalConfig {
+  return {
+    icon: 'injured',
+    title: t('ui.crew.dismiss_confirm_title'),
+    body: t('ui.crew.dismiss_confirm_body', { name: e.name }),
+    confirmLabel: t('ui.crew.dismiss'),
+    onConfirm: () => run(fireCommand(e)),
+  };
+}
+
 // ── DISMISS ──
 
 export function makeDismissSection(e: Employee, onDismiss: () => void): HTMLElement {
@@ -425,7 +449,7 @@ export function makeDismissSection(e: Employee, onDismiss: () => void): HTMLElem
   return wrap;
 }
 
-// ── INSPECTOR-ONLY BUILDERS (#1762) ──
+// ── SHARED BUILDERS (Crew row + inspector, #1762) ──
 
 /** Role-coloured initials chip, shared by the roster card and the identity section. */
 export function makeAvatar(e: Employee): HTMLElement {
@@ -433,7 +457,7 @@ export function makeAvatar(e: Employee): HTMLElement {
 }
 
 /** Morale bar + percentage; the `bs-crew-morale-*` classes are what the Crew panel repaints in place. */
-export function makeMoraleMeter(e: Employee): HTMLElement[] {
+function makeMoraleMeter(e: Employee): HTMLElement[] {
   const color = moraleColor(e.morale);
   const fill = el('div', { className: 'bs-crew-morale-fill', attrs: { style: `height:100%;background:${color};width:${e.morale}%` } });
   const track = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;overflow:hidden;background:#242c36' }, children: [fill] });
@@ -441,14 +465,19 @@ export function makeMoraleMeter(e: Employee): HTMLElement[] {
   return [track, value];
 }
 
+/** Role label followed by the morale meter, shared by the roster card and the identity section. */
+export function makeRoleMoraleLine(e: Employee): HTMLElement {
+  return el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' }, children: [
+    el('span', { text: t(`role.${e.role}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
+    ...makeMoraleMeter(e),
+  ] });
+}
+
 /** Avatar, role, morale, status icons and hire day. */
 export function makeIdentitySection(e: Employee, state: GameState): HTMLElement {
   const nameCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' } });
   nameCol.append(
-    el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' }, children: [
-      el('span', { text: t(`role.${e.role}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
-      ...makeMoraleMeter(e),
-    ] }),
+    makeRoleMoraleLine(e),
     el('span', { text: `${t('ui.crew.hired')} ${hiredText(e)}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
   );
   return el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px' }, children: [makeAvatar(e), nameCol, makeStatusTags(e, state)] });

@@ -2,7 +2,7 @@
 // Employee inspector content (#1762): full detail sections, links, actions, live refresh.
 import { describe, it, expect, vi } from 'vitest';
 import { employeeContent } from '../../../../../src/ui/panels/inspector/employeeContent.js';
-import type { InspectorLinks, InspectorView } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
+import type { InspectorLinks } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../../src/core/entities/Employee.js';
@@ -41,7 +41,7 @@ function makeState(e: Employee, buildings: Building[] = [living, academy]): Game
 function makeLinks() {
   const select = vi.fn();
   const run = vi.fn();
-  const confirm = vi.fn<(c: ConfirmModalConfig) => void>();
+  const confirm = vi.fn<[ConfirmModalConfig], void>();
   const links: InspectorLinks = { select, run, confirm };
   return { links, select, run, confirm };
 }
@@ -73,8 +73,8 @@ describe('employee inspector — sections', () => {
   });
 
   it('the view wrapper carries .bs-employee-detail (sections mount inside it)', () => {
-    const { root } = build(makeEmployee());
-    expect(root.matches('.bs-employee-detail')).toBe(true);
+    const { view, root } = build(makeEmployee());
+    expect(view.sections[0]!.matches('.bs-employee-detail')).toBe(true);
     expect(root.querySelector('.bs-train-btn')).not.toBeNull();
   });
 

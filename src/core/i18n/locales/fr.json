@@ -3414,6 +3414,7 @@
   "inspector.status_fragment": "Fragment libre",
   "inspector.no_move_target": "Visez le sol pour choisir une destination",
   "inspector.action.detail": "Détail",
+  "inspector.command_failed": "Action échouée",
   "inspector.action.dispatch_here": "Envoyer ici",
   "inspector.action.train": "Former",
   "inspector.action.move_here": "Aller ici",

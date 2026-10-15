@@ -5,8 +5,11 @@ import type { Employee } from '../core/entities/Employee.js';
 import type { BuildingType } from '../core/entities/Building.js';
 import type { GameState } from '../core/state/GameState.js';
 
-/** A reference to another selectable entity. */
-export type EntityRef = { kind: 'building' | 'vehicle' | 'ramp' | 'hole'; id: number };
+/**
+ * A reference to another selectable entity. Only kinds resolvable from an employee's state appear here;
+ * hole and fragment task targets are not resolved to a link (they render as plain text).
+ */
+export type EntityRef = { kind: 'building' | 'vehicle' | 'ramp'; id: number };
 
 type EmployeeLocation =
   | { kind: 'inside'; building: EntityRef; buildingType: BuildingType; resting: boolean }
