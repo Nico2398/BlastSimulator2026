@@ -195,3 +195,18 @@ function isIdleForReposition(employee: Employee, vehicle: Vehicle): boolean {
   if (isMounted(employee.locomotion)) return false;
   return true;
 }
+
+/**
+ * Nearest alive, licensed employee (not injured or collapsing) who is resting
+ * or about to rest and so could be fetched to drive `vehicle` (#1746); null
+ * when none.
+ */
+export function findRestingLicensedDriver(
+  vehicle: Vehicle,
+  vehicleState: VehicleState,
+  employeeState: EmployeeState,
+): Employee | null {
+  void vehicle; void vehicleState; void employeeState;
+  // TODO: implement
+  return null;
+}

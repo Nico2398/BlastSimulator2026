@@ -47,6 +47,8 @@ export interface EvacuationResult {
   orderedEmployeeIds: number[];
   strandedVehicleIds: number[];
   strandedEmployeeIds: number[];
+  /** Driverless in-zone vehicles whose licensed crew member is resting outside the zone and will be fetched (#1746). */
+  awaitingRescuerVehicleIds: number[];
 }
 
 // ── Operations ──
@@ -108,6 +110,7 @@ export function clearZone(
     orderedEmployeeIds: [],
     strandedVehicleIds: [],
     strandedEmployeeIds: [],
+    awaitingRescuerVehicleIds: [],
   };
 
   // Only consulted when nobody inside can drive `v` out (#1648).
