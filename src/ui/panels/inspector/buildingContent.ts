@@ -12,6 +12,7 @@ import { buildingActionRules, REASON_CASH, type BuildingActionRules } from '../.
 import { el } from '../../dom.js';
 import type { ActionSpec, InspectorLinks, InspectorView, KindContent } from './InspectorContent.js';
 import { storageContents } from './storageContent.js';
+import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
 /** Lifecycle status line: operating, closed by an event, demolition ordered, rebuilding or under construction. */
@@ -151,7 +152,7 @@ export const buildingContent: KindContent = {
 
     const def = getBuildingDef(b.type, b.tier);
     const hp = `${Math.round(b.hp)} / ${def.maxHp}`;
-    const hpFraction = def.maxHp > 0 ? Math.min(1, Math.max(0, b.hp / def.maxHp)) : 0;
+    const hpFraction = fractionOf(b.hp, def.maxHp);
     const text = statusText(status);
     const upkeep = upkeepText(state, b);
     const capacity = getBuildingPeopleCapacity(b.type, b.tier);

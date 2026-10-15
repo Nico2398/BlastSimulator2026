@@ -120,6 +120,13 @@ function isPolicyApplicable(root: ParentNode): boolean {
 // tutorial rail's CSS block never touched it — purely resolveStageIndex's
 // signal for when to advance past "open the panel" / "press Run".
 export const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
+/**
+ * Choosing a survey method arms the point pick itself, so the rail has already
+ * moved to the pick stage by the time Run is clicked; Run on an armed pick is a
+ * no-op (SurveyPanel.pickTargetAndRun). Left inert there, a click that landed
+ * after the rail's next 250ms pass was swallowed by `pointer-events: none`.
+ */
+const SURVEY_RUN = '#bs-survey-run';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
 // Only an ore offer the pit can fill in full: rubble, supply and unfillable
 // offers' Accept stays visible but outside the rails allow set (#1335).
@@ -149,9 +156,11 @@ function pickerStages(
   pickHintKey: string,
   region: TileRegion,
   confirmSpent?: { spentWhen: (state: GameState) => boolean; waitingKey: string },
+  /** Controls that stay clickable on the pick stage because the tool is already armed (their click is a no-op). */
+  armedAlso: readonly string[] = [],
 ): TutorialStage[] {
   return [
-    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: [PICKER_CANCEL] },
+    { target: PICKER_CANVAS, hintKey: pickHintKey, region, also: [PICKER_CANCEL, ...armedAlso] },
     {
       target: PICKER_CONFIRM,
       hintKey: 'tutorial.stage.picker_confirm',
@@ -345,11 +354,11 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // name. Pointing the glow at a different method than the card describes is
     // exactly the kind of mismatch that loses a player.
     { target: '#bs-survey-panel [data-method="seismic"]', hintKey: 'tutorial.stage.survey_method' },
-    { target: '#bs-survey-run', hintKey: 'tutorial.stage.survey_run', also: ['#bs-survey-panel [data-method="seismic"]'] },
+    { target: SURVEY_RUN, hintKey: 'tutorial.stage.survey_run', also: ['#bs-survey-panel [data-method="seismic"]'] },
     ...pickerStages('tutorial.stage.survey_target', REGION.survey, {
       spentWhen: (state) => hasPendingActionOfType(state, 'survey'),
       waitingKey: 'tutorial.waiting.surveying',
-    }),
+    }, [SURVEY_RUN]),
   ],
 
   'hire-driller': hireStages('driller', 'tutorial.stage.hire_driller'),

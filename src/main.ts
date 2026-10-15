@@ -1229,6 +1229,10 @@ uiManager.setSelectVehicleHandler((vehicleId) => {
   scenePicking.select({ kind: 'vehicle', id: vehicleId, point: new THREE.Vector3(), distance: 0 });
 });
 
+uiManager.setSelectBuildingHandler((buildingId) => {
+  scenePicking.select({ kind: 'building', id: buildingId, point: new THREE.Vector3(), distance: 0 });
+});
+
 uiManager.setSelectEmployeeHandler((employeeId) => {
   scenePicking.select({ kind: 'employee', id: employeeId, point: new THREE.Vector3(), distance: 0 });
 });
@@ -1275,6 +1279,7 @@ function showSelection(entity: EntityPick, state: GameState): void {
   else entityHighlight.hide();
 }
 scenePicking.setSelectChangeHandler((entity) => {
+  uiManager.setListSelection(entity ? { kind: entity.kind, id: entity.id } : null);
   if (entity && ctx.state) {
     showSelection(entity, ctx.state);
     uiCues.entitySelected(entity.kind);

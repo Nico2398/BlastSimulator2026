@@ -1,0 +1,308 @@
+{
+  "name": "building-list-select-visual",
+  "description": "The Build panel's placed buildings are a master list (#1759). A player opens Build and clicks a placed row body: the inspector shows that building and Build stays open. Clicking another building in the scene moves the row highlight to it. Ordering a building lists a construction row; clicking it selects the site and the inspector shows it under construction.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:500000 staffed:true",
+      "description": "Staffed opening with a generous cushion for three buildings.",
+      "timeout": 40,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:500000 staffed:true"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 500000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:2,8 tier:1",
+      "description": "Order Living Quarters (#1) through the Build panel.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 8
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:15,17 tier:1",
+      "description": "Order a second Living Quarters (#2).",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 17
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:1500",
+      "description": "Wait for the crew to finish both sites so each has a placed row.",
+      "timeout": 130,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 1500,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Open Build and click the body of placed row #1 (not a button): the inspector shows building 1 and the Build panel stays open.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel .bs-build-placed-row div"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-placed-row div"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"]",
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "Row click selects and the panel stays open"
+      }
+    },
+    {
+      "command": "state",
+      "description": "The Build panel is still showing after the row click, and row #1 carries the selected highlight.",
+      "timeout": 30,
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected",
+        "equals": {
+          "buildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Player clicks the other building (#2) in the scene: its row takes the highlight and row #1 loses it.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"2\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected",
+        "equals": {
+          "buildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "build research_center at:26,14 tier:1",
+      "description": "Order a Research Center (#3). Its site has no mesh yet; the Build panel lists it as a construction row.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 26,
+          "z": 14
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Click the construction row of building 3: the inspector selects the site (data-id 3) while it is still a site.",
+      "timeout": 40,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel .bs-build-site-row"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-site-row"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"3\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"building\"][data-id=\"3\"]",
+        "equals": {
+          "orderedBuildingCount": 1,
+          "buildingCount": 2
+        },
+        "note": "Site row selects the site; inspector shows Under construction with progress"
+      }
+    }
+  ]
+}

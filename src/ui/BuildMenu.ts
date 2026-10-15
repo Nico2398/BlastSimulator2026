@@ -63,6 +63,12 @@ import { buildDemolishConfirm, freightOreKg } from './demolishConfirm.js';
 import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
 import { memoizedPlacementCutoff, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
+import type { ListSelection } from './selectionRoute.js';
+import { placedRowModel, siteRowModel, type SiteRowModel } from './panels/placedRowModel.js';
+import { focusCameraOn } from './locateButton.js';
+import {
+  applyRowSelection, makeSiteRow, onRowBodyClick, placedInfoBlock, siteSignature, syncPlacedRow, syncSiteRow,
+} from './buildMenuRows.js';
 
 /** Footprint rect of a `sizeX` x `sizeZ` building whose origin tile is (x, z). */
 function rectAt(x: number, z: number, sizeX: number, sizeZ: number): Rect {
@@ -73,6 +79,12 @@ export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly catalogEl: HTMLElement;
   private readonly placedEl: HTMLElement;
+  /** Construction-site rows (planned buildings, rebuilds included); the wrapper hides while empty. */
+  private readonly siteWrapEl: HTMLElement;
+  private readonly siteEl: HTMLElement;
+  private selectBuildingCb?: (buildingId: number) => void;
+  private selection: ListSelection = null;
+  private lastSiteSignature = '';
   private readonly statusEl: HTMLElement;
   private placementKit: PlacementKit | null = null;
   /** Ground-truth height sampler (#1008) used to refuse a footprint over uneven ground; unset means no footprint check runs. */
@@ -136,6 +148,12 @@ export class BuildMenu extends PanelBase {
     this.placedEl.id = 'bs-build-placed';
     this.placedEl.style.cssText = 'display:flex;flex-direction:column;gap:6px';
 
+    this.siteEl = el('div');
+    this.siteEl.id = 'bs-build-sites';
+    this.siteEl.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+    this.siteWrapEl = el('div', { children: [this.sectionLabel('ui.build.site_section'), this.siteEl] });
+    this.siteWrapEl.style.cssText = 'display:none;flex-direction:column;gap:6px';
+
     this.statusEl = el('div', {
       attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);min-height:14px' },
     });
@@ -145,6 +163,7 @@ export class BuildMenu extends PanelBase {
       this.makeTerrainSection(),
       this.sectionLabel('ui.build.placed_buildings'),
       this.placedEl,
+      this.siteWrapEl,
       this.statusEl,
     );
     this.el.append(header, this.bodyEl);
@@ -174,6 +193,12 @@ export class BuildMenu extends PanelBase {
     this.buildCatalog();
     this.refreshCatalogButtons(this.lastCash);
     this.refreshPlacedList(this.lastState?.buildings.buildings ?? []);
+    this.refreshSiteList();
+  }
+
+  show(): void {
+    super.show();
+    this.applySelection();
   }
 
 
@@ -195,6 +220,9 @@ export class BuildMenu extends PanelBase {
       this.lastPlacedSignature = placedSig;
       this.refreshPlacedList(state.buildings.buildings);
     }
+    const siteModels = new Map(state.plannedBuildings.map((pb) => [pb.buildingId, siteRowModel(pb, state)]));
+    this.syncSites(state, siteModels);
+    this.syncLiveRows(state, siteModels);
     if (unlockedChanged || queueChanged) this.refreshCatalogButtons(state.cash);
     else if (state.buildings.researchQueue.length > 0) this.refreshResearchProgress();
 
@@ -203,6 +231,41 @@ export class BuildMenu extends PanelBase {
       this.lastPlannedBuildingsSignature = plannedSig;
       this.refreshUnderConstructionCounts(state);
     }
+  }
+
+  /** Rebuild the site rows when the planned set (or a site turning into a rebuild) changed. */
+  private syncSites(state: GameState, models: ReadonlyMap<number, SiteRowModel>): void {
+    const sig = siteSignature(state.plannedBuildings, (pb) => models.get(pb.buildingId)?.rebuild ?? false);
+    if (sig === this.lastSiteSignature) return;
+    this.lastSiteSignature = sig;
+    this.refreshSiteList(models);
+  }
+
+  /** Rebuild the site rows; without `models` they are computed from the last observed state. */
+  private refreshSiteList(models?: ReadonlyMap<number, SiteRowModel>): void {
+    const state = this.lastState;
+    const sites = state?.plannedBuildings ?? [];
+    this.siteWrapEl.style.display = state && sites.length > 0 ? 'flex' : 'none';
+    this.siteEl.replaceChildren(...(state ? sites : []).map((pb) =>
+      makeSiteRow(pb, models?.get(pb.buildingId) ?? siteRowModel(pb, state!), () => this.selectBuildingCb?.(pb.buildingId))));
+    this.applySelection();
+  }
+
+  /** Write HP, utilization, badge and site progress into the existing rows. */
+  private syncLiveRows(state: GameState, siteModels: ReadonlyMap<number, SiteRowModel>): void {
+    const byId = new Map(state.buildings.buildings.map((b) => [b.id, b]));
+    for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
+      const b = byId.get(Number(row.dataset['buildingId']));
+      if (b) syncPlacedRow(row, placedRowModel(b, state));
+    }
+    for (const row of Array.from(this.siteEl.children) as HTMLElement[]) {
+      const model = siteModels.get(Number(row.dataset['buildingId']));
+      if (model) syncSiteRow(row, model);
+    }
+  }
+
+  private applySelection(): void {
+    applyRowSelection([this.placedEl, this.siteEl], this.selection);
   }
 
   /** Update each catalog row's "N under construction" count (#556). */
@@ -255,6 +318,17 @@ export class BuildMenu extends PanelBase {
     const requestConfirm = this.onConfirmRequestCb;
     if (upgrade.cutoff !== null && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(upgrade.cutoff, doUpgrade));
     else doUpgrade();
+  }
+
+  /** Wire placed-row click-to-select (main.ts owns ScenePicking). */
+  setSelectBuildingHandler(cb: (buildingId: number) => void): void {
+    this.selectBuildingCb = cb;
+  }
+
+  /** Mirror the scene selection so the matching placed row highlights. */
+  setSelectedEntity(sel: ListSelection): void {
+    this.selection = sel;
+    this.applySelection();
   }
 
   /** Routes a flow's result message somewhere visible while the panel is closed (#1758). */
@@ -807,6 +881,7 @@ export class BuildMenu extends PanelBase {
     }
     const reservations = this.currentReservations();
     this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b, state, reservations)));
+    this.applySelection();
   }
 
   private makePlacedRow(b: Building, state: GameState, reservations: ReadonlyArray<TerrainReservation>): HTMLElement {
@@ -818,10 +893,8 @@ export class BuildMenu extends PanelBase {
       'display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:7px 8px;' +
       'border:1px solid var(--bsx-hairline);border-radius:6px;background:var(--bsx-card)';
 
-    const info = document.createElement('div');
-    info.style.cssText = 'flex:1 1 100%;min-width:0;font-size:10px;color:var(--bsx-text-tinted);overflow-wrap:break-word';
-    info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
-    info.textContent = `#${b.id} ${t(`building.${b.type}.t${b.tier}.name`)} (${b.x},${b.z})`;
+    const info = placedInfoBlock(b, placedRowModel(b, state), () => focusCameraOn(b.x, b.z));
+    onRowBodyClick(row, () => this.selectBuildingCb?.(b.id));
 
     const rules = buildingActionRules(state, b, reservations);
 

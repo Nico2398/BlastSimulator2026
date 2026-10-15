@@ -1059,3 +1059,89 @@ describe('UIManager — blast report follows the playback snapshot (#1590)', () 
     expect(uiManager.blastReportModalPending).toBe(true);
   });
 });
+
+// ── Build menu as a master list: select handler + selection route (#1759) ────
+
+describe('UIManager — Build menu building-select and list selection (#1759)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+  });
+
+  afterEach(() => {
+    uiManager.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  function stateWithBuildings(): GameState {
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.buildings.buildings = [
+      { id: 1, type: 'management_office', tier: 1, x: 5, z: 5, hp: 100, active: true, occupantIds: [] },
+      { id: 2, type: 'living_quarters', tier: 1, x: 9, z: 5, hp: 100, active: true, occupantIds: [] },
+    ];
+    state.buildings.nextId = 3;
+    return state;
+  }
+
+  const placedRow = (id: number) =>
+    container.querySelector<HTMLElement>(`.bs-build-placed-row[data-building-id="${id}"]`);
+
+  it('setSelectBuildingHandler forwards to the Build menu: a row click reaches the callback with the id', () => {
+    const cb = vi.fn();
+    uiManager.setSelectBuildingHandler(cb);
+    uiManager.showPanel('build');
+    uiManager.update(stateWithBuildings());
+    placedRow(2)!.click();
+    expect(cb).toHaveBeenCalledWith(2);
+  });
+
+  it('setListSelection highlights the matching Build row', () => {
+    uiManager.showPanel('build');
+    uiManager.update(stateWithBuildings());
+    uiManager.setListSelection({ kind: 'building', id: 2 });
+    expect(placedRow(2)!.classList.contains('bs-build-row-selected')).toBe(true);
+    expect(placedRow(1)!.classList.contains('bs-build-row-selected')).toBe(false);
+  });
+
+  it('setListSelection(null) clears the highlight', () => {
+    uiManager.showPanel('build');
+    uiManager.update(stateWithBuildings());
+    uiManager.setListSelection({ kind: 'building', id: 2 });
+    uiManager.setListSelection(null);
+    expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+  });
+
+  it('setListSelection is idempotent', () => {
+    uiManager.showPanel('build');
+    uiManager.update(stateWithBuildings());
+    uiManager.setListSelection({ kind: 'building', id: 2 });
+    uiManager.setListSelection({ kind: 'building', id: 2 });
+    expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(1);
+  });
+
+  it('a selection made while the panel is closed highlights the row once the panel is shown and updated', () => {
+    const state = stateWithBuildings();
+    uiManager.setListSelection({ kind: 'building', id: 1 });
+    uiManager.showPanel('build');
+    uiManager.update(state);
+    expect(placedRow(1)!.classList.contains('bs-build-row-selected')).toBe(true);
+  });
+
+  it('a selection that changes between updates is reflected by the next update', () => {
+    const state = stateWithBuildings();
+    uiManager.showPanel('build');
+    uiManager.update(state);
+    uiManager.setListSelection({ kind: 'building', id: 1 });
+    uiManager.update(state);
+    uiManager.setListSelection({ kind: 'building', id: 2 });
+    uiManager.update(state);
+    expect(placedRow(1)!.classList.contains('bs-build-row-selected')).toBe(false);
+    expect(placedRow(2)!.classList.contains('bs-build-row-selected')).toBe(true);
+  });
+});

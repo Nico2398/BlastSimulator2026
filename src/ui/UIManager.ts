@@ -39,6 +39,7 @@ import type { UiCues } from '../audio/ui/UiCues.js';
 import type { SaveBackend } from '../core/state/SaveBackend.js';
 
 import type { GameConsoleFn } from './gameConsole.js';
+import type { ListSelection } from './selectionRoute.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 
 
@@ -58,6 +59,7 @@ export class UIManager {
   private readonly financesPanel: FinancesPanel;
   private readonly operationsPanel: OperationsPanel;
   private readonly buildMenu: BuildMenu;
+  private listSelection: ListSelection = null;
   private readonly fleetPanel: FleetPanel;
   private readonly crewPanel: CrewPanel;
   private readonly eventModal: EventModal;
@@ -360,6 +362,21 @@ export class UIManager {
     this.fleetPanel.setSelectVehicleHandler(cb);
   }
 
+  /** Wire the Build menu's per-row click-to-select (main.ts owns ScenePicking). */
+  setSelectBuildingHandler(cb: (buildingId: number) => void): void {
+    this.buildMenu.setSelectBuildingHandler(cb);
+  }
+
+  /** Current scene selection for the list panels' row highlight; idempotent, re-applied on update (the Build menu re-applies it itself on show). */
+  setListSelection(sel: ListSelection): void {
+    this.listSelection = sel;
+    this.applyListSelection();
+  }
+
+  private applyListSelection(): void {
+    this.buildMenu.setSelectedEntity(this.listSelection);
+  }
+
   /** Open the Crew panel with hiring for `role` in view. */
   showCrewHiring(role: EmployeeRole): void {
     this.showPanel('employees');
@@ -494,6 +511,7 @@ export class UIManager {
     if (this.operationsPanel.visible) this.operationsPanel.update(state);
     this.buildMenu.observe(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
+    this.applyListSelection();
     if (this.fleetPanel.visible) this.fleetPanel.update(state);
     if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyPanel.visible) this.surveyPanel.update(state);
