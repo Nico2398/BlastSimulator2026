@@ -10,7 +10,7 @@ import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js'
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, actionRankTier, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
@@ -502,10 +502,11 @@ function selectWithinIndex(
   // than inside the comparator: the ore-priority bonus resolves the
   // action's fragment, and a comparator re-resolving it O(n log n) times
   // over a post-blast pool of thousands is the same per-tick blow-up
-  // createFragmentLookup exists for (HaulDispatch.ts). Same order as
-  // before — cost ascending, id ascending on a tie.
-  const costed = claimable.map(action => ({ action, ...estimateWithBonus(state, employee, action, fragmentOf) }));
+  // createFragmentLookup exists for (HaulDispatch.ts).
+  const costed = claimable.map(action => ({ action, tier: actionRankTier(action.type), ...estimateWithBonus(state, employee, action, fragmentOf) }));
+  // Tier first (higher wins, #1742), then cost ascending, id ascending on a tie.
   costed.sort((a, b) => {
+    if (a.tier !== b.tier) return b.tier - a.tier;
     const costDiff = a.cost - b.cost;
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
@@ -517,26 +518,36 @@ function selectWithinIndex(
   // attempts, which stay free for a farther candidate that might resolve.
   // Debris is already filtered by it inside the thinning; this loop still
   // covers the non-debris candidates the thinning passes through.
-
+  //
+  // The bounded search runs per tier, highest first; the first tier that
+  // yields a resolvable candidate wins, an unreachable tier falls through.
   let best: SelectedAction | null = null;
   let bestAdjusted = Infinity;
   let attemptsSpent = 0;
-  for (let i = 0; i < costed.length && attemptsSpent < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
-    const { action: candidate, cost: estimate, bonus } = costed[i]!;
+  let tierStart = 0;
+  while (best === null && tierStart < costed.length) {
+    const tier = costed[tierStart]!.tier;
+    let tierEnd = tierStart;
+    while (tierEnd < costed.length && costed[tierEnd]!.tier === tier) tierEnd++;
+    attemptsSpent = 0;
+    for (let i = tierStart; i < tierEnd && attemptsSpent < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
+      const { action: candidate, cost: estimate, bonus } = costed[i]!;
 
-    // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
-    if (best !== null && estimate >= bestAdjusted) break;
+      // Sorted ascending and estimate ~<= real (approximate bound, see doc): stop.
+      if (best !== null && estimate >= bestAdjusted) break;
 
-    if (!reachable(candidate)) continue;
+      if (!reachable(candidate)) continue;
 
-    attemptsSpent++;
-    const resolved = resolveActionCost(state, employee, candidate);
-    if (resolved === null) continue;
-    const adjusted = Math.max(0, resolved.totalTicks - bonus);
-    if (adjusted < bestAdjusted) {
-      best = { action: candidate, totalTicks: resolved.totalTicks };
-      bestAdjusted = adjusted;
+      attemptsSpent++;
+      const resolved = resolveActionCost(state, employee, candidate);
+      if (resolved === null) continue;
+      const adjusted = Math.max(0, resolved.totalTicks - bonus);
+      if (adjusted < bestAdjusted) {
+        best = { action: candidate, totalTicks: resolved.totalTicks };
+        bestAdjusted = adjusted;
+      }
     }
+    tierStart = tierEnd;
   }
 
   return best;
