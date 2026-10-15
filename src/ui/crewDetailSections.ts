@@ -16,6 +16,10 @@ import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, h
 import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
+import type { EntityRef } from './crewFacts.js';
+
+/** Builds a clickable reference to another entity; the host decides what a click does (the inspector selects it). */
+export type LinkFactory = (kind: EntityRef['kind'], id: number, label: string) => HTMLElement;
 
 /** Quick-raise amounts offered in the PAY block — flat $ presets, not derived from any per-role scale. */
 export const RAISE_PRESETS = [50, 100, 250];
@@ -92,7 +96,7 @@ function trainingInfoBlock(title: string, detail: string): HTMLElement {
 
 // ── HIRED / LOCATION ──
 
-export function makeHiredLocationStrip(e: Employee, state: GameState): HTMLElement {
+export function makeHiredLocationStrip(e: Employee, state: GameState, _link?: LinkFactory): HTMLElement {
   const hired = e.hiredAtTick !== undefined
     ? t('ui.crew.day_label', { day: Math.floor(e.hiredAtTick / 24) + 1 })
     : t('ui.crew.hired_unknown');
@@ -141,7 +145,7 @@ export function makeNeedsSection(e: Employee): HTMLElement {
 
 // ── CURRENT TASK ──
 
-export function makeCurrentTaskSection(e: Employee, state: GameState): HTMLElement {
+export function makeCurrentTaskSection(e: Employee, state: GameState, _link?: LinkFactory): HTMLElement {
   const activity = computeEmployeeActivity(e, state.vehicles);
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.current_task')));
@@ -269,7 +273,7 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
 
 // ── TRAINING ──
 
-export function makeTrainingSection(e: Employee, state: GameState, onTrain: (skill: SkillCategory, buildingId: number) => void): HTMLElement {
+export function makeTrainingSection(e: Employee, state: GameState, onTrain: (skill: SkillCategory, buildingId: number) => void, _link?: LinkFactory): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' } });
   wrap.appendChild(microLabel(t('ui.crew.training')));
 
@@ -357,4 +361,21 @@ export function makeDismissSection(e: Employee, onDismiss: () => void): HTMLElem
   wrap.appendChild(btn);
   if (e.unionized) wrap.appendChild(reasonLine(t('ui.crew.dismiss_union_blocked')));
   return wrap;
+}
+
+// ── INSPECTOR-ONLY BUILDERS (#1762) ──
+
+/** Avatar, role, morale, status icons and hire day. */
+export function makeIdentitySection(_e: Employee, _state: GameState): HTMLElement {
+  throw new Error('not implemented');
+}
+
+/** Resting at a building with time left, or walking to rest; null when neither. */
+export function makeRestSection(_e: Employee, _state: GameState, _link?: LinkFactory): HTMLElement | null {
+  throw new Error('not implemented');
+}
+
+/** Status icon chips (union, injured, collapsed, training, driving), shared by the Crew row and the inspector. */
+export function makeStatusTags(_e: Employee, _state: GameState): HTMLElement {
+  throw new Error('not implemented');
 }

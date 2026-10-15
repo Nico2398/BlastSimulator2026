@@ -11,6 +11,7 @@
 // their DOM nodes, so a click is never lost to a rebuild.
 
 import { Vector3 } from 'three';
+import type { ConfirmModalConfig } from '../panels/ConfirmModal.js';
 import { t } from '../../core/i18n/I18n.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
@@ -33,6 +34,8 @@ export class Inspector {
   private onAction: ((action: InspectorAction, entity: EntityPick) => void) | null = null;
   private onSelect: ((entity: EntityPick) => void) | null = null;
   private onClose: (() => void) | null = null;
+  private onCommand: ((command: string) => void) | null = null;
+  private onConfirm: ((config: ConfirmModalConfig) => void) | null = null;
   private current: EntityPick | null = null;
   private lastState: GameState | null = null;
   private shownSignature: string | null = null;
@@ -40,6 +43,8 @@ export class Inspector {
 
   private readonly links: InspectorLinks = {
     select: (kind, id) => this.onSelect?.({ kind, id, point: new Vector3(), distance: 0 }),
+    run: command => this.onCommand?.(command),
+    confirm: config => this.onConfirm?.(config),
   };
 
   constructor(container: HTMLElement) {
@@ -75,6 +80,10 @@ export class Inspector {
   setActionHandler(cb: (action: InspectorAction, entity: EntityPick) => void): void { this.onAction = cb; }
   /** Called when a link inside the window (an occupant name) asks to select another entity. */
   setSelectHandler(cb: (entity: EntityPick) => void): void { this.onSelect = cb; }
+  /** Console command sink for inspector buttons (raise, train, fire). */
+  setCommandHandler(cb: (command: string) => void): void { this.onCommand = cb; }
+  /** Confirm-overlay sink for destructive inspector actions. */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirm = cb; }
   /** Called when the close button is used; the caller clears the selection and its outline. */
   setCloseHandler(cb: () => void): void { this.onClose = cb; }
 
