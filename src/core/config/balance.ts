@@ -1147,6 +1147,17 @@ export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 // (32 ticks), doubled = 64 ticks: 4x the base ore bonus, scaled by urgency.
 export const ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS: number = 64;
 
+// Ore density (share of the fragment's volume that is the demanded ore) at
+// which a fragment earns the full demand bonus (#1828). Richer fragments are
+// capped here; leaner ones scale down proportionally. A half-ore fragment is
+// already a rich haul, so grade above it adds no extra urgency.
+export const ORE_DEMAND_FULL_GRADE: number = 0.5;
+
+// Below this ore share a fragment counts as trace and earns no demand bonus
+// (#1828), so a speck of ore in plain spoil does not pull haulers off real
+// work. 5% is lean enough to ignore, rich enough that genuine ore clears it.
+export const ORE_DEMAND_MIN_GRADE: number = 0.05;
+
 /**
  * Rank tier per action type: a HIGHER tier is considered before any lower one,
  * and cost only orders candidates within a tier (#1742). Without it a cheap
