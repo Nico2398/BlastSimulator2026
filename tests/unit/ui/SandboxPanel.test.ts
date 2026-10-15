@@ -24,8 +24,9 @@ import {
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import { ORE_DEPTH_UNBOUNDED, getAllOres } from '../../../src/core/world/OreCatalog.js';
-import { vehicleDisplayName } from '../../../src/ui/fleetDetailSections.js';
+import { vehicleDisplayName, buildingDisplayName } from '../../../src/ui/fleetDetailSections.js';
 import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
+import { getBuildingDef } from '../../../src/core/entities/Building.js';
 
 const REMOVED_FIELD_IDS = [
   'bs-sandbox-size',
@@ -485,5 +486,82 @@ describe('SandboxPanel', () => {
     expect(select.style.cssText).not.toMatch(/(^|;)\s*width\s*:(?!\s*auto)/);
     expect(parseInt(select.style.maxWidth, 10)).toBeGreaterThanOrEqual(180);
     expect(parseInt(select.style.minWidth, 10)).toBeGreaterThanOrEqual(180);
+  });
+  // ---- #1739: kit buildings name their role; panel is on the bsx design system ----
+
+  it('buildingDisplayName reads "<type name> (<joke name>)" (#1739)', () => {
+    expect(buildingDisplayName('freight_warehouse', 1)).toBe('Freight Warehouse (The Pile)');
+    expect(buildingDisplayName('spoil_heap', 1)).toBe('Spoil Heap (The Dump)');
+    for (const [type, tier] of [['driving_center', 2], ['living_quarters', 3]] as const) {
+      expect(buildingDisplayName(type, tier)).toBe(`${t(`building.${type}.name`)} (${t(getBuildingDef(type, tier).nameKey)})`);
+    }
+  });
+
+  it('opening line names each building as "N× <type> (<joke name>)" (#1739)', () => {
+    panel.show();
+    changeSelect('difficulty', 'easy');
+    const shown = text('bs-sandbox-difficulty-opening');
+    expect(shown).toContain('buildings: 1× Freight Warehouse (The Pile), 1× Spoil Heap (The Dump)');
+    const buildings = sandboxDifficultyDetails('easy').buildings;
+    expect(buildings.length).toBeGreaterThan(0);
+    for (const b of buildings) {
+      expect(shown).toContain(`${b.count}× ${t(`building.${b.type}.name`)} (${buildingDisplayName(b.type, b.tier)})`);
+    }
+  });
+
+  it('opening line building entries are localized in French (#1739)', () => {
+    const prev = getLocale();
+    setLocale('fr');
+    try {
+      document.body.innerHTML = '';
+      const c = document.createElement('div');
+      document.body.appendChild(c);
+      new SandboxPanel(c).show();
+      changeSelect('difficulty', 'easy');
+      const shown = text('bs-sandbox-difficulty-opening');
+      for (const b of sandboxDifficultyDetails('easy').buildings) {
+        const type = t(`building.${b.type}.name`);
+        const joke = t(getBuildingDef(b.type, b.tier).nameKey);
+        expect(type).not.toBe(`building.${b.type}.name`);
+        expect(shown).toContain(`${b.count}× ${type} (${joke})`);
+      }
+    } finally {
+      setLocale(prev);
+    }
+  });
+
+  const legacyClass = /(^|\s)bs-(btn|btn-primary|btn-danger|input|select|panel|panel-title|ui)(\s|$)/;
+  const legacyPalette = /#e8e0d0|#d8d0c0|#c0a060|#6a5030|#ffe0a0|#9a8868|#a09070|#d0c8b0|#060402|#ffc840|rgba\(\s*8\s*,\s*6\s*,\s*3|rgba\(\s*200\s*,\s*160\s*,\s*60|rgba\(\s*220\s*,\s*150\s*,\s*0|rgba\(\s*255\s*,\s*200\s*,\s*64/i;
+
+  it('the panel subtree carries no legacy bs- chrome class (#1739)', () => {
+    panel.show();
+    const root = document.getElementById('bs-sandbox-panel')!;
+    const offenders = [root, ...Array.from(root.querySelectorAll('*'))]
+      .filter(e => legacyClass.test(e.getAttribute('class') ?? ''))
+      .map(e => `${e.tagName}#${e.id}.${e.getAttribute('class')}`);
+    expect(offenders).toEqual([]);
+  });
+
+  it('no inline style in the panel subtree uses a pre-redesign palette literal (#1739)', () => {
+    panel.show();
+    const root = document.getElementById('bs-sandbox-panel')!;
+    const offenders = [root, ...Array.from(root.querySelectorAll('*'))]
+      .filter(e => legacyPalette.test(e.getAttribute('style') ?? ''))
+      .map(e => `${e.tagName}#${e.id}: ${e.getAttribute('style')}`);
+    expect(offenders).toEqual([]);
+  });
+
+  it('Back, Start and randomise are bsx buttons; Start is the primary one (#1739)', () => {
+    panel.show();
+    for (const id of ['bs-sandbox-back', 'bs-sandbox-start', 'bs-sandbox-randomize']) {
+      expect(document.getElementById(id)!.classList.contains('bsx-btn'), id).toBe(true);
+    }
+    expect(document.getElementById('bs-sandbox-start')!.classList.contains('bsx-btn-primary')).toBe(true);
+  });
+
+  it('the panel draws inside the bsx root so it inherits the bsx font and palette (#1739)', () => {
+    panel.show();
+    const root = document.getElementById('bs-sandbox-panel')!;
+    expect(root.classList.contains('bsx-root') || root.closest('.bsx-root') !== null).toBe(true);
   });
 });
