@@ -24,7 +24,7 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
-import { getMaxBuildingTier, type BuildingTier } from './core/entities/Building.js';
+import { getMaxBuildingTier } from './core/entities/Building.js';
 import { isInsideBuilding } from './core/entities/EmployeeLocomotion.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
@@ -67,8 +67,7 @@ import { anchorFootprint, isHostResolvedKind, resolveSelection, type SelectionAn
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
-import { buildDemolishConfirm } from './ui/demolishConfirm.js';
-import { warehouseStoredKg } from './core/economy/FreightWarehouses.js';
+import { buildDemolishConfirm, freightOreKg } from './ui/demolishConfirm.js';
 import { Inspector } from './ui/shell/Inspector.js';
 import { formatBalance } from './ui/shell/TopBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
@@ -1358,11 +1357,9 @@ inspector.setActionHandler((action, entity) => {
       // The Build panel's own flow (research guard, cutoff confirm) without opening the panel (#1758).
       uiManager.upgradeBuilding(entity.id);
       break;
-    case 'research': {
-      const target = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
-      if (target && target.tier < 3) uiManager.queueBuildingResearch(target.type, (target.tier + 1) as BuildingTier);
+    case 'research':
+      uiManager.queueBuildingResearch(entity.id);
       break;
-    }
     case 'move':
       uiManager.moveBuilding(entity.id);
       break;
@@ -1375,9 +1372,7 @@ inspector.setActionHandler((action, entity) => {
     case 'demolish': {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;
-      const storedOreKg = placedBuilding.type === 'freight_warehouse' && ctx.state
-        ? Math.round(warehouseStoredKg(ctx.state.logistics, entity.id))
-        : 0;
+      const storedOreKg = ctx.state ? freightOreKg(ctx.state.logistics, placedBuilding) : 0;
       uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
         reportOrderResult(t('inspector.action.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
       }, { storedOreKg }));

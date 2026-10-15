@@ -4,7 +4,14 @@ import type { Building } from '../core/entities/Building.js';
 import { getDemolishCost, warehouseStockKg } from '../core/entities/Building.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import { t } from '../core/i18n/I18n.js';
+import type { LogisticsState } from '../core/economy/Logistics.js';
+import { warehouseStoredKg } from '../core/economy/FreightWarehouses.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
+
+/** Freight ore (kg) a demolition of `b` would lose; 0 for any other type. */
+export function freightOreKg(logistics: LogisticsState, b: Building): number {
+  return b.type === 'freight_warehouse' ? Math.round(warehouseStoredKg(logistics, b.id)) : 0;
+}
 
 /** Build the confirm-modal config for demolishing `b`; `onConfirm` runs the demolition. */
 export function buildDemolishConfirm(b: Building, onConfirm: () => void, opts: { storedOreKg?: number } = {}): ConfirmModalConfig {

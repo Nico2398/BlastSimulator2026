@@ -10,10 +10,9 @@ import { isDemolitionOrdered } from '../core/engine/BuildingDemolition.js';
 import { getResearchTaskDef } from '../core/config/balance.js';
 import { researchCostFor } from '../core/events/ActiveModifiers.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
-import type { PlacementCutoff } from '../core/entities/Building.js';
-import type { Rect } from '../core/world/WorldGen.js';
 import type { GameState } from '../core/state/GameState.js';
-import { placementCutoffFor, cutoffStateKey } from './placementCutoffConfirm.js';
+import type { PlacementCutoff } from '../core/entities/Building.js';
+import { memoizedPlacementCutoff } from './placementCutoffConfirm.js';
 
 /** Reason key shared by every action refused for short cash; BuildMenu keeps its plain `$cost` tooltip for it. */
 export const REASON_CASH = 'inspector.reason.cash';
@@ -25,7 +24,8 @@ export interface BuildingActionRules {
     reasonKey: string | null;
     reasonParams?: Record<string, string | number>;
     nextTier: BuildingTier | null;
-    cutoff: number | null;
+    /** What the upgraded footprint would strand from the crew (#1391); null when nothing or not applicable. */
+    cutoff: PlacementCutoff | null;
   };
   research: {
     type: BuildingType;
@@ -57,17 +57,6 @@ export function buildingActionRules(
     move: { cost: moveCost, disabledReasonKey: orderedOr(moveCost) },
     demolish: { cost: demolishCost, disabledReasonKey: orderedOr(demolishCost) },
   };
-}
-
-/** Single-entry memo: the inspector asks every frame, but the flood only changes with the nav grid or the crew. */
-let cutoffMemo: { grid: unknown; key: string; value: PlacementCutoff | null } | null = null;
-
-function memoCutoff(state: GameState, buildingKey: string, next: Rect, freed: Rect): PlacementCutoff | null {
-  const key = `${state.navGrid?.revision ?? -1}|${cutoffStateKey(state)}|${buildingKey}|${next.minX},${next.minZ},${next.maxX},${next.maxZ}`;
-  if (cutoffMemo?.grid === state.navGrid && cutoffMemo.key === key) return cutoffMemo.value;
-  const value = placementCutoffFor(state, next, freed);
-  cutoffMemo = { grid: state.navGrid, key, value };
-  return value;
 }
 
 type UpgradeRules = Pick<BuildingActionRules, 'upgrade' | 'research'>;
@@ -111,9 +100,9 @@ function upgradeRules(
     return refused(REASON_CASH, nextTier, cost, { need: formatMoney(cost), have: formatMoney(state.cash) });
   }
   const { sizeX: curX, sizeZ: curZ } = getDefSize(getBuildingDef(b.type, b.tier));
-  const cutoff = memoCutoff(state, `${b.id}:${b.tier}`, next, { minX: b.x, minZ: b.z, maxX: b.x + curX, maxZ: b.z + curZ });
+  const cutoff = memoizedPlacementCutoff(state, next, { minX: b.x, minZ: b.z, maxX: b.x + curX, maxZ: b.z + curZ });
   return {
-    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff: cutoff ? cutoff.cells : null },
+    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff },
     research: null,
   };
 }

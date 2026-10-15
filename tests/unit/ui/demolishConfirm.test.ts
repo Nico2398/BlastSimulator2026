@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // Demolish confirmation modal config (#1399).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { buildDemolishConfirm } from '../../../src/ui/demolishConfirm.js';
+import { createLogisticsState } from '../../../src/core/economy/Logistics.js';
+import { buildDemolishConfirm, freightOreKg } from '../../../src/ui/demolishConfirm.js';
 import { getDemolishCost, type Building } from '../../../src/core/entities/Building.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
@@ -127,5 +128,17 @@ describe('BuildMenu demolish confirm failure path (#1399)', () => {
 
     expect(gameConsole).toHaveBeenCalledWith('build destroy 3');
     expect(container.textContent).toContain('Nope: broke');
+  });
+});
+
+describe('freightOreKg (#1758)', () => {
+  it('sums stored ore of that freight warehouse only; other types are 0', () => {
+    const l = createLogisticsState();
+    l.fragments.push(
+      { fragment: { id: 1, mass: 700.4 }, state: 'stored', vehicleId: null, warehouseId: 7 } as never,
+      { fragment: { id: 2, mass: 50 }, state: 'stored', vehicleId: null, warehouseId: 8 } as never,
+    );
+    expect(freightOreKg(l, makeBuilding({ type: 'freight_warehouse' }))).toBe(700);
+    expect(freightOreKg(l, makeBuilding({ type: 'explosive_warehouse' }))).toBe(0);
   });
 });

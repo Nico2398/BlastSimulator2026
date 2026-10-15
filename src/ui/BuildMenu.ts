@@ -40,7 +40,6 @@ import {
   getAllBuildingTypes,
   getBuildingDef,
   getDefSize,
-  getDemolishCost,
   getMoveCost,
   isTierUnlocked,
   isSingleTierType,
@@ -56,23 +55,18 @@ import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
 import { researchCostFor } from '../core/events/ActiveModifiers.js';
-import { warehouseStoredKg } from '../core/economy/FreightWarehouses.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { buildingCardLine, buildingCardTooltip } from './catalogCardText.js';
-import { buildDemolishConfirm } from './demolishConfirm.js';
+import { buildDemolishConfirm, freightOreKg } from './demolishConfirm.js';
 import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
-import { placementCutoffFor, cutoffStateKey, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
+import { memoizedPlacementCutoff, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
 
 /** Footprint rect of a `sizeX` x `sizeZ` building whose origin tile is (x, z). */
 function rectAt(x: number, z: number, sizeX: number, sizeZ: number): Rect {
   return { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ };
-}
-
-function rectKey(r: Rect): string {
-  return `${r.minX},${r.minZ},${r.maxX},${r.maxZ}`;
 }
 
 export class BuildMenu extends PanelBase {
@@ -113,8 +107,6 @@ export class BuildMenu extends PanelBase {
   private readonly underConstructionEls = new Map<BuildingType, HTMLElement>();
   private readonly locale = new LocaleTextRegistry();
 
-  /** Cutoff verdict memoized per footprint tile and nav revision (#1391), so hover redraws do not re-flood. */
-  private cutoffMemo: { key: string; value: PlacementCutoff | null } | null = null;
 
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private flowResultCb?: (message: string) => void;
@@ -190,7 +182,7 @@ export class BuildMenu extends PanelBase {
     if (state.cash !== this.lastCash) {
       this.lastCash = state.cash;
       this.refreshCatalogButtons(state.cash);
-      this.refreshPlacedButtons(state.cash);
+      this.refreshPlacedButtons();
     }
     const placedSig = state.buildings.buildings.map((b) => `${b.id}:${b.tier}`).join(',');
     const unlockedSig = JSON.stringify(state.buildings.unlockedTiers);
@@ -246,23 +238,21 @@ export class BuildMenu extends PanelBase {
 
   /** Order the next-tier upgrade of `buildingId`: research guard, then the cutoff confirm, then `build upgrade` (#1758). */
   requestUpgrade(buildingId: number): void {
-    const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
-    if (!b) return;
-    const nextTier = this.nextTierOf(b);
-    if (nextTier !== null && this.isTierLocked(b.type, nextTier)) {
-      this.setStatus(t('ui.build.research_required', { tier: nextTier }));
+    const state = this.lastState;
+    const b = state?.buildings.buildings.find((x) => x.id === buildingId);
+    if (!state || !b) return;
+    const { upgrade } = buildingActionRules(state, b);
+    if (upgrade.kind === 'locked') {
+      this.setStatus(t('ui.build.research_required', { tier: upgrade.nextTier! }));
       return;
     }
-    const upgrade = (): void => {
+    const doUpgrade = (): void => {
       const cmdResult = this.gameConsole?.(`build upgrade ${b.id}`);
       this.setStatus(cmdResult?.success ? t('ui.build.upgraded') : (cmdResult?.output ?? ''));
     };
     const requestConfirm = this.onConfirmRequestCb;
-    const cutoff = nextTier !== null && requestConfirm
-      ? this.cutoffFor(this.footprintRect(b, nextTier), this.footprintRect(b, b.tier))
-      : null;
-    if (cutoff && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(cutoff, upgrade));
-    else upgrade();
+    if (upgrade.cutoff !== null && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(upgrade.cutoff, doUpgrade));
+    else doUpgrade();
   }
 
   /** Routes a flow's result message somewhere visible while the panel is closed (#1758). */
@@ -290,6 +280,13 @@ export class BuildMenu extends PanelBase {
     );
     this.refreshCatalogButtons(this.lastCash);
     if (this.lastState) this.refreshPlacedList(this.lastState.buildings.buildings);
+  }
+
+  /** Queue research for the next tier of placed building `buildingId` (the inspector's Research action, #1758). */
+  queueResearchFor(buildingId: number): void {
+    const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
+    const nextTier = b ? this.nextTierOf(b) : null;
+    if (b && nextTier !== null) this.queueResearch(b.type, nextTier);
   }
 
   /** Maps `research queue`'s failure `code` (src/console/commands/research.ts)
@@ -372,13 +369,7 @@ export class BuildMenu extends PanelBase {
 
   /** What `rect` would cut off from the crew (#1391); memoized by rect and nav revision. */
   private cutoffFor(rect: Rect, freed?: Rect): PlacementCutoff | null {
-    const state = this.lastState;
-    if (!state?.navGrid) return null;
-    const key = `${state.navGrid.revision}|${cutoffStateKey(state)}|${rectKey(rect)}|${freed ? rectKey(freed) : ''}`;
-    if (this.cutoffMemo?.key === key) return this.cutoffMemo.value;
-    const value = placementCutoffFor(state, rect, freed);
-    this.cutoffMemo = { key, value };
-    return value;
+    return this.lastState ? memoizedPlacementCutoff(this.lastState, rect, freed) : null;
   }
 
   /** Disabled state and tooltip of `b`'s Upgrade button, from the shared rules: the refusal reason when blocked, else the cost. */
@@ -551,7 +542,7 @@ export class BuildMenu extends PanelBase {
       strip.show({
         icon: 'build',
         title,
-        subtitle: `$${def.constructionCost.toLocaleString('en-US')}`,
+        subtitle: `$${(moving ? getMoveCost(moving) : def.constructionCost).toLocaleString('en-US')}`,
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
         confirmEnabled: controller.canConfirm && !rectReason,
@@ -695,8 +686,10 @@ export class BuildMenu extends PanelBase {
    * rows per affordability, mirroring `refreshCatalogButtons`. Does not
    * rebuild the list — only toggles `disabled` on existing DOM buttons.
    */
-  private refreshPlacedButtons(cash: number): void {
-    const buildings = this.lastState?.buildings.buildings ?? [];
+  private refreshPlacedButtons(): void {
+    const state = this.lastState;
+    if (!state) return;
+    const buildings = state.buildings.buildings;
     const reservations = this.currentReservations();
     for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
       const idStr = row.dataset['buildingId'];
@@ -705,10 +698,11 @@ export class BuildMenu extends PanelBase {
       if (!b) continue;
 
       const moveBtn = row.querySelector<HTMLButtonElement>('.bs-build-move-btn');
-      if (moveBtn) moveBtn.disabled = cash < getMoveCost(b);
+      const rules = buildingActionRules(state, b, reservations);
+      if (moveBtn) moveBtn.disabled = rules.move.disabledReasonKey !== null;
 
       const demolishBtn = row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn');
-      if (demolishBtn) demolishBtn.disabled = cash < getDemolishCost(b);
+      if (demolishBtn) demolishBtn.disabled = rules.demolish.disabledReasonKey !== null;
 
       const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
       if (upgradeBtn) {
@@ -762,11 +756,6 @@ export class BuildMenu extends PanelBase {
     }
   }
 
-  /** Freight ore (kg) a demolition of `b` would lose; 0 for any other type. */
-  private storedOreKg(b: Building): number {
-    return b.type === 'freight_warehouse' && this.lastState ? Math.round(warehouseStoredKg(this.lastState.logistics, b.id)) : 0;
-  }
-
   /** True when `tier` of `type` still needs research (tier 1 is always available). */
   private isTierLocked(type: BuildingType, tier: BuildingTier): boolean {
     return tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
@@ -808,15 +797,16 @@ export class BuildMenu extends PanelBase {
   // ── Placed buildings list ──────────────────────────────────────────────────
 
   private refreshPlacedList(buildings: Building[]): void {
-    if (buildings.length === 0) {
+    const state = this.lastState;
+    if (buildings.length === 0 || !state) {
       this.placedEl.replaceChildren(emptyState(t('ui.build.none_placed')));
       return;
     }
     const reservations = this.currentReservations();
-    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b, reservations)));
+    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b, state, reservations)));
   }
 
-  private makePlacedRow(b: Building, reservations: ReadonlyArray<TerrainReservation>): HTMLElement {
+  private makePlacedRow(b: Building, state: GameState, reservations: ReadonlyArray<TerrainReservation>): HTMLElement {
     const def = getBuildingDef(b.type, b.tier);
     const row = document.createElement('div');
     row.className = 'bs-build-placed-row';
@@ -830,12 +820,14 @@ export class BuildMenu extends PanelBase {
     info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
     info.textContent = `#${b.id} ${t(`building.${b.type}.t${b.tier}.name`)} (${b.x},${b.z})`;
 
+    const rules = buildingActionRules(state, b, reservations);
+
     const moveBtn = document.createElement('button');
     moveBtn.className = 'bsx-btn bs-build-move-btn';
     moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     moveBtn.textContent = t('ui.build.move');
     moveBtn.title = `$${getMoveCost(b)}`;
-    moveBtn.disabled = this.lastCash < getMoveCost(b);
+    moveBtn.disabled = rules.move.disabledReasonKey !== null;
     moveBtn.addEventListener('click', () => this.armMove(b.id));
 
     const nextTier = this.nextTierOf(b);
@@ -861,12 +853,12 @@ export class BuildMenu extends PanelBase {
     demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
-    demolishBtn.disabled = this.lastCash < getDemolishCost(b);
+    demolishBtn.disabled = rules.demolish.disabledReasonKey !== null;
     demolishBtn.addEventListener('click', () => {
       this.onConfirmRequestCb?.(buildDemolishConfirm(b, () => {
         const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
         this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));
-      }, { storedOreKg: this.storedOreKg(b) }));
+      }, { storedOreKg: this.lastState ? freightOreKg(this.lastState.logistics, b) : 0 }));
     });
 
     if (isSingleTierType(b.type)) row.append(info, moveBtn, demolishBtn);

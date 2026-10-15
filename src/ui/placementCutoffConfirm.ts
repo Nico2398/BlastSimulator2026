@@ -15,6 +15,23 @@ export function placementCutoffFor(state: GameState, newRect: Rect, freedRect?: 
   return computePlacementCutoff(state.navGrid, crew, newRect, freedRect, { holes, orders });
 }
 
+const rectKey = (r: Rect): string => `${r.minX},${r.minZ},${r.maxX},${r.maxZ}`;
+
+/** One verdict per nav grid: hover redraws and the inspector ask every frame, but the flood only changes with the grid, crew, holes, or orders. */
+const cutoffMemos = new WeakMap<object, { key: string; value: PlacementCutoff | null }>();
+
+/** `placementCutoffFor`, memoized by nav revision, crew fingerprint and rects (#1391). */
+export function memoizedPlacementCutoff(state: GameState, newRect: Rect, freedRect?: Rect): PlacementCutoff | null {
+  const grid = state.navGrid;
+  if (!grid) return null;
+  const key = `${grid.revision}|${cutoffStateKey(state)}|${rectKey(newRect)}|${freedRect ? rectKey(freedRect) : ''}`;
+  const hit = cutoffMemos.get(grid);
+  if (hit?.key === key) return hit.value;
+  const value = placementCutoffFor(state, newRect, freedRect);
+  cutoffMemos.set(grid, { key, value });
+  return value;
+}
+
 /** Cheap fingerprint of the state a cutoff verdict depends on beyond the nav grid: crew positions, holes, orders. */
 export function cutoffStateKey(state: GameState): string {
   let crew = 0;

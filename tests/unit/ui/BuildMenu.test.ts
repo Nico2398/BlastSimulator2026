@@ -16,11 +16,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BuildMenu } from '../../../src/ui/BuildMenu.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import { getBuildingDef, type Building, type BuildingTier, type BuildingType } from '../../../src/core/entities/Building.js';
+import { getBuildingDef, getMoveCost, type Building, type BuildingTier, type BuildingType } from '../../../src/core/entities/Building.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import { liveArea, regionContains, EXACT_LIVE_MARGIN, type TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { REGION } from '../../../src/ui/tutorialStages.js';
+import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
@@ -1521,5 +1522,57 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     findPlacedRow(container, 9).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.click();
     expect(gameConsole).toHaveBeenCalledWith('build upgrade 9');
     expect(messages).toContain(t('ui.build.upgraded'));
+  });
+
+  it('queueResearchFor queues the next tier of the building by id; unknown id or max tier sends nothing', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    menu.queueResearchFor(10);
+    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
+    gameConsole.mockClear();
+    menu.queueResearchFor(404);
+    expect(gameConsole).not.toHaveBeenCalled();
+    observed(makeBuilding({ id: 11, type: 'management_office', tier: 3 }));
+    menu.queueResearchFor(11);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('placed-row Move and Demolish disable while a demolition is ordered, even with ample cash', () => {
+    const b = makeBuilding({ id: 12, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [b];
+    state.cash = 1e9;
+    state.pendingActions.push({
+      id: 50, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
+      targetX: 5, targetZ: 5, targetY: 0, payload: { buildingId: 12 }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+    menu.update(state);
+    const row = findPlacedRow(container, 12);
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(true);
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
+  });
+
+  it('a freight warehouse holding ore reaches the demolish confirm with the kg lost', () => {
+    const b = makeBuilding({ id: 13, type: 'freight_warehouse', tier: 1 });
+    const confirms: ConfirmModalConfig[] = [];
+    menu.setConfirmHandler((c) => confirms.push(c));
+    const state = makeMockState();
+    state.buildings.buildings = [b];
+    state.logistics.fragments.push(
+      { fragment: { id: 1, mass: 700 }, state: 'stored', vehicleId: null, warehouseId: 13 } as never,
+    );
+    menu.update(state);
+    findPlacedRow(container, 13).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
+    expect(confirms[0]!.body).toContain(t('ui.build.demolish_confirm_loses_ore', { kg: 700 }));
+  });
+
+  it('the Move placement strip subtitle shows the move cost, not the construction cost', () => {
+    const { kit, strip } = makeMockKit();
+    menu.setPlacementKit(kit);
+    const b = makeBuilding({ id: 7, type: 'management_office', tier: 1 });
+    observed(b);
+    menu.armMove(7);
+    const subtitle = strip.show.mock.calls.at(-1)![0].subtitle as string;
+    expect(subtitle).toBe(`$${getMoveCost(b).toLocaleString('en-US')}`);
   });
 });
