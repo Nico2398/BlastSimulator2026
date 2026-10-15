@@ -158,7 +158,7 @@ export function buildCommand(
       const rebuildOrderId = state.nextPlannedBuildingId++;
       state.plannedBuildings.push({
         id: rebuildOrderId, buildingId: id, type: upgradeType, tier: nextTier, x, z,
-        actionId: state.nextPendingActionId++, cost: newDef.constructionCost,
+        actionId: state.nextPendingActionId++, cost: newDef.constructionCost, rebuild: true,
       });
       // Anyone standing on the larger new footprint is put off it now, as the
       // old instant upgrade did.

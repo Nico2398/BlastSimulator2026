@@ -362,6 +362,8 @@ export interface PlannedBuilding {
   z: number;
   actionId: number;
   cost: number;
+  /** True when this site rebuilds a demolished building under its own id (a tier upgrade), false/absent for a new construction. */
+  rebuild?: boolean;
 }
 
 /**

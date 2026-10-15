@@ -41,7 +41,6 @@ import {
   getBuildingDef,
   getDefSize,
   getDemolishCost,
-  getUpgradeCost,
   getMoveCost,
   isTierUnlocked,
   isSingleTierType,
@@ -57,11 +56,13 @@ import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
 import { researchCostFor } from '../core/events/ActiveModifiers.js';
+import { warehouseStoredKg } from '../core/economy/FreightWarehouses.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { buildingCardLine, buildingCardTooltip } from './catalogCardText.js';
 import { buildDemolishConfirm } from './demolishConfirm.js';
+import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
 import { placementCutoffFor, cutoffStateKey, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
 
@@ -116,6 +117,7 @@ export class BuildMenu extends PanelBase {
   private cutoffMemo: { key: string; value: PlacementCutoff | null } | null = null;
 
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
+  private flowResultCb?: (message: string) => void;
 
   /** Routes the placed-row Demolish click to a confirm modal (#1399); unset means the click does nothing. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
@@ -221,27 +223,51 @@ export class BuildMenu extends PanelBase {
 
   setStatus(msg: string): void {
     flashStatus(this.statusEl, msg);
+    if (!this.visible && msg) this.flowResultCb?.(msg);
   }
 
 
-  /** Latest state feed for the inspector-driven flows (#1758). */
-  observe(_state: GameState): void {
-    // TODO: implement
+  /** Latest state feed for the inspector-driven flows (#1758); the panel itself only refreshes while open. */
+  observe(state: GameState): void {
+    this.lastState = state;
+    this.lastCash = state.cash;
   }
 
-  /** Arm the move placement tool for a placed building (#1758). */
-  armMove(_buildingId: number): void {
-    // TODO: implement
+  /** Arm the footprint placement tool that moves placed building `buildingId` (the placed row's Move, #1758). */
+  armMove(buildingId: number): void {
+    const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
+    if (!b) return;
+    this.armBuildingPointTool(b.type, b.tier, `${t('ui.build.move')} #${b.id}`, (x, z) => {
+      const cmdResult = this.gameConsole?.(`build move ${b.id} to:${x},${z}`);
+      this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));
+      return cmdResult?.success === true;
+    }, b.id);
   }
 
-  /** Request a tier upgrade of a placed building (#1758). */
-  requestUpgrade(_buildingId: number): void {
-    // TODO: implement
+  /** Order the next-tier upgrade of `buildingId`: research guard, then the cutoff confirm, then `build upgrade` (#1758). */
+  requestUpgrade(buildingId: number): void {
+    const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
+    if (!b) return;
+    const nextTier = this.nextTierOf(b);
+    if (nextTier !== null && this.isTierLocked(b.type, nextTier)) {
+      this.setStatus(t('ui.build.research_required', { tier: nextTier }));
+      return;
+    }
+    const upgrade = (): void => {
+      const cmdResult = this.gameConsole?.(`build upgrade ${b.id}`);
+      this.setStatus(cmdResult?.success ? t('ui.build.upgraded') : (cmdResult?.output ?? ''));
+    };
+    const requestConfirm = this.onConfirmRequestCb;
+    const cutoff = nextTier !== null && requestConfirm
+      ? this.cutoffFor(this.footprintRect(b, nextTier), this.footprintRect(b, b.tier))
+      : null;
+    if (cutoff && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(cutoff, upgrade));
+    else upgrade();
   }
 
-  /** Receive the player-facing result message of a flow (#1758). */
-  setFlowResultHandler(_cb: (message: string) => void): void {
-    // TODO: implement
+  /** Routes a flow's result message somewhere visible while the panel is closed (#1758). */
+  setFlowResultHandler(cb: (message: string) => void): void {
+    this.flowResultCb = cb;
   }
 
   /**
@@ -355,22 +381,18 @@ export class BuildMenu extends PanelBase {
     return value;
   }
 
-  /** Reservation refusal for `b`'s next-tier footprint (#1390), or null. */
-  private upgradeRefusal(b: Building, nextTier: BuildingTier, reservations: ReadonlyArray<TerrainReservation>): string | null {
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, nextTier));
-    return this.reservationRefusal(rectAt(b.x, b.z, sizeX, sizeZ), reservations);
-  }
-
-  /** Disabled state and tooltip of `b`'s Upgrade button: the refusal reason when blocked, else the cost. */
+  /** Disabled state and tooltip of `b`'s Upgrade button, from the shared rules: the refusal reason when blocked, else the cost. */
   private applyUpgradeState(
-    btn: HTMLButtonElement, b: Building, cash: number, reservations: ReadonlyArray<TerrainReservation>,
+    btn: HTMLButtonElement, b: Building, reservations: ReadonlyArray<TerrainReservation>,
   ): void {
-    if (b.tier >= 3) { btn.disabled = true; return; }
-    const nextTier = (b.tier + 1) as BuildingTier;
-    const cost = getUpgradeCost(b, nextTier);
-    const blocked = this.upgradeRefusal(b, nextTier, reservations);
-    btn.title = blocked ?? `$${cost}`;
-    btn.disabled = cash < cost || blocked !== null;
+    if (!this.lastState) return;
+    const { upgrade } = buildingActionRules(this.lastState, b, reservations);
+    if (upgrade.nextTier === null) { btn.disabled = true; return; }
+    const refused = upgrade.kind === 'refused';
+    btn.title = refused && upgrade.reasonKey !== REASON_CASH
+      ? t(upgrade.reasonKey!, upgrade.reasonParams)
+      : `$${upgrade.cost}`;
+    btn.disabled = refused;
   }
 
   /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
@@ -690,7 +712,7 @@ export class BuildMenu extends PanelBase {
 
       const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
       if (upgradeBtn) {
-        this.applyUpgradeState(upgradeBtn, b, cash, reservations);
+        this.applyUpgradeState(upgradeBtn, b, reservations);
       }
     }
   }
@@ -738,6 +760,11 @@ export class BuildMenu extends PanelBase {
     } else {
       existing?.remove();
     }
+  }
+
+  /** Freight ore (kg) a demolition of `b` would lose; 0 for any other type. */
+  private storedOreKg(b: Building): number {
+    return b.type === 'freight_warehouse' && this.lastState ? Math.round(warehouseStoredKg(this.lastState.logistics, b.id)) : 0;
   }
 
   /** True when `tier` of `type` still needs research (tier 1 is always available). */
@@ -809,13 +836,7 @@ export class BuildMenu extends PanelBase {
     moveBtn.textContent = t('ui.build.move');
     moveBtn.title = `$${getMoveCost(b)}`;
     moveBtn.disabled = this.lastCash < getMoveCost(b);
-    moveBtn.addEventListener('click', () => {
-      this.armBuildingPointTool(b.type, b.tier, `${t('ui.build.move')} #${b.id}`, (x, z) => {
-        const cmdResult = this.gameConsole?.(`build move ${b.id} to:${x},${z}`);
-        this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));
-        return cmdResult?.success === true;
-      }, b.id);
-    });
+    moveBtn.addEventListener('click', () => this.armMove(b.id));
 
     const nextTier = this.nextTierOf(b);
     const nextLocked = nextTier !== null && this.isTierLocked(b.type, nextTier);
@@ -824,23 +845,8 @@ export class BuildMenu extends PanelBase {
     upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
     upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     upgradeBtn.textContent = t('ui.build.upgrade');
-    this.applyUpgradeState(upgradeBtn, b, this.lastCash, reservations);
-    upgradeBtn.addEventListener('click', () => {
-      if (nextTier !== null && nextLocked) {
-        this.setStatus(t('ui.build.research_required', { tier: nextTier }));
-        return;
-      }
-      const upgrade = (): void => {
-        const cmdResult = this.gameConsole?.(`build upgrade ${b.id}`);
-        this.setStatus(cmdResult?.success ? t('ui.build.upgraded') : (cmdResult?.output ?? ''));
-      };
-      const requestConfirm = this.onConfirmRequestCb;
-      const cutoff = nextTier !== null && requestConfirm
-        ? this.cutoffFor(this.footprintRect(b, nextTier), this.footprintRect(b, b.tier))
-        : null;
-      if (cutoff && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(cutoff, upgrade));
-      else upgrade();
-    });
+    this.applyUpgradeState(upgradeBtn, b, reservations);
+    upgradeBtn.addEventListener('click', () => this.requestUpgrade(b.id));
 
     const researchBtn = document.createElement('button');
     researchBtn.className = 'bsx-btn bsx-btn-locked bs-build-research-btn';
@@ -860,7 +866,7 @@ export class BuildMenu extends PanelBase {
       this.onConfirmRequestCb?.(buildDemolishConfirm(b, () => {
         const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
         this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));
-      }));
+      }, { storedOreKg: this.storedOreKg(b) }));
     });
 
     if (isSingleTierType(b.type)) row.append(info, moveBtn, demolishBtn);

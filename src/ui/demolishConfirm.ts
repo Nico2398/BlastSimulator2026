@@ -7,7 +7,7 @@ import { t } from '../core/i18n/I18n.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
 /** Build the confirm-modal config for demolishing `b`; `onConfirm` runs the demolition. */
-export function buildDemolishConfirm(b: Building, onConfirm: () => void, _opts?: { storedOreKg?: number }): ConfirmModalConfig {
+export function buildDemolishConfirm(b: Building, onConfirm: () => void, opts: { storedOreKg?: number } = {}): ConfirmModalConfig {
   const lines = [
     t('ui.build.demolish_confirm_body', {
       name: t(`building.${b.type}.t${b.tier}.name`),
@@ -16,6 +16,7 @@ export function buildDemolishConfirm(b: Building, onConfirm: () => void, _opts?:
   ];
   const kg = warehouseStockKg(b);
   if (kg > 0) lines.push(t('ui.build.demolish_confirm_loses_explosives', { kg }));
+  if ((opts.storedOreKg ?? 0) > 0) lines.push(t('ui.build.demolish_confirm_loses_ore', { kg: opts.storedOreKg! }));
   return {
     icon: 'trash',
     title: t('ui.build.demolish_confirm_title'),

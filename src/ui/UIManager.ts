@@ -132,6 +132,7 @@ export class UIManager {
     this.buildMenu = new BuildMenu(leftCol);
     this.buildMenu.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu.setConfirmHandler(config => this.confirmModal.show(config));
+    this.buildMenu.setFlowResultHandler(message => this.notify({ severity: 'info', title: message, body: '' }));
     this.fleetPanel = new FleetPanel(leftCol);
     this.fleetPanel.setCloseHandler(() => this.hideAllPanels());
     // FleetPanel's no-driver warning cross-links to Crew ('crew' is its own
@@ -191,17 +192,14 @@ export class UIManager {
   private onSpeedChangeCb?: (speed: number) => void;
   private onTogglePauseCb?: () => void;
 
-  moveBuilding(_buildingId: number): void {
-    // TODO: implement
-  }
+  /** Arm the footprint move tool for a building, without opening the Build panel (#1758). */
+  moveBuilding(buildingId: number): void { this.buildMenu.armMove(buildingId); }
 
-  upgradeBuilding(_buildingId: number): void {
-    // TODO: implement
-  }
+  /** Order a building's tier upgrade through the Build panel's shared flow (#1758). */
+  upgradeBuilding(buildingId: number): void { this.buildMenu.requestUpgrade(buildingId); }
 
-  queueBuildingResearch(_type: BuildingType, _tier: BuildingTier): void {
-    // TODO: implement
-  }
+  /** Queue research for a locked building tier through the Build panel's shared flow (#1758). */
+  queueBuildingResearch(type: BuildingType, tier: BuildingTier): void { this.buildMenu.queueResearch(type, tier); }
 
   /** Reveal HUD chrome once a game exists. Idempotent — safe to call every frame/command. */
   show(): void {
@@ -495,6 +493,7 @@ export class UIManager {
     this.contractsPanel.update(state);
     if (this.financesPanel.visible) this.financesPanel.update(state);
     if (this.operationsPanel.visible) this.operationsPanel.update(state);
+    this.buildMenu.observe(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);
     if (this.fleetPanel.visible) this.fleetPanel.update(state);
     if (this.crewPanel.visible) this.crewPanel.update(state);
