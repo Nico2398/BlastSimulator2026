@@ -8,6 +8,7 @@ import {
   checkDeadlines,
   findContract,
   hasFillableOreSaleOffer,
+  hasWinningOreSaleOffer,
   hasFillableSaleOffer,
   isFillableSaleOffer,
   hasRubbleDisposalOffer,
@@ -336,6 +337,24 @@ describe('Contract system', () => {
 
       expect(byId).toBe(target);
       expect(bySelector).toBe(target);
+    });
+  });
+
+  describe('hasWinningOreSaleOffer', () => {
+    const rustite = (quantityKg: number, pricePerKg: number) => offer({ materialId: 'rustite', quantityKg, pricePerKg });
+
+    it('is true for a fillable offer of the ore whose payout covers the shortfall', () => {
+      expect(hasWinningOreSaleOffer([rustite(100, 10)], { rustite: 100 }, 'rustite', 1000)).toBe(true);
+    });
+
+    it('is false when the payout falls short, the ore is not in storage, or the ore differs', () => {
+      expect(hasWinningOreSaleOffer([rustite(100, 10)], { rustite: 100 }, 'rustite', 1001)).toBe(false);
+      expect(hasWinningOreSaleOffer([rustite(100, 10)], { rustite: 99 }, 'rustite', 1000)).toBe(false);
+      expect(hasWinningOreSaleOffer([rustite(100, 10)], { rustite: 100 }, 'dirtite', 0)).toBe(false);
+    });
+
+    it('is false when no profit target applies (infinite shortfall)', () => {
+      expect(hasWinningOreSaleOffer([rustite(100, 10)], { rustite: 100 }, 'rustite', Infinity)).toBe(false);
     });
   });
 

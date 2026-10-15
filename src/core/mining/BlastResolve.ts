@@ -14,7 +14,7 @@
 
 import { vec3, type Vec3 } from '../math/Vec3.js';
 import { drain, type Steps } from '../engine/Steps.js';
-import { firstEmptyLayerAboveGround, type VoxelGrid } from '../world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, firstEmptyLayerAboveGround, type VoxelGrid } from '../world/VoxelGrid.js';
 import {
   GRAVITY,
   BALLISTIC_SAMPLE_DT,
@@ -27,6 +27,7 @@ import {
   MIN_PILE_RISE,
   PILE_SPILL_STEPS,
   PILE_REPOSE_STEP,
+  PILE_VOID_SCAN_MAX_LAYERS,
   BLAST_SLICE_ITEMS,
   MIN_ANIMATED_DISPLACEMENT_SQ_M2,
 } from '../config/balance.js';
@@ -123,7 +124,10 @@ export function totalFlightDuration(flights: readonly FragmentFlight[]): number 
  * pile is just how they got there.
  */
 class PileHeights {
+  /** Piles on the open ground of a column (the top layer). */
   private readonly heights = new Map<number, number>();
+  /** Piles inside a sealed void, keyed by column and the layer (floor height) of the void. */
+  private readonly voidHeights = new Map<string, number>();
   /** Terrain surface per column, computed once — arcs re-query columns heavily. */
   private readonly terrainBase = new Map<number, number>();
 
@@ -159,15 +163,19 @@ class PileHeights {
    * Rock will not pile up past its angle of repose either. A column that has
    * grown well above its neighbours spills into the lowest one nearby, which is
    * what spreads muck across the floor of the pit instead of stacking it.
+   *
+   * `fromY` is where the rock broke, or null for rock landing from elsewhere.
+   * Rock that broke in a void under an intact cap settles in that void (#1724);
+   * everything else rests on the open ground of its column.
    */
-  place(x: number, z: number, volume: number): { x: number; z: number; y: number } {
+  place(x: number, z: number, volume: number, fromY: number | null): { x: number; z: number; y: number } {
     const column = { x: Math.floor(x), z: Math.floor(z) };
+    const rise = this.riseOf(volume);
+    const sealed = fromY === null ? null : this.sealedLayer(column.x, column.z, fromY);
+    if (sealed) return this.placeInVoid(x, z, rise, sealed);
+
     const target = this.spillTarget(column.x, column.z);
     const base = this.surfaceAt(target.x, target.z);
-    const v = Math.max(volume, 0);
-    // v^(2/3) is the footprint of a roughly cubic lump of that volume.
-    const area = Math.max(PILE_COLUMN_AREA, Math.cbrt(v) ** 2);
-    const rise = Math.max(MIN_PILE_RISE, (v / area) * RUBBLE_BULKING);
     this.heights.set(this.key(target.x, target.z), base + rise);
 
     // Rock keeps where it sat inside its column, so rolling a column over does
@@ -177,6 +185,87 @@ class PileHeights {
       z: target.z + (z - column.z),
       y: base + rise / 2,
     };
+  }
+
+  /**
+   * The void a rock broke in, when an intact solid voxel still lies above it in
+   * its column: `floor` is the first empty layer above the ground at or below
+   * `fromY`, `ceiling` the underside of the lowest solid above. Null for rock in
+   * an open column.
+   */
+  sealedLayer(x: number, z: number, fromY: number): { floor: number; ceiling: number } | null {
+    const top = computeVoxelColumnSurfaceY(this.grid, x, z);
+    if (top === null) return null;
+    const ground = this.surfaceBelow(x, z, fromY);
+    const floor = ground === null ? Math.floor(fromY) : ground + 1;
+    if (top < floor) return null;
+    return { floor, ceiling: this.ceilingAbove(x, z, floor) };
+  }
+
+  /** Highest solid voxel at or below `y` in a column, or null when none within reach. */
+  private surfaceBelow(x: number, z: number, y: number): number | null {
+    const start = Math.floor(y);
+    for (let j = start; j > start - PILE_VOID_SCAN_MAX_LAYERS; j--) {
+      if (this.grid.isSolidAt(x, j, z)) return j;
+    }
+    return null;
+  }
+
+  /** Lowest solid voxel at or above `y` in a column, as the height of its underside; Infinity when none. */
+  private ceilingAbove(x: number, z: number, y: number): number {
+    const top = computeVoxelColumnSurfaceY(this.grid, x, z);
+    if (top === null) return Infinity;
+    for (let j = Math.floor(y); j <= top; j++) {
+      if (this.grid.isSolidAt(x, j, z)) return j;
+    }
+    return Infinity;
+  }
+
+  /** How far a fragment of this volume raises the column it lands in. */
+  private riseOf(volume: number): number {
+    const v = Math.max(volume, 0);
+    // v^(2/3) is the footprint of a roughly cubic lump of that volume.
+    const area = Math.max(PILE_COLUMN_AREA, Math.cbrt(v) ** 2);
+    return Math.max(MIN_PILE_RISE, (v / area) * RUBBLE_BULKING);
+  }
+
+  /**
+   * Stack rock inside a sealed void. The pile never rises past the cap: a column
+   * full to the ceiling, or past its angle of repose, spills into the lowest
+   * column of the same void beside it instead.
+   */
+  private placeInVoid(x: number, z: number, rise: number, layer: { floor: number; ceiling: number }): { x: number; z: number; y: number } {
+    const column = { x: Math.floor(x), z: Math.floor(z) };
+    const target = this.voidSpillTarget(column.x, column.z, layer);
+    const key = this.voidKey(target.x, target.z, layer.floor);
+    const base = this.voidHeights.get(key) ?? layer.floor;
+    const top = Math.min(base + rise, Math.max(layer.ceiling, base));
+    this.voidHeights.set(key, top);
+    return {
+      x: target.x + (x - column.x),
+      z: target.z + (z - column.z),
+      y: base + (top - base) / 2,
+    };
+  }
+
+  /** True when a column holds open air at the void's floor layer, resting on ground just below it. */
+  private inVoidLayer(x: number, z: number, floor: number): boolean {
+    return this.grid.containsColumn(x, z) && this.grid.isSolidAt(x, floor - 1, z) && !this.grid.isSolidAt(x, floor, z);
+  }
+
+  /** `spillTarget` for a sealed void: neighbours must hold the same layer, and a column full to the ceiling sheds too. */
+  private voidSpillTarget(startX: number, startZ: number, layer: { floor: number; ceiling: number }): { x: number; z: number } {
+    return this.walkDownhill(startX, startZ, {
+      heightAt: (x, z) => this.voidHeights.get(this.voidKey(x, z, layer.floor)) ?? layer.floor,
+      isCandidate: (x, z) => this.inVoidLayer(x, z, layer.floor),
+      sheds: (_x, _z, here) => here > layer.floor,
+      // A column full to the ceiling sheds to any lower neighbour, not only one a repose step lower.
+      threshold: here => (here >= layer.ceiling ? here : here - PILE_REPOSE_STEP),
+    });
+  }
+
+  private voidKey(x: number, z: number, floor: number): string {
+    return `${Math.floor(x)},${Math.floor(z)},${floor}`;
   }
 
   /**
@@ -195,22 +284,41 @@ class PileHeights {
    * and where it actually landed is the whole reason flyrock is dangerous.
    */
   private spillTarget(startX: number, startZ: number): { x: number; z: number } {
+    return this.walkDownhill(startX, startZ, {
+      heightAt: (x, z) => this.surfaceAt(x, z),
+      isCandidate: (x, z) => this.grid.containsColumn(x, z),
+      sheds: (x, z) => this.heights.has(this.key(x, z)),
+      threshold: here => here - PILE_REPOSE_STEP,
+    });
+  }
+
+  /**
+   * Roll from a column to the lowest neighbouring candidate, repeatedly, until
+   * nothing beside it is lower than `threshold(here)` or the step budget ends.
+   * `sheds` says whether the current column may shed at all.
+   */
+  private walkDownhill(startX: number, startZ: number, walk: {
+    heightAt: (x: number, z: number) => number;
+    isCandidate: (x: number, z: number) => boolean;
+    sheds: (x: number, z: number, here: number) => boolean;
+    threshold: (here: number) => number;
+  }): { x: number; z: number } {
     let x = startX;
     let z = startZ;
 
     for (let step = 0; step < PILE_SPILL_STEPS; step++) {
-      if (!this.heights.has(this.key(x, z))) break;
-      const here = this.surfaceAt(x, z);
+      const here = walk.heightAt(x, z);
+      if (!walk.sheds(x, z, here)) break;
       let bestX = x;
       let bestZ = z;
-      let bestHeight = here - PILE_REPOSE_STEP;
+      let bestHeight = walk.threshold(here);
 
       for (let dz = -1; dz <= 1; dz++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dz === 0) continue;
           const nx = x + dx, nz = z + dz;
-          if (!this.grid.containsColumn(nx, nz)) continue;
-          const height = this.surfaceAt(nx, nz);
+          if (!walk.isCandidate(nx, nz)) continue;
+          const height = walk.heightAt(nx, nz);
           if (height < bestHeight) {
             bestHeight = height;
             bestX = nx;
@@ -364,7 +472,8 @@ export function* resolveFragmentLandingSteps(
     const { projectile, arc } = thrown[t]!;
     const members = projectile.memberIds
       .map(id => byId.get(id))
-      .filter((f): f is LandableFragment => f !== undefined);
+      // Rock sealed in a void under an intact cap has nowhere to fly: it drops in place (#1724).
+      .filter((f): f is LandableFragment => f !== undefined && !piles.sealedLayer(Math.floor(f.position.x), Math.floor(f.position.z), f.position.y));
 
     for (let i = 0; i < members.length; i++) {
       const fragment = members[i]!;
@@ -376,7 +485,7 @@ export function* resolveFragmentLandingSteps(
       const z = Math.min(grid.maxZ - 1, Math.max(grid.minZ, arc.landing.z + dz));
 
       const from = fragment.position;
-      const rest = piles.place(x, z, fragment.volume);
+      const rest = piles.place(x, z, fragment.volume, null);
       const to = vec3(rest.x, rest.y, rest.z);
 
       // position moves on landing; fragment.origin stays (survey lookups key on it)
@@ -406,7 +515,7 @@ export function* resolveFragmentLandingSteps(
     if ((c & (BLAST_SLICE_ITEMS - 1)) === 0) yield;
     const fragment = collapsing[c]!;
     const from = fragment.position;
-    const rest = piles.place(from.x, from.z, fragment.volume);
+    const rest = piles.place(from.x, from.z, fragment.volume, from.y);
     const to = vec3(rest.x, rest.y, rest.z);
     const drop = Math.max(0, from.y - to.y);
 
