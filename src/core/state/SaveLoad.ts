@@ -493,6 +493,12 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
 function backfillProtections(obj: Record<string, unknown>): void {
   const corruption = obj['corruption'] as Record<string, unknown> | undefined;
   if (corruption && !Array.isArray(corruption['protections'])) corruption['protections'] = [];
+  // #1816: entries saved before the linger rule count as already shielded (no retroactive linger).
+  if (corruption && Array.isArray(corruption['protections'])) {
+    for (const p of corruption['protections'] as Record<string, unknown>[]) {
+      if (typeof p['shielded'] !== 'boolean') p['shielded'] = true;
+    }
+  }
 }
 
 /** #1380: an older save never raised an unqualified-task event. Idempotent; mutates `obj` in place. */

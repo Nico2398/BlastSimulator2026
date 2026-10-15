@@ -11,7 +11,7 @@ import {
   TARGET_COSTS,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
-import { BRIBE_PROFILES, protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
+import { BRIBE_PROFILES, isProtectionLingering, protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
 import { applyExposure } from '../../core/events/MafiaActions.js';
 import { addExpense, chargeFine } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -38,10 +38,10 @@ export function corruptCommand(
       `Attempts: ${state.corruption.attempts.length}`,
     ];
     for (const p of state.corruption.protections) {
-      lines.push(t('corruption.protection_line', {
-        target: t(`corruption.target.${p.target}`),
-        ticks: protectionRemainingTicks(p, state.tickCount),
-      }));
+      const target = t(`corruption.target.${p.target}`);
+      lines.push(isProtectionLingering(p, state.tickCount)
+        ? t('corruption.protection_lingering_line', { target })
+        : t('corruption.protection_line', { target, ticks: protectionRemainingTicks(p, state.tickCount) }));
     }
     return { success: true, output: lines.join('\n') };
   }

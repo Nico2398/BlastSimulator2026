@@ -7,7 +7,7 @@ import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
-import { isEventShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
+import { isEventShielded, markShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
 import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
@@ -262,8 +262,11 @@ export function selectEvent(
 ): EventDef | null {
   if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
-  const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx)
-    && !isEventShielded(e, ctx.protections ?? [], ctx.tickCount));
+  const eligible = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx));
+  const protections = ctx.protections ?? [];
+  const shielded = eligible.filter(e => isEventShielded(e, protections, ctx.tickCount));
+  if (shielded.length > 0 && ctx.protections) markShielded(ctx.protections, shielded, ctx.tickCount);
+  const available = eligible.filter(e => !shielded.includes(e));
 
   if (available.length === 0) return null;
 

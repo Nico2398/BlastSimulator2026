@@ -13,7 +13,7 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { getSuccessRate, TARGET_COSTS, MAFIA_THRESHOLD, type CorruptionTarget } from '../../core/economy/Corruption.js';
-import { BRIBE_PROFILES, protectionRemainingTicks, type ActiveProtection } from '../../core/economy/BribeProtection.js';
+import { BRIBE_PROFILES, isProtectionLingering, protectionRemainingTicks, type ActiveProtection } from '../../core/economy/BribeProtection.js';
 import { CORRUPTION_MAX, SMUGGLING_VOLUME_LEVELS } from '../../core/config/balance.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import {
@@ -33,6 +33,7 @@ const TARGETS: readonly { id: CorruptionTarget; nameKey: string; noteKey: string
 
 /** "Time left" label for an active protection row. */
 function remainingLabel(p: ActiveProtection, tickCount: number): string {
+  if (isProtectionLingering(p, tickCount)) return t('ui.shady.protection_lingering');
   return t('ui.shady.protection_remaining', { time: formatGameDuration(protectionRemainingTicks(p, tickCount)) });
 }
 
@@ -208,7 +209,7 @@ export class ShadyPanel extends PanelBase {
       state.corruption.level,
       state.corruption.attempts.length,
       state.corruption.mafiaUnlocked ? 1 : 0,
-      state.corruption.protections.map(p => `${p.target}:${p.expiresAtTick}:${p.dismissalsLeft}`).join(','),
+      state.corruption.protections.map(p => `${p.target}:${p.expiresAtTick}:${p.dismissalsLeft}:${p.shielded ? 1 : 0}`).join(','),
       state.mafia.smugglingVolume,
       framesSig,
       rosterSig,
