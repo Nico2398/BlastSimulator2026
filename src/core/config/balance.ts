@@ -6,6 +6,7 @@ import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
+import type { ActionType } from '../state/GameState.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -1105,6 +1106,20 @@ export const EVACUATION_DRIVER_MAX_PATH_ATTEMPTS = 5;
 export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 
 /**
+ * Rank tier per action type: a HIGHER tier is considered before any lower one,
+ * and cost only orders candidates within a tier (#1742). Without it a cheap
+ * haul_debris trip chain starves a dearer charge_hole that gates the next
+ * shot. Unlisted types are tier 0. A new time-critical order type is one
+ * entry here; no ranking code changes.
+ */
+export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = { charge_hole: 1 };
+
+/** Rank tier of an action type (see ACTION_RANK_TIER). */
+export function actionRankTier(type: ActionType): number {
+  return ACTION_RANK_TIER[type] ?? 0;
+}
+
+/**
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
  * on-foot action class open to whoever is free — place_building, survey,
  * general_work; demolish_building is not one of them since it requires a
@@ -1686,6 +1701,24 @@ export const TRAINING_TIER_SPEED: Record<1 | 2 | 3, number> = {
 
 /** Fee to teach a skill the employee does not hold yet ($). */
 export const TRAINING_BASE_FEE = 2500;
+
+/**
+ * Fee of a course by the level it brings the skill to ($). A course at a tier-N
+ * school brings a skill to level N. Level 1 is the unchanged base fee; levels 2
+ * and 3 reuse the scale #1524 priced driving-licence raises at (base times level).
+ */
+export const TRAINING_LEVEL_FEE: Record<1 | 2 | 3, number> = {
+  1: TRAINING_BASE_FEE,
+  2: TRAINING_BASE_FEE * 2,
+  3: TRAINING_BASE_FEE * 3,
+};
+
+/**
+ * Course duration multiplier by the level it brings the skill to. Level 1 is
+ * unchanged; levels 2 and 3 reuse #1524's licence scale. The school's tier speed
+ * (TRAINING_TIER_SPEED) still multiplies the duration on top.
+ */
+export const TRAINING_LEVEL_TICKS_MULT: Record<1 | 2 | 3, number> = { 1: 1, 2: 1.5, 3: 2 };
 
 // ─── Research Center ───────────────────────────────────────────────────────────
 
@@ -2480,12 +2513,6 @@ export const EVENT_CALM_DAYS = 7;
 
 /** Hours a lingering weather front holds the sky. */
 export const EVENT_FRONT_HOURS = 36;
-
-/** Fee for a course raising a driving licence to level 2 or 3 (#1524): the base course fee times the target level. */
-export const LICENCE_COURSE_FEE: Record<2 | 3, number> = { 2: TRAINING_BASE_FEE * 2, 3: TRAINING_BASE_FEE * 3 };
-
-/** Course duration multiplier for raising a driving licence to level 2 or 3 (#1524). */
-export const LICENCE_COURSE_TICKS_MULT: Record<2 | 3, number> = { 2: 1.5, 3: 2 };
 
 // ── Smuggling vs tax audit (#1409) ──
 

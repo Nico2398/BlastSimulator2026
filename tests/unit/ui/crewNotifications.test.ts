@@ -10,6 +10,7 @@ import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { CREW_TOAST_COOLDOWN_TICKS } from '../../../src/core/config/balance.js';
 import en from '../../../src/core/i18n/locales/en.json';
+import fr from '../../../src/core/i18n/locales/fr.json';
 
 type Handler = (payload: never) => void;
 
@@ -36,6 +37,7 @@ describe('crew notification i18n keys', () => {
     'notification.crew.need_warning',
     'notification.crew.levelup',
     'notification.crew.trained',
+    'notification.crew.upgraded',
     'notification.crew.training_cancelled',
     'notification.crew.stuck',
     'notification.crew.action_abandoned',
@@ -119,7 +121,7 @@ describe('wireCrewNotifications', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0]!.severity).toBe('info');
     expect(notes[0]!.body).toContain(empName);
-    expect(notes[0]!.body).toContain('2');
+    expect(notes[0]!.body).toMatch(/level 2/);
   });
 
   it('trained is info and names the employee', () => {
@@ -127,6 +129,30 @@ describe('wireCrewNotifications', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0]!.severity).toBe('info');
     expect(notes[0]!.body).toContain(empName);
+  });
+
+  it('a new skill names the level it was learned at', () => {
+    emitter.fire('employee:trained', { employeeId: empId, skill: 'geology', level: 2, isNew: true });
+    expect(notes).toHaveLength(1);
+    expect(notes[0]!.body).toContain(empName);
+    expect(notes[0]!.body).toMatch(/learned/i);
+    expect(notes[0]!.body).toMatch(/level 2/);
+  });
+
+  it('an upgrade says the skill rose to the level, not learned', () => {
+    emitter.fire('employee:trained', { employeeId: empId, skill: 'geology', level: 3, isNew: false });
+    expect(notes).toHaveLength(1);
+    expect(notes[0]!.severity).toBe('info');
+    expect(notes[0]!.body).toContain(empName);
+    expect(notes[0]!.body).toMatch(/rose to level 3/i);
+    expect(notes[0]!.body).not.toMatch(/learned/i);
+    expect(notes[0]!.silent).toBeUndefined();
+  });
+
+  it('upgraded resolves in fr and differs from en', () => {
+    const key = 'notification.crew.upgraded';
+    expect((fr as Record<string, string>)[key]).toBeTypeOf('string');
+    expect((fr as Record<string, string>)[key]).not.toBe((en as Record<string, string>)[key]);
   });
 
   it('falls back to #id for an unknown employee, without throwing', () => {

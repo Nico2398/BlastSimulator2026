@@ -519,7 +519,7 @@ describe('employees.ts — train_no_building_on_site (school exists in the catal
   });
 });
 
-// ── train_already_qualified ──────────────────────────────────────────────────
+// ── train refusal (trainingRefusal) ──────────────────────────────────────────────────
 
 describe('employees.ts — train refusal for an already-held skill (#1388)', () => {
   function setupHeldEmployee(ctx: GameContext, level: 1 | 5) {
@@ -579,7 +579,7 @@ describe('employees.ts — train_insufficient_funds', () => {
 
 describe('employees.ts — train success message', () => {
   function expectedEn(name: string, buildingId: number): string {
-    return `${name} enrolled at management_office #${buildingId}: management in 20 ticks ($2500), +$5/h pay once qualified.`;
+    return `${name} enrolled at management_office #${buildingId}: management to level 1 in 20 ticks ($2500), +$5/h pay once qualified.`;
   }
 
   it('matches the exact English literal, embedding the real name/buildingId', () => {

@@ -79,8 +79,8 @@ employee may board any vehicle that is unoccupied and unclaimed. Nothing persist
 assignment across tasks.
 
 **Licence level (#1524).** A licence carries a level 1-3 (`SkillQualification.licenceLevel`, absent = 1), separate
-from proficiency: XP never raises it, only a Driving Center course does (`LICENCE_COURSE_FEE`,
-`LICENCE_COURSE_TICKS_MULT`, `balance.ts`). Driving a tier-N vehicle needs the role licence at level >= N
+from proficiency: XP never raises it, only a Driving Center course does (`TRAINING_LEVEL_FEE`,
+`TRAINING_LEVEL_TICKS_MULT`, `balance.ts`): a tier-N Driving Center caps the licence it teaches at level N. Driving a tier-N vehicle needs the role licence at level >= N
 (`licenceLevelOf`, `canDriveTier`, `countLicenceHolders` in `VehicleDriverAssignment.ts`); `canAssignDriver`
 refuses with 'Employee lacks licence level for this vehicle tier', `findFreeVehicleForRole` skips vehicles above
 the claimer's level. A vehicle order nobody can level-qualify for carries `licence_level_too_low` (when someone
@@ -187,6 +187,8 @@ A `reposition` goal moves a vehicle with no work attached: parking the fleet cle
 `moveTo(driverId, safeCell, { via: vehicleId })`.
 
 ## Cost Model
+
+Ranking is tier first, then cost (`ACTION_RANK_TIER`, #1742; see `gameplay-employee-skills`): cost orders candidates only within a rank tier, so a cheap haul never outranks a `charge_hole`.
 
 A queued action's cost is the itinerary's cost. For a vehicle-gated action claimed by an employee
 on foot that is exactly:
