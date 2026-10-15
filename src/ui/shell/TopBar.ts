@@ -2,7 +2,7 @@
 // Replaces HUD.ts. One coherent bar: balance+trend, day/clock, weather,
 // speed+pause, alert pips, scores, log/saves/site-map — folding in the
 // floating Saves and Return-to-Map buttons main.ts used to create ad-hoc
-// (spec §5 defect: they collided with the paused/event chip).
+// (spec §5 defect: they collided with the event chip).
 
 import { iconEl } from '../icons.js';
 import { el, sectionHeader, progressBar } from '../dom.js';
@@ -20,6 +20,7 @@ import type { PanelName } from '../UIManager.js';
 import { mountModifierChips } from './ModifierChips.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../tokens.js';
+import { activeTimeSegment } from '../timeControlSegments.js';
 
 const FORECAST_DAYS = 14;
 /** Forecast reliability tiers — color-coded, never opacity-encoded (a11y). */
@@ -71,6 +72,12 @@ function topBarBounds(viewport: Viewport): Rect {
 const OBJECTIVE_BAR_COLOR = 'var(--bsx-amber)';
 const OBJECTIVE_BAR_DONE_COLOR = 'var(--bsx-positive)';
 
+/** Amber when lit, transparent otherwise — one look for pause and every speed. */
+function paintSegment(btn: HTMLElement, active: boolean, idleColor: string): void {
+  btn.style.background = active ? 'var(--bsx-amber)' : 'transparent';
+  btn.style.color = active ? 'var(--bsx-text-on-amber)' : idleColor;
+}
+
 export class TopBar {
   private readonly root: HTMLElement;
   private readonly balanceWrap: HTMLButtonElement;
@@ -89,7 +96,7 @@ export class TopBar {
   private readonly weatherPopoverEl: HTMLElement;
   private weatherWrapEl!: HTMLElement;
   private readonly speedButtons: HTMLButtonElement[] = [];
-  private readonly pauseChip: HTMLElement;
+  private readonly pauseBtn: HTMLButtonElement;
   private readonly alertPipsEl: HTMLElement;
   /** Active event modifiers with time left (#1414). */
   private readonly modifierChips: ReturnType<typeof mountModifierChips>;
@@ -108,8 +115,9 @@ export class TopBar {
   private lastWeather: WeatherState = 'sunny';
   private lastState: GameState | undefined;
   private weatherPopoverOpen = false;
-  private currentSpeed = 1;
-  private isPaused = false;
+  // Sentinels so the first update() always paints.
+  private currentSpeed = -1;
+  private isPaused: boolean | null = null;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
@@ -197,6 +205,7 @@ export class TopBar {
     const speedGroup = el('div', { className: 'bs-speed-btn' });
     speedGroup.style.cssText = 'display:flex;height:32px;border:1px solid var(--bsx-hairline-strong);border-radius:4px;overflow:hidden;background:var(--bsx-well)';
     const pauseBtn = document.createElement('button');
+    this.pauseBtn = pauseBtn;
     pauseBtn.dataset['action'] = 'pause-toggle';
     pauseBtn.style.cssText = 'width:32px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;color:var(--bsx-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center';
     pauseBtn.appendChild(iconEl('pause', 12));
@@ -212,10 +221,7 @@ export class TopBar {
       speedGroup.appendChild(btn);
       this.speedButtons.push(btn);
     }
-    this.pauseChip = el('span');
-    this.pauseChip.style.cssText = 'display:none;align-items:center;gap:5px;height:22px;padding:0 7px;border-radius:3px;background:rgba(255,176,46,.16);color:var(--bsx-amber-hover);font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;white-space:nowrap';
-    this.locale.bindText(this.pauseChip, 'shell.topbar.paused');
-    speedWrap.append(speedGroup, this.pauseChip);
+    speedWrap.append(speedGroup);
 
     // ── Alerts ──
     const alertWrap = el('div');
@@ -310,12 +316,11 @@ export class TopBar {
     if (state.timeScale !== this.currentSpeed || state.isPaused !== this.isPaused) {
       this.currentSpeed = state.timeScale;
       this.isPaused = state.isPaused;
+      const segment = activeTimeSegment(state.timeScale, state.isPaused);
+      paintSegment(this.pauseBtn, segment === 'pause', 'var(--bsx-text-secondary)');
       for (const btn of this.speedButtons) {
-        const active = Number(btn.dataset['speed']) === this.currentSpeed && !this.isPaused;
-        btn.style.background = active ? 'var(--bsx-amber)' : 'transparent';
-        btn.style.color = active ? 'var(--bsx-text-on-amber)' : 'var(--bsx-text-muted)';
+        paintSegment(btn, segment === Number(btn.dataset['speed']), 'var(--bsx-text-muted)');
       }
-      this.pauseChip.style.display = this.isPaused ? 'flex' : 'none';
     }
 
     this.modifierChips.update(state.events.activeModifiers, state.tickCount);

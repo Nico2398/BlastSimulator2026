@@ -99,6 +99,16 @@ export function resume(state: GameState): void {
   state.isPaused = false;
 }
 
+/**
+ * Choose a speed and un-pause in one step. Invalid speed leaves state untouched.
+ * @returns true if applied, false if the speed is invalid
+ */
+export function selectSpeed(state: GameState, speed: number): boolean {
+  if (!setSpeed(state, speed)) return false;
+  resume(state);
+  return true;
+}
+
 /** Check if a speed value is valid. */
 export function isValidSpeed(speed: number): speed is SpeedMultiplier {
   return VALID_SPEEDS.includes(speed as SpeedMultiplier);

@@ -794,14 +794,23 @@ describe('full tutorial playthrough ends WON by following the cards then playing
         // Accept is only legal on a fillable ore_sale offer (what the rails
         // let a player click); rubble/supply/unfillable offers stay untouched.
         // With barren rock on a spoil heap the warehouse holds only ore (#1530), so the card's own
-        // accept + deliver commands can already close a sale before the loop starts.
+        // accept + deliver commands can already close a sale before the loop starts. When the
+        // warehouse holds less ore than the offer asks, the card's accept still takes the scripted
+        // offer and its deliver is refused for want of stock: the loop below delivers as the ore
+        // comes in (the rally point's crew and heap make the first haul land sooner, so on fewer kg).
         const soldByCommands = complete();
+        const acceptedByCard = state.contracts.active.some((c) => c.type === 'ore_sale');
         for (let i = 0; i < maxTicks && !complete(); i++) {
           for (const active of [...state.contracts.active]) {
             if (active.type !== 'ore_sale') continue;
             const amount = Math.min(active.quantityKg - active.deliveredKg, state.collectedOre[active.materialId] ?? 0);
             if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
           }
+          // The delivery above can land the first sale itself, when the card's own deliver was refused
+          // for want of stock and the ore came in later. The card is done then: a second offer accepted
+          // now is delivered automatically on the next tick (ContractFulfilment) and can cross the
+          // profit threshold inside the guided phase, which is free play's sale, not this card's.
+          if (complete()) break;
           // The smallest-paying fillable offer: a player reaching the first sale sooner (#1586)
           // carries less accrued payroll, so the biggest offer alone can already cross the
           // tutorial's profit threshold and end the level inside the guided phase. Taking the
@@ -815,7 +824,7 @@ describe('full tutorial playthrough ends WON by following the cards then playing
           }
           playTick(run, state);
         }
-        expect(soldByCommands || acceptedInSellOre.length > 0, 'sell-ore never accepted a fillable ore offer').toBe(true);
+        expect(soldByCommands || acceptedByCard || acceptedInSellOre.length > 0, 'sell-ore never accepted an ore offer').toBe(true);
       } else {
         tickUntil(run, state, maxTicks, complete);
       }

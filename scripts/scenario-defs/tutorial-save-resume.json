@@ -1,6 +1,6 @@
 {
   "name": "tutorial-save-resume",
-  "description": "#1333: tutorial progress survives save/load. The player hires the surveyor (card moves to Survey Terrain), quick-saves with F5 (tutorial games write their own auto_tutorial slot), returns to the main menu, clicks Continue, and the tutorial card is back on the same step. #1627: the save is taken with the survey order already placed (work in flight); after Continue the play/pause control is live (not rail-inert) and the clock runs again so the survey completes.",
+  "description": "#1333: tutorial progress survives save/load. The player hires the surveyor (card moves to Survey Terrain), quick-saves with F5 (tutorial games write their own auto_tutorial slot), returns to the main menu, clicks Continue, and the tutorial card is back on the same step. #1627: the save is taken with the survey order already placed (work in flight); after Continue the pause control is live (not rail-inert), a speed click resumes the clock, and the clock runs again so the survey completes.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit",
@@ -206,7 +206,7 @@
     {
       "command": "state",
       "timeout": 60,
-      "description": "#1627: after Continue on a waits-on-work step with work in flight, the top-bar play/pause control is live (not rail-inert) so the player can always restart time; Space follows it.",
+      "description": "#1627: after Continue on a waits-on-work step with work in flight, the top-bar pause control is live (not rail-inert) and a speed click always resumes time; Space follows the pause control.",
       "role": "player",
       "interaction": [
         {

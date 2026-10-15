@@ -22,7 +22,7 @@ import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSect
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Employee } from '../../core/entities/Employee.js';
+import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
 import { injuryHoursRemaining } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
@@ -41,6 +41,8 @@ export class CrewPanel extends PanelBase {
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private expandedId: number | null = null;
   private lastSignature = '';
+  /** Role to scroll into view once the hiring section next renders (revealHiring before first render/show). */
+  private pendingHiringRole: EmployeeRole | null = null;
   private lastState: GameState | null = null;
   private onSelectEmployeeCb?: (employeeId: number) => void;
   private readonly locale = new LocaleTextRegistry();
@@ -95,6 +97,19 @@ export class CrewPanel extends PanelBase {
     // Optional chained on the method itself, not just the element — jsdom
     // (unit tests) doesn't implement scrollIntoView at all.
     this.bodyEl.querySelector<HTMLElement>(`[data-employee-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  /** Show the hiring section with candidates of `role` in view. */
+  revealHiring(role: EmployeeRole): void {
+    if (!this.lastState) {
+      this.pendingHiringRole = role;
+      return;
+    }
+    this.scrollToHiring(role);
+  }
+
+  private scrollToHiring(role: EmployeeRole): void {
+    this.bodyEl.querySelector<HTMLElement>(`[data-hiring-role="${role}"]`)?.scrollIntoView?.({ block: 'start' });
   }
 
   update(state: GameState): void {
@@ -191,6 +206,10 @@ export class CrewPanel extends PanelBase {
       sectionHeader(t('ui.crew.hiring')),
       ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`)),
     ]);
+    if (this.pendingHiringRole) {
+      this.scrollToHiring(this.pendingHiringRole);
+      this.pendingHiringRole = null;
+    }
   }
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {

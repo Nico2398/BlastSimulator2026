@@ -225,7 +225,11 @@ uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current
 // preference seeds the panel once at startup so its button state matches.
-uiManager.setSurveyOverlayToggleHandler((visible) => { gameRenderer.setSurveyOverlayVisible(visible); });
+function applySurveyOverlayVisible(visible: boolean): void {
+  gameRenderer.setSurveyOverlayVisible(visible);
+  if (!visible) hoverTag.hide(); // the tag only shows with the overlay on
+}
+uiManager.setSurveyOverlayToggleHandler(applySurveyOverlayVisible);
 uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 
 // --- Persistence ---
@@ -1191,9 +1195,11 @@ runner.register('tutorial_start', 'Start the tutorial overlay', () => {
   window.__startTutorial();
   return { success: true, output: 'Tutorial started' };
 });
-uiManager.setSpeedChangeHandler((speed) => {
-  window.__gameConsole(`time speed ${speed}`);
-});
+// Picking a speed also resumes: the speed segments and the pause segment form one radio group.
+function selectSpeedAndResume(n: number): void {
+  window.__gameConsole(`time speed ${n} resume:true`);
+}
+uiManager.setSpeedChangeHandler(selectSpeedAndResume);
 uiManager.setQuitHandler(() => {
   tutorial.suspend(); // lifts the rails so the menu is clickable; keeps progress so Resume continues guided
   levelEndScreen.hide();
@@ -1222,8 +1228,8 @@ uiManager.setSelectEmployeeHandler((employeeId) => {
 });
 
 // --- Scene picking wiring (redesign P2) ---
-scenePicking.setHoverChangeHandler((hover) => {
-  if (ctx.state) hoverTag.update(hover, ctx.state);
+scenePicking.setRestChangeHandler((rest) => {
+  if (ctx.state) hoverTag.update(rest, ctx.state, gameRenderer.surveyOverlayVisible);
 });
 /** Width of the selected ramp as last drawn (bar + corridor highlight); a widening that lands re-draws both (#1298). */
 let shownRampWidth: number | null = null;
@@ -1369,17 +1375,19 @@ savesModal.setOnLoad((state) => {
 });
 
 // --- Keyboard Shortcuts ---
-// Toggles between `time pause`/`time resume` — shared by the Space-bar
-// shortcut and the top bar's pause button so both reflect one source of truth.
+// Space-bar shortcut toggles `time pause`/`time resume`; the top bar's pause
+// segment only pauses (idempotent) — resuming is picking a speed.
 function togglePause(): void {
   window.__gameConsole(ctx.state?.isPaused ? 'time resume' : 'time pause');
 }
-uiManager.setTogglePauseHandler(togglePause);
+function pauseClock(): void {
+  window.__gameConsole('time pause');
+}
+uiManager.setTogglePauseHandler(pauseClock);
 new KeyboardShortcuts({
   togglePause,
-  // Was dispatching the bare `speed ${n}` command, which was never
-  // registered — every keyboard speed change (1-4) silently no-op'd.
-  setSpeed: (n) => window.__gameConsole(`time speed ${n}`),
+  // Same path as the top-bar speed segments: pick the speed and resume.
+  setSpeed: selectSpeedAndResume,
   togglePanel: (name) => uiManager.togglePanel(name),
   quickSave: () => { void savesModal.quickSave(); },
   onEscape: () => uiManager.handleEscape(),
@@ -1387,7 +1395,11 @@ new KeyboardShortcuts({
   // Keep the panel's own button in sync even while the panel is closed —
   // its click handler is the other path into the same preference, and the
   // two must never disagree the next time the panel opens.
-  onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
+  onToggleSurveyOverlay: () => {
+    const visible = !gameRenderer.surveyOverlayVisible;
+    applySurveyOverlayVisible(visible);
+    uiManager.setSurveyOverlayVisible(visible);
+  },
 }, { isSuppressed: fullScreenMenuUp, isControlLive });
 
 // --- Render loop + game tick timer ---

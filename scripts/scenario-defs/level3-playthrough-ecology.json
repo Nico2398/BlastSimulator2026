@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-ecology",
-  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `blast` step ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values. #1649 (supersedes the pattern-1 figures above): charging is worked from the one staffed charging truck by the staffed blaster, about 20 ticks per hole, while payroll and fuel burn the $70k budget. Pattern 1 is therefore a 2x3 grid (6 holes, not 20), the fixed tick-20 pads are one wait_until, and the 7 hand-hires land right before the blast; 4 of 12 die, ecology falls 50 -> ~44.8 and nuisance to ~36. All pinned figures below were re-measured from the real run.",
+  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `blast` step ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values. #1649 (supersedes the pattern-1 figures above): charging is worked from the one staffed charging truck by the staffed blaster, about 20 ticks per hole, while payroll and fuel burn the $70k budget. Pattern 1 is therefore a 2x3 grid (6 holes, not 20), the fixed tick-20 pads are one wait_until, and the 7 hand-hires land right before the blast; 4 of 12 die, ecology falls 50 -> ~44.8 and nuisance to ~36. All pinned figures below were re-measured from the real run. Rally point: the starting crew now gathers around the rally flag at (13,2) and the seven hand-hires spawn beside it, instead of the crew lining the north edge and the hires appearing at the site centre (32,32). The flag is 8 cells from pattern 1 (10..16, 10..13) and the shot still fires with no evacuation, so 11 of 12 die (was 4; only the driller who relocated the rig to (35,35) survives). Drilling also finishes 5 ticks sooner. Tick, death and score pins re-measured in command mode; the ecology drop (50 -> ~45, then ~40.8 after the tick-20 cycle) and the levelEnded false/null outcome are unchanged.",
   "steps": [
     {
       "command": "new_game seed:3666 staffed:true cash:70000",
@@ -384,7 +384,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 54,
+          "tickCount": 49,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -413,7 +413,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 69,
+          "tickCount": 64,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -478,7 +478,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 69,
+          "tickCount": 64,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -546,7 +546,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -574,7 +574,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -602,7 +602,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -630,7 +630,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -658,7 +658,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -686,7 +686,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -714,7 +714,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -738,7 +738,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -762,7 +762,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 203,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -816,7 +816,7 @@
           "holeCount": 0,
           "orderedHoleCount": 0,
           "chargedCount": 0,
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "vehicleCount": 1,
           "levelEnded": false,
@@ -825,7 +825,8 @@
         "changedBy": {
           "cash": 0,
           "tickCount": 0
-        }
+        },
+        "note": "Rally point: the starting crew now gathers around the rally flag at (13,2) and the seven hand-hires spawn beside it, instead of the crew lining the north edge and the hires appearing at the site centre (32,32). The flag is 8 cells from pattern 1 (10..16, 10..13) and the shot still fires with no evacuation, so 11 of 12 die (was 4; only the driller who relocated the rig to (35,35) survives). Drilling also finishes 5 ticks sooner. Tick, death and score pins re-measured in command mode; the ecology drop (50 -> ~45, then ~40.8 after the tick-20 cycle) and the levelEnded false/null outcome are unchanged."
       }
     },
     {
@@ -839,7 +840,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -862,12 +863,12 @@
       "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest versus mid-task at this exact tick. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1090-followup (sandbox-measured): wellBeing 3.30 -> 2.86, safety 50.60 -> 50.55 -- one fewer death at the blast above (deathCount 11, not 12; see that step's own #1090-followup note) means computeAverageMorale averages in one more living-but-devastated employee's own near-zero morale, pulling this checkpoint's average down slightly rather than up, and the surviving rig (vehicleCount 1, not 0) shifts the safety decay accrued by this tick too. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration, sandbox-measured): wellBeing 2.9091666666666565 -> 2.9641666666666575 -- occupancy-aware pathing shifts exactly which of the single surviving driller's rest/work cycles land inside this tick, a small (~0.055) morale-average difference; deathCount/safety/ecology/nuisance/tickCount (314) all reproduce unchanged, confirming this is the same real-crew composition, not a different trajectory.",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 40.30865714285731,
+          "wellBeing": 72.74261071428589,
           "safety": 50,
-          "ecology": 44.72863403876688,
-          "nuisance": 36.8215850969172,
+          "ecology": 44.97863403876688,
+          "nuisance": 37.4465850969172,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -875,7 +876,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect. #1696: idle blockers yield off the route, so the crew clears the drill corridor 10 ticks later (tickCount 193 -> 203, 213 -> 223) and the shifted tick lands the random events differently (wellBeing 54.98 -> 44.77; 58.31 -> 50); re-measured. #1696 merged with main: wellBeing re-measured after the merge (50.57 -> 40.31, 43.84 -> 33.55); timing shift only, tickCount unchanged."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect."
       }
     },
     {
@@ -919,7 +920,7 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -945,7 +946,7 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -972,7 +973,7 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -996,7 +997,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1019,12 +1020,12 @@
       "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136, same recalibration as the earlier `scores` checkpoint above -- no change happened between the two checkpoints (both `changedBy.tickCount: 0`), so they still read identically. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration): wellBeing re-derived 2.9091666666666565 -> 2.9641666666666575, same mechanism and same value as the earlier `scores` checkpoint's own note -- still identical between the two checkpoints (`changedBy.tickCount: 0`).",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 40.30865714285731,
+          "wellBeing": 72.74261071428589,
           "safety": 50,
-          "ecology": 44.72863403876688,
-          "nuisance": 36.8215850969172,
+          "ecology": 44.97863403876688,
+          "nuisance": 37.4465850969172,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1032,7 +1033,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1696 merged with main: wellBeing re-measured after the merge (50.57 -> 40.31, 43.84 -> 33.55); timing shift only, tickCount unchanged."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3)."
       }
     },
     {
@@ -1047,10 +1048,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 223,
+          "tickCount": 193,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1073,15 +1074,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 223,
+          "tickCount": 193,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 4,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 33.55217500000015,
+          "wellBeing": 33.57046785714299,
           "safety": 0,
-          "ecology": 40.53810311268534,
-          "nuisance": 36.20792548458591,
+          "ecology": 40.78810320606929,
+          "nuisance": 36.83292548458591,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1101,8 +1102,8 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 223,
-          "deathCount": 4,
+          "tickCount": 193,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1121,13 +1122,13 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 223,
-          "deathCount": 4,
+          "tickCount": 193,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 33.55217500000015,
+          "wellBeing": 33.57046785714299,
           "safety": 0,
-          "ecology": 40.53810311268534,
-          "nuisance": 36.20792548458591,
+          "ecology": 40.78810320606929,
+          "nuisance": 36.83292548458591,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1145,13 +1146,13 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 223,
-          "deathCount": 4,
+          "tickCount": 193,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 33.55217500000015,
+          "wellBeing": 33.57046785714299,
           "safety": 0,
-          "ecology": 40.53810311268534,
-          "nuisance": 36.20792548458591,
+          "ecology": 40.78810320606929,
+          "nuisance": 36.83292548458591,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false

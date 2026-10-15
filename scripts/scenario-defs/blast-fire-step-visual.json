@@ -15,13 +15,13 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:32 staffed:true",
+      "command": "new_game seed:42 size:31 staffed:true",
       "timeout": 30,
-      "description": "Setup: a fresh site. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Setup: a fresh site. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Rally-point spawns: size 31, not 32. The staffed crew now spawns around the rally flag at (2,9), inside H1's danger zone, and on a 32-cell map the whole crew and fleet drove out past row 25 within 19 ticks of DETONATE, so the armed sequence auto-fired before the Fire-anyway step. On a 31-cell map every evacuation candidate for the (10,10) hole (zone edge -5/25 pushed out by EVACUATION_CANDIDATE_OFFSET_M to -11/31) lies off the map, so the occupants are stranded and the sequence waits for the player. The drill_plan step's command is unchanged (it is pinned on the bootstrap allowlist).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:32 staffed:true"
+          "command": "new_game seed:42 size:31 staffed:true"
         }
       ],
       "role": "setup",
@@ -146,7 +146,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "The plan is complete once H1 is charged, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire). #557 correction: the danger zone is NOT clear here — the single-hole plan's own driller (employee #1) and the drill_rig they drove out on (vehicle #1) both come to rest exactly on top of H1 (10,10) once drilling and charging finish, squarely inside computeDangerZone([H1], BLAST_DANGER_MARGIN_M) (confirmed via direct trace: both sit at (10,10) right at this point) — so Sound the Horn is enabled and the occupant list shows both of them, not the 'nobody nearby' the file used to claim. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
+      "description": "The plan is complete once H1 is charged, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire). #557 correction: the danger zone is NOT clear here — the single-hole plan's own driller (employee #1) and the drill_rig they drove out on (vehicle #1) both come to rest on or beside H1 (10,10) once drilling and charging finish, squarely inside computeDangerZone([H1], BLAST_DANGER_MARGIN_M) (re-traced after the rally-point change: the driller sits in the rig at (9,10) right at this point) — so Sound the Horn is enabled and the occupant list shows both of them, not the 'nobody nearby' the file used to claim. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
       "interaction": [
         {
           "type": "wait",
@@ -213,7 +213,7 @@
     {
       "command": "blast detonate",
       "timeout": 60,
-      "description": "#1362: DETONATE arms the sequence and sounds the horn. The drill_rig is driverless (auto-dismounted when its drilling finished) so it cannot drive out: the preflight modal switches to its waiting state, names the stranded occupant and offers Fire anyway and Cancel.",
+      "description": "#1362: DETONATE arms the sequence and sounds the horn. No one in the zone has a reachable safe cell on this 31-cell map (see the new_game step), so the evacuation strands them, the drill_rig among them: the preflight modal switches to its waiting state, names the stranded occupants and offers Fire anyway and Cancel.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -236,7 +236,7 @@
       "command": "tick 20",
       "timeout": 90,
       "role": "setup",
-      "description": "Let the driller walk out for real; the stranded rig stays, so the sequence must not auto-fire.",
+      "description": "Run the clock: the occupants are stranded, not just slow, so the sequence must not auto-fire.",
       "interaction": [
         {
           "type": "command",
