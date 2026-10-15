@@ -1,0 +1,426 @@
+{
+  "name": "survey-hover-tag-visual",
+  "description": "Hover tag appears only after the cursor rests on a surveyed tile with the survey overlay on (#1752). Rest on surveyed tile -> tag with tile coords, ore, FRESH; move off -> hidden; rest on unsurveyed tile -> hidden; rest on a building -> hidden; overlay toggled off then rest on surveyed tile -> hidden. Tag root is #bs-hover-tag; its visibility is read from dataset.visible ('true'/'false'), which HoverTag must maintain.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:false"
+        }
+      ]
+    },
+    {
+      "command": "time resume",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ]
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for tighter survey estimates -- the player-facing path is `employee train`.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:3"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "survey seismic x:20 z:20",
+      "description": "Real click path: open the Survey panel, pick seismic (the method a geology-skilled surveyor can actually run), dispatch, target the tile.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ]
+    },
+    {
+      "command": "tick 25",
+      "description": "Padding for the seismic survey to resolve",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Hire a driller so the building order below has someone to walk over and build it (#556).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "build management_office at:10,13 tier:1",
+      "description": "Order a management office at a tile away from the surveyed centre; it is the entity the building beat rests on.",
+      "role": "player",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 13
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedBuildingCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction be built out.",
+      "timeout": 130,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 25",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "description": "Let the builder settle."
+    },
+    {
+      "command": "state",
+      "description": "Rest the cursor on the surveyed tile (20,20) with the overlay on: after the dwell the tag appears with tile coords, ore and FRESH.",
+      "role": "player",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 20,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-hover-tag",
+          "property": "dataset",
+          "expectedValue": {
+            "visible": "true"
+          },
+          "timeoutMs": 10000
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Move the cursor off the surveyed tile: the tag hides straight away, no dwell needed.",
+      "role": "player",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "mousemove",
+          "x": 1200,
+          "y": 500
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-hover-tag",
+          "property": "dataset",
+          "expectedValue": {
+            "visible": "false"
+          },
+          "timeoutMs": 10000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-hover-tag",
+        "note": "moving to another tile hides the tag"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Rest on an unsurveyed tile (4,4): no tag, no 'No survey data' variant. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
+      "role": "player",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 4,
+          "z": 4,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 700
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-hover-tag",
+          "property": "dataset",
+          "expectedValue": {
+            "visible": "false"
+          },
+          "timeoutMs": 10000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-hover-tag",
+        "note": "hidden tag is not reachable"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Rest on the management office (11,14), entity hover: no tag even though the overlay is on. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
+      "role": "player",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "cameraFocus",
+          "x": 11,
+          "z": 14,
+          "distance": 15
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 700
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-hover-tag",
+          "property": "dataset",
+          "expectedValue": {
+            "visible": "false"
+          },
+          "timeoutMs": 10000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-hover-tag",
+        "note": "hidden tag is not reachable"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Toggle the survey overlay off with its header button, then rest on the surveyed tile again: no tag. Fixed wait: the tag must STAY hidden, and the absence of an appearance has no condition to poll; 700 ms is past HOVER_TAG_DWELL_MS (400).",
+      "role": "player",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-role=\"overlay-toggle\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 20,
+          "z": 20,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 700
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-hover-tag",
+          "property": "dataset",
+          "expectedValue": {
+            "visible": "false"
+          },
+          "timeoutMs": 10000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-hover-tag",
+        "note": "hidden tag is not reachable"
+      }
+    }
+  ]
+}

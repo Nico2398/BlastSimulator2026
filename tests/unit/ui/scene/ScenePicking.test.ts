@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { pickScene, ScenePicking, type EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
+import { pickScene, ScenePicking, HOVER_TAG_DWELL_MS, type EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
 import { BuildingMesh } from '../../../../src/renderer/BuildingMesh.js';
 import { VehicleMesh } from '../../../../src/renderer/VehicleMesh.js';
 import { CharacterMesh } from '../../../../src/renderer/CharacterMesh.js';
@@ -500,6 +500,241 @@ describe('ScenePicking (class — canvas wiring, debounce, click-vs-drag)', () =
     canvas.style.cursor = 'pointer';
     sp.dispose();
     expect(canvas.style.cursor).toBe('');
+  });
+});
+
+// ── #1752: rest (dwell) detection for the hover tag ──────────────────────────
+
+describe('ScenePicking — rest handler (#1752)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function makeCanvas(): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.getBoundingClientRect = () => ({
+      left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600, x: 0, y: 0, toJSON: () => ({}),
+    });
+    return canvas;
+  }
+
+  function makeRenderer(): GameRenderer {
+    return { pickables: () => [], terrain: null, rampIdAtTile: () => null, resolveFragmentId: () => null } as unknown as GameRenderer;
+  }
+
+  /** The next raycast resolves to bare terrain at tile (x, z). */
+  function stubTile(x: number, z: number): void {
+    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReturnValue([
+      { object: new THREE.Object3D(), distance: 10, point: new THREE.Vector3(x + 0.5, 0, z + 0.5) } as THREE.Intersection,
+    ]);
+  }
+
+  function stubEntity(): void {
+    const o = new THREE.Object3D();
+    o.userData['entityKind'] = 'building';
+    o.userData['entityId'] = 3;
+    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockReturnValue([
+      { object: o, distance: 10, point: new THREE.Vector3(1, 0, 1) } as THREE.Intersection,
+    ]);
+  }
+
+  function move(canvas: HTMLCanvasElement, x = 100, y = 100): void {
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y, bubbles: true }));
+  }
+
+  function setup() {
+    vi.useFakeTimers();
+    const canvas = makeCanvas();
+    const sp = new ScenePicking(canvas, new THREE.PerspectiveCamera(), makeRenderer());
+    const onRest = vi.fn();
+    sp.setRestChangeHandler(onRest);
+    return { canvas, sp, onRest };
+  }
+
+  it('dwell is far longer than the 60ms hover re-pick', () => {
+    expect(HOVER_TAG_DWELL_MS).toBeGreaterThan(60);
+  });
+
+  it('does not fire at the 60ms hover delay', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(60);
+    expect(onRest).not.toHaveBeenCalled();
+    sp.dispose();
+  });
+
+  it('does not fire one millisecond before the dwell elapses', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 1);
+    expect(onRest).not.toHaveBeenCalled();
+    sp.dispose();
+  });
+
+  it('fires once with the pick when the dwell elapses', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    expect(onRest).toHaveBeenCalledTimes(1);
+    expect(onRest.mock.calls[0]![0]).toEqual(expect.objectContaining({
+      terrain: expect.objectContaining({ tileX: 3, tileZ: 4 }),
+    }));
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS * 3);
+    expect(onRest).toHaveBeenCalledTimes(1);
+    sp.dispose();
+  });
+
+  it('repeated moves over the same tile do not restart the dwell', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 100);
+    move(canvas, 101, 101);
+    vi.advanceTimersByTime(100);
+    expect(onRest).toHaveBeenCalledTimes(1);
+    sp.dispose();
+  });
+
+  it('sweeping across tiles faster than the dwell never fires', () => {
+    const { canvas, sp, onRest } = setup();
+    for (let x = 0; x < 20; x++) {
+      stubTile(x, 4);
+      move(canvas, 100 + x, 100);
+      vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 50);
+    }
+    expect(onRest).not.toHaveBeenCalled();
+    sp.dispose();
+  });
+
+  it('moving to another tile after a rest fires null, then fires the new pick after a fresh dwell', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    onRest.mockClear();
+
+    stubTile(5, 4);
+    move(canvas, 140, 100);
+    expect(onRest).toHaveBeenCalledTimes(1);
+    expect(onRest).toHaveBeenLastCalledWith(null);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 1);
+    expect(onRest).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(onRest).toHaveBeenCalledTimes(2);
+    expect(onRest.mock.calls[1]![0]).toEqual(expect.objectContaining({
+      terrain: expect.objectContaining({ tileX: 5, tileZ: 4 }),
+    }));
+    sp.dispose();
+  });
+
+  it('moving to another tile before any rest does not fire null', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(100);
+    stubTile(5, 4);
+    move(canvas, 140, 100);
+    expect(onRest).not.toHaveBeenCalled();
+    sp.dispose();
+  });
+
+  it('an entity pick also rests (the consumer decides it shows nothing)', () => {
+    const { canvas, sp, onRest } = setup();
+    stubEntity();
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    expect(onRest).toHaveBeenCalledTimes(1);
+    expect(onRest.mock.calls[0]![0]).toEqual(expect.objectContaining({
+      entity: expect.objectContaining({ kind: 'building', id: 3 }),
+    }));
+    sp.dispose();
+  });
+
+  it('mouseleave after a rest fires null', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    onRest.mockClear();
+    canvas.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    expect(onRest).toHaveBeenCalledWith(null);
+    sp.dispose();
+  });
+
+  it('mouseleave before the dwell elapses cancels it', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 50);
+    canvas.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    expect(onRest).not.toHaveBeenCalledWith(expect.objectContaining({ terrain: expect.anything() }));
+    sp.dispose();
+  });
+
+  it('mousedown after a rest fires null, and no rest follows during the drag', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    onRest.mockClear();
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0, bubbles: true }));
+    expect(onRest).toHaveBeenCalledWith(null);
+    onRest.mockClear();
+    stubTile(6, 6);
+    move(canvas, 200, 200);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS * 2);
+    expect(onRest).not.toHaveBeenCalled();
+    sp.dispose();
+  });
+
+  it('mousedown before the dwell elapses cancels it', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 50);
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 2, bubbles: true }));
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    expect(onRest).not.toHaveBeenCalledWith(expect.objectContaining({ terrain: expect.anything() }));
+    sp.dispose();
+  });
+
+  it('setEnabled(false) after a rest fires null', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    onRest.mockClear();
+    sp.setEnabled(false);
+    expect(onRest).toHaveBeenCalledWith(null);
+    sp.dispose();
+  });
+
+  it('setEnabled(false) before the dwell elapses cancels it', () => {
+    const { canvas, sp, onRest } = setup();
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS - 50);
+    sp.setEnabled(false);
+    vi.advanceTimersByTime(HOVER_TAG_DWELL_MS);
+    expect(onRest).not.toHaveBeenCalledWith(expect.objectContaining({ terrain: expect.anything() }));
+    sp.dispose();
+  });
+
+  it('leaves the 60ms hover and aim timing unchanged', () => {
+    const { canvas, sp } = setup();
+    const onHover = vi.fn();
+    sp.setHoverChangeHandler(onHover);
+    stubTile(3, 4);
+    move(canvas);
+    vi.advanceTimersByTime(60);
+    expect(onHover).toHaveBeenCalledTimes(1);
+    expect(sp.aim?.terrain?.tileX).toBe(3);
+    sp.dispose();
   });
 });
 
