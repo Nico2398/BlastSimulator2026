@@ -1,10 +1,11 @@
 import type { GameState } from '../../core/state/GameState.js';
+import { getBuildingDef, getDefSize } from '../../core/entities/Building.js';
 
 /** Selection kinds whose on-screen anchor may be a host (building, vehicle, site) rather than the entity itself. */
-export type HostResolvedKind = 'employee' | 'vehicle' | 'building' | 'fragment';
+type HostResolvedKind = 'employee' | 'vehicle' | 'building' | 'fragment';
 
 /** Inclusive tile rectangle. */
-export interface SiteFootprint {
+interface SiteFootprint {
   minX: number;
   maxX: number;
   minZ: number;
@@ -16,31 +17,76 @@ export type SelectionAnchor =
   | { type: 'host'; kind: 'building' | 'vehicle'; id: number }
   | { type: 'site'; footprint: SiteFootprint };
 
-export type SelectionResolution = { exists: false } | { exists: true; anchor: SelectionAnchor };
+type SelectionResolution = { exists: false } | { exists: true; anchor: SelectionAnchor };
 
-export type SelectionWorld = Pick<
+type SelectionWorld = Pick<
   GameState,
   'employees' | 'vehicles' | 'buildings' | 'plannedBuildings' | 'logistics'
 >;
 
-export function isHostResolvedKind(_kind: string): _kind is HostResolvedKind {
-  // TODO: implement
-  return false;
+export function isHostResolvedKind(kind: string): kind is HostResolvedKind {
+  return kind === 'employee' || kind === 'vehicle' || kind === 'building' || kind === 'fragment';
 }
 
-export function resolveSelection(
-  _world: SelectionWorld,
-  _kind: HostResolvedKind,
-  _id: number,
+const SELF: SelectionResolution = { exists: true, anchor: { type: 'self' } };
+
+function hostOrSelf(
+  world: SelectionWorld,
+  kind: 'building' | 'vehicle',
+  id: number,
 ): SelectionResolution {
-  // TODO: implement
-  return { exists: false };
+  const resolvable = kind === 'building'
+    ? world.buildings.buildings.some(b => b.id === id)
+    : world.vehicles.vehicles.some(v => v.id === id);
+  return resolvable ? { exists: true, anchor: { type: 'host', kind, id } } : SELF;
 }
 
+/** Where the selected entity's outline belongs, or that it no longer exists. One linear find, for the one selected entity. */
+export function resolveSelection(
+  world: SelectionWorld,
+  kind: HostResolvedKind,
+  id: number,
+): SelectionResolution {
+  switch (kind) {
+    case 'employee': {
+      const e = world.employees.employees.find(x => x.id === id);
+      if (!e) return { exists: false };
+      if (e.locomotion.kind === 'inside') return hostOrSelf(world, 'building', e.locomotion.buildingId);
+      if (e.locomotion.kind === 'mounted') return hostOrSelf(world, 'vehicle', e.locomotion.vehicleId);
+      return SELF;
+    }
+    case 'vehicle':
+      return world.vehicles.vehicles.some(v => v.id === id) ? SELF : { exists: false };
+    case 'building': {
+      if (world.buildings.buildings.some(b => b.id === id)) return SELF;
+      const site = world.plannedBuildings.find(pb => pb.buildingId === id);
+      if (!site) return { exists: false };
+      const { sizeX, sizeZ } = getDefSize(getBuildingDef(site.type, site.tier));
+      return {
+        exists: true,
+        anchor: {
+          type: 'site',
+          footprint: { minX: site.x, maxX: site.x + sizeX - 1, minZ: site.z, maxZ: site.z + sizeZ - 1 },
+        },
+      };
+    }
+    case 'fragment': {
+      const f = world.logistics.fragments.find(x => x.fragment.id === id);
+      if (!f) return { exists: false };
+      if (f.state === 'in_transit' && f.vehicleId !== null) {
+        const vehicle = world.vehicles.vehicles.find(v => String(v.id) === f.vehicleId);
+        return vehicle ? { exists: true, anchor: { type: 'host', kind: 'vehicle', id: vehicle.id } } : SELF;
+      }
+      if (f.state === 'stored' && f.warehouseId !== null) return hostOrSelf(world, 'building', f.warehouseId);
+      return SELF;
+    }
+  }
+}
+
+/** A destroyed building being rebuilt: a site holds its id and no live building does. */
 export function isUnderRebuild(
-  _world: Pick<GameState, 'buildings' | 'plannedBuildings'>,
-  _id: number,
+  world: Pick<GameState, 'buildings' | 'plannedBuildings'>,
+  id: number,
 ): boolean {
-  // TODO: implement
-  return false;
+  return !world.buildings.buildings.some(b => b.id === id) && world.plannedBuildings.some(pb => pb.buildingId === id);
 }

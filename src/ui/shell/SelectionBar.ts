@@ -9,6 +9,7 @@ import { el, button } from '../dom.js';
 import { iconEl } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
+import { isUnderRebuild } from '../scene/SelectionHost.js';
 import { nextRampWidth } from '../../core/mining/RampWidening.js';
 import type { RampWidth } from '../../core/config/balance.js';
 import { describeRamp } from '../describeRamp.js';
@@ -117,11 +118,6 @@ export type SelectionAction =
   | 'upgrade' | 'move' | 'demolish'
   | 'focus' | 'widen';
 
-/** True when no standing building has this id because its upgrade is being rebuilt (#1392). */
-function isUnderRebuild(id: number, state: GameState): boolean {
-  return !state.buildings.buildings.some(b => b.id === id) && state.plannedBuildings.some(pb => pb.buildingId === id);
-}
-
 /** Warehouse stock and free room, kept short for the one-line sub text (#1685). */
 function warehouseStockEl(kg: number, freeKg: number): HTMLElement {
   const stockEl = el('span', { text: t('shell.selection.warehouse_stock', { stock: kg, free: freeKg }) });
@@ -189,7 +185,7 @@ export class SelectionBar {
     this.subEl.textContent = identity.sub;
     if (identity.stock) this.subEl.append(' · ', warehouseStockEl(identity.stock.kg, identity.stock.freeKg));
     const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
-    const rebuilding = entity.kind === 'building' && isUnderRebuild(entity.id, state);
+    const rebuilding = entity.kind === 'building' && isUnderRebuild(state, entity.id);
     const vehicle = entity.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === entity.id) : undefined;
     const vehicleUpgradable = vehicle !== undefined && canAffordVehicleUpgrade(vehicle, state.cash);
     this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null, rebuilding, vehicleUpgradable));
