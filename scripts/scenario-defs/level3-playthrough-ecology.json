@@ -867,8 +867,8 @@
           "employeeCount": 12,
           "wellBeing": 72.74261071428589,
           "safety": 50,
-          "ecology": 44.85863403876687,
-          "nuisance": 37.14658509691719,
+          "ecology": 44.78863403876688,
+          "nuisance": 36.971585096917195,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1024,8 +1024,8 @@
           "employeeCount": 12,
           "wellBeing": 72.74261071428589,
           "safety": 50,
-          "ecology": 44.85863403876687,
-          "nuisance": 37.14658509691719,
+          "ecology": 44.78863403876688,
+          "nuisance": 36.971585096917195,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1081,8 +1081,8 @@
           "employeeCount": 12,
           "wellBeing": 33.57046785714299,
           "safety": 0,
-          "ecology": 40.75233970385312,
-          "nuisance": 36.5329254845859,
+          "ecology": 40.73221429884332,
+          "nuisance": 36.357925484585905,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1127,8 +1127,8 @@
           "employeeCount": 12,
           "wellBeing": 33.57046785714299,
           "safety": 0,
-          "ecology": 40.75233970385312,
-          "nuisance": 36.5329254845859,
+          "ecology": 40.73221429884332,
+          "nuisance": 36.357925484585905,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1151,8 +1151,8 @@
           "employeeCount": 12,
           "wellBeing": 33.57046785714299,
           "safety": 0,
-          "ecology": 40.75233970385312,
-          "nuisance": 36.5329254845859,
+          "ecology": 40.73221429884332,
+          "nuisance": 36.357925484585905,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false
