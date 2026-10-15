@@ -426,14 +426,16 @@ function staleVehicleOrder(emp: Employee, live: ReadonlySet<number>): boolean {
 /**
  * Drop the order of everyone tied to a vehicle that no longer exists — scrap,
  * blast clearing or projection damage remove vehicles without reaching the
- * people around them. Two kinds, both returned by id:
+ * people around them. Two kinds, only the first returned by id:
  * - mounted occupants stand on foot where the vehicle was (their own x/z,
  *   which the vehicle's position mirrored); dead employees are included so no
- *   `mounted` locomotion outlives its vehicle. They get `employee:alighted`.
+ *   `mounted` locomotion outlives its vehicle. They get `employee:alighted`
+ *   and their ids are the return value.
  * - walkers whose itinerary boards or drives the vanished vehicle (or whose
  *   `pendingDriverVehicleId` names it) lose the whole order and stuck state
  *   in place, idle for dispatch the same tick. They never boarded, so no
- *   alighted event. An action they were claiming is not released here
+ *   alighted event and they are not in the return value. An evacuation walk
+ *   holds no activeActionId (Evacuation.ts), so nothing blocks dispatch. An action they were claiming is not released here
  *   (TaskCancellation imports this module, so importing it back would close a
  *   cycle).
  */
@@ -453,7 +455,6 @@ export function releaseOccupantsOfRemovedVehicles(state: GameState, emitter?: Ev
       emp.vehicleWaitingTicks = 0;
       emp.isMoveStuck = false;
       delete emp.blockEpisode;
-      released.push(emp.id);
     }
   }
   return released;
