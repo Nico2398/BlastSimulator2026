@@ -4,7 +4,6 @@ import {
   isHostResolvedKind,
   isUnderRebuild,
   resolveSelection,
-  type SelectionWorld,
 } from '../../../../src/ui/scene/SelectionHost.js';
 import { createEmployeeState, hireEmployee, type Employee } from '../../../../src/core/entities/Employee.js';
 import { createVehicleState, type Vehicle } from '../../../../src/core/entities/Vehicle.js';
@@ -12,6 +11,8 @@ import { createBuildingState, getBuildingDef, getDefSize, type Building } from '
 import { createLogisticsState, type TrackedFragment } from '../../../../src/core/economy/Logistics.js';
 import type { PlannedBuilding } from '../../../../src/core/state/GameState.js';
 import { Random } from '../../../../src/core/math/Random.js';
+
+type SelectionWorld = Parameters<typeof resolveSelection>[0];
 
 function makeWorld(): SelectionWorld {
   return {
