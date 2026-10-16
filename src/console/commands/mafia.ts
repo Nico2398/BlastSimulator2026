@@ -3,7 +3,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { Random } from '../../core/math/Random.js';
+import { Random, rollSeed } from '../../core/math/Random.js';
 import {
   arrangeAccident,
   startFraming,
@@ -40,8 +40,6 @@ export function mafiaCommand(
     return { success: false, output: t('mafia.not_unlocked') };
   }
 
-  const rng = new Random(state.seed + state.tickCount);
-
   switch (sub) {
     case 'status': {
       const lines = [
@@ -69,7 +67,10 @@ export function mafiaCommand(
           }),
         };
       }
+      const rng = new Random(rollSeed(state.seed, state.tickCount, state.mafia.rollCount));
       const result = arrangeAccident(state.mafia, state, state.corruption, empId, rng);
+      // A missing or dead target draws no roll, so it consumes no salt.
+      if (result.outcomeKey !== 'mafia.target_not_found') state.mafia.rollCount++;
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Arranged accident', state.tickCount);
       raiseInvestigation(ctx, result);
@@ -85,6 +86,8 @@ export function mafiaCommand(
         f => f.employeeId === empId && state.tickCount >= f.readyTick,
       );
       if (pending) {
+        const rng = new Random(rollSeed(state.seed, state.tickCount, state.mafia.rollCount));
+        state.mafia.rollCount++;
         const result = completeFrame(state.mafia, state, empId, state.tickCount, rng);
         raiseInvestigation(ctx, result);
         return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
