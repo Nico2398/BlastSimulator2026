@@ -547,29 +547,27 @@ export interface FootprintOccupant {
   z: number;
 }
 
-/** Whether the inclusive-min / exclusive-max world rect overlaps any occupant's footprint (#1396). */
-export function rectOverlapsOccupants(
-  occupants: ReadonlyArray<FootprintOccupant>,
-  rect: Rect,
-): boolean {
-  for (const occ of occupants) {
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
-    if (rect.minX < occ.x + sizeX && rect.maxX > occ.x &&
-        rect.minZ < occ.z + sizeZ && rect.maxZ > occ.z) {
-      return true;
-    }
-  }
-  return false;
-}
-
 /** The first occupant whose footprint overlaps the inclusive-min / exclusive-max world rect, if any (#1830). */
 export function findOverlappingOccupant(
   occupants: ReadonlyArray<FootprintOccupant>,
   rect: Rect,
 ): FootprintOccupant | undefined {
-  void occupants;
-  void rect;
-  return undefined; // TODO: implement
+  for (const occ of occupants) {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
+    if (rect.minX < occ.x + sizeX && rect.maxX > occ.x &&
+        rect.minZ < occ.z + sizeZ && rect.maxZ > occ.z) {
+      return occ;
+    }
+  }
+  return undefined;
+}
+
+/** Whether the inclusive-min / exclusive-max world rect overlaps any occupant's footprint (#1396). */
+export function rectOverlapsOccupants(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  rect: Rect,
+): boolean {
+  return findOverlappingOccupant(occupants, rect) !== undefined;
 }
 
 /**
@@ -604,8 +602,14 @@ export function checkFootprintPlacement(
     return { valid: false, error: 'Out of bounds', errorKey: 'shell.placement.refused_out_of_bounds' };
   }
 
-  if (rectOverlapsOccupants(occupants, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ })) {
-    return { valid: false, error: 'Space is occupied', errorKey: 'shell.placement.refused_occupied' };
+  const blocker = findOverlappingOccupant(occupants, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ });
+  if (blocker !== undefined) {
+    return {
+      valid: false,
+      error: 'Space is occupied',
+      errorKey: 'shell.placement.refused_occupied_by',
+      errorParams: { type: blocker.type, x: blocker.x, z: blocker.z },
+    };
   }
 
   if (reservations !== undefined) {
