@@ -435,12 +435,13 @@ function ensureScratchCapacity(size: number): void {
   stampArr = new Int32Array(size); // zero-filled; currentStamp starts at 1 so this never falsely reads as "touched"
 }
 
-/** Clamp a world coordinate pair into the grid's covered box. */
+/**
+ * Clamp a world coordinate pair into the grid's covered box. Delegates to
+ * NavGrid.clampX/clampZ (Math.round) so a fractional mover position maps to
+ * the same cell here as in the runtime grid (#1851).
+ */
 function clampToGrid(grid: NavGrid, x: number, z: number): { x: number; z: number } {
-  return {
-    x: Math.max(grid.originX, Math.min(grid.maxX - 1, Math.floor(x))),
-    z: Math.max(grid.originZ, Math.min(grid.maxZ - 1, Math.floor(z))),
-  };
+  return { x: grid.clampX(x), z: grid.clampZ(z) };
 }
 
 // ---------------------------------------------------------------------------
@@ -962,16 +963,16 @@ export function findExactPath(grid: NavGrid, request: PathRequest): PathResult {
   const path = findPath(grid, request);
   if (!path.found) return path;
 
-  // Compare against the RAW requested destination (floored, unclamped) —
+  // Compare against the RAW requested destination (rounded, unclamped) —
   // not clampToGrid's output, which is what findPath itself already
   // targeted internally. Comparing against that would make this guard
   // always agree with findPath's own endpoint and never fire. In-bounds
-  // requests floor to the same cell clampToGrid would have clamped to, so
-  // behavior there is unchanged; an out-of-bounds request floors to a cell
+  // requests round to the same cell clampToGrid would have clamped to, so
+  // behavior there is unchanged; an out-of-bounds request rounds to a cell
   // outside the grid, which never matches the path's actual (in-grid) last
   // waypoint, correctly triggering rejection.
-  const rawTargetX = Math.floor(request.toX);
-  const rawTargetZ = Math.floor(request.toZ);
+  const rawTargetX = Math.round(request.toX);
+  const rawTargetZ = Math.round(request.toZ);
   const last = path.waypoints[path.waypoints.length - 1];
   if (!last || last.x !== rawTargetX || last.z !== rawTargetZ) {
     return { found: false, waypoints: [], totalCost: 0 };
