@@ -20,6 +20,9 @@ function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   };
 }
 
+// A roster member holding the licence a tier-1 debris hauler needs, so the vehicle reads Unmanned (not no-licence).
+const TRUCK_LICENCE = { category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: 1 } as Employee['qualifications'][number];
+
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: 1, name: 'Dorian Kask', role: 'driver', salary: 400, morale: 60,
@@ -189,14 +192,14 @@ describe('fleetDetailSections — makeDriverNameLine', () => {
   it('ignores a pending walker bound for another vehicle', () => {
     const line = makeDriverNameLine(
       makeVehicle({ id: 2 }),
-      [makeEmployee({ id: 8, name: 'Pip Walker', pendingDriverVehicleId: 5 })],
+      [makeEmployee({ id: 8, name: 'Pip Walker', pendingDriverVehicleId: 5, qualifications: [TRUCK_LICENCE] })],
     );
     expect(line.textContent).not.toContain('Pip Walker');
     expect(line.textContent).toContain('Unmanned');
   });
 
   it('reads Unmanned (muted) with no driver and no pending walker', () => {
-    const line = makeDriverNameLine(makeVehicle(), [makeEmployee({ id: 6 })]);
+    const line = makeDriverNameLine(makeVehicle(), [makeEmployee({ id: 6, qualifications: [TRUCK_LICENCE] })]);
     expect(line.textContent).toContain('Unmanned');
     expect(line.classList.contains('bs-fleet-driver')).toBe(true);
   });
