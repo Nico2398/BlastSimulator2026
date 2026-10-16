@@ -122,7 +122,7 @@ describe('stranded on-foot pathfinding deadlock — scenario-runner (#1025)', ()
     const holder = state.employees.employees.find(e => e.id === holderId)!;
 
     // Freeze the employee at a fractional position that rounds to (24, 24) —
-    // mirrors a fatigue-freeze mid-walk (clampToGrid uses Math.floor).
+    // mirrors a fatigue-freeze mid-walk (clampToGrid uses Math.round via NavGrid).
     holder.x = 24.307;
     holder.z = 24.293;
 
