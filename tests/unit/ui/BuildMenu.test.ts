@@ -433,6 +433,82 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     });
   });
 
+  // ── #1852: the Ramp strip says where the foot meets the end tile's ground ──
+  // The foot line rides the strip's `subtitle`. Sampler: the start tile (5,5) reads 15 m,
+  // every tile from z=20 on (the end tile (5,25) included) reads `endGround`.
+
+  describe('Ramp tool: foot against the end tile floor (#1852)', () => {
+    function armRampOver(endGround: number | null) {
+      const { kit, controller, strip } = makeMockKit();
+      menu.setPlacementKit(kit);
+      if (endGround !== null) menu.setSurfaceHeightSampler((_x, z) => (z >= 20 ? endGround : 15));
+      container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!.click();
+      controller.simulateSelect({ x1: 5, z1: 5, x2: 5, z2: 25 });
+      const shown = () => strip.show.mock.calls.at(-1)![0];
+      return { controller, strip, shown };
+    }
+
+    it('a crater floor within reach: shows the snapped line with the snapped depth (15 - 8.5 = 6.5 m), no miss text', () => {
+      const { shown } = armRampOver(8.5);
+      const line = shown().subtitle as string;
+      expect(line).toContain('6.5');
+      expect(line).not.toBe('ui.build.ramp_foot_snapped'); // a translated line, not the bare key
+    });
+
+    it('a crater floor far below the foot: shows the miss line with the offset and the depth that meets the floor, and Confirm stays enabled', () => {
+      const { shown } = armRampOver(4); // foot ~7.4 m, floor 4: 3.4 m above; start - end = 11 m
+      const line = shown().subtitle as string;
+      expect(line).toContain('3.4');
+      expect(line).toContain('11');
+      expect(line).not.toBe('ui.build.ramp_foot_miss');
+      expect(shown().confirmEnabled).toBe(true);
+    });
+
+    it('intact ground at the end tile: the strip shows no foot line', () => {
+      const { shown } = armRampOver(14.5);
+      expect(shown().subtitle).toBe('');
+    });
+
+    it('end tile level with the start: no foot line', () => {
+      const { shown } = armRampOver(15);
+      expect(shown().subtitle).toBe('');
+    });
+
+    it('no surface sampler registered: no foot line and the strip still renders', () => {
+      const { shown } = armRampOver(null);
+      expect(shown().subtitle).toBe('');
+      expect(shown().fields.map((f: { key: string }) => f.key)).toEqual(['depth', 'width']);
+    });
+
+    it('stepping the depth to a miss swaps the snapped line for the miss line live', () => {
+      const { shown } = armRampOver(8.5);
+      expect(shown().subtitle).toContain('6.5');
+      const depth = () => shown().fields[0];
+      for (let i = 0; i < 3; i++) depth().onInc(); // depth 11: foot 4.55, 3.95 m under the floor, out of reach of the snap
+      expect(shown().subtitle).not.toBe('');
+      expect(shown().subtitle).not.toContain('6.5');
+    });
+
+    it('confirm still dispatches the player\'s chosen depth, not the snapped one', () => {
+      const { controller } = armRampOver(8.5);
+      controller.simulateConfirm();
+      expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('depth:8'));
+    });
+
+    it('en and fr both carry the two foot lines, and they differ between languages', async () => {
+      const { readFileSync } = await import('node:fs');
+      const load = (lang: string): Record<string, string> =>
+        JSON.parse(readFileSync(`src/core/i18n/locales/${lang}.json`, 'utf8'));
+      const en = load('en');
+      const fr = load('fr');
+      for (const key of ['ui.build.ramp_foot_snapped', 'ui.build.ramp_foot_miss']) {
+        expect(en[key], `en ${key}`).toBeTruthy();
+        expect(fr[key], `fr ${key}`).toBeTruthy();
+        expect(fr[key]).not.toBe(en[key]);
+      }
+    });
+  });
+
   // ── #1210: BuildMenu's own confirmEnabled gate must never disagree with
   // core's validateRampOrder — today it doesn't consult validateRampOrder at
   // all: `tiles` is computed locally with a +1 buildRampCommand's own
