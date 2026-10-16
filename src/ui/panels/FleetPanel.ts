@@ -1,15 +1,9 @@
 // BlastSimulator2026 — Fleet panel (redesign P6)
-// Traffic advisory banner, then one card per vehicle: name/id/role, status
-// chip, HP gauge, LOAD gauge (haulers only), driver row or no-driver status
-// (licence warning or "unmanned" — display-only since #921), UPGRADE (#1401:
-// pay the price difference to move up one tier in place; shows the cost,
-// disabled at tier 3 or when cash is short, patched in place as cash changes;
-// a warning row when nobody on the roster can drive the next tier), REPOSITION
-// (pick a tile in the scene, then `vehicle reposition`), SCRAP (confirm,
-// real residual value). Both Haul and Break are
-// self-dispatching now (#552, #618) — there is no button for either; a
-// qualified idle employee/driver auto-claims the free vehicle and does the
-// work on its own.
+// Traffic advisory banner, then one master-list row per vehicle (#1767): icon
+// chip, tier name, #id, role, status chip, HP gauge, LOAD gauge (haulers
+// only), driver name line, Locate. Upgrade/Reposition/Scrap and the driver
+// block live in the vehicle inspector. Haul and Break are self-dispatching
+// (#552, #618) — there is no button for either.
 // DEALERSHIP below the roster: every role/tier with a real stat-multiplier
 // line from VEHICLE_TIER_MULTIPLIERS, dispatching `vehicle buy`.
 //
@@ -21,40 +15,33 @@
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, card, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
-import { getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
+import { getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment.js';
-import { nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import type { ListSelection } from '../selectionRoute.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge } from '../fleetDetailSections.js';
-import { makeDriverBlock, upgradeState, upgradeDisabledReason, scrapConfirmConfig } from './inspector/vehicleDetailParts.js';
-import type { ConfirmModalConfig } from './ConfirmModal.js';
+import { applyRowSelection, type ListSelection } from '../selectionRoute.js';
+import { onRowBodyClick } from '../buildMenuRows.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverNameLine } from '../fleetDetailSections.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import type { PlacementKit } from '../scene/PlacementKit.js';
-import { armEntityMovePick } from '../scene/EntityMovePick.js';
 
 
 const TIER_BTN_BASE_STYLE = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left';
 
 export class FleetPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
-  private onNavigateCb?: (panel: 'crew') => void;
   private gameConsole?: GameConsoleFn;
-  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private onSelectVehicleCb?: (vehicleId: number) => void;
   private lastSignature = '';
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
-  /** Shared in-scene placement tool (#1092), for the "Reposition" click flow — armed by each card's Reposition button through `armPointPick`, same as `SurveyPanel.pickTargetAndRun`. */
-  private placementKit: PlacementKit | null = null;
+  private selection: ListSelection = null;
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-vehicle-panel'));
@@ -72,44 +59,31 @@ export class FleetPanel extends PanelBase {
     container.appendChild(this.el);
   }
 
-  setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigateCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
-  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
 
   /** Register a callback fired when a vehicle's Fleet panel row is clicked to select it. */
   setSelectVehicleHandler(cb: (vehicleId: number) => void): void { this.onSelectVehicleCb = cb; }
 
-  setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
-
-  /**
-   * Arms the shared placement tool to pick a parking spot for `vehicleId`,
-   * the "Reposition" click flow's entry point — the same `armPointPick` flow
-   * `SurveyPanel.pickTargetAndRun` uses: arm on click, dispatch
-   * `vehicle reposition <id> <x> <z>` via `this.gameConsole` on confirm.
-   * Pre-selects the vehicle's own tile so Confirm is reachable immediately
-   * and the player can see which vehicle the strip is talking about.
-   */
-  requestReposition(vehicleId: number): void {
-    const kit = this.placementKit;
-    if (!kit) return;
-
-    const vehicle = this.lastState?.vehicles.vehicles.find(v => v.id === vehicleId);
-    if (!vehicle) return;
-
-    armEntityMovePick(kit, {
-      kind: 'vehicle',
-      id: vehicleId,
-      name: vehicleDisplayName(vehicle.type, vehicle.tier),
-      x: vehicle.x,
-      z: vehicle.z,
-    }, (cmd) => { this.gameConsole?.(cmd); });
+  /** Highlights the row matching the scene selection `sel`; kept across re-renders, not part of the signature. */
+  setSelectedVehicle(sel: ListSelection): void {
+    const changed = this.selection?.id !== sel?.id || this.selection?.kind !== sel?.kind;
+    this.selection = sel;
+    this.applySelection(changed);
   }
 
+  private applySelection(scroll = false): void {
+    applyRowSelection([this.bodyEl], this.selection, 'vehicle', 'data-vehicle-id');
+    if (!scroll || this.selection?.kind !== 'vehicle') return;
+    // Optional chained on the method: jsdom doesn't implement scrollIntoView.
+    this.bodyEl.querySelector<HTMLElement>('.bs-row-selected')?.scrollIntoView?.({ block: 'nearest' });
+  }
 
-  /** Highlights the row of the entity picked elsewhere (#1767). */
-  setSelectedVehicle(sel: ListSelection): void {
-    // TODO: implement
-    void sel;
+  /** Locate button action: focus the camera on the live vehicle and select it. */
+  private locateVehicle(id: number): void {
+    const live = this.lastState?.vehicles.vehicles.find(x => x.id === id);
+    if (!live) return;
+    focusCameraOn(live.x, live.z);
+    this.onSelectVehicleCb?.(id);
   }
 
   update(state: GameState): void {
@@ -119,11 +93,13 @@ export class FleetPanel extends PanelBase {
     if (signature === this.lastSignature) {
       this.refreshDynamic(state);
       this.refreshDealershipAffordability(state);
+      this.applySelection();
       return;
     }
     this.lastSignature = signature;
     this.render(state);
     this.refreshDealershipAffordability(state);
+    this.applySelection();
   }
 
   refreshLocale(): void {
@@ -134,28 +110,12 @@ export class FleetPanel extends PanelBase {
 
 
   /**
-   * Structural facts only: which cards exist, whether each has a driver
-   * (swaps the driver row for the no-driver row), and who is eligible to
-   * drive (changes the no-driver row's licence warning). HP, load, status,
-   * and the traffic banner all drift on their own — refreshDynamic patches
-   * (or adds/removes, for the banner) those in place so an in-progress
-   * board-walk or Haul/Scrap click survives.
+   * Structural facts only: which rows exist and their type/tier. Status, HP,
+   * load, driver line and the traffic banner drift on their own —
+   * refreshDynamic patches those in place.
    */
   private computeSignature(state: GameState): string {
-    // reservedForActionId is part of the signature too (#1092): it decides
-    // whether the card's Reposition button renders enabled or refused.
-    const rows = state.vehicles.vehicles
-      .map(v => `${v.id}:${v.type}:${v.tier}:${vehicleDriverId(v) ?? '-'}:${getVehicleReservation(state.vehicles, v.id) ?? '-'}`).join('|');
-    // pendingDriverVehicleId, not just the driver seat: VehicleReservation's
-    // automatic claim sets it immediately, but the seat itself stays empty
-    // for the whole walk to the vehicle (the board arrival step fills it).
-    // Omitting it here let every OTHER vehicle's already-rendered
-    // no-driver row go stale the moment one claim took an employee, until
-    // some unrelated structural change (a further purchase) happened to
-    // force a fresh render — #715.
-    const quals = state.employees.employees.filter(e => e.alive)
-      .map(e => `${e.id}:${e.qualifications.map(q => q.category).join(',')}:${e.pendingDriverVehicleId ?? '-'}`).join('|');
-    return `${rows}#${quals}`;
+    return state.vehicles.vehicles.map(v => `${v.id}:${v.type}:${v.tier}`).join('|');
   }
 
   private refreshDynamic(state: GameState): void {
@@ -169,8 +129,7 @@ export class FleetPanel extends PanelBase {
       const load = makeLoadGauge(v);
       const existingLoad = row.querySelector('.bs-fleet-load');
       if (load && existingLoad) existingLoad.replaceWith(this.tag(load, 'bs-fleet-load'));
-      const upgradeBtn = row.querySelector<HTMLButtonElement>('[data-action="upgrade"]');
-      if (upgradeBtn) this.applyUpgradeState(upgradeBtn, v, state.cash);
+      row.querySelector('.bs-fleet-driver')?.replaceWith(this.tag(makeDriverNameLine(v, state.employees.employees), 'bs-fleet-driver'));
     }
   }
 
@@ -302,119 +261,21 @@ export class FleetPanel extends PanelBase {
       ] }),
       el('span', { text: t(`vehicle_type.${v.type}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
     );
-    const locateBtn = makeLocateButton({
-      title: t('ui.fleet.locate'),
-      onClick: () => {
-        const live = this.lastState?.vehicles.vehicles.find(x => x.id === v.id);
-        if (live) focusCameraOn(live.x, live.z);
-      },
-    });
+    const locateBtn = makeLocateButton({ title: t('ui.fleet.locate'), onClick: () => this.locateVehicle(v.id) });
     head.append(iconChip, nameCol, this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'), locateBtn);
 
     const rows: HTMLElement[] = [head, this.tag(makeHpGauge(v), 'bs-fleet-hp')];
     const load = makeLoadGauge(v);
     if (load) rows.push(this.tag(load, 'bs-fleet-load'));
-
-    rows.push(...makeDriverBlock(v, state, { onGoToCrew: () => this.onNavigateCb?.('crew') }));
-
-    const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
-    actions.appendChild(this.makeRepositionButton(v, state));
-    actions.appendChild(this.makeUpgradeButton(v, state.cash));
-    const scrapBtn = button('danger', '', { icon: 'trash' });
-    scrapBtn.style.cssText = 'width:34px;height:28px;padding:0';
-    scrapBtn.title = t('ui.fleet.scrap');
-    scrapBtn.addEventListener('click', () => this.requestScrap(v));
-    actions.appendChild(scrapBtn);
-    rows.push(actions);
+    rows.push(this.tag(makeDriverNameLine(v, state.employees.employees), 'bs-fleet-driver'));
 
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);
-    // Mirrors the dealership buy buttons' own [data-vtype] (this file's
-    // header comment) so a tutorial stage can scope its purchase target to a
-    // specific vehicle TYPE, not just "the first matching element in the
-    // DOM" — see tutorialStages.ts's 'vehicle-buy-assign' (and
-    // tutorialStagesTraining.ts's 'buy-drill-rig-assign'/
-    // 'buy-rock-digger-assign') for why that distinction matters (#557
-    // follow-up).
+    // Mirrors the dealership buy buttons' own [data-vtype] so a tutorial stage
+    // can scope its target to a vehicle TYPE (tutorialStages.ts, #557).
     wrap.dataset['vtype'] = v.type;
     wrap.style.cursor = 'pointer';
-    wrap.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('button, select, input, a')) return;
-      this.onSelectVehicleCb?.(v.id);
-    });
+    onRowBodyClick(wrap, () => this.onSelectVehicleCb?.(v.id));
     return wrap;
-  }
-
-  /**
-   * "Reposition": park this vehicle somewhere with no work attached (#1092).
-   * Click arms the in-scene point picker (`requestReposition`), and the
-   * confirmed tile is dispatched as `vehicle reposition <id> <x> <z>` — the
-   * one player-facing path to the itinerary's `reposition` goal.
-   *
-   * Disabled, with the reason on the button itself, in the two states the
-   * console command would refuse anyway: the vehicle is reserved for a task
-   * (repositioning it would strand that work), or nobody on the roster holds
-   * its licence at all, so no driver could ever be found for it.
-   */
-  private makeRepositionButton(v: Vehicle, state: GameState): HTMLButtonElement {
-    const btn = button('ghost', t('ui.fleet.reposition'), { icon: 'drive' });
-    btn.className += ' bs-fleet-reposition-btn';
-    btn.style.cssText += ';height:28px;font-size:10px;flex:1';
-    // `data-action`, not `data-vehicle-id`: the card wrapper already carries
-    // the id, and duplicating the key onto a descendant makes every
-    // `[data-vehicle-id]` card query count each card twice. Scoping is by
-    // the card's own `[data-vtype]` ancestor — see
-    // vehicle-reposition-before-blast.json's own click selector.
-    btn.dataset['action'] = 'reposition';
-
-    const reason = getVehicleReservation(state.vehicles, v.id) !== null
-      ? t('ui.fleet.reposition_busy')
-      : !rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier)
-        ? t('ui.fleet.no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`) })
-        : null;
-
-    if (reason !== null) {
-      btn.disabled = true;
-      btn.title = reason;
-      btn.style.opacity = '.45';
-      btn.style.cursor = 'not-allowed';
-      return btn;
-    }
-
-    btn.title = t('ui.fleet.reposition_hint');
-    btn.addEventListener('click', () => this.requestReposition(v.id));
-    return btn;
-  }
-
-  /** "Upgrade" (#1401): dispatches `vehicle upgrade <id>`; state comes from applyUpgradeState and is re-patched as cash drifts. */
-  private makeUpgradeButton(v: Vehicle, cash: number): HTMLButtonElement {
-    const btn = button('ghost', t('ui.fleet.upgrade'), { icon: 'up' });
-    btn.className += ' bs-fleet-upgrade-btn';
-    btn.style.cssText += ';height:28px;font-size:10px;flex:1';
-    btn.dataset['action'] = 'upgrade';
-    btn.addEventListener('click', () => this.gameConsole?.(`vehicle upgrade ${v.id}`));
-    this.applyUpgradeState(btn, v, cash);
-    return btn;
-  }
-
-  private applyUpgradeState(btn: HTMLButtonElement, v: Vehicle, cash: number): void {
-    const next = nextVehicleTier(v.tier);
-    const upgrade = upgradeState(v, cash);
-    const reason = upgradeDisabledReason(upgrade);
-    const { cost } = upgrade;
-    const label = cost === null ? t('ui.fleet.upgrade') : `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
-    // button() builds [icon][label span]; patch only the label span so the icon survives.
-    const labelEl = btn.lastElementChild;
-    if (labelEl) labelEl.textContent = label;
-    btn.disabled = reason !== null;
-    btn.title = reason ?? t('ui.fleet.upgrade_hint', { tier: next ?? v.tier, cost: formatMoney(cost ?? 0) });
-    btn.style.opacity = reason === null ? '1' : '.45';
-    btn.style.cursor = reason === null ? 'pointer' : 'not-allowed';
-  }
-
-  /** destroyVehicle removes the vehicle outright — no reversal — so scrap always confirms first, with the real residual credit shown up front. */
-  private requestScrap(v: Vehicle): void {
-    this.onConfirmRequestCb?.(scrapConfirmConfig(v, cmd => this.gameConsole?.(cmd)));
   }
 }

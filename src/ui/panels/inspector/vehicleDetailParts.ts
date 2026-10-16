@@ -12,7 +12,7 @@ import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { rosterCanDriveVehicleTier, canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier } from '../../../core/entities/VehicleUpgrade.js';
 import { missingHp } from '../../../core/entities/VehicleRepair.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
-import { vehicleDisplayName } from '../../fleetDetailSections.js';
+import { vehicleDisplayName, vehicleDriverState } from '../../fleetDetailSections.js';
 
 /** Shared shell for the drive-icon + single-line-label rows below: driver, pending driver, unmanned. */
 function makeDriveIconRow(label: string, color: string, link?: { name: string; onClick: () => void; id: number }): HTMLElement {
@@ -133,23 +133,9 @@ export function scrapConfirmConfig(v: Vehicle, run: (command: string) => void): 
   };
 }
 
-type DriverState =
-  | { kind: 'driver'; employee: Employee }
-  | { kind: 'pending'; employee: Employee }
-  | { kind: 'unmanned' }
-  | { kind: 'no_licensed' };
-
-/** Who drives a vehicle: its driver, an employee walking to board, nobody (unmanned), or nobody able to. */
-export function driverState(v: Vehicle, state: GameState): DriverState {
-  const driverId = vehicleDriverId(v);
-  const employees = state.employees.employees;
-  if (driverId !== null) {
-    const employee = employees.find(e => e.id === driverId);
-    if (employee) return { kind: 'driver', employee };
-  }
-  const pending = employees.find(e => e.pendingDriverVehicleId === v.id);
-  if (driverId === null && pending) return { kind: 'pending', employee: pending };
-  return rosterCanDriveVehicleTier(employees, v.type, v.tier) ? { kind: 'unmanned' } : { kind: 'no_licensed' };
+/** Who drives a vehicle, read off the game state. */
+export function driverState(v: Vehicle, state: GameState): ReturnType<typeof vehicleDriverState> {
+  return vehicleDriverState(v, state.employees.employees);
 }
 
 /** Repair progress for a vehicle: the queued/active repair action, if any. */

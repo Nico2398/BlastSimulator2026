@@ -4,11 +4,12 @@
 // file-size guideline, mirroring the CrewPanel/crewDetailSections split.
 
 import { t } from '../core/i18n/I18n.js';
-import { chip, gauge, type ChipTone } from './dom.js';
+import { el, chip, gauge, type ChipTone } from './dom.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
-import { getVehicleDefByTier, vehicleCargoMassKg } from '../core/entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleCargoMassKg, vehicleDriverId } from '../core/entities/Vehicle.js';
 import { getBuildingDef, type BuildingType, type BuildingTier } from '../core/entities/Building.js';
 import type { Employee } from '../core/entities/Employee.js';
+import { rosterCanDriveVehicleTier } from '../core/entities/VehicleUpgrade.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
 
 export function vehicleDisplayName(type: Vehicle['type'], tier: VehicleTier): string {
@@ -86,9 +87,30 @@ export function makeLoadGauge(v: Vehicle): HTMLElement | null {
   return row;
 }
 
+type DriverState =
+  | { kind: 'driver'; employee: Employee }
+  | { kind: 'pending'; employee: Employee }
+  | { kind: 'unmanned' }
+  | { kind: 'no_licensed' };
+
+/** Who drives a vehicle: its driver, an employee walking to board, nobody (unmanned), or nobody able to. */
+export function vehicleDriverState(v: Vehicle, employees: readonly Employee[]): DriverState {
+  const driverId = vehicleDriverId(v);
+  if (driverId !== null) {
+    const employee = employees.find(e => e.id === driverId);
+    if (employee) return { kind: 'driver', employee };
+  }
+  const pending = employees.find(e => e.pendingDriverVehicleId === v.id);
+  if (driverId === null && pending) return { kind: 'pending', employee: pending };
+  return rosterCanDriveVehicleTier(employees, v.type, v.tier) ? { kind: 'unmanned' } : { kind: 'no_licensed' };
+}
+
 /** Driver name line for a Fleet row: driver, pending driver, or muted "Unmanned". No warning, no Train button. */
 export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[]): HTMLElement {
-  // TODO: implement
-  void v; void employees;
-  return document.createElement('div');
+  const driver = vehicleDriverState(v, employees);
+  const text = driver.kind === 'driver' ? driver.employee.name
+    : driver.kind === 'pending' ? t('ui.fleet.walking_to_board', { name: driver.employee.name })
+      : t('ui.fleet.unmanned');
+  const muted = driver.kind === 'driver' ? 'var(--bsx-text-secondary)' : 'var(--bsx-text-micro)';
+  return el('div', { text, attrs: { style: `font:500 10px/1.2 var(--bsx-font-ui);color:${muted}` } });
 }

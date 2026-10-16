@@ -136,10 +136,6 @@ export class UIManager {
     this.buildMenu.setFlowResultHandler(message => this.notify({ severity: 'info', title: message, body: '' }));
     this.fleetPanel = new FleetPanel(leftCol);
     this.fleetPanel.setCloseHandler(() => this.hideAllPanels());
-    // FleetPanel's no-driver warning cross-links to Crew ('crew' is its own
-    // vocabulary — this.showPanel takes the PanelName key, 'employees').
-    this.fleetPanel.setNavigateHandler(() => this.showPanel('employees'));
-    this.fleetPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.crewPanel = new CrewPanel(leftCol);
     this.crewPanel.setCloseHandler(() => this.hideAllPanels());
     this.surveyPanel = new SurveyPanel(leftCol);
@@ -237,9 +233,6 @@ export class UIManager {
     this.blastUI.setPlacementKit(kit);
     this.buildMenu.setPlacementKit(kit);
     this.surveyPanel.setPlacementKit(kit);
-    // #1092: FleetPanel's own arm/refresh wiring for the "Reposition" click
-    // flow is the implementer's job — this forwards the kit so it's ready.
-    this.fleetPanel.setPlacementKit(kit);
     // Esc cascade (see KeyboardShortcuts.onEscape doc comment): an armed placement
     // tool is "on top" and must consume Esc itself before handleEscape() falls
     // through to closing the panel that armed it. PlacementController has its own
@@ -375,6 +368,7 @@ export class UIManager {
   private applyListSelection(): void {
     this.buildMenu.setSelectedEntity(this.listSelection);
     this.crewPanel.setSelectedEmployee(this.listSelection);
+    this.fleetPanel.setSelectedVehicle(this.listSelection);
   }
 
   /** Open the Crew panel with hiring for `role` in view. */
@@ -556,7 +550,10 @@ export class UIManager {
       case 'finances': this.financesPanel.show(); break;
       case 'ops': this.operationsPanel.show(); break;
       case 'build': this.buildMenu.show(); break;
-      case 'vehicles': this.fleetPanel.show(); break;
+      case 'vehicles':
+        this.fleetPanel.show();
+        this.fleetPanel.setSelectedVehicle(this.listSelection);
+        break;
       case 'employees':
         this.crewPanel.show();
         this.crewPanel.setSelectedEmployee(this.listSelection);
