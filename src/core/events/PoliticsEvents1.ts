@@ -5,6 +5,8 @@ import type { EventDef } from './EventPool.js';
 import {
   EVENT_BOOM_PRICE_PCT,
   EVENT_BRIEF_STOP_HOURS,
+  EVENT_CALM_DAYS,
+  EVENT_CALM_WEIGHT_FACTOR,
   EVENT_DRAG_HOURS,
   EVENT_DRAG_WORK_PCT,
   EVENT_EXPLOSIVE_DISCOUNT_PCT,
@@ -160,7 +162,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },
       { cashDelta: 20000, scoreDelta: { ecology: 5 }, effectTag: 'subsidy_green_strings' },
-      { cashDelta: 0, scoreDelta: { ecology: 3 } },
+      { cashDelta: 0, scoreDelta: { ecology: 3 },
+        effects: [{ type: 'event_weight', category: 'lawsuit', factor: EVENT_CALM_WEIGHT_FACTOR, days: EVENT_CALM_DAYS }] },
     ],
   }),
   // 11 — Trade war with Explosistan

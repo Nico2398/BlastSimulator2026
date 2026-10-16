@@ -192,7 +192,7 @@ export const UNION_EVENTS_1: EventDef[] = [
       { cashDelta: -1000, scoreDelta: { wellBeing: 5 }, effectTag: 'remove_posters' },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 },
         effects: [{ type: 'work_rate', pct: EVENT_SLOWDOWN_WORK_PCT, hours: EVENT_SLOWDOWN_HOURS }] },
-      { cashDelta: -2000, scoreDelta: { wellBeing: 3, nuisance: -2 }, effectTag: 'worker_posters' },
+      { cashDelta: 0, scoreDelta: { wellBeing: 3, nuisance: -2 }, effectTag: 'worker_posters' },
     ],
   }),
   // 16 — Nap room demand
