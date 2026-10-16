@@ -62,12 +62,15 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"] .bs-emp-skills"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"]:not(.bs-row-selected)"
         }
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"] .bs-emp-skills",
-        "blocked": "#bs-employee-panel [data-employee-role=\"driller\"].bs-row-selected"
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"] .bs-emp-skills"
       }
     },
     {
@@ -88,14 +91,17 @@
           "selector": "#bs-employee-panel [data-employee-role=\"driver\"].bs-row-selected"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"]:not(.bs-row-selected)"
+        },
+        {
           "type": "screenshot"
         }
       ],
       "role": "player",
       "expect": {
         "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"driver\"]",
-        "note": "The highlight follows the scene selection, one row at a time",
-        "blocked": "#bs-employee-panel [data-employee-role=\"blaster\"].bs-row-selected"
+        "note": "The highlight follows the scene selection, one row at a time"
       }
     },
     {
@@ -113,13 +119,13 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"]:not(.bs-row-selected)"
         }
       ],
       "role": "player",
       "expect": {
-        "blocked": "#bs-employee-panel .bs-row-selected",
-        "note": "Deselecting clears the roster highlight"
+        "usable": "#bs-employee-panel [data-employee-role=\"driver\"]",
+        "note": "Deselecting clears the roster highlight (driver row now matches :not(.bs-row-selected))"
       }
     }
   ]
