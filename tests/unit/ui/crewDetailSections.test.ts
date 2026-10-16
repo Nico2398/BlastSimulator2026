@@ -29,6 +29,7 @@ import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.
 import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
+import { PROFICIENCY_MULTIPLIERS } from '../../../src/core/config/balance.js';
 import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
@@ -277,9 +278,16 @@ describe('makePaySection per-hour display (#1373)', () => {
 
   it('shows skill bonus per hour', () => {
     const e = makeEmployee({
-      qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 2, xp: 0 }],
+      qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }],
     });
     expect(pay(e)).toMatch(exactly(`+ skills $${perHour(QUALIFICATION_SALARY_BONUS[2])}`));
+  });
+
+  it('shows a flat licence bonus for a level-5 licence holder (#1843)', () => {
+    const e = makeEmployee({
+      qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 5, xp: 0 }],
+    });
+    expect(pay(e)).toMatch(exactly(`+ skills $${perHour(QUALIFICATION_SALARY_BONUS[1])}`));
   });
 });
 
@@ -466,6 +474,48 @@ describe('makeSkillsSection — driving licence tier (#1762)', () => {
 
   it('an absent licenceLevel reads as tier 1', () => {
     expect(makeSkillsSection(driving()).textContent).toContain(t('ui.crew.licence_tier', { tier: 1 }));
+  });
+
+  describe('licence rows show no duration multiplier (#1843)', () => {
+    const effect = (mult: string) => t('ui.crew.skill_effect', { mult });
+    const lic5 = () => makeEmployee({
+      qualifications: [{ category: 'driving.truck', proficiencyLevel: 5, xp: 0, licenceLevel: 2 }],
+    });
+
+    it('a proficiency-5 licence has no task-duration text', () => {
+      const text = makeSkillsSection(lic5()).textContent ?? '';
+      expect(text).not.toContain('task duration');
+    });
+
+    it('a licence row at any proficiency has no task-duration text', () => {
+      for (const level of [1, 2, 3, 4, 5] as const) {
+        const e = makeEmployee({ qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: level, xp: 0 }] });
+        expect(makeSkillsSection(e).textContent, `prof ${level}`).not.toContain('task duration');
+      }
+    });
+
+    it('a proficiency-5 licence keeps MAX, stars and Licence tier', () => {
+      const text = makeSkillsSection(lic5()).textContent ?? '';
+      expect(text).toContain(t('ui.crew.skill_maxed'));
+      expect(text).toContain('★★★★★');
+      expect(text).toContain(t('ui.crew.licence_tier', { tier: 2 }));
+    });
+
+    it('a non-licence row keeps its task-duration line', () => {
+      const e = makeEmployee({ qualifications: [{ category: 'blasting' as never, proficiencyLevel: 3, xp: 0 }] });
+      const text = makeSkillsSection(e).textContent ?? '';
+      expect(text).toContain('task duration');
+      expect(text).toContain(effect(PROFICIENCY_MULTIPLIERS[3].toFixed(2)));
+    });
+
+    it('a mixed employee shows exactly one task-duration line, for the non-licence skill', () => {
+      const e = makeEmployee({ qualifications: [
+        { category: 'blasting' as never, proficiencyLevel: 2, xp: 0 },
+        { category: 'driving.truck', proficiencyLevel: 4, xp: 0 },
+      ] });
+      const text = makeSkillsSection(e).textContent ?? '';
+      expect(text.split('task duration').length - 1).toBe(1);
+    });
   });
 
   it('a non-driving skill shows no licence tier', () => {

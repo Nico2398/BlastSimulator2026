@@ -592,6 +592,74 @@ describe('calculateSalary() (3.4)', () => {
   });
 });
 
+describe('licence pay is flat (#1843)', () => {
+  const qual = (category: SkillCategory, proficiencyLevel: 1 | 2 | 3 | 4 | 5): SkillQualification =>
+    ({ category, proficiencyLevel, xp: 0 });
+
+  it('a driving.truck licence costs BONUS[1] at proficiency 1, 3 and 5', () => {
+    for (const level of [1, 3, 5] as const) {
+      expect(calculateQualificationBonus({ qualifications: [qual('driving.truck', level)] }), `prof ${level}`)
+        .toBe(QUALIFICATION_SALARY_BONUS[1]);
+    }
+  });
+
+  it('every driving.* licence is flat at proficiency 5', () => {
+    for (const cat of ['driving.truck', 'driving.drill_rig', 'driving.rock_fragmenter'] as SkillCategory[]) {
+      expect(calculateQualificationBonus({ qualifications: [qual(cat, 5)] }), cat).toBe(QUALIFICATION_SALARY_BONUS[1]);
+    }
+  });
+
+  it('a non-licence skill still pays BONUS[proficiencyLevel], strictly increasing', () => {
+    const pay = (level: 1 | 2 | 3 | 4 | 5) => calculateQualificationBonus({ qualifications: [qual('blasting', level)] });
+    for (const level of [1, 2, 3, 4, 5] as const) expect(pay(level)).toBe(QUALIFICATION_SALARY_BONUS[level]);
+    for (const level of [2, 3, 4, 5] as const) expect(pay(level)).toBeGreaterThan(pay((level - 1) as 1 | 2 | 3 | 4));
+  });
+
+  it('a mixed roster pays BONUS[3] for blasting 3 plus flat BONUS[1] for driving.drill_rig 5', () => {
+    const bonus = calculateQualificationBonus({ qualifications: [qual('blasting', 3), qual('driving.drill_rig', 5)] });
+    expect(bonus).toBe(QUALIFICATION_SALARY_BONUS[3] + QUALIFICATION_SALARY_BONUS[1]);
+  });
+
+  it('no qualifications pays nothing', () => {
+    expect(calculateQualificationBonus({ qualifications: [] })).toBe(0);
+  });
+
+  it('calculateSalary for a level-5 licence holder is base + BONUS[1] + raises', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'blaster', new Random(1));
+    employee.qualifications = [qual('driving.truck', 5)];
+    employee.raises = 120;
+    expect(calculateSalary(employee)).toBe(BASE_SALARIES['blaster'] + QUALIFICATION_SALARY_BONUS[1] + 120);
+  });
+
+  it('gainXp taking a licence to proficiency 5 leaves the salary unchanged and keeps raises', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'blaster', new Random(1));
+    employee.qualifications = [];
+    assignSkill(state, employee.id, 'driving.truck', 1);
+    giveRaise(state, employee.id, 200);
+    const before = employee.salary;
+
+    gainXp(state, employee.id, 'driving.truck', XP_THRESHOLDS[5]);
+
+    expect(employee.qualifications.find(q => q.category === 'driving.truck')!.proficiencyLevel).toBe(5);
+    expect(employee.salary).toBe(before);
+    expect(employee.raises).toBe(200);
+  });
+
+  it('gainXp level-up of a non-licence skill still raises the salary', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'blaster', new Random(1));
+    employee.qualifications = [];
+    assignSkill(state, employee.id, 'blasting', 1);
+    const before = employee.salary;
+
+    gainXp(state, employee.id, 'blasting', XP_THRESHOLDS[5]);
+
+    expect(employee.salary).toBe(before - QUALIFICATION_SALARY_BONUS[1] + QUALIFICATION_SALARY_BONUS[5]);
+  });
+});
+
 describe('computeAverageMorale()', () => {
   // ── Test 1 (happy path) ────────────────────────────────────────────────────
   it('averages morale across only the living roster, ignoring dead employees entirely', () => {
