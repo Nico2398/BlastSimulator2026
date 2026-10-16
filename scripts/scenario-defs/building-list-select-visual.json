@@ -184,11 +184,11 @@
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected"
+          "selector": "#bs-build-panel .bs-build-placed-row.bs-row-selected"
         }
       ],
       "expect": {
-        "usable": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected",
+        "usable": "#bs-build-panel .bs-build-placed-row.bs-row-selected",
         "equals": {
           "buildingCount": 2
         }
@@ -216,11 +216,11 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected"
+          "selector": "#bs-build-panel .bs-build-placed-row.bs-row-selected"
         }
       ],
       "expect": {
-        "usable": "#bs-build-panel .bs-build-placed-row.bs-build-row-selected",
+        "usable": "#bs-build-panel .bs-build-placed-row.bs-row-selected",
         "equals": {
           "buildingCount": 2
         }
