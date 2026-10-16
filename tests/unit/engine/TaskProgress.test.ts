@@ -707,6 +707,7 @@ describe('isPhaseDrivenWorkTick (#1833)', () => {
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     employee.itinerary = { ...ITIN };
     employee.taskTicksRemaining = null;
+    employee.activeActionId = 1;
     const action: PendingAction = {
       id: 1, type, requiredSkill: null, requiredVehicleRole: 'debris_hauler',
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,

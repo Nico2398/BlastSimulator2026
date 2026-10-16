@@ -20,7 +20,7 @@ export interface TaskProgressLevelUp {
   newLevel: Level;
 }
 
-export interface TaskXpResult {
+interface TaskXpResult {
   /** Skill category XP was granted to, or null when nothing was awarded. */
   skill: SkillCategory | null;
   /** True when ANY award crossed a proficiency level threshold. */
@@ -74,6 +74,7 @@ export function isPhaseDrivenWorkTick(emp: Employee, action: PendingAction | und
   return action !== undefined
     && emp.activeActionId === action.id
     && isAutoDebrisAction(action.type)
+    && emp.taskTicksRemaining === null
     && emp.restTicksRemaining === null
     && isMounted(emp.locomotion)
     && emp.itinerary !== null;
