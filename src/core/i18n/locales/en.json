@@ -1127,7 +1127,7 @@
   "event.politics_land_auction.opt0": "Win Auction",
   "event.politics_land_auction.opt1": "Skip the Auction",
   "event.politics_land_auction.opt2": "Bid in a Joint Venture",
-  "event.politics_land_auction.res0": "The adjacent land is won at auction, outright and expensively. The extraction rights come with a special contract offer. A lucrative special contract lands on the board.",
+  "event.politics_land_auction.res0": "The adjacent land is won at auction, outright and expensively. The extraction rights bring a lucrative special contract onto the board.",
   "event.politics_land_auction.res1": "The auction is skipped entirely. The adjacent land goes to a competitor, quietly and without incident.",
   "event.politics_land_auction.res2": "A joint-venture bid splits the winning cost and, in theory, the land's management. Upkeep costs 15% less for 7 days while the partner shares the bills.",
   "event.politics_land_auction.res2_alt": "The joint-venture partner reneges on the management split right after the auction closes.",

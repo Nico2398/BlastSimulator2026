@@ -28,11 +28,14 @@ function vector(c: EventConsequence): Vec {
   return [c.cashDelta ?? 0, ...SCORE_DIMS.map(k => sd[k] ?? 0)];
 }
 
+/** Effects or a follow-up event: payload of unknown sign that the vector does not see. */
+const hasEffectsOrFollowUp = (b: EventConsequence): boolean =>
+  (b.effects?.length ?? 0) > 0 || b.followUpEventId !== undefined;
+
 /** Payload beyond cash/score. effectTag alone is flavour, not payload. */
 function carriesExtra(c: EventConsequence): boolean {
   return branches(c).some(b =>
-    (b.effects?.length ?? 0) > 0
-    || b.followUpEventId !== undefined
+    hasEffectsOrFollowUp(b)
     || (b.corruptionDelta ?? 0) !== 0
     || (b.exposureDelta ?? 0) !== 0);
 }
@@ -52,8 +55,8 @@ function comparedPairs(d: EventConsequence, by: EventConsequence): Array<[Vec, V
  * that the vector does not see, so such an option may carry a hidden trade-off.
  */
 const addsRisk = (c: EventConsequence): boolean =>
-  branches(c).some(b => (b.corruptionDelta ?? 0) > 0 || (b.exposureDelta ?? 0) > 0)
-  || branches(c).some(b => (b.effects?.length ?? 0) > 0 || b.followUpEventId !== undefined);
+  branches(c).some(b =>
+    (b.corruptionDelta ?? 0) > 0 || (b.exposureDelta ?? 0) > 0 || hasEffectsOrFollowUp(b));
 
 function isDominated(d: EventConsequence, by: EventConsequence): boolean {
   if (carriesExtra(d) || addsRisk(by)) return false;
@@ -80,8 +83,11 @@ function findDominatedOptions(event: Pick<EventDef, 'id' | 'options' | 'conseque
   return out;
 }
 
-const synth = (consequences: EventConsequence[]): Pick<EventDef, 'id' | 'options' | 'consequences'> => ({
-  id: 'synthetic',
+const synth = (
+  consequences: EventConsequence[],
+  id = 'synthetic',
+): Pick<EventDef, 'id' | 'options' | 'consequences'> => ({
+  id,
   options: consequences.map((_, i) => ({ labelKey: `synthetic.opt${i}` })) as EventDef['options'],
   consequences,
 });
@@ -146,6 +152,12 @@ describe('event option dominance (#1847)', () => {
       { cashDelta: -50, effects: [{ type: 'ban', what: 'blast', hours: 12 }] },
     ]));
     expect(r).toEqual([]);
+  });
+
+  it('exempts BEHAVIOURAL_TAG_EVENTS even when an option is strictly worse', () => {
+    const worse: EventConsequence[] = [{ cashDelta: -100 }, { cashDelta: -50 }];
+    expect(findDominatedOptions(synth(worse))).toHaveLength(1);
+    expect(findDominatedOptions(synth(worse, 'unqualified_task_error'))).toEqual([]);
   });
 
   it('does not flag identical consequences', () => {

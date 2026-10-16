@@ -1127,7 +1127,7 @@
   "event.politics_land_auction.opt0": "Remporter les Enchères",
   "event.politics_land_auction.opt1": "Boycotter les Enchères",
   "event.politics_land_auction.opt2": "Enchérir en Coentreprise",
-  "event.politics_land_auction.res0": "Le terrain adjacent est remporté aux enchères, entièrement et à grands frais. Les droits d'extraction viennent avec une offre de contrat spécial. Un contrat spécial lucratif arrive sur le tableau.",
+  "event.politics_land_auction.res0": "Le terrain adjacent est remporté aux enchères, entièrement et à grands frais. Les droits d'extraction amènent un contrat spécial lucratif sur le tableau.",
   "event.politics_land_auction.res1": "L'enchère est purement ignorée. Le terrain adjacent revient à un concurrent, discrètement et sans incident.",
   "event.politics_land_auction.res2": "Une offre en coentreprise partage le coût de la victoire et, en théorie, la gestion du terrain. L'entretien coûte 15 % de moins pendant 7 jours, le temps que le partenaire partage les factures.",
   "event.politics_land_auction.res2_alt": "Le partenaire de la coentreprise se rétracte sur le partage de gestion juste après la clôture de l'enchère.",
