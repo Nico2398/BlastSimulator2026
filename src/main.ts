@@ -1317,10 +1317,6 @@ inspector.setCommandHandler((command) => reportIfFailed(t('inspector.command_fai
 inspector.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 inspector.setActionHandler((action, entity) => {
   switch (action) {
-    case 'detail':
-    case 'train':
-      uiManager.showEmployeeDetail(entity.id);
-      break;
     case 'dispatch_here': {
       // "Here" = wherever the player is currently pointing on the ground —
       // the live hover state, read at the moment the button is clicked.

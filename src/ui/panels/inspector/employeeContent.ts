@@ -52,9 +52,7 @@ export const employeeContent: KindContent = {
       signature: `${e.id}:${optional}`,
       get sections() { return [build()]; },
       actions: [
-        { action: 'detail', labelKey: 'inspector.action.detail', icon: 'person', variant: 'ghost' },
         { action: 'dispatch_here', labelKey: 'inspector.action.dispatch_here', icon: 'locate', variant: 'ghost' },
-        { action: 'train', labelKey: 'inspector.action.train', icon: 'training', variant: 'ghost' },
       ],
       sync: root => {
         const body = root.querySelector<HTMLElement>('.bs-employee-detail');

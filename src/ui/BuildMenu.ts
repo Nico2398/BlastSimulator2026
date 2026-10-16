@@ -265,7 +265,7 @@ export class BuildMenu extends PanelBase {
   }
 
   private applySelection(): void {
-    applyRowSelection([this.placedEl, this.siteEl], this.selection);
+    applyRowSelection([this.placedEl, this.siteEl], this.selection, 'building', 'data-building-id');
   }
 
   /** Update each catalog row's "N under construction" count (#556). */
