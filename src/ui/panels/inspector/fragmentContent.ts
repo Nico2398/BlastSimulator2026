@@ -8,7 +8,7 @@ import type { GameState } from '../../../core/state/GameState.js';
 import { buildingDisplayName, vehicleDisplayName } from '../../fleetDetailSections.js';
 import { el } from '../../dom.js';
 import type { InspectorLinks, KindContent } from './InspectorContent.js';
-import { entityLink, kindLabel, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
+import { entityLink, kindLabel, noteLine, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
 
 /** Ore rows below this mass are noise. */
 const MIN_ORE_ROW_KG = 0.5;
@@ -41,7 +41,7 @@ function buildRockSection(tracked: TrackedFragment): HTMLElement {
     rows.push(tagged(valueRow(t(`ore.${oreId}.name`), kgText(kg)), 'data-fragment-ore', oreId));
   }
   if (isBarrenFragment(f.oreDensities)) {
-    rows.push(tagged(el('div', { text: t('inspector.fragment.barren'), className: 'bsx-mono' }), 'data-fragment-barren'));
+    rows.push(tagged(noteLine(t('inspector.fragment.barren')), 'data-fragment-barren'));
   }
   const section = sectionOf(t('inspector.fragment.section.rock'), rows);
   section.classList.add('bs-fragment-rock');
@@ -62,7 +62,7 @@ function buildLocationSection(tracked: TrackedFragment, state: GameState, links:
   const rows: HTMLElement[] = [];
   switch (tracked.state) {
     case 'on_ground':
-      rows.push(el('div', { text: t('inspector.fragment.on_ground'), className: 'bsx-mono' }));
+      rows.push(noteLine(t('inspector.fragment.on_ground')));
       break;
     case 'in_transit':
       rows.push(valueRow(t('inspector.fragment.in_transit'), vehicleNode(tracked.vehicleId, state, links)));

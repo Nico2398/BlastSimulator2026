@@ -84,6 +84,14 @@ describe('FragmentMesh (InstancedMesh)', () => {
     expect(scene.children.length).toBe(SHAPE_VARIANTS);
   });
 
+  it('a raycast before the blast does not blind later fragment picks', () => {
+    const ray = new THREE.Raycaster(new THREE.Vector3(2, 10, 0), new THREE.Vector3(0, -1, 0));
+    const hits = () => ray.intersectObjects(fm.pickables(), false);
+    expect(hits()).toHaveLength(0); // caches an empty bounding sphere while count = 0
+    fm.spawnFragments([makeFragment(1)]);
+    expect(hits().length).toBeGreaterThan(0);
+  });
+
   it('spawnFragments updates count correctly', () => {
     fm.spawnFragments([makeFragment(1), makeFragment(2), makeFragment(3)]);
     expect(fm.count).toBe(3);

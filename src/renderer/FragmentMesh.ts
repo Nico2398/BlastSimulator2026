@@ -75,6 +75,17 @@ function dominantOre(oreDensities: Record<string, number>): { id: string; amt: n
   return { id, amt };
 }
 
+/**
+ * three's InstancedMesh.raycast caches its bounding sphere on first use. A
+ * raycast while count=0 (any pick before the blast) caches an empty sphere and
+ * every later fragment pick misses; moved instances stale it too. Dropping the
+ * cache makes the next raycast recompute it from the current instances.
+ */
+function invalidateBounds(im: THREE.InstancedMesh): void {
+  im.boundingSphere = null;
+  im.boundingBox = null;
+}
+
 // ---------- Main class ----------
 
 /** Fragments written between two yields of a resumable spawn (a power of two). */
@@ -221,6 +232,7 @@ export class FragmentMesh {
     for (let i = 0; i < SHAPE_VARIANTS; i++) {
       const im = this.instancedMeshes[i]!;
       im.count = this.bucketCount[i]!;
+      invalidateBounds(im);
       if (im.instanceMatrix) im.instanceMatrix.needsUpdate = true;
       this.instanceRockA[i]!.needsUpdate = true;
       this.instanceRockB[i]!.needsUpdate = true;
@@ -244,7 +256,10 @@ export class FragmentMesh {
     }
 
     for (let i = 0; i < SHAPE_VARIANTS; i++) {
-      if (this.dirtyBuckets[i]) this.instancedMeshes[i]!.instanceMatrix.needsUpdate = true;
+      if (!this.dirtyBuckets[i]) continue;
+      const im = this.instancedMeshes[i]!;
+      im.instanceMatrix.needsUpdate = true;
+      invalidateBounds(im);
     }
   }
 
@@ -281,6 +296,7 @@ export class FragmentMesh {
 
     this.bucketCount[meshIdx] = lastIdx;
     im.count = lastIdx;
+    invalidateBounds(im);
     im.instanceMatrix.needsUpdate = true;
     this.instanceRockA[meshIdx]!.needsUpdate = true;
     this.instanceRockB[meshIdx]!.needsUpdate = true;
@@ -297,6 +313,7 @@ export class FragmentMesh {
     for (let i = 0; i < SHAPE_VARIANTS; i++) {
       this.bucketCount[i] = 0;
       this.instancedMeshes[i]!.count = 0;
+      invalidateBounds(this.instancedMeshes[i]!);
     }
     this.fragIdToSlot.clear();
     this.fragBaseTransform.clear();

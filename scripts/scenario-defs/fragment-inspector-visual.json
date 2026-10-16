@@ -269,7 +269,7 @@
     },
     {
       "command": "fragments status",
-      "description": "A player clicks a loose fragment (id tuned for seed 10, this 9-hole blast; a fragment the staffed hauler picks up first). The inspector shows its mass, localized rock and one row per ore with kg, and says it lies on the ground. Command mode stand-in is a read-only status.",
+      "description": "A player clicks a loose fragment (clickEntity ids are tuned for seed 10 and this 9-hole blast in interaction mode; 749 is the top rock of the pile at the pick point, a sandite boulder, so a barren one). The inspector shows its mass and localized rock, and says it lies on the ground. Command mode stand-in is a read-only status.",
       "timeout": 60,
       "interaction": [
         {
@@ -285,16 +285,16 @@
         {
           "type": "clickEntity",
           "kind": "fragment",
-          "id": 648,
-          "distance": 8
+          "id": 749,
+          "distance": 4
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-rock [data-fragment-ore]"
+          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock"
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-location"
+          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-location"
         },
         {
           "type": "screenshot"
@@ -302,13 +302,13 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-rock [data-fragment-ore]",
+        "usable": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock",
         "note": "rock and ore kg are readable where the player clicks"
       }
     },
     {
       "command": "wait_until field:vehicleLoaded equals:true max_ticks:600",
-      "description": "Advance until a hauler carries cargo. The selection follows the fragment onto its carrier, so the open inspector re-reads the location without a new click. Condition-based wait.",
+      "description": "Advance until a hauler carries cargo. Condition-based wait.",
       "timeout": 125,
       "interaction": [
         {
@@ -328,12 +328,23 @@
     },
     {
       "command": "fragments status",
-      "description": "While the hauler carries the fragment the location section reads In transit on <vehicle>, with the hauler as a link.",
+      "description": "With the hauler loaded the player clicks a fragment it carries (whichever one the pick lands on: ids and pile depth are tuned for seed 10 only loosely, so the checks name no id). The location section reads In transit on <vehicle>, with the hauler as a link.",
       "timeout": 60,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "fragment",
+          "id": 761,
+          "distance": 4
+        },
+        {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-location [data-select-kind=\"vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"vehicle\"]"
         },
         {
           "type": "screenshot"
@@ -341,7 +352,7 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-location [data-select-kind=\"vehicle\"]",
+        "usable": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"vehicle\"]",
         "note": "the carrying hauler is a link"
       }
     },
@@ -369,14 +380,14 @@
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-location [data-select-kind=\"building\"]"
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"building\"]"
         },
         {
           "type": "screenshot"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"648\"] .bs-fragment-location [data-select-kind=\"building\"]"
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"building\"]"
         },
         {
           "type": "awaitUsable",

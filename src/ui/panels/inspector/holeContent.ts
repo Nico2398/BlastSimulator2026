@@ -9,7 +9,7 @@ import { isHoleFlooded } from '../../../core/weather/WeatherEffects.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import type { KindContent } from './InspectorContent.js';
-import { kindLabel, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
+import { kindLabel, noteLine, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
 
 type ChargeKind = 'charged' | 'ordered' | 'none';
 type GroundKind = 'dry' | 'wet' | 'tubed';
@@ -43,9 +43,9 @@ function buildChargeSection(holeId: string, state: GameState): HTMLElement {
   const { kind, charge } = chargeOf(holeId, state);
   const rows: HTMLElement[] = [];
   if (!charge) {
-    rows.push(el('div', { text: t('inspector.hole.uncharged'), className: 'bsx-mono' }));
+    rows.push(noteLine(t('inspector.hole.uncharged')));
   } else {
-    if (kind === 'ordered') rows.push(el('div', { text: t('inspector.hole.charge_ordered'), className: 'bsx-mono' }));
+    if (kind === 'ordered') rows.push(noteLine(t('inspector.hole.charge_ordered')));
     rows.push(valueRow(t('inspector.hole.explosive'), explosiveName(charge.explosiveId)));
     rows.push(valueRow(t('inspector.hole.charge_kg'), t('inspector.vehicle.kg', { kg: formatMoney(charge.amountKg) })));
     if ((charge.fromStockKg ?? 0) > 0) {
@@ -66,7 +66,7 @@ function buildFactsSection(hole: DrillHole, ordered: boolean, state: GameState):
     tagged(valueRow(t('inspector.hole.state'), t(ordered ? 'inspector.hole.state_ordered' : 'inspector.hole.state_drilled')),
       'data-hole-state', ordered ? 'ordered' : 'drilled'),
     tagged(valueRow(t('inspector.hole.ground'), t(`inspector.hole.ground_${ground}`)), 'data-hole-ground', ground),
-    el('div', { text: t('inspector.hole.workshop_note'), className: 'bsx-mono' }),
+    noteLine(t('inspector.hole.workshop_note')),
   ];
   return sectionOf(t('inspector.section.details'), rows);
 }

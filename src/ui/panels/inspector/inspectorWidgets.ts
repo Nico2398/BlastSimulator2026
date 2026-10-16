@@ -44,6 +44,13 @@ export function markLive(node: HTMLElement, key: string): HTMLElement {
   return node;
 }
 
+/** A static 11px note line, sized like the rows around it. */
+export function noteLine(text: string): HTMLElement {
+  const line = el('div', { text, className: 'bsx-mono' });
+  line.style.fontSize = '11px';
+  return line;
+}
+
 /** A small monospace text line rewritten in place under `data-live` = key. */
 export function liveLine(key: string, text: string): HTMLElement {
   const line = el('div', { text, className: 'bsx-mono' });
