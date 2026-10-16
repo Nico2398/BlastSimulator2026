@@ -104,4 +104,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.build.unit.kg', // "kg" — SI symbol
   'ui.fleet.unit.m3_per_hour', // "m³/h" — SI symbol
   'ui.fleet.unit.kg_per_hour', // "kg/h" — SI symbol
+  'inspector.vehicle.destination', // "Destination" — same word in French
+  'inspector.vehicle.fragments', // "Fragments" — same word in French
+  'inspector.vehicle.eta_value', // "{n} h" — unit-only format
+  'inspector.vehicle.kg', // "{kg} kg" — SI symbol format
 ];

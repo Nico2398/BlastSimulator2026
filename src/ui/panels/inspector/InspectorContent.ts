@@ -34,6 +34,8 @@ export interface InspectorLinks {
   readonly run: (command: string) => void;
   /** Ask the shared confirm overlay. */
   readonly confirm: (config: ConfirmModalConfig) => void;
+  /** Open a panel (the Crew panel from a vehicle's "no licensed driver" row). */
+  readonly navigate?: (panel: 'crew') => void;
 }
 
 /** Everything the Inspector shows for one entity at one moment. */

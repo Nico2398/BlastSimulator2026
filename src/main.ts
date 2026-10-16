@@ -74,7 +74,7 @@ import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
 import { armEntityMovePick } from './ui/scene/EntityMovePick.js';
-import { vehicleDisplayName } from './ui/fleetDetailSections.js';
+import { vehicleDisplayName, scrapConfirmConfig } from './ui/fleetDetailSections.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { nextRampWidth } from './core/mining/RampWidening.js';
@@ -1319,6 +1319,7 @@ inspector.setSelectHandler((entity) => scenePicking.select(entity));
 inspector.setCloseHandler(() => scenePicking.clearSelection());
 inspector.setCommandHandler((command) => reportIfFailed(t('inspector.command_failed'), window.__gameConsole(command)));
 inspector.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
+inspector.setNavigateHandler(() => uiManager.showPanel('employees'));
 inspector.setActionHandler((action, entity) => {
   switch (action) {
     case 'dispatch_here': {
@@ -1333,6 +1334,11 @@ inspector.setActionHandler((action, entity) => {
     case 'upgrade_vehicle':
       reportIfFailed(t('inspector.action.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
       break;
+    case 'scrap_vehicle': {
+      const vehicle = ctx.state?.vehicles.vehicles.find(v => v.id === entity.id);
+      if (vehicle) uiManager.showConfirm(scrapConfirmConfig(vehicle, cmd => reportIfFailed(t('ui.fleet.scrap'), window.__gameConsole(cmd))));
+      break;
+    }
     case 'move_here': {
       const vehicle = ctx.state?.vehicles.vehicles.find(v => v.id === entity.id);
       if (!vehicle) break;

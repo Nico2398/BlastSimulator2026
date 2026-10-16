@@ -58,6 +58,14 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Vehicle inspector (#1761): the unit-tested ETA contract (production composes it inside computeVehicleJob) and the result shapes the tests type their fixtures with.
+  'src/core/entities/VehicleStatus.ts:vehicleEtaTicks',
+  'src/core/entities/VehicleStatus.ts:VehicleJob',
+  'src/core/economy/VehicleCargo.ts:VehicleCargoBreakdown',
+  'src/ui/fleetDetailSections.ts:DriverState',
+  'src/ui/fleetDetailSections.ts:LicenceWarning',
+  'src/ui/fleetDetailSections.ts:RepairState',
+  'src/ui/fleetDetailSections.ts:UpgradeState',
   // Hover-tag dwell (#1752): the unit tests read the dwell to advance fake timers; production uses it inside ScenePicking.
   'src/ui/scene/ScenePicking.ts:HOVER_TAG_DWELL_MS',
   // Floor-to-grade pass (#1723): the unit-tested contract of the grading rule; production runs it inside identifyFragmentedVoxelsSteps.

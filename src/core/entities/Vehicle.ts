@@ -320,12 +320,13 @@ export function getVehicleMaintenanceCostPerTick(state: VehicleState): number {
  */
 export function getVehicleFuelCostPerTick(state: VehicleState): number {
   let total = 0;
-  for (const v of state.vehicles) {
-    if (getVehicleReservation(state, v.id) !== null) {
-      total += getVehicleDefByTier(v.type, v.tier).fuelCostPerTick;
-    }
-  }
+  for (const v of state.vehicles) total += vehicleFuelCostPerTick(state, v);
   return total;
+}
+
+/** Fuel one vehicle burns per tick: its tier's rate while it holds a reservation, else 0 (#1761). */
+export function vehicleFuelCostPerTick(state: VehicleState, v: Pick<Vehicle, 'id' | 'type' | 'tier'>): number {
+  return getVehicleReservation(state, v.id) !== null ? getVehicleDefByTier(v.type, v.tier).fuelCostPerTick : 0;
 }
 
 /**

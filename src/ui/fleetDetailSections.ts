@@ -7,14 +7,16 @@ import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, button, type ChipTone } from './dom.js';
 import { iconEl } from './icons.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
-import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, vehicleCargoMassKg } from '../core/entities/Vehicle.js';
+import { getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, vehicleCargoMassKg, computeScrapResidualValue } from '../core/entities/Vehicle.js';
 import { getBuildingDef, type BuildingType, type BuildingTier } from '../core/entities/Building.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
 import type { PendingAction } from '../core/state/GameState.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
-import { rosterCanDriveVehicleTier } from '../core/entities/VehicleUpgrade.js';
+import { rosterCanDriveVehicleTier, canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier } from '../core/entities/VehicleUpgrade.js';
+import { missingHp } from '../core/entities/VehicleRepair.js';
+import { formatMoney } from '../core/economy/formatMoney.js';
 
 export function vehicleDisplayName(type: Vehicle['type'], tier: VehicleTier): string {
   return t(getVehicleDefByTier(type, tier).nameKey);
@@ -92,12 +94,20 @@ export function makeLoadGauge(v: Vehicle): HTMLElement | null {
 }
 
 /** Shared shell for the drive-icon + single-line-label rows below: driver, pending driver, unmanned. */
-function makeDriveIconRow(label: string, color: string): HTMLElement {
+function makeDriveIconRow(label: string, color: string, link?: { name: string; onClick: () => void; id: number }): HTMLElement {
   const wrap = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:4px;background:var(--bsx-well)' } });
-  wrap.append(
-    iconEl('drive', 12, 0.6),
-    el('span', { text: label, attrs: { style: `font:500 10px/1 var(--bsx-font-ui);color:${color}` } }),
-  );
+  const text = el('span', { attrs: { style: `font:500 10px/1 var(--bsx-font-ui);color:${color}` } });
+  const at = link ? label.indexOf(link.name) : -1;
+  if (link && at >= 0) {
+    const btn = el('button', { text: link.name, attrs: { style: 'border:0;background:transparent;padding:0;color:var(--bsx-info);cursor:pointer;text-decoration:underline;font:inherit' } });
+    btn.dataset['selectKind'] = 'employee';
+    btn.dataset['selectId'] = String(link.id);
+    btn.addEventListener('click', link.onClick);
+    text.append(label.slice(0, at), btn, label.slice(at + link.name.length));
+  } else {
+    text.textContent = label;
+  }
+  wrap.append(iconEl('drive', 12, 0.6), text);
   return wrap;
 }
 
@@ -107,10 +117,11 @@ function makeDriveIconRow(label: string, color: string): HTMLElement {
  * ArrivalGate/VehicleReservation, so there is no unassign control here
  * anymore.
  */
-export function makeDriverRow(v: Vehicle, state: GameState, _link?: (employeeId: number) => void): HTMLElement {
+export function makeDriverRow(v: Vehicle, state: GameState, link?: (employeeId: number) => void): HTMLElement {
   const driverId = vehicleDriverId(v);
   const driver = state.employees.employees.find(e => e.id === driverId);
-  return makeDriveIconRow(driver?.name ?? `#${driverId}`, 'var(--bsx-text-secondary)');
+  const name = driver?.name ?? `#${driverId}`;
+  return makeDriveIconRow(name, 'var(--bsx-text-secondary)', link && driverId !== null ? { name, id: driverId, onClick: () => link(driverId) } : undefined);
 }
 
 /**
@@ -121,8 +132,9 @@ export function makeDriverRow(v: Vehicle, state: GameState, _link?: (employeeId:
  * claimed the vehicle yet. No unassign control: cancelling an in-progress
  * walk has no console command today, only display.
  */
-export function makePendingDriverRow(employee: Employee, _link?: (employeeId: number) => void): HTMLElement {
-  return makeDriveIconRow(t('ui.fleet.walking_to_board', { name: employee.name }), 'var(--bsx-text-micro)');
+export function makePendingDriverRow(employee: Employee, link?: (employeeId: number) => void): HTMLElement {
+  return makeDriveIconRow(t('ui.fleet.walking_to_board', { name: employee.name }), 'var(--bsx-text-micro)',
+    link ? { name: employee.name, id: employee.id, onClick: () => link(employee.id) } : undefined);
 }
 
 /**
@@ -137,7 +149,7 @@ export function makePendingDriverRow(employee: Employee, _link?: (employeeId: nu
  * The check is roster-wide licence ownership, not claim state — there is no
  * picker left to keep honest, unlike the old canBoardVehicle-based filter.
  */
-export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => void, _link?: (employeeId: number) => void): HTMLElement {
+export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => void): HTMLElement {
   const licence = ROLE_LICENCE_REQUIRED[v.type];
   const anyLicensed = rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier);
 
@@ -162,10 +174,11 @@ export interface UpgradeState {
   cost: number | null;
 }
 
+/** Next-tier upgrade availability and price; the single source for the Fleet card and the Inspector. */
 export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number): UpgradeState {
-  void v; void cash;
-  // TODO: implement
-  return { available: false, affordable: false, cost: null };
+  const cost = computeVehicleUpgradeCost(v.type, v.tier);
+  const available = nextVehicleTier(v.tier) !== null && cost !== null;
+  return { available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null };
 }
 
 /** Licence warning key + params, null when a licensed driver exists. */
@@ -174,17 +187,23 @@ export interface LicenceWarning {
   params: Record<string, string | number>;
 }
 
+/** Warning when nobody on the roster can drive the next tier; null at max tier or when someone can. */
 export function licenceWarning(v: Pick<Vehicle, 'type' | 'tier'>, employees: readonly Employee[]): LicenceWarning | null {
-  void v; void employees;
-  // TODO: implement
-  return null;
+  const next = nextVehicleTier(v.tier);
+  if (next === null || rosterCanDriveVehicleTier(employees, v.type, next)) return null;
+  return { key: 'ui.fleet.upgrade_licence_warning', params: {} };
 }
 
 /** Confirm-modal config for scrapping a vehicle; `run` receives the console command. */
 export function scrapConfirmConfig(v: Vehicle, run: (command: string) => void): ConfirmModalConfig {
-  void v; void run;
-  // TODO: implement
-  throw new Error('not implemented');
+  const residual = computeScrapResidualValue(v.type, v.tier, v.hp);
+  return {
+    icon: 'trash',
+    title: t('ui.fleet.scrap_confirm_title'),
+    body: t('ui.fleet.scrap_confirm_body', { name: vehicleDisplayName(v.type, v.tier), amount: formatMoney(residual) }),
+    confirmLabel: t('ui.fleet.scrap'),
+    onConfirm: () => run(`vehicle scrap ${v.id}`),
+  };
 }
 
 export type DriverState =
@@ -193,10 +212,17 @@ export type DriverState =
   | { kind: 'unmanned' }
   | { kind: 'no_licensed' };
 
+/** Who drives a vehicle: its driver, an employee walking to board, nobody (unmanned), or nobody able to. */
 export function driverState(v: Vehicle, state: GameState): DriverState {
-  void v; void state;
-  // TODO: implement
-  return { kind: 'unmanned' };
+  const driverId = vehicleDriverId(v);
+  const employees = state.employees.employees;
+  if (driverId !== null) {
+    const employee = employees.find(e => e.id === driverId);
+    if (employee) return { kind: 'driver', employee };
+  }
+  const pending = employees.find(e => e.pendingDriverVehicleId === v.id);
+  if (driverId === null && pending) return { kind: 'pending', employee: pending };
+  return rosterCanDriveVehicleTier(employees, v.type, v.tier) ? { kind: 'unmanned' } : { kind: 'no_licensed' };
 }
 
 /** Repair progress for a vehicle: the queued/active repair action, if any. */
@@ -205,8 +231,8 @@ export interface RepairState {
   needsRepair: boolean;
 }
 
-export function repairState(v: Pick<Vehicle, 'id' | 'hp'>, actions: readonly PendingAction[]): RepairState {
-  void v; void actions;
-  // TODO: implement
-  return { action: null, needsRepair: false };
+export function repairState(v: Vehicle, actions: readonly PendingAction[]): RepairState {
+  const action = actions.find(a => a.type === 'repair_vehicle' && a.payload['vehicleId'] === v.id) ?? null;
+  return { action, needsRepair: missingHp(v) > 0 };
 }
+

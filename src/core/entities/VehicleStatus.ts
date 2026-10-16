@@ -8,7 +8,8 @@
 // EmployeeActivity.ts.
 
 import type { Vehicle, VehicleTask, VehicleState } from './Vehicle.js';
-import { getVehicleReservation } from './Vehicle.js';
+import { getVehicleReservation, getVehicleDefByTier } from './Vehicle.js';
+import { octileHeuristic } from '../nav/Pathfinding.js';
 import type { Employee } from './Employee.js';
 import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
 import type { ActionType, BlockedOrderReason, PendingAction } from '../state/GameState.js';
@@ -86,7 +87,24 @@ export interface VehicleJob {
   blockedReason: BlockedOrderReason | null;
 }
 
-/** Job a vehicle currently serves, read off its reservation, occupant and pending actions. */
+const NO_JOB: VehicleJob = { actionType: null, target: null, destination: null, etaTicks: null, blockedReason: null };
+
+function jobTargetOf(action: PendingAction): VehicleJobTarget | null {
+  const p = action.payload;
+  if (typeof p['fragmentId'] === 'number') return { kind: 'fragment', id: p['fragmentId'] };
+  if (typeof p['holeId'] === 'string') return { kind: 'hole', id: p['holeId'] };
+  if (typeof p['buildingId'] === 'number') return { kind: 'building', id: p['buildingId'] };
+  if (typeof p['vehicleId'] === 'number') return { kind: 'vehicle', id: p['vehicleId'] };
+  return null;
+}
+
+/**
+ * Job a vehicle currently serves, read off its reservation, occupant and pending actions.
+ * Locale-free. `cargoWarehouseId` is the warehouse the loaded cargo is bound for; only a
+ * loaded hauler names it as the destination building. A broken vehicle, or an idle one with
+ * nothing queued for its role, has no job; an idle one with a queued order for its role
+ * that is blocked carries the order's `blockedReason`.
+ */
 export function computeVehicleJob(
   v: Vehicle,
   vehicleState: VehicleState,
@@ -94,14 +112,40 @@ export function computeVehicleJob(
   occupant?: Employee,
   cargoWarehouseId?: number | null,
 ): VehicleJob {
-  void v; void vehicleState; void pendingActions; void occupant; void cargoWarehouseId;
-  // TODO: implement
-  return { actionType: null, target: null, destination: null, etaTicks: null, blockedReason: null };
+  if (v.hp <= 0) return NO_JOB;
+  const reservedId = getVehicleReservation(vehicleState, v.id);
+  const action = reservedId === null ? undefined : pendingActions.find(a => a.id === reservedId);
+  if (!action) {
+    const blocked = pendingActions.find(a =>
+      a.status === 'queued' && a.holderId === null && a.requiredVehicleRole === v.type && a.blockedReason != null);
+    if (!blocked) return NO_JOB;
+    return { ...NO_JOB, actionType: blocked.type, target: jobTargetOf(blocked), blockedReason: blocked.blockedReason ?? null };
+  }
+
+  const base = { actionType: action.type, target: jobTargetOf(action), blockedReason: null };
+  if (occupant?.taskTicksRemaining != null) {
+    return { ...base, destination: null, etaTicks: occupant.taskTicksRemaining };
+  }
+  const legs = occupant?.itinerary?.legs ?? [];
+  const last = legs[legs.length - 1];
+  const loaded = v.type === 'debris_hauler' && v.cargo.length > 0;
+  const dest = last ? { x: last.destX, z: last.destZ } : { x: action.targetX, z: action.targetZ };
+  return {
+    ...base,
+    destination: { ...dest, buildingId: loaded ? (cargoWarehouseId ?? null) : null },
+    etaTicks: occupant?.itinerary ? vehicleEtaTicks(v, occupant.itinerary) : null,
+  };
 }
 
-/** Ticks left on an itinerary from the vehicle's current position. */
+/**
+ * Ticks left on an itinerary from the vehicle's current position (1 tick = 1 hour): the
+ * octile distance to the first leg's destination at the tier's speed (rounded up), plus the
+ * planned cost of the remaining legs. Shrinks as the vehicle closes on that destination.
+ */
 export function vehicleEtaTicks(v: Pick<Vehicle, 'x' | 'z' | 'type' | 'tier'>, itinerary: Itinerary): number {
-  void v; void itinerary;
-  // TODO: implement
-  return 0;
+  const [first, ...rest] = itinerary.legs;
+  if (!first) return 0;
+  const { speed } = getVehicleDefByTier(v.type, v.tier);
+  const toFirst = speed > 0 ? Math.ceil(octileHeuristic(v.x, v.z, first.destX, first.destZ) / speed) : 0;
+  return toFirst + rest.reduce((sum, leg) => sum + leg.estTicks, 0);
 }
