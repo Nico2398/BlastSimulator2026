@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { Inspector } from '../../../../src/ui/shell/Inspector.js';
+import type { ActionSpec, InspectorView } from '../../../../src/ui/panels/inspector/InspectorContent.js';
 import { PANEL_CLOSE_ATTR } from '../../../../src/ui/panels/PanelBase.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
@@ -16,6 +17,19 @@ import { join } from 'node:path';
 import { createRunner } from '../../../../src/console-api.js';
 import { armEntityMovePick } from '../../../../src/ui/scene/EntityMovePick.js';
 import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
+
+// Lets a test hand the Inspector a hand-built view; null falls through to the real per-kind content.
+const viewOverride = vi.hoisted(() => ({ make: null as (() => unknown) | null }));
+vi.mock('../../../../src/ui/panels/inspector/InspectorContent.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/ui/panels/inspector/InspectorContent.js')>();
+  return {
+    ...actual,
+    contentFor: (kind: Parameters<typeof actual.contentFor>[0]) => {
+      const real = actual.contentFor(kind);
+      return { view: (...args: Parameters<typeof real.view>) => (viewOverride.make ? viewOverride.make() : real.view(...args)) };
+    },
+  };
+});
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -923,14 +937,15 @@ describe('Inspector — inline note on an enabled action (#1820)', () => {
     return { bar, root, state, id: building.id };
   }
 
-  it('an enabled Upgrade and Demolish show the wait line inline while the buttons stay enabled', () => {
+  it('an enabled Upgrade and Demolish share one wait line inline (keyed upgrade) while the buttons stay enabled', () => {
     const { bar, root, state, id } = upgradable();
     bar.show(entity('building', id), state);
     const expected = t('inspector.wait.no_vehicle', { role: t('vehicle_type.building_destroyer') });
+    const lines = root.querySelectorAll<HTMLElement>('[data-reason]');
+    expect(lines.length).toBe(1);
+    expect(lines[0]!.dataset['reason']).toBe('upgrade');
+    expect(lines[0]!.textContent).toBe(expected);
     for (const action of ['upgrade', 'demolish']) {
-      const line = root.querySelector<HTMLElement>(`[data-reason="${action}"]`);
-      expect(line, action).not.toBeNull();
-      expect(line!.textContent).toBe(expected);
       expect(root.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`)!.disabled, action).toBe(false);
     }
   });
@@ -954,5 +969,81 @@ describe('Inspector — inline note on an enabled action (#1820)', () => {
     bar.show(entity('building', id), state);
     expect(root.querySelector('[data-reason="upgrade"]')!.textContent)
       .toBe(t('inspector.wait.no_driver', { role: t('vehicle_type.building_destroyer') }));
+  });
+});
+
+describe('Inspector — reason lines are deduplicated (#1861)', () => {
+  function spec(action: ActionSpec['action'], extra: Partial<ActionSpec> = {}): ActionSpec {
+    return { action, labelKey: 'inspector.locate', icon: 'build', variant: 'ghost', ...extra };
+  }
+  function viewOf(actions: ActionSpec[]): InspectorView {
+    return { title: 'T', sub: 's', icon: 'build', status: 'ok', signature: 'sig', sections: [], actions, sync: () => {} };
+  }
+  function shown(actions: () => ActionSpec[]) {
+    const { bar, root } = makeBar();
+    viewOverride.make = () => viewOf(actions());
+    bar.show(entity('building', 1), makeState());
+    return { bar, root };
+  }
+  const reasons = (root: HTMLElement) => Array.from(root.querySelectorAll<HTMLElement>('[data-reason]'));
+
+  afterEach(() => { viewOverride.make = null; });
+
+  it('two enabled actions carrying the same note give exactly one line, keyed by the first', () => {
+    const { root } = shown(() => [spec('upgrade', { note: 'Waits for a crew' }), spec('demolish', { note: 'Waits for a crew' })]);
+    const lines = reasons(root);
+    expect(lines.length).toBe(1);
+    expect(lines[0]!.dataset['reason']).toBe('upgrade');
+    expect(lines[0]!.textContent).toBe('Waits for a crew');
+  });
+
+  it('a disabled action whose title equals its own label adds no line', () => {
+    const { root } = shown(() => [spec('upgrade', { disabled: true, label: 'Upgrade', title: 'Upgrade' })]);
+    expect(reasons(root).length).toBe(0);
+  });
+
+  it('a disabled action whose title equals its translated labelKey adds no line', () => {
+    const { root } = shown(() => [spec('upgrade', { disabled: true, title: t('inspector.locate') })]);
+    expect(reasons(root).length).toBe(0);
+  });
+
+  it('a disabled action with a title different from its label still gets its line', () => {
+    const { root } = shown(() => [spec('upgrade', { disabled: true, label: 'Upgrade', title: 'Not enough cash' })]);
+    expect(reasons(root).map(l => l.textContent)).toEqual(['Not enough cash']);
+  });
+
+  it('an enabled note equal to the label is never compared away', () => {
+    const { root } = shown(() => [spec('upgrade', { label: 'Same', note: 'Same' })]);
+    expect(reasons(root).map(l => l.textContent)).toEqual(['Same']);
+  });
+
+  it('two different reasons each get a line, in action order', () => {
+    const { root } = shown(() => [spec('upgrade', { note: 'First reason' }), spec('demolish', { note: 'Second reason' })]);
+    const lines = reasons(root);
+    expect(lines.map(l => l.dataset['reason'])).toEqual(['upgrade', 'demolish']);
+    expect(lines.map(l => l.textContent)).toEqual(['First reason', 'Second reason']);
+  });
+
+  it('a repeated show() with the same signature keeps one line and updates its text in place', () => {
+    let note = 'Waits for a vehicle';
+    const { bar, root } = shown(() => [spec('upgrade', { note }), spec('demolish', { note })]);
+    note = 'Waits for a driver';
+    bar.show(entity('building', 1), makeState());
+    bar.update(makeState());
+    const lines = reasons(root);
+    expect(lines.length).toBe(1);
+    expect(lines[0]!.textContent).toBe('Waits for a driver');
+    expect(lines[0]!.dataset['reason']).toBe('upgrade');
+  });
+
+  it('update() with an unchanged signature collapses a reason that became shared', () => {
+    let second = 'Other reason';
+    const { bar, root } = shown(() => [spec('upgrade', { note: 'Shared' }), spec('demolish', { note: second })]);
+    expect(reasons(root).length).toBe(2);
+    second = 'Shared';
+    bar.update(makeState());
+    const lines = reasons(root);
+    expect(lines.length).toBe(1);
+    expect(lines[0]!.dataset['reason']).toBe('upgrade');
   });
 });
