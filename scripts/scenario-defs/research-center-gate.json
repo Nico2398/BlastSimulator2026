@@ -1,6 +1,6 @@
 {
   "name": "research-center-gate",
-  "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Queue Research on an already-placed building must be rejected on screen — not silently accepted — while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
+  "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Research in the inspector of an already-placed building (opened from its Build panel row) must be rejected on screen — not silently accepted — while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit staffed:true",
@@ -86,12 +86,20 @@
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Click Queue Research on the placed living quarters' own row — no Research Center exists yet, so getQueueBlockCode must return no_research_center and the click must be rejected on screen, not silently swallowed.",
+      "description": "Open the placed living quarters' inspector from its Build panel row and click Research — no Research Center exists yet, so getQueueBlockCode must return no_research_center and the click must be rejected on screen, not silently swallowed.",
       "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-research-btn"
+          "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"research\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
       "expect": {
@@ -166,12 +174,20 @@
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Click the identical Queue Research control on the living quarters again — now that a Research Center is placed, the tier-2 cost-only task must actually queue.",
+      "description": "Open the living quarters' inspector again and click the identical Research action — now that a Research Center is placed, the tier-2 cost-only task must actually queue.",
       "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-research-btn"
+          "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"research\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
       "expect": {
@@ -194,16 +210,16 @@
     },
     {
       "command": "tick 1",
-      "description": "#1398: after the research completes, the player sees it in the Build panel — the placed living quarters' Upgrade control becomes usable (tier 2 unlocked) with no console command standing in for a click.",
+      "description": "#1398: after the research completes, the player sees it in the Build panel — the inspector's Upgrade action for the placed living quarters replaces Research and becomes usable (tier 2 unlocked) with no console command standing in for a click.",
       "role": "player",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row .bs-build-upgrade-btn:not([disabled])"
+          "selector": "#bs-inspector [data-action=\"upgrade\"]:not([disabled])"
         }
       ],
       "expect": {
-        "usable": "#bs-build-panel .bs-build-placed-row .bs-build-upgrade-btn:not([disabled])"
+        "usable": "#bs-inspector [data-action=\"upgrade\"]:not([disabled])"
       }
     },
     {

@@ -307,8 +307,20 @@
     },
     {
       "command": "build destroy 1",
-      "description": "$1,500 < demolishCost $2,000 — refused, and the Build panel's Demolish button on building #1's row must be disabled, not merely present.",
+      "description": "$1,500 < demolishCost $2,000 — refused, and the inspector's Demolish action (opened by clicking building #1's row) must be disabled, not merely present.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector"
+        },
         {
           "type": "command",
           "command": "build destroy 1"
@@ -319,7 +331,7 @@
           "cash": 1500,
           "buildingCount": 1
         },
-        "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn",
+        "blocked": "#bs-inspector [data-action=\"demolish\"]",
         "note": "issue #511 — build destroy funds guard"
       },
       "role": "guard",
@@ -327,8 +339,20 @@
     },
     {
       "command": "build upgrade 1",
-      "description": "$1,500 < upgradeCost $22,000 (demolishCost T1 $2,000 + constructionCost T2 $20,000) — refused, and the Upgrade button on building #1's row must be disabled.",
+      "description": "$1,500 < upgradeCost $22,000 (demolishCost T1 $2,000 + constructionCost T2 $20,000) — refused, and the inspector's Upgrade action (opened by clicking building #1's row) must be disabled.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector"
+        },
         {
           "type": "command",
           "command": "build upgrade 1"
@@ -339,7 +363,7 @@
           "cash": 1500,
           "buildingCount": 1
         },
-        "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn",
+        "blocked": "#bs-inspector [data-action=\"upgrade\"]",
         "note": "issue #511 — build upgrade funds guard"
       },
       "role": "guard",
@@ -347,8 +371,20 @@
     },
     {
       "command": "build move 1 to:10,10",
-      "description": "$1,500 < moveCost $4,000 (round(constructionCost T1 8000 * 0.5)) — refused, and the Move button on building #1's row must be disabled.",
+      "description": "$1,500 < moveCost $4,000 (round(constructionCost T1 8000 * 0.5)) — refused, and the inspector's Move action (opened by clicking building #1's row) must be disabled.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector"
+        },
         {
           "type": "command",
           "command": "build move 1 to:10,10"
@@ -359,7 +395,7 @@
           "cash": 1500,
           "buildingCount": 1
         },
-        "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-move-btn",
+        "blocked": "#bs-inspector [data-action=\"move\"]",
         "note": "issue #511 — build move funds guard"
       },
       "role": "guard",
