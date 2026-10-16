@@ -10,6 +10,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { getDefSize, getBuildingDef } from '../../src/core/entities/Building.js';
 import { t, setLocale } from '../../src/core/i18n/I18n.js';
+import { equipDemolition } from '../helpers/demolition.js';
 
 const SEED = 42;
 const MAX_RESEARCH_TICKS = 3000;
@@ -37,20 +38,21 @@ function startWithResearchedTier2() {
   expect(run('research queue type:freight_warehouse tier:2')).toMatchObject({ success: true });
   tickUntil(run, state, () => state.buildings.researchQueue.length === 0, MAX_RESEARCH_TICKS);
   expect(state.buildings.researchQueue).toHaveLength(0);
-  return { run, state };
+  return { run, state, ctx };
 }
 
 describe('kit warehouse upgrade (#1830)', () => {
   it('upgrades the kit freight warehouse to tier 2 with the tier-2 capacity', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state, ctx } = startWithResearchedTier2();
     const kit = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
     expect(kit.id).toBe(1);
+    equipDemolition(ctx); // upgrade = demolition by a building_destroyer, then rebuild
     const result = run('build upgrade 1');
     expect(result, JSON.stringify(result)).toMatchObject({ success: true });
     tickUntil(run, state, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.tier === 2), MAX_REBUILD_TICKS);
     const upgraded = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
     expect(upgraded.tier).toBe(2);
-    expect(upgraded.capacity).toBe(FREIGHT_WAREHOUSE_CAPACITY_KG[2]);
+    expect(getBuildingDef('freight_warehouse', upgraded.tier).capacity).toBe(FREIGHT_WAREHOUSE_CAPACITY_KG[2]);
     expect(FREIGHT_WAREHOUSE_CAPACITY_KG[2]).toBe(72_000);
   });
 

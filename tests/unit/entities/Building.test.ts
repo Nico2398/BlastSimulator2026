@@ -841,7 +841,7 @@ describe('checkFootprintPlacement — terrain reservations (#1390)', () => {
     const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 4, z: 4 }];
     const r = checkFootprintPlacement(occupants, 'management_office', 4, 4, 1, 64, 64, 0, 0, undefined, [rampRes]);
     expect(r.error).toBe('Space is occupied');
-    expect(r.errorKey).toBe('shell.placement.refused_occupied');
+    expect(r.errorKey).toBe('shell.placement.refused_occupied_by');
   });
 
   it('reports the reservation before "Uneven surface"', () => {
