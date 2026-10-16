@@ -31,6 +31,7 @@ import {
 } from '../crewDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import type { ListSelection } from '../selectionRoute.js';
 
 
 export class CrewPanel extends PanelBase {
@@ -95,6 +96,11 @@ export class CrewPanel extends PanelBase {
     // Optional chained on the method itself, not just the element — jsdom
     // (unit tests) doesn't implement scrollIntoView at all.
     this.bodyEl.querySelector<HTMLElement>(`[data-employee-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  /** Highlight the roster row matching the scene selection `sel`. */
+  setSelectedEmployee(_sel: ListSelection): void {
+    // TODO: implement
   }
 
   /** Show the hiring section with candidates of `role` in view. */
