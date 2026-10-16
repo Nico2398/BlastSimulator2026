@@ -42,6 +42,14 @@ const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
   in_progress: 'ui.operations.work_queue_status_in_progress',
 };
 
+/** Counts queued work by block state: open (unblocked), blocked (failure), stranded (debris out of reach) (#1810). */
+export function countQueuedByBlock(
+  _actions: readonly Pick<PendingAction, 'status' | 'blockedReason'>[],
+): { open: number; blocked: number; stranded: number } {
+  // TODO: implement
+  return { open: 0, blocked: 0, stranded: 0 };
+}
+
 export class OperationsPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private readonly shiftButtons: Record<ShiftMode, HTMLButtonElement>;

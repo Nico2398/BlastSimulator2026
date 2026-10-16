@@ -311,6 +311,12 @@ export class NotificationCenter {
   }
 }
 
+/** True when the block is a failure the player must fix (vs. a stranded-debris wait) (#1810). */
+export function isFailureBlock(_action: Pick<PendingAction, 'blockedReason'>): boolean {
+  // TODO: implement
+  return false;
+}
+
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
 export function buildBlockedOrderMessage(action: PendingAction): string {
   const order = t(ACTION_LABEL_KEY[action.type]);
