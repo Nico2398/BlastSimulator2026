@@ -421,3 +421,13 @@ export function classifyNewOrder(state: GameState, actionId: number): void {
 export function refreshOrderReachability(state: GameState): void {
   classifyQueuedOrders(state);
 }
+
+/** Why no actor can serve `role`: the fleet holds no such vehicle, or no eligible employee is licensed to drive one; null when both exist. */
+export function roleShortfall(
+  vehicles: ReadonlyArray<Vehicle>,
+  eligible: ReadonlyArray<Employee>,
+  role: VehicleRole,
+): 'no_vehicle_in_fleet' | 'no_licensed_driver' | null {
+  void vehicles; void eligible; void role;
+  return null; // TODO: implement
+}

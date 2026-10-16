@@ -27,6 +27,8 @@ export interface ActionSpec {
   readonly label?: string;
   /** Tooltip text (#1758). */
   readonly title?: string;
+  /** Explanatory line shown with the action, e.g. why the order will wait. */
+  readonly note?: string;
 }
 
 /** Callbacks a view uses to navigate to other entities (host, occupant, driver...). */

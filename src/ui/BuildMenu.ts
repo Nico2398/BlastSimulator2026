@@ -357,10 +357,11 @@ export class BuildMenu extends PanelBase {
   }
 
   /** Queue research for the next tier of placed building `buildingId` (the inspector's Research action, #1758). */
-  queueResearchFor(buildingId: number): void {
+  queueResearchFor(buildingId: number): string | null {
     const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
     const nextTier = b ? this.nextTierOf(b) : null;
     if (b && nextTier !== null) this.queueResearch(b.type, nextTier);
+    return null; // TODO: implement
   }
 
   /** Maps `research queue`'s failure `code` (src/console/commands/research.ts)

@@ -17,6 +17,9 @@ import { refreshLogisticsCapacity, emitFootprintRegionChanged } from './Building
 
 export type { DemolishBuildingActionPayload };
 
+/** Vehicle role every demolition order requires. */
+export const DEMOLITION_VEHICLE_ROLE = 'building_destroyer' as const;
+
 interface DemolitionOptions {
   cost: number;
   rebuildOrderId: number | null;

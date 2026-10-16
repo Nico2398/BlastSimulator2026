@@ -17,6 +17,8 @@ import { memoizedPlacementCutoff } from './placementCutoffConfirm.js';
 /** Reason key shared by every action refused for short cash; BuildMenu keeps its plain `$cost` tooltip for it. */
 export const REASON_CASH = 'inspector.reason.cash';
 
+export type InspectorWaitKey = 'inspector.wait.no_vehicle' | 'inspector.wait.no_driver';
+
 export interface BuildingActionRules {
   upgrade: {
     kind: 'available' | 'locked' | 'refused';
@@ -26,6 +28,8 @@ export interface BuildingActionRules {
     nextTier: BuildingTier | null;
     /** What the upgraded footprint would strand from the crew (#1391); null when nothing or not applicable. */
     cutoff: PlacementCutoff | null;
+    /** Why the order will wait for want of a vehicle or driver; null when none. */
+    waitKey: InspectorWaitKey | null;
   };
   research: {
     type: BuildingType;
@@ -33,9 +37,11 @@ export interface BuildingActionRules {
     cost: number;
     duration: number;
     queued: { fraction: number; remaining: number } | null;
+    /** Why queueing is refused right now; null when it can be queued. */
+    blocked: { reasonKey: string; reasonParams?: Record<string, string | number> } | null;
   } | null;
   move: { cost: number; disabledReasonKey: string | null };
-  demolish: { cost: number; disabledReasonKey: string | null };
+  demolish: { cost: number; disabledReasonKey: string | null; waitKey: InspectorWaitKey | null };
 }
 
 export function buildingActionRules(
@@ -55,7 +61,7 @@ export function buildingActionRules(
     upgrade,
     research,
     move: { cost: moveCost, disabledReasonKey: orderedOr(moveCost) },
-    demolish: { cost: demolishCost, disabledReasonKey: orderedOr(demolishCost) },
+    demolish: { cost: demolishCost, disabledReasonKey: orderedOr(demolishCost), waitKey: null },
   };
 }
 
@@ -66,7 +72,7 @@ function upgradeRules(
   state: GameState, b: Building, ordered: boolean, reservations: ReadonlyArray<TerrainReservation>,
 ): UpgradeRules {
   const refused = (reasonKey: string, nextTier: BuildingTier | null, cost: number | null, params?: Record<string, string | number>): UpgradeRules => ({
-    upgrade: { kind: 'refused', cost, reasonKey, ...(params ? { reasonParams: params } : {}), nextTier, cutoff: null }, research: null,
+    upgrade: { kind: 'refused', cost, reasonKey, ...(params ? { reasonParams: params } : {}), nextTier, cutoff: null, waitKey: null }, research: null,
   });
   if (isSingleTierType(b.type)) return refused('inspector.reason.single_tier', null, null);
   if (b.tier >= 3) return refused('inspector.reason.max_tier', null, null);
@@ -80,13 +86,14 @@ function upgradeRules(
     return {
       upgrade: {
         kind: 'locked', cost, reasonKey: 'ui.build.research_required', reasonParams: { tier: nextTier },
-        nextTier, cutoff: null,
+        nextTier, cutoff: null, waitKey: null,
       },
       research: {
         type: b.type,
         tier: nextTier,
         cost: researchCostFor(def.cost, state.events.activeModifiers, state.tickCount),
         duration: def.ticks,
+        blocked: null,
         queued: task ? { fraction: getResearchProgress(task).fraction, remaining: task.ticksRemaining } : null,
       },
     };
@@ -102,7 +109,7 @@ function upgradeRules(
   const { sizeX: curX, sizeZ: curZ } = getDefSize(getBuildingDef(b.type, b.tier));
   const cutoff = memoizedPlacementCutoff(state, next, { minX: b.x, minZ: b.z, maxX: b.x + curX, maxZ: b.z + curZ });
   return {
-    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff },
+    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff, waitKey: null },
     research: null,
   };
 }
