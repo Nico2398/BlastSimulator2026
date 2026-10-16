@@ -186,9 +186,15 @@ export class Inspector {
 
   /** One inline reason line under the strip per action that names why: the refusal of a disabled one, the note of an enabled one (the tooltip alone is invisible to touch). */
   private syncReasons(view: InspectorView): void {
-    const wanted = view.actions
-      .map(a => ({ action: a.action, text: a.disabled === true ? a.title : a.note }))
-      .filter((w): w is { action: InspectorAction; text: string } => w.text !== undefined);
+    const wanted: { action: InspectorAction; text: string }[] = [];
+    for (const a of view.actions) {
+      const disabled = a.disabled === true;
+      const text = disabled ? a.title : a.note;
+      if (text === undefined) continue;
+      if (disabled && text === (a.label ?? t(a.labelKey))) continue; // the button already says it
+      if (wanted.some(w => w.text === text)) continue; // each distinct text once, keyed by its first action
+      wanted.push({ action: a.action, text });
+    }
     const shown = Array.from(this.actionsEl.querySelectorAll<HTMLElement>('[data-reason]'));
     const sameActions = shown.length === wanted.length && wanted.every((w, i) => shown[i]!.dataset['reason'] === w.action);
     if (sameActions) {
