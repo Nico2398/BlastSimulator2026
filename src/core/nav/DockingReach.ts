@@ -9,8 +9,9 @@ const DOCKING_HOPS = 2;
  * Widen a reachable set with the docking cells around it: a cell the set does
  * not hold, that is traversable, whose clearance is below `requiredClearance`,
  * and that touches (8 neighbours) a cell the set holds, or touches another
- * such docking cell, up to `DOCKING_HOPS` cells deep. Each hop costs at most
- * 9 lookups, so the widened set stays O(1) per query (#1603).
+ * such docking cell, up to `DOCKING_HOPS` cells deep. Each hop is 8-way, so a
+ * query costs about 1 + 8 + 64 lookups at two hops: bounded, the widened set
+ * stays O(1) per query (#1603).
  *
  * Two hops, not unbounded: the clearance-1 ring a building footprint leaves
  * around itself can sit in a strip between footprint and wall, entered only

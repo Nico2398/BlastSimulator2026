@@ -137,6 +137,7 @@ function fillPool(
   });
   const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS).reachableFrom(usable);
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
+  // Role-agnostic: applies to every vehicle-gated order, not only demolition.
   return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };
 }
 

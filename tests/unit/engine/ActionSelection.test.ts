@@ -2190,7 +2190,7 @@ describe('selectBestActionForEmployee — demolition outranks debris hauling (#1
     expect(picks).toBe(1);
   });
 
-  it('keeps hauling when the same driver has cargo aboard (mid-haul, canReleaseDriver refuses)', () => {
+  it('keeps hauling when the same driver has cargo aboard (planner refusal stubbed as unplannable, canReleaseDriver false asserted)', () => {
     const state = makeState();
     const { emp, hauler } = mountedHaulDriver(state);
     hauler.cargo.push({ fragmentId: 1, massKg: 500 });
