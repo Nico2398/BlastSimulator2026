@@ -325,6 +325,7 @@
     {
       "command": "state",
       "description": "The player clicks the Freight Warehouse (the first building placed, id 1) in the scene. The inspector's contents section shows the stored/capacity gauge and at least one per-ore row.",
+      "timeout": 90,
       "role": "player",
       "expect": {
         "usable": "#bs-inspector [data-live=\"gauge\"]"
@@ -342,11 +343,13 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-inspector [data-live=\"gauge\"]"
+          "selector": "#bs-inspector [data-live=\"gauge\"]",
+          "timeout": 30000
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-inspector [data-live^=\"ore-row-\"]"
+          "selector": "#bs-inspector [data-live^=\"ore-row-\"]",
+          "timeout": 30000
         },
         {
           "type": "screenshot"

@@ -188,7 +188,7 @@ A `reposition` goal moves a vehicle with no work attached: parking the fleet cle
 
 ## Cost Model
 
-Ranking is tier first, then cost (`ACTION_RANK_TIER`, #1742; see `gameplay-employee-skills`): cost orders candidates only within a rank tier, so a cheap haul never outranks a `charge_hole`.
+Ranking is tier first, then cost (`ACTION_RANK_TIER`, #1742; see `gameplay-employee-skills`): cost orders candidates only within a rank tier, so a cheap haul never outranks a `charge_hole` or a `demolish_building` (#1840; a loaded haul is still never abandoned, #1709). Reachability: a vehicle order whose target is a clearance-1 approach cell beside a building is reachable when a neighbouring cell lies in a vehicle component (`withDockingCells`, `DockingReach.ts`, one hop, O(1) per query); genuinely cut-off approaches still report `target_unreachable`.
 
 A queued action's cost is the itinerary's cost. For a vehicle-gated action claimed by an employee
 on foot that is exactly:
