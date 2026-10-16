@@ -297,6 +297,13 @@ An owned vehicle moves up one tier in place (`src/core/entities/VehicleUpgrade.t
 - **Upgrade vs scrap:** scrap sells at the 40% residual and the vehicle is gone; upgrade keeps the vehicle and pays only the difference, so it is the intended way up a tier.
 - **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the card shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`, #1524).
 
+## Vehicle inspector job, ETA and running cost (#1761)
+
+- `computeVehicleJob` (`VehicleStatus.ts`) reads the reserved action's payload for the target (fragment, hole, building, vehicle). The destination is the occupant's last itinerary leg; its building is the cargo's warehouse only for a loaded hauler. A working vehicle shows the remaining task ticks as ETA and no drive destination. A broken vehicle has no job; an idle one shows the `blockedReason` of a queued unclaimed order for its role.
+- **ETA** (`vehicleEtaTicks`): octile distance from the vehicle's live position to the first leg's destination, divided by the tier's speed (cells per tick) and rounded up, plus the remaining legs' `estTicks`. It shrinks as the vehicle approaches, unlike the plan-time `estTotalTicks`. 1 tick = 1 hour.
+- **Running cost** $/h: maintenance always (tier-scaled `maintenanceCostPerTick`); fuel (`vehicleFuelCostPerTick`, shared with the fleet total) only while the vehicle holds a reservation.
+- Cargo ore composition shares `sumOreMass` (`BlastOreReport.ts`) with the warehouse stock; a stale fragment id contributes no ore, so its mass reads as barren.
+
 ## Traffic
 
 Vehicles cannot share a cell. A driver whose next drive step is occupied waits and retries, then
