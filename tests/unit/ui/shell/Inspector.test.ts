@@ -593,6 +593,10 @@ describe('Inspector — window frame (#1756)', () => {
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.builtRamps.push({ id: 1, def: { originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 6, width: 3 }, width: 3, footprint: { minX: 9, maxX: 11, minZ: 5, maxZ: 16 } });
     state.nextBuiltRampId = 2;
+    state.logistics.fragments.push({
+      fragment: { id: 42, position: { x: 0, y: 0, z: 0 }, volume: 1, mass: 2000, rockId: 'granite', oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, origin: { x: 0, y: 0, z: 0 } },
+      state: 'on_ground', vehicleId: null, warehouseId: null,
+    });
     const onAction = vi.fn();
     bar.setActionHandler(onAction);
 

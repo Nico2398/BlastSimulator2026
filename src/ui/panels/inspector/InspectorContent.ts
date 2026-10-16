@@ -4,7 +4,9 @@ import type { EntityPick } from '../../scene/ScenePicking.js';
 import { buildingContent } from './buildingContent.js';
 import { vehicleContent } from './vehicleContent.js';
 import { employeeContent } from './employeeContent.js';
-import { pickedContent } from './pickedContent.js';
+import { fragmentContent } from './fragmentContent.js';
+import { holeContent } from './holeContent.js';
+import { rampContent } from './rampContent.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
 
 export type InspectorKind = EntityPick['kind'];
@@ -60,9 +62,9 @@ const CONTENT: Record<InspectorKind, KindContent> = {
   building: buildingContent,
   vehicle: vehicleContent,
   employee: employeeContent,
-  fragment: pickedContent,
-  hole: pickedContent,
-  ramp: pickedContent,
+  fragment: fragmentContent,
+  hole: holeContent,
+  ramp: rampContent,
 };
 
 export function contentFor(kind: InspectorKind): KindContent {

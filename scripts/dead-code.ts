@@ -58,6 +58,10 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Fragment/ramp inspector (#1769): the unit-tested contracts; production composes them inside fragmentContent / rampContent.
+  'src/core/economy/FragmentOre.ts:FragmentOreBreakdown',
+  'src/ui/panels/inspector/rampContent.ts:WidenState',
+  'src/ui/panels/inspector/rampContent.ts:widenState',
   // Vehicle inspector (#1761): the unit-tested ETA contract (production composes it inside computeVehicleJob).
   'src/core/entities/VehicleStatus.ts:vehicleEtaTicks',
   // Hover-tag dwell (#1752): the unit tests read the dwell to advance fake timers; production uses it inside ScenePicking.

@@ -50,7 +50,11 @@ export function pickScene(
 
   const entityTargets = renderer.pickables();
   const terrainTargets = [...(renderer.terrain?.meshes ?? []), ...(renderer.landscape?.meshes ?? [])];
-  const hits = raycaster.intersectObjects([...entityTargets, ...terrainTargets], true);
+  const allHits = raycaster.intersectObjects([...entityTargets, ...terrainTargets], true);
+  // Raw-ground callers (placement, tile picking) see through loose rubble: a
+  // crater full of fragments is still a tile a player can order a ramp or a
+  // drill plan onto, so fragments must not occlude the ground beneath them.
+  const hits = selectRamps ? allHits : allHits.filter(h => h.object.userData['entityKind'] !== 'fragment');
   const closest = hits[0];
   if (!closest) return EMPTY_PICK;
 

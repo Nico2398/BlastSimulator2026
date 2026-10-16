@@ -131,6 +131,26 @@ describe('pickScene', () => {
     fm.dispose();
   });
 
+  it('raw-ground picks (selectRamps=false) see through fragments to the terrain beneath', () => {
+    const scene = new THREE.Scene();
+    const fm = new FragmentMesh(scene, new THREE.MeshBasicMaterial());
+    fm.spawnFragments([{
+      id: 12, position: { x: 5.5, y: 0.5, z: 5.5 }, volume: 4, mass: 1000,
+      rockId: 'sandite', oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 }, shapeSeed: 12,
+      origin: { x: 5.5, y: 0.5, z: 5.5 },
+    }]);
+    const tm = makeSolidTerrain();
+    const camera = makeTopDownCamera(5.5, 5.5);
+    const renderer = makeFakeRenderer({ pickables: fm.pickables(), fragments: fm, terrainMeshes: tm.meshes });
+
+    const result = pickScene(0, 0, camera, renderer, undefined, false);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
+    fm.dispose();
+    tm.dispose();
+  });
+
   it('falls back to terrain with floored tile coordinates when no entity is hit', () => {
     const tm = makeSolidTerrain();
     const camera = makeTopDownCamera(3.7, 2.2);

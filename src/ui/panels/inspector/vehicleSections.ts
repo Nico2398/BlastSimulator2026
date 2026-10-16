@@ -4,7 +4,7 @@ import { getVehicleDefByTier, getVehicleReservation, resolveVehicleDriver, vehic
 import { computeVehicleJob, type VehicleJobTarget } from '../../../core/entities/VehicleStatus.js';
 import { isVehicleUnderRepair, missingHp, repairPartsCost } from '../../../core/entities/VehicleRepair.js';
 import { vehicleCargoByOre, vehicleCargoWarehouseId } from '../../../core/economy/VehicleCargo.js';
-import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js';
+import { formatDollars } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import {
@@ -14,12 +14,7 @@ import { makeDriverBlock, repairState } from './vehicleDetailParts.js';
 import { ACTION_LABEL_KEY } from '../../crewDetailSections.js';
 import { buildBlockedOrderMessage } from '../../notify/NotificationCenter.js';
 import type { InspectorLinks } from './InspectorContent.js';
-import { entityLink, liveRow, sectionOf, valueRow } from './inspectorWidgets.js';
-
-function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
-  node.setAttribute(attr, value);
-  return node;
-}
+import { entityLink, kgText, liveRow, sectionOf, tagged, valueRow } from './inspectorWidgets.js';
 
 /** Status chip and HP current/max gauge. */
 export function buildConditionSection(v: Vehicle, state: GameState): HTMLElement {
@@ -96,10 +91,10 @@ export function buildCargoSection(v: Vehicle, state: GameState): HTMLElement | n
   const cargo = vehicleCargoByOre(v, state.logistics.fragments);
   const rows: HTMLElement[] = [load];
   for (const [oreId, kg] of Object.entries(cargo.byOre).sort(([a], [b]) => a.localeCompare(b))) {
-    rows.push(tagged(valueRow(t(`ore.${oreId}.name`), t('inspector.vehicle.kg', { kg: formatMoney(kg) })), 'data-cargo-ore', oreId));
+    rows.push(tagged(valueRow(t(`ore.${oreId}.name`), kgText(kg)), 'data-cargo-ore', oreId));
   }
   if (cargo.totalKg > 0) {
-    rows.push(tagged(valueRow(t('inspector.vehicle.barren'), t('inspector.vehicle.kg', { kg: formatMoney(cargo.barrenKg) })), 'data-cargo-barren'));
+    rows.push(tagged(valueRow(t('inspector.vehicle.barren'), kgText(cargo.barrenKg)), 'data-cargo-barren'));
   }
   rows.push(valueRow(t('inspector.vehicle.fragments'), String(cargo.fragmentCount)));
   const wrap = sectionOf(t('inspector.vehicle.cargo'), rows);
@@ -121,7 +116,7 @@ export function buildSpecsSection(v: Vehicle): HTMLElement {
   const def = getVehicleDefByTier(v.type, v.tier);
   const rows = [
     valueRow(t('inspector.vehicle.speed'), t('inspector.vehicle.speed_value', { n: Math.round(def.speed * 100) / 100 })),
-    ...(def.capacity > 0 ? [valueRow(t('inspector.vehicle.capacity'), t('inspector.vehicle.kg', { kg: formatMoney(def.capacity) }))] : []),
+    ...(def.capacity > 0 ? [valueRow(t('inspector.vehicle.capacity'), kgText(def.capacity))] : []),
     valueRow(t('inspector.vehicle.work_rate'), String(Math.round(def.workRate * 100) / 100)),
   ];
   const wrap = sectionOf(t('inspector.vehicle.specs'), rows);
