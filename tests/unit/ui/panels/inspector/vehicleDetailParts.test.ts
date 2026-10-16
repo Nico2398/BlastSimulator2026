@@ -240,3 +240,21 @@ describe('vehicleDetailParts — repairState', () => {
     expect(s.action).not.toBeNull();
   });
 });
+
+describe('vehicleDetailParts — makeNoDriverRow warning names the level (#1850)', () => {
+  it('after an upgrade to tier 2 with only level-1 holders, says nobody holds level 2', () => {
+    const driller = makeEmployee({
+      id: 6, qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0, licenceLevel: 1 }],
+    });
+    const state = makeState([], [driller]);
+    const row = makeNoDriverRow(makeVehicle({ type: 'drill_rig', tier: 2 }), state, () => {});
+    expect(row.textContent).toContain('Nobody holds Drill Rig Operation level 2');
+    expect(row.textContent).not.toContain('Nobody is licensed');
+  });
+
+  it('the level follows the vehicle tier', () => {
+    const state = makeState([], []);
+    const row = makeNoDriverRow(makeVehicle({ type: 'drill_rig', tier: 3 }), state, () => {});
+    expect(row.textContent).toContain('Nobody holds Drill Rig Operation level 3');
+  });
+});

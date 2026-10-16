@@ -9,6 +9,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -54,21 +55,21 @@ describe('fleetDetailSections — makeHpGauge', () => {
   it('colors the gauge positive-green above 50%', () => {
     const gauge = makeHpGauge(makeVehicle({ hp: 90 }));
     const value = gauge.querySelector('.bsx-gauge-value') as HTMLElement;
-    expect(value.textContent).toBe('90');
+    expect(value.textContent).toBe('90%');
     expect(value.style.color).toBe('var(--bsx-positive)');
   });
 
   it('colors the gauge amber between 21% and 50%', () => {
     const gauge = makeHpGauge(makeVehicle({ hp: 50 }));
     const value = gauge.querySelector('.bsx-gauge-value') as HTMLElement;
-    expect(value.textContent).toBe('50');
+    expect(value.textContent).toBe('50%');
     expect(value.style.color).toBe('var(--bsx-amber)');
   });
 
   it('colors the gauge critical-red at or below 20%', () => {
     const gauge = makeHpGauge(makeVehicle({ hp: 10 }));
     const value = gauge.querySelector('.bsx-gauge-value') as HTMLElement;
-    expect(value.textContent).toBe('10');
+    expect(value.textContent).toBe('10%');
     expect(value.style.color).toBe('var(--bsx-critical)');
   });
 });
@@ -200,9 +201,9 @@ describe('fleetDetailSections — makeDriverNameLine', () => {
     expect(line.classList.contains('bs-fleet-driver')).toBe(true);
   });
 
-  it('never warns or offers Train, even when nobody holds the licence', () => {
+  it('never offers Train, even when nobody holds the licence (#1850: reads the no-licence line)', () => {
     const line = makeDriverNameLine(makeVehicle({ type: 'drill_rig' }), []);
-    expect(line.textContent).toContain('Unmanned');
+    expect(line.textContent).not.toContain('Unmanned');
     expect(line.textContent).not.toContain('Nobody is licensed');
     expect(line.querySelector('button')).toBeNull();
   });
@@ -215,5 +216,48 @@ describe('fleetDetailSections — makeDriverNameLine', () => {
   it('falls back to "#<id>" when the seated driver is not on the roster', () => {
     const line = makeDriverNameLine(makeVehicle({ occupantIds: [99] }), []);
     expect(line.textContent).toContain('#99');
+  });
+});
+
+describe('fleetDetailSections — makeDriverNameLine, nobody licensed at the tier (#1850)', () => {
+  const rig = (overrides: Partial<Vehicle> = {}) => makeVehicle({ type: 'drill_rig', tier: 2, hp: 120, ...overrides });
+  const levelOneDriller = () => makeEmployee({
+    id: 6, qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0, licenceLevel: 1 }],
+  });
+
+  it('a tier nobody on the roster holds shows the no-licence line, not Unmanned', () => {
+    const line = makeDriverNameLine(rig(), [levelOneDriller()]);
+    const expected = t('ui.fleet.row_no_licensed', { licence: t('skill.driving.drill_rig'), level: 2 });
+    expect(line.textContent).toBe(expected);
+    expect(line.textContent).toContain('Drill Rig Operation');
+    expect(line.textContent).toContain('2');
+    expect(line.textContent).not.toBe(t('ui.fleet.unmanned'));
+    expect(line.textContent).not.toContain('crews automatically');
+  });
+
+  it('the no-licence line is amber', () => {
+    const line = makeDriverNameLine(rig(), [levelOneDriller()]);
+    expect(line.style.color).toBe('var(--bsx-amber)');
+  });
+
+  it('an empty roster also reads as no-licence', () => {
+    const line = makeDriverNameLine(rig(), []);
+    expect(line.textContent).not.toContain('crews automatically');
+    expect(line.textContent).toContain('Drill Rig Operation');
+  });
+
+  it('a vehicle someone can drive still reads Unmanned, not amber', () => {
+    const line = makeDriverNameLine(rig({ tier: 1, hp: 100 }), [levelOneDriller()]);
+    expect(line.textContent).toBe(t('ui.fleet.unmanned'));
+    expect(line.style.color).not.toBe('var(--bsx-amber)');
+  });
+
+  it('a seated driver off the roster keeps its #id line even when nobody is licensed', () => {
+    const line = makeDriverNameLine(rig({ occupantIds: [99] }), []);
+    expect(line.textContent).toBe('#99');
+  });
+
+  it('the row still carries no Train button', () => {
+    expect(makeDriverNameLine(rig(), [levelOneDriller()]).querySelector('button')).toBeNull();
   });
 });
