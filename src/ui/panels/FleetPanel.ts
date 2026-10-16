@@ -37,7 +37,7 @@ import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDri
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { PlacementKit } from '../scene/PlacementKit.js';
-import { armPointPick } from '../scene/PlacementKit.js';
+import { armEntityMovePick } from '../scene/EntityMovePick.js';
 
 
 const TIER_BTN_BASE_STYLE = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left';
@@ -92,16 +92,15 @@ export class FleetPanel extends PanelBase {
     if (!kit) return;
 
     const vehicle = this.lastState?.vehicles.vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) return;
 
-    armPointPick(kit, {
-      icon: 'vehicle',
-      title: t('ui.fleet.reposition_pick_target'),
-      subtitle: vehicle ? vehicleDisplayName(vehicle.type, vehicle.tier) : `#${vehicleId}`,
-      instruction: t('ui.fleet.reposition_pick_instruction'),
-      result: (sel) => `(${sel.x1}, ${sel.z1})`,
-      ...(vehicle ? { initialSelection: { x: Math.round(vehicle.x), z: Math.round(vehicle.z) } } : {}),
-      onConfirm: (sel) => { this.gameConsole?.(`vehicle reposition ${vehicleId} ${sel.x1} ${sel.z1}`); },
-    });
+    armEntityMovePick(kit, {
+      kind: 'vehicle',
+      id: vehicleId,
+      name: vehicleDisplayName(vehicle.type, vehicle.tier),
+      x: vehicle.x,
+      z: vehicle.z,
+    }, (cmd) => { this.gameConsole?.(cmd); });
   }
 
 

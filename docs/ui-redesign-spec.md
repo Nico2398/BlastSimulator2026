@@ -402,6 +402,8 @@ Every mention of another entity is a link that selects it. Values follow §2.3: 
 
 **Testing hooks (§2.5).** Root `#bs-inspector`, carrying the selected kind and id as data attributes; action buttons keep their existing `data-action` values (`dispatch_here`, `move_here`, `upgrade_vehicle`, `upgrade`, `move`, `demolish`, `widen`) and new ones follow the same convention; Locate is `data-action="locate"`; the close button carries the shared panel-close attribute the tutorial rails allow; list rows keep `[data-employee-id]`, `[data-vehicle-id]`, `[data-building-id]` and mark the selected row; Explosive Warehouse stock keeps `[data-info="warehouse-stock"]`. `__uiState()` reports whether the inspector is open and on which kind and id, so scenarios wait on it rather than on a delay.
 
+**Move Here / Dispatch Here (one move flow).** Both actions (and the Fleet panel's Reposition) arm the same in-scene single-tile pick, `armEntityMovePick` (`src/ui/scene/EntityMovePick.ts`). The destination is never read from the cursor, so the flow works on touch and with no hover: the entity's own tile is pre-selected, the strip's subtitle names the vehicle or employee being moved, the player clicks a tile to change the pick, and **Confirm** sends the command (`vehicle reposition <id> <x> <z>` or `employee dispatch <id> x:<x> z:<z>`). **Esc** cancels the pick first and leaves the inspector selection alone; a second Esc deselects. A failed command is reported as a toast titled with the action.
+
 ---
 
 ## 7. Information the player must *always* be able to answer (acceptance checklist)

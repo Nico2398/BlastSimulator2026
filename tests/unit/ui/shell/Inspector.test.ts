@@ -14,6 +14,8 @@ import type { EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRunner } from '../../../../src/console-api.js';
+import { armEntityMovePick } from '../../../../src/ui/scene/EntityMovePick.js';
+import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -345,40 +347,58 @@ describe('removed vehicle Haul/Unassign i18n keys (#1400)', () => {
 
 // main.ts owns what each Inspector action *does*, and it can't be imported
 // in a unit test (it wires a full SceneManager/Three.js canvas, audio and
-// IndexedDB at import time), so the handler is checked statically — same
-// approach as tests/unit/ui/TutorialBridge.test.ts. The template it dispatches
-// is then substituted and run through the *real* console runner, so a wrong
-// coordinate form (`x:… z:…` instead of `to:x,z`) fails here rather than
+// IndexedDB at import time), so the handlers are checked statically — same
+// approach as tests/unit/ui/TutorialBridge.test.ts. The commands themselves
+// come from armEntityMovePick (#1766), which the tests below run through the
+// *real* console runner, so a wrong coordinate form fails here rather than
 // silently doing nothing in the browser.
-describe('Inspector move_here — the command src/main.ts dispatches', () => {
+describe('Inspector move_here / dispatch_here — arm the in-scene move pick (#1766)', () => {
   const mainTs = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8');
 
-  /** The `vehicle reposition …` template literal handed to window.__gameConsole. */
-  function extractTemplate(): string {
-    const match = /__gameConsole\(`(vehicle reposition [^`]*)`\)/.exec(mainTs);
-    expect(match, 'src/main.ts dispatches no `vehicle reposition …` command').not.toBeNull();
-    return match![1]!;
+  function handlerBody(action: string): string {
+    const start = mainTs.indexOf(`case '${action}':`);
+    expect(start, `src/main.ts handles no '${action}' action`).toBeGreaterThanOrEqual(0);
+    const rest = mainTs.slice(start + 1);
+    const next = rest.search(/\n    case '/);
+    return rest.slice(0, next === -1 ? undefined : next);
   }
 
-  it('handles the move_here action at all', () => {
-    expect(mainTs).toContain("case 'move_here':");
+  for (const action of ['move_here', 'dispatch_here']) {
+    it(`${action} arms the shared move pick and never reads the hover aim`, () => {
+      const body = handlerBody(action);
+      expect(body).toContain('armEntityMovePick');
+      expect(body).not.toContain('scenePicking.aim');
+      expect(body).not.toContain('scenePicking.hover');
+      expect(body).not.toContain('no_move_target');
+    });
+  }
+
+  it('main.ts no longer references scenePicking.aim anywhere', () => {
+    expect(mainTs).not.toContain('scenePicking.aim');
   });
 
-  it('dispatches `vehicle reposition <id> <x> <z>` built from the latched aim tile', () => {
-    expect(extractTemplate()).toBe('vehicle reposition ${entity.id} ${terrain.tileX} ${terrain.tileZ}');
-  });
+  /** A kit whose controller selects instantly: enough to drive armEntityMovePick to Confirm. */
+  function confirmAt(kind: 'vehicle' | 'employee', id: number, x: number, z: number, run: (c: string) => void): void {
+    let confirm: ((sel: { x1: number; z1: number; x2: number; z2: number }) => void) | null = null;
+    const controller = {
+      isArmed: false, currentPhase: 'idle', selection: null, canConfirm: true,
+      setConfirmHandler: (cb: typeof confirm) => { confirm = cb; },
+      setChangeHandler: () => {}, setCancelHandler: () => {}, cancel: () => {},
+      arm: () => { controller.isArmed = true; },
+    };
+    const kit = {
+      controller,
+      overlay: { update: () => {}, clear: () => {}, flashConfirm: () => {} },
+      strip: { show: () => {}, hide: () => {} },
+    } as unknown as PlacementKit;
+    armEntityMovePick(kit, { kind, id, name: 'X', x: 0, z: 0 }, run);
+    confirm!({ x1: x, z1: z, x2: x, z2: z });
+  }
 
-  it('reads the LATCHED aim, not the live hover, and warns when there is no target', () => {
-    const handler = mainTs.slice(mainTs.indexOf("case 'move_here':"));
-    const body = handler.slice(0, handler.indexOf("case 'upgrade':"));
-    // Must be `aim`, never `hover`. The live hover is cleared by the
-    // canvas mouseleave that firing this very button necessarily causes, so
-    // reading it made the action impossible with a real mouse. This assertion
-    // originally required `hover` and so locked the bug in.
-    expect(body).toContain('scenePicking.aim?.terrain');
-    expect(body).not.toContain('scenePicking.hover?.terrain');
-    expect(body).toContain("t('inspector.no_move_target')");
-    expect(body).toContain("severity: 'warn'");
+  it('the employee pick confirms as `employee dispatch <id> x:<x> z:<z>`', () => {
+    let command = '';
+    confirmAt('employee', 4, 12, 7, c => { command = c; });
+    expect(command).toBe('employee dispatch 4 x:12 z:7');
   });
 
   it('the dispatched string is accepted by the real vehicle command parser and moves the vehicle', () => {
@@ -396,10 +416,8 @@ describe('Inspector move_here — the command src/main.ts dispatches', () => {
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     vehicle.occupantIds = [employee.id];
 
-    const command = extractTemplate()
-      .replace('${entity.id}', String(vehicle.id))
-      .replace('${terrain.tileX}', '12')
-      .replace('${terrain.tileZ}', '7');
+    let command = '';
+    confirmAt('vehicle', vehicle.id, 12, 7, c => { command = c; });
     expect(command).toBe(`vehicle reposition ${vehicle.id} 12 7`);
 
     const result = runner.run(command);
