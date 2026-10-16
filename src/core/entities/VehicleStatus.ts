@@ -11,6 +11,8 @@ import type { Vehicle, VehicleTask, VehicleState } from './Vehicle.js';
 import { getVehicleReservation } from './Vehicle.js';
 import type { Employee } from './Employee.js';
 import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
+import type { ActionType, BlockedOrderReason, PendingAction } from '../state/GameState.js';
+import type { Itinerary } from '../engine/Itinerary.js';
 
 export type VehicleStatusKind = 'broken' | 'stuck' | 'waiting' | 'hauling' | 'working' | 'moving' | 'idle';
 
@@ -67,4 +69,39 @@ export function computeVehicleStatus(v: Vehicle, vehicleState: VehicleState, occ
   if (occupant.taskTicksRemaining !== null) return { ...IDLE, kind: 'working', task: VEHICLE_ROLE_ARRIVAL_TASK[v.type] };
   if (occupant.itinerary !== null) return { ...IDLE, kind: 'moving' };
   return IDLE;
+}
+
+/** What a vehicle's job is aimed at (#1761). */
+export type VehicleJobTarget =
+  | { kind: 'fragment'; id: number }
+  | { kind: 'hole'; id: string }
+  | { kind: 'building' | 'vehicle'; id: number };
+
+/** The job a vehicle is serving: action, target, destination and ETA (#1761). */
+export interface VehicleJob {
+  actionType: ActionType | null;
+  target: VehicleJobTarget | null;
+  destination: { x: number; z: number; buildingId: number | null } | null;
+  etaTicks: number | null;
+  blockedReason: BlockedOrderReason | null;
+}
+
+/** Job a vehicle currently serves, read off its reservation, occupant and pending actions. */
+export function computeVehicleJob(
+  v: Vehicle,
+  vehicleState: VehicleState,
+  pendingActions: readonly PendingAction[],
+  occupant?: Employee,
+  cargoWarehouseId?: number | null,
+): VehicleJob {
+  void v; void vehicleState; void pendingActions; void occupant; void cargoWarehouseId;
+  // TODO: implement
+  return { actionType: null, target: null, destination: null, etaTicks: null, blockedReason: null };
+}
+
+/** Ticks left on an itinerary from the vehicle's current position. */
+export function vehicleEtaTicks(v: Pick<Vehicle, 'x' | 'z' | 'type' | 'tier'>, itinerary: Itinerary): number {
+  void v; void itinerary;
+  // TODO: implement
+  return 0;
 }

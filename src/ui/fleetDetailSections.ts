@@ -12,6 +12,8 @@ import { getBuildingDef, type BuildingType, type BuildingTier } from '../core/en
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { computeVehicleStatus, type VehicleStatus } from '../core/entities/VehicleStatus.js';
+import type { PendingAction } from '../core/state/GameState.js';
+import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { rosterCanDriveVehicleTier } from '../core/entities/VehicleUpgrade.js';
 
 export function vehicleDisplayName(type: Vehicle['type'], tier: VehicleTier): string {
@@ -105,7 +107,7 @@ function makeDriveIconRow(label: string, color: string): HTMLElement {
  * ArrivalGate/VehicleReservation, so there is no unassign control here
  * anymore.
  */
-export function makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
+export function makeDriverRow(v: Vehicle, state: GameState, _link?: (employeeId: number) => void): HTMLElement {
   const driverId = vehicleDriverId(v);
   const driver = state.employees.employees.find(e => e.id === driverId);
   return makeDriveIconRow(driver?.name ?? `#${driverId}`, 'var(--bsx-text-secondary)');
@@ -119,7 +121,7 @@ export function makeDriverRow(v: Vehicle, state: GameState): HTMLElement {
  * claimed the vehicle yet. No unassign control: cancelling an in-progress
  * walk has no console command today, only display.
  */
-export function makePendingDriverRow(employee: Employee): HTMLElement {
+export function makePendingDriverRow(employee: Employee, _link?: (employeeId: number) => void): HTMLElement {
   return makeDriveIconRow(t('ui.fleet.walking_to_board', { name: employee.name }), 'var(--bsx-text-micro)');
 }
 
@@ -135,7 +137,7 @@ export function makePendingDriverRow(employee: Employee): HTMLElement {
  * The check is roster-wide licence ownership, not claim state — there is no
  * picker left to keep honest, unlike the old canBoardVehicle-based filter.
  */
-export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => void): HTMLElement {
+export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => void, _link?: (employeeId: number) => void): HTMLElement {
   const licence = ROLE_LICENCE_REQUIRED[v.type];
   const anyLicensed = rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier);
 
@@ -151,4 +153,60 @@ export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => 
   }
 
   return makeDriveIconRow(t('ui.fleet.unmanned'), 'var(--bsx-text-micro)');
+}
+
+/** Whether a vehicle upgrade is available and affordable (#1761). */
+export interface UpgradeState {
+  available: boolean;
+  affordable: boolean;
+  cost: number | null;
+}
+
+export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number): UpgradeState {
+  void v; void cash;
+  // TODO: implement
+  return { available: false, affordable: false, cost: null };
+}
+
+/** Licence warning key + params, null when a licensed driver exists. */
+export interface LicenceWarning {
+  key: string;
+  params: Record<string, string | number>;
+}
+
+export function licenceWarning(v: Pick<Vehicle, 'type' | 'tier'>, employees: readonly Employee[]): LicenceWarning | null {
+  void v; void employees;
+  // TODO: implement
+  return null;
+}
+
+/** Confirm-modal config for scrapping a vehicle; `run` receives the console command. */
+export function scrapConfirmConfig(v: Vehicle, run: (command: string) => void): ConfirmModalConfig {
+  void v; void run;
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+export type DriverState =
+  | { kind: 'driver'; employee: Employee }
+  | { kind: 'pending'; employee: Employee }
+  | { kind: 'unmanned' }
+  | { kind: 'no_licensed' };
+
+export function driverState(v: Vehicle, state: GameState): DriverState {
+  void v; void state;
+  // TODO: implement
+  return { kind: 'unmanned' };
+}
+
+/** Repair progress for a vehicle: the queued/active repair action, if any. */
+export interface RepairState {
+  action: PendingAction | null;
+  needsRepair: boolean;
+}
+
+export function repairState(v: Pick<Vehicle, 'id' | 'hp'>, actions: readonly PendingAction[]): RepairState {
+  void v; void actions;
+  // TODO: implement
+  return { action: null, needsRepair: false };
 }
