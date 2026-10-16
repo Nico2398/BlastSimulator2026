@@ -43,6 +43,22 @@ const AUTO_SLOTS: ReadonlyMap<string, { nameKey: string; emptyKey: string }> = n
 const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
   + 'background:repeating-linear-gradient(135deg,#2a3038 0 6px,#1d232b 6px 12px)';
 
+/** Text telling the player what leaving the live game costs: age of its auto-save, or that none exists. */
+export async function autosaveLossText(
+  backend: SaveBackend | null,
+  levelId: string | null | undefined,
+): Promise<string> {
+  if (!backend) return t('ui.settings.return_confirm_body_none');
+  try {
+    const metas = await backend.list();
+    const auto = metas.find(m => m.slotId === autoSaveSlotFor(levelId));
+    if (!auto) return t('ui.settings.return_confirm_body_none');
+    return t('ui.settings.return_confirm_body', { time: relativeTime(auto.timestamp) });
+  } catch {
+    return t('ui.settings.return_confirm_body_none');
+  }
+}
+
 export function relativeTime(timestampMs: number): string {
   const minutes = Math.floor((Date.now() - timestampMs) / 60000);
   if (minutes < 1) return t('ui.saves.ago_now');
