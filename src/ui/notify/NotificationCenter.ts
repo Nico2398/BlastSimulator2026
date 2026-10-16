@@ -222,8 +222,8 @@ export class NotificationCenter {
     const queuedBlocked = state.pendingActions.filter(
       a => a.status === 'queued' && a.blockedReason != null,
     );
-    const strandedCount = queuedBlocked.filter(a => a.blockedReason === 'debris_out_of_reach').length;
-    const blockedActions = queuedBlocked.filter(a => a.blockedReason !== 'debris_out_of_reach');
+    const strandedCount = queuedBlocked.filter(a => !isFailureBlock(a)).length;
+    const blockedActions = queuedBlocked.filter(isFailureBlock);
     // Hundreds of haul actions share one cause: toast once per reason, not per action.
     const haulActions = new Map<BlockedOrderReason, PendingAction>();
     for (const a of blockedActions) {
@@ -312,9 +312,8 @@ export class NotificationCenter {
 }
 
 /** True when the block is a failure the player must fix (vs. a stranded-debris wait) (#1810). */
-export function isFailureBlock(_action: Pick<PendingAction, 'blockedReason'>): boolean {
-  // TODO: implement
-  return false;
+export function isFailureBlock(action: Pick<PendingAction, 'blockedReason'>): boolean {
+  return action.blockedReason != null && action.blockedReason !== 'debris_out_of_reach';
 }
 
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
@@ -356,8 +355,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
     case 'debris_out_of_reach':
-      // Unreachable from update(): stranded debris is surfaced as one summary pip, not a per-order toast. Kept for exhaustiveness.
-      return t('notification.pip.stranded_debris_tip', { count: 1 });
+      // Not toasted from update() (one summary pip instead); the Operations panel shows it per order.
+      return t('notification.order_stranded_debris', { order });
     default:
       return order;
   }

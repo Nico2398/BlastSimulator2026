@@ -28,6 +28,7 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import { isFailureBlock, buildBlockedOrderMessage } from '../notify/NotificationCenter.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 
@@ -44,10 +45,16 @@ const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
 
 /** Counts queued work by block state: open (unblocked), blocked (failure), stranded (debris out of reach) (#1810). */
 export function countQueuedByBlock(
-  _actions: readonly Pick<PendingAction, 'status' | 'blockedReason'>[],
+  actions: readonly Pick<PendingAction, 'status' | 'blockedReason'>[],
 ): { open: number; blocked: number; stranded: number } {
-  // TODO: implement
-  return { open: 0, blocked: 0, stranded: 0 };
+  const counts = { open: 0, blocked: 0, stranded: 0 };
+  for (const a of actions) {
+    if (a.status !== 'queued') continue;
+    if (a.blockedReason == null) counts.open++;
+    else if (isFailureBlock(a)) counts.blocked++;
+    else counts.stranded++;
+  }
+  return counts;
 }
 
 export class OperationsPanel extends PanelBase {
@@ -136,13 +143,13 @@ export class OperationsPanel extends PanelBase {
       oreReport: state.lastOreReport,
       accidents: state.damage.accidents.length,
       injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
-      unclaimed: state.pendingActions.filter(a => a.status === 'queued').length,
+      unclaimed: state.pendingActions.filter(a => a.status === 'queued').map(a => `${a.id}:${a.blockedReason ?? ''}`),
       // Every live (non-rest) action's id/status/holder — so a claim or a
       // cancellation (#548) triggers a rebuild of the Work Queue section,
       // not just the count already covered by `unclaimed` above.
       workQueue: state.pendingActions
         .filter(a => a.type !== 'rest')
-        .map(a => `${a.id}:${a.status}:${a.holderId}`),
+        .map(a => `${a.id}:${a.status}:${a.holderId}:${a.blockedReason ?? ''}`),
       policy: state.sitePolicy.revision,
     });
     if (signature === this.lastSignature) return;
@@ -190,7 +197,10 @@ export class OperationsPanel extends PanelBase {
     // pool action repeating on every eligible idle employee's own row — the
     // new CrewPanel shows only an employee's own claimed activity, so this is
     // now the only place an unclaimed action is visible at all (#39).
-    const unclaimed = state.pendingActions.filter(a => a.status === 'queued').length;
+    const { open, blocked, stranded } = countQueuedByBlock(state.pendingActions);
+    const unclaimedNote = blocked + stranded > 0
+      ? t('ui.operations.unclaimed_work_note_blocked', { blocked, stranded })
+      : t('ui.operations.unclaimed_work_note');
 
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
@@ -198,7 +208,7 @@ export class OperationsPanel extends PanelBase {
       this.makeLogisticsRow(t('ui.operations.on_ground'), t('ui.operations.fragment_count', { count: counts.onGround }), t('ui.operations.mass_kg', { kg: Math.round(onGroundKg).toLocaleString('en-US') })),
       this.makeLogisticsRow(t('ui.operations.in_transit'), t('ui.operations.fragment_count', { count: counts.inTransit }), t('ui.operations.mass_kg', { kg: Math.round(inTransitKg).toLocaleString('en-US') })),
       this.makeLogisticsRow(t('ui.operations.stored'), `${Math.round(state.logistics.storedMassKg).toLocaleString('en-US')} / ${cap.toLocaleString('en-US')} kg`, t('ui.operations.storage_pct', { pct: storedPct })),
-      this.makeLogisticsRow(t('ui.operations.unclaimed_work'), t('ui.operations.unclaimed_work_count', { count: unclaimed }), t('ui.operations.unclaimed_work_note')),
+      this.makeLogisticsRow(t('ui.operations.unclaimed_work'), t('ui.operations.unclaimed_work_count', { count: open }), unclaimedNote),
     );
     return wrap;
   }
@@ -242,6 +252,13 @@ export class OperationsPanel extends PanelBase {
     const row = el('div');
     row.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)';
 
+    const queuedBlocked = action.status === 'queued' && action.blockedReason != null;
+    const statusChip = queuedBlocked
+      ? (isFailureBlock(action)
+        ? chip(t('ui.operations.work_queue_status_blocked'), 'warn')
+        : chip(t('ui.operations.work_queue_status_stranded'), 'neutral'))
+      : chip(t(WORK_QUEUE_STATUS_KEY[action.status]), action.status === 'in_progress' ? 'info' : 'neutral');
+
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
     headRow.append(
       el('span', { text: t(ACTION_LABEL_KEY[action.type]), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
@@ -250,7 +267,7 @@ export class OperationsPanel extends PanelBase {
         className: 'bsx-mono',
         attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
       }),
-      chip(t(WORK_QUEUE_STATUS_KEY[action.status]), action.status === 'in_progress' ? 'info' : 'neutral'),
+      statusChip,
     );
 
     const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
@@ -263,7 +280,14 @@ export class OperationsPanel extends PanelBase {
       cancelBtn,
     );
 
-    row.append(headRow, footRow);
+    row.append(headRow);
+    if (queuedBlocked) {
+      row.append(el('span', {
+        text: buildBlockedOrderMessage(action),
+        attrs: { 'data-blocked-reason': action.blockedReason as string, style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+      }));
+    }
+    row.append(footRow);
     return row;
   }
 
