@@ -441,6 +441,7 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     function armRampOver(endGround: number | null) {
       const { kit, controller, strip } = makeMockKit();
       menu.setPlacementKit(kit);
+      menu.update(makeMockState({ cash: 1_000_000 })); // Confirm needs cash for the ramp's cost
       if (endGround !== null) menu.setSurfaceHeightSampler((_x, z) => (z >= 20 ? endGround : 15));
       container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!.click();
       controller.simulateSelect({ x1: 5, z1: 5, x2: 5, z2: 25 });
