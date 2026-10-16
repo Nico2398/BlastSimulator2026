@@ -31,7 +31,7 @@ import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues, releaseDeadHoldersActions } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
-import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags } from '../entities/Building.js';
+import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags, getStorageCapacity } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
 import { getBedCapacity } from '../entities/BuildingWellbeing.js';
 import { tickNeedGauges, needsMoraleEffect, computeCrewFatigueStrain } from '../entities/EmployeeNeeds.js';
@@ -47,7 +47,7 @@ import {
   employeeWorkState,
   BASE_TICK_MS,
 } from './GameLoop.js';
-import { onGroundMassKg } from '../economy/Logistics.js';
+import { onGroundMassKg, syncLogisticsCapacity } from '../economy/Logistics.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
@@ -174,7 +174,10 @@ export function runTick(
 
   // 0a. Event modifiers (#1414) — lapsed ones drop, recurring charges and morale drift apply
   tickModifiers(state);
-  syncBuildingServiceFlags(state.buildings.buildings, outOfServiceIds(state.events.activeModifiers, 'building', state.tickCount));
+  if (syncBuildingServiceFlags(state.buildings.buildings, outOfServiceIds(state.events.activeModifiers, 'building', state.tickCount))) {
+    // A closure started or ended: pooled warehouse capacity follows operating state
+    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+  }
 
   // 0. Weather — own persisted rng stream, advanced before events read it; a forced
   // weather overrides the result without drawing from that stream

@@ -8,7 +8,6 @@
 // concept) isn't available in core.
 
 import { getStorageCapacity } from '../entities/Building.js';
-import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
@@ -56,12 +55,13 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
 
 /**
  * Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move).
- * Stock is lost only on destruction: a warehouse demolished for an upgrade keeps its id through
- * the planned rebuild order, so its stock survives until the rebuilt building takes it back.
+ * Stock survives by existence, capacity by operating state: every freight warehouse in the game keeps
+ * its stock whether or not it is operating, and a warehouse demolished for an upgrade keeps its id
+ * through the planned rebuild order. Capacity (operating warehouses only) comes from getStorageCapacity.
  */
 export function refreshLogisticsCapacity(state: GameState): WarehouseLoss[] {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
-  const liveIds = new Set(freightWarehouseSites(state.buildings).map(s => s.id));
+  const liveIds = new Set(state.buildings.buildings.filter(b => b.type === 'freight_warehouse').map(b => b.id));
   for (const pb of state.plannedBuildings) liveIds.add(pb.buildingId);
   return loseOrphanedStock(state.logistics, state.collectedOre, liveIds);
 }

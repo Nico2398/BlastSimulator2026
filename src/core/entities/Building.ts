@@ -211,10 +211,14 @@ export function isOperating(b: Pick<Building, 'active' | 'outOfService'>): boole
  * Returns true when any building's flag flipped.
  */
 export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): boolean {
-  // TODO: implement
-  void buildings;
-  void closed;
-  return false;
+  let flipped = false;
+  for (const b of buildings) {
+    const shut = closed.has(b.id);
+    if (shut !== !!b.outOfService) flipped = true;
+    if (shut) b.outOfService = true;
+    else delete b.outOfService;
+  }
+  return flipped;
 }
 
 // ── People capacity (#1202) ──
