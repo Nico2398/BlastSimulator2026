@@ -15,16 +15,22 @@ export function liveValue(row: HTMLElement): HTMLElement {
   return row.lastElementChild as HTMLElement;
 }
 
-/** Label + value row whose value is rewritten in place by `setLive` (key = `data-live`). */
-export function liveRow(label: string, key: string, text: string): HTMLElement {
+/** Plain label + value row (value may be a node, e.g. a link). */
+export function valueRow(label: string, value: string | HTMLElement): HTMLElement {
   const row = el('div', { className: 'bsx-mono' });
   row.style.cssText = 'display:flex;justify-content:space-between;gap:8px;font-size:11px';
   const labelEl = el('span', { text: label });
   labelEl.style.color = 'var(--bsx-text-muted)';
+  row.append(labelEl, typeof value === 'string' ? el('span', { text: value }) : value);
+  return row;
+}
+
+
+/** Label + value row whose value is rewritten in place by `setLive` (key = `data-live`). */
+export function liveRow(label: string, key: string, text: string): HTMLElement {
   const value = el('span', { text });
   value.dataset['live'] = key;
-  row.append(labelEl, value);
-  return row;
+  return valueRow(label, value);
 }
 
 /** The descendant of `root` tagged `data-live="key"`, or null. */
@@ -89,6 +95,11 @@ export function sectionOf(label: string, rows: (HTMLElement | null)[]): HTMLElem
  */
 function contentHtml(node: Element): string {
   const clone = node.cloneNode(true) as Element;
+  // Live values are written in place by syncSection; they are not structure.
+  for (const live of Array.from(clone.querySelectorAll('[data-live]'))) {
+    live.textContent = '';
+    live.removeAttribute('style');
+  }
   for (const cls of [ALLOWED_CLASS, HIGHLIGHT_CLASS]) {
     for (const marked of [clone, ...Array.from(clone.querySelectorAll(`.${cls}`))]) {
       marked.classList.remove(cls);
@@ -106,6 +117,15 @@ export function syncSection(root: HTMLElement, className: string, build: () => H
   next.classList.add(className);
   if (!current) root.append(next);
   else if (contentHtml(current) !== contentHtml(next)) current.replaceWith(next);
+  else {
+    for (const live of Array.from(next.querySelectorAll<HTMLElement>('[data-live]'))) {
+      const key = live.dataset['live'];
+      if (key === undefined) continue;
+      const node = setLive(current as HTMLElement, key, live.textContent ?? '');
+      const style = live.getAttribute('style');
+      if (node && style !== null && node.getAttribute('style') !== style) node.setAttribute('style', style);
+    }
+  }
 }
 
 /** A LinkFactory whose links select entities through `links`. */

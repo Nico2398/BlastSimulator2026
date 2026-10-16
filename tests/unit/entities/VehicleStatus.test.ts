@@ -209,3 +209,220 @@ describe('computeVehicleStatus — occupant-derived working/moving', () => {
     expect(status.task).toBe(VEHICLE_ROLE_ARRIVAL_TASK['debris_hauler']);
   });
 });
+
+// ── #1761: computeVehicleJob / vehicleEtaTicks ──
+
+import { computeVehicleJob, vehicleEtaTicks } from '../../../src/core/entities/VehicleStatus.js';
+import type { PendingAction, ActionType } from '../../../src/core/state/GameState.js';
+import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
+
+function makeAction(id: number, type: ActionType, payload: Record<string, unknown>, overrides: Partial<PendingAction> = {}): PendingAction {
+  return {
+    id, type, requiredSkill: null, requiredVehicleRole: null,
+    targetX: 0, targetZ: 0, targetY: 0, payload, targetEmployeeId: null,
+    status: 'assigned', holderId: null, queuedAtTick: 0,
+    ...overrides,
+  };
+}
+
+function driveItinerary(destX: number, destZ: number, extra: Partial<Itinerary> = {}): Itinerary {
+  return {
+    legs: [{ mode: 'drive', vehicleId: 1, destX, destZ, arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 100 }],
+    goal: { kind: 'work', actionId: 10 },
+    workTicks: 0,
+    estTotalTicks: 100,
+    ...extra,
+  };
+}
+
+describe('vehicleEtaTicks', () => {
+  const speed = getVehicleDefByTier('debris_hauler', 1).speed;
+
+  it('is the remaining distance over the tier speed for a single drive leg', () => {
+    const v = makeVehicle({ x: 0, z: 0 });
+    const eta = vehicleEtaTicks(v, driveItinerary(300, 0));
+    expect(eta).toBeGreaterThanOrEqual(Math.floor(300 / speed));
+    expect(eta).toBeLessThanOrEqual(Math.ceil(300 / speed) + 1);
+  });
+
+  it('strictly decreases as the vehicle nears the leg destination', () => {
+    const it = driveItinerary(300, 0);
+    const far = vehicleEtaTicks(makeVehicle({ x: 0, z: 0 }), it);
+    const mid = vehicleEtaTicks(makeVehicle({ x: 90, z: 0 }), it);
+    const near = vehicleEtaTicks(makeVehicle({ x: 210, z: 0 }), it);
+    expect(far).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(near);
+  });
+
+  it('is at most the work ticks once the vehicle sits on the destination', () => {
+    const it = driveItinerary(40, 40, { workTicks: 5 });
+    const arrived = vehicleEtaTicks(makeVehicle({ x: 40, z: 40 }), it);
+    expect(arrived).toBeLessThanOrEqual(5);
+    expect(arrived).toBeGreaterThanOrEqual(0);
+  });
+
+  it('adds the ticks of the legs that follow the current one', () => {
+    const single = driveItinerary(300, 0);
+    const twoLegs: Itinerary = {
+      ...single,
+      legs: [...single.legs, { mode: 'drive', vehicleId: 1, destX: 300, destZ: 60, arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 20 }],
+    };
+    const v = makeVehicle({ x: 0, z: 0 });
+    expect(vehicleEtaTicks(v, twoLegs)).toBeGreaterThan(vehicleEtaTicks(v, single));
+  });
+
+  it('is never negative', () => {
+    const v = makeVehicle({ x: 500, z: 500 });
+    expect(vehicleEtaTicks(v, driveItinerary(500, 500))).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('computeVehicleJob', () => {
+  function haulState(vehicle: Vehicle, action: PendingAction) {
+    const vs = createVehicleState();
+    vs.vehicles.push(vehicle);
+    reserveVehicle(vs, vehicle.id, action.id);
+    return vs;
+  }
+
+  it('is empty for an idle vehicle with no occupant and nothing pending', () => {
+    const vs = createVehicleState();
+    const job = computeVehicleJob(makeVehicle(), vs, []);
+    expect(job).toEqual({ actionType: null, target: null, destination: null, etaTicks: null, blockedReason: null });
+  });
+
+  it('is empty for a broken vehicle', () => {
+    const v = makeVehicle({ hp: 0 });
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const vs = haulState(v, action);
+    const job = computeVehicleJob(v, vs, [action], makeOccupant({ itinerary: driveItinerary(30, 0) }));
+    expect(job.actionType).toBeNull();
+    expect(job.target).toBeNull();
+    expect(job.destination).toBeNull();
+    expect(job.etaTicks).toBeNull();
+  });
+
+  it('an empty hauler heads for its fragment: fragment target, no building at the destination', () => {
+    const v = makeVehicle({ x: 0, z: 0, cargo: [] });
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const vs = haulState(v, action);
+    const occupant = makeOccupant({ itinerary: driveItinerary(30, 12) });
+    const job = computeVehicleJob(v, vs, [action], occupant);
+    expect(job.actionType).toBe('haul_debris');
+    expect(job.target).toEqual({ kind: 'fragment', id: 5 });
+    expect(job.destination).toEqual({ x: 30, z: 12, buildingId: null });
+    expect(job.etaTicks).toBeGreaterThan(0);
+    expect(job.blockedReason).toBeNull();
+  });
+
+  it('a loaded hauler heads for the reserved warehouse, named by buildingId', () => {
+    const v = makeVehicle({ x: 0, z: 0, cargo: [{ fragmentId: 5, massKg: 800 }] });
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const vs = haulState(v, action);
+    const occupant = makeOccupant({ itinerary: driveItinerary(60, 4) });
+    const job = computeVehicleJob(v, vs, [action], occupant, 7);
+    expect(job.destination).toEqual({ x: 60, z: 4, buildingId: 7 });
+    expect(job.etaTicks).toBeGreaterThan(0);
+  });
+
+  it('hauler ETA counts down as the vehicle drives toward the destination', () => {
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const itinerary = driveItinerary(300, 0);
+    const etaAt = (x: number) => {
+      const v = makeVehicle({ x, cargo: [{ fragmentId: 5, massKg: 800 }] });
+      return computeVehicleJob(v, haulState(v, action), [action], makeOccupant({ itinerary }), 7).etaTicks!;
+    };
+    expect(etaAt(0)).toBeGreaterThan(etaAt(90));
+    expect(etaAt(90)).toBeGreaterThan(etaAt(210));
+  });
+
+  it('has no destination and no ETA without an itinerary', () => {
+    const v = makeVehicle({ cargo: [{ fragmentId: 5, massKg: 800 }] });
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const job = computeVehicleJob(v, haulState(v, action), [action], makeOccupant({ itinerary: null }), 7);
+    expect(job.destination).toBeNull();
+    expect(job.etaTicks).toBeNull();
+  });
+
+  it('a fragmenter on a fragment_debris order targets that fragment', () => {
+    const v = makeVehicle({ id: 2, type: 'rock_fragmenter' });
+    const action = makeAction(11, 'fragment_debris', { fragmentId: 9 });
+    const job = computeVehicleJob(v, haulState(v, action), [action], makeOccupant({ taskTicksRemaining: 4 }));
+    expect(job.actionType).toBe('fragment_debris');
+    expect(job.target).toEqual({ kind: 'fragment', id: 9 });
+  });
+
+  it('a working drill rig targets its hole and reports the task ticks left as ETA', () => {
+    const v = makeVehicle({ id: 3, type: 'drill_rig' });
+    const action = makeAction(12, 'drill_hole', { holeId: 'h-3' });
+    const job = computeVehicleJob(v, haulState(v, action), [action], makeOccupant({ taskTicksRemaining: 14, itinerary: null }));
+    expect(job.actionType).toBe('drill_hole');
+    expect(job.target).toEqual({ kind: 'hole', id: 'h-3' });
+    expect(job.etaTicks).toBe(14);
+  });
+
+  it('a charging truck targets the hole of its charge order', () => {
+    const v = makeVehicle({ id: 4, type: 'charging_truck' });
+    const action = makeAction(13, 'charge_hole', { holeId: 'h-8' });
+    const job = computeVehicleJob(v, haulState(v, action), [action], makeOccupant({ taskTicksRemaining: 3 }));
+    expect(job.target).toEqual({ kind: 'hole', id: 'h-8' });
+  });
+
+  it('a building destroyer targets the building it demolishes', () => {
+    const v = makeVehicle({ id: 5, type: 'building_destroyer' });
+    const action = makeAction(14, 'demolish_building', { buildingId: 21 });
+    const job = computeVehicleJob(v, haulState(v, action), [action], makeOccupant({ taskTicksRemaining: 3 }));
+    expect(job.actionType).toBe('demolish_building');
+    expect(job.target).toEqual({ kind: 'building', id: 21 });
+  });
+
+  it('a stuck vehicle keeps its job target', () => {
+    const v = makeVehicle({ cargo: [] });
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const occupant = makeOccupant({ isMoveStuck: true, moveConsecutiveFailures: 6, itinerary: driveItinerary(30, 0) });
+    const job = computeVehicleJob(v, haulState(v, action), [action], occupant);
+    expect(job.target).toEqual({ kind: 'fragment', id: 5 });
+  });
+
+  it('a waiting vehicle keeps its job target and carries no blocked reason', () => {
+    const v = makeVehicle({ cargo: [] });
+    const action = makeAction(10, 'haul_debris', { fragmentId: 5 });
+    const occupant = makeOccupant({ vehicleWaitingTicks: 3, itinerary: driveItinerary(30, 0) });
+    const job = computeVehicleJob(v, haulState(v, action), [action], occupant);
+    expect(job.target).toEqual({ kind: 'fragment', id: 5 });
+    expect(job.blockedReason).toBeNull();
+  });
+
+  it('a moving vehicle with a reposition goal has a destination and ETA but no action or target', () => {
+    const v = makeVehicle({ x: 0, z: 0 });
+    const vs = createVehicleState();
+    const occupant = makeOccupant({ itinerary: makeItinerary() });
+    const job = computeVehicleJob(v, vs, [], occupant);
+    expect(job.actionType).toBeNull();
+    expect(job.target).toBeNull();
+    expect(job.destination).toEqual({ x: 9, z: 9, buildingId: null });
+    expect(job.etaTicks).toBeGreaterThan(0);
+  });
+
+  it('an idle hauler reports the reason when a queued haul order for its role is blocked', () => {
+    const v = makeVehicle();
+    const blocked = makeAction(15, 'haul_debris', { fragmentId: 5 }, {
+      status: 'queued', requiredVehicleRole: 'debris_hauler', blockedReason: 'no_licensed_driver',
+    });
+    const job = computeVehicleJob(v, createVehicleState(), [blocked]);
+    expect(job.blockedReason).toBe('no_licensed_driver');
+  });
+
+  it('ignores a blocked order that needs a different vehicle role', () => {
+    const v = makeVehicle();
+    const blocked = makeAction(15, 'drill_hole', { holeId: 'h' }, {
+      status: 'queued', requiredVehicleRole: 'drill_rig', blockedReason: 'no_vehicle_in_fleet',
+    });
+    expect(computeVehicleJob(v, createVehicleState(), [blocked]).blockedReason).toBeNull();
+  });
+
+  it('reports no blocked reason when no pending order is blocked', () => {
+    const queued = makeAction(15, 'haul_debris', { fragmentId: 5 }, { status: 'queued', requiredVehicleRole: 'debris_hauler' });
+    expect(computeVehicleJob(makeVehicle(), createVehicleState(), [queued]).blockedReason).toBeNull();
+  });
+});

@@ -87,6 +87,21 @@ export function accumulateOreMass(
 }
 
 /**
+ * Per-ore kg of `fragments` plus the barren remainder of `totalKg`, the shared reducer
+ * behind a warehouse's stock and a vehicle's cargo.
+ */
+export function sumOreMass(
+  fragments: Iterable<{ volume: number; oreDensities: Record<string, number> }>,
+  totalKg: number,
+): { oreKg: Record<string, number>; barrenKg: number } {
+  const oreKg: Record<string, number> = {};
+  for (const f of fragments) accumulateOreMass(oreKg, f.volume, f.oreDensities);
+  let oreSum = 0;
+  for (const kg of Object.values(oreKg)) oreSum += kg;
+  return { oreKg, barrenKg: Math.max(0, totalKg - oreSum) };
+}
+
+/**
  * Subtract from `collectedOre` the exact ore-kg every ore carries in a
  * fragment slice of `volume` m³. Returns the per-ore breakdown removed.
  */

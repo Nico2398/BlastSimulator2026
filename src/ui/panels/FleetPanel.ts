@@ -27,13 +27,13 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
-import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
+import { getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment.js';
-import { canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
+import { nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverBlock, upgradeState, upgradeDisabledReason, scrapConfirmConfig } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { PlacementKit } from '../scene/PlacementKit.js';
@@ -307,33 +307,7 @@ export class FleetPanel extends PanelBase {
     const load = makeLoadGauge(v);
     if (load) rows.push(this.tag(load, 'bs-fleet-load'));
 
-    // The driver seat stays empty for a driver's whole walk to the vehicle
-    // (only the board arrival step fills it), so a pending claim needs its
-    // own row — falling through to makeNoDriverRow would re-offer the vehicle
-    // as driverless even though someone's already en route to it (#715).
-    const driverId = vehicleDriverId(v);
-    const pendingDriver = driverId === null
-      ? state.employees.employees.find(e => e.pendingDriverVehicleId === v.id)
-      : undefined;
-    rows.push(
-      driverId !== null
-        ? makeDriverRow(v, state)
-        : pendingDriver
-          ? makePendingDriverRow(pendingDriver)
-          : makeNoDriverRow(v, state, () => this.onNavigateCb?.('crew')),
-    );
-
-    // Redundant when makeNoDriverRow already warns that nobody holds the role licence.
-    const roleWarningShown = driverId === null && !pendingDriver
-      && !rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier);
-    const nextTier = nextVehicleTier(v.tier);
-    if (!roleWarningShown && nextTier !== null && !rosterCanDriveVehicleTier(state.employees.employees, v.type, nextTier)) {
-      rows.push(el('div', {
-        text: t('ui.fleet.upgrade_licence_warning'),
-        className: 'bs-fleet-upgrade-warning',
-        attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' },
-      }));
-    }
+    rows.push(...makeDriverBlock(v, state, { onGoToCrew: () => this.onNavigateCb?.('crew') }));
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
     actions.appendChild(this.makeRepositionButton(v, state));
@@ -418,15 +392,10 @@ export class FleetPanel extends PanelBase {
 
   private applyUpgradeState(btn: HTMLButtonElement, v: Vehicle, cash: number): void {
     const next = nextVehicleTier(v.tier);
-    const cost = computeVehicleUpgradeCost(v.type, v.tier);
-    let reason: string | null = null;
-    let label = t('ui.fleet.upgrade');
-    if (next === null || cost === null) {
-      reason = t('ui.fleet.upgrade_max');
-    } else {
-      label = `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
-      if (!canAffordVehicleUpgrade(v, cash)) reason = t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
-    }
+    const upgrade = upgradeState(v, cash);
+    const reason = upgradeDisabledReason(upgrade);
+    const { cost } = upgrade;
+    const label = cost === null ? t('ui.fleet.upgrade') : `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
     // button() builds [icon][label span]; patch only the label span so the icon survives.
     const labelEl = btn.lastElementChild;
     if (labelEl) labelEl.textContent = label;
@@ -438,13 +407,6 @@ export class FleetPanel extends PanelBase {
 
   /** destroyVehicle removes the vehicle outright — no reversal — so scrap always confirms first, with the real residual credit shown up front. */
   private requestScrap(v: Vehicle): void {
-    const residual = computeScrapResidualValue(v.type, v.tier, v.hp);
-    this.onConfirmRequestCb?.({
-      icon: 'trash',
-      title: t('ui.fleet.scrap_confirm_title'),
-      body: t('ui.fleet.scrap_confirm_body', { name: vehicleDisplayName(v.type, v.tier), amount: formatMoney(residual) }),
-      confirmLabel: t('ui.fleet.scrap'),
-      onConfirm: () => this.gameConsole?.(`vehicle scrap ${v.id}`),
-    });
+    this.onConfirmRequestCb?.(scrapConfirmConfig(v, cmd => this.gameConsole?.(cmd)));
   }
 }

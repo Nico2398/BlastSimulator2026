@@ -11,7 +11,7 @@ export type InspectorKind = EntityPick['kind'];
 
 /** Every action an Inspector button can fire; main.ts decides what each does. */
 export type InspectorAction =
-  | 'dispatch_here' | 'move_here' | 'upgrade_vehicle'
+  | 'dispatch_here' | 'move_here' | 'upgrade_vehicle' | 'scrap_vehicle'
   | 'upgrade' | 'move' | 'demolish' | 'widen' | 'locate' | 'research';
 
 /** One action button the Inspector renders for the current entity. */
@@ -34,6 +34,8 @@ export interface InspectorLinks {
   readonly run: (command: string) => void;
   /** Ask the shared confirm overlay. */
   readonly confirm: (config: ConfirmModalConfig) => void;
+  /** Open a panel (the Crew panel from a vehicle's "no licensed driver" row). */
+  readonly navigate?: (panel: 'crew') => void;
 }
 
 /** Everything the Inspector shows for one entity at one moment. */
