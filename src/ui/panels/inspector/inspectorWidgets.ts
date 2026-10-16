@@ -1,5 +1,6 @@
 /** Small DOM pieces shared by the per-kind Inspector content modules (#1756). */
 import { t } from '../../../core/i18n/I18n.js';
+import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { el, sectionHeader } from '../../dom.js';
 import type { InspectorKind, InspectorLinks } from './InspectorContent.js';
 import type { LinkFactory } from '../../crewDetailSections.js';
@@ -13,6 +14,24 @@ export function writeText(node: HTMLElement, text: string): void {
 /** The value node of a `liveRow`; `setLive` finds it by `data-live`. */
 export function liveValue(row: HTMLElement): HTMLElement {
   return row.lastElementChild as HTMLElement;
+}
+
+/** Set a data attribute on a node and return it, so a row can be tagged inline. */
+export function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
+  node.setAttribute(attr, value);
+  return node;
+}
+
+/** Localized mass in kilograms. */
+export function kgText(kg: number): string {
+  return t('inspector.vehicle.kg', { kg: formatMoney(kg) });
+}
+
+/** Vertical stack of a kind's sections inside the Inspector body. */
+export function detailBody(className: string): HTMLElement {
+  const body = el('div', { className });
+  body.style.cssText = 'display:flex;flex-direction:column;gap:11px';
+  return body;
 }
 
 /** Plain label + value row (value may be a node, e.g. a link). */

@@ -1,23 +1,16 @@
 /** Inspector content for hole selections (#1769). Facts only: charging and editing live in the Blast Workshop. */
 import { t } from '../../../core/i18n/I18n.js';
-import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { holeNumericId, type DrillHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import type { HoleCharge } from '../../../core/mining/ChargePlan.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { isHoleFlooded } from '../../../core/weather/WeatherEffects.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { el } from '../../dom.js';
 import type { KindContent } from './InspectorContent.js';
-import { kindLabel, noteLine, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
+import { detailBody, kgText, kindLabel, noteLine, sectionOf, syncSection, tagged, valueRow } from './inspectorWidgets.js';
 
 type ChargeKind = 'charged' | 'ordered' | 'none';
 type GroundKind = 'dry' | 'wet' | 'tubed';
-
-function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
-  node.setAttribute(attr, value);
-  return node;
-}
 
 /** The charge that applies and whether it is loaded: a loaded charge wins over an ordered one. */
 function chargeOf(holeId: string, state: GameState): { kind: ChargeKind; charge: HoleCharge | null } {
@@ -47,9 +40,9 @@ function buildChargeSection(holeId: string, state: GameState): HTMLElement {
   } else {
     if (kind === 'ordered') rows.push(noteLine(t('inspector.hole.charge_ordered')));
     rows.push(valueRow(t('inspector.hole.explosive'), explosiveName(charge.explosiveId)));
-    rows.push(valueRow(t('inspector.hole.charge_kg'), t('inspector.vehicle.kg', { kg: formatMoney(charge.amountKg) })));
+    rows.push(valueRow(t('inspector.hole.charge_kg'), kgText(charge.amountKg)));
     if ((charge.fromStockKg ?? 0) > 0) {
-      rows.push(tagged(valueRow(t('inspector.hole.from_stock'), t('inspector.vehicle.kg', { kg: formatMoney(charge.fromStockKg ?? 0) })), 'data-hole-from-stock'));
+      rows.push(tagged(valueRow(t('inspector.hole.from_stock'), kgText(charge.fromStockKg ?? 0)), 'data-hole-from-stock'));
     }
     rows.push(valueRow(t('inspector.hole.stemming'), t('inspector.depth_value', { depth: charge.stemmingM })));
   }
@@ -88,8 +81,7 @@ export const holeContent: KindContent = {
       status: t(ordered ? 'inspector.hole.state_ordered' : 'inspector.hole.state_drilled'),
       signature: `${hole.id}:${ordered ? 'ordered' : 'drilled'}:${chargeOf(hole.id, state).kind}`,
       get sections() {
-        const body = el('div', { className: 'bs-hole-detail' });
-        body.style.cssText = 'display:flex;flex-direction:column;gap:11px';
+        const body = detailBody('bs-hole-detail');
         for (const [className, make] of builders) {
           const node = make();
           node.classList.add(className);

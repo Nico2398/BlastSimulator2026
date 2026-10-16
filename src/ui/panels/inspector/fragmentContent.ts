@@ -1,26 +1,15 @@
 /** Inspector content for fragment selections (#1769). */
 import { t } from '../../../core/i18n/I18n.js';
 import { fragmentOreKg } from '../../../core/economy/FragmentOre.js';
-import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { isBarrenFragment } from '../../../core/economy/SpoilHeaps.js';
 import type { TrackedFragment } from '../../../core/economy/Logistics.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { buildingDisplayName, vehicleDisplayName } from '../../fleetDetailSections.js';
-import { el } from '../../dom.js';
 import type { InspectorLinks, KindContent } from './InspectorContent.js';
-import { entityLink, kindLabel, noteLine, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
+import { detailBody, entityLink, kgText, kindLabel, tagged, noteLine, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
 
 /** Ore rows below this mass are noise. */
 const MIN_ORE_ROW_KG = 0.5;
-
-function kgText(kg: number): string {
-  return t('inspector.vehicle.kg', { kg: formatMoney(kg) });
-}
-
-function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
-  node.setAttribute(attr, value);
-  return node;
-}
 
 /** Localized rock name, the raw id when the catalog has no entry. */
 function rockName(rockId: string): string {
@@ -102,8 +91,7 @@ export const fragmentContent: KindContent = {
       status: locationText(tracked),
       signature: `${tracked.state}:${tracked.vehicleId ?? ''}:${tracked.warehouseId ?? ''}`,
       get sections() {
-        const body = el('div', { className: 'bs-fragment-detail' });
-        body.style.cssText = 'display:flex;flex-direction:column;gap:11px';
+        const body = detailBody('bs-fragment-detail');
         for (const [, make] of sections()) body.append(make());
         return [body];
       },
