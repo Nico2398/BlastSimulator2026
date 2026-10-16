@@ -6,8 +6,7 @@
 // GameLoop.ts stays the single public surface for tick-orchestration callers.
 
 import type { GameState, ActionType } from '../state/GameState.js';
-import { gainXp, type Employee, type SkillCategory } from '../entities/Employee.js';
-import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
+import type { Employee, SkillCategory } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { repairHpThisTick, repairPartsCost } from '../entities/VehicleRepair.js';
@@ -16,7 +15,7 @@ import { workRate } from '../events/ActiveModifiers.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
 import { carveLevelColumnsStep } from '../mining/LevelGround.js';
-import type { TaskProgressLevelUp } from './TaskXp.js';
+import { awardTaskXp, isPhaseDrivenWorkTick, type TaskProgressLevelUp } from './TaskXp.js';
 
 export type { TaskProgressLevelUp };
 
@@ -83,6 +82,24 @@ function tickLevelWork(state: GameState, emp: Employee, ticksRemaining: number, 
 }
 
 /**
+ * XP for phase-driven work (#1833): haul/fragment drivers carry no taskTicksRemaining, so
+ * each mounted tick on a live itinerary earns the timed-work award. No timer, never completes.
+ */
+function tickPhaseDrivenWork(state: GameState, emp: Employee, emitter: EventEmitter | undefined): TaskProgressResult | null {
+  const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+  if (!isPhaseDrivenWorkTick(emp, action)) return null;
+  if (workRate(state.events.activeModifiers, emp.role, state.tickCount) <= 0) return null;
+  const { skill, leveledUp, levelUps, levelUpLevels } = awardTaskXp(state.employees, emp, action, emitter);
+  return {
+    completed: false,
+    leveledUp,
+    skill,
+    levelUps,
+    ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
+  };
+}
+
+/**
  * Advance an employee's dispatched task toward completion, granting XP and
  * reporting completion when taskTicksRemaining reaches zero. Mirrors
  * ShiftCycle.ts's completeRestTick shape for taskTicksRemaining instead of
@@ -94,7 +111,7 @@ function tickLevelWork(state: GameState, emp: Employee, ticksRemaining: number, 
  * (still walking to the target).
  */
 export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter, grid?: VoxelGrid): TaskProgressResult | null {
-  if (emp.taskTicksRemaining === null) return null;
+  if (emp.taskTicksRemaining === null) return tickPhaseDrivenWork(state, emp, emitter);
 
   // Event modifiers (#1414): a stoppage freezes the task, a slowdown lets only some ticks count
   // (the fraction left over carries to the next tick), a boost counts more than one.
@@ -159,31 +176,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
   }
 
   const action = state.pendingActions.find(a => a.id === emp.activeActionId);
-  const xpAwards = action ? computeTaskXpAwards(emp, action) : [];
-
-  let skill: SkillCategory | null = null;
-  let leveledUp = false;
-  let levelUpLevels: { oldLevel: 1 | 2 | 3 | 4 | 5; newLevel: 1 | 2 | 3 | 4 | 5 } | null = null;
-  const levelUps: TaskProgressLevelUp[] = [];
-
-  // computeTaskXpAwards returns 0, 1, or 2 awards (2 for a vehicle-gated
-  // action like drill_hole, which grants both the required skill and the
-  // driving licence for its required vehicle role in the same tick — #622).
-  // Aggregate across every award instead of letting a later iteration
-  // overwrite an earlier one's level-up, or a real level-up would go
-  // unreported whenever it isn't the last award processed.
-  for (const xpAward of xpAwards) {
-    if (skill === null) skill = xpAward.category;
-    const xpResult = gainXp(state.employees, emp.id, xpAward.category, xpAward.amount, emitter);
-    if (xpResult?.leveledUp) {
-      levelUps.push({ skill: xpAward.category, oldLevel: xpResult.oldLevel, newLevel: xpResult.newLevel });
-      if (!leveledUp) {
-        leveledUp = true;
-        skill = xpAward.category;
-        levelUpLevels = { oldLevel: xpResult.oldLevel, newLevel: xpResult.newLevel };
-      }
-    }
-  }
+  const { skill, leveledUp, levelUps, levelUpLevels } = awardTaskXp(state.employees, emp, action, emitter);
 
   let completed = false;
   let completedActionType: ActionType | undefined;
