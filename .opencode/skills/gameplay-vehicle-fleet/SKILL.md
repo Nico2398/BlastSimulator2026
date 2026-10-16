@@ -293,9 +293,9 @@ An owned vehicle moves up one tier in place (`src/core/entities/VehicleUpgrade.t
 
 - **Cost:** `purchaseCost(next tier) - purchaseCost(current tier)` (`computeVehicleUpgradeCost`, null at max). Refused with `console.insufficient_funds` when cash is short; booked as an `equipment` expense.
 - **Effect:** `upgradeVehicle` mutates only `tier` and `hp`; hp is set to the new tier's `maxHp` (full restore even when damaged). Id, position, reservation and occupants are kept, so it is allowed while reserved, driven or carrying.
-- **Entry points:** console `vehicle upgrade <id>`; Fleet panel card button (`data-action="upgrade"`, shows cost, disabled with a reason at tier 3 or short cash); Inspector `upgrade_vehicle` (distinct from the building `upgrade` action).
+- **Entry points:** console `vehicle upgrade <id>`; Inspector `upgrade_vehicle` action (shows cost, disabled with a reason at tier 3 or short cash; the Fleet panel rows carry no buttons since #1767, only Locate) (distinct from the building `upgrade` action).
 - **Upgrade vs scrap:** scrap sells at the 40% residual and the vehicle is gone; upgrade keeps the vehicle and pays only the difference, so it is the intended way up a tier.
-- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the card shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`, #1524).
+- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the Inspector shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`, #1524).
 
 ## Vehicle inspector job, ETA and running cost (#1761)
 

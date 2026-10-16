@@ -4,7 +4,7 @@
 // panel and only ever hits one leg of each of makeHpGauge's/makeLoadGauge's/
 // makeDriverRow's ternaries — this file targets the legs it misses.
 import { describe, it, expect } from 'vitest';
-import { makeHpGauge, makeLoadGauge, makeDriverRow, makeStatusChip } from '../../../src/ui/fleetDetailSections.js';
+import { makeHpGauge, makeLoadGauge, makeStatusChip, makeDriverNameLine } from '../../../src/ui/fleetDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
@@ -136,21 +136,6 @@ describe('fleetDetailSections — makeLoadGauge', () => {
   });
 });
 
-describe('fleetDetailSections — makeDriverRow', () => {
-  it('shows the real driver name when driverId matches a roster employee', () => {
-    const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const row = makeDriverRow(makeVehicle({ occupantIds: [6] }), state);
-    expect(row.textContent).toContain('Dorian Kask');
-  });
-
-  it('falls back to "#<driverId>" when no roster employee matches driverId', () => {
-    const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const row = makeDriverRow(makeVehicle({ occupantIds: [99] }), state);
-    expect(row.textContent).toContain('#99');
-    expect(row.textContent).not.toContain('Dorian Kask');
-  });
-});
-
 // ── makeStatusChip (#1138: vehicleState threads through to the reservation
 // lookup computeVehicleStatus's hauling branch needs) ──────────────────────
 
@@ -178,185 +163,57 @@ describe('fleetDetailSections — makeStatusChip', () => {
   });
 });
 
-// ── #1761: pieces shared by the Fleet card and the vehicle inspector ──
+// ── makeDriverNameLine (#1767): the Fleet row's one-line driver readout ──
 
-import { vi } from 'vitest';
-import {
-  upgradeState, licenceWarning, scrapConfirmConfig, driverState, repairState,
-  makePendingDriverRow, makeNoDriverRow, vehicleDisplayName,
-} from '../../../src/ui/fleetDetailSections.js';
-import { computeVehicleUpgradeCost } from '../../../src/core/entities/VehicleUpgrade.js';
-import { computeScrapResidualValue } from '../../../src/core/entities/Vehicle.js';
-import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { formatMoney } from '../../../src/core/economy/formatMoney.js';
-import { t } from '../../../src/core/i18n/I18n.js';
-
-function licensed(overrides: Partial<Employee> = {}, level: 1 | 2 | 3 = 1): Employee {
-  return makeEmployee({ qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: level }], ...overrides });
-}
-
-describe('fleetDetailSections — upgradeState', () => {
-  it('is available and affordable with enough cash, carrying the price difference', () => {
-    const cost = computeVehicleUpgradeCost('debris_hauler', 1)!;
-    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, cost)).toEqual({ available: true, affordable: true, cost });
+describe('fleetDetailSections — makeDriverNameLine', () => {
+  it('carries the bs-fleet-driver class hook', () => {
+    const line = makeDriverNameLine(makeVehicle(), []);
+    expect(line.classList.contains('bs-fleet-driver')).toBe(true);
   });
 
-  it('is available but unaffordable one dollar short', () => {
-    const cost = computeVehicleUpgradeCost('debris_hauler', 1)!;
-    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, cost - 1)).toEqual({ available: true, affordable: false, cost });
+  it('shows the driver name from the seat', () => {
+    const line = makeDriverNameLine(makeVehicle({ occupantIds: [6] }), [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
+    expect(line.textContent).toContain('Dorian Kask');
+    expect(line.textContent).not.toContain('Unmanned');
   });
 
-  it('is unavailable at the maximum tier, with no cost', () => {
-    expect(upgradeState({ type: 'debris_hauler', tier: 3 }, 9_999_999)).toEqual({ available: false, affordable: false, cost: null });
-  });
-});
-
-describe('fleetDetailSections — licenceWarning', () => {
-  it('warns when nobody on the roster can drive the next tier', () => {
-    const w = licenceWarning({ type: 'debris_hauler', tier: 1 }, [licensed({}, 1)]);
-    expect(w).not.toBeNull();
-    expect(w!.key).toBe('ui.fleet.upgrade_licence_warning');
+  it('shows the pending driver walking to the vehicle', () => {
+    const line = makeDriverNameLine(
+      makeVehicle({ id: 2 }),
+      [makeEmployee({ id: 8, name: 'Pip Walker', pendingDriverVehicleId: 2 })],
+    );
+    expect(line.textContent).toContain('Pip Walker');
   });
 
-  it('is null once a living employee holds the next tier licence', () => {
-    expect(licenceWarning({ type: 'debris_hauler', tier: 1 }, [licensed({}, 2)])).toBeNull();
+  it('ignores a pending walker bound for another vehicle', () => {
+    const line = makeDriverNameLine(
+      makeVehicle({ id: 2 }),
+      [makeEmployee({ id: 8, name: 'Pip Walker', pendingDriverVehicleId: 5 })],
+    );
+    expect(line.textContent).not.toContain('Pip Walker');
+    expect(line.textContent).toContain('Unmanned');
   });
 
-  it('ignores a dead licence holder', () => {
-    expect(licenceWarning({ type: 'debris_hauler', tier: 1 }, [licensed({ alive: false }, 3)])).not.toBeNull();
+  it('reads Unmanned (muted) with no driver and no pending walker', () => {
+    const line = makeDriverNameLine(makeVehicle(), [makeEmployee({ id: 6 })]);
+    expect(line.textContent).toContain('Unmanned');
+    expect(line.classList.contains('bs-fleet-driver')).toBe(true);
   });
 
-  it('is null at the maximum tier, where no upgrade exists', () => {
-    expect(licenceWarning({ type: 'debris_hauler', tier: 3 }, [])).toBeNull();
-  });
-});
-
-describe('fleetDetailSections — scrapConfirmConfig', () => {
-  it('names the vehicle and the residual value in the body', () => {
-    const v = makeVehicle({ hp: 60 });
-    const cfg = scrapConfirmConfig(v, () => {});
-    const residual = computeScrapResidualValue(v.type, v.tier, v.hp);
-    expect(cfg.title).toBe(t('ui.fleet.scrap_confirm_title'));
-    expect(cfg.body).toBe(t('ui.fleet.scrap_confirm_body', { name: vehicleDisplayName(v.type, v.tier), amount: formatMoney(residual) }));
-    expect(cfg.confirmLabel).toBe(t('ui.fleet.scrap'));
+  it('never warns or offers Train, even when nobody holds the licence', () => {
+    const line = makeDriverNameLine(makeVehicle({ type: 'drill_rig' }), []);
+    expect(line.textContent).toContain('Unmanned');
+    expect(line.textContent).not.toContain('Nobody is licensed');
+    expect(line.querySelector('button')).toBeNull();
   });
 
-  it('confirming runs the scrap console command for that vehicle', () => {
-    const run = vi.fn();
-    scrapConfirmConfig(makeVehicle({ id: 12 }), run).onConfirm();
-    expect(run).toHaveBeenCalledWith('vehicle scrap 12');
+  it('is plain text: no button even with a driver', () => {
+    const line = makeDriverNameLine(makeVehicle({ occupantIds: [6] }), [makeEmployee({ id: 6 })]);
+    expect(line.querySelector('button')).toBeNull();
   });
 
-  it('does not run anything until confirmed', () => {
-    const run = vi.fn();
-    scrapConfirmConfig(makeVehicle(), run);
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it('a wrecked vehicle shows a lower residual than a pristine one', () => {
-    const pristine = scrapConfirmConfig(makeVehicle({ hp: 100 }), () => {}).body;
-    const wrecked = scrapConfirmConfig(makeVehicle({ hp: 0 }), () => {}).body;
-    expect(wrecked).not.toBe(pristine);
-  });
-});
-
-describe('fleetDetailSections — driverState', () => {
-  it('is driver when an employee is aboard', () => {
-    const e = licensed({ id: 6, name: 'Dorian Kask' });
-    const state = makeState([], [e]);
-    const s = driverState(makeVehicle({ occupantIds: [6] }), state);
-    expect(s.kind).toBe('driver');
-    if (s.kind === 'driver') expect(s.employee.id).toBe(6);
-  });
-
-  it('is pending when an employee is walking to board this vehicle', () => {
-    const e = licensed({ id: 6, pendingDriverVehicleId: 1 });
-    const state = makeState([], [e]);
-    const s = driverState(makeVehicle({ id: 1 }), state);
-    expect(s.kind).toBe('pending');
-    if (s.kind === 'pending') expect(s.employee.id).toBe(6);
-  });
-
-  it('is unmanned when nobody drives but a licensed employee exists', () => {
-    const state = makeState([], [licensed({ id: 6 })]);
-    expect(driverState(makeVehicle(), state).kind).toBe('unmanned');
-  });
-
-  it('is no_licensed when nobody on the roster holds the licence', () => {
-    const state = makeState([], [makeEmployee({ id: 6 })]);
-    expect(driverState(makeVehicle(), state).kind).toBe('no_licensed');
-  });
-
-  it('a pending walker for another vehicle does not count', () => {
-    const state = makeState([], [licensed({ id: 6, pendingDriverVehicleId: 2 })]);
-    expect(driverState(makeVehicle({ id: 1 }), state).kind).toBe('unmanned');
-  });
-});
-
-describe('fleetDetailSections — driver rows with a link factory', () => {
-  it('makeDriverRow renders the name as a clickable link when a link callback is given', () => {
-    const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    const link = vi.fn();
-    const row = makeDriverRow(makeVehicle({ occupantIds: [6] }), state, link);
-    const btn = Array.from(row.querySelectorAll('button')).find(b => b.textContent === 'Dorian Kask');
-    expect(btn).toBeDefined();
-    btn!.click();
-    expect(link).toHaveBeenCalledWith(6);
-  });
-
-  it('makeDriverRow stays plain text without a link callback', () => {
-    const state = makeState([], [makeEmployee({ id: 6, name: 'Dorian Kask' })]);
-    expect(makeDriverRow(makeVehicle({ occupantIds: [6] }), state).querySelector('button')).toBeNull();
-  });
-
-  it('makePendingDriverRow links the walking employee when a callback is given', () => {
-    const link = vi.fn();
-    const row = makePendingDriverRow(makeEmployee({ id: 8, name: 'Pip Walker' }), link);
-    const btn = Array.from(row.querySelectorAll('button')).find(b => b.textContent === 'Pip Walker');
-    expect(btn).toBeDefined();
-    btn!.click();
-    expect(link).toHaveBeenCalledWith(8);
-  });
-
-  it('makeNoDriverRow keeps its Train button routing to crew', () => {
-    const onCrew = vi.fn();
-    const state = makeState([], [makeEmployee({ id: 6 })]);
-    const row = makeNoDriverRow(makeVehicle(), state, onCrew);
-    const train = Array.from(row.querySelectorAll('button')).find(b => b.textContent === t('ui.fleet.train_someone'));
-    train!.click();
-    expect(onCrew).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('fleetDetailSections — repairState', () => {
-  const order = (overrides: Partial<PendingAction> = {}): PendingAction => ({
-    id: 3, type: 'repair_vehicle', requiredSkill: null, requiredVehicleRole: null,
-    targetX: 0, targetZ: 0, targetY: 0, payload: { vehicleId: 1 }, targetEmployeeId: null,
-    status: 'in_progress', holderId: 6, queuedAtTick: 0, ...overrides,
-  });
-
-  it('needs no repair at full HP and has no action', () => {
-    expect(repairState(makeVehicle({ hp: 100 }), [])).toEqual({ action: null, needsRepair: false });
-  });
-
-  it('needs repair when damaged but not wrecked', () => {
-    expect(repairState(makeVehicle({ hp: 40 }), []).needsRepair).toBe(true);
-  });
-
-  it('returns the repair order covering this vehicle', () => {
-    const a = order();
-    const s = repairState(makeVehicle({ hp: 40 }), [a]);
-    expect(s.action).toBe(a);
-  });
-
-  it('ignores repair orders for other vehicles and other action types', () => {
-    const other = order({ payload: { vehicleId: 2 } });
-    const haul = order({ id: 4, type: 'haul_debris', payload: { vehicleId: 1 } });
-    expect(repairState(makeVehicle({ hp: 40 }), [other, haul]).action).toBeNull();
-  });
-
-  it('a wrecked vehicle (hp 0) still needs repair when an order exists', () => {
-    const s = repairState(makeVehicle({ hp: 0 }), [order({ status: 'queued' })]);
-    expect(s.action).not.toBeNull();
+  it('falls back to "#<id>" when the seated driver is not on the roster', () => {
+    const line = makeDriverNameLine(makeVehicle({ occupantIds: [99] }), []);
+    expect(line.textContent).toContain('#99');
   });
 });

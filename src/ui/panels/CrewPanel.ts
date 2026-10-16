@@ -18,7 +18,7 @@ import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { moraleColor, makeAvatar, makeRoleMoraleLine, makeStatusTags, makeManagerEffect } from '../crewDetailSections.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { applyRowSelection, SELECTED_ROW_CLASS, type ListSelection } from '../selectionRoute.js';
+import { syncRowSelection, selectionChanged, type ListSelection } from '../selectionRoute.js';
 
 
 export class CrewPanel extends PanelBase {
@@ -67,16 +67,13 @@ export class CrewPanel extends PanelBase {
 
   /** Highlight the roster row matching the scene selection `sel`; kept across re-renders, not part of the signature. */
   setSelectedEmployee(sel: ListSelection): void {
-    const changed = this.selection?.id !== sel?.id || this.selection?.kind !== sel?.kind;
+    const changed = selectionChanged(this.selection, sel);
     this.selection = sel;
     this.applySelection(changed);
   }
 
   private applySelection(scroll = false): void {
-    applyRowSelection([this.bodyEl], this.selection, 'employee', 'data-employee-id');
-    if (!scroll || this.selection?.kind !== 'employee') return;
-    // Optional chained on the method: jsdom doesn't implement scrollIntoView.
-    this.bodyEl.querySelector<HTMLElement>(`.${SELECTED_ROW_CLASS}`)?.scrollIntoView?.({ block: 'nearest' });
+    syncRowSelection(this.bodyEl, this.selection, 'employee', 'data-employee-id', scroll);
   }
 
   /** Show the hiring section with candidates of `role` in view. */

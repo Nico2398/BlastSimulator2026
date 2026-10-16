@@ -48,7 +48,7 @@
     },
     {
       "command": "vehicle upgrade 1",
-      "description": "Player opens the Fleet panel and clicks Upgrade on the hauler card: tier 1 to 2 costs 50,000 - 25,000.",
+      "description": "Player opens the Fleet panel, clicks the hauler's row, then Upgrade in the inspector: tier 1 to 2 costs 50,000 - 25,000.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -56,11 +56,19 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-vehicle-id] > :first-child"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-vehicle-id] > :first-child"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"] [data-action=\"upgrade_vehicle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"] [data-action=\"upgrade_vehicle\"]"
         }
       ],
       "role": "player",
@@ -79,7 +87,11 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id] > :first-child"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"]"
         },
         {
           "type": "awaitUsable",
@@ -102,7 +114,7 @@
     },
     {
       "command": "vehicle upgrade 1",
-      "description": "role: guard: at max tier the Fleet panel Upgrade button is disabled (console refuses the same command) and cash does not move.",
+      "description": "role: guard: at max tier the inspector's Upgrade button is disabled (console refuses the same command) and cash does not move.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -110,7 +122,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"] [data-action=\"upgrade_vehicle\"]"
         }
       ],
       "role": "guard",
@@ -119,7 +131,7 @@
         "changedBy": {
           "cash": 0
         },
-        "blocked": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]",
+        "blocked": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"] [data-action=\"upgrade_vehicle\"]",
         "note": "rejected: vehicle already at max tier"
       }
     },

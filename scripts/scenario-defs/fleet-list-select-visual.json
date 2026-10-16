@@ -1,0 +1,200 @@
+{
+  "name": "fleet-list-select-visual",
+  "description": "Fleet rows are a master list for the inspector (#1767). A player clicks a vehicle row: the inspector shows that vehicle and the row is highlighted (bs-row-selected); the row holds no Upgrade, Reposition or Scrap button. Clicking another row moves the highlight. Clicking a vehicle in the 3D scene highlights its row. Closing the inspector clears the highlight. Waits are on DOM conditions, never delays.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 staffed:true",
+      "timeout": 30,
+      "description": "Setup: staffed site so the Fleet roster has several vehicle rows",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Open Fleet and click the head of vehicle 1's row (not a button): the inspector shows vehicle 1 and its row is highlighted",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) > :first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) > :first-child"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1).bs-row-selected"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"1\"]",
+        "note": "A row click opens the vehicle inspector and highlights the row"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "The row is a master row: no Upgrade, Reposition or Scrap buttons, no danger button, no select inside it; the other rows are not highlighted",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2):not(.bs-row-selected)"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) .bs-fleet-status"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) .bs-fleet-hp"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) .bs-fleet-driver"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has([data-action=\"upgrade\"]))"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has([data-action=\"reposition\"]))"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has([data-action=\"scrap\"]))"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has(.bsx-btn-danger))"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has(select))"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) [data-action=\"locate\"]"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Click vehicle 2's row head: the inspector switches to vehicle 2 and the highlight moves with it",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2) > :first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2) > :first-child"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2).bs-row-selected"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(.bs-row-selected)"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"]",
+        "note": "One row highlighted at a time"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "Close the inspector, then click vehicle 4 in the 3D scene (clickEntity): its Fleet row takes the highlight and the previous one loses it",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 4
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4).bs-row-selected"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2):not(.bs-row-selected)"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"]",
+        "note": "A scene selection highlights the vehicle's row in the open Fleet panel"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Close the inspector: nothing is selected, so no Fleet row stays highlighted",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-panel-close]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4)"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4):not(.bs-row-selected)"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4) [data-action=\"locate\"]"
+      }
+    }
+  ]
+}

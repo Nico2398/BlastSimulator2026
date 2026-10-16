@@ -105,7 +105,19 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bsx-btn-danger"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > :first-child"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] [data-action=\"scrap_vehicle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "waitForSelector",
@@ -135,12 +147,20 @@
           "panel": "vehicles"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] > :first-child"
+        },
+        {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "waitForSelector",
@@ -170,12 +190,20 @@
           "panel": "vehicles"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] > :first-child"
+        },
+        {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "waitForSelector",

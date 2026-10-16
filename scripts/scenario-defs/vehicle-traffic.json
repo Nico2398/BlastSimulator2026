@@ -286,7 +286,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > :first-child"
         },
         {
           "type": "awaitUsable",
@@ -319,7 +319,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] > :first-child"
         },
         {
           "type": "awaitUsable",
@@ -352,7 +352,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] > :first-child"
         },
         {
           "type": "awaitUsable",
@@ -395,7 +395,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > :first-child"
         },
         {
           "type": "awaitUsable",
@@ -428,7 +428,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] > :first-child"
         },
         {
           "type": "awaitUsable",
@@ -461,7 +461,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] > :first-child"
         },
         {
           "type": "awaitUsable",

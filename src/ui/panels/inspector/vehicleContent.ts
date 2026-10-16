@@ -4,7 +4,8 @@ import { resolveVehicleDriver } from '../../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../../core/entities/VehicleStatus.js';
 import { formatDollars } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { describeStatus, driverState, upgradeDisabledReason, upgradeState } from '../../fleetDetailSections.js';
+import { describeStatus, vehicleDriverState } from '../../fleetDetailSections.js';
+import { upgradeDisabledReason, upgradeState } from './vehicleDetailParts.js';
 import { el } from '../../dom.js';
 import type { ActionSpec, InspectorLinks, KindContent } from './InspectorContent.js';
 import { kindLabel, syncSection } from './inspectorWidgets.js';
@@ -61,7 +62,7 @@ export const vehicleContent: KindContent = {
       sub: `#${v.id} · ${kindLabel('vehicle')} · ${t('inspector.tier', { tier: v.tier })}`,
       icon: 'vehicle',
       status,
-      signature: `${v.type}:${v.tier}:${driverState(v, state).kind}`,
+      signature: `${v.type}:${v.tier}:${vehicleDriverState(v, state.employees.employees).kind}`,
       get sections() { return [build()]; },
       actions: actionsFor(v, state.cash),
       sync: root => {

@@ -22,3 +22,19 @@ export function applyRowSelection(containers: ReadonlyArray<HTMLElement>, sel: L
     }
   }
 }
+
+/**
+ * Re-apply `sel` to the rows under `container` and, when `scroll` is set and
+ * `sel` is of `kind`, bring the highlighted row into view.
+ */
+export function syncRowSelection(container: HTMLElement, sel: ListSelection, kind: EntityPick['kind'], dataAttr: string, scroll: boolean): void {
+  applyRowSelection([container], sel, kind, dataAttr);
+  if (!scroll || sel?.kind !== kind) return;
+  // Optional chained on the method: jsdom doesn't implement scrollIntoView.
+  container.querySelector<HTMLElement>(`.${SELECTED_ROW_CLASS}`)?.scrollIntoView?.({ block: 'nearest' });
+}
+
+/** True when `a` and `b` name different entities (including one being null). */
+export function selectionChanged(a: ListSelection, b: ListSelection): boolean {
+  return a?.id !== b?.id || a?.kind !== b?.kind;
+}
