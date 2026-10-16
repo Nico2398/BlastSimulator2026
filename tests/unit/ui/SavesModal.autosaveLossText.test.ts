@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // BlastSimulator2026 — autosaveLossText (#1809)
 import { describe, it, expect, vi } from 'vitest';
 import { autosaveLossText, relativeTime, AUTO_SAVE_SLOT, TUTORIAL_AUTO_SAVE_SLOT } from '../../../src/ui/panels/SavesModal.js';

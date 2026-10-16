@@ -5,7 +5,7 @@ import { getLevel } from '../../core/campaign/Level.js';
 import { SANDBOX_LEVEL_ID } from '../../core/campaign/Sandbox.js';
 import type { ConfirmModalConfig } from '../panels/ConfirmModal.js';
 
-export interface StartLevelConfirmInput {
+interface StartLevelConfirmInput {
   /** state.campaign.activeLevelId of the live game; null = sandbox. */
   liveLevelId: string | null;
   targetLevelId: string;
