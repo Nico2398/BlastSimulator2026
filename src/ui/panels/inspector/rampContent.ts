@@ -51,7 +51,7 @@ export const rampContent: KindContent = {
       sub: `#${ramp.id} · ${kindLabel('ramp')}`,
       icon: 'layers',
       status: desc.sub,
-      signature: `${ramp.id}:${ramp.width}`,
+      signature: `${ramp.id}:${ramp.width}:${widen.disabledReason ?? 'ready'}`,
       get sections() {
         const body = el('div', { className: 'bs-ramp-detail' });
         const section = buildDimensions(ramp);

@@ -86,7 +86,7 @@ export const holeContent: KindContent = {
       sub: `#${entity.id} · ${kindLabel('hole')}`,
       icon: 'hole',
       status: t(ordered ? 'inspector.hole.state_ordered' : 'inspector.hole.state_drilled'),
-      signature: `${hole.id}:${ordered ? 'ordered' : 'drilled'}`,
+      signature: `${hole.id}:${ordered ? 'ordered' : 'drilled'}:${chargeOf(hole.id, state).kind}`,
       get sections() {
         const body = el('div', { className: 'bs-hole-detail' });
         body.style.cssText = 'display:flex;flex-direction:column;gap:11px';
