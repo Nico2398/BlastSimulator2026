@@ -70,7 +70,7 @@ export class Random {
 }
 
 /** Odd multiplier spreading salts across the 32-bit seed space (#1838). */
-export const ROLL_SALT_STRIDE = 0x9e3779b9;
+const ROLL_SALT_STRIDE = 0x9e3779b9;
 
 /**
  * Seed for one roll: distinct salts within one tick give independent streams;
