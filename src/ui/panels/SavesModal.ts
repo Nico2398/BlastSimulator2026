@@ -43,6 +43,15 @@ const AUTO_SLOTS: ReadonlyMap<string, { nameKey: string; emptyKey: string }> = n
 const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
   + 'background:repeating-linear-gradient(135deg,#2a3038 0 6px,#1d232b 6px 12px)';
 
+/** Text telling the player what leaving the live game costs: age of its auto-save, or that none exists. */
+export async function autosaveLossText(
+  _backend: SaveBackend | null,
+  _levelId: string | null | undefined,
+): Promise<string> {
+  // TODO: implement
+  return '';
+}
+
 export function relativeTime(timestampMs: number): string {
   const minutes = Math.floor((Date.now() - timestampMs) / 60000);
   if (minutes < 1) return t('ui.saves.ago_now');
