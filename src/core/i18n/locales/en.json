@@ -3710,6 +3710,7 @@
   "shell.placement.pick_first": "Click the highlighted area in the scene first.",
   "shell.placement.refused_out_of_bounds": "Out of bounds — the building would stick out of the site.",
   "shell.placement.refused_occupied": "Space is occupied — a building or construction site covers part of that spot.",
+  "shell.placement.refused_occupied_by": "Space is occupied by the {building} at ({x}, {z}) — move or demolish it first.",
   "shell.placement.refused_ramp": "Blocks a ramp — the pit's access would be sealed.",
   "shell.placement.refused_hole": "Blocks a drill hole — a hole is drilled or ordered there.",
   "shell.placement.refused_protected_ground": "Protected ground — a village, river or landmark stands there.",

@@ -254,7 +254,7 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   const FIRST_SHOT = '36,30';
   const SECOND_SHOT = '16,22';
   const RAMP = 'start:12,34 end:34,34 depth:6';
-  const BUNKHOUSE = 'living_quarters at:6,14 tier:1';
+  const BUNKHOUSE = 'living_quarters at:6,18 tier:1';
   /** Contracts filled before the second shot is ordered (income proven). */
   const CONTRACTS_BEFORE_SECOND_SHOT = 3;
 
