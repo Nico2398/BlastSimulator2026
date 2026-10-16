@@ -47,6 +47,7 @@ import {
   classifyQueuedOrders,
   classifyNewOrder,
   refreshOrderReachability,
+  roleShortfall,
 } from '../../../src/core/engine/OrderReachability.js';
 
 const WIDTH = 24;
@@ -1293,5 +1294,52 @@ describe('docking cells beside a building (#1840)', () => {
     expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
     vehicle.x = IN_B.x; vehicle.z = IN_B.z;
     expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
+});
+
+describe('roleShortfall (#1820)', () => {
+  const role = 'building_destroyer' as const;
+  const licence = ROLE_LICENCE_REQUIRED[role];
+
+  it('no vehicle of the role: no_vehicle_in_fleet, even with a licensed employee', () => {
+    const state = makeState();
+    const driver = hire(state, IN_A, [licence]);
+    expect(roleShortfall(state.vehicles.vehicles, [driver], role)).toBe('no_vehicle_in_fleet');
+  });
+
+  it('a vehicle of another role does not count', () => {
+    const state = makeState();
+    const driver = hire(state, IN_A, [licence]);
+    purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    expect(roleShortfall(state.vehicles.vehicles, [driver], role)).toBe('no_vehicle_in_fleet');
+  });
+
+  it('a vehicle but nobody licensed: no_licensed_driver', () => {
+    const state = makeState();
+    const worker = hire(state, IN_A, []);
+    purchaseVehicle(state.vehicles, role, 0, 0);
+    expect(roleShortfall(state.vehicles.vehicles, [worker], role)).toBe('no_licensed_driver');
+  });
+
+  it('a vehicle and nobody eligible at all: no_licensed_driver', () => {
+    const state = makeState();
+    purchaseVehicle(state.vehicles, role, 0, 0);
+    expect(roleShortfall(state.vehicles.vehicles, [], role)).toBe('no_licensed_driver');
+  });
+
+  it('a vehicle and a licensed eligible employee: null', () => {
+    const state = makeState();
+    const driver = hire(state, IN_A, [licence]);
+    purchaseVehicle(state.vehicles, role, 0, 0);
+    expect(roleShortfall(state.vehicles.vehicles, [driver], role)).toBeNull();
+  });
+
+  it('a licensed employee left out of the eligible list does not count', () => {
+    const state = makeState();
+    const licensed = hire(state, IN_A, [licence]);
+    const other = hire(state, IN_A, []);
+    purchaseVehicle(state.vehicles, role, 0, 0);
+    expect(licensed.alive).toBe(true);
+    expect(roleShortfall(state.vehicles.vehicles, [other], role)).toBe('no_licensed_driver');
   });
 });

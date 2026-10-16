@@ -1850,3 +1850,86 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
     });
   });
 });
+
+describe('BuildMenu — catalog price and research refusal (#1820)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+  let gameConsole: ReturnType<typeof vi.fn<[string], CommandResult>>;
+  let messages: string[];
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+    gameConsole = vi.fn<[string], CommandResult>().mockReturnValue({ success: true, output: '' });
+    menu.setGameConsole(gameConsole);
+    messages = [];
+    menu.setFlowResultHandler((m) => messages.push(m));
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  it('catalog card prices group thousands like every other amount', () => {
+    menu.update(makeMockState());
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-build-type]'));
+    expect(rows.length).toBeGreaterThan(0);
+    let grouped = 0;
+    for (const row of rows) {
+      const type = row.dataset['buildType'] as BuildingType;
+      const def = getBuildingDef(type, 1);
+      const expected = t('ui.build.cost', { cost: formatMoney(def.constructionCost) });
+      expect(row.textContent, type).toContain(expected);
+      if (def.constructionCost >= 1000) {
+        grouped++;
+        expect(expected, type).toMatch(/\d,\d{3}/);
+      }
+    }
+    expect(grouped).toBeGreaterThan(0);
+  });
+
+  it('the catalog price follows the selected tier, grouped', () => {
+    menu.update(makeMockState());
+    const row = container.querySelector<HTMLElement>('[data-build-type="management_office"]')!;
+    const sel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    sel.value = '2';
+    sel.dispatchEvent(new Event('change'));
+    const def = getBuildingDef('management_office', 2);
+    expect(row.textContent).toContain(t('ui.build.cost', { cost: formatMoney(def.constructionCost) }));
+  });
+
+  function observed(b: Building): void {
+    const state = makeMockState();
+    state.buildings.buildings = [b];
+    menu.observe(state);
+  }
+
+  it('queueResearchFor returns the translated refusal and does not write the closed panel status line', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    gameConsole.mockReturnValue({ success: false, output: 'raw core text', code: 'no_research_center' });
+    const refusal = menu.queueResearchFor(10);
+    expect(refusal).toBe(t('ui.build.research_failed_no_research_center'));
+    expect(messages).toEqual([]);
+  });
+
+  it('queueResearchFor translates each refusal code it relays', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    gameConsole.mockReturnValue({ success: false, output: 'x', code: 'conditions_not_met' });
+    expect(menu.queueResearchFor(10)).toBe(t('ui.build.research_failed_conditions_not_met'));
+    gameConsole.mockReturnValue({ success: false, output: 'x', code: 'insufficient_funds' });
+    expect(menu.queueResearchFor(10)).toBe(t('ui.build.research_failed_insufficient_funds'));
+  });
+
+  it('queueResearchFor returns null on success', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    expect(menu.queueResearchFor(10)).toBeNull();
+    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
+  });
+
+  it('queueResearchFor returns null and sends nothing for an unknown building or max tier', () => {
+    observed(makeBuilding({ id: 11, type: 'management_office', tier: 3 }));
+    expect(menu.queueResearchFor(11)).toBeNull();
+    expect(menu.queueResearchFor(404)).toBeNull();
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+});

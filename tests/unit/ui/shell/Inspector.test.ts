@@ -6,8 +6,8 @@ import { PANEL_CLOSE_ATTR } from '../../../../src/ui/panels/PanelBase.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { placeBuilding, storeExplosives, getBuildingDef } from '../../../../src/core/entities/Building.js';
-import { purchaseVehicle, resolveVehicleDriver } from '../../../../src/core/entities/Vehicle.js';
-import { hireEmployee } from '../../../../src/core/entities/Employee.js';
+import { purchaseVehicle, resolveVehicleDriver, ROLE_LICENCE_REQUIRED } from '../../../../src/core/entities/Vehicle.js';
+import { hireEmployee, assignSkill } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
@@ -904,5 +904,49 @@ describe('Inspector building actions — what src/main.ts routes them to (#1758)
 
   it('the demolish confirm is handed the freight ore stored in the warehouse', () => {
     expect(caseBody('demolish')).toContain('storedOreKg');
+  });
+});
+
+describe('Inspector — inline note on an enabled action (#1820)', () => {
+  function upgradable() {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    state.buildings.unlockedTiers['management_office'] = 2;
+    state.cash = 9_999_999;
+    return { bar, root, state, id: building.id };
+  }
+
+  it('an enabled Upgrade and Demolish show the wait line inline while the buttons stay enabled', () => {
+    const { bar, root, state, id } = upgradable();
+    bar.show(entity('building', id), state);
+    const expected = t('inspector.wait.no_vehicle', { role: t('vehicle_type.building_destroyer') });
+    for (const action of ['upgrade', 'demolish']) {
+      const line = root.querySelector<HTMLElement>(`[data-reason="${action}"]`);
+      expect(line, action).not.toBeNull();
+      expect(line!.textContent).toBe(expected);
+      expect(root.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`)!.disabled, action).toBe(false);
+    }
+  });
+
+  it('the line is removed once a destroyer and a licensed driver exist', () => {
+    const { bar, root, state, id } = upgradable();
+    bar.show(entity('building', id), state);
+    expect(root.querySelector('[data-reason="upgrade"]')).not.toBeNull();
+    purchaseVehicle(state.vehicles, 'building_destroyer');
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(3), 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.building_destroyer, 1);
+    bar.show(entity('building', id), state);
+    expect(root.querySelector('[data-reason="upgrade"]')).toBeNull();
+    expect(root.querySelector('[data-reason="demolish"]')).toBeNull();
+  });
+
+  it('the line text updates in place when the shortfall changes from vehicle to driver', () => {
+    const { bar, root, state, id } = upgradable();
+    bar.show(entity('building', id), state);
+    purchaseVehicle(state.vehicles, 'building_destroyer');
+    bar.show(entity('building', id), state);
+    expect(root.querySelector('[data-reason="upgrade"]')!.textContent)
+      .toBe(t('inspector.wait.no_driver', { role: t('vehicle_type.building_destroyer') }));
   });
 });
