@@ -2293,6 +2293,19 @@ describe('serialize/deserialize — tax audit (#1409)', () => {
     expect(restored.mafia.smugglingVolume).toBe(0.5);
   });
 
+  it('mafia rollCount survives a round trip (#1838)', () => {
+    const state = createGame({ seed: 42 });
+    state.mafia.rollCount = 7;
+    expect(deserialize(serialize(state)).mafia.rollCount).toBe(7);
+  });
+
+  it('a current-version save missing mafia.rollCount loads with 0 (#1838)', () => {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, any>;
+    delete parsed['mafia'].rollCount;
+    expect(parsed['version']).toBe(SAVE_VERSION);
+    expect(deserialize(JSON.stringify(parsed)).mafia.rollCount).toBe(0);
+  });
+
   it('a save written before the tax audit existed loads with empty books and no smuggling', () => {
     const json = serialize(createGame({ seed: 42 }));
     const parsed = JSON.parse(json) as Record<string, any>;
