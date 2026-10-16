@@ -324,7 +324,7 @@
     },
     {
       "command": "state",
-      "description": "The player clicks the Freight Warehouse (the first building placed, id 1) in the scene. The inspector's contents section shows the stored/capacity gauge and at least one per-ore row.",
+      "description": "The player selects the Freight Warehouse (the first building placed, id 1) from its row in the Build panel. The inspector's contents section shows the stored/capacity gauge and at least one per-ore row. Selecting through the panel, not a scene click, keeps the step independent of whichever hauler or crew member is standing in front of the warehouse mesh at that moment (a scene ray picks the nearest entity; CI selected that entity instead, #1761).",
       "timeout": 90,
       "role": "player",
       "expect": {
@@ -337,9 +337,20 @@
           "timeoutMs": 0
         },
         {
-          "type": "clickEntity",
-          "kind": "building",
-          "id": 1
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel .bs-build-placed-row div"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-placed-row div"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"][data-id=\"1\"]"
         },
         {
           "type": "waitForSelector",

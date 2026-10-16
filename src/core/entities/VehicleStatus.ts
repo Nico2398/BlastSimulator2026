@@ -8,9 +8,12 @@
 // EmployeeActivity.ts.
 
 import type { Vehicle, VehicleTask, VehicleState } from './Vehicle.js';
-import { getVehicleReservation } from './Vehicle.js';
+import { getVehicleReservation, getVehicleDefByTier } from './Vehicle.js';
+import { octileHeuristic } from '../nav/Pathfinding.js';
 import type { Employee } from './Employee.js';
 import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
+import type { ActionType, BlockedOrderReason, PendingAction } from '../state/GameState.js';
+import type { Itinerary } from '../engine/Itinerary.js';
 
 export type VehicleStatusKind = 'broken' | 'stuck' | 'waiting' | 'hauling' | 'working' | 'moving' | 'idle';
 
@@ -67,4 +70,92 @@ export function computeVehicleStatus(v: Vehicle, vehicleState: VehicleState, occ
   if (occupant.taskTicksRemaining !== null) return { ...IDLE, kind: 'working', task: VEHICLE_ROLE_ARRIVAL_TASK[v.type] };
   if (occupant.itinerary !== null) return { ...IDLE, kind: 'moving' };
   return IDLE;
+}
+
+/** What a vehicle's job is aimed at (#1761). */
+export type VehicleJobTarget =
+  | { kind: 'fragment'; id: number }
+  | { kind: 'hole'; id: string }
+  | { kind: 'building' | 'vehicle'; id: number };
+
+/** The job a vehicle is serving: action, target, destination and ETA (#1761). */
+interface VehicleJob {
+  actionType: ActionType | null;
+  target: VehicleJobTarget | null;
+  destination: { x: number; z: number; buildingId: number | null } | null;
+  etaTicks: number | null;
+  blockedReason: BlockedOrderReason | null;
+  /** Id of the queued order behind `blockedReason`; absent when nothing is blocked. */
+  blockedOrderId?: number;
+}
+
+const NO_JOB: VehicleJob = { actionType: null, target: null, destination: null, etaTicks: null, blockedReason: null };
+
+function jobTargetOf(action: PendingAction): VehicleJobTarget | null {
+  const p = action.payload;
+  if (typeof p['fragmentId'] === 'number') return { kind: 'fragment', id: p['fragmentId'] };
+  if (typeof p['holeId'] === 'string') return { kind: 'hole', id: p['holeId'] };
+  if (typeof p['buildingId'] === 'number') return { kind: 'building', id: p['buildingId'] };
+  if (typeof p['vehicleId'] === 'number') return { kind: 'vehicle', id: p['vehicleId'] };
+  return null;
+}
+
+/**
+ * Job a vehicle currently serves, read off its reservation, occupant and pending actions.
+ * Locale-free. `cargoWarehouseId` is the warehouse the loaded cargo is bound for; only a
+ * loaded hauler names it as the destination building. A broken vehicle, or an idle one with
+ * nothing queued for its role, has no job; an idle one with a queued order for its role
+ * that is blocked carries the order's `blockedReason`.
+ */
+export function computeVehicleJob(
+  v: Vehicle,
+  vehicleState: VehicleState,
+  pendingActions: readonly PendingAction[],
+  occupant?: Employee,
+  cargoWarehouseId?: number | null,
+): VehicleJob {
+  if (v.hp <= 0) return NO_JOB;
+  const reservedId = getVehicleReservation(vehicleState, v.id);
+  const action = reservedId === null ? undefined : pendingActions.find(a => a.id === reservedId);
+  const itinerary = occupant?.itinerary ?? null;
+  if (!action) {
+    if (itinerary) return { ...NO_JOB, ...itineraryProgress(v, itinerary, null) };
+    const blocked = pendingActions.find(a =>
+      a.status === 'queued' && a.holderId === null && a.requiredVehicleRole === v.type && a.blockedReason != null);
+    if (!blocked) return NO_JOB;
+    return { ...NO_JOB, actionType: blocked.type, target: jobTargetOf(blocked), blockedReason: blocked.blockedReason ?? null, blockedOrderId: blocked.id };
+  }
+
+  const base = { actionType: action.type, target: jobTargetOf(action), blockedReason: null };
+  if (occupant?.taskTicksRemaining != null) {
+    return { ...base, destination: null, etaTicks: occupant.taskTicksRemaining };
+  }
+  if (!itinerary) return { ...base, destination: null, etaTicks: null };
+  const loaded = v.type === 'debris_hauler' && v.cargo.length > 0;
+  return { ...base, ...itineraryProgress(v, itinerary, loaded ? (cargoWarehouseId ?? null) : null) };
+}
+
+function itineraryProgress(
+  v: Vehicle,
+  itinerary: Itinerary,
+  buildingId: number | null,
+): Pick<VehicleJob, 'destination' | 'etaTicks'> {
+  const last = itinerary.legs[itinerary.legs.length - 1];
+  return {
+    destination: last ? { x: last.destX, z: last.destZ, buildingId } : null,
+    etaTicks: vehicleEtaTicks(v, itinerary),
+  };
+}
+
+/**
+ * Ticks left on an itinerary from the vehicle's current position (1 tick = 1 hour): the
+ * octile distance to the first leg's destination at the tier's speed (rounded up), plus the
+ * planned cost of the remaining legs. Shrinks as the vehicle closes on that destination.
+ */
+export function vehicleEtaTicks(v: Pick<Vehicle, 'x' | 'z' | 'type' | 'tier'>, itinerary: Itinerary): number {
+  const [first, ...rest] = itinerary.legs;
+  if (!first) return 0;
+  const { speed } = getVehicleDefByTier(v.type, v.tier);
+  const toFirst = speed > 0 ? Math.ceil(octileHeuristic(v.x, v.z, first.destX, first.destZ) / speed) : 0;
+  return toFirst + rest.reduce((sum, leg) => sum + leg.estTicks, 0);
 }

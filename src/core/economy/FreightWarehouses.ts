@@ -2,7 +2,7 @@
 
 import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import type { LogisticsState, TrackedFragment } from './Logistics.js';
-import { accumulateOreMass, clampCollectedOre, decrementCollectedOre } from '../mining/BlastOreReport.js';
+import { sumOreMass, clampCollectedOre, decrementCollectedOre } from '../mining/BlastOreReport.js';
 
 export type { WarehouseSite };
 
@@ -31,16 +31,14 @@ export interface WarehouseStock {
 
 /** Stored kg of one warehouse by ore, plus barren remainder. Same fragments as warehouseStoredKg. */
 export function warehouseStockByOre(l: LogisticsState, warehouseId: number): WarehouseStock {
-  const oreKg: Record<string, number> = {};
   let storedKg = 0;
+  const stored = [];
   for (const f of l.fragments) {
     if (f.state !== 'stored' || f.warehouseId !== warehouseId) continue;
     storedKg += f.fragment.mass;
-    accumulateOreMass(oreKg, f.fragment.volume, f.fragment.oreDensities);
+    stored.push(f.fragment);
   }
-  let oreSum = 0;
-  for (const kg of Object.values(oreKg)) oreSum += kg;
-  return { storedKg, oreKg, barrenKg: Math.max(0, storedKg - oreSum) };
+  return { storedKg, ...sumOreMass(stored, storedKg) };
 }
 
 /** Mass (kg) in transit to one warehouse, reserved but not yet stored. */

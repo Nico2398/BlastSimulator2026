@@ -36,6 +36,7 @@ export class Inspector {
   private onClose: (() => void) | null = null;
   private onCommand: ((command: string) => void) | null = null;
   private onConfirm: ((config: ConfirmModalConfig) => void) | null = null;
+  private onNavigate: ((panel: 'crew') => void) | null = null;
   private current: EntityPick | null = null;
   private lastState: GameState | null = null;
   private shownSignature: string | null = null;
@@ -45,6 +46,7 @@ export class Inspector {
     select: (kind, id) => this.onSelect?.({ kind, id, point: new Vector3(), distance: 0 }),
     run: command => this.onCommand?.(command),
     confirm: config => this.onConfirm?.(config),
+    navigate: panel => this.onNavigate?.(panel),
   };
 
   constructor(container: HTMLElement) {
@@ -84,6 +86,8 @@ export class Inspector {
   setCommandHandler(cb: (command: string) => void): void { this.onCommand = cb; }
   /** Confirm-overlay sink for destructive inspector actions. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirm = cb; }
+  /** Panel-opening sink for links such as a vehicle's "Train someone in Crew". */
+  setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigate = cb; }
   /** Called when the close button is used; the caller clears the selection and its outline. */
   setCloseHandler(cb: () => void): void { this.onClose = cb; }
 
