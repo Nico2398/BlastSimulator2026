@@ -20,7 +20,8 @@ import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
+import type { BlastRegion, FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import type { GameState } from '../../../src/core/state/GameState.js';
 
 const SEED = 42;
 
@@ -58,6 +59,125 @@ describe('refreshLogisticsCapacity', () => {
 
     const expectedCapacity = getBuildingDef('freight_warehouse', 1).capacity;
     expect(state.logistics.storageCapacityKg).toBe(expectedCapacity);
+  });
+});
+
+// #1813: a closed (outOfService) or switched-off warehouse is still standing, so
+// its stock survives; only a warehouse that no longer exists loses it.
+describe('refreshLogisticsCapacity stock survival (#1813)', () => {
+  const MASS = 5000;
+  const ORE_KG = 1500;
+
+  function fragment(id: number): FragmentData {
+    return {
+      id, position: { x: 0, y: 0, z: 0 }, volume: 2, mass: MASS, rockId: 'sandite',
+      oreDensities: { iron: 0.3 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x: 0, y: 0, z: 0 },
+    };
+  }
+
+  function addWarehouse(state: GameState, x: number): number {
+    const r = placeBuilding(state.buildings, 'freight_warehouse', x, 0, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, 1, 0, 0);
+    expect(r.success).toBe(true);
+    return r.building!.id;
+  }
+
+  function stock(state: GameState, fragId: number, warehouseId: number): void {
+    state.logistics.fragments.push({ fragment: fragment(fragId), state: 'stored', vehicleId: null, warehouseId });
+    state.logistics.storedMassKg += MASS;
+    state.collectedOre.iron = (state.collectedOre.iron ?? 0) + ORE_KG;
+  }
+
+  function setup() {
+    const state = createGame({ seed: SEED });
+    const id = addWarehouse(state, 0);
+    refreshLogisticsCapacity(state);
+    stock(state, 1, id);
+    return { state, id };
+  }
+
+  const building = (state: GameState, id: number) => state.buildings.buildings.find(b => b.id === id)!;
+
+  it('a closed (outOfService) warehouse keeps fragments, storedMassKg and collectedOre, reports no loss', () => {
+    const { state, id } = setup();
+    building(state, id).outOfService = true;
+
+    const losses = refreshLogisticsCapacity(state);
+
+    expect(losses).toEqual([]);
+    expect(state.logistics.fragments).toHaveLength(1);
+    expect(state.logistics.storedMassKg).toBe(MASS);
+    expect(state.collectedOre.iron).toBe(ORE_KG);
+  });
+
+  it('a closed warehouse contributes no capacity', () => {
+    const { state, id } = setup();
+    building(state, id).outOfService = true;
+    refreshLogisticsCapacity(state);
+    expect(state.logistics.storageCapacityKg).toBe(0);
+  });
+
+  it('a warehouse switched off (active=false) keeps its stock', () => {
+    const { state, id } = setup();
+    building(state, id).active = false;
+
+    const losses = refreshLogisticsCapacity(state);
+
+    expect(losses).toEqual([]);
+    expect(state.logistics.fragments).toHaveLength(1);
+    expect(state.logistics.storedMassKg).toBe(MASS);
+    expect(state.collectedOre.iron).toBe(ORE_KG);
+  });
+
+  it('a destroyed warehouse (gone from buildings, not planned) loses its stock and debits the totals', () => {
+    const { state, id } = setup();
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id !== id);
+
+    const losses = refreshLogisticsCapacity(state);
+
+    expect(losses).toEqual([{ buildingId: id, massKg: MASS, oreKg: { iron: ORE_KG } }]);
+    expect(state.logistics.fragments).toHaveLength(0);
+    expect(state.logistics.storedMassKg).toBe(0);
+    expect(state.collectedOre.iron ?? 0).toBe(0);
+  });
+
+  it('a warehouse listed in plannedBuildings (rebuild) keeps its stock', () => {
+    const { state, id } = setup();
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id !== id);
+    state.plannedBuildings.push({
+      id: 1, buildingId: id, type: 'freight_warehouse', tier: 2, x: 0, z: 0, actionId: 1, cost: 0, rebuild: true,
+    } as GameState['plannedBuildings'][number]);
+
+    expect(refreshLogisticsCapacity(state)).toEqual([]);
+    expect(state.logistics.storedMassKg).toBe(MASS);
+    expect(state.logistics.fragments).toHaveLength(1);
+  });
+
+  it('closing one warehouse leaves the other warehouse stock untouched and capacity from the open one', () => {
+    const { state, id } = setup();
+    const other = addWarehouse(state, 20);
+    stock(state, 2, other);
+    building(state, id).outOfService = true;
+
+    expect(refreshLogisticsCapacity(state)).toEqual([]);
+
+    expect(state.logistics.fragments.map(f => f.warehouseId).sort()).toEqual([id, other].sort());
+    expect(state.logistics.storedMassKg).toBe(2 * MASS);
+    expect(state.logistics.storageCapacityKg).toBe(getBuildingDef('freight_warehouse', 1).capacity);
+  });
+
+  it('destroying one of two warehouses loses only that one stock', () => {
+    const { state, id } = setup();
+    const other = addWarehouse(state, 20);
+    stock(state, 2, other);
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id !== id);
+
+    const losses = refreshLogisticsCapacity(state);
+
+    expect(losses.map(l => l.buildingId)).toEqual([id]);
+    expect(state.logistics.fragments.map(f => f.warehouseId)).toEqual([other]);
+    expect(state.logistics.storedMassKg).toBe(MASS);
+    expect(state.collectedOre.iron).toBe(ORE_KG);
   });
 });
 

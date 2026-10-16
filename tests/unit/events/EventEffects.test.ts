@@ -276,6 +276,21 @@ describe('isOperating / syncBuildingServiceFlags (#1568)', () => {
     expect(bs[0]!.outOfService).toBeFalsy();
   });
 
+  it('sync reports true when a flag flips on close and on reopen (#1813)', () => {
+    const bs = [building({ id: 1 })];
+    expect(syncBuildingServiceFlags(bs, new Set([1]))).toBe(true);
+    expect(bs[0]!.outOfService).toBe(true);
+    expect(syncBuildingServiceFlags(bs, new Set())).toBe(true);
+    expect(bs[0]!.outOfService).toBeFalsy();
+  });
+
+  it('sync reports false when nothing changes (#1813)', () => {
+    const bs = [building({ id: 1 }), building({ id: 2, outOfService: true })];
+    expect(syncBuildingServiceFlags(bs, new Set([2]))).toBe(false);
+    expect(syncBuildingServiceFlags([building({ id: 1 })], new Set())).toBe(false);
+    expect(syncBuildingServiceFlags([], new Set([5]))).toBe(false);
+  });
+
   it('sync ignores ids of non-existent buildings', () => {
     const bs = [building({ id: 1 })];
     expect(() => syncBuildingServiceFlags(bs, new Set([99]))).not.toThrow();
