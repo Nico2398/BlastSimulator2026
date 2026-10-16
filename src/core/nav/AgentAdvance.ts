@@ -277,7 +277,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   // agent's continuous position onto that rounded echo of itself before
   // making real progress — usually just a wasted fraction of a step, but
   // near a bench/ramp boundary where the "correct" next hop flips depending
-  // on which side of an integer cell the agent is floored into, that wasted
+  // on which side of an integer cell the agent is rounded into (NavGrid.clampX/clampZ), that wasted
   // snap-back is enough to drag the agent back across the boundary every
   // tick, producing a stable two-tick walk-forward/walk-back oscillation
   // that never reaches the destination (found via a #458 T6.1 regression:
@@ -594,7 +594,7 @@ function resolveTargetWaypoint(
     // The step's origin cell is `committed.originX/originZ` — the fresh
     // path's own predecessor waypoint recorded at the moment this
     // commitment was adopted (#1166) — never wherever the agent's
-    // continuous position currently floors into, and never `fromX`/`fromZ`
+    // continuous position currently rounds into, and never `fromX`/`fromZ`
     // either: that field is intentionally rewritten every hop for #1129's
     // retrace guard, so flooring it here drifts onto a phantom cell the
     // pathfinder never actually stepped through, over exactly the same
@@ -713,14 +713,14 @@ function resolveTargetWaypoint(
 /**
  * Index of the first waypoint the agent has not effectively walked already.
  *
- * Index 0 is the agent's own floor-rounded cell (see the note in
+ * Index 0 is the agent's own rounded cell (NavGrid.clampX/clampZ) (see the note in
  * `advanceAlongPath`), so 1 is the normal answer. Index 1 has to be skipped
  * too whenever the route's first hop is a *detour backwards*: with a climb
  * limit in force (#953), the legal way out of a cell often starts by stepping
  * to a neighbour the agent has already passed, because the direct
  * continuation is a face too tall to climb. An agent standing between the two
- * cells floors into the one it just left, is handed a route whose first hop
- * points back the way it came, walks back, floors into the other cell, and
+ * cells rounds into the one it just left, is handed a route whose first hop
+ * points back the way it came, walks back, rounds into the other cell, and
  * gets the mirror image next tick — the same stable two-tick oscillation
  * #458 D14 documents for ramps, reached through the climb gate instead.
  * Reproduced on `sandbox-mode`: a drill rig bouncing between (11,10) and
@@ -735,7 +735,7 @@ function resolveTargetWaypoint(
  *   route deliberately walks around, which on a crater rim means stepping
  *   off the wall this gate exists to make impassable.
  * - The hop from the cell the agent is actually standing in (nearest cell,
- *   not floored — flooring is what misplaces it in the first place) to
+ *   not floored — a floor is what would misplace it in the first place) to
  *   waypoint 2 must itself be passable and climb-legal. Without this the
  *   skip invents a step A* rejected: the route (11,12) → (11,13) → (12,12)
  *   descends and re-ascends precisely because (11,12) → (12,12) is a
