@@ -195,7 +195,7 @@ export class UIManager {
   upgradeBuilding(buildingId: number): void { this.buildMenu.requestUpgrade(buildingId); }
 
   /** Queue research for a building's next tier through the Build panel's shared flow (#1758). */
-  queueBuildingResearch(buildingId: number): void { this.buildMenu.queueResearchFor(buildingId); }
+  queueBuildingResearch(buildingId: number): string | null { return this.buildMenu.queueResearchFor(buildingId); }
 
   /** Reveal HUD chrome once a game exists. Idempotent — safe to call every frame/command. */
   show(): void {

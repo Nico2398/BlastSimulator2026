@@ -184,17 +184,21 @@ export class Inspector {
     this.syncReasons(view);
   }
 
-  /** One inline reason line under the strip per disabled action that names why (the tooltip alone is invisible to touch). */
+  /** One inline reason line under the strip per action that names why: the refusal of a disabled one, the note of an enabled one (the tooltip alone is invisible to touch). */
   private syncReasons(view: InspectorView): void {
-    const wanted = view.actions.filter(a => a.disabled === true && a.title !== undefined);
+    const wanted = view.actions
+      .map(a => ({ action: a.action, text: a.disabled === true ? a.title : a.note }))
+      .filter((w): w is { action: InspectorAction; text: string } => w.text !== undefined);
     const shown = Array.from(this.actionsEl.querySelectorAll<HTMLElement>('[data-reason]'));
-    const unchanged = shown.length === wanted.length
-      && wanted.every((a, i) => shown[i]!.dataset['reason'] === a.action && shown[i]!.textContent === a.title);
-    if (unchanged) return;
+    const sameActions = shown.length === wanted.length && wanted.every((w, i) => shown[i]!.dataset['reason'] === w.action);
+    if (sameActions) {
+      wanted.forEach((w, i) => { if (shown[i]!.textContent !== w.text) shown[i]!.textContent = w.text; });
+      return;
+    }
     for (const node of shown) node.remove();
-    for (const a of wanted) {
-      const line = reasonLine(a.title!);
-      line.dataset['reason'] = a.action;
+    for (const w of wanted) {
+      const line = reasonLine(w.text);
+      line.dataset['reason'] = w.action;
       line.style.flex = '1 1 100%';
       this.actionsEl.append(line);
     }

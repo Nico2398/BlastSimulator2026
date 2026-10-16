@@ -1369,8 +1369,11 @@ inspector.setActionHandler((action, entity) => {
       uiManager.upgradeBuilding(entity.id);
       break;
     case 'research':
-      uiManager.queueBuildingResearch(entity.id);
+    {
+      const refusal = uiManager.queueBuildingResearch(entity.id);
+      if (refusal) uiManager.notify({ severity: 'warn', title: t('inspector.action.research'), body: refusal });
       break;
+    }
     case 'move':
       uiManager.moveBuilding(entity.id);
       break;

@@ -6,6 +6,9 @@ import {
   getUpgradeCost, getMoveCost, getDemolishCost, isSingleTierType, getBuildingDef, type Building, type BuildingType,
 } from '../../../src/core/entities/Building.js';
 import { getResearchTaskDef } from '../../../src/core/config/balance.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { RESERVATION_REFUSAL } from '../../../src/core/entities/PlacementReservations.js';
 
 // #1758: one rule, one implementation — the inspector asks this for which
@@ -169,7 +172,7 @@ describe('buildingActionRules — move and demolish', () => {
     const b = makeBuilding();
     const r = buildingActionRules(stateWith(b), b);
     expect(r.move).toEqual({ cost: getMoveCost(b), disabledReasonKey: null });
-    expect(r.demolish).toEqual({ cost: getDemolishCost(b), disabledReasonKey: null });
+    expect(r.demolish).toMatchObject({ cost: getDemolishCost(b), disabledReasonKey: null });
   });
 
   it('are disabled with a reason on short cash', () => {
@@ -193,5 +196,117 @@ describe('buildingActionRules — move and demolish', () => {
     const s = stateWith(b);
     demolitionOrder(s, b.id);
     expect(buildingActionRules(s, b).demolish.disabledReasonKey).toBeTruthy();
+  });
+});
+
+function addResearchCenter(s: GameState): void {
+  s.buildings.buildings.push(makeBuilding({ id: 90, type: 'research_center', tier: 1, x: 30, z: 30 }));
+}
+
+describe('buildingActionRules — research prerequisite (#1820)', () => {
+  it('tier 2 without a Research Center is blocked naming the Research Center', () => {
+    const b = makeBuilding();
+    const r = buildingActionRules(stateWith(b), b).research!;
+    expect(r.blocked).toEqual({ reasonKey: 'inspector.reason.research_no_center' });
+  });
+
+  it('tier 2 with an operating Research Center is not blocked', () => {
+    const b = makeBuilding();
+    const s = stateWith(b);
+    addResearchCenter(s);
+    expect(buildingActionRules(s, b).research!.blocked).toBeNull();
+  });
+
+  it('a Research Center that is not operating does not count', () => {
+    const b = makeBuilding();
+    const s = stateWith(b);
+    addResearchCenter(s);
+    s.buildings.buildings.find(x => x.id === 90)!.active = false;
+    expect(buildingActionRules(s, b).research!.blocked).toEqual({ reasonKey: 'inspector.reason.research_no_center' });
+  });
+
+  it('tier 3 with a Research Center but no tier-2 research names the missing tier', () => {
+    const b = makeBuilding({ tier: 2 });
+    const s = stateWith(b);
+    addResearchCenter(s);
+    expect(buildingActionRules(s, b).research!.blocked).toEqual({
+      reasonKey: 'inspector.reason.research_needs_tier', reasonParams: { tier: 2 },
+    });
+  });
+
+  it('tier 3 with the tier-2 research done and a Research Center is not blocked', () => {
+    const b = makeBuilding({ tier: 2 });
+    const s = stateWith(b);
+    addResearchCenter(s);
+    s.buildings.unlockedTiers['management_office'] = 2;
+    expect(buildingActionRules(s, b).research!.blocked).toBeNull();
+  });
+
+  it('tier 3 with no Research Center reports the Research Center first', () => {
+    const b = makeBuilding({ tier: 2 });
+    expect(buildingActionRules(stateWith(b), b).research!.blocked).toEqual({ reasonKey: 'inspector.reason.research_no_center' });
+  });
+});
+
+describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => {
+  function unlockedState(b: Building): GameState {
+    const s = stateWith(b);
+    s.buildings.unlockedTiers['management_office'] = 2;
+    return s;
+  }
+
+  function licensedDriver(s: GameState): void {
+    const { employee } = hireEmployee(s.employees, 'driver', new Random(5), 0, 0);
+    assignSkill(s.employees, employee.id, ROLE_LICENCE_REQUIRED.building_destroyer, 1);
+  }
+
+  it('no building destroyer in the fleet: upgrade and demolish wait for a vehicle', () => {
+    const b = makeBuilding();
+    const r = buildingActionRules(unlockedState(b), b);
+    expect(r.upgrade.waitKey).toBe('inspector.wait.no_vehicle');
+    expect(r.demolish.waitKey).toBe('inspector.wait.no_vehicle');
+  });
+
+  it('a destroyer but no licensed eligible employee: wait for a driver', () => {
+    const b = makeBuilding();
+    const s = unlockedState(b);
+    purchaseVehicle(s.vehicles, 'building_destroyer');
+    hireEmployee(s.employees, 'driller', new Random(5), 0, 0);
+    const r = buildingActionRules(s, b);
+    expect(r.upgrade.waitKey).toBe('inspector.wait.no_driver');
+    expect(r.demolish.waitKey).toBe('inspector.wait.no_driver');
+  });
+
+  it('a licensed employee who is not eligible for work does not count', () => {
+    const b = makeBuilding();
+    const s = unlockedState(b);
+    purchaseVehicle(s.vehicles, 'building_destroyer');
+    licensedDriver(s);
+    s.employees.employees[s.employees.employees.length - 1]!.injured = true;
+    expect(buildingActionRules(s, b).upgrade.waitKey).toBe('inspector.wait.no_driver');
+  });
+
+  it('a destroyer and a licensed eligible employee: nothing to wait for', () => {
+    const b = makeBuilding();
+    const s = unlockedState(b);
+    purchaseVehicle(s.vehicles, 'building_destroyer');
+    licensedDriver(s);
+    const r = buildingActionRules(s, b);
+    expect(r.upgrade.waitKey).toBeNull();
+    expect(r.demolish.waitKey).toBeNull();
+  });
+
+  it('a demolition already ordered leaves demolish with no wait note (it is disabled instead)', () => {
+    const b = makeBuilding();
+    const s = unlockedState(b);
+    demolitionOrder(s, b.id);
+    const r = buildingActionRules(s, b);
+    expect(r.demolish.waitKey).toBeNull();
+    expect(r.demolish.disabledReasonKey).toBeTruthy();
+  });
+
+  it('a refused upgrade carries no wait key', () => {
+    const b = makeBuilding({ tier: 3 });
+    expect(buildingActionRules(stateWith(b), b).upgrade.waitKey).toBeNull();
   });
 });

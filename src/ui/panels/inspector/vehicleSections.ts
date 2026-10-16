@@ -4,7 +4,7 @@ import { getVehicleDefByTier, getVehicleReservation, resolveVehicleDriver, vehic
 import { computeVehicleJob, type VehicleJobTarget } from '../../../core/entities/VehicleStatus.js';
 import { isVehicleUnderRepair, missingHp, repairPartsCost } from '../../../core/entities/VehicleRepair.js';
 import { vehicleCargoByOre, vehicleCargoWarehouseId } from '../../../core/economy/VehicleCargo.js';
-import { formatDollars } from '../../../core/economy/formatMoney.js';
+import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import {
@@ -127,9 +127,9 @@ export function buildSpecsSection(v: Vehicle): HTMLElement {
 export function buildCostSection(v: Vehicle, state: GameState): HTMLElement {
   const def = getVehicleDefByTier(v.type, v.tier);
   const fuel = vehicleFuelCostPerTick(state.vehicles, v);
-  const rows = [valueRow(t('inspector.vehicle.maintenance'), t('inspector.upkeep_value', { cost: formatDollars(def.maintenanceCostPerTick) }))];
+  const rows = [valueRow(t('inspector.vehicle.maintenance'), t('inspector.upkeep_value', { cost: formatMoney(def.maintenanceCostPerTick) }))];
   if (getVehicleReservation(state.vehicles, v.id) !== null) {
-    rows.push(valueRow(t('inspector.vehicle.fuel'), t('inspector.upkeep_value', { cost: formatDollars(fuel) })));
+    rows.push(valueRow(t('inspector.vehicle.fuel'), t('inspector.upkeep_value', { cost: formatMoney(fuel) })));
   }
   const wrap = sectionOf(t('inspector.vehicle.cost'), rows);
   return wrap;

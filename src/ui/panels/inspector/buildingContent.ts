@@ -8,7 +8,7 @@ import { computeBuildingStatus, type BuildingStatus } from '../../../core/entiti
 import { factorFor } from '../../../core/events/ActiveModifiers.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { buildingActionRules, REASON_CASH, type BuildingActionRules } from '../../buildingActionRules.js';
+import { buildingActionRules, REASON_CASH, type BuildingActionRules, type InspectorWaitKey } from '../../buildingActionRules.js';
 import { el } from '../../dom.js';
 import type { ActionSpec, InspectorLinks, InspectorView, KindContent } from './InspectorContent.js';
 import { storageContents } from './storageContent.js';
@@ -54,10 +54,39 @@ function reasonText(key: string | null, cost: number, cash: number, params?: Rec
   return t(key, params);
 }
 
-function withCost(action: ActionSpec['action'], labelKey: string, icon: string, cost: number, reason: string | undefined, variant: ActionSpec['variant'] = 'ghost'): ActionSpec {
+function withCost(
+  action: ActionSpec['action'], labelKey: string, icon: string, cost: number, reason: string | undefined,
+  variant: ActionSpec['variant'] = 'ghost', note?: string,
+): ActionSpec {
   return {
     action, labelKey, icon, variant,
-    label: `${t(labelKey)} · ${formatMoney(cost)}`,
+    label: t('inspector.action.cost_label', { action: t(labelKey), cost: formatMoney(cost) }),
+    disabled: reason !== undefined,
+    ...(reason !== undefined ? { title: reason } : {}),
+    ...(note !== undefined ? { note } : {}),
+  };
+}
+
+/** The wait note for an order that stays enabled but will queue until a destroyer and driver exist. */
+function waitNote(waitKey: InspectorWaitKey | null): string | undefined {
+  return waitKey === null ? undefined : t(waitKey, { role: t('vehicle_type.building_destroyer') });
+}
+
+/** Research action: queued progress, then a rules block, then cash; instant research drops the tick count. */
+function researchAction(state: GameState, research: NonNullable<BuildingActionRules['research']>): ActionSpec {
+  const queuedText = research.queued
+    ? t('ui.build.research_progress', { percent: Math.round(research.queued.fraction * 100), remaining: research.queued.remaining })
+    : undefined;
+  const blockText = research.blocked ? t(research.blocked.reasonKey, research.blocked.reasonParams) : undefined;
+  const cashReason = state.cash < research.cost ? reasonText(REASON_CASH, research.cost, state.cash) : undefined;
+  const reason = queuedText ?? blockText ?? cashReason;
+  const label = research.queued
+    ? queuedText!
+    : research.duration === 0
+      ? t('inspector.action.cost_label', { action: t('inspector.action.research'), cost: formatMoney(research.cost) })
+      : t('inspector.action.research_cost', { cost: formatMoney(research.cost), duration: research.duration });
+  return {
+    action: 'research', labelKey: 'inspector.action.research', icon: 'up', variant: 'ghost', label,
     disabled: reason !== undefined,
     ...(reason !== undefined ? { title: reason } : {}),
   };
@@ -68,28 +97,16 @@ function standingActions(state: GameState, rules: BuildingActionRules): ActionSp
   const { upgrade, research, move, demolish } = rules;
   const actions: ActionSpec[] = [];
   if (upgrade.kind === 'locked' && research) {
-    const queuedText = research.queued
-      ? t('ui.build.research_progress', { percent: Math.round(research.queued.fraction * 100), remaining: research.queued.remaining })
-      : undefined;
-    const cashReason = state.cash < research.cost ? reasonText(REASON_CASH, research.cost, state.cash) : undefined;
-    const reason = queuedText ?? cashReason;
-    actions.push({
-      action: 'research', labelKey: 'inspector.action.research', icon: 'up', variant: 'ghost',
-      label: research.queued
-        ? queuedText!
-        : t('inspector.action.research_cost', { cost: formatMoney(research.cost), duration: research.duration }),
-      disabled: reason !== undefined,
-      ...(reason !== undefined ? { title: reason } : {}),
-    });
+    actions.push(researchAction(state, research));
   } else {
     const reason = reasonText(upgrade.reasonKey, upgrade.cost ?? 0, state.cash, upgrade.reasonParams);
     actions.push(upgrade.cost === null
       ? { action: 'upgrade', labelKey: 'inspector.action.upgrade', icon: 'up', variant: 'ghost', disabled: true, ...(reason ? { title: reason } : {}) }
-      : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
+      : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason, 'ghost', waitNote(upgrade.waitKey)), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
   }
   actions.push(
     withCost('move', 'inspector.action.move', 'drive', move.cost, reasonText(move.disabledReasonKey, move.cost, state.cash)),
-    withCost('demolish', 'inspector.action.demolish', 'trash', demolish.cost, reasonText(demolish.disabledReasonKey, demolish.cost, state.cash), 'danger'),
+    withCost('demolish', 'inspector.action.demolish', 'trash', demolish.cost, reasonText(demolish.disabledReasonKey, demolish.cost, state.cash), 'danger', waitNote(demolish.waitKey)),
   );
   return actions;
 }

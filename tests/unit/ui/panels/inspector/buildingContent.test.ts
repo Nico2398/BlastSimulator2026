@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 // Building inspector content (#1758): live status, condition, costs, action strip.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { buildingContent } from '../../../../../src/ui/panels/inspector/buildingContent.js';
 import type { ActionSpec, InspectorLinks, InspectorView } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../../../src/core/state/GameState.js';
-import { getBuildingDef, getUpgradeCost, type Building } from '../../../../../src/core/entities/Building.js';
+import { getBuildingDef, getUpgradeCost, getMoveCost, getDemolishCost, type Building } from '../../../../../src/core/entities/Building.js';
 import { getResearchTaskDef } from '../../../../../src/core/config/balance.js';
 import { hireEmployee, createEmployeeState } from '../../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../../src/core/math/Random.js';
 import { RESERVATION_REFUSAL } from '../../../../../src/core/entities/PlacementReservations.js';
-import { t } from '../../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../../../src/core/entities/Vehicle.js';
+import { assignSkill } from '../../../../../src/core/entities/Employee.js';
 
 const links = { select: () => {} } as unknown as InspectorLinks;
 
@@ -72,6 +75,10 @@ function addSite(s: GameState, id: number, remaining: number | null, total: numb
   a.holderId = employee.id;
   a.status = 'in_progress';
   return { builderId: employee.id };
+}
+
+function addResearchCenter(s: GameState): void {
+  s.buildings.buildings.push(makeBuilding({ id: 90, type: 'research_center', x: 40, z: 40 }));
 }
 
 describe('building inspector — status line per state', () => {
@@ -206,7 +213,9 @@ describe('building inspector — action strip', () => {
   });
 
   it('research replaces upgrade when the next tier is locked, carrying cost and duration', () => {
-    const view = viewOf(stateWith(makeBuilding()));
+    const withLab = stateWith(makeBuilding());
+    addResearchCenter(withLab);
+    const view = viewOf(withLab);
     expect(view.actions.map(a => a.action)).toEqual(['research', 'move', 'demolish']);
     const research = actionOf(view, 'research')!;
     expect(research.disabled ?? false).toBe(false);
@@ -217,6 +226,7 @@ describe('building inspector — action strip', () => {
 
   it('once research is queued the research action is disabled and shows live progress', () => {
     const s = stateWith(makeBuilding());
+    addResearchCenter(s);
     const def = getResearchTaskDef('management_office', 2);
     s.buildings.researchQueue.push({
       targetType: 'management_office', targetTier: 2, ticksRemaining: Math.floor(def.ticks / 2), cost: def.cost, conditions: [],
@@ -320,5 +330,181 @@ describe('building inspector — people and activity sections (#1760)', () => {
     const { employee } = hireEmployee(s.employees, 'driller', new Random(7), 0, 0);
     employee.pendingTrainingState = { buildingId: 3, skill: 'blasting', ticksRemaining: 50, fee: 100, grantsLevel: 1 };
     expect(viewOf(s).signature).not.toBe(before);
+  });
+});
+
+describe('building inspector — money carries the currency sign (#1820)', () => {
+  afterEach(() => setLocale('en'));
+
+  const warehouse = () => makeBuilding({ type: 'freight_warehouse', tier: 1 });
+  const upkeepOf = (view: InspectorView): string => {
+    const root = document.createElement('div');
+    root.append(...view.sections);
+    return root.querySelector('[data-live="upkeep"]')!.textContent ?? '';
+  };
+
+  function labelled(s: GameState): InspectorView {
+    addResearchCenter(s);
+    return viewOf(s);
+  }
+
+  it('upkeep reads $cost/h', () => {
+    const b = warehouse();
+    const upkeep = getBuildingDef(b.type, b.tier).operatingCostPerTick;
+    expect(upkeepOf(viewOf(stateWith(b)))).toContain(`$${formatMoney(upkeep)}/h`);
+  });
+
+  it('Research, Move and Demolish labels carry $ before the grouped amount', () => {
+    const b = warehouse();
+    const view = labelled(stateWith(b));
+    const research = getResearchTaskDef('freight_warehouse', 2);
+    expect(actionOf(view, 'research')!.label).toContain(`$${formatMoney(research.cost)}`);
+    expect(actionOf(view, 'move')!.label).toBe(`${t('inspector.action.move')} · $${formatMoney(getMoveCost(b))}`);
+    expect(actionOf(view, 'demolish')!.label).toBe(`${t('inspector.action.demolish')} · $${formatMoney(getDemolishCost(b))}`);
+  });
+
+  it('Upgrade label carries $', () => {
+    const b = warehouse();
+    const s = stateWith(b);
+    s.buildings.unlockedTiers['freight_warehouse'] = 2;
+    expect(actionOf(viewOf(s), 'upgrade')!.label).toBe(`${t('inspector.action.upgrade')} · $${formatMoney(getUpgradeCost(b, 2))}`);
+  });
+
+  it('a cash refusal title carries $ on both amounts', () => {
+    const b = warehouse();
+    const move = actionOf(viewOf(stateWith(b, 0)), 'move')!;
+    expect(move.disabled).toBe(true);
+    expect(move.title).toBe(`Not enough cash: needs $${formatMoney(getMoveCost(b))}, you have $0`);
+  });
+
+  it('the French locale places the sign after the amount', () => {
+    setLocale('fr');
+    const b = warehouse();
+    const view = labelled(stateWith(b));
+    const upkeep = getBuildingDef(b.type, b.tier).operatingCostPerTick;
+    expect(upkeepOf(view)).toContain(`${formatMoney(upkeep)} $ par h`);
+    expect(actionOf(view, 'move')!.label).toContain(`${formatMoney(getMoveCost(b))} $`);
+    expect(actionOf(view, 'move')!.label).not.toContain(`$${formatMoney(getMoveCost(b))}`);
+    expect(actionOf(view, 'research')!.label).toContain(`${formatMoney(getResearchTaskDef('freight_warehouse', 2).cost)} $`);
+    const broke = actionOf(viewOf(stateWith(b, 0)), 'move')!;
+    expect(broke.title).toContain(`${formatMoney(getMoveCost(b))} $`);
+  });
+
+  it('a queued research line and a course row carry the sign', () => {
+    const s = stateWith(makeBuilding({ type: 'research_center' }));
+    // The head of the queue renders as running (no cost); the money shows on the pending lines behind it.
+    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 2, ticksRemaining: 5, cost: 100, conditions: [] });
+    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 2, ticksRemaining: 5, cost: 5000, conditions: [] });
+    expect(textOf(viewOf(s))).toContain('$5,000');
+    const school = makeBuilding({ type: 'blasting_academy' });
+    expect(textOf(viewOf(stateWith(school)))).toMatch(/fee \$[\d,]+/);
+  });
+});
+
+describe('building inspector — research duration (#1820)', () => {
+  it('instant tier-2 research shows no tick count', () => {
+    const s = stateWith(makeBuilding({ type: 'freight_warehouse' }));
+    addResearchCenter(s);
+    expect(getResearchTaskDef('freight_warehouse', 2).ticks).toBe(0);
+    const label = actionOf(viewOf(s), 'research')!.label!;
+    expect(label).not.toMatch(/tick/i);
+    expect(label).not.toMatch(/\b0\b/);
+  });
+
+  it('tier-3 research still shows its duration', () => {
+    const s = stateWith(makeBuilding({ type: 'freight_warehouse', tier: 2 }));
+    addResearchCenter(s);
+    s.buildings.unlockedTiers['freight_warehouse'] = 2;
+    const research = actionOf(viewOf(s), 'research')!;
+    expect(research.disabled ?? false).toBe(false);
+    expect(research.label).toContain('50 ticks');
+  });
+});
+
+describe('building inspector — research prerequisite (#1820)', () => {
+  it('without a Research Center the Research action is disabled and names it', () => {
+    const research = actionOf(viewOf(stateWith(makeBuilding({ type: 'freight_warehouse' }))), 'research')!;
+    expect(research.disabled).toBe(true);
+    expect(research.title).toBe(t('inspector.reason.research_no_center'));
+    expect(research.title).toContain('Research Center');
+  });
+
+  it('with an operating Research Center it is enabled and carries no reason', () => {
+    const s = stateWith(makeBuilding({ type: 'freight_warehouse' }));
+    addResearchCenter(s);
+    const research = actionOf(viewOf(s), 'research')!;
+    expect(research.disabled ?? false).toBe(false);
+    expect(research.title).toBeUndefined();
+  });
+
+  it('tier 3 without the tier-2 research is disabled and names the missing tier', () => {
+    const s = stateWith(makeBuilding({ type: 'freight_warehouse', tier: 2 }));
+    addResearchCenter(s);
+    const research = actionOf(viewOf(s), 'research')!;
+    expect(research.disabled).toBe(true);
+    expect(research.title).toBe(t('inspector.reason.research_needs_tier', { tier: 2 }));
+  });
+
+  it('queued research still shows progress and is disabled', () => {
+    const s = stateWith(makeBuilding({ type: 'freight_warehouse', tier: 2 }));
+    addResearchCenter(s);
+    s.buildings.unlockedTiers['freight_warehouse'] = 2;
+    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 3, ticksRemaining: 20, cost: 12000, conditions: [] });
+    const research = actionOf(viewOf(s), 'research')!;
+    expect(research.disabled).toBe(true);
+    expect(research.label).toBe(t('ui.build.research_progress', { percent: Math.round(((50 - 20) / 50) * 100), remaining: 20 }));
+  });
+
+  it('cash short with a Research Center keeps the cash reason', () => {
+    const s = stateWith(makeBuilding({ type: 'freight_warehouse' }), 0);
+    addResearchCenter(s);
+    const research = actionOf(viewOf(s), 'research')!;
+    expect(research.disabled).toBe(true);
+    expect(research.title).toContain('Not enough cash');
+  });
+});
+
+describe('building inspector — upgrade and demolish wait for a Building Destroyer (#1820)', () => {
+  const waitNoVehicle = () => t('inspector.wait.no_vehicle', { role: t('vehicle_type.building_destroyer') });
+
+  function upgradable(): GameState {
+    const s = stateWith(makeBuilding());
+    s.buildings.unlockedTiers['management_office'] = 2;
+    return s;
+  }
+
+  it('with no destroyer, Upgrade and Demolish stay enabled and carry the wait note', () => {
+    const view = viewOf(upgradable());
+    for (const name of ['upgrade', 'demolish'] as const) {
+      const a = actionOf(view, name)!;
+      expect(a.disabled ?? false, name).toBe(false);
+      expect(a.note, name).toBe(waitNoVehicle());
+    }
+    expect(actionOf(view, 'move')!.note).toBeUndefined();
+  });
+
+  it('with a destroyer but no licensed driver the note names the driver', () => {
+    const s = upgradable();
+    purchaseVehicle(s.vehicles, 'building_destroyer');
+    const a = actionOf(viewOf(s), 'upgrade')!;
+    expect(a.disabled ?? false).toBe(false);
+    expect(a.note).toBe(t('inspector.wait.no_driver', { role: t('vehicle_type.building_destroyer') }));
+    expect(a.note).not.toBe(waitNoVehicle());
+  });
+
+  it('with a destroyer and a licensed driver there is no note', () => {
+    const s = upgradable();
+    purchaseVehicle(s.vehicles, 'building_destroyer');
+    const { employee } = hireEmployee(s.employees, 'driver', new Random(5), 0, 0);
+    assignSkill(s.employees, employee.id, ROLE_LICENCE_REQUIRED.building_destroyer, 1);
+    const view = viewOf(s);
+    for (const a of view.actions) expect(a.note, a.action).toBeUndefined();
+  });
+
+  it('a refused (disabled) action carries its reason, not a wait note', () => {
+    const s = stateWith(makeBuilding({ tier: 3 }));
+    const up = actionOf(viewOf(s), 'upgrade')!;
+    expect(up.disabled).toBe(true);
+    expect(up.note).toBeUndefined();
   });
 });

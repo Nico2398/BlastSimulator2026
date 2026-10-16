@@ -318,6 +318,23 @@ describe('vehicle inspector — specs and running cost', () => {
     expect(cost).toContain(String(def.maintenanceCostPerTick));
   });
 
+  it('prints the dollar sign once, before the amount in English and after it in French', () => {
+    const def = getVehicleDefByTier('debris_hauler', 1);
+    const amount = formatMoney(def.maintenanceCostPerTick);
+    const en = mount(viewOf(makeState(makeVehicle()))).querySelector('.bs-vehicle-cost')!.textContent!;
+    expect(en).toContain(`$${amount}/h`);
+    expect(en).not.toContain('$$');
+    const state = makeState(makeVehicle());
+    setLocale('fr'); // makeState resets to en, so switch after building it
+    try {
+      const fr = mount(viewOf(state)).querySelector('.bs-vehicle-cost')!.textContent!;
+      expect(fr).toContain(`${amount} $ par h`);
+      expect(fr).not.toContain('$$');
+    } finally {
+      setLocale('en');
+    }
+  });
+
   it('a working vehicle also shows the fuel cost per hour', () => {
     const def = getVehicleDefByTier('debris_hauler', 1);
     const { s } = haulerOnTheRoad();
