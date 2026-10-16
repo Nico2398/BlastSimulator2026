@@ -73,6 +73,8 @@ import { formatBalance } from './ui/shell/TopBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
+import { armEntityMovePick } from './ui/scene/EntityMovePick.js';
+import { vehicleDisplayName } from './ui/fleetDetailSections.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { nextRampWidth } from './core/mining/RampWidening.js';
@@ -216,7 +218,8 @@ placementController.setClaimCheck((x, z) => {
 paramStrip.setConfirmHandler(() => placementController.confirm());
 paramStrip.setCancelHandler(() => placementController.cancel());
 uiManager.setClaimAreaPreview((rect) => ctx.playableArea?.previewClaimArea(rect) ?? null);
-uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
+const placementKit = { controller: placementController, overlay: selectionOverlay, strip: paramStrip };
+uiManager.setPlacementKit(placementKit);
 // Build panel's footprint-flatness preview (#1008) reads the same ground
 // truth checkFootprintPlacement does — the raw voxel surface, not a
 // smoothed/rendered height — so the strip and the console never disagree.
@@ -1293,7 +1296,8 @@ scenePicking.setSelectChangeHandler((entity) => {
 // registered before the Site Map layer, which outranks it (most recently
 // registered wins, per UIManager.registerEscLayer).
 uiManager.registerEscLayer(() => {
-  if (!scenePicking.selection) return false;
+  // An armed pick (Move Here / Dispatch Here) outranks deselecting: Esc cancels it first.
+  if (placementController.isArmed || !scenePicking.selection) return false;
   scenePicking.clearSelection();
   return true;
 });
@@ -1318,31 +1322,23 @@ inspector.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 inspector.setActionHandler((action, entity) => {
   switch (action) {
     case 'dispatch_here': {
-      // "Here" = wherever the player is currently pointing on the ground —
-      // the live hover state, read at the moment the button is clicked.
-      const terrain = scenePicking.aim?.terrain;
-      if (!terrain) {
-        uiManager.notify({ severity: 'warn', title: t('inspector.action.dispatch_here'), body: t('inspector.no_move_target') });
-        break;
-      }
-      reportIfFailed(t('inspector.action.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
+      // Touch-friendly: arms the in-scene tile pick (own tile pre-selected) instead of reading a hover.
+      const employee = ctx.state?.employees.employees.find(e => e.id === entity.id);
+      if (!employee) break;
+      const title = t('inspector.action.dispatch_here');
+      armEntityMovePick(placementKit, { kind: 'employee', id: employee.id, name: employee.name, x: employee.x, z: employee.z },
+        (cmd) => reportIfFailed(title, window.__gameConsole(cmd)));
       break;
     }
     case 'upgrade_vehicle':
       reportIfFailed(t('inspector.action.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
       break;
     case 'move_here': {
-      // Vehicle counterpart of Dispatch Here: drive to whatever tile the
-      // player is currently pointing at. `vehicle reposition` takes its
-      // coordinates positionally (#1092) — `<id> <x> <z>`, not the `to:x,z`
-      // form the deleted `vehicle move` took; it also finds an idle licensed
-      // driver on its own when the vehicle is empty.
-      const terrain = scenePicking.aim?.terrain;
-      if (!terrain) {
-        uiManager.notify({ severity: 'warn', title: t('inspector.action.move_here'), body: t('inspector.no_move_target') });
-        break;
-      }
-      reportIfFailed(t('inspector.action.move_here'), window.__gameConsole(`vehicle reposition ${entity.id} ${terrain.tileX} ${terrain.tileZ}`));
+      const vehicle = ctx.state?.vehicles.vehicles.find(v => v.id === entity.id);
+      if (!vehicle) break;
+      const title = t('inspector.action.move_here');
+      armEntityMovePick(placementKit, { kind: 'vehicle', id: vehicle.id, name: vehicleDisplayName(vehicle.type, vehicle.tier), x: vehicle.x, z: vehicle.z },
+        (cmd) => reportIfFailed(title, window.__gameConsole(cmd)));
       break;
     }
     case 'locate': {
