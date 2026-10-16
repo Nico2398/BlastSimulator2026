@@ -562,6 +562,16 @@ export function rectOverlapsOccupants(
   return false;
 }
 
+/** The first occupant whose footprint overlaps the inclusive-min / exclusive-max world rect, if any (#1830). */
+export function findOverlappingOccupant(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  rect: Rect,
+): FootprintOccupant | undefined {
+  void occupants;
+  void rect;
+  return undefined; // TODO: implement
+}
+
 /**
  * Whether a building of `type`/`tier` can be placed at (x, z) given the
  * current occupants (live buildings AND planned-but-not-yet-built ones) —
