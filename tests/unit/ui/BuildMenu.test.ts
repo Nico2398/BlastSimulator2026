@@ -21,7 +21,6 @@ import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import { liveArea, regionContains, EXACT_LIVE_MARGIN, type TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { REGION } from '../../../src/ui/tutorialStages.js';
-import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
@@ -86,12 +85,10 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     container.remove();
   });
 
-  it('4-button row (Research Center, tier 2 locked + not queued): info div gets a flex basis and min-width:0, all 4 buttons get flex:0 1 auto + white-space:normal', () => {
+  it('Research Center row: label column keeps its flex basis and min-width:0, and no action button is rendered', () => {
     const researchCenter = makeBuilding({ id: 1, type: 'research_center', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [researchCenter];
-    // Default unlockedTiers is {} (tier 2 not unlocked) and researchQueue is
-    // empty (nothing queued), so researchBtn is visible — 4 buttons total.
 
     menu.update(state);
 
@@ -101,36 +98,18 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(info).not.toBeNull();
     expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');
-    // Sanity: only CSS changed, label text still complete.
     expect(info!.textContent).toContain('#1');
     expect(info!.textContent).toContain('(5,5)');
 
-    const moveBtn = row.querySelector<HTMLButtonElement>('.bs-build-move-btn');
-    const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
-    const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
-    const demolishBtn = row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn');
-
-    expect(moveBtn).not.toBeNull();
-    expect(upgradeBtn).not.toBeNull();
-    expect(researchBtn).not.toBeNull();
-    expect(demolishBtn).not.toBeNull();
-    // Research Center's own tier 2 must be locked and not queued for the
-    // 4th button to be visible — confirm the fixture actually exercises the
-    // 4-button case before asserting on its buttons.
-    expect(researchBtn!.style.display).not.toBe('none');
-
-    for (const btn of [moveBtn, upgradeBtn, researchBtn, demolishBtn]) {
-      expect(btn!.style.flex).toBe('0 0 auto');
-      expect(btn!.style.whiteSpace).toBe('nowrap');
+    for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn']) {
+      expect(row.querySelector(sel), sel).toBeNull();
     }
   });
 
-  it('3-button row (Living Quarters at max tier 3, researchBtn hidden): info div gets a flex basis and min-width:0, all 3 visible buttons get flex:0 1 auto + white-space:normal', () => {
+  it('max-tier row (Living Quarters tier 3): same label layout, still no action button', () => {
     const livingQuarters = makeBuilding({ id: 2, type: 'living_quarters', tier: 3 });
     const state = makeMockState();
     state.buildings.buildings = [livingQuarters];
-    // Tier 3 is the max tier, so nextTier is null and researchBtn stays
-    // hidden — exactly 3 visible buttons: Move, Upgrade (disabled), Demolish.
 
     menu.update(state);
 
@@ -143,20 +122,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(info!.textContent).toContain('#2');
     expect(info!.textContent).toContain('(5,5)');
 
-    const moveBtn = row.querySelector<HTMLButtonElement>('.bs-build-move-btn');
-    const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
-    const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
-    const demolishBtn = row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn');
-
-    expect(moveBtn).not.toBeNull();
-    expect(upgradeBtn).not.toBeNull();
-    expect(demolishBtn).not.toBeNull();
-    // Confirm the fixture actually exercises the 3-button case.
-    expect(researchBtn!.style.display).toBe('none');
-
-    for (const btn of [moveBtn, upgradeBtn, demolishBtn]) {
-      expect(btn!.style.flex).toBe('0 0 auto');
-      expect(btn!.style.whiteSpace).toBe('nowrap');
+    for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn']) {
+      expect(row.querySelector(sel), sel).toBeNull();
     }
   });
 });
@@ -174,84 +141,39 @@ describe('BuildMenu — placed-row affordability guard (issue #511)', () => {
     container.remove();
   });
 
-  it('.bs-build-demolish-btn / .bs-build-upgrade-btn / .bs-build-move-btn disable when cash is short of their real cost, and re-enable on a cash-only update() that never rebuilds the row', () => {
+  it('a cash-only update() never rebuilds the placed row and the row carries no action buttons', () => {
     const building = makeBuilding({ id: 1, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [building];
-    // Tier 2 researched so only the funds guard — not the research gate — is
-    // under test here; the tier-locked case is covered by BuildMenu's own
-    // pre-existing nextTier===null disabling, not this guard.
     state.buildings.unlockedTiers['management_office'] = 2;
 
-    const oldDef = getBuildingDef('management_office', 1);
-    const newDef = getBuildingDef('management_office', 2);
-    const demolishCost = oldDef.demolishCost;
-    const moveCost = Math.round(oldDef.constructionCost * 0.5);
-    const upgradeCost = oldDef.demolishCost + newDef.constructionCost;
-    const maxCost = Math.max(demolishCost, moveCost, upgradeCost);
-
-    state.cash = maxCost - 1;
+    state.cash = 10;
     menu.update(state);
     const row = findPlacedRow(container, 1);
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(demolishCost > state.cash);
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.disabled).toBe(upgradeCost > state.cash);
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(moveCost > state.cash);
+    expect(row.querySelector('button.bs-build-demolish-btn, button.bs-build-upgrade-btn, button.bs-build-move-btn')).toBeNull();
 
-    // Cash-only change: building id/tier, unlockedTiers, and researchQueue are
-    // all unchanged, so `update()` must not trigger `refreshPlacedList()` — the
-    // row's own DOM node must survive, proving the cash refresh is the cheap
-    // per-tick path, not a full placed-list rebuild.
-    state.cash = maxCost;
+    state.cash = 99999;
     menu.update(state);
-    const rowAfter = findPlacedRow(container, 1);
-    expect(rowAfter).toBe(row);
-    expect(rowAfter.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(false);
-    expect(rowAfter.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.disabled).toBe(false);
-    expect(rowAfter.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(false);
+    expect(findPlacedRow(container, 1)).toBe(row);
+    state.cash = 10;
+    menu.update(state);
+    expect(findPlacedRow(container, 1)).toBe(row);
   });
 
-  it('re-disables on a cash-only update() that drops the balance back below cost', () => {
-    const building = makeBuilding({ id: 2, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    state.buildings.unlockedTiers['management_office'] = 2;
-    const demolishCost = getBuildingDef('management_office', 1).demolishCost;
-
-    state.cash = demolishCost;
-    menu.update(state);
-    expect(findPlacedRow(container, 2).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(false);
-
-    state.cash = demolishCost - 1;
-    menu.update(state);
-    expect(findPlacedRow(container, 2).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
-  });
-
-  it('cash that dropped while only observe() saw the state still disables Move and Demolish on the next update()', () => {
+  it('cash dropped while only observe() saw the state still leaves the row untouched on the next update()', () => {
     const building = makeBuilding({ id: 3, type: 'management_office', tier: 1 });
     const rich = makeMockState();
     rich.buildings.buildings = [building];
     rich.cash = 99999;
     menu.update(rich);
     const row = findPlacedRow(container, 3);
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(false);
 
     const poor = makeMockState();
     poor.buildings.buildings = [building];
     poor.cash = 1500;
     menu.observe(poor);
     menu.update(poor);
-    const after = findPlacedRow(container, 3);
-    expect(after.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
-    expect(after.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(true);
-  });
-
-  it('placed-row Upgrade of a research-locked tier is disabled when cash is short of the upgrade cost', () => {
-    const building = makeBuilding({ id: 4, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    state.cash = 1500;
-    menu.update(state);
-    expect(findPlacedRow(container, 4).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.disabled).toBe(true);
+    expect(findPlacedRow(container, 3)).toBe(row);
   });
 });
 
@@ -664,7 +586,7 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalled();
   });
 
-  it('placed row Move button arms the point tool at a new location and dispatches build move on confirm', () => {
+  it('armMove (the inspector Move) arms the point tool and dispatches build move on confirm', () => {
     const { kit, controller } = makeMockKit();
     menu.setPlacementKit(kit);
     const building = makeBuilding({ id: 7, type: 'management_office', tier: 1 });
@@ -672,9 +594,7 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     state.buildings.buildings = [building];
     menu.update(state);
 
-    const row = findPlacedRow(container, 7);
-    const moveBtn = row.querySelector<HTMLButtonElement>('.bs-build-move-btn')!;
-    moveBtn.click();
+    menu.armMove(7);
     expect(controller.isArmed).toBe(true);
 
     controller.simulateSelect({ x1: 20, z1: 21, x2: 20, z2: 21 });
@@ -683,102 +603,38 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalledWith('build move 7 to:20,21');
   });
 
-  it('placed row Upgrade button on a locked next tier reports research-required instead of upgrading', () => {
+  it('requestUpgrade on a locked next tier reports research-required instead of upgrading', () => {
     const building = makeBuilding({ id: 8, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [building];
-    // unlockedTiers left empty — tier 2 is locked.
     menu.update(state);
 
-    const row = findPlacedRow(container, 8);
-    const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!;
-    upgradeBtn.click();
+    menu.requestUpgrade(8);
 
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));
   });
 
-  it('placed row Upgrade button dispatches build upgrade once the next tier is unlocked', () => {
+  it('requestUpgrade dispatches build upgrade once the next tier is unlocked', () => {
     const building = makeBuilding({ id: 9, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [building];
     state.buildings.unlockedTiers['management_office'] = 2;
     menu.update(state);
 
-    const row = findPlacedRow(container, 9);
-    const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!;
-    upgradeBtn.click();
+    menu.requestUpgrade(9);
 
     expect(gameConsole).toHaveBeenCalledWith('build upgrade 9');
   });
 
-  it('placed row Queue Research button dispatches research queue for the next tier', () => {
+  it('queueResearchFor dispatches research queue for the next tier', () => {
     const building = makeBuilding({ id: 10, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [building];
     menu.update(state);
 
-    const row = findPlacedRow(container, 10);
-    const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!;
-    expect(researchBtn.style.display).not.toBe('none');
-    researchBtn.click();
+    menu.queueResearchFor(10);
 
     expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
-  });
-
-  it('placed row Demolish click hands a confirm config to the handler and does not destroy (#1399)', () => {
-    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    const handler = vi.fn();
-    menu.setConfirmHandler(handler);
-    menu.update(state);
-
-    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
-
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(gameConsole).not.toHaveBeenCalledWith('build destroy 11');
-    const config = handler.mock.calls[0]![0];
-    expect(config.confirmLabel).toBe(t('ui.build.demolish'));
-  });
-
-  it('confirming the handed config runs build destroy and reports demolished (#1399)', () => {
-    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    const handler = vi.fn();
-    menu.setConfirmHandler(handler);
-    menu.update(state);
-    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
-
-    handler.mock.calls[0]![0].onConfirm();
-
-    expect(gameConsole).toHaveBeenCalledTimes(1);
-    expect(gameConsole).toHaveBeenCalledWith('build destroy 11');
-  });
-
-  it('Demolish click only hands off a confirm config and does not run build destroy (#1399)', () => {
-    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    menu.setConfirmHandler(vi.fn());
-    menu.update(state);
-    const handler = vi.fn();
-    menu.setConfirmHandler(handler);
-    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
-
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(gameConsole).not.toHaveBeenCalled();
-  });
-
-  it('Demolish click with no confirm handler does nothing (#1399)', () => {
-    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    menu.update(state);
-
-    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
-
-    expect(gameConsole).not.toHaveBeenCalled();
   });
 
   it('refreshUnderConstructionCounts shows the per-type count once a building enters plannedBuildings', () => {
@@ -976,24 +832,6 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
         expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'rect', refused: false }));
         expect(lastStrip(strip).confirmDisabledReason).toBeUndefined();
       });
-
-      it('disables the placed row Upgrade button with the reason as title when the next tier reaches the ramp, and a cash-only update re-evaluates it', () => {
-        const state = stateWithRampAt(5, 7); // tier 1 office covers z 5..6; tier 2 (2x3) grows into z 7
-        state.buildings.buildings = [makeBuilding({ id: 7, type: 'management_office', tier: 1, x: 5, z: 5 })];
-        state.buildings.unlockedTiers['management_office'] = 2;
-        menu.update(state);
-        const btn = findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!;
-        expect(btn.disabled).toBe(true);
-        expect(btn.title).toBe(t('shell.placement.refused_ramp'));
-        // control: same upgrade with no ramp stays enabled
-        const clear = makeMockState();
-        clear.buildings.buildings = state.buildings.buildings;
-        clear.buildings.unlockedTiers['management_office'] = 2;
-        menu.update({ ...clear, cash: 99998 });
-        const btn2 = findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!;
-        expect(btn2.disabled).toBe(false);
-        expect(btn2.title).toMatch(/^\$/);
-      });
     });
 
     it('a free selection keeps Confirm enabled with no reason', () => {
@@ -1014,7 +852,7 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
         makeBuilding({ id: 8, type: 'management_office', tier: 1, x: 20, z: 20 }),
       ];
       menu.update(state);
-      findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-move-btn')!.click();
+      menu.armMove(7);
 
       controller.simulateHover({ x: 5, z: 5 });
       expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
@@ -1077,7 +915,7 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
       const { kit, controller, overlay } = makeMockKit();
       menu.setPlacementKit(kit);
       menu.update(stateWithBuildingAt(5, 5));
-      findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-move-btn')!.click();
+      menu.armMove(7);
       gameConsole.mockReturnValue({ success: false, output: 'Move refused' });
       controller.simulateSelect({ x1: 20, z1: 21, x2: 20, z2: 21 });
 
@@ -1239,17 +1077,6 @@ describe('BuildMenu — research cost, duration and progress (#1398)', () => {
       expect(label).toContain(String(def.ticks));
       expect(label).toBe(t('ui.build.queue_research_cost', { cost: formatMoney(def.cost), duration: def.ticks }));
     });
-
-    it(`placed row research button shows cost and duration for tier ${tier}`, () => {
-      const state = makeMockState();
-      state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: (tier - 1) as 1 | 2 })];
-      if (tier === 3) state.buildings.unlockedTiers['management_office'] = 2;
-      menu.update(state);
-      const def = RESEARCH_TASK_DEFS['management_office'][tier];
-      const label = findPlacedRow(container, 1).querySelector<HTMLButtonElement>('.bs-build-research-btn')!.textContent ?? '';
-      expect(label).toContain(formatMoney(def.cost));
-      expect(label).toContain(String(def.ticks));
-    });
   }
 
   it('catalog research button label updates when the tier selector changes', () => {
@@ -1280,16 +1107,26 @@ describe('BuildMenu — research cost, duration and progress (#1398)', () => {
     expect(row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.style.display).toBe('none');
   });
 
-  it('queued task shows a progress element and hides the button (placed row)', () => {
+  it('queued task adds no progress element or research button to the placed row; the catalog row keeps its own', () => {
     const state = stateWithTier2();
     state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
     state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
     menu.update(state);
     const row = findPlacedRow(container, 1);
-    const progress = row.querySelector<HTMLElement>('.bs-build-research-progress');
-    expect(progress).not.toBeNull();
-    expect(progress!.textContent).toBe(t('ui.build.research_progress', { percent: 50, remaining: 25 }));
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.style.display).toBe('none');
+    expect(row.querySelector('.bs-build-research-progress')).toBeNull();
+    expect(row.querySelector('.bs-build-research-btn')).toBeNull();
+    selectTier(catalogRow('management_office'), 3);
+    expect(catalogRow('management_office').querySelector('.bs-build-research-progress')).not.toBeNull();
+  });
+
+  it('a research-queue change does not rebuild the placed row', () => {
+    const state = stateWithTier2();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
+    menu.update(state);
+    const row = findPlacedRow(container, 1);
+    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
+    menu.update(state);
+    expect(findPlacedRow(container, 1)).toBe(row);
   });
 
   it('no progress element when nothing is queued', () => {
@@ -1298,21 +1135,6 @@ describe('BuildMenu — research cost, duration and progress (#1398)', () => {
     menu.update(state);
     selectTier(catalogRow('management_office'), 3);
     expect(container.querySelector('.bs-build-research-progress')).toBeNull();
-  });
-
-  it('progress advances as ticksRemaining drops (placed row)', () => {
-    const state = stateWithTier2();
-    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
-    const task = { targetType: 'management_office' as const, targetTier: 3 as const, ticksRemaining: 40, cost: 12000, conditions: [] };
-    state.buildings.researchQueue.push(task);
-    menu.update(state);
-    const before = findPlacedRow(container, 1).querySelector<HTMLElement>('.bs-build-research-progress')!.textContent;
-    expect(before).toBe(t('ui.build.research_progress', { percent: 20, remaining: 40 }));
-
-    task.ticksRemaining = 10;
-    menu.update(state);
-    const after = findPlacedRow(container, 1).querySelector<HTMLElement>('.bs-build-research-progress')!.textContent;
-    expect(after).toBe(t('ui.build.research_progress', { percent: 80, remaining: 10 }));
   });
 
   it('progress element disappears and button state resets once research completes', () => {
@@ -1428,29 +1250,6 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     expect(gameConsole).toHaveBeenCalledWith('build move 7 to:20,21');
   });
 
-  it('armMove uses the same tool as the placed row Move button (same overlay footprint ghost)', () => {
-    const viaRow = makeMockKit();
-    menu.setPlacementKit(viaRow.kit);
-    const b = makeBuilding({ id: 7, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [b];
-    menu.update(state);
-    findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-move-btn')!.click();
-    viaRow.controller.simulateHover({ x: 12, z: 12 });
-    const rowOverlay = viaRow.overlay.update.mock.calls.at(-1)![0];
-
-    menu.dispose();
-    container.remove();
-    ({ container, menu } = setupMenu());
-    menu.setGameConsole(gameConsole);
-    const viaInspector = makeMockKit();
-    menu.setPlacementKit(viaInspector.kit);
-    menu.observe(state);
-    menu.armMove(7);
-    viaInspector.controller.simulateHover({ x: 12, z: 12 });
-    expect(viaInspector.overlay.update.mock.calls.at(-1)![0]).toEqual(rowOverlay);
-  });
-
   it('the move result reaches the flow handler: failure carries the console output', () => {
     const { kit, controller } = makeMockKit();
     menu.setPlacementKit(kit);
@@ -1541,17 +1340,6 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     expect(gameConsole).not.toHaveBeenCalled();
   });
 
-  it('placed-row Upgrade still dispatches through the shared flow and reports to the handler', () => {
-    const b = makeBuilding({ id: 9, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [b];
-    state.buildings.unlockedTiers['management_office'] = 2;
-    menu.update(state);
-    findPlacedRow(container, 9).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.click();
-    expect(gameConsole).toHaveBeenCalledWith('build upgrade 9');
-    expect(messages).toContain(t('ui.build.upgraded'));
-  });
-
   it('queueResearchFor queues the next tier of the building by id; unknown id or max tier sends nothing', () => {
     observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
     menu.queueResearchFor(10);
@@ -1564,11 +1352,10 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     expect(gameConsole).not.toHaveBeenCalled();
   });
 
-  it('placed-row Move and Demolish disable while a demolition is ordered, even with ample cash', () => {
+  it('a pending demolition leaves the placed row without action buttons', () => {
     const b = makeBuilding({ id: 12, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [b];
-    state.cash = 1e9;
     state.pendingActions.push({
       id: 50, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
       targetX: 5, targetZ: 5, targetY: 0, payload: { buildingId: 12 }, targetEmployeeId: null,
@@ -1576,22 +1363,7 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     });
     menu.update(state);
     const row = findPlacedRow(container, 12);
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(true);
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
-  });
-
-  it('a freight warehouse holding ore reaches the demolish confirm with the kg lost', () => {
-    const b = makeBuilding({ id: 13, type: 'freight_warehouse', tier: 1 });
-    const confirms: ConfirmModalConfig[] = [];
-    menu.setConfirmHandler((c) => confirms.push(c));
-    const state = makeMockState();
-    state.buildings.buildings = [b];
-    state.logistics.fragments.push(
-      { fragment: { id: 1, mass: 700 }, state: 'stored', vehicleId: null, warehouseId: 13 } as never,
-    );
-    menu.update(state);
-    findPlacedRow(container, 13).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
-    expect(confirms[0]!.body).toContain(t('ui.build.demolish_confirm_loses_ore', { kg: 700 }));
+    expect(row.querySelector('button.bs-build-move-btn, button.bs-build-demolish-btn')).toBeNull();
   });
 
   it('the Move placement strip subtitle shows the move cost, not the construction cost', () => {
@@ -1656,18 +1428,21 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       expect(cb).toHaveBeenCalledWith(4);
     });
 
-    it.each(['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn'])(
-      'a click on %s does not select',
-      (sel) => {
-        const cb = vi.fn();
-        menu.setSelectBuildingHandler(cb);
-        const s = stateWith([makeBuilding({ id: 4, type: 'research_center', tier: 1 })]);
-        s.cash = 1e9;
-        menu.update(s);
-        findPlacedRow(container, 4).querySelector<HTMLButtonElement>(sel)!.click();
-        expect(cb).not.toHaveBeenCalled();
-      },
-    );
+    it('a placed row has no action buttons; clicking it selects', () => {
+      const cb = vi.fn();
+      menu.setSelectBuildingHandler(cb);
+      const s = stateWith([makeBuilding({ id: 4, type: 'research_center', tier: 1 })]);
+      s.cash = 1e9;
+      menu.update(s);
+      const row = findPlacedRow(container, 4);
+      for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn']) {
+        expect(row.querySelector(sel), sel).toBeNull();
+      }
+      expect(row.querySelector('.bs-build-research-progress')).toBeNull();
+      row.click();
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledWith(4);
+    });
 
     it('clicking a row does not close the panel', () => {
       menu.setSelectBuildingHandler(vi.fn());

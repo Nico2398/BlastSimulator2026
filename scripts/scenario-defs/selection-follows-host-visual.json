@@ -306,7 +306,7 @@
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Queue tier-2 Living Quarters research from the Build panel row (building #1).",
+      "description": "Queue tier-2 Living Quarters research: click the Build panel row body (building #1) to open the inspector, then its Research action (next tier is locked, so Research replaces Upgrade).",
       "timeout": 40,
       "role": "player",
       "interaction": [
@@ -316,11 +316,19 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-research-btn"
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-row-name"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-research-btn"
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"research\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
       "expect": {

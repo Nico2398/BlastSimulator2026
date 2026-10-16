@@ -1,7 +1,9 @@
 // BlastSimulator2026 — Build panel (CH1.7, redesign P10)
 // Catalog of buildable types with tier selection; clicking arms the shared
-// placement tool. Also lists placed buildings with Move, Upgrade, Queue
-// Research, and Demolish actions. Terrain ramps (carved, not a building)
+// placement tool. Also lists placed buildings (identity, HP, utilization,
+// badge, Locate; no action buttons, #1768 — the inspector drives Move,
+// Upgrade, Research and Demolish through armMove / requestUpgrade /
+// queueResearchFor). Terrain ramps (carved, not a building)
 // get their own small section between the two lists.
 //
 // Root id, the catalog rows' `data-build-type`, the buy button's
@@ -11,17 +13,14 @@
 // .bs-build-buy-btn` and `#bs-build-panel .bs-build-ramp-btn` unchanged —
 // same convention ContractsPanel.ts established for #bs-contract-panel in
 // P5. `.bs-build-tier-sel` (catalog tier `<select>`), `.bs-build-placed-row`
-// + `data-building-id` (placed rows), and `.bs-build-move-btn`
-// /`.bs-build-upgrade-btn`/`.bs-build-research-btn`/`.bs-build-demolish-btn`
-// (placed-row actions) are additionally load-bearing — scenario defs
-// (research-center-gate, building-tier-system-visual) and
-// BuildMenu.test.ts (#462, placed-row layout) all click or assert on them
-// directly, so they carry over unchanged too.
+// + `data-building-id` (placed rows) are additionally load-bearing — scenario
+// defs and BuildMenu.test.ts click or assert on them directly, so they carry
+// over unchanged too.
 //
 // This was the one panel the P0-P9 redesign never reached — still the
 // pre-redesign `.bs-ui`/`.bs-panel` dark/gold chrome with a plain text
 // title and a bottom Close button. This pass is chrome-only: same catalog
-// logic, same placed-row logic, same ramp tool, same research-queue
+// logic, same placed-row list, same ramp tool, same research-queue
 // handling, just rebuilt onto the shared `bsx-root` docked-panel
 // convention (46px header with icon chip + title + close button,
 // scrollable body) that every other panel already uses.
@@ -59,8 +58,7 @@ import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { buildingCardLine, buildingCardTooltip } from './catalogCardText.js';
-import { buildDemolishConfirm, freightOreKg } from './demolishConfirm.js';
-import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
+import { buildingActionRules } from './buildingActionRules.js';
 import { memoizedPlacementCutoff, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
 import { applyRowSelection, type ListSelection } from './selectionRoute.js';
@@ -103,7 +101,7 @@ export class BuildMenu extends PanelBase {
   /** Last placed-building signature (id:tier pairs) for change detection.
    *  Building count alone misses an upgrade, which destroys the old id and
    *  places a new one — the count stays flat while the id and tier both change. */
-  private lastPlacedSignature = '';
+  private lastPlacedSignature: string | null = null;
   /** Serialized `unlockedTiers` for change detection — a completed research
    *  task changes tier availability without changing cash or placed count. */
   private lastUnlockedSignature = '';
@@ -123,7 +121,7 @@ export class BuildMenu extends PanelBase {
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private flowResultCb?: (message: string) => void;
 
-  /** Routes the placed-row Demolish click to a confirm modal (#1399); unset means the click does nothing. */
+  /** Routes confirm requests (upgrade cutoff, placement cutoff) to a modal (#1399); unset means they proceed unconfirmed or do nothing. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
     this.onConfirmRequestCb = cb;
   }
@@ -207,7 +205,6 @@ export class BuildMenu extends PanelBase {
     if (state.cash !== this.lastCash) {
       this.lastCash = state.cash;
       this.refreshCatalogButtons(state.cash);
-      this.refreshPlacedButtons();
     }
     const placedSig = state.buildings.buildings.map((b) => `${b.id}:${b.tier}`).join(',');
     const unlockedSig = JSON.stringify(state.buildings.unlockedTiers);
@@ -216,7 +213,7 @@ export class BuildMenu extends PanelBase {
     const queueSig = state.buildings.researchQueue.map((r) => `${r.targetType}:${r.targetTier}`).join(',');
     const queueChanged = queueSig !== this.lastResearchQueueSignature;
     if (queueChanged) this.lastResearchQueueSignature = queueSig;
-    if (placedSig !== this.lastPlacedSignature || unlockedChanged || queueChanged) {
+    if (placedSig !== this.lastPlacedSignature) {
       this.lastPlacedSignature = placedSig;
       this.refreshPlacedList(state.buildings.buildings);
     }
@@ -290,7 +287,7 @@ export class BuildMenu extends PanelBase {
     this.lastState = state;
   }
 
-  /** Arm the footprint placement tool that moves placed building `buildingId` (the placed row's Move, #1758). */
+  /** Arm the footprint placement tool that moves placed building `buildingId` (the inspector's Move, #1758). */
   armMove(buildingId: number): void {
     const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
     if (!b) return;
@@ -338,8 +335,9 @@ export class BuildMenu extends PanelBase {
 
   /**
    * Queue a Research Center task for `type` tier `tier` and report progress.
-   * Shared by the catalog row (place-blocked) and the placed-row (upgrade-blocked)
-   * "Queue Research" buttons — the only in-game path to unlock tier 2/3.
+   * Called by the catalog row's "Queue Research" button (place-blocked) and, via
+   * `queueResearchFor`, by the inspector's Research action (upgrade-blocked) —
+   * the only in-game paths to unlock tier 2/3.
    */
   queueResearch(type: BuildingType, tier: BuildingTier): void {
     if (tier === 1) return;
@@ -355,7 +353,6 @@ export class BuildMenu extends PanelBase {
       task ? t('ui.build.research_queued', { ticks: task.ticksRemaining }) : t('ui.build.research_queued_generic'),
     );
     this.refreshCatalogButtons(this.lastCash);
-    if (this.lastState) this.refreshPlacedList(this.lastState.buildings.buildings);
   }
 
   /** Queue research for the next tier of placed building `buildingId` (the inspector's Research action, #1758). */
@@ -446,21 +443,6 @@ export class BuildMenu extends PanelBase {
   /** What `rect` would cut off from the crew (#1391); memoized by rect and nav revision. */
   private cutoffFor(rect: Rect, freed?: Rect): PlacementCutoff | null {
     return this.lastState ? memoizedPlacementCutoff(this.lastState, rect, freed) : null;
-  }
-
-  /** Disabled state and tooltip of `b`'s Upgrade button, from the shared rules: the refusal reason when blocked, else the cost. */
-  private applyUpgradeState(
-    btn: HTMLButtonElement, b: Building, reservations: ReadonlyArray<TerrainReservation>,
-  ): void {
-    if (!this.lastState) return;
-    const { upgrade } = buildingActionRules(this.lastState, b, reservations);
-    if (upgrade.nextTier === null) { btn.disabled = true; return; }
-    const refused = upgrade.kind === 'refused';
-    btn.title = refused && upgrade.reasonKey !== REASON_CASH
-      ? t(upgrade.reasonKey!, upgrade.reasonParams)
-      : `$${upgrade.cost}`;
-    // A locked tier is not refused (Research is the way forward) but short cash still disables the button.
-    btn.disabled = refused || (upgrade.cost !== null && this.lastState.cash < upgrade.cost);
   }
 
   /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
@@ -758,36 +740,6 @@ export class BuildMenu extends PanelBase {
     target.textContent = t('ui.build.cost', { cost: String(def.constructionCost) });
   }
 
-  /**
-   * Re-apply move/upgrade/demolish disabled state on already-rendered placed
-   * rows per affordability, mirroring `refreshCatalogButtons`. Does not
-   * rebuild the list — only toggles `disabled` on existing DOM buttons.
-   */
-  private refreshPlacedButtons(): void {
-    const state = this.lastState;
-    if (!state) return;
-    const buildings = state.buildings.buildings;
-    const reservations = this.currentReservations();
-    for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
-      const idStr = row.dataset['buildingId'];
-      if (!idStr) continue;
-      const b = buildings.find((bb) => bb.id === Number(idStr));
-      if (!b) continue;
-
-      const moveBtn = row.querySelector<HTMLButtonElement>('.bs-build-move-btn');
-      const rules = buildingActionRules(state, b, reservations);
-      if (moveBtn) moveBtn.disabled = rules.move.disabledReasonKey !== null;
-
-      const demolishBtn = row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn');
-      if (demolishBtn) demolishBtn.disabled = rules.demolish.disabledReasonKey !== null;
-
-      const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
-      if (upgradeBtn) {
-        this.applyUpgradeState(upgradeBtn, b, reservations);
-      }
-    }
-  }
-
   /** Research price after live research_cost modifiers. */
   private researchCost(base: number): number {
     const s = this.lastState;
@@ -795,18 +747,19 @@ export class BuildMenu extends PanelBase {
   }
 
   /**
-   * Label the research button with its cost and duration, or — when a task for
-   * that building/tier is already queued — hide it and show the live progress.
+   * Catalog rows only (placed rows carry no research button): label the row's
+   * research button with its cost and duration, or — when a task for that
+   * building/tier is already queued — hide it and show the live progress.
    */
   private syncResearchControls(
     row: HTMLElement,
     type: BuildingType,
-    tier: BuildingTier | null,
+    tier: BuildingTier,
     locked: boolean,
   ): void {
     const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
     if (!btn) return;
-    const researchTier = tier !== null && tier > 1 ? (tier as 2 | 3) : null;
+    const researchTier = tier > 1 ? (tier as 2 | 3) : null;
     if (researchTier !== null) {
       const def = getResearchTaskDef(type, researchTier);
       btn.textContent = t('ui.build.queue_research_cost', { cost: formatMoney(this.researchCost(def.cost)), duration: def.ticks });
@@ -842,16 +795,9 @@ export class BuildMenu extends PanelBase {
     return b.tier < 3 && !isSingleTierType(b.type) ? ((b.tier + 1) as BuildingTier) : null;
   }
 
-  /** Update progress text on existing rows in place (called every tick while research is queued). */
+  /** Update progress text on existing catalog rows in place (called every tick while research is queued). */
   private refreshResearchProgress(): void {
     for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) this.syncCatalogRow(row);
-    const buildings = this.lastState?.buildings.buildings ?? [];
-    for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
-      const b = buildings.find((bb) => bb.id === Number(row.dataset['buildingId']));
-      if (!b) continue;
-      const nextTier = this.nextTierOf(b);
-      if (nextTier !== null) this.syncResearchControls(row, b.type, nextTier, this.isTierLocked(b.type, nextTier));
-    }
   }
 
   private refreshCatalogButtons(cash: number): void {
@@ -879,13 +825,12 @@ export class BuildMenu extends PanelBase {
       this.placedEl.replaceChildren(emptyState(t('ui.build.none_placed')));
       return;
     }
-    const reservations = this.currentReservations();
-    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b, state, reservations)));
+    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b, state)));
     this.applySelection();
   }
 
-  private makePlacedRow(b: Building, state: GameState, reservations: ReadonlyArray<TerrainReservation>): HTMLElement {
-    const def = getBuildingDef(b.type, b.tier);
+  /** Identity, HP, utilization, badge and Locate; actions live in the inspector (#1768). */
+  private makePlacedRow(b: Building, state: GameState): HTMLElement {
     const row = document.createElement('div');
     row.className = 'bs-build-placed-row';
     row.dataset['buildingId'] = String(b.id);
@@ -895,51 +840,7 @@ export class BuildMenu extends PanelBase {
 
     const info = placedInfoBlock(b, placedRowModel(b, state), () => focusCameraOn(b.x, b.z));
     onRowBodyClick(row, () => this.selectBuildingCb?.(b.id));
-
-    const rules = buildingActionRules(state, b, reservations);
-
-    const moveBtn = document.createElement('button');
-    moveBtn.className = 'bsx-btn bs-build-move-btn';
-    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
-    moveBtn.textContent = t('ui.build.move');
-    moveBtn.title = `$${getMoveCost(b)}`;
-    moveBtn.disabled = rules.move.disabledReasonKey !== null;
-    moveBtn.addEventListener('click', () => this.armMove(b.id));
-
-    const nextTier = this.nextTierOf(b);
-    const nextLocked = nextTier !== null && this.isTierLocked(b.type, nextTier);
-
-    const upgradeBtn = document.createElement('button');
-    upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
-    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
-    upgradeBtn.textContent = t('ui.build.upgrade');
-    this.applyUpgradeState(upgradeBtn, b, reservations);
-    upgradeBtn.addEventListener('click', () => this.requestUpgrade(b.id));
-
-    const researchBtn = document.createElement('button');
-    researchBtn.className = 'bsx-btn bsx-btn-locked bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
-    researchBtn.textContent = t('ui.build.queue_research_button');
-    researchBtn.addEventListener('click', () => {
-      if (nextTier !== null) this.queueResearch(b.type, nextTier);
-    });
-
-    const demolishBtn = document.createElement('button');
-    demolishBtn.className = 'bsx-btn bsx-btn-danger bs-build-demolish-btn';
-    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
-    demolishBtn.textContent = t('ui.build.demolish');
-    demolishBtn.title = `$${def.demolishCost}`;
-    demolishBtn.disabled = rules.demolish.disabledReasonKey !== null;
-    demolishBtn.addEventListener('click', () => {
-      this.onConfirmRequestCb?.(buildDemolishConfirm(b, () => {
-        const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
-        this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));
-      }, { storedOreKg: this.lastState ? freightOreKg(this.lastState.logistics, b) : 0 }));
-    });
-
-    if (isSingleTierType(b.type)) row.append(info, moveBtn, demolishBtn);
-    else row.append(info, moveBtn, upgradeBtn, researchBtn, demolishBtn);
-    this.syncResearchControls(row, b.type, nextTier, nextLocked);
+    row.append(info);
     return row;
   }
 }
