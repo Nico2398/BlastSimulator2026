@@ -193,7 +193,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 0.7 + 0.4 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.weatherId === 'storm' && ctx.hasDrillPlan,
     options: [
-      { cashDelta: -8000, scoreDelta: { safety: 6 }, effectTag: 'reprint_plans' },
+      { cashDelta: -8000, scoreDelta: { safety: 6, wellBeing: 4 }, effectTag: 'reprint_plans' },
       { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'blast_from_memory',
         effects: [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },

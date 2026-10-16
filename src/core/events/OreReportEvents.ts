@@ -3,6 +3,7 @@
 
 import { ev } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import { EVENT_SURGE_HOURS, EVENT_SURGE_WORK_PCT } from '../config/balance.js';
 
 export const ORE_REPORT_EVENTS: EventDef[] = [
   // lucky_strike — blast yielded significantly more ore than survey estimated
@@ -21,7 +22,7 @@ export const ORE_REPORT_EVENTS: EventDef[] = [
     options: [
       { cashDelta: -5000, effectTag: 'geologist_review' },
       { cashDelta: 0, scoreDelta: { safety: -3 }, effectTag: 'blame_crew' },
-      { cashDelta: -10000, scoreDelta: { wellBeing: -5 }, effectTag: 'order_new_survey' },
+      { cashDelta: 4000, scoreDelta: { wellBeing: -5 }, effectTag: 'spin_exploration' },
     ],
   }),
 
@@ -41,7 +42,8 @@ export const ORE_REPORT_EVENTS: EventDef[] = [
     options: [
       { cashDelta: 50000, effectTag: 'jackpot_bonus' },
       { cashDelta: 20000, scoreDelta: { wellBeing: 8, safety: -5 }, effectTag: 'wild_celebration' },
-      { cashDelta: 15000, scoreDelta: { ecology: -8 }, effectTag: 'expedite_mining' },
+      { cashDelta: 15000, scoreDelta: { ecology: -8 }, effectTag: 'expedite_mining',
+        effects: [{ type: 'work_rate', pct: EVENT_SURGE_WORK_PCT, hours: EVENT_SURGE_HOURS }] },
     ],
   }),
 ];
