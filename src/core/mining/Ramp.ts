@@ -11,7 +11,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import {
-  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_CUT_SLOPE_RATIO,
+  MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_FLOOR_SNAP_REACH_M, RAMP_CRATER_MIN_DROP_M, RAMP_CUT_SLOPE_RATIO,
   RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH,
   RAMP_COST_PER_METER_PER_WIDTH, isRampWidth, type RampWidth,
 } from '../config/balance.js';
@@ -89,6 +89,12 @@ const DIR_OFFSETS: Record<RampDirection, { dx: number; dz: number }> = {
   east: { dx: 1, dz: 0 },
   west: { dx: -1, dz: 0 },
 };
+
+/** The tile one step past the ramp's last carved column (origin + length along its direction). */
+export function rampEndTile(ramp: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length'>): { x: number; z: number } {
+  const o = DIR_OFFSETS[ramp.direction];
+  return { x: ramp.originX + o.dx * ramp.length, z: ramp.originZ + o.dz * ramp.length };
+}
 
 // ── Core function ──
 
@@ -420,9 +426,18 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
   let globalMaxY = -Infinity;
 
   const originSurfaceY = computeColumnSurfaceY(grid, ramp.originX, ramp.originZ);
+  // (#1852) A ramp ending on a dug floor is graded to meet it: the carved line
+  // uses the snapped depth, the player's ordered depth is untouched.
+  const endTile = rampEndTile(ramp);
+  const lineDepth = snapRampDepthToEndFloor(
+    originSurfaceY,
+    computeColumnSurfaceY(grid, endTile.x, endTile.z),
+    ramp.targetDepth,
+    ramp.length,
+  );
 
   for (let step = 0; step < ramp.length; step++) {
-    const currentDepth = computeRampColumnDepth(step, ramp.length, ramp.targetDepth);
+    const currentDepth = computeRampColumnDepth(step, ramp.length, lineDepth);
     const floorY = originSurfaceY - currentDepth;
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
@@ -799,16 +814,16 @@ export function computeRampSegmentDurationTicks(
 export function snapRampDepthToEndFloor(
   startGround: number, endGround: number, targetDepth: number, length: number,
 ): number {
-  void startGround; void endGround; void length;
-  // TODO: implement
-  return targetDepth;
+  const drop = startGround - endGround;
+  if (!Number.isFinite(drop) || !(endGround > 0) || drop < RAMP_CRATER_MIN_DROP_M) return targetDepth;
+  if (Math.abs(rampFootOffset(startGround, endGround, targetDepth, length)) > RAMP_FLOOR_SNAP_REACH_M) return targetDepth;
+  if (computeMinimumRampLength(drop) > length + RAMP_MIN_LENGTH_EPSILON) return targetDepth;
+  return drop;
 }
 
 /** Foot (last carved column, step `length - 1`) minus end-tile ground; positive = above the floor. */
 export function rampFootOffset(
   startGround: number, endGround: number, targetDepth: number, length: number,
 ): number {
-  void startGround; void endGround; void targetDepth; void length;
-  // TODO: implement
-  return 0;
+  return startGround - computeRampColumnDepth(length - 1, length, targetDepth) - endGround;
 }

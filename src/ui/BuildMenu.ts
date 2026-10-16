@@ -51,7 +51,8 @@ import {
 } from '../core/entities/Building.js';
 import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
-import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
+import { rampDefFromEndpoints, rampEndTile, validateRampOrder } from '../core/mining/Ramp.js';
+import { rampFootLine } from './rampFootLine.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
 import { researchCostFor } from '../core/events/ActiveModifiers.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
@@ -537,10 +538,15 @@ export class BuildMenu extends PanelBase {
       } else if (validation && !validation.success) {
         confirmDisabledReason = validation.messageKey ? t(validation.messageKey, validation.messageParams) : validation.message;
       }
+      const sampler = this.surfaceHeightSampler;
+      const endTile = rampDef ? rampEndTile(rampDef) : null;
+      const footLine = sel && rampDef && endTile && sampler
+        ? rampFootLine(sampler(sel.x1, sel.z1), sampler(endTile.x, endTile.z), this.rampDepth, rampDef.length)
+        : '';
       strip.show({
         icon: 'down',
         title: t('ui.build.ramp'),
-        subtitle: '',
+        subtitle: footLine,
         fields: [
           { key: 'depth', label: t('ui.build.ramp_depth'), value: this.rampDepth, format: v => `${v}m`, onDec: () => { this.rampDepth = Math.max(1, this.rampDepth - 1); refresh(); }, onInc: () => { this.rampDepth = Math.min(40, this.rampDepth + 1); refresh(); } },
           { key: 'width', label: t('ui.build.ramp_width'), value: this.rampWidth, format: v => `${v}m`, onDec: () => { this.stepRampWidth(-1); refresh(); }, onInc: () => { this.stepRampWidth(1); refresh(); } },
