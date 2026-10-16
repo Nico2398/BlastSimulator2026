@@ -718,6 +718,24 @@ describe('FleetPanel — Reposition button (#1092)', () => {
     expect(strip.show).toHaveBeenCalled();
   });
 
+  it('Reposition goes through the shared move flow: catalog title/instruction keys (#1766)', () => {
+    const { panel } = makePanel();
+    const { kit, strip } = makeMockKit();
+    panel.setPlacementKit(kit);
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler', x: 7, z: 11 })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    repositionBtn(panel).click();
+
+    const cfg = strip.show.mock.calls.at(-1)![0];
+    expect(cfg.title).toBe(t('inspector.move_pick.vehicle.title'));
+    expect(cfg.instruction).toBe(t('inspector.move_pick.vehicle.instruction'));
+    expect(typeof cfg.subtitle).toBe('string');
+    expect(cfg.subtitle.length).toBeGreaterThan(0);
+  });
+
   it('dispatches the real reposition command for the confirmed tile', () => {
     const { panel } = makePanel();
     const { kit, controller, overlay } = makeMockKit();
@@ -750,6 +768,21 @@ describe('FleetPanel — Reposition button (#1092)', () => {
     repositionBtn(panel).click();
 
     expect(controller.isArmed).toBe(false);
+  });
+
+  it('does nothing (no pick armed) when the vehicle is missing from lastState', () => {
+    const { panel } = makePanel();
+    const { kit, controller, strip } = makeMockKit();
+    panel.setPlacementKit(kit);
+    panel.update(makeState(
+      [makeVehicle({ id: 2, type: 'debris_hauler' })],
+      [makeLicensedTruckDriver()],
+    ));
+
+    panel.requestReposition(99);
+
+    expect(controller.isArmed).toBe(false);
+    expect(strip.show).not.toHaveBeenCalled();
   });
 
   it('does nothing and does not throw when no placement kit has been wired', () => {
