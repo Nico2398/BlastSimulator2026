@@ -77,7 +77,5 @@ export const ROLL_SALT_STRIDE = 0x9e3779b9;
  * salt 0 equals the legacy seed + tick (#1838).
  */
 export function rollSeed(seed: number, tick: number, salt: number): number {
-  // TODO: implement
-  void seed; void tick; void salt;
-  return 0;
+  return (seed + tick + Math.imul(salt, ROLL_SALT_STRIDE)) | 0;
 }
