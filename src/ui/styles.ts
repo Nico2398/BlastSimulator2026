@@ -119,6 +119,10 @@ body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearanc
   max-height: calc(100vh - ${INSPECTOR_TOP_PX}px - var(--bs-inspector-bottom));
 }
 body.bs-tutorial-card #bs-inspector { --bs-inspector-bottom: var(--bsx-tutorial-card-clearance, 210px); }
+/* While a placement tool owns the canvas (e.g. the inspector's Move pick) the
+   body sections fold away: header, status and the action row stay, so the tall
+   vehicle sections never cover the tiles the player is told to click. */
+body.bs-placement-armed #bs-inspector [data-scroll-key="inspector-body"] { display: none !important; }
 /* The coach card's title sits inline with the CLOCK HELD chip and step counter
    instead of owning a bordered header row. */
 .bs-tutorial-box .bs-panel-title {
