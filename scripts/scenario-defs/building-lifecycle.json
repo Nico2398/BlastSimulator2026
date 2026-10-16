@@ -96,16 +96,25 @@
       "command": "build upgrade 1",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn"
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
-      "description": "role: player (issue #515): building #1's Upgrade button is present and ENABLED — `upgradeBtn.disabled` (BuildMenu.ts) only checks `nextTier === null` or affordability, not the research lock. A real click intercepts client-side (`if (nextTier !== null && nextLocked) { this.setStatus(...); return; }`) and never even issues `build upgrade 1` — a stricter no-op than the console command's own rejection, but the same observable outcome (buildingCount unchanged). Not `guard`: the button is reachable, just ineffective while locked.",
+      "description": "role: player (issue #515, migrated #1768): placed rows no longer carry Upgrade; the player opens building #1's inspector, whose next tier (management_office tier 2) is research-locked, so it offers Research instead of Upgrade — there is no Upgrade control to click. Command mode runs `build upgrade 1` and the console refuses (tier 2 not researched), so buildingCount is unchanged. Not `guard`: guard needs a present-but-disabled control, and the Upgrade action is absent by design.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
-        "note": "rejected: Tier 2 management_office is not researched — confirms this is a genuine no-op, not a silent success"
+        "note": "rejected: Tier 2 management_office is not researched — confirms this is a genuine no-op, not a silent success",
+        "usable": "#bs-inspector [data-action=\"research\"]"
       },
       "role": "player",
       "commandOutcome": "refused"

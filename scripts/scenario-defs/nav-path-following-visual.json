@@ -439,11 +439,19 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
         },
         {
           "type": "waitForSelector",
@@ -474,11 +482,19 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-row-name"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
         },
         {
           "type": "waitForSelector",
@@ -510,11 +526,19 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-row-name"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
         },
         {
           "type": "waitForSelector",

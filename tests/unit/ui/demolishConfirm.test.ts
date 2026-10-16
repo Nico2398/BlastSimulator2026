@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 // Demolish confirmation modal config (#1399).
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createLogisticsState } from '../../../src/core/economy/Logistics.js';
 import { buildDemolishConfirm, freightOreKg } from '../../../src/ui/demolishConfirm.js';
 import { getDemolishCost, type Building } from '../../../src/core/entities/Building.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
-import { BuildMenu } from '../../../src/ui/BuildMenu.js';
-import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 
 function makeBuilding(overrides: Partial<Building> = {}): Building {
   return { id: 7, type: 'management_office', tier: 1, x: 5, z: 5, hp: 100, active: true, occupantIds: [], ...overrides };
@@ -103,31 +101,6 @@ describe('buildDemolishConfirm (#1399)', () => {
     const onConfirm = vi.fn();
     buildDemolishConfirm(makeBuilding(), onConfirm).onConfirm();
     expect(onConfirm).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('BuildMenu demolish confirm failure path (#1399)', () => {
-  let container: HTMLDivElement;
-  beforeEach(() => { container = document.createElement('div'); document.body.appendChild(container); });
-  afterEach(() => { container.remove(); });
-
-  it('shows the command output when the destroy is refused', async () => {
-    const { createGame } = await import('../../../src/core/state/GameState.js');
-    const menu = new BuildMenu(container);
-    const gameConsole = vi.fn<[string], CommandResult>().mockReturnValue({ success: false, output: 'Nope: broke' });
-    menu.setGameConsole(gameConsole);
-    const handler = vi.fn();
-    menu.setConfirmHandler(handler);
-    const state = createGame({ seed: 42, mineType: 'desert' });
-    state.cash = 99999;
-    state.buildings.buildings = [makeBuilding({ id: 3 })];
-    menu.update(state);
-    container.querySelector<HTMLButtonElement>('.bs-build-placed-row[data-building-id="3"] .bs-build-demolish-btn')!.click();
-
-    handler.mock.calls[0]![0].onConfirm();
-
-    expect(gameConsole).toHaveBeenCalledWith('build destroy 3');
-    expect(container.textContent).toContain('Nope: broke');
   });
 });
 
