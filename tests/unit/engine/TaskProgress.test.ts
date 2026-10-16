@@ -645,11 +645,8 @@ describe('tickTaskProgress — phase-driven work earns licence XP (#1833)', () =
 
   it('a resting employee gains nothing', () => {
     const { state, employee, xp } = setup('haul_debris');
+    // Mounted, action active, itinerary live: only the rest guard differs.
     employee.restTicksRemaining = 5;
-    employee.pendingActionType = 'rest';
-    employee.activeActionId = null;
-    employee.itinerary = null;
-    employee.locomotion = { kind: 'on_foot' };
     tickTaskProgress(state, employee);
     expect(xp()).toBe(0);
   });
@@ -673,7 +670,7 @@ describe('tickTaskProgress — phase-driven work earns licence XP (#1833)', () =
     const { state, employee, xp } = setup('haul_debris');
     addModifier(state.events.activeModifiers, mod({ kind: 'work_stoppage', startTick: 0, endTick: 100 }), 1);
     state.tickCount = 5;
-    for (let i = 0; i < 3; i++) tickTaskProgress(state, employee);
+    for (let i = 0; i < 3; i++) expect(tickTaskProgress(state, employee)).toBeNull();
     expect(xp()).toBe(0);
   });
 
@@ -745,6 +742,12 @@ describe('isPhaseDrivenWorkTick (#1833)', () => {
 
   it('is false for an action type that is not phase-driven', () => {
     const { employee, action } = fixture('general_work');
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
+  });
+
+  it('is false while the employee is resting', () => {
+    const { employee, action } = fixture();
+    employee.restTicksRemaining = 5;
     expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
   });
 

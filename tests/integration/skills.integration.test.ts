@@ -898,10 +898,9 @@ describe('Level courses through the console (#1726)', () => {
 // fragmenter drivers spent hundreds of ticks on haul_debris / fragment_debris
 // between t1221 and t1821 and gained no XP: phase-driven work has no work timer.
 
-describe('debris haul and fragment drivers gain licence XP over the opening to t1821 (#1833)', () => {
-  // The issue's probe saw both drivers idle of XP across t1221-t1821. This scripted opening fires its
-  // blast earlier, so fragmenting happens before t1221; the whole run to t1821 is observed (it covers that window).
-  const WINDOW_START = 0;
+describe('debris haul and fragment drivers gain licence XP over the whole scripted opening to t1821 (#1833)', () => {
+  // The issue's t1221-t1821 slice is not reproducible here: this scripted opening fires its blast earlier,
+  // so fragmenting happens before t1221. The test therefore observes the entire opening, t0 to t1821.
   const WINDOW_END = 1821;
   const MIN_ACTIVE_TICKS = 20;
 
@@ -927,7 +926,7 @@ describe('debris haul and fragment drivers gain licence XP over the opening to t
     };
     const sample = () => {
       const t = elapsed();
-      if (t < WINDOW_START || t > WINDOW_END) return;
+      if (t > WINDOW_END) return;
       for (const e of state.employees.employees) {
         const type = state.pendingActions.find(a => a.id === e.activeActionId)?.type;
         if (type === 'haul_debris') observe(haul, e.id, 'driving.truck');
@@ -953,9 +952,9 @@ describe('debris haul and fragment drivers gain licence XP over the opening to t
     const { haul, fragment } = playOpening();
     const active = (m: Map<number, Probe>) => [...m.values()].filter(p => p.ticks >= MIN_ACTIVE_TICKS);
 
-    expect(active(haul).length, 'a driver worked haul_debris in the window').toBeGreaterThan(0);
-    expect(active(fragment).length, 'a driver worked fragment_debris in the window').toBeGreaterThan(0);
-    expect(active(haul).some(p => p.xpEnd > p.xpStart), 'driving.truck XP rose while hauling').toBe(true);
-    expect(active(fragment).some(p => p.xpEnd > p.xpStart), 'driving.rock_fragmenter XP rose while fragmenting').toBe(true);
+    expect(active(haul).length, 'a driver worked haul_debris in the opening').toBeGreaterThan(0);
+    expect(active(fragment).length, 'a driver worked fragment_debris in the opening').toBeGreaterThan(0);
+    for (const p of active(haul)) expect(p.xpEnd, 'driving.truck XP rose while hauling').toBeGreaterThan(p.xpStart);
+    for (const p of active(fragment)) expect(p.xpEnd, 'driving.rock_fragmenter XP rose while fragmenting').toBeGreaterThan(p.xpStart);
   }, 600_000);
 });

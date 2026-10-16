@@ -86,6 +86,7 @@ function tickLevelWork(state: GameState, emp: Employee, ticksRemaining: number, 
  * each mounted tick on a live itinerary earns the timed-work award. No timer, never completes.
  */
 function tickPhaseDrivenWork(state: GameState, emp: Employee, emitter: EventEmitter | undefined): TaskProgressResult | null {
+  if (emp.activeActionId === null) return null;
   const action = state.pendingActions.find(a => a.id === emp.activeActionId);
   if (!isPhaseDrivenWorkTick(emp, action)) return null;
   if (workRate(state.events.activeModifiers, emp.role, state.tickCount) <= 0) return null;
@@ -95,7 +96,7 @@ function tickPhaseDrivenWork(state: GameState, emp: Employee, emitter: EventEmit
     leveledUp,
     skill,
     levelUps,
-    ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
+    ...levelUpLevels,
   };
 }
 
@@ -200,7 +201,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     leveledUp,
     skill,
     levelUps,
-    ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
+    ...levelUpLevels,
     ...(completedActionType !== undefined ? { actionType: completedActionType } : {}),
     ...(completedActionPayload !== undefined ? { actionPayload: completedActionPayload } : {}),
     ...(completedActionId !== undefined ? { actionId: completedActionId } : {}),
