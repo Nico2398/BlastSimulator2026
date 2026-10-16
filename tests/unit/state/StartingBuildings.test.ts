@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createRunner } from '../../../src/console/createRunner.js';
 import { placeStartingBuildings, resolveStartingSite, isStaffedComposition } from '../../../src/core/state/StartingBuildings.js';
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, getSmoothTerrainSurfaceY, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
@@ -262,5 +263,106 @@ describe('starting compositions carry a charging truck and a crew member who can
     const { TUTORIAL_STARTING_SITE } = await import('../../../src/core/config/balance.js');
     expect(TUTORIAL_STARTING_SITE.employees).toHaveLength(0);
     expect(TUTORIAL_STARTING_SITE.vehicles).toHaveLength(0);
+  });
+});
+
+
+// ── Kit buildings keep each other's largest tier free (#1830) ────────────────
+type Rect = { minX: number; minZ: number; maxX: number; maxZ: number };
+
+function rectOf(type: 'freight_warehouse' | 'spoil_heap', tier: 1 | 2 | 3, x: number, z: number): Rect {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
+  return { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ };
+}
+
+function disjoint(a: Rect, b: Rect): boolean {
+  return a.maxX <= b.minX || b.maxX <= a.minX || a.maxZ <= b.minZ || b.maxZ <= a.minZ;
+}
+
+function sandboxKit(biome: string, seed: number) {
+  const { runner, ctx } = createRunner();
+  const r = runner.run(`sandbox start biome:${biome} difficulty:easy seed:${seed}`);
+  expect(r).toMatchObject({ success: true });
+  const list = ctx.state!.buildings.buildings;
+  return {
+    warehouse: list.find(b => b.type === 'freight_warehouse')!,
+    heap: list.find(b => b.type === 'spoil_heap')!,
+  };
+}
+
+describe('placeStartingBuildings — warehouse upgrade room (#1830)', () => {
+  it('the warehouse tiers 2 and 3 are 5x4 and 6x5', () => {
+    expect(getDefSize(getBuildingDef('freight_warehouse', 2))).toMatchObject({ sizeX: 5, sizeZ: 4 });
+    expect(getDefSize(getBuildingDef('freight_warehouse', 3))).toMatchObject({ sizeX: 6, sizeZ: 5 });
+  });
+
+  const BIOMES = ['desert_badlands', 'red_canyon', 'volcanic_flats', 'tropical_karst', 'alpine_granite', 'green_foothills'];
+  const SEEDS = [1, 2, 3, 7, 42];
+  for (const biome of BIOMES) {
+    for (const seed of SEEDS) {
+      it(`${biome} seed ${seed}: heap is clear of warehouse tier-2 and tier-3 footprints`, () => {
+        const { warehouse, heap } = sandboxKit(biome, seed);
+        const heapRect = rectOf('spoil_heap', 1, heap.x, heap.z);
+        expect(disjoint(heapRect, rectOf('freight_warehouse', 2, warehouse.x, warehouse.z)), 'tier 2').toBe(true);
+        expect(disjoint(heapRect, rectOf('freight_warehouse', 3, warehouse.x, warehouse.z)), 'tier 3').toBe(true);
+      });
+    }
+  }
+
+  it('desert_badlands seed 42 (the reported repro) leaves tier 2 free', () => {
+    const { warehouse, heap } = sandboxKit('desert_badlands', 42);
+    expect(disjoint(rectOf('spoil_heap', 1, heap.x, heap.z), rectOf('freight_warehouse', 2, warehouse.x, warehouse.z))).toBe(true);
+  });
+
+  it('green_foothills seed 3 leaves tier 2 free', () => {
+    const { warehouse, heap } = sandboxKit('green_foothills', 3);
+    expect(disjoint(rectOf('spoil_heap', 1, heap.x, heap.z), rectOf('freight_warehouse', 2, warehouse.x, warehouse.z))).toBe(true);
+  });
+
+  it('keeps the room when the heap is listed before the warehouse (symmetric to slot order)', () => {
+    const buildings = createBuildingState();
+    const slots: StartingBuildingSlot[] = [{ type: 'spoil_heap', tier: 1 }, WAREHOUSE];
+    expect(placeStartingBuildings(buildings, makeFlatGrid(60), slots, { x: 30, z: 30 })).toBe(2);
+    const w = buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    const h = buildings.buildings.find(b => b.type === 'spoil_heap')!;
+    const heapRect = rectOf('spoil_heap', 1, h.x, h.z);
+    expect(disjoint(heapRect, rectOf('freight_warehouse', 2, w.x, w.z))).toBe(true);
+    expect(disjoint(heapRect, rectOf('freight_warehouse', 3, w.x, w.z))).toBe(true);
+  });
+
+  it('keeps the room in the warehouse-first order on a flat grid too', () => {
+    const buildings = createBuildingState();
+    const slots: StartingBuildingSlot[] = [WAREHOUSE, { type: 'spoil_heap', tier: 1 }];
+    placeStartingBuildings(buildings, makeFlatGrid(60), slots, { x: 30, z: 30 });
+    const w = buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    const h = buildings.buildings.find(b => b.type === 'spoil_heap')!;
+    expect(disjoint(rectOf('spoil_heap', 1, h.x, h.z), rectOf('freight_warehouse', 3, w.x, w.z))).toBe(true);
+  });
+
+  it('stays near the anchor and keeps rally clearance while reserving room', () => {
+    const flag = { x: 30, z: 30 };
+    const buildings = createBuildingState();
+    placeStartingBuildings(buildings, makeFlatGrid(60), [WAREHOUSE, { type: 'spoil_heap', tier: 1 }], flag, flag);
+    for (const b of buildings.buildings) {
+      expect(Math.hypot(b.x - flag.x, b.z - flag.z), b.type).toBeLessThanOrEqual(RALLY_POINT_BUILDING_CLEARANCE + 12);
+    }
+  });
+
+  it('still places every building on a cramped site where no cell leaves room', () => {
+    const buildings = createBuildingState();
+    const slots: StartingBuildingSlot[] = [WAREHOUSE, { type: 'spoil_heap', tier: 1 }];
+    // 9x7 fits the tier-1 pair but cannot hold a tier-3 warehouse clear of the heap.
+    const grid = makeFlatGrid(9);
+    expect(placeStartingBuildings(buildings, grid, slots, { x: 4, z: 4 })).toBe(2);
+    expect(buildings.buildings).toHaveLength(2);
+  });
+
+  it('is deterministic', () => {
+    const run = () => {
+      const buildings = createBuildingState();
+      placeStartingBuildings(buildings, makeFlatGrid(60), [{ type: 'spoil_heap', tier: 1 }, WAREHOUSE], { x: 30, z: 30 });
+      return buildings.buildings.map(b => [b.type, b.x, b.z]);
+    };
+    expect(run()).toEqual(run());
   });
 });

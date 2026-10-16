@@ -20,6 +20,7 @@ import {
   moveBuilding,
   checkFootprintPlacement,
   rectOverlapsOccupants,
+  findOverlappingOccupant,
   BUILDING_DEFS,
 } from '../../../src/core/entities/Building.js';
 import type { Building, FootprintOccupant } from '../../../src/core/entities/Building.js';
@@ -877,5 +878,57 @@ describe('moveBuilding — terrain reservations (#1390)', () => {
     const res: TerrainReservation[] = [{ kind: 'hole', minX: 40, maxX: 40, minZ: 40, maxZ: 40 }];
     const r = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], undefined, res);
     expect(r.success).toBe(true);
+  });
+});
+
+
+describe('findOverlappingOccupant (#1830)', () => {
+  // management_office T1 is 2x2.
+  const a: FootprintOccupant = { type: 'management_office', tier: 1, x: 4, z: 4 };
+  const b: FootprintOccupant = { type: 'spoil_heap', tier: 1, x: 5, z: 5 };
+
+  it('returns the overlapping occupant', () => {
+    expect(findOverlappingOccupant([a], { minX: 5, minZ: 5, maxX: 8, maxZ: 8 })).toBe(a);
+  });
+
+  it('returns the first overlapping occupant in array order', () => {
+    expect(findOverlappingOccupant([a, b], { minX: 5, minZ: 5, maxX: 6, maxZ: 6 })).toBe(a);
+    expect(findOverlappingOccupant([b, a], { minX: 5, minZ: 5, maxX: 6, maxZ: 6 })).toBe(b);
+  });
+
+  it('returns undefined for an edge-adjacent rect, no occupants, or a far rect', () => {
+    expect(findOverlappingOccupant([a], { minX: 6, minZ: 4, maxX: 8, maxZ: 6 })).toBeUndefined();
+    expect(findOverlappingOccupant([], { minX: 0, minZ: 0, maxX: 64, maxZ: 64 })).toBeUndefined();
+    expect(findOverlappingOccupant([a], { minX: 30, minZ: 30, maxX: 34, maxZ: 34 })).toBeUndefined();
+  });
+
+  it('agrees with rectOverlapsOccupants', () => {
+    const rect = { minX: 3, minZ: 3, maxX: 5, maxZ: 5 };
+    expect(findOverlappingOccupant([a], rect) !== undefined).toBe(rectOverlapsOccupants([a], rect));
+  });
+});
+
+describe('checkFootprintPlacement — names the blocker (#1830)', () => {
+  it('keeps the plain error and adds a key naming the blocker type and position', () => {
+    const occ: FootprintOccupant = { type: 'spoil_heap', tier: 1, x: 10, z: 12 };
+    const r = checkFootprintPlacement([occ], 'management_office', 10, 12, 1, 64, 64, 0, 0);
+    expect(r.valid).toBe(false);
+    expect(r.error).toBe('Space is occupied');
+    expect(r.errorKey).toBe('shell.placement.refused_occupied_by');
+    expect(r.errorParams).toEqual({ type: 'spoil_heap', x: 10, z: 12 });
+  });
+
+  it('names the first overlapping occupant when several overlap', () => {
+    const first: FootprintOccupant = { type: 'management_office', tier: 1, x: 10, z: 10 };
+    const second: FootprintOccupant = { type: 'spoil_heap', tier: 1, x: 11, z: 11 };
+    const r = checkFootprintPlacement([first, second], 'management_office', 10, 10, 2, 64, 64, 0, 0);
+    expect(r.errorParams).toEqual({ type: 'management_office', x: 10, z: 10 });
+  });
+
+  it('does not name anything for a valid placement or an out-of-bounds refusal', () => {
+    const ok = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0);
+    expect(ok.errorParams).toBeUndefined();
+    const oob = checkFootprintPlacement([], 'management_office', -1, 0, 1, 64, 64, 0, 0);
+    expect(oob.errorKey).toBe('shell.placement.refused_out_of_bounds');
   });
 });
