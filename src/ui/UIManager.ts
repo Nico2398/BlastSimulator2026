@@ -142,7 +142,6 @@ export class UIManager {
     this.fleetPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.crewPanel = new CrewPanel(leftCol);
     this.crewPanel.setCloseHandler(() => this.hideAllPanels());
-    this.crewPanel.setConfirmHandler(config => this.confirmModal.show(config));
     this.surveyPanel = new SurveyPanel(leftCol);
     this.surveyPanel.setCloseHandler(() => this.hideAllPanels());
     this.surveyPanel.setNotifyHandler(n => this.notify(n));
@@ -375,6 +374,7 @@ export class UIManager {
 
   private applyListSelection(): void {
     this.buildMenu.setSelectedEntity(this.listSelection);
+    this.crewPanel.setSelectedEmployee(this.listSelection);
   }
 
   /** Open the Crew panel with hiring for `role` in view. */
@@ -557,19 +557,16 @@ export class UIManager {
       case 'ops': this.operationsPanel.show(); break;
       case 'build': this.buildMenu.show(); break;
       case 'vehicles': this.fleetPanel.show(); break;
-      case 'employees': this.crewPanel.show(); break;
+      case 'employees':
+        this.crewPanel.show();
+        this.crewPanel.setSelectedEmployee(this.listSelection);
+        break;
       case 'survey': this.surveyPanel.show(); break;
       case 'shady': this.shadyPanel.show(); break;
       case 'settings': this.settingsPanel.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
     if (changed) this.cues?.panelShown(true);
-  }
-
-  /** Open the Crew panel with a specific employee's card expanded — the DETAIL/TRAIN actions of the inspector (src/ui/shell/Inspector.ts). */
-  showEmployeeDetail(id: number): void {
-    this.showPanel('employees');
-    this.crewPanel.expandEmployee(id);
   }
 
   /** Wire the scene-selection callback used by the Crew panel's Locate button. */

@@ -156,7 +156,7 @@ export const TOKENS_CSS = `
 .bs-build-row-badge { align-self: flex-start; padding: 1px 5px; border-radius: 3px; font: 600 9px/1.3 var(--bsx-font-ui); color: var(--bsx-amber); border: 1px solid var(--bsx-amber); }
 .bs-build-placed-row, .bs-build-site-row { cursor: pointer; }
 .bs-build-site-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 7px 8px; border: 1px dashed var(--bsx-hairline-strong); border-radius: 6px; background: var(--bsx-card); }
-.bs-build-row-selected { border-color: var(--bsx-amber) !important; background: rgba(255,176,46,.10) !important; }
+.bs-row-selected { border-color: var(--bsx-amber) !important; background: rgba(255,176,46,.10) !important; }
 
 /* ── cards ── */
 .bsx-card {
