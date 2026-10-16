@@ -162,6 +162,33 @@
       }
     },
     {
+      "command": "state",
+      "description": "#1820: select the freight warehouse (#1) before any Research Center or Building Destroyer exists. The inspector shows signed money (Research \u00b7 $5,000, Move \u00b7 $7,500, Demolish \u00b7 $4,000, upkeep $10/h), Research is disabled with the inline reason 'Needs a Research Center', and Demolish stays enabled with the note 'The order will wait: no Building Destroyer in the fleet.'",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-panel-close]"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-inspector [data-action=\"research\"]",
+        "note": "Research blocked: no Research Center yet; Demolish still usable with a wait note."
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
