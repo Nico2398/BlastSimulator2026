@@ -52,8 +52,10 @@ gh label create decision-review --color ededed --force \
   --description "A default the pipeline chose; revisit when convenient"
 gh issue create --label agent-task --label decision-review --label scope:<area> \
   --title "Decision review: <one-line summary> (from #<N>)" \
-  --body "<the Decisions taken block>, linking the PR"
+  --body-file <body>
 ```
+
+`<body>` is `.github/ISSUE_BODY_TEMPLATE/decision-review.md` copied outside the working tree with every `<…>` placeholder filled. The issue is read by a human deciding at leisure, often from a phone, not by the run that wrote it — so it opens on **one sentence** stating the default in player-facing terms, then gives each decision its own section: what was open, what was chosen, why, the alternatives, and the lever that reverses it. Several decisions from one PR share one issue, one `## <decision name>` section each, and the opening sentence covers them all. Write sentences, not a list of constant assignments: `RAMP_FLOOR_SNAP_REACH_M=2` means nothing to a reader who has not opened the PR, "a ramp snaps to the crater floor when the floor is within 2 m (`RAMP_FLOOR_SNAP_REACH_M`)" does. The PR body's `## Decisions taken` block stays compact; the issue is where the context is spelled out.
 
 The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing: `agentic-assign` selects on `ready` alone, and nothing in the pipeline ever applies `ready` to an issue a human filed. It is where a human goes to revisit a default at leisure. It carries `agent-task` and the `scope:*` labels of the code the decision lives in, so adding `ready` later is all it takes to meet the Definition of Ready (`agentic-issue-creation`) and put it back in the queue; one of the pipeline's entry points — a manual dispatch, the next merged pipeline PR, the next run that halts, or the next run that closes its own issue — is what starts it.
 
