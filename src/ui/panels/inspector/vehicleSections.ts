@@ -8,8 +8,9 @@ import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
 import {
-  buildingDisplayName, makeDriverBlock, makeHpGauge, makeLoadGauge, makeStatusChip, repairState, vehicleDisplayName,
+  buildingDisplayName, makeHpGauge, makeLoadGauge, makeStatusChip, vehicleDisplayName,
 } from '../../fleetDetailSections.js';
+import { makeDriverBlock, repairState } from './vehicleDetailParts.js';
 import { ACTION_LABEL_KEY } from '../../crewDetailSections.js';
 import { buildBlockedOrderMessage } from '../../notify/NotificationCenter.js';
 import type { InspectorLinks } from './InspectorContent.js';

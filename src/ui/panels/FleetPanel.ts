@@ -33,7 +33,9 @@ import { nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverBlock, upgradeState, upgradeDisabledReason, scrapConfirmConfig } from '../fleetDetailSections.js';
+import type { ListSelection } from '../selectionRoute.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge } from '../fleetDetailSections.js';
+import { makeDriverBlock, upgradeState, upgradeDisabledReason, scrapConfirmConfig } from './inspector/vehicleDetailParts.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { PlacementKit } from '../scene/PlacementKit.js';
@@ -103,6 +105,12 @@ export class FleetPanel extends PanelBase {
     }, (cmd) => { this.gameConsole?.(cmd); });
   }
 
+
+  /** Highlights the row of the entity picked elsewhere (#1767). */
+  setSelectedVehicle(sel: ListSelection): void {
+    // TODO: implement
+    void sel;
+  }
 
   update(state: GameState): void {
     this.lastState = state;

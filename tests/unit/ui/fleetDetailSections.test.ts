@@ -4,7 +4,7 @@
 // panel and only ever hits one leg of each of makeHpGauge's/makeLoadGauge's/
 // makeDriverRow's ternaries — this file targets the legs it misses.
 import { describe, it, expect } from 'vitest';
-import { makeHpGauge, makeLoadGauge, makeDriverRow, makeStatusChip } from '../../../src/ui/fleetDetailSections.js';
+import { makeHpGauge, makeLoadGauge, makeStatusChip } from '../../../src/ui/fleetDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
@@ -182,9 +182,12 @@ describe('fleetDetailSections — makeStatusChip', () => {
 
 import { vi } from 'vitest';
 import {
-  upgradeState, licenceWarning, scrapConfirmConfig, driverState, repairState,
-  makePendingDriverRow, makeNoDriverRow, vehicleDisplayName,
+  vehicleDisplayName,
 } from '../../../src/ui/fleetDetailSections.js';
+import {
+  upgradeState, licenceWarning, scrapConfirmConfig, driverState, repairState,
+  makePendingDriverRow, makeNoDriverRow, makeDriverRow,
+} from '../../../src/ui/panels/inspector/vehicleDetailParts.js';
 import { computeVehicleUpgradeCost } from '../../../src/core/entities/VehicleUpgrade.js';
 import { computeScrapResidualValue } from '../../../src/core/entities/Vehicle.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
