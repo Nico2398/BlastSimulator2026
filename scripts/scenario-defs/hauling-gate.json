@@ -574,12 +574,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 80",
-      "description": "Rally point (#1772 CI): barren rock reaches the spoil heap once the warehouse is full. Measured on the aligned trajectory (both modes): the warehouse tops out at ~24.4t around tick 365, the first spoil delivery lands at tick ~375 (~3.4t), and the heap holds ~10.5t by tick 410 -- so this 80-tick block (330 -> 410) holds the first spoil delivery with ~35 ticks to spare. Together with the ore blocks above, this proves self-dispatching hauling delivers to both depots: ore to the warehouse, spoil to the heap.",
+      "command": "tick 140",
+      "description": "#1828: grade-weighted haul urgency ranks trace-ore fragments behind rich ones, so the warehouse tops out later (~24.9t around tick 410 instead of ~365) and spoil resumes after it; the block is 330 -> 470 (was 330 -> 410). Rally point (#1772 CI): barren rock reaches the spoil heap once the warehouse is full. Measured on the aligned trajectory (both modes): the warehouse tops out at ~24.4t around tick 365, the first spoil delivery lands at tick ~375 (~3.4t), and the heap holds ~10.5t by tick 410 -- so this 80-tick block (330 -> 410) holds the first spoil delivery with ~35 ticks to spare. Together with the ore blocks above, this proves self-dispatching hauling delivers to both depots: ore to the warehouse, spoil to the heap.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 80"
+          "command": "tick 140"
         }
       ],
       "role": "setup",

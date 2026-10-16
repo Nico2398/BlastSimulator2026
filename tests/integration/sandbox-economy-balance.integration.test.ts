@@ -462,3 +462,75 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 900_000);
 });
+
+describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#1828)', () => {
+  const HORIZON = 3550;
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  const SHOT_START = '36,32';
+  /** The player takes any rustite offer this small as it appears (the #1828 repro), stock or no stock. */
+  const MAX_OFFER_KG = 2_000;
+  /** Rustite share of a fragment from which it counts as high-grade. */
+  const HIGH_GRADE = 0.5;
+  /** "Most" accepted rustite contracts complete rather than expire (measured 20 of 31 accepted by the last tick rustite sat in stock, t2502; 3 of 38 before #1817; the grade weighting itself moves it by +-2, supply binds). */
+  const MIN_COMPLETED_SHARE = 0.6;
+  /**
+   * Rustite kg in reachable high-grade fragments still on the ground at the horizon. Fragments whose haul/fragment order is
+   * `debris_out_of_reach` (152 t at the horizon, all boulders and ledge rock no hauler can climb to) are not counted: no
+   * ranking can move them, so they only ever measured the blast geometry. Measured 0.5 t reachable.
+   */
+  const HIGH_GRADE_GROUND_CEILING_KG = 10_000;
+
+  it('easy: accepted rustite contracts mostly complete, rustite and dirtite sell, high-grade rustite leaves the ground', () => {
+    const acceptedRustite = new Set<number>();
+    const rustiteActive = () => state.contracts.active.some((c) => c.type === 'ore_sale' && c.materialId === 'rustite');
+    let armed = false; // offers are taken only once the shot is fired: rock must exist before a deadline runs against it
+    const acceptSmallRustite = (run: Run) => {
+      if (!armed || rustiteActive()) return;
+      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && c.materialId === 'rustite' && c.quantityKg <= MAX_OFFER_KG);
+      if (offer && run(`contract accept ${offer.id}`).success) acceptedRustite.add(offer.id);
+    };
+    // Last tick rustite sat in the warehouse: once the reachable rustite is all hauled and sold nothing can fill a later offer,
+    // so contracts accepted after it expire for want of ore, whatever the haul ranking does.
+    let lastRustiteStockTick = 0;
+    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON, () => {
+      if ((state.collectedOre['rustite'] ?? 0) > 1) lastRustiteStockTick = state.tickCount;
+      acceptSmallRustite(logged);
+    });
+
+    expect(logged(`build ${BUILD}`).success).toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SHOT_START}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+    armed = true;
+    playUntil(HORIZON, () => false);
+
+    expect(over() && state.levelEnded, `ended ${String(state.levelEndReason)}`).toBeFalsy();
+    const rustiteContracts = state.contracts.completedHistory.filter((c) => c.type === 'ore_sale' && c.materialId === 'rustite' && acceptedRustite.has(c.id)
+      && c.acceptedAtTick <= lastRustiteStockTick);
+    const completed = rustiteContracts.filter((c) => c.completed).length;
+    const expired = rustiteContracts.filter((c) => c.expired && !c.completed).length;
+    expect(rustiteContracts.length, `rustite offers accepted while rustite was in stock (last stock t${lastRustiteStockTick}; ${acceptedRustite.size} accepted in all)`).toBeGreaterThanOrEqual(10);
+    // Before the fix 35 of 38 accepted rustite contracts expired (18 of 41 completed once stock-covered ones are counted).
+    expect(completed / Math.max(1, completed + expired), `${completed} completed vs ${expired} expired of ${rustiteContracts.length} accepted by t${lastRustiteStockTick}`).toBeGreaterThanOrEqual(MIN_COMPLETED_SHARE);
+
+    const sales = (ore: string) => state.contracts.completedHistory.filter((c) => c.type === 'ore_sale' && c.completed && c.materialId === ore).length;
+    expect(sales('rustite'), 'rustite ore sales').toBeGreaterThan(5);
+    expect(sales('dirtite'), 'dirtite sales continued').toBeGreaterThanOrEqual(5);
+
+    const unreachable = new Set<number>();
+    for (const a of state.pendingActions) {
+      const id = a.payload['fragmentId'];
+      if (a.blockedReason === 'debris_out_of_reach' && typeof id === 'number') unreachable.add(id);
+    }
+    let highGradeRustiteKg = 0;
+    for (const t of state.logistics.fragments) {
+      const share = t.fragment.oreDensities['rustite'] ?? 0;
+      if (t.state === 'on_ground' && share >= HIGH_GRADE && !unreachable.has(t.fragment.id)) highGradeRustiteKg += t.fragment.mass * share;
+    }
+    expect(highGradeRustiteKg, `reachable high-grade rustite still on the ground: ${Math.round(highGradeRustiteKg / 1000)} t`).toBeLessThan(HIGH_GRADE_GROUND_CEILING_KG);
+    expect(commands.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 900_000);
+});

@@ -2235,4 +2235,73 @@ describe('selectBestActionForEmployee — demand-weighted haul ranking (#1817)',
 
     expect(selectBestActionForEmployee(state, emp, pool)!.action.id).toBe(1);
   });
+
+  describe('grade-weighted demand (#1828)', () => {
+    it('full of dirtite, rustite urgent: a far high-grade rustite fragment is claimed before a near trace-rustite dirtite one', () => {
+      state.collectedOre = { dirtite: 25_000 };
+      state.contracts.available.push(offer('rustite'));
+      addBlastFragments(state.logistics, [fragment(1, 5, { dirtite: 0.9, rustite: 0.02 }), fragment(2, 40, { rustite: 0.7, dirtite: 0.3 })]);
+      const pool = [haul(1, 5), haul(2, 40)];
+
+      const sel = selectBestActionForEmployee(state, emp, pool);
+
+      expect(sel!.action.id).toBe(2);
+      expect(sel!.totalTicks).toBeCloseTo(40, 10);
+    });
+
+    it('a leaner-than-full but real share (10% rustite) still earns less bonus than a rich one at equal distance', () => {
+      state.collectedOre = { dirtite: 25_000 };
+      state.contracts.available.push(offer('rustite'));
+      addBlastFragments(state.logistics, [fragment(1, 40, { dirtite: 0.9, rustite: 0.1 }), fragment(2, 40, { rustite: 0.7 })]);
+
+      expect(selectBestActionForEmployee(state, emp, [haul(1, 40), haul(2, 40)])!.action.id).toBe(2);
+    });
+
+    it('dirtite wanted and dense keeps its bonus: far dense dirtite beats a near ore with no demand (#1817)', () => {
+      state.contracts.available.push(offer('dirtite'));
+      addBlastFragments(state.logistics, [fragment(1, 5, { rustite: 0.6 }), fragment(2, 40, { dirtite: 0.6 })]);
+
+      expect(selectBestActionForEmployee(state, emp, [haul(1, 5), haul(2, 40)])!.action.id).toBe(2);
+    });
+
+    it('a trace-grade fragment still outranks nearer barren rock (#671)', () => {
+      state.contracts.available.push(offer('rustite'));
+      addBlastFragments(state.logistics, [fragment(1, 3, {}), fragment(2, 12, { dirtite: 0.9, rustite: 0.02 })]);
+
+      expect(selectBestActionForEmployee(state, emp, [haul(1, 3), haul(2, 12)])!.action.id).toBe(2);
+    });
+
+    it('a loaded haul of a trace fragment keeps the full bonus against a rich ground fragment (#1709)', () => {
+      state.collectedOre = { dirtite: 25_000 };
+      state.contracts.available.push(offer('rustite'));
+      addBlastFragments(state.logistics, [fragment(1, 2, { dirtite: 0.9, rustite: 0.02 }), fragment(2, 40, { rustite: 0.7 })]);
+      state.logistics.fragments[0]!.state = 'in_transit';
+
+      expect(selectBestActionForEmployee(state, emp, [haul(1, 2), haul(2, 40)])!.action.id).toBe(1);
+    });
+
+    it('thinning: one rich rustite fragment survives behind many nearer trace-rustite fragments (#1603)', () => {
+      state = makeState(100, 100);
+      emp = makeEmployee(state, 0, 0);
+      state.collectedOre = { dirtite: 25_000 };
+      state.contracts.available.push(offer('rustite'));
+      const frags: FragmentData[] = [];
+      const pool: PendingAction[] = [];
+      const at = (id: number, x: number, z: number, ores: Record<string, number>) => {
+        frags.push(fragment(id, x, ores));
+        pool.push(makeAction({ id, type: 'haul_debris', requiredVehicleRole: 'debris_hauler', targetX: x, targetZ: z, payload: { fragmentId: id } }));
+      };
+      // 144 trace fragments over a 24x24 patch (36 bins, more than the per-kind budget), all nearer than the rich one.
+      let id = 1;
+      for (let gx = 0; gx < 12; gx++) for (let gz = 0; gz < 12; gz++) at(id++, gx * 2, gz * 2, { dirtite: 0.9, rustite: 0.02 });
+      expect(id - 1).toBeGreaterThan(DEBRIS_SELECTION_BINNING_MIN);
+      const richId = id;
+      at(richId, 40, 0, { rustite: 0.7 });
+      addBlastFragments(state.logistics, frags);
+
+      const sel = selectBestActionForEmployee(state, emp, pool);
+
+      expect(sel!.action.id).toBe(richId);
+    });
+  });
 });

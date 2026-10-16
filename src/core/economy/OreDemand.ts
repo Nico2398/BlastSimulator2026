@@ -2,6 +2,7 @@
  * Ore demand: how urgently the open ore_sale offers need ore the mine has not
  * yet stocked, and how much of that urgency a haul fragment can relieve (#1817).
  */
+import { ORE_DEMAND_FULL_GRADE, ORE_DEMAND_MIN_GRADE } from '../config/balance.js';
 import { isAutoDeliverable, remainingKg, storedStockKg, type Contract } from './Contract.js';
 
 /**
@@ -41,14 +42,24 @@ export function oreHaulUrgency(
   return urgency;
 }
 
-/** Highest urgency among the ores a fragment carries (density > 0); 0 if none. */
+/** Grade weight in 0..1: 0 below ORE_DEMAND_MIN_GRADE, else density / ORE_DEMAND_FULL_GRADE capped at 1. */
+function gradeWeight(density: number): number {
+  if (density < ORE_DEMAND_MIN_GRADE || density <= 0) return 0;
+  if (ORE_DEMAND_FULL_GRADE <= 0) return 1;
+  return Math.min(1, density / ORE_DEMAND_FULL_GRADE);
+}
+
+/**
+ * Highest grade-weighted urgency among the ores a fragment carries (#1828): urgency x grade weight,
+ * so a rich fragment of the wanted ore outranks a trace one; 0 if none.
+ */
 export function fragmentHaulUrgency(
   oreDensities: Readonly<Record<string, number>>,
   urgency: ReadonlyMap<string, number>,
 ): number {
   let max = 0;
   for (const [ore, density] of Object.entries(oreDensities)) {
-    if (density > 0) max = Math.max(max, urgency.get(ore) ?? 0);
+    max = Math.max(max, (urgency.get(ore) ?? 0) * gradeWeight(density));
   }
   return max;
 }
