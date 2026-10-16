@@ -16,7 +16,7 @@ import { applyExposure } from '../../core/events/MafiaActions.js';
 import { addExpense, chargeFine } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
-import { Random } from '../../core/math/Random.js';
+import { Random, rollSeed } from '../../core/math/Random.js';
 import { requireGame, sanitizeFiniteOverride } from './commandUtils.js';
 
 export function corruptCommand(
@@ -62,7 +62,7 @@ export function corruptCommand(
       }),
     };
   }
-  const rng = new Random(state.seed + state.tickCount);
+  const rng = new Random(rollSeed(state.seed, state.tickCount, state.corruption.attempts.length));
   const result = attemptCorruption(state.corruption, target, state.tickCount, rng, cost);
 
   addExpense(state.finances, result.cost, 'corruption', `Bribe: ${target}`, state.tickCount);

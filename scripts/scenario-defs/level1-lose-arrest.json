@@ -61,8 +61,9 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -7500
-        }
+          "cash": -5000
+        },
+        "note": "#1838: each bribe draws its own roll (seed salted by attempts so far); at this seed this call succeeds, so only the base cost is deducted (no scandal fine)."
       },
       "role": "bootstrap"
     },
@@ -77,8 +78,9 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -7500
-        }
+          "cash": -5000
+        },
+        "note": "#1838: each bribe draws its own roll (seed salted by attempts so far); at this seed this call succeeds, so only the base cost is deducted (no scandal fine)."
       },
       "role": "bootstrap"
     },
@@ -141,8 +143,9 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -15000
-        }
+          "cash": -10000
+        },
+        "note": "#1838: each bribe draws its own roll (seed salted by attempts so far); at this seed this call succeeds, so only the base cost is deducted (no scandal fine)."
       },
       "role": "bootstrap"
     },
@@ -157,9 +160,9 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -15000
+          "cash": -10000
         },
-        "note": "the eighth of eleven opening bribes (#1407 added three more): $82,500 of failed bribes (cost plus fine, #1411) against the level's $100,000, leaving $17,500 -- enough for both hires below to be real clicks on enabled buttons. `corrupt` itself still has no funds guard (only employee hire / vehicle buy / build got one), so this scenario no longer relies on that: it stays solvent by being funded, not by overdrawing."
+        "note": "#1838: each bribe draws its own roll (seed salted by attempts so far); at this seed this call succeeds, so only the base cost is deducted (no scandal fine)."
       },
       "role": "bootstrap"
     },
@@ -191,9 +194,9 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -7500
+          "cash": -5000
         },
-        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
+        "note": "#1838: each bribe draws its own roll (seed salted by attempts so far); at this seed this call succeeds, so only the base cost is deducted (no scandal fine)."
       },
       "role": "bootstrap"
     },
@@ -208,9 +211,9 @@
       "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "changedBy": {
-          "cash": -7500
+          "cash": -5000
         },
-        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
+        "note": "#1838: each bribe draws its own roll (seed salted by attempts so far); at this seed this call succeeds, so only the base cost is deducted (no scandal fine)."
       },
       "role": "bootstrap"
     },

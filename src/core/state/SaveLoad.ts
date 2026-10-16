@@ -585,6 +585,7 @@ function migrateV35ToV36(obj: Record<string, unknown>): Record<string, unknown> 
     if (typeof mafia['smugglingVolume'] !== 'number') mafia['smugglingVolume'] = mafia['smugglingActive'] === true ? SMUGGLING_MIGRATED_VOLUME : 0;
     delete mafia['smugglingActive'];
     delete mafia['smugglingIncome'];
+    if (typeof mafia['rollCount'] !== 'number') mafia['rollCount'] = 0;
   }
   return obj;
 }
