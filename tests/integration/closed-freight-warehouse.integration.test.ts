@@ -10,20 +10,11 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { addModifier } from '../../src/core/events/ActiveModifiers.js';
 import { completeDemolition } from '../../src/core/engine/BuildingDemolition.js';
 import { getBuildingDef } from '../../src/core/entities/Building.js';
-import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
-import { addFreightWarehouseToState } from '../helpers/freightWarehouse.js';
+import { addFreightWarehouseToState, stockWarehouse, storedFragment } from '../helpers/freightWarehouse.js';
 import { mod } from '../helpers/eventEffectWorld.js';
 
 const MASS = 5000;
 const ORE_KG = 1500;
-
-function fragment(id: number): FragmentData {
-  return {
-    id, position: { x: 0, y: 0, z: 0 }, volume: 2, mass: MASS, rockId: 'sandite',
-    oreDensities: { iron: 0.3 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
-    halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x: 0, y: 0, z: 0 },
-  };
-}
 
 /** Site with a tier-1 warehouse holding 5000 kg, closed for 50 ticks from tick 0. */
 function closedSite() {
@@ -32,9 +23,7 @@ function closedSite() {
   expect(run('new_game seed:42 size:48 cash:500000')).toMatchObject({ success: true });
   const state = ctx.state!;
   const id = addFreightWarehouseToState(state, 20, 20, 1);
-  state.logistics.fragments.push({ fragment: fragment(1), state: 'stored', vehicleId: null, warehouseId: id });
-  state.logistics.storedMassKg = MASS;
-  state.collectedOre.iron = ORE_KG;
+  stockWarehouse(state, id, storedFragment(1, MASS, { iron: ORE_KG / MASS }));
   addModifier(
     state.events.activeModifiers,
     mod({ kind: 'out_of_service', targetId: id, targetKind: 'building', startTick: 0, endTick: state.tickCount + 50 }),

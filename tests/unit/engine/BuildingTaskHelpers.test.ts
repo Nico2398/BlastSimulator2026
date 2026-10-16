@@ -20,8 +20,9 @@ import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import type { BlastRegion, FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import { stockWarehouse, storedFragment } from '../../helpers/freightWarehouse.js';
 
 const SEED = 42;
 
@@ -68,14 +69,6 @@ describe('refreshLogisticsCapacity stock survival (#1813)', () => {
   const MASS = 5000;
   const ORE_KG = 1500;
 
-  function fragment(id: number): FragmentData {
-    return {
-      id, position: { x: 0, y: 0, z: 0 }, volume: 2, mass: MASS, rockId: 'sandite',
-      oreDensities: { iron: 0.3 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
-      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x: 0, y: 0, z: 0 },
-    };
-  }
-
   function addWarehouse(state: GameState, x: number): number {
     const r = placeBuilding(state.buildings, 'freight_warehouse', x, 0, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, 1, 0, 0);
     expect(r.success).toBe(true);
@@ -83,9 +76,7 @@ describe('refreshLogisticsCapacity stock survival (#1813)', () => {
   }
 
   function stock(state: GameState, fragId: number, warehouseId: number): void {
-    state.logistics.fragments.push({ fragment: fragment(fragId), state: 'stored', vehicleId: null, warehouseId });
-    state.logistics.storedMassKg += MASS;
-    state.collectedOre.iron = (state.collectedOre.iron ?? 0) + ORE_KG;
+    stockWarehouse(state, warehouseId, storedFragment(fragId, MASS, { iron: ORE_KG / MASS }));
   }
 
   function setup() {

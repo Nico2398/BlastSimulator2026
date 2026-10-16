@@ -58,10 +58,7 @@ export function setFreightRoomExact(state: GameState, freeKg: number): void {
   for (const site of sites) {
     if (surplus <= 0) break;
     const mass = Math.min(surplus, site.capacityKg);
-    state.logistics.fragments.push({
-      fragment: fillerFragment(++fillerSeq, mass), state: 'stored', vehicleId: null, warehouseId: site.id,
-    });
-    state.logistics.storedMassKg += mass;
+    stockWarehouse(state, site.id, storedFragment(++fillerSeq, mass));
     surplus -= mass;
   }
 }
@@ -74,20 +71,30 @@ function placeFixtureWarehouses(state: GameState, kg: number): void {
   }
 }
 
-function fillerFragment(id: number, mass: number): FragmentData {
+/** A rock fragment of `mass` kg; `oreDensities` (ore id -> fraction of mass) defaults to barren. */
+export function storedFragment(id: number, mass: number, oreDensities: Record<string, number> = {}): FragmentData {
   return {
     id,
     position: { x: 0, y: 0, z: 0 },
     volume: mass / 2500,
     mass,
     rockId: 'sandite',
-    oreDensities: {},
+    oreDensities,
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
-    shapeSeed: 1,
+    shapeSeed: id,
     origin: { x: 0, y: 0, z: 0 },
   };
+}
+
+/** Park `fragment` as stored in `warehouseId`, adding its mass to storedMassKg and its ore to collectedOre. */
+export function stockWarehouse(state: GameState, warehouseId: number, fragment: FragmentData): void {
+  state.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId });
+  state.logistics.storedMassKg += fragment.mass;
+  for (const [ore, density] of Object.entries(fragment.oreDensities)) {
+    state.collectedOre[ore] = (state.collectedOre[ore] ?? 0) + fragment.mass * density;
+  }
 }
 
 /**
