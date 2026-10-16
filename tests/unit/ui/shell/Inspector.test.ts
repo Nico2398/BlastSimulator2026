@@ -39,7 +39,7 @@ describe('Inspector', () => {
     expect(root.style.display).toBe('none');
   });
 
-  it('shows employee identity and the crew action set (Detail, Dispatch Here, Train)', () => {
+  it('shows employee identity and the crew action set (Dispatch Here only)', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
@@ -48,9 +48,9 @@ describe('Inspector', () => {
     expect(root.style.display).not.toBe('none');
     expect(root.textContent).toContain(employee.name);
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
-    expect(labels.some(l => l?.includes('Detail'))).toBe(true);
+    expect(labels.some(l => l?.includes('Detail'))).toBe(false);
     expect(labels.some(l => l?.includes('Dispatch Here'))).toBe(true);
-    expect(labels.some(l => l?.includes('Train'))).toBe(true);
+    expect(labels.some(l => l?.includes('Train'))).toBe(false);
   });
 
   it('shows the vehicle action set (Locate, Move Here, Upgrade) and no Haul/Unassign', () => {

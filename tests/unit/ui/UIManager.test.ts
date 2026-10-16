@@ -387,7 +387,7 @@ describe('UIManager — setListSelection reaches the Crew panel (#1765)', () => 
     const id = state.employees.employees[0]!.id;
     uiManager.showPanel('employees');
     uiManager.update(state);
-    uiManager.hideAllPanels();
+    (uiManager as unknown as { hideAllPanels(): void }).hideAllPanels();
     uiManager.setListSelection({ kind: 'employee', id });
     uiManager.showPanel('employees');
     uiManager.update(state);

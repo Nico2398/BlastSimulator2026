@@ -4,7 +4,6 @@ import { CrewPanel } from '../../../../src/ui/panels/CrewPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { managerNegotiationBonusPct } from '../../../../src/core/economy/Negotiation.js';
-import { PAY_CYCLE_TICKS, BASE_SALARIES, QUALIFICATION_SALARY_BONUS } from '../../../../src/core/config/balance.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
@@ -13,7 +12,6 @@ import { perHour } from '../../../../src/ui/crewDetailSections.js';
 import { hiringSignature } from '../../../../src/ui/panels/CrewHiring.js';
 import { candidatesForRole, takeCandidate, type HireCandidate } from '../../../../src/core/entities/HiringPool.js';
 import { HIRING_COSTS } from '../../../../src/core/entities/Employee.js';
-import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -56,10 +54,6 @@ function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
     occupantIds: [],
     ...overrides,
   };
-}
-
-function makeBuilding(overrides: Partial<Building> = {}): Building {
-  return { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [], ...overrides };
 }
 
 function makeState(employees: Employee[] = [], vehicles: Vehicle[] = [], buildings: Building[] = []): GameState {
