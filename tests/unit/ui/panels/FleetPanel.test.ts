@@ -480,7 +480,7 @@ describe('FleetPanel — rows hold no actions (#1767)', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeVehicle({ id: 3, type: 'drill_rig', tier: 1 })]));
     const row = rowOf(panel, 3);
-    expect(row.querySelector('svg')).not.toBeNull();
+    expect(row.querySelector('bs-icon')).not.toBeNull(); // iconEl renders a <bs-icon> custom element, not an inline <svg>
     expect(row.textContent).toContain('#3');
     expect(row.textContent).toContain('Drill Rig');
     expect(row.querySelector('.bs-fleet-status')).not.toBeNull();

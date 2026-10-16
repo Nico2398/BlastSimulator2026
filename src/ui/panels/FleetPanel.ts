@@ -38,7 +38,7 @@ export class FleetPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
   private onSelectVehicleCb?: (vehicleId: number) => void;
-  private lastSignature = '';
+  private lastSignature: string | null = null;
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
   private selection: ListSelection = null;
@@ -104,7 +104,7 @@ export class FleetPanel extends PanelBase {
 
   refreshLocale(): void {
     this.locale.refresh();
-    this.lastSignature = '';
+    this.lastSignature = null;
     if (this.lastState) this.update(this.lastState);
   }
 

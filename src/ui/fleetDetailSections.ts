@@ -108,9 +108,11 @@ export function vehicleDriverState(v: Vehicle, employees: readonly Employee[]): 
 /** Driver name line for a Fleet row: driver, pending driver, or muted "Unmanned". No warning, no Train button. */
 export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[]): HTMLElement {
   const driver = vehicleDriverState(v, employees);
+  const seatedId = vehicleDriverId(v);
   const text = driver.kind === 'driver' ? driver.employee.name
     : driver.kind === 'pending' ? t('ui.fleet.walking_to_board', { name: driver.employee.name })
-      : t('ui.fleet.unmanned');
+      : seatedId !== null ? `#${seatedId}` // seated but off the roster
+        : t('ui.fleet.unmanned');
   const muted = driver.kind === 'driver' ? 'var(--bsx-text-secondary)' : 'var(--bsx-text-micro)';
-  return el('div', { text, attrs: { style: `font:500 10px/1.2 var(--bsx-font-ui);color:${muted}` } });
+  return el('div', { text, className: 'bs-fleet-driver', attrs: { style: `font:500 10px/1.2 var(--bsx-font-ui);color:${muted}` } });
 }
