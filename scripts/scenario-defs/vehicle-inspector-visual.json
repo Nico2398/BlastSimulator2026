@@ -1,0 +1,418 @@
+{
+  "name": "vehicle-inspector-visual",
+  "description": "The vehicle inspector (#1761). A player clicks a loaded hauler and sees cargo per ore plus its destination warehouse as a link, follows the driver link to the employee inspector, then upgrades and scraps a vehicle through the inspector's action strip. Waits are on DOM conditions, never delays.",
+  "steps": [
+    {
+      "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:500000",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:500000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 500000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:18,19 diameter:0.089",
+      "description": "9-hole grid, deterministic under seed 10 -- sandbox-confirmed to expose ~250 ore-bearing ground fragments alongside plenty of plain rock once blasted. diameter:0.089 added to match the real grid-tool confirm's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter fell back to a different console-only default (0.15, mining.ts), desyncing drill duration/tick timing against interaction mode (same fix as rock-fragmenter-breaking.json's own drill_plan step).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "dragTiles",
+          "x1": 18,
+          "z1": 19,
+          "x2": 24,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:9 max_ticks:220",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 9 holes well inside this budget (sandbox-measured landing at tick 166 under real, un-cheated needs gauges).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 220,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 90,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "description": "#1774: 6 kg breakout charge (BURDEN_BREAKOUT_MAX, balance.ts) -- the 5 kg shot left the rubble sealed under the cap, and sealed rock gets no haul/fragment order, so collectedOreTotal never rose. Amount is set through its stepper so interaction mode charges the same 6 kg; stemming 2 matches DEFAULT_STEMMING_M (Charge.ts).",
+      "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "timeout": 125,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "description": "#1801: rest-completion morale shifts the crew's pace and so the weather at blast time. Boomite is water-sensitive: a wet hole fizzles and the shot no longer breaks out (measured: 9 wet holes at tick 233, none at tick 251). Waiting for the holes to dry is what a player does; blasting is unchanged.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 65,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "collectedOreTotal": 0
+        },
+        "note": "a fired blast clears the plan back to zero -- nothing has been hauled anywhere yet, so collectedOreTotal is still 0 at this point"
+      }
+    },
+    {
+      "command": "build freight_warehouse at:12,17",
+      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "storedMassKg": 0,
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle list",
+      "description": "A player clicks the staffed debris hauler (vehicle 2) in the scene while it hauls. Once it carries a load, the inspector's cargo section lists kg per ore and its job section names the destination warehouse as a link. Command mode stand-in is a read-only list.",
+      "timeout": 240,
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-job"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-cargo [data-cargo-ore]",
+          "timeout": 180000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-job [data-select-kind=\"building\"]",
+          "timeout": 60000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-job [data-select-kind=\"building\"]",
+        "note": "cargo per ore and the destination warehouse link are on screen while the hauler is loaded"
+      }
+    },
+    {
+      "command": "vehicle list",
+      "description": "The driver's name in the hauler's driver section is a link: clicking it switches the inspector to that employee.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-driver [data-select-kind=\"employee\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"2\"] .bs-vehicle-driver [data-select-kind=\"employee\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail"
+      }
+    },
+    {
+      "command": "vehicle upgrade 3",
+      "description": "Back on a vehicle: click the staffed rock digger (vehicle 3) and upgrade it through the inspector Upgrade button. Same rules and cost as the Fleet card.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 3
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"upgrade_vehicle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"upgrade_vehicle\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 4
+        }
+      }
+    },
+    {
+      "command": "vehicle scrap 3",
+      "description": "Scrap the same vehicle from the inspector: Scrap opens the confirm modal naming the residual value; confirming removes the vehicle and credits cash.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "changedBy": {
+          "vehicleCount": -1
+        }
+      }
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}
