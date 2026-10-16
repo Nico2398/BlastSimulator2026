@@ -5,7 +5,7 @@
 import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, type ChipTone } from './dom.js';
 import type { Vehicle, VehicleTier, VehicleState } from '../core/entities/Vehicle.js';
-import { getVehicleDefByTier, vehicleCargoMassKg, vehicleDriverId } from '../core/entities/Vehicle.js';
+import { ROLE_LICENCE_REQUIRED, getVehicleDefByTier, vehicleCargoMassKg, vehicleDriverId } from '../core/entities/Vehicle.js';
 import { getBuildingDef, type BuildingType, type BuildingTier } from '../core/entities/Building.js';
 import type { Employee } from '../core/entities/Employee.js';
 import { rosterCanDriveVehicleTier } from '../core/entities/VehicleUpgrade.js';
@@ -69,7 +69,10 @@ export function makeHpGauge(v: Vehicle): HTMLElement {
   const maxHp = getVehicleDefByTier(v.type, v.tier).maxHp;
   const pct = maxHp > 0 ? Math.round((v.hp / maxHp) * 100) : 0;
   const color = pct > 50 ? 'var(--bsx-positive)' : pct > 20 ? 'var(--bsx-amber)' : 'var(--bsx-critical)';
-  return gauge(t('ui.fleet.hp'), pct, color, { labelWidth: 30 });
+  const row = gauge(t('ui.fleet.hp'), pct, color, { labelWidth: 30 });
+  const value = row.querySelector('.bsx-gauge-value');
+  if (value) value.textContent = `${pct}%`;
+  return row;
 }
 
 /** Only debris_hauler ever carries a payload — every other role's massKg sits at 0 forever, so the gauge is omitted rather than shown always-empty. */
@@ -111,7 +114,9 @@ export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[]): 
   const text = driver.kind === 'driver' ? driver.employee.name
     : driver.kind === 'pending' ? t('ui.fleet.walking_to_board', { name: driver.employee.name })
       : seatedId !== null ? `#${seatedId}` // seated but off the roster
-        : t('ui.fleet.unmanned');
-  const muted = driver.kind === 'driver' ? 'var(--bsx-text-secondary)' : 'var(--bsx-text-micro)';
+        : driver.kind === 'no_licensed' ? t('ui.fleet.row_no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`), level: v.tier })
+          : t('ui.fleet.unmanned');
+  const muted = driver.kind === 'driver' ? 'var(--bsx-text-secondary)'
+    : driver.kind === 'no_licensed' && seatedId === null ? 'var(--bsx-amber)' : 'var(--bsx-text-micro)';
   return el('div', { text, className: 'bs-fleet-driver', attrs: { style: `font:500 10px/1.2 var(--bsx-font-ui);color:${muted}` } });
 }

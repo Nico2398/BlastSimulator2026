@@ -82,7 +82,9 @@ export function buildingCardTooltip(def: BuildingDef): string {
 }
 
 /** Capacity of a vehicle role with its work unit, e.g. "2 holes/h". */
-export function vehicleCapacityText(_role: VehicleRole, _capacity: number): string {
-  // TODO: implement
-  return '';
+export function vehicleCapacityText(role: VehicleRole, capacity: number): string {
+  const unitKey = VEHICLE_WORK_UNIT_KEY[role];
+  return unitKey
+    ? `${num(capacity)} ${t(unitKey)}`
+    : t('inspector.vehicle.kg', { kg: num(capacity) });
 }
