@@ -793,10 +793,10 @@ interface CraterRampOutcome {
   haulOrFragmentOrders: number;
 }
 
-function rampIntoCrater(endZ: number): CraterRampOutcome {
+function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): CraterRampOutcome {
   const { runner, ctx } = createRunner();
   const run = (c: string) => runner.run(c);
-  expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true')).toMatchObject({ success: true });
+  expect(run(`sandbox start biome:${biome} difficulty:easy seed:42 staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
@@ -820,7 +820,7 @@ function rampIntoCrater(endZ: number): CraterRampOutcome {
   tickWhile(() => state.lastBlastReport !== null, 400);
   expect(state.lastBlastReport).not.toBeNull();
 
-  expect(run(`build_ramp start:40,12 end:40,${endZ} depth:8`)).toMatchObject({ success: true });
+  expect(run(`build_ramp start:40,12 end:40,${endZ} depth:${depth}`)).toMatchObject({ success: true });
   const rampDone = (): boolean => state.plannedRamps.every(r => r.segments.every(s => s.done));
   tickWhile(rampDone, 2500);
   // Classification runs at the start of each employee tick: give it a pass after the last segment.
@@ -866,6 +866,36 @@ describe('A ramp ending inside an already-dug crater finishes and connects it (#
     'control: ending 3 tiles inside (40,34) finishes with no order out of reach',
     () => {
       const r = rampIntoCrater(34);
+      expect(r.allDone).toBe(true);
+      expect(r.unreachableSegments).toBe(0);
+      expect(r.outOfReach).toBe(0);
+    },
+    600000,
+  );
+});
+
+// ── A ramp into a crater meets the crater floor (#1852) ──────────────────────
+// A ramp's foot sits `depth` below the ground at its START tile. On red_canyon seed 42 that
+// ground is ~1 m lower than the blast site's, so depth 8 left the foot 1.1 m under the crater
+// floor (8.5) and 1,180 orders stayed debris_out_of_reach; depth 7 reached it (61). The depth
+// now snaps so the foot meets the floor at the end tile.
+
+describe('A depth-8 ramp into a red_canyon crater meets the crater floor (#1852)', () => {
+  it(
+    'red_canyon seed 42, build_ramp 40,12 -> 40,31 depth 8: out-of-reach orders drop far below the 1,180 of the unsnapped ramp, near the depth-7 run\'s 61',
+    () => {
+      const r = rampIntoCrater(31, 'red_canyon', 8);
+      expect(r.allDone, 'every ramp segment dug').toBe(true);
+      expect(r.haulOrFragmentOrders).toBeGreaterThan(0);
+      expect(r.outOfReach, 'haul/fragment orders debris_out_of_reach').toBeLessThan(150);
+    },
+    600000,
+  );
+
+  it(
+    'control: desert_badlands seed 42 at depth 8 stays fully reachable',
+    () => {
+      const r = rampIntoCrater(31, 'desert_badlands', 8);
       expect(r.allDone).toBe(true);
       expect(r.unreachableSegments).toBe(0);
       expect(r.outOfReach).toBe(0);

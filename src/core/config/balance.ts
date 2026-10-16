@@ -1270,6 +1270,12 @@ const RAMP_CUT_SLOPE_MARGIN = 0.98;
 /** The actual rise-per-metre-of-run a ramp's floor is cut at (#1152). */
 export const RAMP_CUT_SLOPE_RATIO = NAV_MAX_SLOPE_RATIO * RAMP_CUT_SLOPE_MARGIN;
 
+/** Largest gap (m) between a ramp's planned foot and the end tile's floor that the depth snap bridges (#1852). */
+export const RAMP_FLOOR_SNAP_REACH_M = 2;
+
+/** An end tile counts as dug floor only when at least this far (m) below the start ground (#1852). */
+export const RAMP_CRATER_MIN_DROP_M = 2;
+
 /** Required clearance, in cells, for an employee on foot (#1154). */
 export const NAV_CLEARANCE_EMPLOYEE_CELLS = 1;
 
