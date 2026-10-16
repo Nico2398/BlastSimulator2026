@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Random } from '../../../src/core/math/Random.js';
+import { Random, rollSeed } from '../../../src/core/math/Random.js';
 
 describe('Random — determinism', () => {
   it('same seed produces the same sequence', () => {
@@ -121,6 +121,26 @@ describe('Random — snapshot / fromState (#1403)', () => {
       a.next();
       const b = Random.fromState(a.snapshot());
       expect(b.nextInt(0, 1000)).toBe(a.nextInt(0, 1000));
+    }
+  });
+});
+
+describe('rollSeed (#1838)', () => {
+  it('salt 0 equals the legacy (seed + tick) | 0', () => {
+    for (const [s, t] of [[42, 7], [0, 0], [2 ** 31 - 1, 5], [-9, 100]] as const) {
+      expect(rollSeed(s, t, 0)).toBe((s + t) | 0);
+    }
+  });
+
+  it('salts 0..50 give distinct seeds', () => {
+    const seeds = new Set<number>();
+    for (let n = 0; n <= 50; n++) seeds.add(rollSeed(42, 10, n));
+    expect(seeds.size).toBe(51);
+  });
+
+  it('the next tick with the previous salt does not collide with this tick', () => {
+    for (const [s, t, n] of [[42, 10, 1], [7, 0, 5], [1, 99, 30]] as const) {
+      expect(rollSeed(s, t + 1, n - 1)).not.toBe(rollSeed(s, t, n));
     }
   });
 });
