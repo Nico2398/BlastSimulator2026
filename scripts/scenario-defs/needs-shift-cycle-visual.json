@@ -121,7 +121,7 @@
           "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
-      "description": "role: guard: open building #1's inspector from its Build panel row. Its next tier is not researched, so the action strip offers Research instead of Upgrade — the Upgrade action is absent, the same observable outcome (buildingCount/cash unchanged) as the console command's own rejection.",
+      "description": "role: observe: open building #1's inspector from its Build panel row. Its next tier is not researched, so the action strip offers Research instead of Upgrade — the Upgrade action is absent, the same observable outcome (buildingCount/cash unchanged) as the console command's own rejection.",
       "expect": {
         "changedBy": {
           "cash": 0

@@ -20,7 +20,7 @@
 // This was the one panel the P0-P9 redesign never reached — still the
 // pre-redesign `.bs-ui`/`.bs-panel` dark/gold chrome with a plain text
 // title and a bottom Close button. This pass is chrome-only: same catalog
-// logic, same placed-row logic, same ramp tool, same research-queue
+// logic, same placed-row list, same ramp tool, same research-queue
 // handling, just rebuilt onto the shared `bsx-root` docked-panel
 // convention (46px header with icon chip + title + close button,
 // scrollable body) that every other panel already uses.
@@ -287,7 +287,7 @@ export class BuildMenu extends PanelBase {
     this.lastState = state;
   }
 
-  /** Arm the footprint placement tool that moves placed building `buildingId` (the placed row's Move, #1758). */
+  /** Arm the footprint placement tool that moves placed building `buildingId` (the inspector's Move, #1758). */
   armMove(buildingId: number): void {
     const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
     if (!b) return;
@@ -335,8 +335,9 @@ export class BuildMenu extends PanelBase {
 
   /**
    * Queue a Research Center task for `type` tier `tier` and report progress.
-   * Shared by the catalog row (place-blocked) and the placed-row (upgrade-blocked)
-   * "Queue Research" buttons — the only in-game path to unlock tier 2/3.
+   * Called by the catalog row's "Queue Research" button (place-blocked) and, via
+   * `queueResearchFor`, by the inspector's Research action (upgrade-blocked) —
+   * the only in-game paths to unlock tier 2/3.
    */
   queueResearch(type: BuildingType, tier: BuildingTier): void {
     if (tier === 1) return;
@@ -746,18 +747,19 @@ export class BuildMenu extends PanelBase {
   }
 
   /**
-   * Label the research button with its cost and duration, or — when a task for
-   * that building/tier is already queued — hide it and show the live progress.
+   * Catalog rows only (placed rows carry no research button): label the row's
+   * research button with its cost and duration, or — when a task for that
+   * building/tier is already queued — hide it and show the live progress.
    */
   private syncResearchControls(
     row: HTMLElement,
     type: BuildingType,
-    tier: BuildingTier | null,
+    tier: BuildingTier,
     locked: boolean,
   ): void {
     const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
     if (!btn) return;
-    const researchTier = tier !== null && tier > 1 ? (tier as 2 | 3) : null;
+    const researchTier = tier > 1 ? (tier as 2 | 3) : null;
     if (researchTier !== null) {
       const def = getResearchTaskDef(type, researchTier);
       btn.textContent = t('ui.build.queue_research_cost', { cost: formatMoney(this.researchCost(def.cost)), duration: def.ticks });

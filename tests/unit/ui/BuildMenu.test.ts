@@ -21,7 +21,6 @@ import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import { liveArea, regionContains, EXACT_LIVE_MARGIN, type TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { REGION } from '../../../src/ui/tutorialStages.js';
-import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
