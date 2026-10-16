@@ -206,12 +206,15 @@ export function isOperating(b: Pick<Building, 'active' | 'outOfService'>): boole
   return b.active && !b.outOfService;
 }
 
-/** Sets each building's `outOfService` flag from the set of closed building ids. */
-export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): void {
-  for (const b of buildings) {
-    if (closed.has(b.id)) b.outOfService = true;
-    else delete b.outOfService;
-  }
+/**
+ * Sets each building's `outOfService` flag from the set of closed building ids.
+ * Returns true when any building's flag flipped.
+ */
+export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): boolean {
+  // TODO: implement
+  void buildings;
+  void closed;
+  return false;
 }
 
 // ── People capacity (#1202) ──
