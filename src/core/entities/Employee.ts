@@ -449,9 +449,16 @@ export function processPayCycle(state: EmployeeState, salaryFactorOf: (role: Emp
   return totalSalaries;
 }
 
-/** Sum of QUALIFICATION_SALARY_BONUS over the employee's qualifications. */
+/**
+ * Sum of QUALIFICATION_SALARY_BONUS over the employee's qualifications. A licence (`driving.*`) is a
+ * pass: it pays the level-1 bonus at any proficiency. Its proficiency (XP) still accrues (#1833) but
+ * changes neither pay nor speed (#1843).
+ */
 export function calculateQualificationBonus(employee: Pick<Employee, 'qualifications'>): number {
-  return employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
+  return employee.qualifications.reduce(
+    (sum, q) => sum + QUALIFICATION_SALARY_BONUS[isLicenceSkill(q.category) ? 1 : q.proficiencyLevel],
+    0,
+  );
 }
 
 /** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */
