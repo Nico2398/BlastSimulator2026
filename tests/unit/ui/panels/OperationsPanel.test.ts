@@ -766,7 +766,8 @@ describe('OperationsPanel — Unclaimed Work with blocked orders (#1810)', () =>
 });
 
 describe('countQueuedByBlock (#1810)', () => {
-  const q = (blockedReason: BlockedOrderReason | null | undefined, status: PendingAction['status'] = 'queued') => ({ status, blockedReason });
+  const q = (blockedReason: BlockedOrderReason | null | undefined, status: PendingAction['status'] = 'queued'): Pick<PendingAction, 'status' | 'blockedReason'> =>
+    (blockedReason === undefined ? { status } : { status, blockedReason });
 
   it('returns zeros for no actions', () => {
     expect(countQueuedByBlock([])).toEqual({ open: 0, blocked: 0, stranded: 0 });
