@@ -14,6 +14,13 @@ import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js'
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { purchaseVehicle, type Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
+import { isPhaseDrivenWorkTick, awardTaskXp } from '../../../src/core/engine/TaskXp.js';
+import type { Employee, SkillCategory } from '../../../src/core/entities/Employee.js';
+import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
+import { addModifier } from '../../../src/core/events/ActiveModifiers.js';
+import { mod } from '../../helpers/eventEffectWorld.js';
 
 /**
  * Rest/task timers are arrival-gated (#437): tickEmployees only queues
@@ -545,5 +552,230 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
       expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
     }
     expect(employee.taskTicksRemaining).toBe(3);
+  });
+});
+
+// ── #1833: phase-driven work (haul_debris / fragment_debris) earns XP ───────
+//
+// Hauling and fragmenting carry no taskTicksRemaining (#1091): the driver
+// drives, loads and unloads through itinerary arrival effects. Every tick the
+// mounted driver spends on the reserved action must still earn the licence XP.
+
+describe('tickTaskProgress — phase-driven work earns licence XP (#1833)', () => {
+  const SEED = 42;
+  type DebrisType = 'haul_debris' | 'fragment_debris';
+  const SETUP: Record<DebrisType, { role: 'debris_hauler' | 'rock_fragmenter'; skill: SkillCategory }> = {
+    haul_debris: { role: 'debris_hauler', skill: 'driving.truck' },
+    fragment_debris: { role: 'rock_fragmenter', skill: 'driving.rock_fragmenter' },
+  };
+
+  const ITINERARY: Itinerary = {
+    legs: [{ mode: 'drive', vehicleId: 1, destX: 9, destZ: 9, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 20 }],
+    goal: { kind: 'work', actionId: 77 },
+    workTicks: 0,
+    estTotalTicks: 20,
+  };
+
+  function setup(type: DebrisType, level: 1 | 2 | 3 | 4 | 5 = 1) {
+    const { role, skill } = SETUP[type];
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, role, 0, 0);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED));
+    assignSkill(state.employees, employee.id, skill, level);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const action: PendingAction = {
+      id: 77, type, requiredSkill: null, requiredVehicleRole: role,
+      targetX: 9, targetZ: 9, targetY: 0, payload: { fragmentId: 1 }, targetEmployeeId: employee.id,
+      status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
+    employee.activeActionId = action.id;
+    employee.itinerary = structuredClone(ITINERARY);
+    employee.taskTicksRemaining = null;
+    const xp = () => employee.qualifications.find(q => q.category === skill)!.xp;
+    return { state, vehicle, employee, action, skill, xp };
+  }
+
+  it.each(['haul_debris', 'fragment_debris'] as const)('a mounted %s driver with a live itinerary gains computeXpPerTick per call and keeps taskTicksRemaining null', (type) => {
+    const { state, employee, skill, xp } = setup(type);
+    expect(xp()).toBe(0);
+
+    const result = tickTaskProgress(state, employee);
+
+    expect(xp()).toBe(computeXpPerTick(1));
+    expect(result).not.toBeNull();
+    expect(result?.skill).toBe(skill);
+    expect(result?.completed).toBe(false);
+    expect(employee.taskTicksRemaining).toBeNull();
+    expect(employee.activeActionId).toBe(77);
+  });
+
+  it('XP accumulates one step per tick over many calls', () => {
+    const { state, employee, xp } = setup('haul_debris');
+    for (let i = 0; i < 10; i++) tickTaskProgress(state, employee);
+    expect(xp()).toBe(10 * computeXpPerTick(1));
+  });
+
+  it.each([1, 3, 5] as const)('XP scales with proficiency like timed work (level %i)', (level) => {
+    const { state, employee, xp } = setup('haul_debris', level);
+    tickTaskProgress(state, employee);
+    expect(xp()).toBe(computeXpPerTick(level));
+  });
+
+  it('a level-up during a haul is reported as leveledUp with levelUps', () => {
+    const { state, employee, skill } = setup('haul_debris');
+    employee.qualifications.find(q => q.category === skill)!.xp = XP_THRESHOLDS[2] - 1;
+
+    const result = tickTaskProgress(state, employee);
+
+    expect(result?.leveledUp).toBe(true);
+    expect(result?.oldLevel).toBe(1);
+    expect(result?.newLevel).toBe(2);
+    expect(result?.levelUps).toEqual([{ skill, oldLevel: 1, newLevel: 2 }]);
+  });
+
+  it('an idle driver (activeActionId null) gains nothing and the call returns null', () => {
+    const { state, employee, xp } = setup('haul_debris');
+    employee.activeActionId = null;
+    expect(tickTaskProgress(state, employee)).toBeNull();
+    expect(xp()).toBe(0);
+  });
+
+  it('a resting employee gains nothing', () => {
+    const { state, employee, xp } = setup('haul_debris');
+    // Mounted, action active, itinerary live: only the rest guard differs.
+    employee.restTicksRemaining = 5;
+    tickTaskProgress(state, employee);
+    expect(xp()).toBe(0);
+  });
+
+  it('an on-foot employee who has not boarded yet gains nothing', () => {
+    const { state, employee, vehicle, xp } = setup('haul_debris');
+    vehicle.occupantIds = [];
+    employee.locomotion = { kind: 'on_foot' };
+    expect(tickTaskProgress(state, employee)).toBeNull();
+    expect(xp()).toBe(0);
+  });
+
+  it('a mounted driver with no itinerary gains nothing', () => {
+    const { state, employee, xp } = setup('haul_debris');
+    employee.itinerary = null;
+    expect(tickTaskProgress(state, employee)).toBeNull();
+    expect(xp()).toBe(0);
+  });
+
+  it('a work_stoppage freezes phase-driven XP', () => {
+    const { state, employee, xp } = setup('haul_debris');
+    addModifier(state.events.activeModifiers, mod({ kind: 'work_stoppage', startTick: 0, endTick: 100 }), 1);
+    state.tickCount = 5;
+    for (let i = 0; i < 3; i++) expect(tickTaskProgress(state, employee)).toBeNull();
+    expect(xp()).toBe(0);
+  });
+
+  it('timed task XP is unchanged: a timed drill_hole still counts down and awards its skill', () => {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED));
+    state.pendingActions.push({
+      id: 5, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
+      status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    });
+    employee.activeActionId = 5;
+    employee.taskTicksRemaining = 4;
+    employee.activeTaskTotalTicks = 4;
+    tickTaskProgress(state, employee);
+    expect(employee.taskTicksRemaining).toBe(3);
+    expect(employee.qualifications.find(q => q.category === 'blasting')!.xp).toBe(computeXpPerTick(1));
+  });
+});
+
+describe('isPhaseDrivenWorkTick (#1833)', () => {
+  const SEED = 42;
+  const ITIN: Itinerary = {
+    legs: [], goal: { kind: 'work', actionId: 1 }, workTicks: 0, estTotalTicks: 0,
+  };
+
+  function fixture(type: PendingAction['type'] = 'haul_debris') {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED));
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    employee.itinerary = { ...ITIN };
+    employee.taskTicksRemaining = null;
+    employee.activeActionId = 1;
+    const action: PendingAction = {
+      id: 1, type, requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
+      status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    };
+    return { employee, action, vehicle: vehicle as Vehicle };
+  }
+
+  it('is true for a mounted driver with an itinerary on a haul_debris action', () => {
+    const { employee, action } = fixture('haul_debris');
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(true);
+  });
+
+  it('is true for a mounted driver with an itinerary on a fragment_debris action', () => {
+    const { employee, action } = fixture('fragment_debris');
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(true);
+  });
+
+  it('is false without an action', () => {
+    const { employee } = fixture();
+    expect(isPhaseDrivenWorkTick(employee, undefined)).toBe(false);
+  });
+
+  it('is false for an on-foot employee', () => {
+    const { employee, action } = fixture();
+    employee.locomotion = { kind: 'on_foot' };
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
+  });
+
+  it('is false with a null itinerary', () => {
+    const { employee, action } = fixture();
+    employee.itinerary = null;
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
+  });
+
+  it('is false for an action type that is not phase-driven', () => {
+    const { employee, action } = fixture('general_work');
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
+  });
+
+  it('is false while the employee is resting', () => {
+    const { employee, action } = fixture();
+    employee.restTicksRemaining = 5;
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
+  });
+
+  it('is false while a work timer runs (timed work is paid by the timer path)', () => {
+    const { employee, action } = fixture();
+    employee.taskTicksRemaining = 3;
+    expect(isPhaseDrivenWorkTick(employee, action)).toBe(false);
+  });
+});
+
+describe('awardTaskXp (#1833)', () => {
+  it('reports no skill and no level-ups for an undefined action', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(42));
+    const result = awardTaskXp(state.employees, employee as Employee, undefined);
+    expect(result).toEqual({ skill: null, leveledUp: false, levelUps: [], levelUpLevels: null });
+  });
+
+  it('grants the licence XP for a haul_debris action', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(42));
+    const action: PendingAction = {
+      id: 1, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
+      status: 'in_progress', holderId: employee.id, queuedAtTick: 0,
+    };
+    const result = awardTaskXp(state.employees, employee, action);
+    expect(result.skill).toBe('driving.truck');
+    expect(employee.qualifications.find(q => q.category === 'driving.truck')!.xp).toBe(computeXpPerTick(1));
   });
 });
