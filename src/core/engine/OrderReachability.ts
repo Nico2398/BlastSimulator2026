@@ -8,6 +8,8 @@
 // changes — so a pool costs the union of its actors' components, not a flood
 // fill: actors walking about every tick re-cost nothing (#1603). An order aimed
 // at one named employee is answered straight from that employee's component.
+// A vehicle order's target may be a narrow approach cell beside a building:
+// it counts as reachable when it touches the vehicle component (#1840).
 // Temporary unavailability (injured, resting, training, busy) does not remove
 // an actor: alive and on the roster is enough.
 
@@ -27,6 +29,7 @@ import {
   type ClimbComponents,
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
+import { withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
@@ -132,10 +135,9 @@ function fillPool(
     const driverId = vehicleDriverId(v);
     return (driverId !== null && candidateIds.has(driverId)) || onFoot.has(Math.round(v.x), Math.round(v.z));
   });
-  return {
-    hasActor: true,
-    reachable: componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS).reachableFrom(usable),
-  };
+  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS).reachableFrom(usable);
+  // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
+  return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };
 }
 
 function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCache | null): ActorPool {
