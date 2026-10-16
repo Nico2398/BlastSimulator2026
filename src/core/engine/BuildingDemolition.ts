@@ -42,7 +42,7 @@ export function queueDemolition(state: GameState, building: Building, opts: Demo
     id: actionId,
     type: 'demolish_building',
     requiredSkill: null,
-    requiredVehicleRole: 'building_destroyer',
+    requiredVehicleRole: DEMOLITION_VEHICLE_ROLE,
     targetX: opts.approach.x,
     targetZ: opts.approach.z,
     targetY: opts.targetY,

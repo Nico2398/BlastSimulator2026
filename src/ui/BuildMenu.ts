@@ -342,26 +342,33 @@ export class BuildMenu extends PanelBase {
    */
   queueResearch(type: BuildingType, tier: BuildingTier): void {
     if (tier === 1) return;
+    this.setStatus(this.runResearchQueue(type, tier).message);
+  }
+
+  /** Runs `research queue` and words the outcome; shared by the catalog button and the inspector. */
+  private runResearchQueue(type: BuildingType, tier: BuildingTier): { ok: boolean; message: string } {
     const cmdResult = this.gameConsole?.(`research queue type:${type} tier:${tier}`);
     if (!cmdResult?.success) {
-      this.setStatus(t(BuildMenu.RESEARCH_FAILURE_KEYS[cmdResult?.code ?? ''] ?? 'ui.build.research_queue_failed'));
-      return;
+      return { ok: false, message: t(BuildMenu.RESEARCH_FAILURE_KEYS[cmdResult?.code ?? ''] ?? 'ui.build.research_queue_failed') };
     }
     const task = this.lastState?.buildings.researchQueue.find(
       (r) => r.targetType === type && r.targetTier === tier,
     );
-    this.setStatus(
-      task ? t('ui.build.research_queued', { ticks: task.ticksRemaining }) : t('ui.build.research_queued_generic'),
-    );
-    this.refreshCatalogButtons(this.lastCash);
+    return {
+      ok: true,
+      message: task ? t('ui.build.research_queued', { ticks: task.ticksRemaining }) : t('ui.build.research_queued_generic'),
+    };
   }
 
-  /** Queue research for the next tier of placed building `buildingId` (the inspector's Research action, #1758). */
+  /** Inspector entry: null on success (status set) or nothing to research; else the translated refusal, with no status set. */
   queueResearchFor(buildingId: number): string | null {
     const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
     const nextTier = b ? this.nextTierOf(b) : null;
-    if (b && nextTier !== null) this.queueResearch(b.type, nextTier);
-    return null; // TODO: implement
+    if (!b || nextTier === null) return null;
+    const result = this.runResearchQueue(b.type, nextTier);
+    if (!result.ok) return result.message;
+    this.setStatus(result.message);
+    return null;
   }
 
   /** Maps `research queue`'s failure `code` (src/console/commands/research.ts)
@@ -744,7 +751,7 @@ export class BuildMenu extends PanelBase {
 
   private updateCostDisplay(target: HTMLElement, type: BuildingType, tier: BuildingTier): void {
     const def = getBuildingDef(type, tier);
-    target.textContent = t('ui.build.cost', { cost: String(def.constructionCost) });
+    target.textContent = t('ui.build.cost', { cost: formatMoney(def.constructionCost) });
   }
 
   /** Research price after live research_cost modifiers. */

@@ -274,8 +274,8 @@ function availabilityReason(
   const role = action.requiredVehicleRole;
   if (role !== null) {
     // Existing reasons win: nothing of the role owned, then nobody licensed at all; only then a missing reaching rig.
-    if (!vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
-    if (!eligible.some(emp => licenceLevelOf(emp, role) > 0)) return 'no_licensed_driver';
+    const shortfall = roleShortfall(vehicles, eligible, role);
+    if (shortfall !== null) return shortfall;
     const floor = orderTierFloor(action);
     if (floor > 1) {
       // A rig tier the order needs: owned and drivable by an eligible employee, else no reaching vehicle.
@@ -428,6 +428,7 @@ export function roleShortfall(
   eligible: ReadonlyArray<Employee>,
   role: VehicleRole,
 ): 'no_vehicle_in_fleet' | 'no_licensed_driver' | null {
-  void vehicles; void eligible; void role;
-  return null; // TODO: implement
+  if (!vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
+  if (!eligible.some(emp => licenceLevelOf(emp, role) > 0)) return 'no_licensed_driver';
+  return null;
 }
