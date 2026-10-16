@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Unit tests: ore demand haul urgency (#1817)
 import { describe, it, expect } from 'vitest';
+import { ORE_DEMAND_FULL_GRADE, ORE_DEMAND_MIN_GRADE } from '../../../src/core/config/balance.js';
 import { oreHaulUrgency, fragmentHaulUrgency } from '../../../src/core/economy/OreDemand.js';
 import type { Contract, ContractType } from '../../../src/core/economy/Contract.js';
 
@@ -84,15 +85,15 @@ describe('oreHaulUrgency (#1817)', () => {
   });
 });
 
-describe('fragmentHaulUrgency (#1817)', () => {
+describe('fragmentHaulUrgency (#1817, #1828)', () => {
   const urgency = new Map([['rustite', 0.8], ['dirtite', 0.3]]);
 
-  it('is the highest urgency among the ores the fragment carries', () => {
-    expect(fragmentHaulUrgency({ dirtite: 0.2, rustite: 0.1 }, urgency)).toBeCloseTo(0.8, 10);
+  it('is the highest urgency among the ores the fragment carries, once each is rich enough', () => {
+    expect(fragmentHaulUrgency({ dirtite: 0.5, rustite: 0.5 }, urgency)).toBeCloseTo(0.8, 10);
   });
 
   it('counts only ores with density above zero', () => {
-    expect(fragmentHaulUrgency({ dirtite: 0.2, rustite: 0 }, urgency)).toBeCloseTo(0.3, 10);
+    expect(fragmentHaulUrgency({ dirtite: 0.5, rustite: 0 }, urgency)).toBeCloseTo(0.3, 10);
   });
 
   it('is 0 for a barren fragment', () => {
@@ -101,5 +102,44 @@ describe('fragmentHaulUrgency (#1817)', () => {
 
   it('is 0 for an ore with no urgency entry', () => {
     expect(fragmentHaulUrgency({ blingite: 0.5 }, urgency)).toBe(0);
+  });
+
+  it('is the full urgency at ORE_DEMAND_FULL_GRADE and above (richer adds nothing)', () => {
+    expect(fragmentHaulUrgency({ rustite: ORE_DEMAND_FULL_GRADE }, urgency)).toBeCloseTo(0.8, 10);
+    expect(fragmentHaulUrgency({ rustite: 0.9 }, urgency)).toBeCloseTo(0.8, 10);
+    expect(fragmentHaulUrgency({ rustite: 1 }, urgency)).toBeCloseTo(0.8, 10);
+  });
+
+  it('scales with the ore share below ORE_DEMAND_FULL_GRADE: half the full grade earns half the urgency', () => {
+    expect(fragmentHaulUrgency({ rustite: ORE_DEMAND_FULL_GRADE / 2 }, urgency)).toBeCloseTo(0.4, 10);
+    expect(fragmentHaulUrgency({ rustite: 0.1 }, urgency)).toBeCloseTo(0.8 * (0.1 / ORE_DEMAND_FULL_GRADE), 10);
+  });
+
+  it('is 0 for a trace below ORE_DEMAND_MIN_GRADE', () => {
+    expect(fragmentHaulUrgency({ rustite: ORE_DEMAND_MIN_GRADE / 5 }, urgency)).toBe(0);
+    expect(fragmentHaulUrgency({ rustite: 0.01 }, urgency)).toBe(0);
+    expect(fragmentHaulUrgency({ rustite: ORE_DEMAND_MIN_GRADE - 1e-9 }, urgency)).toBe(0);
+  });
+
+  it('is nonzero exactly at ORE_DEMAND_MIN_GRADE', () => {
+    expect(fragmentHaulUrgency({ rustite: ORE_DEMAND_MIN_GRADE }, urgency)).toBeGreaterThan(0);
+  });
+
+  it('weights before taking the max: a trace of the most urgent ore loses to a rich share of a less urgent one', () => {
+    expect(fragmentHaulUrgency({ rustite: 0.02, dirtite: 0.6 }, urgency)).toBeCloseTo(0.3, 10);
+    expect(fragmentHaulUrgency({ rustite: 0.1, dirtite: 0.5 }, urgency)).toBeCloseTo(0.3, 10);
+  });
+
+  it('is 0 for zero density and for an empty urgency map', () => {
+    expect(fragmentHaulUrgency({ rustite: 0, dirtite: 0 }, urgency)).toBe(0);
+    expect(fragmentHaulUrgency({ rustite: 0.7 }, new Map())).toBe(0);
+  });
+
+  it('with rustite urgent, a 70% rustite fragment scores above a 2% rustite / 98% dirtite one', () => {
+    const wantsRustite = new Map([['rustite', 0.8]]);
+    const rich = fragmentHaulUrgency({ rustite: 0.7, dirtite: 0.3 }, wantsRustite);
+    const trace = fragmentHaulUrgency({ rustite: 0.02, dirtite: 0.98 }, wantsRustite);
+    expect(rich).toBeGreaterThan(trace);
+    expect(trace).toBe(0);
   });
 });
