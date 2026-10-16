@@ -198,9 +198,11 @@ export class OperationsPanel extends PanelBase {
     // new CrewPanel shows only an employee's own claimed activity, so this is
     // now the only place an unclaimed action is visible at all (#39).
     const { open, blocked, stranded } = countQueuedByBlock(state.pendingActions);
-    const unclaimedNote = blocked + stranded > 0
-      ? t('ui.operations.unclaimed_work_note_blocked', { blocked, stranded })
-      : t('ui.operations.unclaimed_work_note');
+    const noteParts: string[] = [];
+    if (open > 0 || blocked + stranded === 0) noteParts.push(t('ui.operations.unclaimed_work_note'));
+    if (blocked > 0) noteParts.push(t('ui.operations.unclaimed_work_note_blocked', { blocked }));
+    if (stranded > 0) noteParts.push(t('ui.operations.unclaimed_work_note_stranded', { stranded }));
+    const unclaimedNote = noteParts.join(' ');
 
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';
