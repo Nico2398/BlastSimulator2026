@@ -123,242 +123,6 @@ describe('CrewPanel', () => {
     expect(row.querySelector('[title="Driving a vehicle"]')).not.toBeNull();
   });
 
-  it('is collapsed by default and expands on click', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1 })]));
-    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
-
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-detail')).not.toBeNull();
-  });
-
-  it('allows only one card expanded at a time', () => {
-    const { panel } = makePanel();
-    const state = makeState([makeEmployee({ id: 1 }), makeEmployee({ id: 2 })]);
-    panel.update(state);
-
-    toggle(panel, 1);
-    expect(panel.root.querySelector('[data-employee-id="1"] .bs-crew-detail')).not.toBeNull();
-
-    toggle(panel, 2);
-    expect(panel.root.querySelector('[data-employee-id="1"] .bs-crew-detail')).toBeNull();
-    expect(panel.root.querySelector('[data-employee-id="2"] .bs-crew-detail')).not.toBeNull();
-  });
-
-  it('collapses again on a second click of the same card', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1 })]));
-    toggle(panel, 1);
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
-  });
-
-  it('detail shows HIRED as a real day number and falls back to unknown without hiredAtTick', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1, hiredAtTick: 48 })]));
-    toggle(panel, 1);
-    expect(panel.root.textContent).toContain('Day 3');
-
-    const { panel: panel2 } = makePanel();
-    panel2.update(makeState([makeEmployee({ id: 1 })]));
-    toggle(panel2, 1);
-    expect(panel2.root.textContent).toContain('Unknown');
-  });
-
-  it('detail shows real needs gauges', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1, fatigue: 80 })]));
-    toggle(panel, 1);
-    const detail = panel.root.querySelector('.bs-crew-needs')!;
-    expect(detail.textContent).toContain('80');
-  });
-
-  it('current task shows Idle for an employee with nothing assigned', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1 })]));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-task')!.textContent).toContain('Idle');
-  });
-
-  it('current task shows a real percentage bar for a dispatched task', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({
-      id: 1, taskTicksRemaining: 5, activeTaskTotalTicks: 20, pendingActionType: 'survey',
-    })]));
-    toggle(panel, 1);
-    const task = panel.root.querySelector('.bs-crew-task')!;
-    expect(task.textContent).toContain('Surveying');
-    expect(task.textContent).toContain('5h left');
-    const fill = task.querySelector('div[style*="background:var(--bsx-amber)"]') as HTMLElement;
-    expect(fill.style.width).toBe('75%');
-  });
-
-  it('current task shows Collapsed, taking priority over an in-progress task', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1, collapsing: true, taskTicksRemaining: 5 })]));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-task')!.textContent).toContain('Collapsed');
-  });
-
-  it('skills section lists real qualifications with stars and effect multiplier', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({
-      id: 1, qualifications: [{ category: 'blasting', proficiencyLevel: 3, xp: 320 }],
-    })]));
-    toggle(panel, 1);
-    const skills = panel.root.querySelector('.bs-crew-skills')!;
-    expect(skills.textContent).toContain('★★★☆☆');
-    expect(skills.textContent).toContain('320 / 600 XP');
-    expect(skills.textContent).toContain('×0.70 task duration');
-  });
-
-  it('skills section shows MAX with no fraction at proficiency level 5', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({
-      id: 1, qualifications: [{ category: 'geology', proficiencyLevel: 5, xp: 1200 }],
-    })]));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-skills')!.textContent).toContain('MAX');
-  });
-
-  it('skills section shows an empty state with no qualifications', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1, qualifications: [] })]));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-skills')!.textContent).toContain('No qualifications yet.');
-  });
-
-  // ── PAY ──
-
-  it('pay section shows a real base/bonus/total breakdown', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({
-      id: 1, role: 'driller', salary: BASE_SALARIES.driller + QUALIFICATION_SALARY_BONUS[1],
-      qualifications: [{ category: 'blasting', proficiencyLevel: 1, xp: 0 }],
-    })]));
-    toggle(panel, 1);
-    const text = panel.root.textContent!;
-    // Stored salary is per pay cycle; display is per hour (1 tick = 1 hour).
-    const hourly = (n: number) => Math.round((n / PAY_CYCLE_TICKS) * 10) / 10;
-    expect(text).toContain(`Base $${hourly(BASE_SALARIES.driller)}/h`);
-    expect(text).toContain(`+ skills $${hourly(QUALIFICATION_SALARY_BONUS[1])}/h`);
-    expect(text).toContain(`$${hourly(BASE_SALARIES.driller + QUALIFICATION_SALARY_BONUS[1])}/h`);
-  });
-
-  it('a raise preset button dispatches employee raise with the real id and amount', () => {
-    const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    panel.update(makeState([makeEmployee({ id: 3 })]));
-    toggle(panel, 3);
-
-    const raiseBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === `+$${100 / PAY_CYCLE_TICKS}/h`)!;
-    raiseBtn.click();
-
-    expect(calls).toContain('employee raise 3 amount:100');
-  });
-
-  // ── TRAINING ──
-
-  it('training section reports no school when none is built', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1 })], [], []));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-training')?.textContent ?? panel.root.textContent).toContain('No school built yet.');
-  });
-
-  it('training section offers a real course from a built school and dispatches employee train on click', () => {
-    const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    const state = makeState([makeEmployee({ id: 5 })], [], [makeBuilding({ id: 9, type: 'geology_lab', tier: 1 })]);
-    state.cash = 50000;
-    panel.update(state);
-    toggle(panel, 5);
-
-    expect(panel.root.textContent).toContain('Geology Diploma');
-    const trainBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Train')!;
-    expect(trainBtn.disabled).toBe(false);
-    trainBtn.click();
-    expect(calls).toContain('employee train 5 skill:geology building:9');
-  });
-
-  it('repaints the training offers when a licence level changes (#1726: signature includes licenceLevel)', () => {
-    const { panel } = makePanel();
-    const emp = makeEmployee({ id: 5, qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0, licenceLevel: 1 }] });
-    const state = makeState([emp], [], [makeBuilding({ id: 9, type: 'driving_center', tier: 2 })]);
-    state.cash = 50000;
-    panel.update(state);
-    toggle(panel, 5);
-    const btn = () => panel.root.querySelector<HTMLButtonElement>('.bs-train-btn[data-skill="driving.drill_rig"]');
-    expect(btn()).not.toBeNull();
-    expect(btn()!.disabled).toBe(false);
-
-    // A tier-2 school cannot take a level-2 licence further: only a repaint shows that.
-    emp.qualifications[0]!.licenceLevel = 2;
-    panel.update(state);
-    const after = btn();
-    expect(after === null || after.disabled).toBe(true);
-  });
-
-  it('training button is disabled when the fee is unaffordable', () => {
-    const { panel } = makePanel();
-    const state = makeState([makeEmployee({ id: 5 })], [], [makeBuilding({ id: 9, type: 'geology_lab', tier: 1 })]);
-    state.cash = 0;
-    panel.update(state);
-    toggle(panel, 5);
-    const trainBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Train')!;
-    expect(trainBtn.disabled).toBe(true);
-  });
-
-  it('training section shows in-progress status instead of course offers while training', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({
-      id: 1, trainingState: { buildingId: 9, skill: 'geology', ticksRemaining: 12, fee: 1000 },
-    })], [], [makeBuilding({ id: 9, type: 'geology_lab' })]));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-training')!.textContent).toContain('12h left');
-  });
-
-  it('training section is reason-blocked for an injured employee', () => {
-    const { panel } = makePanel();
-    panel.update(makeState([makeEmployee({ id: 1, injured: true })], [], [makeBuilding({ id: 9, type: 'geology_lab' })]));
-    toggle(panel, 1);
-    expect(panel.root.querySelector('.bs-crew-training')!.textContent).toContain('Injured');
-  });
-
-  // ── DISMISS ──
-
-  it('dismiss requests confirmation instead of firing immediately', () => {
-    const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    let requested: ConfirmModalConfig | null = null;
-    panel.setConfirmHandler(config => { requested = config; });
-    panel.update(makeState([makeEmployee({ id: 4, name: 'Oz Trill' })]));
-    toggle(panel, 4);
-
-    const dismissBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Dismiss')!;
-    dismissBtn.click();
-
-    expect(calls).toEqual([]); // not fired yet — only the confirm was requested
-    expect(requested).not.toBeNull();
-    expect(requested!.body).toContain('Oz Trill');
-
-    requested!.onConfirm();
-    expect(calls).toContain('employee fire 4');
-  });
-
-  it('dismiss is disabled with a reason for a unionised employee', () => {
-    const { panel } = makePanel();
-    panel.setConfirmHandler(() => { throw new Error('should not be called'); });
-    panel.update(makeState([makeEmployee({ id: 1, unionized: true })]));
-    toggle(panel, 1);
-    const dismissBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Dismiss')!;
-    expect(dismissBtn.disabled).toBe(true);
-    expect(panel.root.textContent).toContain("Unionised");
-  });
-
   // ── HIRING ──
 
   it('hiring rows list every role with real cost, starting qualification, and headcount', () => {
@@ -700,7 +464,7 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
     ];
   }
 
-  it('keeps roster scrollTop and the expanded card when an employee changes activity', () => {
+  it('keeps roster scrollTop and renders no detail when an employee changes activity', () => {
     const { panel } = makePanel();
     panel.update(makeState(threeCrew()));
     toggle(panel, 2);
@@ -710,8 +474,7 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
     panel.update(makeState(threeCrew(), [makeVehicle({ id: 1, occupantIds: [1] })]));
 
     expect(rosterScroll(panel).scrollTop).toBe(80);
-    expect(panel.root.querySelector('[data-employee-id="2"] .bs-crew-detail')).not.toBeNull();
-    expect(panel.root.querySelector('[data-employee-id="1"] .bs-crew-detail')).toBeNull();
+    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
   });
 
   it('keeps roster scrollTop when injury hours remaining change', () => {
@@ -805,7 +568,7 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
   });
 });
 
-describe('CrewPanel — row header selects the employee (#1762)', () => {
+describe('CrewPanel — row header only selects the employee (#1765)', () => {
   it('clicking .bs-detail-toggle calls the select handler with the employee id', () => {
     const { panel } = makePanel();
     const picked: number[] = [];
@@ -815,21 +578,16 @@ describe('CrewPanel — row header selects the employee (#1762)', () => {
     expect(picked).toEqual([2]);
   });
 
-  it('the row still expands on the same click', () => {
-    const { panel } = makePanel();
-    panel.setSelectEmployeeHandler(() => {});
-    panel.update(makeState([makeEmployee({ id: 1 })]));
-    (panel.root.querySelector('[data-employee-id="1"] .bs-detail-toggle') as HTMLButtonElement).click();
-    expect(panel.root.querySelector('[data-employee-id="1"] .bs-employee-detail')).not.toBeNull();
-  });
-
-  it('collapsing an expanded row also selects', () => {
+  it('the click renders no inline detail, and a second click selects again', () => {
     const { panel } = makePanel();
     const picked: number[] = [];
     panel.setSelectEmployeeHandler(id => picked.push(id));
     panel.update(makeState([makeEmployee({ id: 1 })]));
     toggle(panel, 1);
+    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
+    expect(panel.root.querySelector('.bs-employee-detail')).toBeNull();
     toggle(panel, 1);
+    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
     expect(picked).toEqual([1, 1]);
   });
 
@@ -837,5 +595,105 @@ describe('CrewPanel — row header selects the employee (#1762)', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeEmployee({ id: 1 })]));
     expect(() => toggle(panel, 1)).not.toThrow();
+  });
+
+  it('the row keeps avatar-row content, role attribute and Locate', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({ id: 5, role: 'blaster', name: 'Walt Diggins', morale: 62 })]));
+    const row = panel.root.querySelector('[data-employee-id="5"]')!;
+    expect(row.getAttribute('data-employee-role')).toBe('blaster');
+    expect(row.textContent).toContain('Walt Diggins');
+    expect(row.textContent).toContain('62%');
+    expect(row.querySelector('[data-action="locate"]')).not.toBeNull();
+    expect(row.querySelector('.bs-detail-toggle')).not.toBeNull();
+  });
+
+  it('no longer exposes expandEmployee', () => {
+    const { panel } = makePanel();
+    expect((panel as unknown as { expandEmployee?: unknown }).expandEmployee).toBeUndefined();
+  });
+});
+
+describe('CrewPanel — scene selection highlight (#1765)', () => {
+  const SEL = 'bs-row-selected';
+  const crew = (): Employee[] => [
+    makeEmployee({ id: 1 }), makeEmployee({ id: 2, name: 'Bea Rock' }), makeEmployee({ id: 3, name: 'Cy Haul' }),
+  ];
+  const selectedIds = (panel: CrewPanel): string[] =>
+    [...panel.root.querySelectorAll(`.${SEL}`)].map(n => n.closest('[data-employee-id]')?.getAttribute('data-employee-id') ?? n.getAttribute('data-employee-id') ?? '');
+
+  it('highlights exactly the selected employee row', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 2 });
+    expect(selectedIds(panel)).toEqual(['2']);
+    expect(panel.root.querySelector('[data-employee-id="2"]')!.classList.contains(SEL)).toBe(true);
+    expect(panel.root.querySelector('[data-employee-id="2"]')!.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('moving the selection moves the highlight', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 1 });
+    panel.setSelectedEmployee({ kind: 'employee', id: 3 });
+    expect(selectedIds(panel)).toEqual(['3']);
+    expect(panel.root.querySelector('[data-employee-id="1"]')!.classList.contains(SEL)).toBe(false);
+  });
+
+  it.each([
+    ['null', null],
+    ['a building', { kind: 'building', id: 2 }],
+    ['a vehicle', { kind: 'vehicle', id: 2 }],
+  ] as const)('clears the highlight when the selection is %s', (_n, sel) => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 2 });
+    panel.setSelectedEmployee(sel as never);
+    expect(panel.root.querySelectorAll(`.${SEL}`).length).toBe(0);
+    expect(panel.root.querySelector('[aria-selected="true"]')).toBeNull();
+  });
+
+  it('a non-employee selection never highlights an employee with the same id', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'building', id: 2 });
+    expect(panel.root.querySelectorAll(`.${SEL}`).length).toBe(0);
+  });
+
+  it('highlight survives a structural re-render', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 2 });
+    panel.update(makeState([...crew(), makeEmployee({ id: 4, name: 'New Hire' })]));
+    expect(selectedIds(panel)).toEqual(['2']);
+  });
+
+  it('highlight survives refreshLocale', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 3 });
+    panel.refreshLocale();
+    expect(selectedIds(panel)).toEqual(['3']);
+  });
+
+  it('a selection made before the first update is applied once rows exist', () => {
+    const { panel } = makePanel();
+    panel.setSelectedEmployee({ kind: 'employee', id: 2 });
+    panel.update(makeState(crew()));
+    expect(selectedIds(panel)).toEqual(['2']);
+  });
+
+  it('selecting an employee not in the roster highlights nothing', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 99 });
+    expect(panel.root.querySelectorAll(`.${SEL}`).length).toBe(0);
+  });
+
+  it('the neutral class replaces any build-specific one', () => {
+    const { panel } = makePanel();
+    panel.update(makeState(crew()));
+    panel.setSelectedEmployee({ kind: 'employee', id: 1 });
+    expect(panel.root.querySelector('.bs-build-row-selected')).toBeNull();
   });
 });

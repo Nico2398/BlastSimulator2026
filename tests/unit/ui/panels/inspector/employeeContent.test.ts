@@ -113,9 +113,9 @@ describe('employee inspector — sections', () => {
     expect(employeeContent.view({ kind: 'employee', id: 999 }, s, makeLinks().links)).toBeNull();
   });
 
-  it('keeps the detail/dispatch_here/train actions', () => {
+  it('keeps only the dispatch_here action (#1765)', () => {
     const { view } = build(makeEmployee());
-    expect(view.actions.map(a => a.action)).toEqual(['detail', 'dispatch_here', 'train']);
+    expect(view.actions.map(a => a.action)).toEqual(['dispatch_here']);
   });
 });
 

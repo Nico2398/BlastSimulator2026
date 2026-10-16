@@ -175,9 +175,9 @@ describe('Inspector', () => {
 
     bar.show(entity('employee', employee.id), state);
 
-    expect(root.querySelector('[data-action="detail"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="detail"]')).toBeNull();
     expect(root.querySelector('[data-action="dispatch_here"]')).not.toBeNull();
-    expect(root.querySelector('[data-action="train"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="train"]')).toBeNull();
   });
 
   it('clicking an action fires the handler with the action name and entity', () => {
@@ -191,10 +191,10 @@ describe('Inspector', () => {
     // Scoped to this test's own root — earlier tests' containers are still in
     // document.body (jsdom doesn't reset it between tests), so a bare
     // document.querySelector() here would find a stale button instead.
-    const detailBtn = root.querySelector<HTMLButtonElement>('[data-action="detail"]');
-    detailBtn?.click();
+    const dispatchBtn = root.querySelector<HTMLButtonElement>('[data-action="dispatch_here"]');
+    dispatchBtn?.click();
 
-    expect(onAction).toHaveBeenCalledWith('detail', expect.objectContaining({ kind: 'employee', id: employee.id }));
+    expect(onAction).toHaveBeenCalledWith('dispatch_here', expect.objectContaining({ kind: 'employee', id: employee.id }));
   });
 
   it('the close button hides the bar', () => {

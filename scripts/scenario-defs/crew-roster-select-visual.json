@@ -1,0 +1,126 @@
+{
+  "name": "crew-roster-select-visual",
+  "description": "Crew roster rows are a master list for the inspector (#1765). A player clicks a roster row: the inspector shows that employee and the row is highlighted (bs-row-selected). Clicking another employee in the scene moves the highlight. Closing the inspector clears it. No inline expansion exists in the panel any more.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 staffed:true",
+      "timeout": 30,
+      "description": "Setup: staffed site so the Crew roster has several rows",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Click the roster row of the blaster: the inspector shows the blaster and the row carries the selected highlight",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"] .bs-detail-toggle"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"].bs-row-selected"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"]",
+        "note": "A row click must open the inspector on that employee, with no inline detail in the panel"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Only the selected row is highlighted and the inspector carries the detail",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"] .bs-emp-skills"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"blaster\"] .bs-emp-skills",
+        "blocked": "#bs-employee-panel [data-employee-role=\"driller\"].bs-row-selected"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Click a different employee in the scene (Locate on the driver selects them): the highlight moves to the driver row",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"] [data-action=\"locate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"driver\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"].bs-row-selected"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail[data-employee-role=\"driver\"]",
+        "note": "The highlight follows the scene selection, one row at a time",
+        "blocked": "#bs-employee-panel [data-employee-role=\"blaster\"].bs-row-selected"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Close the inspector: nothing is selected, so no roster row stays highlighted",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-panel-close]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-employee-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "blocked": "#bs-employee-panel .bs-row-selected",
+        "note": "Deselecting clears the roster highlight"
+      }
+    }
+  ]
+}

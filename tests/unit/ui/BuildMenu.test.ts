@@ -1711,25 +1711,25 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       menu.update(stateWith(two()));
       menu.setSelectedEntity({ kind: 'building', id: 2 });
       const row = findPlacedRow(container, 2);
-      expect(row.classList.contains('bs-build-row-selected')).toBe(true);
+      expect(row.classList.contains('bs-row-selected')).toBe(true);
       expect(row.getAttribute('aria-selected')).toBe('true');
-      expect(findPlacedRow(container, 1).classList.contains('bs-build-row-selected')).toBe(false);
+      expect(findPlacedRow(container, 1).classList.contains('bs-row-selected')).toBe(false);
     });
 
     it('the highlight moves with a new selection', () => {
       menu.update(stateWith(two()));
       menu.setSelectedEntity({ kind: 'building', id: 1 });
       menu.setSelectedEntity({ kind: 'building', id: 2 });
-      expect(findPlacedRow(container, 1).classList.contains('bs-build-row-selected')).toBe(false);
-      expect(findPlacedRow(container, 2).classList.contains('bs-build-row-selected')).toBe(true);
-      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(1);
+      expect(findPlacedRow(container, 1).classList.contains('bs-row-selected')).toBe(false);
+      expect(findPlacedRow(container, 2).classList.contains('bs-row-selected')).toBe(true);
+      expect(container.querySelectorAll('.bs-row-selected').length).toBe(1);
     });
 
     it('null clears the highlight', () => {
       menu.update(stateWith(two()));
       menu.setSelectedEntity({ kind: 'building', id: 1 });
       menu.setSelectedEntity(null);
-      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+      expect(container.querySelectorAll('.bs-row-selected').length).toBe(0);
       expect(findPlacedRow(container, 1).getAttribute('aria-selected')).not.toBe('true');
     });
 
@@ -1737,19 +1737,19 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       menu.update(stateWith(two()));
       menu.setSelectedEntity({ kind: 'building', id: 1 });
       menu.setSelectedEntity({ kind: 'vehicle', id: 1 });
-      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+      expect(container.querySelectorAll('.bs-row-selected').length).toBe(0);
     });
 
     it('a vehicle selection with the same id does not highlight a building row', () => {
       menu.update(stateWith(two()));
       menu.setSelectedEntity({ kind: 'vehicle', id: 1 });
-      expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+      expect(container.querySelectorAll('.bs-row-selected').length).toBe(0);
     });
 
     it('selecting before the rows exist highlights them once built', () => {
       menu.setSelectedEntity({ kind: 'building', id: 2 });
       menu.update(stateWith(two()));
-      expect(findPlacedRow(container, 2).classList.contains('bs-build-row-selected')).toBe(true);
+      expect(findPlacedRow(container, 2).classList.contains('bs-row-selected')).toBe(true);
     });
 
     it('survives a list rebuild (a new building changes the row signature)', () => {
@@ -1758,8 +1758,8 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       menu.setSelectedEntity({ kind: 'building', id: 2 });
       s.buildings.buildings = [...s.buildings.buildings, makeBuilding({ id: 3, type: 'geology_lab', tier: 1, x: 12 })];
       menu.update(s);
-      expect(findPlacedRow(container, 2).classList.contains('bs-build-row-selected')).toBe(true);
-      expect(findPlacedRow(container, 3).classList.contains('bs-build-row-selected')).toBe(false);
+      expect(findPlacedRow(container, 2).classList.contains('bs-row-selected')).toBe(true);
+      expect(findPlacedRow(container, 3).classList.contains('bs-row-selected')).toBe(false);
     });
 
     it('a construction-site row with the selected id is highlighted', () => {
@@ -1767,7 +1767,7 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       addSite(s, 7);
       menu.update(s);
       menu.setSelectedEntity({ kind: 'building', id: 7 });
-      expect(siteRow(7)!.classList.contains('bs-build-row-selected')).toBe(true);
+      expect(siteRow(7)!.classList.contains('bs-row-selected')).toBe(true);
       expect(siteRow(7)!.getAttribute('aria-selected')).toBe('true');
     });
   });

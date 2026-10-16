@@ -24,6 +24,8 @@ import type { BlastPlaybackSnapshot } from '../../../src/core/mining/BlastPlayba
 import { setupEvents } from '../../../src/core/events/index.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementController } from '../../../src/ui/scene/PlacementController.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 setupEvents();
 
@@ -309,7 +311,7 @@ describe('UIManager — locale refresh on language switch (issue #457)', () => {
   });
 });
 
-describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', () => {
+describe('UIManager — employee detail moved to the inspector (#1765)', () => {
   let container: HTMLDivElement;
   let uiManager: UIManager;
 
@@ -324,20 +326,82 @@ describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', 
     vi.restoreAllMocks();
   });
 
-  it('opens the Crew panel', () => {
+  it('no longer exposes showEmployeeDetail', () => {
     uiManager = new UIManager(container);
-    uiManager.showEmployeeDetail(3);
-    const panel = container.querySelector('#bs-employee-panel') as HTMLElement;
-    expect(panel.style.display).not.toBe('none');
+    expect((uiManager as unknown as { showEmployeeDetail?: unknown }).showEmployeeDetail).toBeUndefined();
   });
 
-  it('expands the given employee\'s card in the Crew panel', () => {
-    const expandSpy = vi.spyOn(CrewPanel.prototype, 'expandEmployee');
+  it('CrewPanel no longer has expandEmployee', () => {
+    expect((CrewPanel.prototype as unknown as { expandEmployee?: unknown }).expandEmployee).toBeUndefined();
+  });
+});
+
+describe('UIManager — setListSelection reaches the Crew panel (#1765)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
     uiManager = new UIManager(container);
+  });
 
-    uiManager.showEmployeeDetail(3);
+  afterEach(() => {
+    uiManager.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
 
-    expect(expandSpy).toHaveBeenCalledWith(3);
+  function stateWithCrew(): GameState {
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    hireEmployee(state.employees, 'driller', new Random(1));
+    hireEmployee(state.employees, 'blaster', new Random(2));
+    return state;
+  }
+
+  const crewRow = (id: number) =>
+    container.querySelector<HTMLElement>(`#bs-employee-panel [data-employee-id="${id}"]`);
+
+  it('highlights the selected employee row', () => {
+    const state = stateWithCrew();
+    const [a, b] = state.employees.employees;
+    uiManager.showPanel('employees');
+    uiManager.update(state);
+    uiManager.setListSelection({ kind: 'employee', id: b!.id });
+    expect(crewRow(b!.id)!.classList.contains('bs-row-selected')).toBe(true);
+    expect(crewRow(a!.id)!.classList.contains('bs-row-selected')).toBe(false);
+  });
+
+  it('a selection made before the panel was ever opened is applied once opened', () => {
+    const state = stateWithCrew();
+    const id = state.employees.employees[1]!.id;
+    uiManager.setListSelection({ kind: 'employee', id });
+    uiManager.showPanel('employees');
+    uiManager.update(state);
+    expect(crewRow(id)!.classList.contains('bs-row-selected')).toBe(true);
+  });
+
+  it('a selection made while the panel is closed is applied once reopened', () => {
+    const state = stateWithCrew();
+    const id = state.employees.employees[0]!.id;
+    uiManager.showPanel('employees');
+    uiManager.update(state);
+    uiManager.hideAllPanels();
+    uiManager.setListSelection({ kind: 'employee', id });
+    uiManager.showPanel('employees');
+    uiManager.update(state);
+    expect(crewRow(id)!.classList.contains('bs-row-selected')).toBe(true);
+  });
+
+  it('null clears the Crew highlight', () => {
+    const state = stateWithCrew();
+    const id = state.employees.employees[0]!.id;
+    uiManager.showPanel('employees');
+    uiManager.update(state);
+    uiManager.setListSelection({ kind: 'employee', id });
+    uiManager.setListSelection(null);
+    expect(container.querySelectorAll('#bs-employee-panel .bs-row-selected').length).toBe(0);
   });
 });
 
@@ -1105,8 +1169,8 @@ describe('UIManager — Build menu building-select and list selection (#1759)', 
     uiManager.showPanel('build');
     uiManager.update(stateWithBuildings());
     uiManager.setListSelection({ kind: 'building', id: 2 });
-    expect(placedRow(2)!.classList.contains('bs-build-row-selected')).toBe(true);
-    expect(placedRow(1)!.classList.contains('bs-build-row-selected')).toBe(false);
+    expect(placedRow(2)!.classList.contains('bs-row-selected')).toBe(true);
+    expect(placedRow(1)!.classList.contains('bs-row-selected')).toBe(false);
   });
 
   it('setListSelection(null) clears the highlight', () => {
@@ -1114,7 +1178,7 @@ describe('UIManager — Build menu building-select and list selection (#1759)', 
     uiManager.update(stateWithBuildings());
     uiManager.setListSelection({ kind: 'building', id: 2 });
     uiManager.setListSelection(null);
-    expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(0);
+    expect(container.querySelectorAll('.bs-row-selected').length).toBe(0);
   });
 
   it('setListSelection is idempotent', () => {
@@ -1122,7 +1186,7 @@ describe('UIManager — Build menu building-select and list selection (#1759)', 
     uiManager.update(stateWithBuildings());
     uiManager.setListSelection({ kind: 'building', id: 2 });
     uiManager.setListSelection({ kind: 'building', id: 2 });
-    expect(container.querySelectorAll('.bs-build-row-selected').length).toBe(1);
+    expect(container.querySelectorAll('.bs-row-selected').length).toBe(1);
   });
 
   it('a selection made while the panel is closed highlights the row once the panel is shown and updated', () => {
@@ -1130,7 +1194,7 @@ describe('UIManager — Build menu building-select and list selection (#1759)', 
     uiManager.setListSelection({ kind: 'building', id: 1 });
     uiManager.showPanel('build');
     uiManager.update(state);
-    expect(placedRow(1)!.classList.contains('bs-build-row-selected')).toBe(true);
+    expect(placedRow(1)!.classList.contains('bs-row-selected')).toBe(true);
   });
 
   it('a selection that changes between updates is reflected by the next update', () => {
@@ -1141,7 +1205,7 @@ describe('UIManager — Build menu building-select and list selection (#1759)', 
     uiManager.update(state);
     uiManager.setListSelection({ kind: 'building', id: 2 });
     uiManager.update(state);
-    expect(placedRow(1)!.classList.contains('bs-build-row-selected')).toBe(false);
-    expect(placedRow(2)!.classList.contains('bs-build-row-selected')).toBe(true);
+    expect(placedRow(1)!.classList.contains('bs-row-selected')).toBe(false);
+    expect(placedRow(2)!.classList.contains('bs-row-selected')).toBe(true);
   });
 });

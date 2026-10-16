@@ -161,7 +161,7 @@ describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
     expect(btn.getAttribute('style')).toMatch(/(?<![-\w])color\s*:\s*var\(--bsx-text-primary\)/);
   });
 
-  it('CrewPanel: roster, hiring rows and expanded card', () => {
+  it('CrewPanel: roster and hiring rows', () => {
     const panel = mount(c => new CrewPanel(c));
     panel.show();
     const state = populated();
@@ -169,7 +169,7 @@ describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
     expectNoDefaultColour(panel.root);
     const id = state.employees.employees[0]!.id;
     panel.root.querySelector<HTMLButtonElement>(`[data-employee-id="${id}"] button`)!.click();
-    expect(panel.root.querySelector('.bs-crew-detail')).not.toBeNull();
+    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
     expectNoDefaultColour(panel.root);
   });
 
