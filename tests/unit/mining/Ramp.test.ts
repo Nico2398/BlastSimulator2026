@@ -6,13 +6,13 @@ import {
   buildRamp,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
-  rampDefFromEndpoints,
+  rampDefFromEndpoints, snapRampDepthToEndFloor, rampFootOffset,
   type RampDef, type RampDirection, type RampSegmentDef,
 } from '../../../src/core/mining/Ramp.js';
 import { isStepClimbable } from '../../../src/core/nav/NavGrid.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_CUT_SLOPE_RATIO,
-  NAV_MAX_SLOPE_DEGREES,
+  NAV_MAX_SLOPE_DEGREES, NAV_MAX_SLOPE_RATIO, RAMP_FLOOR_SNAP_REACH_M, RAMP_CRATER_MIN_DROP_M,
 } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -1733,5 +1733,177 @@ describe('carveRampSegmentSlice (#946)', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     const emitted = handler.mock.calls[0]![0] as { region: { maxY: number } };
     expect(emitted.region.maxY).toBe(TOP_Y + 1);
+  });
+});
+
+// ── #1852: a ramp into a crater meets the crater floor ──────────────────────
+// A ramp's floor line descends `targetDepth` over `length` steps and meets the end tile's
+// ground at step `length`; the last carved column (step length-1) is one slope step above.
+
+describe('rampFootOffset (#1852)', () => {
+  it('a foot 1.1 m under the end floor reads -1.1 (start 15, floor 8.5, depth 8 over 20 steps)', () => {
+    expect(rampFootOffset(15, 8.5, 8, 20)).toBeCloseTo(-1.1, 6);
+  });
+
+  it('a foot above the end floor reads positive', () => {
+    expect(rampFootOffset(15, 5, 8, 20)).toBeCloseTo(2.4, 6);
+  });
+
+  it('a foot exactly on the end floor reads 0 for the depth that makes it so (boundary)', () => {
+    // foot = 15 - 8 * 19/20 = 7.4
+    expect(rampFootOffset(15, 7.4, 8, 20)).toBeCloseTo(0, 6);
+  });
+
+  it('on intact ground the foot sits one slope step above the end tile, never below it', () => {
+    const offset = rampFootOffset(15, 15 - 8, 8, 20);
+    expect(offset).toBeCloseTo(8 / 20, 6);
+    expect(offset).toBeLessThan(NAV_MAX_SLOPE_RATIO);
+  });
+
+  it('grows more negative as the planned depth grows (failure direction: too deep)', () => {
+    expect(rampFootOffset(15, 8.5, 10, 20)).toBeLessThan(rampFootOffset(15, 8.5, 8, 20));
+  });
+});
+
+describe('snapRampDepthToEndFloor (#1852)', () => {
+  it('exposes the documented reach and crater-drop constants', () => {
+    expect(RAMP_FLOOR_SNAP_REACH_M).toBe(2);
+    expect(RAMP_CRATER_MIN_DROP_M).toBe(2);
+  });
+
+  it('snaps to startGround - endGround when the end is a crater floor within reach (red_canyon: 15, 8.5, depth 8 -> 6.5)', () => {
+    expect(snapRampDepthToEndFloor(15, 8.5, 8, 20)).toBeCloseTo(6.5, 6);
+  });
+
+  it('the snapped depth leaves the foot within one slope step above the floor', () => {
+    const snapped = snapRampDepthToEndFloor(15, 8.5, 8, 20);
+    const offset = rampFootOffset(15, 8.5, snapped, 20);
+    expect(offset).toBeGreaterThanOrEqual(0);
+    expect(offset).toBeLessThan(NAV_MAX_SLOPE_RATIO);
+  });
+
+  it('snaps to a deeper depth when the foot would stop above the floor', () => {
+    // start 15, floor 7, depth 7 over 16 steps: foot 15 - 7*15/16 = 8.44, 1.44 above the floor; depth 8 fits (min length 14.4)
+    expect(snapRampDepthToEndFloor(15, 7, 7, 16)).toBeCloseTo(8, 6);
+  });
+
+  it('keeps the target depth on intact ground (end at the start height)', () => {
+    expect(snapRampDepthToEndFloor(15, 15, 8, 20)).toBe(8);
+  });
+
+  it('keeps the target depth when the end is only 1.9 m below the start (not a crater, just under the drop floor)', () => {
+    expect(snapRampDepthToEndFloor(15, 15 - (RAMP_CRATER_MIN_DROP_M - 0.1), 2.5, 10)).toBe(2.5);
+  });
+
+  it('snaps at exactly the minimum crater drop (boundary)', () => {
+    expect(snapRampDepthToEndFloor(15, 15 - RAMP_CRATER_MIN_DROP_M, 2.5, 10)).toBeCloseTo(RAMP_CRATER_MIN_DROP_M, 6);
+  });
+
+  it('keeps the target depth when the end ground is higher than the start (uphill)', () => {
+    expect(snapRampDepthToEndFloor(15, 18, 8, 20)).toBe(8);
+  });
+
+  it('keeps the target depth when the foot is more than the reach away from the floor', () => {
+    // foot 7.4, floor 4 -> offset 3.4 > 2
+    expect(snapRampDepthToEndFloor(15, 4, 8, 20)).toBe(8);
+  });
+
+  it('keeps the target depth when the end ground is 0 or NaN (no usable floor reading)', () => {
+    expect(snapRampDepthToEndFloor(15, 0, 8, 20)).toBe(8);
+    expect(snapRampDepthToEndFloor(15, NaN, 8, 20)).toBe(8);
+  });
+
+  it('keeps the target depth when the snapped depth is too steep for the ramp length', () => {
+    // start 15, floor 7, depth 7 over 13 steps: foot offset +1.54 (in reach), snapped depth 8 needs length 14.4 > 13
+    expect(computeMinimumRampLength(8)).toBeGreaterThan(13);
+    expect(snapRampDepthToEndFloor(15, 7, 7, 13)).toBe(7);
+  });
+
+  it('snaps when the snapped depth just fits the length', () => {
+    const length = Math.ceil(computeMinimumRampLength(8)) + 1;
+    expect(snapRampDepthToEndFloor(15, 7, 7, length)).toBeCloseTo(8, 6);
+  });
+});
+
+describe('defineRampSegments — ramp into a crater snaps to the end floor (#1852)', () => {
+  const ORIGIN_X = 20;
+  const ORIGIN_Z = 5;
+  const LENGTH = 20;
+  const START_SURFACE = 15;
+
+  /** Flat ground at START_SURFACE for z < craterFromZ, `craterSurface` from there on. */
+  function makeCraterGrid(craterFromZ: number, craterSurface: number): VoxelGrid {
+    const grid = new VoxelGrid(40, 40);
+    for (let z = 0; z < 40; z++) {
+      const top = z >= craterFromZ ? craterSurface : START_SURFACE;
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y <= top; y++) {
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+        }
+      }
+    }
+    return grid;
+  }
+
+  /** Continuous floor height the ramp reaches at each z: cut columns by floorAdjustment, fill columns by fillTarget. */
+  function floorByZ(segments: RampSegmentDef[]): Map<number, number> {
+    const heights = new Map<number, number>();
+    for (const segment of segments) {
+      for (const cell of segment.cells) {
+        if (cell.floorAdjustment !== undefined) heights.set(cell.z, (cell.y - 1) + cell.floorAdjustment);
+        else if (cell.fillTarget !== undefined) heights.set(cell.z, cell.fillTarget);
+      }
+    }
+    return heights;
+  }
+
+  const ramp = (targetDepth: number): RampDef => ({ originX: ORIGIN_X, originZ: ORIGIN_Z, direction: 'south', length: LENGTH, targetDepth });
+
+  it('a crater floor 1.6 m above the planned foot: the foot meets the floor and every adjacent step is within the slope cap', () => {
+    const craterSurface = 9; // end tile (z=25) in the crater; planned foot 15 - 8*19/20 = 7.4, 1.6 under it
+    const grid = makeCraterGrid(20, craterSurface);
+
+    const floors = floorByZ(defineRampSegments(grid, ramp(8)));
+
+    for (let step = 0; step < LENGTH; step++) {
+      expect(floors.has(ORIGIN_Z + step), `floor missing at step ${step}`).toBe(true);
+    }
+    const foot = floors.get(ORIGIN_Z + LENGTH - 1)!;
+    expect(foot - craterSurface, 'foot above the crater floor').toBeGreaterThanOrEqual(-1e-6);
+    expect(foot - craterSurface, 'foot step up from the floor').toBeLessThanOrEqual(NAV_MAX_SLOPE_RATIO);
+    for (let step = 0; step + 1 < LENGTH; step++) {
+      const drop = floors.get(ORIGIN_Z + step)! - floors.get(ORIGIN_Z + step + 1)!;
+      expect(Math.abs(drop), `step ${step} -> ${step + 1}`).toBeLessThanOrEqual(NAV_MAX_SLOPE_RATIO);
+    }
+  });
+
+  it('the snapped line is the straight line of depth startGround - endGround (15 - 9 = 6)', () => {
+    const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 9), ramp(8)));
+    for (let step = 0; step < LENGTH; step++) {
+      expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_SURFACE - (step / LENGTH) * 6, 6);
+    }
+  });
+
+  it('a ramp ending on intact ground keeps its own depth, step for step', () => {
+    const floors = floorByZ(defineRampSegments(makeCraterGrid(40, START_SURFACE), ramp(8)));
+    for (let step = 0; step < LENGTH; step++) {
+      expect(floors.get(ORIGIN_Z + step)!, `step ${step}`).toBeCloseTo(START_SURFACE - (step / LENGTH) * 8, 6);
+    }
+  });
+
+  it('an end tile only 1 m lower (not a crater) keeps the planned depth', () => {
+    const floors = floorByZ(defineRampSegments(makeCraterGrid(20, START_SURFACE - 1), ramp(8)));
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
+  });
+
+  it('an end tile higher than the start keeps the planned depth', () => {
+    const floors = floorByZ(defineRampSegments(makeCraterGrid(20, START_SURFACE + 3), ramp(8)));
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
+  });
+
+  it('a crater floor beyond the snap reach of the foot keeps the planned depth', () => {
+    // floor 15 - 11 = 4: foot 7.4 is 3.4 above it, past RAMP_FLOOR_SNAP_REACH_M
+    const floors = floorByZ(defineRampSegments(makeCraterGrid(20, 4), ramp(8)));
+    expect(floors.get(ORIGIN_Z + LENGTH - 1)!).toBeCloseTo(START_SURFACE - (19 / LENGTH) * 8, 6);
   });
 });
