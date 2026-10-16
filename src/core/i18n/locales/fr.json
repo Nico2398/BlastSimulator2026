@@ -4141,7 +4141,7 @@
   "inspector.reason.research_no_center": "Nécessite un centre de recherche",
   "inspector.reason.research_needs_tier": "Nécessite d'abord la recherche du niveau {tier}",
   "inspector.wait.no_vehicle": "L'ordre attendra : aucun véhicule « {role} » dans la flotte.",
-  "inspector.wait.no_driver": "L'ordre attendra : personne n'a le permis pour conduire : {role}.",
+  "inspector.wait.no_driver": "L'ordre attendra : personne n'a le permis requis pour « {role} ».",
   "inspector.reason.max_tier": "Déjà au niveau maximal",
   "inspector.reason.single_tier": "Ce bâtiment n'a qu'un seul niveau",
   "inspector.reason.demolition_ordered": "Une démolition est déjà ordonnée",

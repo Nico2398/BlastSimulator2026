@@ -354,6 +354,7 @@ export class BuildMenu extends PanelBase {
     const task = this.lastState?.buildings.researchQueue.find(
       (r) => r.targetType === type && r.targetTier === tier,
     );
+    this.refreshCatalogButtons(this.lastCash);
     return {
       ok: true,
       message: task ? t('ui.build.research_queued', { ticks: task.ticksRemaining }) : t('ui.build.research_queued_generic'),

@@ -902,6 +902,12 @@ describe('Inspector building actions — what src/main.ts routes them to (#1758)
     expect(caseBody('research')).toContain('uiManager.queueBuildingResearch(');
   });
 
+  it('a research refusal is surfaced as a notification, not dropped', () => {
+    const body = caseBody('research');
+    expect(body).toContain('if (refusal)');
+    expect(body).toContain('uiManager.notify(');
+  });
+
   it('the demolish confirm is handed the freight ore stored in the warehouse', () => {
     expect(caseBody('demolish')).toContain('storedOreKg');
   });

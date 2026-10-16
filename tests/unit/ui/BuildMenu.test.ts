@@ -1926,6 +1926,17 @@ describe('BuildMenu — catalog price and research refusal (#1820)', () => {
     expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
   });
 
+  it('a successful research queue re-applies catalog button state; a refusal does not', () => {
+    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
+    const refresh = vi.spyOn(menu as unknown as { refreshCatalogButtons(cash: number): void }, 'refreshCatalogButtons');
+    gameConsole.mockReturnValue({ success: false, output: 'no', code: 'insufficient_funds' });
+    menu.queueResearchFor(10);
+    expect(refresh).not.toHaveBeenCalled();
+    gameConsole.mockReturnValue({ success: true, output: '' });
+    menu.queueResearchFor(10);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('queueResearchFor returns null and sends nothing for an unknown building or max tier', () => {
     observed(makeBuilding({ id: 11, type: 'management_office', tier: 3 }));
     expect(menu.queueResearchFor(11)).toBeNull();
