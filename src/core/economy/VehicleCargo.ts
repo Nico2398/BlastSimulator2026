@@ -21,5 +21,5 @@ export function vehicleCargoByOre(vehicle: Pick<Vehicle, 'cargo'>, fragments: re
   });
   const totalKg = vehicle.cargo.reduce((sum, item) => sum + item.massKg, 0);
   const { oreKg, barrenKg } = sumOreMass(aboard, totalKg);
-  return { byOre: oreKg, barrenKg, totalKg, fragmentCount: vehicle.cargo.length };
+  return { byOre: oreKg, barrenKg, totalKg, fragmentCount: aboard.length };
 }

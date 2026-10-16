@@ -69,7 +69,7 @@ describe('Inspector', () => {
     expect(labels.some(l => l?.includes('Unassign'))).toBe(false);
     expect(root.querySelector('[data-action="haul"]')).toBeNull();
     expect(root.querySelector('[data-action="unassign"]')).toBeNull();
-    expect(Array.from(root.querySelectorAll('button[data-action]')).map(b => b.getAttribute('data-action')).sort()).toEqual(['locate', 'move_here', 'upgrade_vehicle']);
+    expect(Array.from(root.querySelectorAll('button[data-action]')).map(b => b.getAttribute('data-action')).sort()).toEqual(['locate', 'move_here', 'scrap_vehicle', 'upgrade_vehicle']);
   });
 
   it('shows the building action set (Upgrade, Move, Demolish)', () => {
@@ -229,7 +229,7 @@ describe('Inspector', () => {
     bar.show(entity('employee', employee.id), state);
     bar.show(entity('vehicle', vehicle.id), state);
 
-    const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
+    const labels = Array.from(root.querySelectorAll('button[data-action]')).map(b => b.textContent);
     expect(labels.some(l => l?.includes('Train'))).toBe(false);
     expect(root.querySelector('[data-action="locate"]')).not.toBeNull();
   });

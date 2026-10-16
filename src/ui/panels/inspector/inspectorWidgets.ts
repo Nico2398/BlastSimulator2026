@@ -90,7 +90,10 @@ export function sectionOf(label: string, rows: (HTMLElement | null)[]): HTMLElem
 function contentHtml(node: Element): string {
   const clone = node.cloneNode(true) as Element;
   // Live values are written in place by syncSection; they are not structure.
-  for (const live of Array.from(clone.querySelectorAll('[data-live]'))) live.textContent = '';
+  for (const live of Array.from(clone.querySelectorAll('[data-live]'))) {
+    live.textContent = '';
+    live.removeAttribute('style');
+  }
   for (const cls of [ALLOWED_CLASS, HIGHLIGHT_CLASS]) {
     for (const marked of [clone, ...Array.from(clone.querySelectorAll(`.${cls}`))]) {
       marked.classList.remove(cls);
@@ -111,7 +114,10 @@ export function syncSection(root: HTMLElement, className: string, build: () => H
   else {
     for (const live of Array.from(next.querySelectorAll<HTMLElement>('[data-live]'))) {
       const key = live.dataset['live'];
-      if (key !== undefined) setLive(current as HTMLElement, key, live.textContent ?? '');
+      if (key === undefined) continue;
+      const node = setLive(current as HTMLElement, key, live.textContent ?? '');
+      const style = live.getAttribute('style');
+      if (node && style !== null && node.getAttribute('style') !== style) node.setAttribute('style', style);
     }
   }
 }

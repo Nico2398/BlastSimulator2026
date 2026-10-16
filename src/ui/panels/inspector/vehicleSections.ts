@@ -36,7 +36,11 @@ function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
 export function buildConditionSection(v: Vehicle, state: GameState): HTMLElement {
   const hp = makeHpGauge(v);
   const value = hp.querySelector('.bsx-gauge-value');
-  if (value) value.textContent = `${Math.round(v.hp)} / ${getVehicleDefByTier(v.type, v.tier).maxHp}`;
+  if (value) {
+    value.textContent = `${Math.round(v.hp)} / ${getVehicleDefByTier(v.type, v.tier).maxHp}`;
+    value.setAttribute('data-live', 'hp');
+  }
+  hp.querySelector('.bsx-gauge-fill')?.setAttribute('data-live', 'hp-bar');
   const wrap = sectionOf(t('inspector.vehicle.condition'), [makeStatusChip(v, state.vehicles, resolveVehicleDriver(v, state.employees.employees)), hp]);
   wrap.classList.add('bs-vehicle-condition');
   return wrap;

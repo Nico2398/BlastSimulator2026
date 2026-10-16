@@ -115,7 +115,9 @@ export function computeVehicleJob(
   if (v.hp <= 0) return NO_JOB;
   const reservedId = getVehicleReservation(vehicleState, v.id);
   const action = reservedId === null ? undefined : pendingActions.find(a => a.id === reservedId);
+  const itinerary = occupant?.itinerary ?? null;
   if (!action) {
+    if (itinerary) return { ...NO_JOB, ...itineraryProgress(v, itinerary, null) };
     const blocked = pendingActions.find(a =>
       a.status === 'queued' && a.holderId === null && a.requiredVehicleRole === v.type && a.blockedReason != null);
     if (!blocked) return NO_JOB;
@@ -126,14 +128,20 @@ export function computeVehicleJob(
   if (occupant?.taskTicksRemaining != null) {
     return { ...base, destination: null, etaTicks: occupant.taskTicksRemaining };
   }
-  const legs = occupant?.itinerary?.legs ?? [];
-  const last = legs[legs.length - 1];
+  if (!itinerary) return { ...base, destination: null, etaTicks: null };
   const loaded = v.type === 'debris_hauler' && v.cargo.length > 0;
-  const dest = last ? { x: last.destX, z: last.destZ } : { x: action.targetX, z: action.targetZ };
+  return { ...base, ...itineraryProgress(v, itinerary, loaded ? (cargoWarehouseId ?? null) : null) };
+}
+
+function itineraryProgress(
+  v: Vehicle,
+  itinerary: Itinerary,
+  buildingId: number | null,
+): Pick<VehicleJob, 'destination' | 'etaTicks'> {
+  const last = itinerary.legs[itinerary.legs.length - 1];
   return {
-    ...base,
-    destination: { ...dest, buildingId: loaded ? (cargoWarehouseId ?? null) : null },
-    etaTicks: occupant?.itinerary ? vehicleEtaTicks(v, occupant.itinerary) : null,
+    destination: last ? { x: last.destX, z: last.destZ, buildingId } : null,
+    etaTicks: vehicleEtaTicks(v, itinerary),
   };
 }
 

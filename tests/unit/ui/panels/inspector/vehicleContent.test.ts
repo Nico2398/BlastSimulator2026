@@ -307,9 +307,9 @@ describe('vehicle inspector — specs and running cost', () => {
   it('shows speed, capacity and work rate of the tier', () => {
     const def = getVehicleDefByTier('debris_hauler', 2);
     const specs = mount(viewOf(makeState(makeVehicle({ tier: 2 })))).querySelector('.bs-vehicle-specs')!.textContent!;
-    expect(specs).toContain(String(def.speed));
-    expect(specs).toContain(String(Math.round(def.capacity)));
-    expect(specs).toContain(String(def.workRate));
+    expect(specs).toContain(String(Math.round(def.speed * 10) / 10));
+    expect(specs).toContain(Math.round(def.capacity).toLocaleString('en-US'));
+    expect(specs).toContain(String(Math.round(def.workRate * 10) / 10));
   });
 
   it('idle running cost is the maintenance per hour', () => {

@@ -191,7 +191,7 @@ import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 
-function licensed(overrides: Partial<Employee> = {}, level = 1): Employee {
+function licensed(overrides: Partial<Employee> = {}, level: 1 | 2 | 3 = 1): Employee {
   return makeEmployee({ qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: level }], ...overrides });
 }
 
@@ -336,27 +336,27 @@ describe('fleetDetailSections — repairState', () => {
   });
 
   it('needs no repair at full HP and has no action', () => {
-    expect(repairState({ id: 1, hp: 100 }, [])).toEqual({ action: null, needsRepair: false });
+    expect(repairState(makeVehicle({ hp: 100 }), [])).toEqual({ action: null, needsRepair: false });
   });
 
   it('needs repair when damaged but not wrecked', () => {
-    expect(repairState({ id: 1, hp: 40 }, []).needsRepair).toBe(true);
+    expect(repairState(makeVehicle({ hp: 40 }), []).needsRepair).toBe(true);
   });
 
   it('returns the repair order covering this vehicle', () => {
     const a = order();
-    const s = repairState({ id: 1, hp: 40 }, [a]);
+    const s = repairState(makeVehicle({ hp: 40 }), [a]);
     expect(s.action).toBe(a);
   });
 
   it('ignores repair orders for other vehicles and other action types', () => {
     const other = order({ payload: { vehicleId: 2 } });
     const haul = order({ id: 4, type: 'haul_debris', payload: { vehicleId: 1 } });
-    expect(repairState({ id: 1, hp: 40 }, [other, haul]).action).toBeNull();
+    expect(repairState(makeVehicle({ hp: 40 }), [other, haul]).action).toBeNull();
   });
 
   it('a wrecked vehicle (hp 0) still needs repair when an order exists', () => {
-    const s = repairState({ id: 1, hp: 0 }, [order({ status: 'queued' })]);
+    const s = repairState(makeVehicle({ hp: 0 }), [order({ status: 'queued' })]);
     expect(s.action).not.toBeNull();
   });
 });
