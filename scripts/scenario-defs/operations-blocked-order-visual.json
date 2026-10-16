@@ -1,0 +1,231 @@
+{
+  "name": "operations-blocked-order-visual",
+  "description": "A demolish order with no Building Destroyer reads as blocked, with its reason, in the Operations Work Queue (#1810); after buying a destroyer the blocked marker disappears. All by real clicks.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:330000 staffed:true",
+      "timeout": 40,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:330000 staffed:true"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 330000,
+          "buildingCount": 0
+        }
+      },
+      "description": "Staffed site with no Building Destroyer in the fleet."
+    },
+    {
+      "command": "build management_office at:14,5 tier:1",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 14,
+          "z": 5
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "Order a management office by clicking the Build panel row and picking the tile."
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "role": "setup",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      },
+      "description": "Wait for the construction site to finish."
+    },
+    {
+      "command": "build destroy 1",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"demolish\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 1
+        }
+      },
+      "description": "Demolish the building by clicking. With no Building Destroyer in the fleet the order cannot be carried out (#1392)."
+    },
+    {
+      "command": "tick 5",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "description": "Let EmployeeDispatch stamp blockedReason on the queued demolish order."
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "ops"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-operations-panel [data-blocked-reason]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-operations-panel [data-blocked-reason]",
+        "note": "The Operations Work Queue row carries the blocked reason (the Building Destroyer wording the toast uses), #1810."
+      },
+      "description": "Open Operations by clicking; the demolish row is marked blocked with its reason, not Queued/Unclaimed open to anyone. The reason text equals the toast text; exact wording is proven in OperationsPanel.test.ts."
+    },
+    {
+      "command": "vehicle buy building_destroyer tier:1",
+      "role": "player",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ],
+        "changedBy": {
+          "cash": -30000
+        }
+      },
+      "description": "Buy a Building Destroyer through the Fleet panel."
+    },
+    {
+      "command": "wait_until field:buildingCount equals:0 max_ticks:900",
+      "role": "setup",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 0,
+          "maxTicks": 900,
+          "timeoutMs": 90000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        }
+      },
+      "description": "The demolish order is now carried out and the building goes."
+    },
+    {
+      "command": "state",
+      "role": "guard",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "ops"
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-operations-panel [data-blocked-reason]",
+        "note": "No blocked marker remains in Operations once the order is claimed and done."
+      },
+      "description": "The blocked marker is gone from the Operations panel."
+    }
+  ]
+}
