@@ -29,8 +29,7 @@ import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.
 import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { PROFICIENCY_MULTIPLIERS } from '../../../src/core/config/balance.js';
-import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };

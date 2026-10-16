@@ -1743,6 +1743,7 @@ export const XP_THRESHOLDS = {
 /**
  * Salary bonus per pay cycle for each qualification proficiency level ($).
  * Salary = BASE_SALARY[role] + sum(QUALIFICATION_SALARY_BONUS[level]) for each qualification.
+ * A driving.* licence pays the level-1 entry at any proficiency (flat, #1843).
  * Bonuses are strictly increasing: higher skill = higher pay demand.
  */
 export const QUALIFICATION_SALARY_BONUS: Record<1 | 2 | 3 | 4 | 5, number> = {
