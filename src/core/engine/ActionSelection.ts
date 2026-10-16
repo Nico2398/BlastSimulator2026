@@ -470,6 +470,8 @@ function isQueuedActionAvailableToEmployee(employee: Employee, action: PendingAc
  * on-foot action can be held exactly as often as a vehicle-gated one, and
  * force-assigning a held one here would send `employee` back into a
  * still-dangerous zone.
+ *
+ * Vehicle-gated demolish_building is out of scope here: ACTION_RANK_TIER covers it (#1840).
  */
 export function findStarvedActionForEmployee(state: GameState, employee: Employee): SelectedAction | null {
   const candidates = state.pendingActions.filter(a =>
