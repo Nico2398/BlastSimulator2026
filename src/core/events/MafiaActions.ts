@@ -38,6 +38,8 @@ export interface MafiaState {
   pendingFrames: PendingFrame[];
   /** Tick of the last mafia action; drives exposure decay (#1411). */
   lastActivityTick: number;
+  /** Rolls drawn so far; salts the next one (#1838). */
+  rollCount: number;
 }
 
 export interface PendingFrame {
@@ -52,6 +54,7 @@ export function createMafiaState(): MafiaState {
     smugglingVolume: 0,
     pendingFrames: [],
     lastActivityTick: 0,
+    rollCount: 0,
   };
 }
 

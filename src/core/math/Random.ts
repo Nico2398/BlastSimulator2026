@@ -68,3 +68,16 @@ export class Random {
     return copy;
   }
 }
+
+/** Odd multiplier spreading salts across the 32-bit seed space (#1838). */
+export const ROLL_SALT_STRIDE = 0x9e3779b9;
+
+/**
+ * Seed for one roll: distinct salts within one tick give independent streams;
+ * salt 0 equals the legacy seed + tick (#1838).
+ */
+export function rollSeed(seed: number, tick: number, salt: number): number {
+  // TODO: implement
+  void seed; void tick; void salt;
+  return 0;
+}
