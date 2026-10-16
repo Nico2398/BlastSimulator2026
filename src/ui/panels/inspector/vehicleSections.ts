@@ -37,7 +37,7 @@ export function buildConditionSection(v: Vehicle, state: GameState): HTMLElement
   const hp = makeHpGauge(v);
   const value = hp.querySelector('.bsx-gauge-value');
   if (value) {
-    value.textContent = `${Math.round(v.hp)} / ${getVehicleDefByTier(v.type, v.tier).maxHp}`;
+    value.textContent = `${Math.round(v.hp)} / ${Math.round(getVehicleDefByTier(v.type, v.tier).maxHp)}`;
     value.setAttribute('data-live', 'hp');
   }
   hp.querySelector('.bsx-gauge-fill')?.setAttribute('data-live', 'hp-bar');
@@ -100,7 +100,7 @@ export function buildJobSection(v: Vehicle, state: GameState, links: InspectorLi
       ? entityLink(buildingDisplayName(building.type, building.tier), 'building', building.id, links)
       : t('inspector.vehicle.tile', { x: Math.round(x), z: Math.round(z) })));
   }
-  if (job.etaTicks !== null) rows.push(liveRow(t('inspector.vehicle.eta'), 'eta', t('inspector.vehicle.eta_value', { n: job.etaTicks })));
+  if (job.etaTicks !== null) rows.push(liveRow(t('inspector.vehicle.eta'), 'eta', t('inspector.vehicle.eta_value', { n: Math.ceil(job.etaTicks) })));
   if (job.blockedReason !== null) {
     const order = state.pendingActions.find(a =>
       a.status === 'queued' && a.holderId === null && a.requiredVehicleRole === v.type && a.blockedReason === job.blockedReason);

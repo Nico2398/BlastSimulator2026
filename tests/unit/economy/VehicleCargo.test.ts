@@ -75,3 +75,14 @@ describe('vehicleCargoByOre', () => {
     expect(vehicleCargoByOre(cargoOf(a), [tracked(a)]).barrenKg).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('vehicleCargoByOre ore kg never exceeds the load (#1761 visual)', () => {
+  it('scales per-ore kg down when nominal ore density overshoots the fragment mass', () => {
+    const a = frag(1, 1000, { goldite: 1 });
+    const over = { ...a, volume: 2 };
+    const r = vehicleCargoByOre(cargoOf(over), [tracked(over)]);
+    const oreSum = Object.values(r.byOre).reduce((s, kg) => s + kg, 0);
+    expect(oreSum).toBeCloseTo(1000, 6);
+    expect(r.barrenKg).toBe(0);
+  });
+});

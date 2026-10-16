@@ -268,6 +268,37 @@
       }
     },
     {
+      "command": "wait_until field:storedMassKg equals:3425.125 max_ticks:200",
+      "description": "The hauler's first delivery lands in the warehouse (seed 10 trajectory, sandbox-measured at tick 337). waitForSelector never advances the simulation in scenario mode, so the sim must be driven to a loaded hauler before the cargo section can be read.",
+      "timeout": 65,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "storedMassKg",
+          "equals": 3425.125,
+          "maxTicks": 200,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "storedMassKg": 3425.125
+        }
+      }
+    },
+    {
+      "command": "tick 13",
+      "description": "Thirteen ticks later the hauler is back on the road with its second load (sandbox-measured: 3785/4000 kg at tick 345).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "vehicle list",
       "description": "A player clicks the staffed debris hauler (vehicle 2) in the scene while it hauls. Once it carries a load, the inspector's cargo section lists kg per ore and its job section names the destination warehouse as a link. Command mode stand-in is a read-only list.",
       "timeout": 240,
@@ -338,22 +369,27 @@
       }
     },
     {
-      "command": "vehicle upgrade 3",
-      "description": "Back on a vehicle: click the staffed rock digger (vehicle 3) and upgrade it through the inspector Upgrade button. Same rules and cost as the Fleet card.",
+      "command": "vehicle upgrade 4",
+      "description": "Back on a vehicle: click the staffed rock fragmenter (vehicle 4) and upgrade it through the inspector Upgrade button. Same rules and cost as the Fleet card. The blast destroys the drill rig (1) and charging truck (5), so 3 vehicles remain. The open employee inspector is closed first: it covers the viewport centre, where clickEntity aims.",
       "timeout": 60,
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
           "type": "clickEntity",
           "kind": "vehicle",
-          "id": 3
+          "id": 4
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"upgrade_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"upgrade_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"upgrade_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"upgrade_vehicle\"]"
         },
         {
           "type": "screenshot"
@@ -365,22 +401,22 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 4
+          "vehicleCount": 3
         }
       }
     },
     {
-      "command": "vehicle scrap 3",
+      "command": "vehicle scrap 4",
       "description": "Scrap the same vehicle from the inspector: Scrap opens the confirm modal naming the residual value; confirming removes the vehicle and credits cash.",
       "timeout": 60,
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"3\"] [data-action=\"scrap_vehicle\"]"
+          "selector": "#bs-inspector[data-kind=\"vehicle\"][data-id=\"4\"] [data-action=\"scrap_vehicle\"]"
         },
         {
           "type": "waitForSelector",
