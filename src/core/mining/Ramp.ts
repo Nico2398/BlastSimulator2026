@@ -807,6 +807,13 @@ export function computeRampSegmentDurationTicks(
 
 // ── End-floor snap (#1852) ──
 
+/** Drop from start to end ground when the end tile is a dug floor (finite, non-empty, deep enough); else null. */
+export function rampEndFloorDrop(startGround: number, endGround: number): number | null {
+  const drop = startGround - endGround;
+  if (!Number.isFinite(drop) || !(endGround > 0) || drop < RAMP_CRATER_MIN_DROP_M) return null;
+  return drop;
+}
+
 /**
  * Depth that lands the ramp's foot on the end tile's floor when that tile is dug floor
  * within `RAMP_FLOOR_SNAP_REACH_M` and the snapped depth fits `length`; else `targetDepth`.
@@ -814,8 +821,8 @@ export function computeRampSegmentDurationTicks(
 export function snapRampDepthToEndFloor(
   startGround: number, endGround: number, targetDepth: number, length: number,
 ): number {
-  const drop = startGround - endGround;
-  if (!Number.isFinite(drop) || !(endGround > 0) || drop < RAMP_CRATER_MIN_DROP_M) return targetDepth;
+  const drop = rampEndFloorDrop(startGround, endGround);
+  if (drop === null) return targetDepth;
   if (Math.abs(rampFootOffset(startGround, endGround, targetDepth, length)) > RAMP_FLOOR_SNAP_REACH_M) return targetDepth;
   if (computeMinimumRampLength(drop) > length + RAMP_MIN_LENGTH_EPSILON) return targetDepth;
   return drop;
