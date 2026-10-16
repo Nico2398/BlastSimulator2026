@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // Inspector storage contents section (#1757): explosive warehouse, freight warehouse, spoil heap.
 import { describe, it, expect } from 'vitest';
-import { storageContents, type StorageContents } from '../../../../../src/ui/panels/inspector/storageContent.js';
+import { storageContents } from '../../../../../src/ui/panels/inspector/storageContent.js';
+import type { InspectorSection } from '../../../../../src/ui/panels/inspector/inspectorWidgets.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 import { getBuildingDef, type Building, type BuildingType } from '../../../../../src/core/entities/Building.js';
@@ -40,7 +41,7 @@ function load(s: GameState, f: FragmentData, store: boolean): void {
   if (store) expect(deliverToDepot(s.logistics, f.id, s.collectedOre, sites, 17, 23)).toBe(true);
 }
 
-function mount(b: Building, s: GameState, closed = false): { c: StorageContents; root: HTMLElement } {
+function mount(b: Building, s: GameState, closed = false): { c: InspectorSection; root: HTMLElement } {
   const c = storageContents(b, s, closed);
   if (!c) throw new Error('expected a storage section');
   const root = document.createElement('div');

@@ -38,6 +38,21 @@ export function markLive(node: HTMLElement, key: string): HTMLElement {
   return node;
 }
 
+/** A small monospace text line rewritten in place under `data-live` = key. */
+export function liveLine(key: string, text: string): HTMLElement {
+  const line = el('div', { text, className: 'bsx-mono' });
+  line.style.fontSize = '11px';
+  return markLive(line, key);
+}
+
+/** A building section plus its live-sync hook. */
+export interface InspectorSection {
+  readonly section: HTMLElement;
+  /** Names the row set: when it changes the section must be rebuilt, not synced in place. */
+  readonly rowSignature: string;
+  readonly sync: (root: HTMLElement) => void;
+}
+
 /** Write a live value in place; a no-op when unchanged so a steady frame touches no DOM. */
 export function setLive(root: HTMLElement, key: string, text: string): HTMLElement | null {
   const node = findLive(root, key);

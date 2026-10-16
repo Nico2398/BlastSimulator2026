@@ -174,6 +174,13 @@ export function planTraining(
     kind: unlock ? 'unlock' : 'upgrade',
     // A driving licence is a pass, not a rank: the unlock pays the level-1 bonus and raises pay nothing.
     salaryIncrease: isLicenceSkill(skill) ? (unlock ? bonusAt(1) : 0) : bonusAt(tier) - bonusAt(held),
+    ...courseTerms(tier),
+  };
+}
+
+/** Duration and fee of a course at a school of this tier. */
+export function courseTerms(tier: BuildingTier): { ticks: number; fee: number } {
+  return {
     ticks: Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[tier] * TRAINING_LEVEL_TICKS_MULT[tier])),
     fee: TRAINING_LEVEL_FEE[tier],
   };
@@ -382,3 +389,61 @@ export function tickTraining(
 }
 
 export type { TrainingState };
+
+/** One employee enrolled at a school, for the inspector's school section. */
+export interface SchoolTrainee {
+  employeeId: number;
+  name: string;
+  skill: SkillCategory;
+  grantsLevel: ProficiencyLevel | undefined;
+  ticksRemaining: number;
+  fee: number;
+  phase: 'inside' | 'walking_in';
+}
+
+/** Employees enrolled at the school `buildingId`, inside first, then by time left, then id. */
+export function schoolTrainees(employees: readonly Employee[], buildingId: number): SchoolTrainee[] {
+  const rows: SchoolTrainee[] = [];
+  for (const e of employees) {
+    if (!e.alive) continue;
+    const inside = e.trainingState?.buildingId === buildingId;
+    const course = inside ? e.trainingState : e.pendingTrainingState?.buildingId === buildingId ? e.pendingTrainingState : null;
+    if (!course) continue;
+    rows.push({
+      employeeId: e.id,
+      name: e.name,
+      skill: course.skill,
+      grantsLevel: course.grantsLevel,
+      ticksRemaining: course.ticksRemaining,
+      fee: course.fee,
+      phase: inside ? 'inside' : 'walking_in',
+    });
+  }
+  return rows.sort((a, b) =>
+    (a.phase === b.phase ? 0 : a.phase === 'inside' ? -1 : 1)
+    || a.ticksRemaining - b.ticksRemaining
+    || a.employeeId - b.employeeId);
+}
+
+/** One course a school teaches, with the terms it runs on. */
+export interface SchoolCourse {
+  skill: SkillCategory;
+  level: BuildingTier;
+  ticks: number;
+  fee: number;
+  /** A better school on site that teaches this course instead, or null. */
+  supersededBy: Building | null;
+}
+
+/** Courses taught at `building`, given the best-school offers on site. */
+export function schoolCourses(building: Building, offers: readonly SkillOffer[]): SchoolCourse[] {
+  return trainableSkills(building.type).map(skill => {
+    const best = offers.find(o => o.skill === skill)?.building ?? null;
+    return {
+      skill,
+      level: building.tier,
+      ...courseTerms(building.tier),
+      supersededBy: best && best.id !== building.id ? best : null,
+    };
+  });
+}

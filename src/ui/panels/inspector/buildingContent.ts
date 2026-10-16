@@ -12,6 +12,8 @@ import { buildingActionRules, REASON_CASH, type BuildingActionRules } from '../.
 import { el } from '../../dom.js';
 import type { ActionSpec, InspectorLinks, InspectorView, KindContent } from './InspectorContent.js';
 import { storageContents } from './storageContent.js';
+import { residentsSection, schoolSection } from './occupantsContent.js';
+import { researchSection } from './researchContent.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
@@ -157,9 +159,10 @@ export const buildingContent: KindContent = {
     const upkeep = upkeepText(state, b);
     const capacity = getBuildingPeopleCapacity(b.type, b.tier);
     const storage = storageContents(b, state, status.kind === 'out_of_service');
-    const occupants = b.occupantIds
-      .map(id => ({ id, name: state.employees.employees.find(e => e.id === id)?.name }))
-      .filter((o): o is { id: number; name: string } => o.name !== undefined);
+    const peopleSection = residentsSection(b, state, links) ?? schoolSection(b, state, links);
+    const research = researchSection(b, state);
+    const extras = [storage, peopleSection, research];
+    const occupantNames = b.occupantIds.flatMap(id => state.employees.employees.find(e => e.id === id)?.name ?? []);
     const effects = Object.entries(def.scoreEffects).filter(([, v]) => v !== 0 && v !== undefined);
 
     return {
@@ -167,7 +170,7 @@ export const buildingContent: KindContent = {
       sub: `#${b.id} · ${kindLabel('building')} · ${t('inspector.tier', { tier: b.tier })}`,
       icon: 'build',
       status: text,
-      signature: `${b.type}:${b.tier}:${status.kind}:${capacity}:${b.occupantIds.join(',')}:${occupants.map(o => o.name).join('|')}:${storage?.rowSignature ?? ''}`,
+      signature: `${b.type}:${b.tier}:${status.kind}:${capacity}:${b.occupantIds.join(',')}:${occupantNames.join('|')}:${extras.map(x => x?.rowSignature ?? '').join('|')}`,
       get sections() {
         const rows: HTMLElement[] = [
           liveRow(t('inspector.status'), 'status', text),
@@ -181,18 +184,9 @@ export const buildingContent: KindContent = {
         rows.push(liveRow(t('inspector.position'), 'position', `(${b.x}, ${b.z})`));
         if (capacity > 0) {
           rows.push(liveRow(t('inspector.occupancy'), 'occupancy', t('building.occupancy', { inside: b.occupantIds.length, capacity })));
-          if (occupants.length > 0) {
-            const inside = el('div', { text: t('inspector.inside') });
-            inside.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;font-size:11px';
-            occupants.forEach((o, i) => {
-              if (i > 0) inside.append(', ');
-              inside.append(entityLink(o.name, 'employee', o.id, links));
-            });
-            rows.push(inside);
-          }
         }
         const details = sectionOf(t('inspector.section.details'), rows);
-        return storage ? [details, storage.section] : [details];
+        return [details, ...extras.flatMap(x => (x ? [x.section] : []))];
       },
       actions: standingActions(state, buildingActionRules(state, b)),
       sync(root) {
@@ -203,6 +197,8 @@ export const buildingContent: KindContent = {
         setLive(root, 'upkeep', upkeep);
         setLive(root, 'occupancy', t('building.occupancy', { inside: b.occupantIds.length, capacity }));
         storage?.sync(root);
+        peopleSection?.sync(root);
+        research?.sync(root);
       },
     };
   },

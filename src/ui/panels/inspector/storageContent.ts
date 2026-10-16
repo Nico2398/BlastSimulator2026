@@ -7,18 +7,10 @@ import type { GameState } from '../../../core/state/GameState.js';
 import { getOre } from '../../../core/world/OreCatalog.js';
 import { el } from '../../dom.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
-import { liveRow, liveValue, sectionOf, setLive } from './inspectorWidgets.js';
+import { liveLine, liveRow, liveValue, sectionOf, setLive, type InspectorSection } from './inspectorWidgets.js';
 
 /** Rows at or below this mass are noise and stay hidden. */
 const MIN_ROW_KG = 0.5;
-
-/** A storage section plus its live-sync hook. */
-export interface StorageContents {
-  readonly section: HTMLElement;
-  /** Names the row set: when it changes the section must be rebuilt, not synced in place. */
-  readonly rowSignature: string;
-  readonly sync: (root: HTMLElement) => void;
-}
 
 interface Row { key: string; label: string; text: string }
 
@@ -109,13 +101,6 @@ function modelOf(b: Building, state: GameState, closed: boolean): Model | null {
   }
 }
 
-function lineOf(key: string, text: string): HTMLElement {
-  const line = el('div', { text, className: 'bsx-mono' });
-  line.style.fontSize = '11px';
-  line.dataset['live'] = key;
-  return line;
-}
-
 function noteOf(text: string): HTMLElement {
   const note = el('div', { text });
   note.dataset['live'] = 'note';
@@ -144,7 +129,7 @@ function buildSection(m: Model): HTMLElement {
     rows.push(row, bar);
   }
   for (const r of m.rows) rows.push(liveRow(r.label, r.key, r.text));
-  for (const l of m.lines) rows.push(lineOf(l.key, l.text));
+  for (const l of m.lines) rows.push(liveLine(l.key, l.text));
   if (m.note !== null) rows.push(noteOf(m.note));
   return sectionOf(t('inspector.section.contents'), rows);
 }
@@ -181,7 +166,7 @@ function reconcile(root: HTMLElement, container: HTMLElement, shown: Set<string>
 }
 
 /** Storage section for a building, or null when the building stores nothing. */
-export function storageContents(b: Building, state: GameState, closed: boolean): StorageContents | null {
+export function storageContents(b: Building, state: GameState, closed: boolean): InspectorSection | null {
   const m = modelOf(b, state, closed);
   if (!m) return null;
   const shown = new Set<string>([...m.rows.map(r => r.key), ...m.lines.map(l => l.key), ...(m.note !== null ? ['note'] : [])]);
@@ -200,7 +185,7 @@ export function storageContents(b: Building, state: GameState, closed: boolean):
       }
       reconcile(root, section, shown, [
         ...cur.rows.map(r => ({ key: r.key, text: r.text, make: () => liveRow(r.label, r.key, r.text) })),
-        ...cur.lines.map(l => ({ key: l.key, text: l.text, make: () => lineOf(l.key, l.text) })),
+        ...cur.lines.map(l => ({ key: l.key, text: l.text, make: () => liveLine(l.key, l.text) })),
         ...(cur.note !== null ? [{ key: 'note', text: cur.note, make: () => noteOf(cur.note as string) }] : []),
       ]);
     },
