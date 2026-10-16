@@ -227,26 +227,25 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 5.5,
-          "z": 9.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 5,
+          "z": 9
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 5,
+          "z": 9
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on (5,9), then press the inspector's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre here, which is where the camera ray lands on this flat stretch; it was measured in a real browser (dispatched command read `vehicle reposition 6 5 9`), not assumed -- other tiles need an offset, so re-measure rather than copy.",
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. ",
       "role": "player",
       "expect": {
         "changedBy": {

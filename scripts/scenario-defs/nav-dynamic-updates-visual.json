@@ -293,26 +293,25 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 15.5,
-          "z": 16.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 15,
+          "z": 15
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "timeout raised from the 60s default (#1092 visual-tester finding): dispatch is proven correct within budget every run (commandOutput \"Vehicle #5 repositioning to (15,16).\") -- driver #3 is already aboard at this point (boarded during the earlier `tick 60` step), so `vehicle reposition`'s `vehicleDriverId(vehicle) ?? findAvailableDriverForReposition(...)` short-circuits on the already-known driver and never runs #1092's new driver search. Historically what overran the 60s ceiling under `--screenshots` was capture cost (5 captures at ~6s/frame software rasterization, so 3 of 4 shots on a slow sandbox); since #1224 capture time no longer counts against a step's deadline, and the raised 120s timeout is kept as historical headroom with zero change to what is asserted. Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on the destination tile, then press the inspector's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- that is false since the SelectionBar gained `move_here` (G4), and it was only unusable with a mouse until ScenePicking started latching `.aim` separately from the live hover (47f4fef). cameraFocus sits at z=16.5, one tile past the target: at the default orbit the camera ray hits terrain about a tile short of its focus point, so the offset was calibrated in a real browser until the dispatched command read exactly `vehicle reposition 6 15 15`. Never adjust the camera focus offset arithmetically -- re-measure.",
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. timeout raised from the 60s default (#1092 visual-tester finding): dispatch is proven correct within budget every run (commandOutput \"Vehicle #5 repositioning to (15,16).\") -- driver #3 is already aboard at this point (boarded during the earlier `tick 60` step), so `vehicle reposition`'s `vehicleDriverId(vehicle) ?? findAvailableDriverForReposition(...)` short-circuits on the already-known driver and never runs #1092's new driver search. Historically what overran the 60s ceiling under `--screenshots` was capture cost (5 captures at ~6s/frame software rasterization, so 3 of 4 shots on a slow sandbox); since #1224 capture time no longer counts against a step's deadline, and the raised 120s timeout is kept as historical headroom with zero change to what is asserted. Never adjust the camera focus offset arithmetically -- re-measure.",
       "role": "player",
       "expect": {
         "changedBy": {

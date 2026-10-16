@@ -38,7 +38,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -63,7 +65,9 @@
       "role": "player",
       "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so hauler #1 needs a driver before either `vehicle move` step below can succeed. Hired first (employee #1) so the driller hired later becomes #2 -- see that step and the `employee dispatch` step's own note on the id shift.",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -89,13 +93,15 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       },
       "description": "Employee #1 and hauler #1 both spawn at the same default point -- confirmed live 20 ticks is enough to board (`vehicle list` shows driver:#1 afterward)."
     },
     {
       "command": "vehicle reposition 1 8 20",
-      "description": "Real click path, pre-ramp: select hauler #1 in the 3D scene, rest the cursor on (8,20), press the inspector's MOVE HERE, then Esc to drop the selection so the bottom-docked bar cannot sit over the ramp placement strip two steps later. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). cameraFocus sits at z=21.5, one tile past the target: at the default orbit the camera ray lands about a tile short of its focus point. Measured in a real browser until the dispatched command read `vehicle reposition 1 8 20`; never adjust it arithmetically.",
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Measured in a real browser until the dispatched command read `vehicle reposition 1 8 20`; never adjust it arithmetically.",
       "interaction": [
         {
           "type": "clickEntity",
@@ -107,23 +113,22 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 8.5,
-          "z": 21.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 8,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 8,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "keypress",
@@ -147,7 +152,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -194,7 +201,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 0
         }
@@ -202,7 +211,7 @@
     },
     {
       "command": "vehicle reposition 1 8 20",
-      "description": "Same click path again, now that the ramp exists: re-select the hauler (it has moved, so clickEntity resolves its live position rather than a baked one) and re-aim at (8,20). The same z=21.5 focus offset was re-measured after the ramp changed the terrain and still lands on (8,20).",
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Same click path again, now that the ramp exists: re-select the hauler (it has moved, so clickEntity resolves its live position rather than a baked one), pick (8,20) again and confirm; confirming closes the move strip so it cannot cover the ramp placement strip.",
       "interaction": [
         {
           "type": "clickEntity",
@@ -214,23 +223,22 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 8.5,
-          "z": 21.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 8,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 8,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "keypress",
@@ -263,7 +271,9 @@
       "role": "player",
       "description": "#947 hired a driver first (see that step) to board hauler #1, so this driller lands as employee #2, not #1 -- the `employee dispatch` step below targets #2 accordingly.",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2
         }
@@ -306,7 +316,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "stuckEmployeeCount": 0
         }

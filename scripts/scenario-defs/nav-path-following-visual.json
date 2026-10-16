@@ -589,7 +589,7 @@
     },
     {
       "command": "employee dispatch 5 x:10 z:0",
-      "description": "#1038 regression beat: dispatches driller #5 across seed 42's natural x:0..10, z:0 downslope (getSurfaceY probed column-by-column at game start: 37,36,35,34,33,33,32,32,32,31,30 -- a real, continuous ~7-unit drop over these 10 cells, no ramp construction needed) via the SelectionBar's own dispatch_here action -- same real click path as nav-ramp-routing-visual.json's vehicle move_here (clickEntity -> cameraFocus -> mousemove -> click), aimed at an employee instead of a vehicle. dispatch_here (src/main.ts) fires the exact `employee dispatch <id> x:<tileX> z:<tileZ>` command named above, read from the live cursor-terrain hit under the focused camera. The cameraFocus offset (+0.5 x, +1.5 z past the nominal target) reuses the offset nav-ramp-routing-visual.json measured live for this same default orbit/distance -- worth reconfirming in a real browser run if the hover lands on a different tile than (10,0).",
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. ",
       "interaction": [
         {
           "type": "clickEntity",
@@ -601,23 +601,22 @@
           "selector": "#bs-inspector [data-action=\"dispatch_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 10.5,
-          "z": 1.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"dispatch_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 10,
+          "z": 0
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 10,
+          "z": 0
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"dispatch_here\"]"
+          "selector": "#bs-tile-select-confirm"
         },
         {
           "type": "keypress",

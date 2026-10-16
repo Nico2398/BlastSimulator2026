@@ -110,7 +110,7 @@
     {
       "command": "vehicle reposition 1 37 33",
       "timeout": 120,
-      "description": "timeout raised from the 60s default (#1092 visual-tester finding): this step's own dispatch is proven correct by its commandOutput/state JSON (\"Vehicle #1 repositioning to (37,33).\", status flips to Moving) well inside budget every run -- driver #1 is already aboard at this point (boarded during the earlier `tick 20` step), so `vehicle reposition`'s `vehicleDriverId(vehicle) ?? findAvailableDriverForReposition(...)` short-circuits on the already-known driver and never runs the new driver search added by #1092. Historically what overran the 60s ceiling under `--screenshots` was capture cost (5 captures at ~6s/frame software rasterization, so 3 of 4 shots on a slow sandbox); since #1224 capture time no longer counts against a step's deadline, and the raised 120s timeout is kept as historical headroom with zero change to what is asserted. Real click path: select hauler #1 in the 3D scene, rest the cursor on the destination, press the inspector's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). DESTINATION CHANGED from (2,2) to (37,33): (2,2) sits in dusty_hollow's far corner behind a rise, and no camera-ray aim from the default orbit can land on it -- a focus sweep along x=2.5 jumps straight from tile z=0 to z=3, skipping 1 and 2, so the tile is occluded. This file tests idle -> moving -> transport task transitions, not one particular destination, so it aims at a tile a player can actually point at. (37,33) is the same tile vehicle-traffic-routing-visual drives to on this level, and its focus point was measured in a real browser until the dispatched command read `vehicle reposition 1 37 33`.",
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. timeout raised from the 60s default (#1092 visual-tester finding): this step's own dispatch is proven correct by its commandOutput/state JSON (\"Vehicle #1 repositioning to (37,33).\", status flips to Moving) well inside budget every run -- driver #1 is already aboard at this point (boarded during the earlier `tick 20` step), so `vehicle reposition`'s `vehicleDriverId(vehicle) ?? findAvailableDriverForReposition(...)` short-circuits on the already-known driver and never runs the new driver search added by #1092. Historically what overran the 60s ceiling under `--screenshots` was capture cost (5 captures at ~6s/frame software rasterization, so 3 of 4 shots on a slow sandbox); since #1224 capture time no longer counts against a step's deadline, and the raised 120s timeout is kept as historical headroom with zero change to what is asserted. This file tests idle -> moving -> transport task transitions, not one particular destination, so it aims at a tile a player can actually point at.",
       "interaction": [
         {
           "type": "clickEntity",
@@ -122,23 +122,22 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 37.5,
-          "z": 33.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 37,
+          "z": 33
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 37,
+          "z": 33
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",

@@ -293,27 +293,26 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 21.5,
-          "z": 20.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 21,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 21,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
-      "description": "Fixed by issue #512: all four haulers spawn on ONE tile (vehicle buy stagger gets undone by NavGrid.findNearestReachableCell snapping every one of them to the same reachable cell), so scene-raycast clickEntity could only ever pick hauler #1 -- clickEntity for #2/#3/#4 always raycast onto #1 instead. FleetPanel rows are clickable now, so hauler #2 gets selected by clicking its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"2\"]`), routed through ScenePicking.select(), then MOVE HERE drives the same `vehicle move` command as the hauler #1 step above."
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Fixed by issue #512: all four haulers spawn on ONE tile (vehicle buy stagger gets undone by NavGrid.findNearestReachableCell snapping every one of them to the same reachable cell), so scene-raycast clickEntity could only ever pick hauler #1 -- clickEntity for #2/#3/#4 always raycast onto #1 instead. FleetPanel rows are clickable now, so hauler #2 gets selected by clicking its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"2\"]`), routed through ScenePicking.select(), then MOVE HERE drives the same `vehicle move` command as the hauler #1 step above."
     },
     {
       "command": "vehicle reposition 3 20 21",
@@ -327,27 +326,26 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 20.5,
-          "z": 21.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 20,
+          "z": 21
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 20,
+          "z": 21
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
-      "description": "Fixed by issue #512, same fix as hauler #2 above: hauler #3 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"3\"]`) instead of the scene raycast that could only ever hit hauler #1."
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Fixed by issue #512, same fix as hauler #2 above: hauler #3 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"3\"]`) instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle reposition 4 19 20",
@@ -361,27 +359,26 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 19.5,
-          "z": 20.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 19,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 19,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
-      "description": "Fixed by issue #512, same fix as haulers #2/#3 above: hauler #4 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"4\"]`) instead of the scene raycast that could only ever hit hauler #1."
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Fixed by issue #512, same fix as haulers #2/#3 above: hauler #4 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"4\"]`) instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "tick 5",
@@ -405,27 +402,26 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 20.5,
-          "z": 20.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 20,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
-      "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #2 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Fixed by issue #512, second round of convergence at (20,20): hauler #2 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle reposition 3 20 20",
@@ -439,27 +435,26 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 20.5,
-          "z": 20.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 20,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
-      "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #3 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Fixed by issue #512, second round of convergence at (20,20): hauler #3 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle reposition 4 20 20",
@@ -473,27 +468,26 @@
           "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "cameraFocus",
-          "x": 20.5,
-          "z": 20.5,
-          "distance": 25
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"move_here\"]"
         },
         {
-          "type": "mousemove",
-          "x": 640,
-          "y": 360
+          "type": "focusTile",
+          "x": 20,
+          "z": 20
         },
         {
-          "type": "wait",
-          "durationMs": 300
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"move_here\"]"
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
-      "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #4 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
+      "description": "Real click path via the shared in-scene move pick (#1766, no hover): click the entity, press the inspector's Move action (arms the tile pick on the entity's own tile), pick tile and confirm. Fixed by issue #512, second round of convergence at (20,20): hauler #4 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle list",
