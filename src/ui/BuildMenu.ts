@@ -63,11 +63,11 @@ import { buildDemolishConfirm, freightOreKg } from './demolishConfirm.js';
 import { buildingActionRules, REASON_CASH } from './buildingActionRules.js';
 import { memoizedPlacementCutoff, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
-import type { ListSelection } from './selectionRoute.js';
+import { applyRowSelection, type ListSelection } from './selectionRoute.js';
 import { placedRowModel, siteRowModel, type SiteRowModel } from './panels/placedRowModel.js';
 import { focusCameraOn } from './locateButton.js';
 import {
-  applyRowSelection, makeSiteRow, onRowBodyClick, placedInfoBlock, siteSignature, syncPlacedRow, syncSiteRow,
+  makeSiteRow, onRowBodyClick, placedInfoBlock, siteSignature, syncPlacedRow, syncSiteRow,
 } from './buildMenuRows.js';
 
 /** Footprint rect of a `sizeX` x `sizeZ` building whose origin tile is (x, z). */

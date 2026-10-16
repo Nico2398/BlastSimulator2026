@@ -10,10 +10,6 @@ import { findLive, markLive, writeText } from './panels/inspector/inspectorWidge
 import type { PlacedRowModel, SiteRowModel } from './panels/placedRowModel.js';
 import type { Building } from '../core/entities/Building.js';
 import type { PlannedBuilding } from '../core/state/GameState.js';
-import { isSelected, type ListSelection } from './selectionRoute.js';
-import type { EntityPick } from './scene/ScenePicking.js';
-
-const SELECTED_ROW_CLASS = 'bs-row-selected';
 
 const makeBadge = (): HTMLElement => markLive(el('span', { className: 'bs-build-row-badge' }), 'badge');
 
@@ -111,16 +107,4 @@ export function syncSiteRow(row: HTMLElement, model: SiteRowModel): void {
 /** Signature that names a site row set: a change rebuilds the rows. */
 export function siteSignature(sites: ReadonlyArray<PlannedBuilding>, isRebuild: (pb: PlannedBuilding) => boolean): string {
   return sites.map((pb) => `${pb.buildingId}:${pb.type}:${pb.tier}:${isRebuild(pb)}`).join(',');
-}
-
-/** Highlight exactly the row of `kind` matching `sel` (rows carry its id in `dataAttr`, e.g. `data-building-id`) under each container. */
-export function applyRowSelection(containers: ReadonlyArray<HTMLElement>, sel: ListSelection, kind: EntityPick['kind'], dataAttr: string): void {
-  for (const container of containers) {
-    for (const row of Array.from(container.querySelectorAll<HTMLElement>(`[${dataAttr}]`))) {
-      const on = isSelected(sel, kind, Number(row.getAttribute(dataAttr)));
-      row.classList.toggle(SELECTED_ROW_CLASS, on);
-      if (on) row.setAttribute('aria-selected', 'true');
-      else row.removeAttribute('aria-selected');
-    }
-  }
 }

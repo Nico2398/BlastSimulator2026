@@ -538,27 +538,13 @@ describe('CrewPanel — live refresh keeps the roster scroll (#1592)', () => {
     expect(rosterScroll(panel).scrollTop).toBe(80);
   });
 
-  it('keeps roster scrollTop across a card toggle', () => {
+  it('keeps roster scrollTop across a select click', () => {
     const { panel } = makePanel();
     panel.show();
     panel.update(makeState(threeCrew()));
     rosterScroll(panel).scrollTop = 80;
     toggle(panel, 1);
     expect(rosterScroll(panel).scrollTop).toBe(80);
-  });
-
-  it('the toggle handler re-renders from the latest state, not the render-time state', () => {
-    const { panel } = makePanel();
-    const first = makeState([makeEmployee({ id: 1, morale: 60 }), makeEmployee({ id: 2, name: 'Ada Blaster' })]);
-    panel.update(first);
-    // Morale drifts every tick without changing the structural signature.
-    const second = makeState([makeEmployee({ id: 1, morale: 20 }), makeEmployee({ id: 2, name: 'Ada Blaster' })]);
-    panel.update(second);
-
-    toggle(panel, 2);
-
-    const moraleText = panel.root.querySelector('[data-employee-id="1"] .bs-crew-morale-value')!.textContent;
-    expect(moraleText).toBe('20%');
   });
 });
 

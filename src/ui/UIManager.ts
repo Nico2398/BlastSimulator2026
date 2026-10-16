@@ -557,7 +557,10 @@ export class UIManager {
       case 'ops': this.operationsPanel.show(); break;
       case 'build': this.buildMenu.show(); break;
       case 'vehicles': this.fleetPanel.show(); break;
-      case 'employees': this.crewPanel.show(); this.crewPanel.setSelectedEmployee(this.listSelection); break;
+      case 'employees':
+        this.crewPanel.show();
+        this.crewPanel.setSelectedEmployee(this.listSelection);
+        break;
       case 'survey': this.surveyPanel.show(); break;
       case 'shady': this.shadyPanel.show(); break;
       case 'settings': this.settingsPanel.show(); break;

@@ -16,11 +16,9 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
-import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import { moraleColor, makeAvatar, makeRoleMoraleLine, makeStatusTags, makeManagerEffect } from '../crewDetailSections.js';
-import { applyRowSelection } from '../buildMenuRows.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import type { ListSelection } from '../selectionRoute.js';
+import { applyRowSelection, SELECTED_ROW_CLASS, type ListSelection } from '../selectionRoute.js';
 
 
 export class CrewPanel extends PanelBase {
@@ -78,7 +76,7 @@ export class CrewPanel extends PanelBase {
     applyRowSelection([this.bodyEl], this.selection, 'employee', 'data-employee-id');
     if (!scroll || this.selection?.kind !== 'employee') return;
     // Optional chained on the method: jsdom doesn't implement scrollIntoView.
-    this.bodyEl.querySelector<HTMLElement>('.bs-row-selected')?.scrollIntoView?.({ block: 'nearest' });
+    this.bodyEl.querySelector<HTMLElement>(`.${SELECTED_ROW_CLASS}`)?.scrollIntoView?.({ block: 'nearest' });
   }
 
   /** Show the hiring section with candidates of `role` in view. */
@@ -114,35 +112,22 @@ export class CrewPanel extends PanelBase {
 
 
   /**
-   * Structural facts only: which rows exist and what their tags show. Morale
-   * and status drift every tick on their own; including them here would force a full
-   * rebuild every tick and drop whatever the player is mid-click on.
+   * Structural facts only: which rows exist and what their static card parts
+   * show (name, role, flags, collapsing border, qualifications). Morale and status tags
+   * (training included) drift on their own; including them here would force a
+   * full rebuild and drop whatever the player is mid-click on.
    * refreshDynamic() below writes those in place instead.
-   *
-   * Cash is bucketed to affordability, not included as a raw number: a
-   * training fee or hire cost only needs a rebuild when it crosses from
-   * affordable to not (or back), the same way OperationsPanel/legacy
-   * EmployeePanel bucket cash against their own price thresholds.
    */
   private computeSignature(state: GameState): string {
     const rows = state.employees.employees
       .filter(e => e.alive)
       .map(e => {
+        // Qualifications drive the manager-effect line, which refreshDynamic does not repaint.
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}${q.licenceLevel ?? ''}`).join(',');
-        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
-          + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
+        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}:${e.name}:${quals}`;
       })
       .join('|');
-    const schools = state.buildings.buildings.map(b => `${b.type}${b.tier}`).sort().join(',');
-    return `${rows}#${hiringSignature(state)}#${schools}`;
-  }
-
-  private affordsAnyCourse(e: Employee, state: GameState): boolean {
-    if (e.trainingState || e.pendingTrainingState || e.injured) return false;
-    return availableTrainingOffers(state.buildings.buildings).some(({ skill, building }) => {
-      const plan = planTraining(e, skill, building.tier);
-      return plan !== null && state.cash >= plan.fee;
-    });
+    return `${rows}#${hiringSignature(state)}`;
   }
 
   /** Re-paint values that drift every tick without rebuilding the DOM under an in-flight click. */
