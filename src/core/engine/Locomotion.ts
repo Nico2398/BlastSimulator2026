@@ -396,13 +396,6 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // every tick, instead of deciding once, oscillates the mover forever.
   let avoidVehicles = isDrive ? false : (leg.crossesVehicles ? false : !isDestinationOccupied(state, leg.destX, leg.destZ));
 
-  // Snapped through NavGrid's own (nearest-cell, round-based) convention
-  // rather than handed to findPath continuous (#1166): Pathfinding.ts's own
-  // clampToGrid floors instead, which can choose a start cell up to a full
-  // diagonal away from the agent's true nearest cell — see this file's own
-  // NavGrid.clampX/clampZ usage throughout AgentAdvance.ts for the same fix.
-  const roundedFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
-  const roundedFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
   // Retry origin when the rounded cell has no route: a mover mid-hop paths
   // from its committed hop origin, since the rounded cell of a fractional
   // diagonal position can be a sealed pit (#1687). Only a fallback — a found
@@ -456,7 +449,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     }
     return path;
   };
-  let path = planPath(roundedFromX, roundedFromZ);
+  let path = planPath(emp.x, emp.z);
   if (!path.found && hopOrigin) path = planPath(hopOrigin.x, hopOrigin.z);
 
   const outcome = advanceAlongPath({

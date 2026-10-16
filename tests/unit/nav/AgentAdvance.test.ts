@@ -891,3 +891,56 @@ describe('inFlightHopOrigin (#1687)', () => {
     expect(inFlightHopOrigin(hop, 4, 1, 5, 5)).toBeNull();
   });
 });
+
+// #1851: with no recorded hop origin, the standing cell of a fractional live
+// position is the NavGrid-rounded one (clampX/clampZ), never the floored one.
+describe('advanceAlongPath — live-position fallback rounds to the NavGrid cell (#1851)', () => {
+  // Column 0 is a 10 m drop above columns 1-2: a hop out of column 0 is never
+  // climbable, a hop along columns 1 -> 2 is flat.
+  const grid = () => heightGrid([
+    [10, 0, 0],
+    [10, 0, 0],
+    [10, 0, 0],
+  ]);
+
+  it('keeps a legal committed hop when the standing cell (rounded, no origin) is the flat one', () => {
+    // x = 0.7 rounds to column 1 (flat -> (2,0) legal); flooring gives column 0 (10 m rise: illegal).
+    const committed: RouteCommitment = {
+      ...NULL_ROUTE_COMMITMENT,
+      waypointX: 2, waypointZ: 0, destX: 2, destZ: 0, remainingCost: 5,
+    };
+    const result = advanceAlongPath(baseInput({
+      x: 0.7, z: 0, walkSpeed: 0.1,
+      destinationX: 2, destinationZ: 0,
+      path: { found: true, waypoints: [{ x: 0.7, z: 0 }, { x: 0, z: 1 }], totalCost: 5 },
+      committed,
+      navGrid: grid(),
+    }));
+    expect(result.committed.waypointX).toBe(2);
+    expect(result.committed.waypointZ).toBe(0);
+  });
+
+  it('adopting a fresh path with no predecessor waypoint records the rounded standing cell as hop origin', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 1.7, z: 0.3, walkSpeed: 0.1,
+      destinationX: 2, destinationZ: 2,
+      path: { found: true, waypoints: [{ x: 2, z: 2 }], totalCost: 2 },
+      committed: NULL_ROUTE_COMMITMENT,
+      navGrid: grid(),
+    }));
+    expect(result.committed.originX).toBe(2);
+    expect(result.committed.originZ).toBe(0);
+  });
+
+  it('still prefers the recorded hop origin over the live position (#1687 untouched)', () => {
+    const result = advanceAlongPath(baseInput({
+      x: 1.7, z: 0.3, walkSpeed: 0.1,
+      destinationX: 2, destinationZ: 2,
+      path: { found: true, waypoints: [{ x: 1, z: 0 }, { x: 2, z: 2 }], totalCost: 2 },
+      committed: NULL_ROUTE_COMMITMENT,
+      navGrid: grid(),
+    }));
+    expect(result.committed.originX).toBe(1);
+    expect(result.committed.originZ).toBe(0);
+  });
+});
