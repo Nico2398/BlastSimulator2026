@@ -293,7 +293,8 @@ describe('vehicle inspector — driver', () => {
     const { links, navigate, run, select } = makeLinks();
     const root = mount(viewOf(makeState(makeVehicle(), [makeEmployee({ qualifications: [] })]), links));
     const driver = root.querySelector('.bs-vehicle-driver')!;
-    expect(driver.textContent).toContain(t('ui.fleet.no_licensed', { licence: t('skill.driving.truck') }));
+    expect(driver.textContent).toContain(t('ui.fleet.no_licensed', { licence: t('skill.driving.truck'), level: 1 }));
+    expect(driver.textContent).toContain('Nobody holds Truck Driving level 1');
     const train = Array.from(driver.querySelectorAll('button')).find(b => b.textContent === t('ui.fleet.train_someone'));
     expect(train).toBeDefined();
     train!.click();
@@ -310,6 +311,53 @@ describe('vehicle inspector — specs and running cost', () => {
     expect(specs).toContain(String(Math.round(def.speed * 10) / 10));
     expect(specs).toContain(Math.round(def.capacity).toLocaleString('en-US'));
     expect(specs).toContain(String(Math.round(def.workRate * 10) / 10));
+  });
+
+  it('drill rig capacity reads in holes/h, not kg (#1850)', () => {
+    const rig = makeVehicle({ type: 'drill_rig', tier: 1 });
+    const specs = mount(viewOf(makeState(rig))).querySelector('.bs-vehicle-specs')!.textContent!;
+    expect(specs).toContain('2 holes/h');
+    expect(specs).not.toContain('2 kg');
+  });
+
+  it('drill rig tier 2 capacity reads in holes/h (#1850)', () => {
+    const def = getVehicleDefByTier('drill_rig', 2);
+    const specs = mount(viewOf(makeState(makeVehicle({ type: 'drill_rig', tier: 2 })))).querySelector('.bs-vehicle-specs')!.textContent!;
+    expect(specs).toContain(`${def.capacity} holes/h`);
+    expect(specs).not.toMatch(/\d kg/);
+  });
+
+  it('debris hauler capacity stays a kg payload (#1850)', () => {
+    const specs = mount(viewOf(makeState(makeVehicle()))).querySelector('.bs-vehicle-specs')!.textContent!;
+    expect(specs).toContain('kg');
+    expect(specs).not.toContain('/h kg');
+    expect(specs).not.toMatch(/kg\/h/);
+  });
+
+  it('rock digger capacity reads in m3/h (#1850)', () => {
+    const specs = mount(viewOf(makeState(makeVehicle({ type: 'rock_digger' })))).querySelector('.bs-vehicle-specs')!.textContent!;
+    expect(specs).toContain(t('ui.fleet.unit.m3_per_hour'));
+  });
+
+  it('a speed of 1 reads "1 cell/h", other speeds keep "cells/h" (#1850)', () => {
+    const base = getVehicleDefByTier('debris_hauler', 1);
+    const speedOf = (speed: number) => {
+      const s = makeState(makeVehicle());
+      // Specs read the tier definition's speed; override it for the render only.
+      const def = getVehicleDefByTier('debris_hauler', 1);
+      const saved = def.speed;
+      (def as { speed: number }).speed = speed;
+      try {
+        return mount(viewOf(s)).querySelector('.bs-vehicle-specs')!.textContent!;
+      } finally {
+        (def as { speed: number }).speed = saved;
+      }
+    };
+    expect(base.speed).not.toBe(1);
+    const one = speedOf(1);
+    expect(one).toContain('1 cell/h');
+    expect(one).not.toContain('1 cells/h');
+    expect(speedOf(2)).toContain('2 cells/h');
   });
 
   it('idle running cost is the maintenance per hour', () => {

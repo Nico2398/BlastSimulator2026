@@ -7,6 +7,7 @@ import { vehicleCargoByOre, vehicleCargoWarehouseId } from '../../../core/econom
 import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { el } from '../../dom.js';
+import { vehicleCapacityText } from '../../catalogCardText.js';
 import {
   buildingDisplayName, makeHpGauge, makeLoadGauge, makeStatusChip, vehicleDisplayName,
 } from '../../fleetDetailSections.js';
@@ -111,12 +112,14 @@ export function buildDriverSection(v: Vehicle, state: GameState, links: Inspecto
   return wrap;
 }
 
+const speedText = (n: number): string => t(n === 1 ? 'inspector.vehicle.speed_value_one' : 'inspector.vehicle.speed_value', { n });
+
 /** Speed, capacity and work rate of this tier. */
 export function buildSpecsSection(v: Vehicle): HTMLElement {
   const def = getVehicleDefByTier(v.type, v.tier);
   const rows = [
-    valueRow(t('inspector.vehicle.speed'), t('inspector.vehicle.speed_value', { n: Math.round(def.speed * 100) / 100 })),
-    ...(def.capacity > 0 ? [valueRow(t('inspector.vehicle.capacity'), kgText(def.capacity))] : []),
+    valueRow(t('inspector.vehicle.speed'), speedText(Math.round(def.speed * 100) / 100)),
+    ...(def.capacity > 0 ? [valueRow(t('inspector.vehicle.capacity'), vehicleCapacityText(v.type, def.capacity))] : []),
     valueRow(t('inspector.vehicle.work_rate'), String(Math.round(def.workRate * 100) / 100)),
   ];
   const wrap = sectionOf(t('inspector.vehicle.specs'), rows);
