@@ -31,7 +31,7 @@ import { createGame, type GameState, type PendingAction } from '../../../src/cor
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, getLivingEmployees, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleDefByTier, canReleaseDriver, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { actionRankTier, DEBRIS_SELECTION_BINNING_MIN, ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
@@ -2114,6 +2114,146 @@ describe('selectBestActionForEmployee — rank tiers (#1742)', () => {
     const near = makeAction({ id: 2, type: 'haul_debris', targetX: 2, targetZ: 0 });
     const far = makeAction({ id: 1, type: 'haul_debris', targetX: 20, targetZ: 0 });
     expect(selectBestActionForEmployee(state, emp, [far, near])!.action.id).toBe(2);
+  });
+});
+
+describe('selectBestActionForEmployee — demolition outranks debris hauling (#1840)', () => {
+  // Same stub as the #1742 block: the planner is a straight-line cost; `unplannable` orders have no route.
+  let unplannable: Set<number>;
+  beforeEach(() => {
+    unplannable = new Set();
+    vi.spyOn(PlanItineraryModule, 'planItinerary').mockImplementation((_state, employee, _goal, _fidelity, opts) => (
+      unplannable.has(opts!.action!.id) ? null
+        : { estTotalTicks: Math.hypot(opts!.action!.targetX - employee.x, opts!.action!.targetZ - employee.z) }
+    ) as unknown as ReturnType<typeof PlanItineraryModule.planItinerary>);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** A truck-licensed driver riding a debris hauler, with a building_destroyer parked in the fleet. */
+  function mountedHaulDriver(state: GameState) {
+    const emp = makeEmployee(state, 5, 5);
+    assignSkill(state.employees, emp.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    assignSkill(state.employees, emp.id, ROLE_LICENCE_REQUIRED.building_destroyer, 1);
+    const { vehicle: hauler } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    purchaseVehicle(state.vehicles, 'building_destroyer', 25, 25);
+    hauler.occupantIds = [emp.id];
+    emp.locomotion = { kind: 'mounted', vehicleId: hauler.id };
+    return { emp, hauler };
+  }
+
+  function haulsAndDemolition(count = 12) {
+    const hauls = Array.from({ length: count }, (_, i) => makeAction({
+      id: 1 + i, type: 'haul_debris', requiredVehicleRole: 'debris_hauler', targetX: 6 + i % 3, targetZ: 5,
+    }));
+    const demolition = makeAction({
+      id: 100, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 28, targetZ: 28,
+      payload: { buildingId: 1, cost: 0, durationTicks: 10, footprint: [], rebuildOrderId: null },
+    });
+    return { hauls, demolition };
+  }
+
+  it('ranks demolish_building in a higher tier than haul_debris', () => {
+    expect(actionRankTier('demolish_building')).toBeGreaterThan(actionRankTier('haul_debris'));
+    expect(actionRankTier('haul_debris')).toBe(0);
+  });
+
+  it('puts demolish_building in the same tier as charge_hole', () => {
+    expect(actionRankTier('demolish_building')).toBe(1);
+    expect(actionRankTier('demolish_building')).toBe(actionRankTier('charge_hole'));
+  });
+
+  it('a driver mounted on an unloaded debris hauler takes a far demolition over many near hauls', () => {
+    const state = makeState();
+    const { emp, hauler } = mountedHaulDriver(state);
+    expect(canReleaseDriver(state.vehicles, hauler.id).success).toBe(true);
+    const { hauls, demolition } = haulsAndDemolition();
+    state.pendingActions.push(...hauls, demolition);
+
+    const sel = selectBestActionForEmployee(state, emp, [...hauls, demolition]);
+    expect(sel!.action.id).toBe(demolition.id);
+  });
+
+  it('takes the demolition on the first pick however much debris is queued', () => {
+    const state = makeState();
+    const { emp } = mountedHaulDriver(state);
+    const { hauls, demolition } = haulsAndDemolition(25);
+    state.pendingActions.push(...hauls, demolition);
+    const pool = [...hauls, demolition];
+
+    let picks = 0;
+    for (let n = 0; n < pool.length; n++) {
+      const sel = selectBestActionForEmployee(state, emp, pool.filter(a => a.status === 'queued'))!;
+      picks++;
+      if (sel.action.type === 'demolish_building') break;
+      sel.action.status = 'assigned';
+    }
+    expect(picks).toBe(1);
+  });
+
+  it('keeps hauling when the same driver has cargo aboard (mid-haul, canReleaseDriver refuses)', () => {
+    const state = makeState();
+    const { emp, hauler } = mountedHaulDriver(state);
+    hauler.cargo.push({ fragmentId: 1, massKg: 500 });
+    expect(canReleaseDriver(state.vehicles, hauler.id).success).toBe(false);
+    const { hauls, demolition } = haulsAndDemolition();
+    state.pendingActions.push(...hauls, demolition);
+    unplannable.add(demolition.id); // a loaded hauler cannot be swapped for the destroyer (#1709)
+
+    const sel = selectBestActionForEmployee(state, emp, [...hauls, demolition]);
+    expect(sel).not.toBeNull();
+    expect(sel!.action.type).toBe('haul_debris');
+  });
+
+  it('falls through to the haul when the demolition is not claimable', () => {
+    const state = makeState();
+    const { emp } = mountedHaulDriver(state);
+    const { hauls, demolition } = haulsAndDemolition();
+    state.pendingActions.push(...hauls, demolition);
+
+    const sel = selectBestActionForEmployee(state, emp, [...hauls, demolition], a => a.type !== 'demolish_building');
+    expect(sel!.action.type).toBe('haul_debris');
+  });
+
+  it('falls through to the haul when the demolition has no route', () => {
+    const state = makeState();
+    const { emp } = mountedHaulDriver(state);
+    const { hauls, demolition } = haulsAndDemolition();
+    state.pendingActions.push(...hauls, demolition);
+    unplannable.add(demolition.id);
+
+    const sel = selectBestActionForEmployee(state, emp, [...hauls, demolition]);
+    expect(sel).not.toBeNull();
+    expect(sel!.action.type).toBe('haul_debris');
+  });
+
+  it('ranks a charge_hole and a demolish_building by cost, not by type', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    assignSkill(state.employees, emp.id, 'blasting', 1);
+    const nearCharge = makeAction({ id: 7, type: 'charge_hole', requiredSkill: 'blasting', targetX: 3, targetZ: 0 });
+    const farDemolition = makeAction({ id: 3, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 25, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [farDemolition, nearCharge])!.action.id).toBe(7);
+
+    const nearDemolition = makeAction({ id: 9, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 2, targetZ: 0 });
+    const farCharge = makeAction({ id: 4, type: 'charge_hole', requiredSkill: 'blasting', targetX: 25, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [farCharge, nearDemolition])!.action.id).toBe(9);
+  });
+
+  it('ranks two demolish_building orders by cost, then lowest id', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    const near = makeAction({ id: 5, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 4, targetZ: 0 });
+    const far = makeAction({ id: 3, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 20, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [far, near])!.action.id).toBe(5);
+    const tieA = makeAction({ id: 8, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 10, targetZ: 0 });
+    const tieB = makeAction({ id: 7, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 10, targetZ: 0 });
+    expect(selectBestActionForEmployee(state, emp, [tieA, tieB])!.action.id).toBe(7);
+  });
+
+  it('leaves other action types in tier 0', () => {
+    for (const type of ['general_work', 'survey', 'drill_hole', 'place_building', 'haul_debris'] as const) {
+      expect(actionRankTier(type)).toBe(0);
+    }
   });
 });
 
