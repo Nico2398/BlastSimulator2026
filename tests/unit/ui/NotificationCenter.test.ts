@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { NotificationCenter, buildBlockedOrderMessage, isFailureBlock } from '../../../src/ui/notify/NotificationCenter.js';
+import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
+import { buildBlockedOrderMessage, isFailureBlock } from '../../../src/ui/notify/blockedOrders.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction, PlannedRamp } from '../../../src/core/state/GameState.js';
 import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';

@@ -12,7 +12,7 @@ import {
 } from '../../fleetDetailSections.js';
 import { makeDriverBlock, repairState } from './vehicleDetailParts.js';
 import { ACTION_LABEL_KEY } from '../../crewDetailSections.js';
-import { buildBlockedOrderMessage } from '../../notify/NotificationCenter.js';
+import { buildBlockedOrderMessage } from '../../notify/blockedOrders.js';
 import type { InspectorLinks } from './InspectorContent.js';
 import { entityLink, kgText, liveRow, sectionOf, tagged, valueRow } from './inspectorWidgets.js';
 

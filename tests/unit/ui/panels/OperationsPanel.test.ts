@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { OperationsPanel, countQueuedByBlock } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
-import { buildBlockedOrderMessage } from '../../../../src/ui/notify/NotificationCenter.js';
+import { buildBlockedOrderMessage } from '../../../../src/ui/notify/blockedOrders.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
@@ -746,6 +746,17 @@ describe('OperationsPanel — Unclaimed Work with blocked orders (#1810)', () =>
   it('keeps the open-to-anyone note for unblocked work', () => {
     const { panel } = renderWith([blockedFixture(1, null)]);
     expect(panel.root.textContent).toContain(UNCLAIMED_NOTE);
+  });
+
+  it('note shows both the blocked and out-of-reach clauses for a mixed queue', () => {
+    const { panel } = renderWith([
+      blockedFixture(1, 'no_vehicle_in_fleet'),
+      blockedFixture(2, 'debris_out_of_reach', { type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' }),
+    ]);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('1 blocked - waiting on the site');
+    expect(text).toContain('1 out of reach - waiting on the site');
+    expect(text).not.toContain(UNCLAIMED_NOTE);
   });
 
   it('i18n has the blocked-note wording with a {blocked} placeholder', () => {

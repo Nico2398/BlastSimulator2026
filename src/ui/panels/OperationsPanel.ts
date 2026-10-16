@@ -28,7 +28,7 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { isFailureBlock, buildBlockedOrderMessage } from '../notify/NotificationCenter.js';
+import { isFailureBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 
@@ -254,7 +254,8 @@ export class OperationsPanel extends PanelBase {
     const row = el('div');
     row.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)';
 
-    const queuedBlocked = action.status === 'queued' && action.blockedReason != null;
+    const blockedReason = action.status === 'queued' ? (action.blockedReason ?? null) : null;
+    const queuedBlocked = blockedReason !== null;
     const statusChip = queuedBlocked
       ? (isFailureBlock(action)
         ? chip(t('ui.operations.work_queue_status_blocked'), 'warn')
@@ -286,7 +287,7 @@ export class OperationsPanel extends PanelBase {
     if (queuedBlocked) {
       row.append(el('span', {
         text: buildBlockedOrderMessage(action),
-        attrs: { 'data-blocked-reason': action.blockedReason as string, style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+        attrs: { 'data-blocked-reason': blockedReason, style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
       }));
     }
     row.append(footRow);

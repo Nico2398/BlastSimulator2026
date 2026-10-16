@@ -2,7 +2,7 @@
 // BlastSimulator2026 — blocked demolition order names the Building Destroyer, en + fr (#1392)
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { buildBlockedOrderMessage } from '../../../src/ui/notify/NotificationCenter.js';
+import { buildBlockedOrderMessage } from '../../../src/ui/notify/blockedOrders.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 
