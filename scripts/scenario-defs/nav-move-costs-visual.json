@@ -215,7 +215,7 @@
       "description": "60 ticks is enough for employee #3 to walk from the staffed fleet's spawn cluster over to hauler #5's own spawn point and board it -- same margin confirmed live for the same staffed:true fleet layout in nav-dynamic-updates-visual.json."
     },
     {
-      "command": "vehicle reposition 6 5 9",
+      "command": "vehicle reposition 6 12 10",
       "interaction": [
         {
           "type": "clickEntity",
@@ -232,13 +232,13 @@
         },
         {
           "type": "focusTile",
-          "x": 5,
-          "z": 9
+          "x": 12,
+          "z": 10
         },
         {
           "type": "pickTile",
-          "x": 5,
-          "z": 9
+          "x": 12,
+          "z": 10
         },
         {
           "type": "clickSelector",
@@ -276,12 +276,12 @@
         "decreased": [
           "cash"
         ],
-        "note": "vehicle list confirms real per-tick progress toward (5,9), crossing the drill_hole row's different NavGrid cost"
+        "note": "vehicle list confirms real per-tick progress toward (12,10), crossing the drill_hole row's different NavGrid cost"
       }
     },
     {
       "command": "state full",
-      "description": "Final state dump — vehicle x/z should have advanced toward (5,9) across the drill_hole row.",
+      "description": "Final state dump — vehicle x/z should have advanced toward (12,10) across the drill_hole row.",
       "interaction": [
         {
           "type": "command",
