@@ -270,7 +270,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   let blockedByOccupant: Occupant | null = null;
 
   // Both of findPath's sources (the A* reconstruction and the direct-line
-  // fallback) emit waypoints[0] as the agent's own (floor-rounded) starting
+  // fallback) emit waypoints[0] as the agent's own (rounded) starting
   // cell — every path is a fresh from-here-to-there route recomputed each
   // tick, so index 0 is never a real step to walk toward. Left at index 0,
   // advanceAgent spends part of every tick's movement budget snapping the
@@ -559,8 +559,8 @@ function resolveTargetWaypoint(
       // edge A* actually validated — or, when there is none (the trivial
       // already-there case), the agent's own current cell. Stays fixed for
       // as long as this waypoint stays committed; see the field's own doc.
-      originX: navGrid ? navGrid.clampX(freshOrigin ? Math.floor(freshOrigin.x) : Math.floor(x)) : null,
-      originZ: navGrid ? navGrid.clampZ(freshOrigin ? Math.floor(freshOrigin.z) : Math.floor(z)) : null,
+      originX: navGrid ? navGrid.clampX(freshOrigin ? freshOrigin.x : x) : null,
+      originZ: navGrid ? navGrid.clampZ(freshOrigin ? freshOrigin.z : z) : null,
     },
   });
 
@@ -605,10 +605,10 @@ function resolveTargetWaypoint(
     // adjacent cell the edge never touched). `originX`/`originZ` stays fixed
     // for as long as this waypoint stays committed, so the climb check
     // always re-tests the exact edge A* validated when the path was built.
-    // Falls back to the live position's floor only for a fixture/caller
+    // Falls back to the live position's rounded cell only for a fixture/caller
     // predating the field (see its own doc).
-    const standingCellX = navGrid.clampX(Math.floor(committed.originX ?? x));
-    const standingCellZ = navGrid.clampZ(Math.floor(committed.originZ ?? z));
+    const standingCellX = navGrid.clampX(committed.originX ?? x);
+    const standingCellZ = navGrid.clampZ(committed.originZ ?? z);
     const targetCell = navGrid.cellAt(targetCellX, targetCellZ);
     const standingCell = navGrid.cellAt(standingCellX, standingCellZ);
     const blocked = !targetCell || isImpassable(targetCell, avoidVehicles, false);

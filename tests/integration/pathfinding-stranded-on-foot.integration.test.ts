@@ -121,9 +121,9 @@ describe('stranded on-foot pathfinding deadlock — scenario-runner (#1025)', ()
     const holderId = hireOne(ctx);
     const holder = state.employees.employees.find(e => e.id === holderId)!;
 
-    // Freeze the employee at a fractional position that floors to (24, 24) —
+    // Freeze the employee at a fractional position that rounds to (24, 24) —
     // mirrors a fatigue-freeze mid-walk (clampToGrid uses Math.floor).
-    holder.x = 24.707;
+    holder.x = 24.307;
     holder.z = 24.293;
 
     // management_office T1 footprint is a 2x2 rect(2,2) anchored at (x,z):
@@ -164,8 +164,8 @@ describe('stranded on-foot pathfinding deadlock — scenario-runner (#1025)', ()
     rescuer.x = 5;
     rescuer.z = 5;
 
-    holder.x = 24.707;
-    holder.z = 24.293; // floors to (24, 24)
+    holder.x = 24.307;
+    holder.z = 24.293; // rounds to (24, 24)
 
     // management_office T3 footprint is a 3x3 rect(3,3): anchored at (23,23)
     // it covers x:23-25, z:23-25 — (24,24) sits at the CENTER, so every one
