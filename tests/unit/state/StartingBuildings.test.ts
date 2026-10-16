@@ -339,22 +339,29 @@ describe('placeStartingBuildings — warehouse upgrade room (#1830)', () => {
     expect(disjoint(rectOf('spoil_heap', 1, h.x, h.z), rectOf('freight_warehouse', 3, w.x, w.z))).toBe(true);
   });
 
-  it('stays near the anchor and keeps rally clearance while reserving room', () => {
+  it('stays near the anchor and still reserves room when a rally flag is set', () => {
     const flag = { x: 30, z: 30 };
     const buildings = createBuildingState();
     placeStartingBuildings(buildings, makeFlatGrid(60), [WAREHOUSE, { type: 'spoil_heap', tier: 1 }], flag, flag);
     for (const b of buildings.buildings) {
       expect(Math.hypot(b.x - flag.x, b.z - flag.z), b.type).toBeLessThanOrEqual(RALLY_POINT_BUILDING_CLEARANCE + 12);
     }
+    const w = buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    const h = buildings.buildings.find(b => b.type === 'spoil_heap')!;
+    expect(disjoint(rectOf('spoil_heap', 1, h.x, h.z), rectOf('freight_warehouse', 3, w.x, w.z))).toBe(true);
   });
 
   it('still places every building on a cramped site where no cell leaves room', () => {
     const buildings = createBuildingState();
     const slots: StartingBuildingSlot[] = [WAREHOUSE, { type: 'spoil_heap', tier: 1 }];
-    // 9x7 fits the tier-1 pair but cannot hold a tier-3 warehouse clear of the heap.
-    const grid = makeFlatGrid(9);
-    expect(placeStartingBuildings(buildings, grid, slots, { x: 4, z: 4 })).toBe(2);
+    // 6x6 fits the tier-1 pair but cannot hold a 6x5 tier-3 warehouse clear of a 2x2 heap.
+    const grid = makeFlatGrid(6);
+    expect(placeStartingBuildings(buildings, grid, slots, { x: 3, z: 3 })).toBe(2);
     expect(buildings.buildings).toHaveLength(2);
+    // The room rule really failed here: the heap sits inside the warehouse's tier-3 footprint.
+    const w = buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    const h = buildings.buildings.find(b => b.type === 'spoil_heap')!;
+    expect(disjoint(rectOf('spoil_heap', 1, h.x, h.z), rectOf('freight_warehouse', 3, w.x, w.z))).toBe(false);
   });
 
   it('is deterministic', () => {

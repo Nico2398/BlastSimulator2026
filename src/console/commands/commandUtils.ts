@@ -23,9 +23,9 @@ export function staffedSuffix(staffed: boolean): string {
 export function refusalText(refusal: { error?: string } & RefusalKey): string {
   if (!refusal.errorKey) return refusal.error!;
   const params = refusal.errorParams;
-  if (refusal.errorKey === 'shell.placement.refused_occupied_by' && params !== undefined) {
-    const { type, ...rest } = params;
-    return t(refusal.errorKey, { ...rest, building: buildingTypeName(type as BuildingType) });
+  // Convention: a `building` param carries a BuildingType id; show its translated name.
+  if (params !== undefined && typeof params.building === 'string') {
+    return t(refusal.errorKey, { ...params, building: buildingTypeName(params.building as BuildingType) });
   }
   return t(refusal.errorKey, params);
 }

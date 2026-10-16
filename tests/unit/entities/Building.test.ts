@@ -915,14 +915,14 @@ describe('checkFootprintPlacement — names the blocker (#1830)', () => {
     expect(r.valid).toBe(false);
     expect(r.error).toBe('Space is occupied');
     expect(r.errorKey).toBe('shell.placement.refused_occupied_by');
-    expect(r.errorParams).toEqual({ type: 'spoil_heap', x: 10, z: 12 });
+    expect(r.errorParams).toEqual({ building: 'spoil_heap', x: 10, z: 12 });
   });
 
   it('names the first overlapping occupant when several overlap', () => {
     const first: FootprintOccupant = { type: 'management_office', tier: 1, x: 10, z: 10 };
     const second: FootprintOccupant = { type: 'spoil_heap', tier: 1, x: 11, z: 11 };
     const r = checkFootprintPlacement([first, second], 'management_office', 10, 10, 2, 64, 64, 0, 0);
-    expect(r.errorParams).toEqual({ type: 'management_office', x: 10, z: 10 });
+    expect(r.errorParams).toEqual({ building: 'management_office', x: 10, z: 10 });
   });
 
   it('does not name anything for a valid placement or an out-of-bounds refusal', () => {

@@ -33,6 +33,9 @@ export type BuildingType =
 /** Building upgrade tier. Tier 1 is the base tier available from the start. */
 export type BuildingTier = 1 | 2 | 3;
 
+/** Every tier a multi-tier building can hold, ascending. */
+export const BUILDING_TIERS: readonly BuildingTier[] = [1, 2, 3];
+
 /**
  * Ramp voxel direction. Ramps are carved into the VoxelGrid as directional
  * voxels to connect bench levels for vehicle travel. They are NOT buildings.
@@ -547,6 +550,11 @@ export interface FootprintOccupant {
   z: number;
 }
 
+/** Whether two half-open (min inclusive, max exclusive) cell rects share at least one cell. */
+export function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+}
+
 /** The first occupant whose footprint overlaps the inclusive-min / exclusive-max world rect, if any (#1830). */
 export function findOverlappingOccupant(
   occupants: ReadonlyArray<FootprintOccupant>,
@@ -554,10 +562,7 @@ export function findOverlappingOccupant(
 ): FootprintOccupant | undefined {
   for (const occ of occupants) {
     const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
-    if (rect.minX < occ.x + sizeX && rect.maxX > occ.x &&
-        rect.minZ < occ.z + sizeZ && rect.maxZ > occ.z) {
-      return occ;
-    }
+    if (rectsOverlap(rect, { minX: occ.x, minZ: occ.z, maxX: occ.x + sizeX, maxZ: occ.z + sizeZ })) return occ;
   }
   return undefined;
 }
@@ -608,7 +613,7 @@ export function checkFootprintPlacement(
       valid: false,
       error: 'Space is occupied',
       errorKey: 'shell.placement.refused_occupied_by',
-      errorParams: { type: blocker.type, x: blocker.x, z: blocker.z },
+      errorParams: { building: blocker.type, x: blocker.x, z: blocker.z },
     };
   }
 

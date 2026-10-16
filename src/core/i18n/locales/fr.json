@@ -3711,7 +3711,7 @@
   "shell.placement.pick_first": "Cliquez d’abord sur la zone indiquée dans la scène.",
   "shell.placement.refused_out_of_bounds": "Hors limites — le bâtiment dépasserait du site.",
   "shell.placement.refused_occupied": "Emplacement occupé — un bâtiment ou un chantier couvre une partie de cet endroit.",
-  "shell.placement.refused_occupied_by": "Emplacement occupé par le bâtiment {building} en ({x}, {z}) — déplacez-le ou démolissez-le d'abord.",
+  "shell.placement.refused_occupied_by": "Emplacement occupé par le bâtiment {building} en ({x}, {z}) — déplacez-le ou démolissez-le d’abord.",
   "shell.placement.refused_ramp": "Bloque une rampe — l’accès à la fosse serait coupé.",
   "shell.placement.refused_hole": "Bloque un trou de forage — un trou est foré ou commandé à cet endroit.",
   "shell.placement.refused_protected_ground": "Terrain protégé — un village, une rivière ou un site remarquable s’y trouve.",
