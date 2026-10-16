@@ -789,3 +789,26 @@ export function computeRampSegmentDurationTicks(
   const baseTicks = voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tierWorkRateMultiplier);
   return computeTaskDuration(baseTicks, proficiencyLevel, needMultiplier, lqMultiplier, 1);
 }
+
+// ── End-floor snap (#1852) ──
+
+/**
+ * Depth that lands the ramp's foot on the end tile's floor when that tile is dug floor
+ * within `RAMP_FLOOR_SNAP_REACH_M` and the snapped depth fits `length`; else `targetDepth`.
+ */
+export function snapRampDepthToEndFloor(
+  startGround: number, endGround: number, targetDepth: number, length: number,
+): number {
+  void startGround; void endGround; void length;
+  // TODO: implement
+  return targetDepth;
+}
+
+/** Foot (last carved column, step `length - 1`) minus end-tile ground; positive = above the floor. */
+export function rampFootOffset(
+  startGround: number, endGround: number, targetDepth: number, length: number,
+): number {
+  void startGround; void endGround; void targetDepth; void length;
+  // TODO: implement
+  return 0;
+}
