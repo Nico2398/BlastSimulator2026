@@ -405,6 +405,67 @@ describe('UIManager — setListSelection reaches the Crew panel (#1765)', () => 
   });
 });
 
+describe('UIManager — setListSelection reaches the Fleet panel (#1767)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+  });
+
+  afterEach(() => {
+    uiManager.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  function stateWithFleet(): GameState {
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.vehicles.vehicles = [
+      { id: 1, type: 'debris_hauler', tier: 1, x: 1, z: 1, hp: 100, cargo: [], occupantIds: [] },
+      { id: 2, type: 'drill_rig', tier: 1, x: 2, z: 2, hp: 100, cargo: [], occupantIds: [] },
+    ];
+    state.vehicles.nextId = 3;
+    return state;
+  }
+
+  const fleetRow = (id: number) =>
+    container.querySelector<HTMLElement>(`#bs-vehicle-panel [data-vehicle-id="${id}"]`);
+
+  it('highlights the selected vehicle row', () => {
+    uiManager.showPanel('vehicles');
+    uiManager.update(stateWithFleet());
+    uiManager.setListSelection({ kind: 'vehicle', id: 2 });
+    expect(fleetRow(2)!.classList.contains('bs-row-selected')).toBe(true);
+    expect(fleetRow(1)!.classList.contains('bs-row-selected')).toBe(false);
+  });
+
+  it('a selection made before the panel was opened is applied once opened', () => {
+    uiManager.setListSelection({ kind: 'vehicle', id: 1 });
+    uiManager.showPanel('vehicles');
+    uiManager.update(stateWithFleet());
+    expect(fleetRow(1)!.classList.contains('bs-row-selected')).toBe(true);
+  });
+
+  it('null clears the Fleet highlight', () => {
+    uiManager.showPanel('vehicles');
+    uiManager.update(stateWithFleet());
+    uiManager.setListSelection({ kind: 'vehicle', id: 1 });
+    uiManager.setListSelection(null);
+    expect(container.querySelectorAll('#bs-vehicle-panel .bs-row-selected').length).toBe(0);
+  });
+
+  it('an employee selection does not highlight a vehicle row with the same id', () => {
+    uiManager.showPanel('vehicles');
+    uiManager.update(stateWithFleet());
+    uiManager.setListSelection({ kind: 'employee', id: 1 });
+    expect(container.querySelectorAll('#bs-vehicle-panel .bs-row-selected').length).toBe(0);
+  });
+});
+
 describe('UIManager — showCrewHiring (#1771)', () => {
   let container: HTMLDivElement;
   let uiManager: UIManager;

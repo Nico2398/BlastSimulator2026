@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { FleetPanel } from '../../../../src/ui/panels/FleetPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
@@ -11,10 +11,7 @@ import type { Employee } from '../../../../src/core/entities/Employee.js';
 import { NavGrid } from '../../../../src/core/nav/NavGrid.js';
 import { addBlastFragments } from '../../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js';
-import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
-import type {
-  PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler,
-} from '../../../../src/ui/scene/PlacementController.js';
+import { SELECTED_ROW_CLASS } from '../../../../src/ui/selectionRoute.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -262,107 +259,6 @@ describe('FleetPanel', () => {
     expect(rigPanel.root.querySelector('.bs-fleet-load')).toBeNull();
   });
 
-  // #921: player-facing driver assignment/unassignment is gone — a vehicle's
-  // driver is claimed automatically (VehicleReservation/ArrivalGate). Only
-  // the "shows the real driver name" half of this test survives; the
-  // Unassign-click assertions are deleted along with the control.
-  it('shows the real driver name', () => {
-    const { panel } = makePanel();
-    panel.update(makeState(
-      [makeVehicle({ id: 2, occupantIds: [6] })],
-      [makeEmployee({ id: 6, name: 'Dorian Kask' })],
-    ));
-    expect(panel.root.textContent).toContain('Dorian Kask');
-  });
-
-  // #921: the assign-picker (`<select>` of eligible crew + Assign button) is
-  // gone — the two tests that used to cover it ("offers only licensed,
-  // unclaimed crew in the assign picker" and "excludes an employee already
-  // walking to board a different vehicle from the picker") are deleted along
-  // with the picker itself. The eligibility logic those tests exercised
-  // (licence-filtering, excluding an employee already walking to board a
-  // different vehicle) is not orphaned: it lives in the automatic claim path
-  // (VehicleReservation.ts / ArrivalGate.resolveBoarding / VehicleBoarding.ts's
-  // requestBoardVehicle), which already has its own coverage in
-  // tests/unit/entities/Vehicle.test.ts and tests/unit/entities/
-  // VehicleBoarding.test.ts — this file only ever exercised it through the now-
-  // retired UI picker, not as the licence check's own source of truth.
-
-  // #715 follow-up, retargeted for #921: excluding a pending driver from every
-  // OTHER vehicle's card is proven by the "unmanned, auto-crews" test below,
-  // which now covers what the old no-licensed-warning-vs-pending-row
-  // distinction proved. This test keeps only the still-true half: a pending
-  // claim renders its own row and never mentions "Nobody is licensed" — the
-  // select/Assign-button assertions are stripped since neither ever renders
-  // anywhere in this panel anymore.
-  it('shows a pending-driver row, not the no-licensed warning, for a vehicle its only licensed employee is already walking to', () => {
-    const { panel } = makePanel();
-    const dorian = makeEmployee({
-      id: 6, name: 'Dorian Kask',
-      qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
-      pendingDriverVehicleId: 2,
-    });
-    const vehicle = makeVehicle({ id: 2, type: 'debris_hauler' });
-
-    panel.update(makeState([vehicle], [dorian]));
-
-    expect(panel.root.textContent).toContain('Dorian Kask');
-    expect(panel.root.textContent).not.toContain('Nobody is licensed');
-  });
-
-  // #921: a vehicle with no driver, no pending claim, and at least one
-  // roster employee who holds the required licence renders the "unmanned,
-  // auto-crews" row — not the no-licensed warning, and with no button or
-  // <select> for the player to click, since claiming is fully automatic now.
-  it('shows an "unmanned, auto-crews" row (no button, no select) when a licensed employee exists on the roster', () => {
-    const { panel } = makePanel();
-    const licensed = makeEmployee({
-      id: 6, name: 'Dorian Kask',
-      qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
-    });
-    const vehicle = makeVehicle({ id: 2, type: 'debris_hauler' });
-
-    panel.update(makeState([vehicle], [licensed]));
-
-    const card = panel.root.querySelector('[data-vehicle-id="2"]') as HTMLElement;
-    expect(card).not.toBeNull();
-    expect(card.textContent).toContain('Unmanned');
-    expect(card.querySelector('select')).toBeNull();
-    // The only buttons on the card are the always-present per-vehicle actions
-    // (locate, scrap) — none of them named Assign/Train, since a licensed
-    // driver exists and will claim the vehicle on their own.
-    const buttonLabels = [...card.querySelectorAll('button')].map(b => b.textContent);
-    expect(buttonLabels).not.toContain('Assign');
-    expect(buttonLabels).not.toContain('Train someone in Crew');
-  });
-
-  it('shows a no-licensed warning and the TRAIN button navigates to Crew', () => {
-    const { panel } = makePanel();
-    let navigated: string | null = null;
-    panel.setNavigateHandler(p => { navigated = p; });
-    panel.update(makeState([makeVehicle({ id: 2, type: 'drill_rig' })], []));
-
-    expect(panel.root.textContent).toContain('Nobody is licensed for');
-    const trainBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === 'Train someone in Crew')!;
-    trainBtn.click();
-    expect(navigated).toBe('crew');
-  });
-
-  it('scrap requests confirmation with the real residual value instead of scrapping immediately', () => {
-    const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    let requestedBody = '';
-    panel.setConfirmHandler(config => { requestedBody = config.body; config.onConfirm(); });
-    panel.update(makeState([makeVehicle({ id: 4, type: 'debris_hauler', tier: 1, hp: 100 })]));
-
-    const scrapBtn = panel.root.querySelector('button[title="Scrap"]') as HTMLButtonElement;
-    scrapBtn.click();
-
-    expect(requestedBody).toContain('$10,000');
-    expect(calls).toContain('vehicle scrap 4');
-  });
-
   // ── DEALERSHIP ──
 
   it('dealership lists every real role with all three tiers', () => {
@@ -495,23 +391,6 @@ describe('FleetPanel', () => {
     expect(selectedId).toBe(3);
   });
 
-  it('clicking a nested interactive control inside the card does not also fire the select handler', () => {
-    const { panel } = makePanel();
-    let selectedId: number | null = null;
-    panel.setSelectVehicleHandler(id => { selectedId = id; });
-    panel.setConfirmHandler(config => config.onConfirm());
-    panel.update(makeState([makeVehicle({ id: 4, type: 'debris_hauler', tier: 1, hp: 100 })]));
-
-    const scrapBtn = panel.root.querySelector('button[title="Scrap"]') as HTMLButtonElement;
-    expect(scrapBtn).not.toBeNull();
-    scrapBtn.click();
-
-    expect(selectedId).toBeNull();
-  });
-
-  // #921: the driver-assign <select> this test exercised is gone — no
-  // control of that kind renders anywhere in the panel anymore. Deleted
-  // rather than retargeted: there is no remaining nested-select scenario to
   // guard, and the sibling "nested interactive control" test above (scrap
   // button) already covers the same click-propagation contract.
 
@@ -566,236 +445,213 @@ function makeManyVehicles(count: number): ReturnType<typeof makeVehicle>[] {
   return Array.from({ length: count }, (_, i) => makeVehicle({ id: i + 1, x: i, z: 0 }));
 }
 
-// ── Reposition (#1092) ──────────────────────────────────────────────────────
-//
-// The button's two disabled branches mirror what `vehicle reposition` itself
-// refuses (a vehicle reserved for a task, a role nobody on the roster is
-// licensed for), so the player is told why up front instead of clicking into a
-// refusal. When it is enabled, clicking arms the shared point picker and the
-// confirmed tile becomes the console command — the whole player-facing path to
-// the itinerary's `reposition` goal.
+// ── Rows are master-list rows (#1767) ───────────────────────────────────────
+// Upgrade, Reposition, Scrap and the driver block live in the vehicle
+// inspector now; a row only shows state and selects.
 
-/** Lightweight stand-in for PlacementController/SelectionOverlay/ParamStrip — mirrors Drill.test.ts's own mock kit, plus arm()'s initialSelection, which the Reposition flow relies on. */
-function makeMockKit() {
-  let armed = false;
-  let phase: 'idle' | 'armed' | 'selected' = 'idle';
-  let selection: PlacementSelection | null = null;
-  let confirmHandler: PlacementConfirmHandler | null = null;
-  let changeHandler: PlacementChangeHandler | null = null;
+describe('FleetPanel — rows hold no actions (#1767)', () => {
+  const rowOf = (panel: FleetPanel, id: number) => panel.root.querySelector(`[data-vehicle-id="${id}"]`) as HTMLElement;
 
-  const controller = {
-    get isArmed() { return armed; },
-    get currentPhase() { return phase; },
-    get selection() { return selection; },
-    get activeRegion() { return null; },
-    get canConfirm() { return selection !== null; },
-    setConfirmHandler: (cb: PlacementConfirmHandler) => { confirmHandler = cb; },
-    setCancelHandler: vi.fn(),
-    setChangeHandler: (cb: PlacementChangeHandler) => { changeHandler = cb; },
-    arm: (config: PlacementArmConfig) => {
-      armed = true;
-      phase = config.initialSelection ? 'selected' : 'armed';
-      selection = config.initialSelection
-        ? { x1: config.initialSelection.x, z1: config.initialSelection.z, x2: config.initialSelection.x, z2: config.initialSelection.z }
-        : null;
-    },
-    cancel: () => { armed = false; phase = 'idle'; selection = null; changeHandler?.(); },
-    simulateSelect(sel: PlacementSelection) { selection = sel; phase = 'selected'; changeHandler?.(); },
-    simulateConfirm() { if (selection) confirmHandler?.(selection); },
-  };
-  const overlay = { update: vi.fn(), clear: vi.fn(), flashConfirm: vi.fn() };
-  const strip = { show: vi.fn(), hide: vi.fn(), setConfirmHandler: vi.fn(), setCancelHandler: vi.fn() };
-
-  return { kit: { controller, overlay, strip } as unknown as PlacementKit, controller, overlay, strip };
-}
-
-/** A truck driver holding the licence every debris_hauler needs. */
-function makeLicensedTruckDriver(overrides: Partial<Employee> = {}): Employee {
-  return makeEmployee({
-    id: 6, name: 'Dorian Kask',
-    qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
-    ...overrides,
-  });
-}
-
-function repositionBtn(panel: FleetPanel): HTMLButtonElement {
-  return panel.root.querySelector('.bs-fleet-reposition-btn') as HTMLButtonElement;
-}
-
-describe('FleetPanel — Upgrade button (#1401)', () => {
-  function upgradeBtn(panel: FleetPanel): HTMLButtonElement {
-    return panel.root.querySelector('[data-action="upgrade"]') as HTMLButtonElement;
-  }
-
-  it('is enabled when cash covers the upgrade', () => {
+  it('a row has no Upgrade, Reposition, Scrap, select or upgrade-warning controls', () => {
     const { panel } = makePanel();
-    const state = makeState([makeVehicle({ id: 2, tier: 1 })]);
-    state.cash = 1e9;
-    panel.update(state);
-    expect(upgradeBtn(panel).disabled).toBe(false);
+    panel.update(makeState([makeVehicle({ id: 2, type: 'drill_rig' }), makeVehicle({ id: 3, type: 'debris_hauler', occupantIds: [6] })], [makeEmployee({ id: 6 })]));
+    for (const id of [2, 3]) {
+      const row = rowOf(panel, id);
+      expect(row.querySelector('[data-action="upgrade"]')).toBeNull();
+      expect(row.querySelector('[data-action="reposition"]')).toBeNull();
+      expect(row.querySelector('.bs-fleet-upgrade-btn')).toBeNull();
+      expect(row.querySelector('.bs-fleet-reposition-btn')).toBeNull();
+      expect(row.querySelector('.bsx-btn-danger')).toBeNull();
+      expect(row.querySelector('button[title="Scrap"]')).toBeNull();
+      expect(row.querySelector('select')).toBeNull();
+      expect(row.querySelector('.bs-fleet-upgrade-warning')).toBeNull();
+    }
   });
 
-  it('is disabled when cash is short', () => {
+  it('the only button in a row is Locate', () => {
     const { panel } = makePanel();
-    const state = makeState([makeVehicle({ id: 2, tier: 1 })]);
-    state.cash = 0;
-    panel.update(state);
-    expect(upgradeBtn(panel).disabled).toBe(true);
+    panel.update(makeState([makeVehicle({ id: 4 })]));
+    const buttons = [...rowOf(panel, 4).querySelectorAll('button')];
+    expect(buttons.length).toBe(1);
+    expect(buttons[0]!.getAttribute('data-action')).toBe('locate');
   });
 
-  it('is disabled at tier 3 with the max-tier explanation', () => {
+  it('a row shows icon, tier name, id, role, status, HP and driver line', () => {
     const { panel } = makePanel();
-    const state = makeState([makeVehicle({ id: 2, tier: 3 })]);
-    state.cash = 1e9;
+    panel.update(makeState([makeVehicle({ id: 3, type: 'drill_rig', tier: 1 })]));
+    const row = rowOf(panel, 3);
+    expect(row.querySelector('svg')).not.toBeNull();
+    expect(row.textContent).toContain('#3');
+    expect(row.textContent).toContain('Drill Rig');
+    expect(row.querySelector('.bs-fleet-status')).not.toBeNull();
+    expect(row.querySelector('.bs-fleet-hp')).not.toBeNull();
+    expect(row.querySelector('.bs-fleet-driver')).not.toBeNull();
+  });
+
+  it('driver line shows the real driver name', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 2, occupantIds: [6] })], [makeEmployee({ id: 6, name: 'Dorian Kask' })]));
+    expect(rowOf(panel, 2).querySelector('.bs-fleet-driver')!.textContent).toContain('Dorian Kask');
+  });
+
+  it('driver line shows the pending driver walking to the vehicle', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 2 })], [makeEmployee({ id: 6, name: 'Dorian Kask', pendingDriverVehicleId: 2 })]));
+    expect(rowOf(panel, 2).querySelector('.bs-fleet-driver')!.textContent).toContain('Dorian Kask');
+  });
+
+  it('driver line reads Unmanned with no driver, and never warns or offers Train', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 2, type: 'drill_rig' })], []));
+    const row = rowOf(panel, 2);
+    expect(row.querySelector('.bs-fleet-driver')!.textContent).toContain('Unmanned');
+    expect(row.textContent).not.toContain('Nobody is licensed');
+    expect(row.textContent).not.toContain('Train someone in Crew');
+  });
+
+  it('no row element exposes the old no-licensed / train block even with no licensed employee', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 2, type: 'drill_rig' })], []));
+    expect(panel.root.textContent).not.toContain('Nobody is licensed for');
+    expect([...panel.root.querySelectorAll('button')].some(b => b.textContent === 'Train someone in Crew')).toBe(false);
+  });
+
+  it('FleetPanel no longer has the navigate, confirm or placement-kit handlers', () => {
+    const proto = FleetPanel.prototype as unknown as Record<string, unknown>;
+    expect(proto['setNavigateHandler']).toBeUndefined();
+    expect(proto['setConfirmHandler']).toBeUndefined();
+    expect(proto['setPlacementKit']).toBeUndefined();
+    expect(proto['requestReposition']).toBeUndefined();
+  });
+
+  it('a driver change patches the driver line in place; the row DOM identity survives', () => {
+    const { panel } = makePanel();
+    const vehicle = makeVehicle({ id: 2 });
+    const state = makeState([vehicle], []);
     panel.update(state);
-    expect(upgradeBtn(panel).disabled).toBe(true);
-    expect(upgradeBtn(panel).title).toBe(t('ui.fleet.upgrade_max'));
+    const row = rowOf(panel, 2);
+    expect(row.querySelector('.bs-fleet-driver')!.textContent).toContain('Unmanned');
+
+    const driver = makeEmployee({ id: 6, name: 'Dorian Kask' });
+    vehicle.occupantIds = [6];
+    state.employees.employees = [driver];
+    panel.update(state);
+
+    expect(rowOf(panel, 2)).toBe(row);
+    expect(row.querySelector('.bs-fleet-driver')!.textContent).toContain('Dorian Kask');
+  });
+
+  it('a qualification change does not rebuild rows', () => {
+    const { panel } = makePanel();
+    const state = makeState([makeVehicle({ id: 2 })], [makeEmployee({ id: 6 })]);
+    panel.update(state);
+    const row = rowOf(panel, 2);
+    state.employees.employees[0]!.qualifications = [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }];
+    panel.update(state);
+    expect(rowOf(panel, 2)).toBe(row);
+  });
+
+  it('a cash change does not rebuild rows', () => {
+    const { panel } = makePanel();
+    const state = makeState([makeVehicle({ id: 2 })]);
+    panel.update(state);
+    const row = rowOf(panel, 2);
+    state.cash += 1234;
+    panel.update(state);
+    expect(rowOf(panel, 2)).toBe(row);
   });
 });
 
-describe('FleetPanel — Reposition button (#1092)', () => {
-  it('is disabled and explains why when the vehicle is reserved for a task', () => {
+describe('FleetPanel — selected row highlight (#1767)', () => {
+  const selectedRows = (panel: FleetPanel) => [...panel.root.querySelectorAll<HTMLElement>('.bs-row-selected')];
+  const rowOf = (panel: FleetPanel, id: number) => panel.root.querySelector(`[data-vehicle-id="${id}"]`) as HTMLElement;
+  const threeVehicles = () => makeState([makeVehicle({ id: 1, x: 1 }), makeVehicle({ id: 2, x: 2 }), makeVehicle({ id: 3, x: 3 })]);
+
+  it('setSelectedVehicle highlights exactly the matching row with aria-selected', () => {
     const { panel } = makePanel();
-    const state = makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler' })],
-      [makeLicensedTruckDriver()],
-    );
-    state.vehicles.reservations.push({ vehicleId: 2, actionId: 11 });
+    panel.update(threeVehicles());
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 2 });
+    expect(selectedRows(panel)).toEqual([rowOf(panel, 2)]);
+    expect(rowOf(panel, 2).classList.contains(SELECTED_ROW_CLASS)).toBe(true);
+    expect(rowOf(panel, 2).getAttribute('aria-selected')).toBe('true');
+    expect(rowOf(panel, 1).hasAttribute('aria-selected')).toBe(false);
+  });
+
+  it('moving the selection moves the highlight', () => {
+    const { panel } = makePanel();
+    panel.update(threeVehicles());
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 1 });
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 3 });
+    expect(selectedRows(panel)).toEqual([rowOf(panel, 3)]);
+  });
+
+  it('null clears the highlight', () => {
+    const { panel } = makePanel();
+    panel.update(threeVehicles());
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 2 });
+    panel.setSelectedVehicle(null);
+    expect(selectedRows(panel).length).toBe(0);
+    expect(panel.root.querySelector('[aria-selected]')).toBeNull();
+  });
+
+  it('a selection of another kind clears the highlight, even with a matching id', () => {
+    const { panel } = makePanel();
+    panel.update(threeVehicles());
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 2 });
+    panel.setSelectedVehicle({ kind: 'employee', id: 2 });
+    expect(selectedRows(panel).length).toBe(0);
+  });
+
+  it('a vehicle id that has no row highlights nothing', () => {
+    const { panel } = makePanel();
+    panel.update(threeVehicles());
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 99 });
+    expect(selectedRows(panel).length).toBe(0);
+  });
+
+  it('the highlight survives a structural re-render', () => {
+    const { panel } = makePanel();
+    const state = threeVehicles();
     panel.update(state);
-
-    const btn = repositionBtn(panel);
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(t('ui.fleet.reposition_busy'));
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 2 });
+    state.vehicles.vehicles.push(makeVehicle({ id: 4, x: 4 }));
+    panel.update(state);
+    expect(selectedRows(panel)).toEqual([rowOf(panel, 2)]);
   });
 
-  it('is disabled and explains why when nobody living holds the role licence', () => {
+  it('the highlight survives refreshDynamic (unchanged signature)', () => {
     const { panel } = makePanel();
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'drill_rig' })],
-      [makeEmployee({ id: 6 })], // no qualifications at all
-    ));
-
-    const btn = repositionBtn(panel);
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(t('ui.fleet.no_licensed', { licence: t('skill.driving.drill_rig') }));
+    const state = threeVehicles();
+    panel.update(state);
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 2 });
+    state.vehicles.vehicles[1]!.hp = 40;
+    panel.update(state);
+    expect(selectedRows(panel)).toEqual([rowOf(panel, 2)]);
   });
 
-  it('counts only a LIVING licensed employee — a dead licence holder still leaves the button refused', () => {
+  it('a selection made before the first update is applied once rows exist', () => {
     const { panel } = makePanel();
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler' })],
-      [makeLicensedTruckDriver({ alive: false })],
-    ));
-
-    expect(repositionBtn(panel).disabled).toBe(true);
+    panel.setSelectedVehicle({ kind: 'vehicle', id: 3 });
+    panel.update(threeVehicles());
+    expect(selectedRows(panel)).toEqual([rowOf(panel, 3)]);
   });
 
-  it('is enabled when the vehicle is free and someone is licensed', () => {
+  it('a row click selects through the handler once; the highlight is applied by the route, not the click', () => {
     const { panel } = makePanel();
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler' })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    const btn = repositionBtn(panel);
-    expect(btn.disabled).toBe(false);
-    expect(btn.title).toBe(t('ui.fleet.reposition_hint'));
+    const selected: number[] = [];
+    panel.setSelectVehicleHandler(id => selected.push(id));
+    panel.update(threeVehicles());
+    rowOf(panel, 2).click();
+    expect(selected).toEqual([2]);
   });
 
-  it('clicking arms the placement kit, pre-selected on the vehicle\'s own tile', () => {
+  it('a click on a row child (not the Locate button) selects once', () => {
     const { panel } = makePanel();
-    const { kit, controller, strip } = makeMockKit();
-    panel.setPlacementKit(kit);
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler', x: 7.4, z: 11.6 })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    repositionBtn(panel).click();
-
-    expect(controller.isArmed).toBe(true);
-    expect(controller.selection).toEqual({ x1: 7, z1: 12, x2: 7, z2: 12 });
-    expect(strip.show).toHaveBeenCalled();
-  });
-
-  it('Reposition goes through the shared move flow: catalog title/instruction keys (#1766)', () => {
-    const { panel } = makePanel();
-    const { kit, strip } = makeMockKit();
-    panel.setPlacementKit(kit);
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler', x: 7, z: 11 })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    repositionBtn(panel).click();
-
-    const cfg = strip.show.mock.calls.at(-1)![0];
-    expect(cfg.title).toBe(t('inspector.move_pick.vehicle.title'));
-    expect(cfg.instruction).toBe(t('inspector.move_pick.vehicle.instruction'));
-    expect(typeof cfg.subtitle).toBe('string');
-    expect(cfg.subtitle.length).toBeGreaterThan(0);
-  });
-
-  it('dispatches the real reposition command for the confirmed tile', () => {
-    const { panel } = makePanel();
-    const { kit, controller, overlay } = makeMockKit();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    panel.setPlacementKit(kit);
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler', x: 5, z: 5 })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    repositionBtn(panel).click();
-    controller.simulateSelect({ x1: 18, z1: 4, x2: 18, z2: 4 });
-    controller.simulateConfirm();
-
-    expect(calls).toEqual(['vehicle reposition 2 18 4']);
-    expect(overlay.flashConfirm).toHaveBeenCalled();
-  });
-
-  it('clicking a second time cancels instead of re-arming (the button is a toggle)', () => {
-    const { panel } = makePanel();
-    const { kit, controller } = makeMockKit();
-    panel.setPlacementKit(kit);
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler' })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    repositionBtn(panel).click();
-    repositionBtn(panel).click();
-
-    expect(controller.isArmed).toBe(false);
-  });
-
-  it('does nothing (no pick armed) when the vehicle is missing from lastState', () => {
-    const { panel } = makePanel();
-    const { kit, controller, strip } = makeMockKit();
-    panel.setPlacementKit(kit);
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler' })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    panel.requestReposition(99);
-
-    expect(controller.isArmed).toBe(false);
-    expect(strip.show).not.toHaveBeenCalled();
-  });
-
-  it('does nothing and does not throw when no placement kit has been wired', () => {
-    const { panel } = makePanel();
-    const calls: string[] = [];
-    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    panel.update(makeState(
-      [makeVehicle({ id: 2, type: 'debris_hauler' })],
-      [makeLicensedTruckDriver()],
-    ));
-
-    expect(() => repositionBtn(panel).click()).not.toThrow();
-    expect(calls).toEqual([]);
+    const selected: number[] = [];
+    panel.setSelectVehicleHandler(id => selected.push(id));
+    panel.update(threeVehicles());
+    (rowOf(panel, 2).firstElementChild as HTMLElement).click();
+    expect(selected).toEqual([2]);
   });
 });
 
