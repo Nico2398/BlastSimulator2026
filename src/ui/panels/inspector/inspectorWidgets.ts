@@ -15,16 +15,22 @@ export function liveValue(row: HTMLElement): HTMLElement {
   return row.lastElementChild as HTMLElement;
 }
 
-/** Label + value row whose value is rewritten in place by `setLive` (key = `data-live`). */
-export function liveRow(label: string, key: string, text: string): HTMLElement {
+/** Plain label + value row (value may be a node, e.g. a link). */
+export function valueRow(label: string, value: string | HTMLElement): HTMLElement {
   const row = el('div', { className: 'bsx-mono' });
   row.style.cssText = 'display:flex;justify-content:space-between;gap:8px;font-size:11px';
   const labelEl = el('span', { text: label });
   labelEl.style.color = 'var(--bsx-text-muted)';
+  row.append(labelEl, typeof value === 'string' ? el('span', { text: value }) : value);
+  return row;
+}
+
+
+/** Label + value row whose value is rewritten in place by `setLive` (key = `data-live`). */
+export function liveRow(label: string, key: string, text: string): HTMLElement {
   const value = el('span', { text });
   value.dataset['live'] = key;
-  row.append(labelEl, value);
-  return row;
+  return valueRow(label, value);
 }
 
 /** The descendant of `root` tagged `data-live="key"`, or null. */

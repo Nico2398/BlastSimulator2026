@@ -2,9 +2,9 @@
 import { t } from '../../../core/i18n/I18n.js';
 import { resolveVehicleDriver } from '../../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../../core/entities/VehicleStatus.js';
-import { formatMoney, formatDollars } from '../../../core/economy/formatMoney.js';
+import { formatDollars } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { describeStatus, driverState, upgradeState } from '../../fleetDetailSections.js';
+import { describeStatus, driverState, upgradeDisabledReason, upgradeState } from '../../fleetDetailSections.js';
 import { el } from '../../dom.js';
 import type { ActionSpec, InspectorLinks, KindContent } from './InspectorContent.js';
 import { kindLabel, syncSection } from './inspectorWidgets.js';
@@ -28,9 +28,9 @@ function sectionBuilders(v: Vehicle, state: GameState, links: InspectorLinks): A
 
 /** Move Here, Upgrade (cost; disabled with the reason) and Scrap. */
 function actionsFor(v: Vehicle, cash: number): ActionSpec[] {
-  const { available, affordable, cost } = upgradeState(v, cash);
-  const reason = !available ? t('ui.fleet.upgrade_max')
-    : !affordable ? t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost ?? 0) }) : undefined;
+  const upgrade = upgradeState(v, cash);
+  const { cost } = upgrade;
+  const reason = upgradeDisabledReason(upgrade) ?? undefined;
   return [
     { action: 'move_here', labelKey: 'inspector.action.move_here', icon: 'locate', variant: 'ghost' },
     {
@@ -61,7 +61,7 @@ export const vehicleContent: KindContent = {
       sub: `#${v.id} · ${kindLabel('vehicle')} · ${t('inspector.tier', { tier: v.tier })}`,
       icon: 'vehicle',
       status,
-      signature: `${v.type}:${v.tier}:${v.type === 'debris_hauler' ? 'h' : '-'}:${driverState(v, state).kind}`,
+      signature: `${v.type}:${v.tier}:${driverState(v, state).kind}`,
       get sections() { return [build()]; },
       actions: actionsFor(v, state.cash),
       sync: root => {

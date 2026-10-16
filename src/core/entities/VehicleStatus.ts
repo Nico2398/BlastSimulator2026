@@ -79,12 +79,14 @@ export type VehicleJobTarget =
   | { kind: 'building' | 'vehicle'; id: number };
 
 /** The job a vehicle is serving: action, target, destination and ETA (#1761). */
-export interface VehicleJob {
+interface VehicleJob {
   actionType: ActionType | null;
   target: VehicleJobTarget | null;
   destination: { x: number; z: number; buildingId: number | null } | null;
   etaTicks: number | null;
   blockedReason: BlockedOrderReason | null;
+  /** Id of the queued order behind `blockedReason`; absent when nothing is blocked. */
+  blockedOrderId?: number;
 }
 
 const NO_JOB: VehicleJob = { actionType: null, target: null, destination: null, etaTicks: null, blockedReason: null };
@@ -121,7 +123,7 @@ export function computeVehicleJob(
     const blocked = pendingActions.find(a =>
       a.status === 'queued' && a.holderId === null && a.requiredVehicleRole === v.type && a.blockedReason != null);
     if (!blocked) return NO_JOB;
-    return { ...NO_JOB, actionType: blocked.type, target: jobTargetOf(blocked), blockedReason: blocked.blockedReason ?? null };
+    return { ...NO_JOB, actionType: blocked.type, target: jobTargetOf(blocked), blockedReason: blocked.blockedReason ?? null, blockedOrderId: blocked.id };
   }
 
   const base = { actionType: action.type, target: jobTargetOf(action), blockedReason: null };

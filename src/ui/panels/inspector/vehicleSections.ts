@@ -2,30 +2,18 @@
 import { t } from '../../../core/i18n/I18n.js';
 import { getVehicleDefByTier, getVehicleReservation, resolveVehicleDriver, vehicleFuelCostPerTick, type Vehicle } from '../../../core/entities/Vehicle.js';
 import { computeVehicleJob, type VehicleJobTarget } from '../../../core/entities/VehicleStatus.js';
-import { missingHp, repairPartsCost } from '../../../core/entities/VehicleRepair.js';
-import { vehicleCargoByOre } from '../../../core/economy/VehicleCargo.js';
+import { isVehicleUnderRepair, missingHp, repairPartsCost } from '../../../core/entities/VehicleRepair.js';
+import { vehicleCargoByOre, vehicleCargoWarehouseId } from '../../../core/economy/VehicleCargo.js';
 import { formatDollars, formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { isVehicleUnderRepair } from '../../../core/entities/VehicleRepair.js';
 import { el } from '../../dom.js';
 import {
-  buildingDisplayName, driverState, licenceWarning, makeDriverRow, makeHpGauge, makeLoadGauge,
-  makeNoDriverRow, makePendingDriverRow, makeStatusChip, repairState, vehicleDisplayName,
+  buildingDisplayName, makeDriverBlock, makeHpGauge, makeLoadGauge, makeStatusChip, repairState, vehicleDisplayName,
 } from '../../fleetDetailSections.js';
 import { ACTION_LABEL_KEY } from '../../crewDetailSections.js';
 import { buildBlockedOrderMessage } from '../../notify/NotificationCenter.js';
 import type { InspectorLinks } from './InspectorContent.js';
-import { entityLink, liveRow, sectionOf } from './inspectorWidgets.js';
-
-/** Plain label + value row (value may be a node, e.g. a link). */
-function valueRow(label: string, value: string | HTMLElement): HTMLElement {
-  const row = el('div', { className: 'bsx-mono' });
-  row.style.cssText = 'display:flex;justify-content:space-between;gap:8px;font-size:11px';
-  const labelEl = el('span', { text: label });
-  labelEl.style.color = 'var(--bsx-text-muted)';
-  row.append(labelEl, typeof value === 'string' ? el('span', { text: value }) : value);
-  return row;
-}
+import { entityLink, liveRow, sectionOf, valueRow } from './inspectorWidgets.js';
 
 function tagged(node: HTMLElement, attr: string, value = ''): HTMLElement {
   node.setAttribute(attr, value);
@@ -42,7 +30,6 @@ export function buildConditionSection(v: Vehicle, state: GameState): HTMLElement
   }
   hp.querySelector('.bsx-gauge-fill')?.setAttribute('data-live', 'hp-bar');
   const wrap = sectionOf(t('inspector.vehicle.condition'), [makeStatusChip(v, state.vehicles, resolveVehicleDriver(v, state.employees.employees)), hp]);
-  wrap.classList.add('bs-vehicle-condition');
   return wrap;
 }
 
@@ -59,7 +46,6 @@ export function buildRepairSection(v: Vehicle, state: GameState): HTMLElement | 
     valueRow(t('inspector.vehicle.repair_missing'), t('inspector.vehicle.hp_value', { hp: Math.round(missing) })),
     valueRow(t('inspector.vehicle.repair_parts'), formatDollars(repairPartsCost(missing))),
   ]);
-  wrap.classList.add('bs-vehicle-repair');
   return wrap;
 }
 
@@ -78,17 +64,10 @@ function targetNode(target: VehicleJobTarget, state: GameState, links: Inspector
   }
 }
 
-/** The warehouse a hauler's cargo is bound for, from its first tracked fragment. */
-function cargoWarehouseId(v: Vehicle, state: GameState): number | null {
-  const first = v.cargo[0];
-  if (!first) return null;
-  return state.logistics.fragments.find(f => f.fragment.id === first.fragmentId)?.warehouseId ?? null;
-}
-
 /** Current job: task, target and destination links, live ETA, and why a queued order waits. */
 export function buildJobSection(v: Vehicle, state: GameState, links: InspectorLinks): HTMLElement {
   const occupant = resolveVehicleDriver(v, state.employees.employees);
-  const job = computeVehicleJob(v, state.vehicles, state.pendingActions, occupant, cargoWarehouseId(v, state));
+  const job = computeVehicleJob(v, state.vehicles, state.pendingActions, occupant, vehicleCargoWarehouseId(v, state.logistics.fragments));
   const rows: HTMLElement[] = [];
   rows.push(valueRow(t('inspector.vehicle.task'),
     job.actionType ? t(ACTION_LABEL_KEY[job.actionType]) : t('inspector.vehicle.job_none')));
@@ -102,12 +81,10 @@ export function buildJobSection(v: Vehicle, state: GameState, links: InspectorLi
   }
   if (job.etaTicks !== null) rows.push(liveRow(t('inspector.vehicle.eta'), 'eta', t('inspector.vehicle.eta_value', { n: Math.ceil(job.etaTicks) })));
   if (job.blockedReason !== null) {
-    const order = state.pendingActions.find(a =>
-      a.status === 'queued' && a.holderId === null && a.requiredVehicleRole === v.type && a.blockedReason === job.blockedReason);
+    const order = state.pendingActions.find(a => a.id === job.blockedOrderId);
     rows.push(valueRow(t('inspector.vehicle.waiting'), order ? buildBlockedOrderMessage(order) : t('inspector.vehicle.job_none')));
   }
   const wrap = sectionOf(t('inspector.vehicle.job'), rows);
-  wrap.classList.add('bs-vehicle-job');
   return wrap;
 }
 
@@ -125,27 +102,16 @@ export function buildCargoSection(v: Vehicle, state: GameState): HTMLElement | n
   }
   rows.push(valueRow(t('inspector.vehicle.fragments'), String(cargo.fragmentCount)));
   const wrap = sectionOf(t('inspector.vehicle.cargo'), rows);
-  wrap.classList.add('bs-vehicle-cargo');
   return wrap;
 }
 
 /** Driver row (name link, walking to board, unmanned, or no licensed driver with a Train button). */
 export function buildDriverSection(v: Vehicle, state: GameState, links: InspectorLinks): HTMLElement {
-  const driver = driverState(v, state);
-  const select = (id: number): void => links.select('employee', id);
-  const rows: HTMLElement[] = [
-    driver.kind === 'driver' ? makeDriverRow(v, state, select)
-      : driver.kind === 'pending' ? makePendingDriverRow(driver.employee, select)
-        : makeNoDriverRow(v, state, () => links.navigate?.('crew')),
-  ];
-  const warning = driver.kind === 'no_licensed' ? null : licenceWarning(v, state.employees.employees);
-  if (warning) {
-    const line = el('div', { text: t(warning.key, warning.params), className: 'bs-vehicle-upgrade-warning' });
-    line.style.cssText = 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)';
-    rows.push(line);
-  }
+  const rows = makeDriverBlock(v, state, {
+    select: id => links.select('employee', id),
+    onGoToCrew: () => links.navigate?.('crew'),
+  });
   const wrap = sectionOf(t('inspector.vehicle.driver'), rows);
-  wrap.classList.add('bs-vehicle-driver');
   return wrap;
 }
 
@@ -158,7 +124,6 @@ export function buildSpecsSection(v: Vehicle): HTMLElement {
     valueRow(t('inspector.vehicle.work_rate'), String(Math.round(def.workRate * 100) / 100)),
   ];
   const wrap = sectionOf(t('inspector.vehicle.specs'), rows);
-  wrap.classList.add('bs-vehicle-specs');
   return wrap;
 }
 
@@ -171,6 +136,5 @@ export function buildCostSection(v: Vehicle, state: GameState): HTMLElement {
     rows.push(valueRow(t('inspector.vehicle.fuel'), t('inspector.upkeep_value', { cost: formatDollars(fuel) })));
   }
   const wrap = sectionOf(t('inspector.vehicle.cost'), rows);
-  wrap.classList.add('bs-vehicle-cost');
   return wrap;
 }

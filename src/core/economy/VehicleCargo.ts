@@ -5,7 +5,7 @@ import type { TrackedFragment } from './Logistics.js';
 import { sumOreMass } from '../mining/BlastOreReport.js';
 
 /** Cargo contents: kg per ore id, barren remainder, total and fragment count. */
-export interface VehicleCargoBreakdown {
+interface VehicleCargoBreakdown {
   byOre: Record<string, number>;
   barrenKg: number;
   totalKg: number;
@@ -29,4 +29,11 @@ export function vehicleCargoByOre(vehicle: Pick<Vehicle, 'cargo'>, fragments: re
     for (const oreId of Object.keys(oreKg)) oreKg[oreId] = oreKg[oreId]! * scale;
   }
   return { byOre: oreKg, barrenKg, totalKg, fragmentCount: aboard.length };
+}
+
+/** The warehouse a vehicle's cargo is bound for, from its first tracked fragment; null when empty or unassigned. */
+export function vehicleCargoWarehouseId(vehicle: Pick<Vehicle, 'cargo'>, fragments: readonly TrackedFragment[]): number | null {
+  const first = vehicle.cargo[0];
+  if (!first) return null;
+  return fragments.find(f => f.fragment.id === first.fragmentId)?.warehouseId ?? null;
 }

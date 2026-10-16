@@ -33,7 +33,7 @@ import { nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow, upgradeState, licenceWarning, scrapConfirmConfig, driverState } from '../fleetDetailSections.js';
+import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverBlock, upgradeState, upgradeDisabledReason, scrapConfirmConfig } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { PlacementKit } from '../scene/PlacementKit.js';
@@ -307,28 +307,7 @@ export class FleetPanel extends PanelBase {
     const load = makeLoadGauge(v);
     if (load) rows.push(this.tag(load, 'bs-fleet-load'));
 
-    // The driver seat stays empty for a driver's whole walk to the vehicle
-    // (only the board arrival step fills it), so a pending claim needs its
-    // own row — falling through to makeNoDriverRow would re-offer the vehicle
-    // as driverless even though someone's already en route to it (#715).
-    const driver = driverState(v, state);
-    rows.push(
-      driver.kind === 'driver'
-        ? makeDriverRow(v, state)
-        : driver.kind === 'pending'
-          ? makePendingDriverRow(driver.employee)
-          : makeNoDriverRow(v, state, () => this.onNavigateCb?.('crew')),
-    );
-
-    // Redundant when makeNoDriverRow already warns that nobody holds the role licence.
-    const warning = driver.kind === 'no_licensed' ? null : licenceWarning(v, state.employees.employees);
-    if (warning) {
-      rows.push(el('div', {
-        text: t(warning.key, warning.params),
-        className: 'bs-fleet-upgrade-warning',
-        attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' },
-      }));
-    }
+    rows.push(...makeDriverBlock(v, state, { onGoToCrew: () => this.onNavigateCb?.('crew') }));
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
     actions.appendChild(this.makeRepositionButton(v, state));
@@ -413,15 +392,10 @@ export class FleetPanel extends PanelBase {
 
   private applyUpgradeState(btn: HTMLButtonElement, v: Vehicle, cash: number): void {
     const next = nextVehicleTier(v.tier);
-    const { available, affordable, cost } = upgradeState(v, cash);
-    let reason: string | null = null;
-    let label = t('ui.fleet.upgrade');
-    if (!available || cost === null) {
-      reason = t('ui.fleet.upgrade_max');
-    } else {
-      label = `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
-      if (!affordable) reason = t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
-    }
+    const upgrade = upgradeState(v, cash);
+    const reason = upgradeDisabledReason(upgrade);
+    const { cost } = upgrade;
+    const label = cost === null ? t('ui.fleet.upgrade') : `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
     // button() builds [icon][label span]; patch only the label span so the icon survives.
     const labelEl = btn.lastElementChild;
     if (labelEl) labelEl.textContent = label;

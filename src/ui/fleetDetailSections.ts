@@ -168,7 +168,7 @@ export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => 
 }
 
 /** Whether a vehicle upgrade is available and affordable (#1761). */
-export interface UpgradeState {
+interface UpgradeState {
   available: boolean;
   affordable: boolean;
   cost: number | null;
@@ -181,8 +181,14 @@ export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number): U
   return { available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null };
 }
 
+/** Why the upgrade control is disabled (max tier, or cost beyond cash); null when it can be used. Single source for the Fleet card and the Inspector. */
+export function upgradeDisabledReason({ available, affordable, cost }: UpgradeState): string | null {
+  if (!available || cost === null) return t('ui.fleet.upgrade_max');
+  return affordable ? null : t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
+}
+
 /** Licence warning key + params, null when a licensed driver exists. */
-export interface LicenceWarning {
+interface LicenceWarning {
   key: string;
   params: Record<string, string | number>;
 }
@@ -206,7 +212,7 @@ export function scrapConfirmConfig(v: Vehicle, run: (command: string) => void): 
   };
 }
 
-export type DriverState =
+type DriverState =
   | { kind: 'driver'; employee: Employee }
   | { kind: 'pending'; employee: Employee }
   | { kind: 'unmanned' }
@@ -226,7 +232,7 @@ export function driverState(v: Vehicle, state: GameState): DriverState {
 }
 
 /** Repair progress for a vehicle: the queued/active repair action, if any. */
-export interface RepairState {
+interface RepairState {
   action: PendingAction | null;
   needsRepair: boolean;
 }
@@ -236,3 +242,35 @@ export function repairState(v: Vehicle, actions: readonly PendingAction[]): Repa
   return { action, needsRepair: missingHp(v) > 0 };
 }
 
+
+/** How the shared driver block differs between its hosts: employee links (Inspector) and the Train button's target. */
+interface DriverBlockOptions {
+  /** Makes the driver / pending-driver name a link that selects the employee. */
+  select?: (employeeId: number) => void;
+  onGoToCrew: () => void;
+}
+
+/**
+ * The driver rows every vehicle view shows: driver, walking-to-board or no-driver row, plus the
+ * next-tier licence warning line (omitted when the no-driver row already warns).
+ */
+export function makeDriverBlock(v: Vehicle, state: GameState, { select, onGoToCrew }: DriverBlockOptions): HTMLElement[] {
+  // The driver seat stays empty for a driver's whole walk to the vehicle (only the board arrival
+  // step fills it), so a pending claim needs its own row — falling through to makeNoDriverRow
+  // would re-offer the vehicle as driverless even though someone's already en route to it (#715).
+  const driver = driverState(v, state);
+  const rows: HTMLElement[] = [
+    driver.kind === 'driver' ? makeDriverRow(v, state, select)
+      : driver.kind === 'pending' ? makePendingDriverRow(driver.employee, select)
+        : makeNoDriverRow(v, state, onGoToCrew),
+  ];
+  const warning = driver.kind === 'no_licensed' ? null : licenceWarning(v, state.employees.employees);
+  if (warning) {
+    rows.push(el('div', {
+      text: t(warning.key, warning.params),
+      className: 'bs-fleet-upgrade-warning',
+      attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' },
+    }));
+  }
+  return rows;
+}
