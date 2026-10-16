@@ -3,7 +3,7 @@ import { isTraversableCell, type ReachableSet } from './NavGridReachability.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 
 /** How many thin cells deep a docking strip may run from the base: ring cell beside a footprint, then the strip beside that ring (#1840). */
-export const DOCKING_HOPS = 2;
+const DOCKING_HOPS = 2;
 
 /**
  * Widen a reachable set with the docking cells around it: a cell the set does
