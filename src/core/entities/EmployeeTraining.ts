@@ -8,7 +8,7 @@
 
 import type { Employee, EmployeeState, SkillCategory, TrainingState, LicenceLevel } from './Employee.js';
 import { licenceLevelOfSkill } from './VehicleDriverAssignment.js';
-import { calculateSalary, qualificationAtLevel } from './Employee.js';
+import { calculateSalary, qualificationAtLevel, isLicenceSkill } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
 import { t } from '../i18n/I18n.js';
 import { getBuildingPeopleCapacity, isOperating } from './Building.js';
@@ -111,9 +111,6 @@ export interface TrainingPlan {
   /** Salary raise (per pay cycle) the course causes on grant. */
   salaryIncrease: number;
 }
-
-/** Whether `skill` is a driving licence (levelled by licenceLevel, not proficiency). */
-export const isLicenceSkill = (skill: SkillCategory): boolean => skill.startsWith('driving.');
 
 /**
  * Level at which `qualifications` hold `skill`: the licence level for driving

@@ -70,6 +70,9 @@ export interface SkillQualification {
 /** Driving-licence level; a licence of level N may drive vehicles of tier <= N. */
 export type LicenceLevel = VehicleTier;
 
+/** Whether `skill` is a driving licence (levelled by licenceLevel, not proficiency). */
+export const isLicenceSkill = (skill: SkillCategory): boolean => skill.startsWith('driving.');
+
 /** A qualification at `level`, with the XP that level starts at. */
 export function qualificationAtLevel(category: SkillCategory, level: SkillQualification['proficiencyLevel']): SkillQualification {
   return { category, proficiencyLevel: level, xp: XP_THRESHOLDS[level] };
