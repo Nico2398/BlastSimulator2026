@@ -1,5 +1,5 @@
-// BlastSimulator2026 — vehicle driver / upgrade / scrap / repair pieces shared by the
-// vehicle inspector and the Fleet list (moved from fleetDetailSections.ts, #1767).
+// BlastSimulator2026 — vehicle driver / upgrade / scrap / repair pieces of the
+// vehicle inspector (moved from fleetDetailSections.ts, #1767).
 
 import { t } from '../../../core/i18n/I18n.js';
 import { el, button } from '../../dom.js';
@@ -95,14 +95,14 @@ interface UpgradeState {
   cost: number | null;
 }
 
-/** Next-tier upgrade availability and price; the single source for the Fleet card and the Inspector. */
+/** Next-tier upgrade availability and price; the single source for the Inspector. */
 export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number): UpgradeState {
   const cost = computeVehicleUpgradeCost(v.type, v.tier);
   const available = nextVehicleTier(v.tier) !== null && cost !== null;
   return { available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null };
 }
 
-/** Why the upgrade control is disabled (max tier, or cost beyond cash); null when it can be used. Single source for the Fleet card and the Inspector. */
+/** Why the upgrade control is disabled (max tier, or cost beyond cash); null when it can be used. Single source for the Inspector. */
 export function upgradeDisabledReason({ available, affordable, cost }: UpgradeState): string | null {
   if (!available || cost === null) return t('ui.fleet.upgrade_max');
   return affordable ? null : t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
@@ -133,11 +133,6 @@ export function scrapConfirmConfig(v: Vehicle, run: (command: string) => void): 
   };
 }
 
-/** Who drives a vehicle, read off the game state. */
-export function driverState(v: Vehicle, state: GameState): ReturnType<typeof vehicleDriverState> {
-  return vehicleDriverState(v, state.employees.employees);
-}
-
 /** Repair progress for a vehicle: the queued/active repair action, if any. */
 interface RepairState {
   action: PendingAction | null;
@@ -165,7 +160,7 @@ export function makeDriverBlock(v: Vehicle, state: GameState, { select, onGoToCr
   // The driver seat stays empty for a driver's whole walk to the vehicle (only the board arrival
   // step fills it), so a pending claim needs its own row — falling through to makeNoDriverRow
   // would re-offer the vehicle as driverless even though someone's already en route to it (#715).
-  const driver = driverState(v, state);
+  const driver = vehicleDriverState(v, state.employees.employees);
   const rows: HTMLElement[] = [
     driver.kind === 'driver' ? makeDriverRow(v, state, select)
       : driver.kind === 'pending' ? makePendingDriverRow(driver.employee, select)

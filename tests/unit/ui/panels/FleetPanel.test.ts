@@ -93,7 +93,7 @@ describe('FleetPanel', () => {
     expect(panel.root.textContent).toContain('No vehicles');
   });
 
-  it('renders a vehicle card with its real name, id, and role', () => {
+  it('renders a vehicle row with its real name, id, and role', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeVehicle({ id: 3, type: 'debris_hauler', tier: 1 })]));
     const text = panel.root.textContent!;
@@ -208,7 +208,7 @@ describe('FleetPanel', () => {
       expect(panel.root.querySelector('.bs-fleet-traffic')!.textContent).toContain('4 people and vehicles');
     });
 
-    it('vehicle cards keep DOM identity across jam appear and disappear', () => {
+    it('vehicle rows keep DOM identity across jam appear and disappear', () => {
       const { panel } = makePanel();
       panel.update(stateFor([1, 2, 3], 0));
       const before = [1, 2, 3].map(id => panel.root.querySelector(`[data-vehicle-id="${id}"]`));
@@ -378,31 +378,28 @@ describe('FleetPanel', () => {
   // (wired by UIManager/main.ts) — these tests cover only FleetPanel's own
   // click-to-handler plumbing.
 
-  it('clicking a rendered vehicle card fires the select handler with the real vehicle id', () => {
+  it('clicking a rendered vehicle row fires the select handler with the real vehicle id', () => {
     const { panel } = makePanel();
     let selectedId: number | null = null;
     panel.setSelectVehicleHandler(id => { selectedId = id; });
     panel.update(makeState([makeVehicle({ id: 3 })]));
 
-    const card = panel.root.querySelector('[data-vehicle-id="3"]') as HTMLElement;
-    expect(card).not.toBeNull();
-    card.click();
+    const row = panel.root.querySelector('[data-vehicle-id="3"]') as HTMLElement;
+    expect(row).not.toBeNull();
+    row.click();
 
     expect(selectedId).toBe(3);
   });
 
-  // guard, and the sibling "nested interactive control" test above (scrap
-  // button) already covers the same click-propagation contract.
-
-  it('clicking a vehicle card does not throw when no select handler is registered', () => {
+  it('clicking a vehicle row does not throw when no select handler is registered', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeVehicle({ id: 7 })]));
 
-    const card = panel.root.querySelector('[data-vehicle-id="7"]') as HTMLElement;
-    expect(() => card.click()).not.toThrow();
+    const row = panel.root.querySelector('[data-vehicle-id="7"]') as HTMLElement;
+    expect(() => row.click()).not.toThrow();
   });
 
-  it('two different vehicle cards fire the select handler with two different, correct ids', () => {
+  it('two different vehicle rows fire the select handler with two different, correct ids', () => {
     const { panel } = makePanel();
     const selected: number[] = [];
     panel.setSelectVehicleHandler(id => { selected.push(id); });
@@ -418,11 +415,11 @@ describe('FleetPanel', () => {
 // ── Scroll-bounded vehicle list section (#958) ──────────────────────────────
 //
 // bodyEl (this.el.append(header, this.bodyEl) in the constructor) is always
-// the panel root's second child. Vehicle cards (one per fleet vehicle,
+// the panel root's second child. Vehicle rows (one per fleet vehicle,
 // unbounded) are rendered directly into bodyEl today, followed by the
 // DEALERSHIP sectionHeader and its fixed role × tier catalog rows — a large
 // fleet buries the dealership far below the panel's fold. The fix nests
-// every vehicle card inside one scrollBoundedSection wrapper standing before
+// every vehicle row inside one scrollBoundedSection wrapper standing before
 // the DEALERSHIP section header, leaving the dealership unwrapped, a
 // reachable bodyEl-level sibling.
 
@@ -643,6 +640,7 @@ describe('FleetPanel — selected row highlight (#1767)', () => {
     panel.update(threeVehicles());
     rowOf(panel, 2).click();
     expect(selected).toEqual([2]);
+    expect(selectedRows(panel)).toEqual([]);
   });
 
   it('a click on a row child (not the Locate button) selects once', () => {
@@ -656,7 +654,7 @@ describe('FleetPanel — selected row highlight (#1767)', () => {
 });
 
 describe('FleetPanel — scroll-bounded vehicle list section (#958)', () => {
-  it('nests all 12 vehicle cards inside a single bounded wrapper, not flattened directly into bodyEl', () => {
+  it('nests all 12 vehicle rows inside a single bounded wrapper, not flattened directly into bodyEl', () => {
     const { panel } = makePanel();
     panel.update(makeState(makeManyVehicles(12)));
 

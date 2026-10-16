@@ -1,7 +1,6 @@
-// BlastSimulator2026 — Fleet panel card-piece builders (redesign P6)
-// Status chip, HP/load gauges, and the driver row/no-driver warning shown on
-// every fleet card. Split out of FleetPanel.ts to keep both files under the
-// file-size guideline, mirroring the CrewPanel/crewDetailSections split.
+// BlastSimulator2026 — Fleet row piece builders (redesign P6)
+// Status chip, HP/load gauges and the driver name line shown on every Fleet
+// row. The full driver block lives in inspector/vehicleDetailParts.ts.
 
 import { t } from '../core/i18n/I18n.js';
 import { el, chip, gauge, type ChipTone } from './dom.js';

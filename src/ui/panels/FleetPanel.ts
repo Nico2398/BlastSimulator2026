@@ -26,11 +26,21 @@ import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import { applyRowSelection, type ListSelection } from '../selectionRoute.js';
+import { syncRowSelection, selectionChanged, type ListSelection } from '../selectionRoute.js';
 import { onRowBodyClick } from '../buildMenuRows.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverNameLine } from '../fleetDetailSections.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
+
+/** Per-row pieces that drift between structural renders: render() builds them, refreshDynamic() swaps them in place by class. */
+const ROW_PART_CLASS = {
+  status: 'bs-fleet-status',
+  hp: 'bs-fleet-hp',
+  load: 'bs-fleet-load',
+  driver: 'bs-fleet-driver',
+} as const;
+
+type RowParts = Record<Exclude<keyof typeof ROW_PART_CLASS, 'load'>, HTMLElement> & { load: HTMLElement | null };
 
 const TIER_BTN_BASE_STYLE = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left';
 
@@ -66,16 +76,13 @@ export class FleetPanel extends PanelBase {
 
   /** Highlights the row matching the scene selection `sel`; kept across re-renders, not part of the signature. */
   setSelectedVehicle(sel: ListSelection): void {
-    const changed = this.selection?.id !== sel?.id || this.selection?.kind !== sel?.kind;
+    const changed = selectionChanged(this.selection, sel);
     this.selection = sel;
     this.applySelection(changed);
   }
 
   private applySelection(scroll = false): void {
-    applyRowSelection([this.bodyEl], this.selection, 'vehicle', 'data-vehicle-id');
-    if (!scroll || this.selection?.kind !== 'vehicle') return;
-    // Optional chained on the method: jsdom doesn't implement scrollIntoView.
-    this.bodyEl.querySelector<HTMLElement>('.bs-row-selected')?.scrollIntoView?.({ block: 'nearest' });
+    syncRowSelection(this.bodyEl, this.selection, 'vehicle', 'data-vehicle-id', scroll);
   }
 
   /** Locate button action: focus the camera on the live vehicle and select it. */
@@ -124,12 +131,11 @@ export class FleetPanel extends PanelBase {
     for (const v of state.vehicles.vehicles) {
       const row = this.bodyEl.querySelector<HTMLElement>(`[data-vehicle-id="${v.id}"]`);
       if (!row) continue;
-      row.querySelector('.bs-fleet-status')?.replaceWith(this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'));
-      row.querySelector('.bs-fleet-hp')?.replaceWith(this.tag(makeHpGauge(v), 'bs-fleet-hp'));
-      const load = makeLoadGauge(v);
-      const existingLoad = row.querySelector('.bs-fleet-load');
-      if (load && existingLoad) existingLoad.replaceWith(this.tag(load, 'bs-fleet-load'));
-      row.querySelector('.bs-fleet-driver')?.replaceWith(this.tag(makeDriverNameLine(v, state.employees.employees), 'bs-fleet-driver'));
+      const parts = this.makeRowParts(v, state);
+      for (const key of Object.keys(ROW_PART_CLASS) as Array<keyof RowParts>) {
+        const node = parts[key];
+        if (node) row.querySelector(`.${ROW_PART_CLASS[key]}`)?.replaceWith(node);
+      }
     }
   }
 
@@ -146,6 +152,18 @@ export class FleetPanel extends PanelBase {
   private occupantOf(v: Vehicle, state: GameState): Employee | undefined {
     const driverId = vehicleDriverId(v);
     return driverId === null ? undefined : state.employees.employees.find(e => e.id === driverId);
+  }
+
+  /** The drifting pieces of `v`'s row, each carrying its ROW_PART_CLASS; load is null for roles that never carry a payload. */
+  private makeRowParts(v: Vehicle, state: GameState): RowParts {
+    const parts: RowParts = {
+      status: makeStatusChip(v, state.vehicles, this.occupantOf(v, state)),
+      hp: makeHpGauge(v),
+      load: makeLoadGauge(v),
+      driver: makeDriverNameLine(v, state.employees.employees),
+    };
+    for (const key of Object.keys(parts) as Array<keyof RowParts>) parts[key]?.classList.add(ROW_PART_CLASS[key]);
+    return parts;
   }
 
   private tag(elToTag: HTMLElement, className: string): HTMLElement {
@@ -262,12 +280,12 @@ export class FleetPanel extends PanelBase {
       el('span', { text: t(`vehicle_type.${v.type}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
     );
     const locateBtn = makeLocateButton({ title: t('ui.fleet.locate'), onClick: () => this.locateVehicle(v.id) });
-    head.append(iconChip, nameCol, this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'), locateBtn);
+    const parts = this.makeRowParts(v, state);
+    head.append(iconChip, nameCol, parts.status, locateBtn);
 
-    const rows: HTMLElement[] = [head, this.tag(makeHpGauge(v), 'bs-fleet-hp')];
-    const load = makeLoadGauge(v);
-    if (load) rows.push(this.tag(load, 'bs-fleet-load'));
-    rows.push(this.tag(makeDriverNameLine(v, state.employees.employees), 'bs-fleet-driver'));
+    const rows: HTMLElement[] = [head, parts.hp];
+    if (parts.load) rows.push(parts.load);
+    rows.push(parts.driver);
 
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);

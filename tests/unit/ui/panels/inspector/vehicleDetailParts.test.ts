@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 // BlastSimulator2026 — the vehicle inspector's driver/upgrade/scrap/repair pieces
-// (moved out of fleetDetailSections.ts by #1767; shared with the Fleet card until then).
+// (moved out of fleetDetailSections.ts by #1767).
 import { describe, it, expect, vi } from 'vitest';
-import { vehicleDisplayName } from '../../../../../src/ui/fleetDetailSections.js';
+import { vehicleDisplayName, vehicleDriverState } from '../../../../../src/ui/fleetDetailSections.js';
 import {
-  upgradeState, licenceWarning, scrapConfirmConfig, driverState, repairState,
+  upgradeState, licenceWarning, scrapConfirmConfig, repairState,
   makePendingDriverRow, makeNoDriverRow, makeDriverRow,
 } from '../../../../../src/ui/panels/inspector/vehicleDetailParts.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
@@ -140,11 +140,11 @@ describe('vehicleDetailParts — scrapConfirmConfig', () => {
   });
 });
 
-describe('vehicleDetailParts — driverState', () => {
+describe('vehicleDriverState', () => {
   it('is driver when an employee is aboard', () => {
     const e = licensed({ id: 6, name: 'Dorian Kask' });
     const state = makeState([], [e]);
-    const s = driverState(makeVehicle({ occupantIds: [6] }), state);
+    const s = vehicleDriverState(makeVehicle({ occupantIds: [6] }), state.employees.employees);
     expect(s.kind).toBe('driver');
     if (s.kind === 'driver') expect(s.employee.id).toBe(6);
   });
@@ -152,24 +152,24 @@ describe('vehicleDetailParts — driverState', () => {
   it('is pending when an employee is walking to board this vehicle', () => {
     const e = licensed({ id: 6, pendingDriverVehicleId: 1 });
     const state = makeState([], [e]);
-    const s = driverState(makeVehicle({ id: 1 }), state);
+    const s = vehicleDriverState(makeVehicle({ id: 1 }), state.employees.employees);
     expect(s.kind).toBe('pending');
     if (s.kind === 'pending') expect(s.employee.id).toBe(6);
   });
 
   it('is unmanned when nobody drives but a licensed employee exists', () => {
     const state = makeState([], [licensed({ id: 6 })]);
-    expect(driverState(makeVehicle(), state).kind).toBe('unmanned');
+    expect(vehicleDriverState(makeVehicle(), state.employees.employees).kind).toBe('unmanned');
   });
 
   it('is no_licensed when nobody on the roster holds the licence', () => {
     const state = makeState([], [makeEmployee({ id: 6 })]);
-    expect(driverState(makeVehicle(), state).kind).toBe('no_licensed');
+    expect(vehicleDriverState(makeVehicle(), state.employees.employees).kind).toBe('no_licensed');
   });
 
   it('a pending walker for another vehicle does not count', () => {
     const state = makeState([], [licensed({ id: 6, pendingDriverVehicleId: 2 })]);
-    expect(driverState(makeVehicle({ id: 1 }), state).kind).toBe('unmanned');
+    expect(vehicleDriverState(makeVehicle({ id: 1 }), state.employees.employees).kind).toBe('unmanned');
   });
 });
 
