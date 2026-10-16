@@ -30,11 +30,11 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] > :first-child"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) > :first-child"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] > :first-child"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) > :first-child"
         },
         {
           "type": "waitForSelector",
@@ -42,7 +42,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"].bs-row-selected"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1).bs-row-selected"
         },
         {
           "type": "screenshot"
@@ -61,44 +61,44 @@
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]:not(.bs-row-selected)"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2):not(.bs-row-selected)"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-fleet-status"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) .bs-fleet-status"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-fleet-hp"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) .bs-fleet-hp"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-fleet-driver"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) .bs-fleet-driver"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"]:not(:has([data-action=\"upgrade\"]))"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has([data-action=\"upgrade\"]))"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"]:not(:has([data-action=\"reposition\"]))"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has([data-action=\"reposition\"]))"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"]:not(:has([data-action=\"scrap\"]))"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has([data-action=\"scrap\"]))"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"]:not(:has(.bsx-btn-danger))"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has(.bsx-btn-danger))"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"]:not(:has(select))"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(:has(select))"
         }
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-vehicle-panel [data-vehicle-id=\"1\"] [data-action=\"locate\"]"
+        "usable": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1) [data-action=\"locate\"]"
       }
     },
     {
@@ -108,11 +108,11 @@
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > :first-child"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2) > :first-child"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > :first-child"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2) > :first-child"
         },
         {
           "type": "waitForSelector",
@@ -120,11 +120,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"].bs-row-selected"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2).bs-row-selected"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"]:not(.bs-row-selected)"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(1):not(.bs-row-selected)"
         },
         {
           "type": "screenshot"
@@ -157,11 +157,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"].bs-row-selected"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4).bs-row-selected"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]:not(.bs-row-selected)"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(2):not(.bs-row-selected)"
         },
         {
           "type": "screenshot"
@@ -184,16 +184,16 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4)"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]:not(.bs-row-selected)"
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4):not(.bs-row-selected)"
         }
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-vehicle-panel [data-vehicle-id=\"4\"] [data-action=\"locate\"]"
+        "usable": "#bs-vehicle-panel [data-vehicle-id]:nth-of-type(4) [data-action=\"locate\"]"
       }
     }
   ]
