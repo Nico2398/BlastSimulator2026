@@ -329,10 +329,13 @@ export const POLITICS_EVENTS_2: EventDef[] = [
     weight: (s) => 0.7 + 0.5 * r.ec(s),
     canFire: (ctx) => ctx.tickCount > 25,
     options: [
-      { cashDelta: -60000, scoreDelta: { ecology: -10 }, effectTag: 'win_auction' },
+      { cashDelta: -60000, scoreDelta: { ecology: -10 }, effectTag: 'win_auction',
+        effects: [{ type: 'special_contract' }] },
       { cashDelta: 0, scoreDelta: { ecology: 5 } },
       { cashDelta: -30000, scoreDelta: { ecology: -3 }, effectTag: 'joint_venture',
-        probability: 0.7, alt: { cashDelta: -30000, scoreDelta: { ecology: -8 }, effectTag: 'venture_betrayal' } },
+        probability: 0.7,
+        effects: [{ type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS }],
+        alt: { cashDelta: -30000, scoreDelta: { ecology: -8 }, effectTag: 'venture_betrayal' } },
     ],
   }),
 ];

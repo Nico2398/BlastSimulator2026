@@ -7,6 +7,8 @@ import {
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CALM_DAYS,
   EVENT_CALM_WEIGHT_FACTOR,
+  EVENT_CHEER_HOURS,
+  EVENT_CHEER_MORALE_PER_HOUR,
   EVENT_CURFEW_BAN_HOURS,
   EVENT_DRAG_HOURS,
   EVENT_DRAG_WORK_PCT,
@@ -163,7 +165,8 @@ export const MAFIA_EVENTS_1: EventDef[] = [
         effects: [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },
-      { cashDelta: 0, scoreDelta: { safety: -4 }, effectTag: 'refused_hiding' },
+      { cashDelta: 0, scoreDelta: { safety: -4 }, effectTag: 'refused_hiding',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
       { cashDelta: 0, corruptionDelta: -5, scoreDelta: { safety: 8 }, effectTag: 'witness_protection_tip' },
     ],
   }),

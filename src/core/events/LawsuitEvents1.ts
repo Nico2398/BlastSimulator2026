@@ -231,7 +231,8 @@ export const LAWSUIT_EVENTS_1: EventDef[] = [
     weight: (s) => 1.2 + 1.5 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.lawsuitCount >= 3,
     options: [
-      { cashDelta: -90000, effectTag: 'insurance_settle' },
+      { cashDelta: -60000, effectTag: 'insurance_settle',
+        effects: [{ type: 'event_weight', category: 'lawsuit', factor: EVENT_CALM_WEIGHT_FACTOR, days: EVENT_CALM_DAYS }] },
       { cashDelta: -30000, scoreDelta: { safety: 10 }, effectTag: 'improve_safety_record' },
       { cashDelta: -15000, corruptionDelta: 15, effectTag: 'falsify_records',
         effects: [{ type: 'recurring_charge', perDay: EVENT_SETTLEMENT_PER_DAY, days: EVENT_SETTLEMENT_DAYS }] },
