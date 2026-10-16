@@ -214,16 +214,23 @@
     },
     {
       "command": "state",
-      "role": "guard",
+      "role": "observe",
       "interaction": [
         {
           "type": "ensurePanel",
           "panel": "ops"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-operations-panel"
         }
       ],
       "expect": {
-        "blocked": "#bs-operations-panel [data-blocked-reason]",
-        "note": "No blocked marker remains in Operations once the order is claimed and done."
+        "equals": {
+          "buildingCount": 0,
+          "pendingActionCount": 0
+        },
+        "note": "No blocked marker remains in Operations once the order is claimed and done; absence is read from the screenshot (a blocked goal needs the control in the DOM)."
       },
       "description": "The blocked marker is gone from the Operations panel."
     }
