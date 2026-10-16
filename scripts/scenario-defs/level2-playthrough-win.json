@@ -4316,7 +4316,7 @@
         {
           "type": "set",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
-          "value": "430"
+          "value": "490"
         },
         {
           "type": "clickSelector",
