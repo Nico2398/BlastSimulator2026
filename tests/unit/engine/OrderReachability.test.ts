@@ -77,7 +77,7 @@ function makeState(wall = true): GameState {
   return state;
 }
 
-function hire(state: GameState, at: { x: number; z: number }, skills: string[] = [], role: 'driver' | 'blaster' | 'driller' = 'driver') {
+function hire(state: GameState, at: { x: number; z: number }, skills: string[] = [], role: 'driver' | 'blaster' | 'driller' | 'surveyor' = 'driver') {
   const { employee } = hireEmployee(state.employees, role, new Random(42 + state.employees.nextId), at.x, at.z);
   for (const skill of skills) assignSkill(state.employees, employee.id, skill as never, 1);
   return employee;
@@ -1316,7 +1316,7 @@ describe('roleShortfall (#1820)', () => {
 
   it('a vehicle but nobody licensed: no_licensed_driver', () => {
     const state = makeState();
-    const worker = hire(state, IN_A, []);
+    const worker = hire(state, IN_A, [], 'surveyor'); // a driver starts with the truck licence; a surveyor holds none
     purchaseVehicle(state.vehicles, role, 0, 0);
     expect(roleShortfall(state.vehicles.vehicles, [worker], role)).toBe('no_licensed_driver');
   });
@@ -1337,7 +1337,7 @@ describe('roleShortfall (#1820)', () => {
   it('a licensed employee left out of the eligible list does not count', () => {
     const state = makeState();
     const licensed = hire(state, IN_A, [licence]);
-    const other = hire(state, IN_A, []);
+    const other = hire(state, IN_A, [], 'surveyor');
     purchaseVehicle(state.vehicles, role, 0, 0);
     expect(licensed.alive).toBe(true);
     expect(roleShortfall(state.vehicles.vehicles, [other], role)).toBe('no_licensed_driver');

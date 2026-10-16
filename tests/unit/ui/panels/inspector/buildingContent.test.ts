@@ -392,6 +392,8 @@ describe('building inspector — money carries the currency sign (#1820)', () =>
 
   it('a queued research line and a course row carry the sign', () => {
     const s = stateWith(makeBuilding({ type: 'research_center' }));
+    // The head of the queue renders as running (no cost); the money shows on the pending lines behind it.
+    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 2, ticksRemaining: 5, cost: 100, conditions: [] });
     s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 2, ticksRemaining: 5, cost: 5000, conditions: [] });
     expect(textOf(viewOf(s))).toContain('$5,000');
     const school = makeBuilding({ type: 'blasting_academy' });
