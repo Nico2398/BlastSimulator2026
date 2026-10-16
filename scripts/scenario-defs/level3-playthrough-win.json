@@ -1786,7 +1786,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 751956,
+          "cash": 751752,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1797,7 +1797,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged. Rally point: cash re-measured (747,800 -> 751,752) -- hires spawn at the rally flag, so walk and payroll timing shift; no behaviour change. #1777 (idle trucks and crew yield to a drill rig in a 1-wide pocket): the pattern is drilled sooner (24 holes by tick 280 instead of 23, 16 instead of 14 at tick 230), so fuel and wear accrue differently; cash re-measured 751,752 -> 751,956. No behaviour change in this file beyond that."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged. Rally point: cash re-measured (747,800 -> 751,752) -- hires spawn at the rally flag, so walk and payroll timing shift; no behaviour change. #1777 (idle trucks and crew yield to a drill rig in a 1-wide pocket): the pattern is drilled sooner (24 holes by tick 280 instead of 23, 16 instead of 14 at tick 230), so fuel and wear accrue differently; cash re-measured 751,752 -> 751,956. No behaviour change in this file beyond that. #1851: position->cell mapping now rounds (Pathfinding/AgentAdvance/Locomotion); one worker steps a tick earlier/later, shifting payroll-exposure cash 751956 -> 751752. No behaviour defect."
       }
     },
     {
@@ -2048,12 +2048,12 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 59.799579111137255,
+          "wellBeing": 60.27667858857491,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect."
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
     },

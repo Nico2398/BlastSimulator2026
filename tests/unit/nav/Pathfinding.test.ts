@@ -2046,3 +2046,109 @@ describe('findPath — ordinary route longer than the base node budget (#1305)',
     expect(result.found).toBe(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #1851: one cell mapping for a mover's fractional position — NavGrid's rounding
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// A hauler stopped mid-hop at (36.29, 42.71) on a crater rim was mapped by the
+// planner (Math.floor) to the corner crater-floor cell (36,42), which no route
+// climbs out of, while the grid (NavGrid.clampX/clampZ, Math.round) puts it on
+// the rim cell (36,43).
+
+describe('#1851 start/goal cell mapping matches NavGrid rounding', () => {
+  const RIM_Y = 16;
+  const FLOOR_Y = 8.5;
+
+  /** 50x60 rim at y=16 with a single crater-floor corner cell (36,42) at y=8.5. */
+  function makeRimGrid(): NavGrid {
+    const grid = makeFlatGrid(50, 60, 'walkable', RIM_Y);
+    setCell(grid, 36, 42, 'walkable', { surfaceY: FLOOR_Y });
+    return grid;
+  }
+
+  const GOAL = { toX: 30, toZ: 43 };
+
+  it('fixture sanity: the crater-floor cell itself has no route out, the rim cells do', () => {
+    const grid = makeRimGrid();
+    expect(findPath(grid, { agentId: 1, fromX: 36, fromZ: 42, ...GOAL, avoidVehicles: false }).found).toBe(false);
+    expect(findPath(grid, { agentId: 1, fromX: 36, fromZ: 43, ...GOAL, avoidVehicles: false }).found).toBe(true);
+    expect(findPath(grid, { agentId: 1, fromX: 37, fromZ: 42, ...GOAL, avoidVehicles: false }).found).toBe(true);
+  });
+
+  it('a fractional start (36.29, 42.71) maps to the rounded rim cell (36,43) and finds a path', () => {
+    const grid = makeRimGrid();
+    const result = findPath(grid, { agentId: 1, fromX: 36.29, fromZ: 42.71, ...GOAL, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    expect(result.waypoints[0]).toEqual({ x: 36, z: 43 });
+  });
+
+  it('sweeping t along the diagonal (37,42) -> (36,43): every position routes from its rounded cell', () => {
+    const grid = makeRimGrid();
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20;
+      const x = 37 - t, z = 42 + t;
+      const cx = grid.clampX(x), cz = grid.clampZ(z);
+      const result = findPath(grid, { agentId: 1, fromX: x, fromZ: z, ...GOAL, avoidVehicles: false });
+      expect(cx === 36 && cz === 42, 'rounding never lands on the corner cell along this diagonal').toBe(false);
+      expect(result.found, `t=${t} (${x}, ${z}) rounds to (${cx},${cz})`).toBe(true);
+      expect(result.waypoints[0], `t=${t}`).toEqual({ x: cx, z: cz });
+    }
+  });
+
+  it('waypoint[0] equals grid.clampX/clampZ of the start for assorted fractional points', () => {
+    const grid = makeFlatGrid(12, 12, 'walkable');
+    const points = [
+      [3.49, 3.49], [3.5, 3.5], [3.51, 3.51], [0.6, 0.4], [7.7, 2.2], [2.5, 8.5], [10.49, 9.51],
+    ] as const;
+    for (const [x, z] of points) {
+      const result = findPath(grid, { agentId: 1, fromX: x, fromZ: z, toX: 11, toZ: 11, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      expect(result.waypoints[0], `(${x}, ${z})`).toEqual({ x: grid.clampX(x), z: grid.clampZ(z) });
+    }
+  });
+
+  it('a fractional goal maps to the rounded cell as well', () => {
+    const grid = makeFlatGrid(12, 12, 'walkable');
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 5.6, toZ: 3.4, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 6, z: 3 });
+  });
+
+  it('integer coordinates are unchanged', () => {
+    const grid = makeFlatGrid(12, 12, 'walkable');
+    const result = findPath(grid, { agentId: 1, fromX: 2, fromZ: 3, toX: 9, toZ: 7, avoidVehicles: false });
+    expect(result.waypoints[0]).toEqual({ x: 2, z: 3 });
+    expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 9, z: 7 });
+  });
+
+  describe('findExactPath', () => {
+    it('accepts a fractional in-bounds goal, ending at its rounded cell', () => {
+      const grid = makeFlatGrid(10, 10, 'walkable');
+      const result = findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 5.6, toZ: 3.2, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 6, z: 3 });
+    });
+
+    it('rounds a .5 goal boundary up (4.5 -> 5, 3.5 -> 4)', () => {
+      const grid = makeFlatGrid(10, 10, 'walkable');
+      const result = findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4.5, toZ: 3.5, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 5, z: 4 });
+    });
+
+    it('a goal just below .5 rounds down (4.49 -> 4)', () => {
+      const grid = makeFlatGrid(10, 10, 'walkable');
+      const result = findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4.49, toZ: 2.2, avoidVehicles: false });
+      expect(result.found).toBe(true);
+      expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 4, z: 2 });
+    });
+
+    it('still rejects an out-of-bounds goal (#1109)', () => {
+      const grid = makeFlatGrid(10, 10, 'walkable');
+      expect(findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 15.4, toZ: 5, avoidVehicles: false }).found).toBe(false);
+      expect(findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 5, toZ: 12.2, avoidVehicles: false }).found).toBe(false);
+      expect(findExactPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 15, toZ: 5, avoidVehicles: false }).found).toBe(false);
+    });
+  });
+});
