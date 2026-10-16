@@ -439,7 +439,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
         },
         {
           "type": "clickSelector",
@@ -482,7 +482,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-row-name"
         },
         {
           "type": "clickSelector",
@@ -526,7 +526,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
+          "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-row-name"
         },
         {
           "type": "clickSelector",

@@ -339,7 +339,7 @@
     },
     {
       "command": "build upgrade 1",
-      "description": "$1,500 < upgradeCost $22,000 (demolishCost T1 $2,000 + constructionCost T2 $20,000) — refused, and the inspector's Upgrade action (opened by clicking building #1's row) must be disabled.",
+      "description": "$1,500 < upgradeCost $22,000 (demolishCost T1 $2,000 + constructionCost T2 $20,000) — refused, and, the next tier being research-locked, the inspector's Research action (the Upgrade slot, opened by clicking building #1's row) must be disabled.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -363,7 +363,7 @@
           "cash": 1500,
           "buildingCount": 1
         },
-        "blocked": "#bs-inspector [data-action=\"upgrade\"]",
+        "blocked": "#bs-inspector [data-action=\"research\"]",
         "note": "issue #511 — build upgrade funds guard"
       },
       "role": "guard",

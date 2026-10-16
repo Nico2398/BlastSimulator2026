@@ -129,10 +129,10 @@
         "equals": {
           "buildingCount": 1
         },
-        "blocked": "#bs-inspector [data-action=\"upgrade\"]",
+        "usable": "#bs-inspector [data-action=\"research\"]",
         "note": "rejected: Tier 2 living_quarters is not researched — this is Finding #27's root cause, confirmed here in state too"
       },
-      "role": "guard",
+      "role": "observe",
       "commandOutcome": "refused"
     },
     {
