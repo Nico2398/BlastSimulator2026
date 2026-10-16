@@ -53,11 +53,18 @@ describe('withDockingCells (#1840)', () => {
     expect(set.has(8, 5)).toBe(false);
   });
 
-  it('does not chain: a thin cell behind another thin cell stays out', () => {
+  it('docks a strip two thin cells deep: ring cell, then the cell beside it', () => {
     const grid = makeGrid((x, z) => (z === 5 && (x === 5 || x === 6) ? { clearance: 1 } : null));
     const set = withDockingCells(grid, leftColumns, 2);
     expect(set.has(5, 5)).toBe(true);
-    expect(set.has(6, 5)).toBe(false);
+    expect(set.has(6, 5)).toBe(true);
+  });
+
+  it('does not chain past two hops: a third thin cell in a row stays out', () => {
+    const grid = makeGrid((x, z) => (z === 5 && x >= 5 && x <= 7 ? { clearance: 1 } : null));
+    const set = withDockingCells(grid, leftColumns, 2);
+    expect(set.has(6, 5)).toBe(true);
+    expect(set.has(7, 5)).toBe(false);
   });
 
   it('does not add a blocked cell beside the base', () => {
