@@ -1274,7 +1274,7 @@ describe('docking cells beside a building (#1840)', () => {
 
   it('on foot nothing changes: a walled-off cell stays unreachable and open ground stays reachable', () => {
     const state = createGame({ seed: 42 });
-    state.navGrid = makeDockGrid((x, z) => (x === WALL_X ? BLOCKED : null));
+    state.navGrid = makeDockGrid((x) => (x === WALL_X ? BLOCKED : null));
     hire(state, IN_A);
     const near = queue(state, 'survey', IN_A_TARGET);
     const far = queue(state, 'survey', IN_B_TARGET);
