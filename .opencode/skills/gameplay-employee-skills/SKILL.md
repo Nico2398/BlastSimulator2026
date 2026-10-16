@@ -126,7 +126,7 @@ Each role offers `HIRING_POOL_SIZE` (3) candidates (`src/core/entities/HiringPoo
 
 ## Salary Calculation
 
-Salary = base + qualification bonus (sum of level bonuses) + raises. Raises are permanent, stored in `Employee.raises`, and survive every recompute (level-up, training, skill assignment). Legacy saves backfill `raises = max(0, salary - base - bonus)`. Multi-skilled employee costs more than single-skill specialist.
+Salary = base + qualification bonus (sum of level bonuses) + raises. Raises are permanent, stored in `Employee.raises`, and survive every recompute (level-up, training, skill assignment). Legacy saves backfill `raises = max(0, salary - base - bonus)`. A `driving.*` qualification contributes the level-1 bonus at any proficiency: licence proficiency changes neither pay nor speed (#1843). Multi-skilled employee costs more than single-skill specialist.
 
 ## Work & Rest Policies
 

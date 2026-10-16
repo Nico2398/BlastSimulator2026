@@ -85,7 +85,7 @@ from proficiency: XP never raises it, only a Driving Center course does (`TRAINI
 refuses with 'Employee lacks licence level for this vehicle tier', `findFreeVehicleForRole` skips vehicles above
 the claimer's level. A vehicle order nobody can level-qualify for carries `licence_level_too_low` (when someone
 holds the licence at a lower level) with `blockedLicenceLevel` = the lowest tier in that role's fleet, else
-`no_licensed_driver`. The dealership shows each tier's required level and how many employees hold it.
+`no_licensed_driver`. The dealership shows each tier's required level and how many employees hold it. Licence proficiency neither gates tiers nor changes pay or speed (#1843); only `licenceLevel` matters.
 
 ## State Model
 

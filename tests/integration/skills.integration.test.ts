@@ -904,7 +904,7 @@ describe('debris haul and fragment drivers gain licence XP over the whole script
   const WINDOW_END = 1821;
   const MIN_ACTIVE_TICKS = 20;
 
-  interface Probe { ticks: number; xpStart: number; xpEnd: number }
+  interface Probe { ticks: number; xpStart: number; xpEnd: number; salaryStart: number; salaryEnd: number }
 
   function playOpening(): { haul: Map<number, Probe>; fragment: Map<number, Probe> } {
     const { runner, ctx } = createRunner();
@@ -918,10 +918,12 @@ describe('debris haul and fragment drivers gain licence XP over the whole script
     const fragment = new Map<number, Probe>();
     const xpOf = (id: number, skill: string) =>
       state.employees.employees.find(e => e.id === id)!.qualifications.find(q => q.category === skill)?.xp ?? 0;
+    const salaryOf = (id: number) => state.employees.employees.find(e => e.id === id)!.salary;
     const observe = (map: Map<number, Probe>, id: number, skill: string) => {
-      const p = map.get(id) ?? { ticks: 0, xpStart: xpOf(id, skill), xpEnd: 0 };
+      const p = map.get(id) ?? { ticks: 0, xpStart: xpOf(id, skill), xpEnd: 0, salaryStart: salaryOf(id), salaryEnd: 0 };
       p.ticks++;
       p.xpEnd = xpOf(id, skill);
+      p.salaryEnd = salaryOf(id);
       map.set(id, p);
     };
     const sample = () => {
@@ -956,5 +958,17 @@ describe('debris haul and fragment drivers gain licence XP over the whole script
     expect(active(fragment).length, 'a driver worked fragment_debris in the opening').toBeGreaterThan(0);
     for (const p of active(haul)) expect(p.xpEnd, 'driving.truck XP rose while hauling').toBeGreaterThan(p.xpStart);
     for (const p of active(fragment)) expect(p.xpEnd, 'driving.rock_fragmenter XP rose while fragmenting').toBeGreaterThan(p.xpStart);
+  }, 600_000);
+
+  it('licence XP gained while hauling and fragmenting never raises the driver salary (#1843)', () => {
+    const { haul, fragment } = playOpening();
+    const active = (m: Map<number, Probe>) => [...m.values()].filter(p => p.ticks >= MIN_ACTIVE_TICKS);
+    const drivers = [...active(haul), ...active(fragment)];
+
+    expect(drivers.length, 'drivers worked debris in the opening').toBeGreaterThan(0);
+    for (const p of drivers) {
+      expect(p.xpEnd, 'licence XP still accrues').toBeGreaterThan(p.xpStart);
+      expect(p.salaryEnd, 'salary unchanged across the window').toBe(p.salaryStart);
+    }
   }, 600_000);
 });

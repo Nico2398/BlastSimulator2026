@@ -70,6 +70,9 @@ export interface SkillQualification {
 /** Driving-licence level; a licence of level N may drive vehicles of tier <= N. */
 export type LicenceLevel = VehicleTier;
 
+/** Whether `skill` is a driving licence (levelled by licenceLevel, not proficiency). */
+export const isLicenceSkill = (skill: SkillCategory): boolean => skill.startsWith('driving.');
+
 /** A qualification at `level`, with the XP that level starts at. */
 export function qualificationAtLevel(category: SkillCategory, level: SkillQualification['proficiencyLevel']): SkillQualification {
   return { category, proficiencyLevel: level, xp: XP_THRESHOLDS[level] };
@@ -446,9 +449,16 @@ export function processPayCycle(state: EmployeeState, salaryFactorOf: (role: Emp
   return totalSalaries;
 }
 
-/** Sum of QUALIFICATION_SALARY_BONUS over the employee's qualifications. */
+/**
+ * Sum of QUALIFICATION_SALARY_BONUS over the employee's qualifications. A licence (`driving.*`) is a
+ * pass: it pays the level-1 bonus at any proficiency. Its proficiency (XP) still accrues (#1833) but
+ * changes neither pay nor speed (#1843).
+ */
 export function calculateQualificationBonus(employee: Pick<Employee, 'qualifications'>): number {
-  return employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
+  return employee.qualifications.reduce(
+    (sum, q) => sum + QUALIFICATION_SALARY_BONUS[isLicenceSkill(q.category) ? 1 : q.proficiencyLevel],
+    0,
+  );
 }
 
 /** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */

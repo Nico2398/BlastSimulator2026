@@ -7,12 +7,12 @@
 import { t } from '../core/i18n/I18n.js';
 import { el, gauge, button, reasonLine } from './dom.js';
 import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Employee.js';
-import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf, injuryHoursRemaining, employeeQueueDepth } from '../core/entities/Employee.js';
+import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf, injuryHoursRemaining, employeeQueueDepth, isLicenceSkill } from '../core/entities/Employee.js';
 import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, heldCourseLevel, isLicenceSkill } from '../core/entities/EmployeeTraining.js';
+import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, heldCourseLevel } from '../core/entities/EmployeeTraining.js';
 import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
@@ -281,14 +281,14 @@ export function makeSkillsSection(e: Employee): HTMLElement {
     const xpTrack = el('div', { attrs: { style: 'height:3px;border-radius:2px;overflow:hidden;background:#242c36' } });
     xpTrack.appendChild(el('div', { attrs: { style: `height:100%;background:var(--bsx-ore);width:${xpPct}%` } }));
 
-    const effect = el('span', {
-      text: t('ui.crew.skill_effect', { mult: PROFICIENCY_MULTIPLIERS[q.proficiencyLevel].toFixed(2) }),
-      className: 'bsx-mono',
-      attrs: { style: 'font-size:10px;color:var(--bsx-positive)' },
-    });
-
-    const rows = [headRow, xpTrack, effect];
-    if (isLicenceSkill(q.category)) {
+    const rows: HTMLElement[] = [headRow, xpTrack];
+    if (!isLicenceSkill(q.category)) {
+      rows.push(el('span', {
+        text: t('ui.crew.skill_effect', { mult: PROFICIENCY_MULTIPLIERS[q.proficiencyLevel].toFixed(2) }),
+        className: 'bsx-mono',
+        attrs: { style: 'font-size:10px;color:var(--bsx-positive)' },
+      }));
+    } else {
       rows.push(el('span', { text: t('ui.crew.licence_tier', { tier: q.licenceLevel ?? 1 }), className: 'bsx-mono bs-licence-tier', attrs: { style: 'font-size:10px;color:var(--bsx-text-secondary)' } }));
     }
     wrap.appendChild(well(rows));
