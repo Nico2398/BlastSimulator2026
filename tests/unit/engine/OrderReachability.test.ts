@@ -1174,3 +1174,124 @@ describe('cached verdicts equal fresh verdicts over random mutation sequences (#
     }
   });
 });
+
+describe('docking cells beside a building (#1840)', () => {
+  // A demolition targets the cell beside the building. Cells next to a building have
+  // clearance 1, below the vehicle requirement (2), yet the destroyer drives there.
+  const DOCK = { x: 6, z: 6 };
+
+  function makeDockGrid(cellFn: (x: number, z: number) => Partial<NavCell> | null = () => null): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < HEIGHT; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < WIDTH; x++) {
+        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false, clearance: 2, ...cellFn(x, z) });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(WIDTH, HEIGHT, cells);
+  }
+
+  const BLOCKED: Partial<NavCell> = { type: 'blocked', moveCost: Infinity, clearance: 0 };
+
+  /** The building stands at x = 7..8, z = 5..7: blocked cells, with clearance-1 cells hugging it. */
+  const besideBuilding = (x: number, z: number): Partial<NavCell> | null => {
+    if (x >= 7 && x <= 8 && z >= 5 && z <= 7) return BLOCKED;
+    if (x === 6 && z >= 5 && z <= 7) return { clearance: 1 };
+    return null;
+  };
+
+  function stageDemolition(grid: NavGrid, target = DOCK) {
+    const state = createGame({ seed: 42 });
+    state.navGrid = grid;
+    const driver = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.building_destroyer]);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'building_destroyer', IN_A.x + 1, IN_A.z);
+    const id = queue(state, 'demolish_building', target, { requiredVehicleRole: 'building_destroyer' });
+    return { state, driver, vehicle, id };
+  }
+
+  it('a demolition aimed at a clearance-1 cell beside a building is reachable when the destroyer can drive to the ground around it', () => {
+    const { state, id } = stageDemolition(makeDockGrid(besideBuilding));
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
+  });
+
+  it('that demolition carries no target_unreachable reason and a blue ghost', () => {
+    const { state, id } = stageDemolition(makeDockGrid(besideBuilding));
+    classifyQueuedOrders(state);
+    const action = state.pendingActions.find(a => a.id === id)!;
+    expect(action.blockedReason).not.toBe('target_unreachable');
+    expect(ghostOf(state, id).unreachable).toBe(false);
+  });
+
+  it('classifyNewOrder does not stamp target_unreachable on it either', () => {
+    const { state, id } = stageDemolition(makeDockGrid(besideBuilding));
+    classifyNewOrder(state, id);
+    expect(state.pendingActions.find(a => a.id === id)!.blockedReason).not.toBe('target_unreachable');
+  });
+
+  it('an approach walled off from the destroyer still reads target_unreachable', () => {
+    // Blocked ring around the dock cell: no neighbour belongs to the destroyer's component.
+    const walled = (x: number, z: number): Partial<NavCell> | null => {
+      if (x === DOCK.x && z === DOCK.z) return { clearance: 1 };
+      if (Math.abs(x - DOCK.x) <= 1 && Math.abs(z - DOCK.z) <= 1) return BLOCKED;
+      return null;
+    };
+    const { state, id } = stageDemolition(makeDockGrid(walled));
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+    classifyQueuedOrders(state);
+    expect(state.pendingActions.find(a => a.id === id)!.blockedReason).toBe('target_unreachable');
+  });
+
+  it('an approach across a wall from the destroyer is unreachable even though its own side is open ground', () => {
+    const { state, id } = stageDemolition(makeDockGrid((x, z) => (x === WALL_X ? BLOCKED : besideBuilding(x, z))), IN_B);
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
+
+  it('a dock cell only touching thin cells (no clearance-2 neighbour) is unreachable', () => {
+    const pocket = (x: number, z: number): Partial<NavCell> | null => {
+      if (Math.abs(x - DOCK.x) <= 1 && Math.abs(z - DOCK.z) <= 1) return { clearance: 1 };
+      if (Math.abs(x - DOCK.x) === 2 && Math.abs(z - DOCK.z) <= 2) return BLOCKED;
+      if (Math.abs(z - DOCK.z) === 2 && Math.abs(x - DOCK.x) <= 2) return BLOCKED;
+      return null;
+    };
+    const { state, id } = stageDemolition(makeDockGrid(pocket));
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
+
+  it('a blocked target cell is unreachable however open the ground around it', () => {
+    const blockedTarget = (x: number, z: number): Partial<NavCell> | null => (x === DOCK.x && z === DOCK.z ? BLOCKED : null);
+    const { state, id } = stageDemolition(makeDockGrid(blockedTarget));
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
+
+  it('on foot nothing changes: an order aimed at a cell below foot clearance beside open ground stays unreachable', () => {
+    const state = createGame({ seed: 42 });
+    state.navGrid = makeDockGrid((x, z) => (x === DOCK.x && z === DOCK.z ? { clearance: 0 } : null));
+    hire(state, IN_A);
+    const id = queue(state, 'survey', DOCK);
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
+
+  it('on foot nothing changes: a walled-off cell stays unreachable and open ground stays reachable', () => {
+    const state = createGame({ seed: 42 });
+    state.navGrid = makeDockGrid((x) => (x === WALL_X ? BLOCKED : null));
+    hire(state, IN_A);
+    const near = queue(state, 'survey', IN_A_TARGET);
+    const far = queue(state, 'survey', IN_B_TARGET);
+    const verdicts = judgeQueuedOrders(state);
+    expect(verdicts.get(near)).toBe('reachable');
+    expect(verdicts.get(far)).toBe('unreachable');
+  });
+
+  it('a vehicle order aimed at ordinary clearance-2 ground is unaffected', () => {
+    const { state, id } = stageDemolition(makeDockGrid(besideBuilding), { x: 3, z: 8 });
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
+  });
+
+  it('a docking verdict follows the destroyer: parked across the wall with nobody driving it, it is unreachable', () => {
+    const { state, vehicle, id } = stageDemolition(makeDockGrid((x, z) => (x === WALL_X ? BLOCKED : besideBuilding(x, z))));
+    expect(judgeQueuedOrders(state).get(id)).toBe('reachable');
+    vehicle.x = IN_B.x; vehicle.z = IN_B.z;
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
+});

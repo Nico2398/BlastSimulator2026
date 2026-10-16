@@ -1164,8 +1164,14 @@ export const ORE_DEMAND_MIN_GRADE: number = 0.05;
  * haul_debris trip chain starves a dearer charge_hole that gates the next
  * shot. Unlisted types are tier 0. A new time-critical order type is one
  * entry here; no ranking code changes.
+ *
+ * demolish_building shares the tier (#1840): demolition (and the upgrade that
+ * starts with it) must not wait behind a never-ending haul stream when every
+ * licensed driver is mounted on debris haulers. A driver on a loaded vehicle
+ * still never abandons the haul (#1709; the planner refuses). Reverse by
+ * deleting the entry.
  */
-export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = { charge_hole: 1 };
+export const ACTION_RANK_TIER: Partial<Record<ActionType, number>> = { charge_hole: 1, demolish_building: 1 };
 
 /** Rank tier of an action type (see ACTION_RANK_TIER). */
 export function actionRankTier(type: ActionType): number {
@@ -1176,7 +1182,7 @@ export function actionRankTier(type: ActionType): number {
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
  * on-foot action class open to whoever is free — place_building, survey,
  * general_work; demolish_building is not one of them since it requires a
- * building_destroyer, #1392) may sit waiting before it must win the
+ * building_destroyer, #1392; ACTION_RANK_TIER covers it, #1840) may sit waiting before it must win the
  * next vehicle-gated completion's dispatch decision, overriding
  * tryContinueVehicleGatedAction's same-role continuity fast path
  * (VehicleContinuity.ts) regardless of cost ranking (#1000).
