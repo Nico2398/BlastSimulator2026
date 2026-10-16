@@ -16,13 +16,9 @@ import { workRate } from '../events/ActiveModifiers.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
 import { carveLevelColumnsStep } from '../mining/LevelGround.js';
+import type { TaskProgressLevelUp } from './TaskXp.js';
 
-/** One skill category's level-up, reported when a single tick's XP gain crosses a proficiency threshold. */
-export interface TaskProgressLevelUp {
-  skill: SkillCategory;
-  oldLevel: 1 | 2 | 3 | 4 | 5;
-  newLevel: 1 | 2 | 3 | 4 | 5;
-}
+export type { TaskProgressLevelUp };
 
 export interface TaskProgressResult {
   /** True when taskTicksRemaining reached 0 this tick and the task completed. */
