@@ -1,6 +1,6 @@
 {
   "name": "scene-picking-visual",
-  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building — the debounced hover tag should show its name and HP; click it — a selection ring should appear on the ground and the inspector should show Research (tier 2 locked)/Move/Demolish; Esc deselects — both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the inspector's DETAIL action.",
+  "description": "Redesign P2: hovering and clicking scene entities (raycaster over terrain + entity meshes). Hover a placed building \u2014 the debounced hover tag should show its name and HP; click it \u2014 a selection ring should appear on the ground and the inspector should show Research (tier 2 locked)/Move/Demolish; Esc deselects \u2014 both disappear; hovering bare terrain shows tile coordinates and 'no survey data'. Also covers the employee side of the same picker (parity with the retired playtest 'scene-picking' definition): selecting a hired employee by clicking them in the 3D scene (clickEntity, not a panel row) and opening their crew detail via the inspector's DETAIL action.",
   "shots": [
     {
       "name": "overview",
@@ -11,7 +11,10 @@
       "name": "closeup",
       "yaw": 30,
       "pitch": 35,
-      "target": [11, 14],
+      "target": [
+        11,
+        14
+      ],
       "distance": 12
     }
   ],
@@ -55,7 +58,9 @@
       ],
       "role": "player",
       "expect": {
-        "increased": ["employeeCount"],
+        "increased": [
+          "employeeCount"
+        ],
         "changedBy": {
           "cash": -1000
         },
@@ -65,7 +70,7 @@
     {
       "command": "build management_office at:10,13 tier:1",
       "timeout": 30,
-      "description": "Setup: place a building at a known tile — its footprint centre (11, 14) is the click target",
+      "description": "Setup: place a building at a known tile \u2014 its footprint centre (11, 14) is the click target",
       "interaction": [
         {
           "type": "clickSelector",
@@ -94,7 +99,9 @@
       ],
       "role": "player",
       "expect": {
-        "increased": ["orderedBuildingCount"],
+        "increased": [
+          "orderedBuildingCount"
+        ],
         "changedBy": {
           "cash": -8000
         },
@@ -124,7 +131,7 @@
     },
     {
       "command": "employee dispatch 1 x:20 z:20",
-      "description": "Walk the driller clear of the office it just built (#556). Construction relocates the builder off the finished footprint onto the nearest walkable tile — right up against the building — and the employee pick further down then lands on the office instead of the crew member, so the inspector never offers DETAIL at all.",
+      "description": "Walk the driller clear of the office it just built (#556). Construction relocates the builder off the finished footprint onto the nearest walkable tile \u2014 right up against the building \u2014 and the employee pick further down then lands on the office instead of the crew member, so the inspector never offers DETAIL at all.",
       "interaction": [
         {
           "type": "command",
@@ -157,7 +164,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Frame the building dead-centre, then hover it — the tag should appear once the 60ms debounce settles, showing the building's name and HP",
+      "description": "Frame the building dead-centre, then hover it \u2014 the tag should appear once the 60ms debounce settles, showing the building's name and HP",
       "interaction": [
         {
           "type": "command",
@@ -187,7 +194,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the building — a dashed selection ring appears on the ground and the inspector shows Research (tier 2 is still locked, so Upgrade is replaced by it)/Move/Demolish",
+      "description": "Click the building \u2014 a dashed selection ring appears on the ground and the inspector shows Research (tier 2 is still locked, so Upgrade is replaced by it)/Move/Demolish",
       "interaction": [
         {
           "type": "command",
@@ -218,14 +225,14 @@
       ],
       "role": "observe",
       "expect": {
-        "usable": "#bs-inspector [data-action=\"research\"]",
-        "note": "waitForSelector above only proved the button exists in the DOM; usable proves it is genuinely clickable, not covered/hidden"
+        "note": "waitForSelector above proved the Research button exists in the DOM; blocked proves it is disabled (no Research Center yet), not covered/hidden",
+        "blocked": "#bs-inspector [data-action=\"research\"]"
       }
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Esc deselects — the ring and the inspector both disappear",
+      "description": "Esc deselects \u2014 the ring and the inspector both disappear",
       "interaction": [
         {
           "type": "command",
@@ -258,7 +265,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Hover bare terrain away from the building — the tag shows tile coordinates and 'no survey data' (nothing has surveyed this column)",
+      "description": "Hover bare terrain away from the building \u2014 the tag shows tile coordinates and 'no survey data' (nothing has surveyed this column)",
       "interaction": [
         {
           "type": "command",
@@ -288,7 +295,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the hired driller in the 3D scene (clickEntity by kind+id, not a panel row) — the inspector should show Detail/Dispatch Here/Train for this employee",
+      "description": "Click the hired driller in the 3D scene (clickEntity by kind+id, not a panel row) \u2014 the inspector should show Detail/Dispatch Here/Train for this employee",
       "interaction": [
         {
           "type": "command",

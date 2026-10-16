@@ -530,6 +530,12 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "cameraFocus",
+          "x": 26,
+          "z": 14,
+          "distance": 20
+        },
+        {
           "type": "pickTile",
           "x": 26,
           "z": 14
@@ -603,6 +609,12 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 14,
+          "z": 5,
+          "distance": 12
         },
         {
           "type": "pickTile",

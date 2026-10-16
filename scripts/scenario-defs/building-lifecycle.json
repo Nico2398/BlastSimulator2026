@@ -104,19 +104,19 @@
           "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
         },
         {
-          "type": "awaitUsable",
+          "type": "waitForSelector",
           "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
-      "description": "role: player (issue #515, migrated #1768): placed rows no longer carry Upgrade; the player opens building #1's inspector, whose next tier (management_office tier 2) is research-locked, so it offers Research instead of Upgrade — there is no Upgrade control to click. Command mode runs `build upgrade 1` and the console refuses (tier 2 not researched), so buildingCount is unchanged. Not `guard`: guard needs a present-but-disabled control, and the Upgrade action is absent by design.",
+      "description": "role: guard (issue #515, migrated #1768): placed rows no longer carry Upgrade; the player opens building #1's inspector, whose next tier (management_office tier 2) is research-locked, so it offers Research instead of Upgrade \u2014 there is no Upgrade control to click, and Research is present but disabled (no Research Center yet, inline reason shown). Command mode runs `build upgrade 1` and the console refuses (tier 2 not researched), so buildingCount is unchanged. Not `guard`: guard needs a present-but-disabled control, and the Upgrade action is absent by design.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
-        "note": "rejected: Tier 2 management_office is not researched — confirms this is a genuine no-op, not a silent success",
-        "usable": "#bs-inspector [data-action=\"research\"]"
+        "note": "rejected: Tier 2 management_office is not researched \u2014 confirms this is a genuine no-op, not a silent success",
+        "blocked": "#bs-inspector [data-action=\"research\"]"
       },
-      "role": "player",
+      "role": "guard",
       "commandOutcome": "refused"
     },
     {
@@ -137,12 +137,12 @@
           "command": "build move 2 to:10,5"
         }
       ],
-      "description": "role: bootstrap (issue #515): building #2 was never placed, so there is no row and no button in the DOM at all — not merely disabled. `expect.blocked` needs a present-but-unusable control (interaction-driver.ts's checkGoal refuses an absent selector: \"not in the DOM, so blocked proves nothing\"), which doesn't exist here, and no player can ever target an id that was never shown to them. Genuinely bootstrap: this exercises the console's own bad-id guard, not a control a player could reach either way.",
+      "description": "role: bootstrap (issue #515): building #2 was never placed, so there is no row and no button in the DOM at all \u2014 not merely disabled. `expect.blocked` needs a present-but-unusable control (interaction-driver.ts's checkGoal refuses an absent selector: \"not in the DOM, so blocked proves nothing\"), which doesn't exist here, and no player can ever target an id that was never shown to them. Genuinely bootstrap: this exercises the console's own bad-id guard, not a control a player could reach either way.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
-        "note": "rejected: Building #2 not found — only building #1 was ever placed"
+        "note": "rejected: Building #2 not found \u2014 only building #1 was ever placed"
       },
       "role": "bootstrap",
       "commandOutcome": "refused"
@@ -165,12 +165,12 @@
           "command": "build destroy 2"
         }
       ],
-      "description": "role: bootstrap (issue #515): same reasoning as the `build move 2` step above — building #2 was never placed, so there is no row and no button in the DOM to point `expect.blocked` at, and no player can ever target an id that was never shown to them.",
+      "description": "role: bootstrap (issue #515): same reasoning as the `build move 2` step above \u2014 building #2 was never placed, so there is no row and no button in the DOM to point `expect.blocked` at, and no player can ever target an id that was never shown to them.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
-        "note": "rejected: Building #2 not found — the real building #1 is still standing"
+        "note": "rejected: Building #2 not found \u2014 the real building #1 is still standing"
       },
       "role": "bootstrap",
       "commandOutcome": "refused"

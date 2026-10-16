@@ -1,10 +1,10 @@
 {
   "name": "research-center-gate",
-  "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Research in the inspector of an already-placed building (opened from its Build panel row) must be rejected on screen — not silently accepted — while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
+  "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Research in the inspector of an already-placed building (opened from its Build panel row) must be rejected on screen \u2014 not silently accepted \u2014 while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit staffed:true",
-      "description": "Setup: load the Tutorial Pit terrain — tutorial_start is never called, so no rail restricts tile picks below. Staffed (#556) so the Research Center order below has an idle employee to actually build it.",
+      "description": "Setup: load the Tutorial Pit terrain \u2014 tutorial_start is never called, so no rail restricts tile picks below. Staffed (#556) so the Research Center order below has an idle employee to actually build it.",
       "role": "setup",
       "interaction": [
         {
@@ -21,7 +21,7 @@
     },
     {
       "command": "build living_quarters at:2,6",
-      "description": "Place a living quarters, tier 1, with no Research Center on site — the building this scenario will try (and fail, then succeed) to queue research on.",
+      "description": "Place a living quarters, tier 1, with no Research Center on site \u2014 the building this scenario will try (and fail, then succeed) to queue research on.",
       "role": "player",
       "interaction": [
         {
@@ -86,19 +86,15 @@
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Open the placed living quarters' inspector from its Build panel row and click Research — no Research Center exists yet, so getQueueBlockCode must return no_research_center and the click must be rejected on screen, not silently swallowed.",
-      "role": "player",
+      "description": "Open the placed living quarters' inspector from its Build panel row \u2014 no Research Center exists yet, so getQueueBlockCode returns no_research_center and the Research action is disabled on screen (inline reason 'Needs a Research Center'), not silently swallowed.",
+      "role": "guard",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-row-name"
         },
         {
-          "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"research\"]"
-        },
-        {
-          "type": "clickSelector",
+          "type": "waitForSelector",
           "selector": "#bs-inspector [data-action=\"research\"]"
         }
       ],
@@ -109,13 +105,14 @@
         "changedBy": {
           "cash": 0
         },
-        "note": "Cash unchanged and no research queued proves the click was rejected (#442's prerequisite gate), not silently swallowed."
+        "note": "Cash unchanged and no research queued proves the click was rejected (#442's prerequisite gate), not silently swallowed.",
+        "blocked": "#bs-inspector [data-action=\"research\"]"
       },
       "commandOutcome": "refused"
     },
     {
       "command": "build research_center at:13,15",
-      "description": "Place a Research Center, tier 1 — the prerequisite the previous step was missing.",
+      "description": "Place a Research Center, tier 1 \u2014 the prerequisite the previous step was missing.",
       "role": "player",
       "interaction": [
         {
@@ -148,7 +145,7 @@
         "changedBy": {
           "cash": -25000
         },
-        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before the next Queue Research click depends on hasActiveResearchCenter seeing a real building."
+        "note": "Confirming placement only queues a construction site (#556) \u2014 the next step waits for it to actually land before the next Queue Research click depends on hasActiveResearchCenter seeing a real building."
       }
     },
     {
@@ -174,7 +171,7 @@
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Open the living quarters' inspector again and click the identical Research action — now that a Research Center is placed, the tier-2 cost-only task must actually queue.",
+      "description": "Open the living quarters' inspector again and click the identical Research action \u2014 now that a Research Center is placed, the tier-2 cost-only task must actually queue.",
       "role": "player",
       "interaction": [
         {
@@ -194,12 +191,12 @@
         "changedBy": {
           "cash": -5000
         },
-        "note": "Cash dropped by exactly the tier-2 cost-only research price ($5,000, 0 ticks, no conditions per RESEARCH_TASK_DEFS) — the task actually queued this time, purely from clicking."
+        "note": "Cash dropped by exactly the tier-2 cost-only research price ($5,000, 0 ticks, no conditions per RESEARCH_TASK_DEFS) \u2014 the task actually queued this time, purely from clicking."
       }
     },
     {
       "command": "tick 2",
-      "description": "Let the cost-only research task resolve — 0-tick research resolves on the first tick processed after queueing.",
+      "description": "Let the cost-only research task resolve \u2014 0-tick research resolves on the first tick processed after queueing.",
       "role": "setup",
       "interaction": [
         {
@@ -210,7 +207,7 @@
     },
     {
       "command": "tick 1",
-      "description": "#1398: after the research completes, the player sees it in the Build panel — the inspector's Upgrade action for the placed living quarters replaces Research and becomes usable (tier 2 unlocked) with no console command standing in for a click.",
+      "description": "#1398: after the research completes, the player sees it in the Build panel \u2014 the inspector's Upgrade action for the placed living quarters replaces Research and becomes usable (tier 2 unlocked) with no console command standing in for a click.",
       "role": "player",
       "interaction": [
         {
@@ -224,7 +221,7 @@
     },
     {
       "command": "build living_quarters at:20,24 tier:2",
-      "description": "Proof the unlock is real, not just queued: tier 2 living quarters actually builds now, in both modes. Goes one step further than the playtest's own beat 7 (which stops at asserting the Place button is usable) so command mode has a real completion to check against — equals/increased have no interaction-only exemption (unlike usable/blocked/tutorialStep, scenario-types.ts's ScenarioStepGoal), so a step whose interaction only set the tier selector without clicking Buy would assert a buildingCount increase interaction mode never produced.",
+      "description": "Proof the unlock is real, not just queued: tier 2 living quarters actually builds now, in both modes. Goes one step further than the playtest's own beat 7 (which stops at asserting the Place button is usable) so command mode has a real completion to check against \u2014 equals/increased have no interaction-only exemption (unlike usable/blocked/tutorialStep, scenario-types.ts's ScenarioStepGoal), so a step whose interaction only set the tier selector without clicking Buy would assert a buildingCount increase interaction mode never produced.",
       "role": "player",
       "interaction": [
         {
@@ -275,7 +272,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "Tier-2 living_quarters construction cost is $25,000 (BuildingDefs.ts), on top of two ticks' worth of operatingCostPerTick from the living_quarters+research_center already placed — cash uses decreased not an exact equals since this follows a tick step (same class as building-research-visual.json's Finding #12). isTierUnlocked is genuinely true, not merely queued, or this build would still be rejected the same way the pre-Research-Center attempt was."
+        "note": "Tier-2 living_quarters construction cost is $25,000 (BuildingDefs.ts), on top of two ticks' worth of operatingCostPerTick from the living_quarters+research_center already placed \u2014 cash uses decreased not an exact equals since this follows a tick step (same class as building-research-visual.json's Finding #12). isTierUnlocked is genuinely true, not merely queued, or this build would still be rejected the same way the pre-Research-Center attempt was."
       }
     },
     {
