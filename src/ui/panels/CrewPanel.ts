@@ -1,43 +1,30 @@
 // BlastSimulator2026 — Crew panel (redesign P6)
-// Roster cards (avatar, morale, status tags) with an expandable detail per
-// employee: hired/location, needs, current task, skills, pay/raise,
-// training, dismiss. A HIRING section below the roster covers headcount.
+// Roster cards (avatar, morale, status tags, Locate) — a row click selects the
+// employee in the scene, whose inspector shows the detail. A HIRING section
+// below the roster covers headcount.
 //
-// Single expansion, unlike the old EmployeePanel's multi-expand Set: the
-// design mock keeps exactly one card open at a time (clicking a second one
-// closes the first), so `expandedId` is a lone id rather than a set.
-//
-// Root id, the roster toggle's .bs-detail-toggle class, the detail
-// wrapper's .bs-employee-detail class, [data-employee-id], the hire
-// button's [data-role], and the train button's .bs-train-btn/[data-skill]/
-// [data-employee] are all preserved from the old EmployeePanel so
-// tutorialStages.ts, uiActionProbe.ts, and the tutorial/scenario
-// defs keep resolving unchanged — same convention ContractsPanel.ts already
-// established for #bs-contract-panel in P5.
+// Root id, the roster toggle's .bs-detail-toggle class, [data-employee-id],
+// and the hire button's [data-role] are preserved from the old EmployeePanel
+// so tutorialStages.ts, uiActionProbe.ts, and the tutorial/scenario defs keep
+// resolving unchanged.
 
 import { PanelBase } from './PanelBase.js';
 import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll } from '../dom.js';
-import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
 import { makeHiringSection, hiringSignature } from './CrewHiring.js';
-import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
-import {
-  moraleColor, makeAvatar, makeRoleMoraleLine, raiseCommand, trainCommand, dismissConfirmConfig, makeStatusTags, makeHiredLocationStrip, makeNeedsSection,
-  makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection, makeManagerEffect,
-} from '../crewDetailSections.js';
-import type { ConfirmModalConfig } from './ConfirmModal.js';
+import { moraleColor, makeAvatar, makeRoleMoraleLine, makeStatusTags, makeManagerEffect } from '../crewDetailSections.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import { applyRowSelection, SELECTED_ROW_CLASS, type ListSelection } from '../selectionRoute.js';
 
 
 export class CrewPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
-  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
-  private expandedId: number | null = null;
+  private selection: ListSelection = null;
   private lastSignature = '';
   /** Role to scroll into view once the hiring section next renders (revealHiring before first render/show). */
   private pendingHiringRole: EmployeeRole | null = null;
@@ -66,13 +53,10 @@ export class CrewPanel extends PanelBase {
   }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
-  /** UIManager wires this to its shared ConfirmModal's show() — see ConfirmModal.ts. */
-  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
-
   /** Wire the callback that selects an employee in the 3D scene (focuses the camera on them). */
   setSelectEmployeeHandler(cb: (employeeId: number) => void): void { this.onSelectEmployeeCb = cb; }
 
-  /** Locate button action: focus the camera on the live employee and select them. Never touches card expansion. */
+  /** Locate button action: focus the camera on the live employee and select them. */
   private locateEmployee(id: number): void {
     const live = this.lastState?.employees.employees.find(x => x.id === id);
     if (!live) return;
@@ -81,20 +65,18 @@ export class CrewPanel extends PanelBase {
   }
 
 
-  /**
-   * Expand a specific employee's card and scroll it into view — the
-   * panel-side half of the inspector's DETAIL/TRAIN actions
-   * (src/ui/shell/Inspector.ts via UIManager.showEmployeeDetail), which
-   * pick an employee in the 3D scene and need their card opened here, not
-   * just the panel shown.
-   */
-  expandEmployee(id: number): void {
-    this.expandedId = id;
-    this.lastSignature = '';
-    if (this.lastState) this.update(this.lastState);
-    // Optional chained on the method itself, not just the element — jsdom
-    // (unit tests) doesn't implement scrollIntoView at all.
-    this.bodyEl.querySelector<HTMLElement>(`[data-employee-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  /** Highlight the roster row matching the scene selection `sel`; kept across re-renders, not part of the signature. */
+  setSelectedEmployee(sel: ListSelection): void {
+    const changed = this.selection?.id !== sel?.id || this.selection?.kind !== sel?.kind;
+    this.selection = sel;
+    this.applySelection(changed);
+  }
+
+  private applySelection(scroll = false): void {
+    applyRowSelection([this.bodyEl], this.selection, 'employee', 'data-employee-id');
+    if (!scroll || this.selection?.kind !== 'employee') return;
+    // Optional chained on the method: jsdom doesn't implement scrollIntoView.
+    this.bodyEl.querySelector<HTMLElement>(`.${SELECTED_ROW_CLASS}`)?.scrollIntoView?.({ block: 'nearest' });
   }
 
   /** Show the hiring section with candidates of `role` in view. */
@@ -119,6 +101,7 @@ export class CrewPanel extends PanelBase {
     }
     this.lastSignature = signature;
     this.render(state);
+    this.applySelection();
   }
 
   refreshLocale(): void {
@@ -129,36 +112,22 @@ export class CrewPanel extends PanelBase {
 
 
   /**
-   * Structural facts only: which rows exist, and — for the one expanded row
-   * — which controls it shows. Morale, need gauges, and task countdowns
-   * drift every tick on their own; including them here would force a full
-   * rebuild every tick and drop whatever the player is mid-click on.
+   * Structural facts only: which rows exist and what their static card parts
+   * show (name, role, flags, collapsing border, qualifications). Morale and status tags
+   * (training included) drift on their own; including them here would force a
+   * full rebuild and drop whatever the player is mid-click on.
    * refreshDynamic() below writes those in place instead.
-   *
-   * Cash is bucketed to affordability, not included as a raw number: a
-   * training fee or hire cost only needs a rebuild when it crosses from
-   * affordable to not (or back), the same way OperationsPanel/legacy
-   * EmployeePanel bucket cash against their own price thresholds.
    */
   private computeSignature(state: GameState): string {
     const rows = state.employees.employees
       .filter(e => e.alive)
       .map(e => {
+        // Qualifications drive the manager-effect line, which refreshDynamic does not repaint.
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}${q.licenceLevel ?? ''}`).join(',');
-        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
-          + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
+        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}:${e.name}:${quals}`;
       })
       .join('|');
-    const schools = state.buildings.buildings.map(b => `${b.type}${b.tier}`).sort().join(',');
-    return `${rows}#${this.expandedId ?? '-'}#${hiringSignature(state)}#${schools}`;
-  }
-
-  private affordsAnyCourse(e: Employee, state: GameState): boolean {
-    if (e.trainingState || e.pendingTrainingState || e.injured) return false;
-    return availableTrainingOffers(state.buildings.buildings).some(({ skill, building }) => {
-      const plan = planTraining(e, skill, building.tier);
-      return plan !== null && state.cash >= plan.fee;
-    });
+    return `${rows}#${hiringSignature(state)}`;
   }
 
   /** Re-paint values that drift every tick without rebuilding the DOM under an in-flight click. */
@@ -176,19 +145,7 @@ export class CrewPanel extends PanelBase {
       if (value) { value.textContent = `${Math.round(e.morale)}%`; value.style.color = color; }
 
       row.querySelector('.bs-crew-status')?.replaceWith(makeStatusTags(e, state));
-
-      if (e.id !== this.expandedId) continue;
-      const detail = row.querySelector<HTMLElement>('.bs-crew-detail');
-      if (!detail) continue;
-      detail.querySelector('.bs-crew-needs')?.replaceWith(this.tag(makeNeedsSection(e), 'bs-crew-needs'));
-      detail.querySelector('.bs-crew-task')?.replaceWith(this.tag(makeCurrentTaskSection(e, state), 'bs-crew-task'));
-      detail.querySelector('.bs-crew-skills')?.replaceWith(this.tag(makeSkillsSection(e), 'bs-crew-skills'));
     }
-  }
-
-  private tag(elToTag: HTMLElement, className: string): HTMLElement {
-    elToTag.classList.add(className);
-    return elToTag;
   }
 
   private render(state: GameState): void {
@@ -211,22 +168,13 @@ export class CrewPanel extends PanelBase {
   }
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
-    const expanded = e.id === this.expandedId;
     const row = el('div', { attrs: { 'data-employee-id': String(e.id), 'data-employee-role': e.role } });
-    // flex-shrink:0 — overflow:hidden (for the rounded corners) drops this
-    // row's automatic min-height from content-based to 0, which without this
-    // lets bodyEl's flex layout compress an expanded row to fit instead of
-    // leaving it at natural size and scrolling past it (the panel's own
-    // overflow-y:auto is otherwise a no-op: nothing left to overflow with).
     row.style.cssText = `border-radius:var(--bsx-r-card);overflow:hidden;flex-shrink:0;border:1px solid ${
-      expanded ? 'rgba(255,176,46,.4)' : e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
-    };background:${expanded ? 'rgba(255,176,46,.07)' : 'var(--bsx-card)'}`;
+      e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
+    };background:var(--bsx-card)`;
 
     const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;color:var(--bsx-text-primary);cursor:pointer;text-align:left' } });
     toggle.addEventListener('click', () => {
-      this.expandedId = expanded ? null : e.id;
-      this.lastSignature = '';
-      if (this.lastState) this.update(this.lastState);
       this.onSelectEmployeeCb?.(e.id);
     });
 
@@ -243,7 +191,7 @@ export class CrewPanel extends PanelBase {
     const managerEffect = makeManagerEffect(e);
     const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: managerEffect ? [nameLine, roleLine, managerEffect] : [nameLine, roleLine] });
 
-    toggle.append(avatar, col, makeStatusTags(e, state), iconEl('chev', 12, 0.4));
+    toggle.append(avatar, col, makeStatusTags(e, state));
     const locateBtn = makeLocateButton({
       title: t('ui.crew.locate'),
       onClick: () => this.locateEmployee(e.id),
@@ -253,28 +201,6 @@ export class CrewPanel extends PanelBase {
     const header = el('div', { attrs: { style: 'display:flex;align-items:center' }, children: [toggle, locateBtn] });
     row.appendChild(header);
 
-    if (expanded) {
-      const detail = el('div', { className: 'bs-crew-detail bs-employee-detail', attrs: { style: 'padding:0 11px 12px;display:flex;flex-direction:column;gap:11px' } });
-      detail.append(
-        makeHiredLocationStrip(e, state),
-        this.tag(makeNeedsSection(e), 'bs-crew-needs'),
-        this.tag(makeCurrentTaskSection(e, state), 'bs-crew-task'),
-        this.tag(makeSkillsSection(e), 'bs-crew-skills'),
-        this.tag(makePaySection(e, amount => this.gameConsole?.(raiseCommand(e, amount))), 'bs-crew-pay'),
-        this.tag(makeTrainingSection(e, state, (skill, buildingId) => this.gameConsole?.(trainCommand(e, skill, buildingId))), 'bs-crew-training'),
-        this.tag(makeDismissSection(e, () => this.requestDismiss(e)), 'bs-crew-dismiss'),
-      );
-      row.appendChild(detail);
-    }
     return row;
-  }
-
-  /**
-   * Dismissal removes the employee from the roster permanently — there is no severance
-   * payment or reversal — so this always routes through the shared confirm
-   * overlay rather than firing on the first click.
-   */
-  private requestDismiss(e: Employee): void {
-    this.onConfirmRequestCb?.(dismissConfirmConfig(e, command => this.gameConsole?.(command)));
   }
 }

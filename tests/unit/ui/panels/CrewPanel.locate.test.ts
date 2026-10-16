@@ -93,6 +93,7 @@ describe('CrewPanel — Locate button (#1422)', () => {
     const card = panel.root.querySelector('[data-employee-id="1"]');
     (panel.root.querySelector(`[data-employee-id="1"] ${LOCATE}`) as HTMLButtonElement).click();
     expect(panel.root.querySelector('.bs-employee-detail')).toBeNull();
+    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
     expect(panel.root.querySelector('[data-employee-id="1"]')).toBe(card);
   });
 
@@ -104,11 +105,15 @@ describe('CrewPanel — Locate button (#1422)', () => {
     expect(() => btn.click()).not.toThrow();
   });
 
-  it('the roster toggle still expands the card', () => {
+  it('the roster toggle selects and does not expand the card (#1765)', () => {
     const panel = makePanel();
+    const cb = vi.fn();
+    panel.setSelectEmployeeHandler(cb);
     panel.update(makeState([makeEmployee()]));
     (panel.root.querySelector('[data-employee-id="1"] .bs-detail-toggle') as HTMLElement).click();
-    expect(panel.root.querySelector('.bs-employee-detail')).not.toBeNull();
+    expect(cb).toHaveBeenCalledWith(1);
+    expect(panel.root.querySelector('.bs-employee-detail')).toBeNull();
+    expect(panel.root.querySelector('.bs-crew-detail')).toBeNull();
   });
 });
 

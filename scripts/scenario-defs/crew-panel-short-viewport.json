@@ -1,6 +1,6 @@
 {
   "name": "crew-panel-short-viewport",
-  "description": "Regression for the tutorial step 8 report: on a short browser window the Crew panel's Training section (and everything else below the fold) had no way to scroll into view. One root cause, in CrewPanel.ts: the expandable roster row carries overflow:hidden for its rounded corners, which drops that row's automatic flex min-height from content-based to 0. Without a min-height floor the panel body's flex layout compressed an expanded row down to the space available instead of leaving it at natural size and overflowing the body the way a scrollable list does — so bodyEl.scrollHeight sat exactly equal to clientHeight (472=472, nothing to scroll at all) and the body's own overflow-y:auto was a no-op. flex-shrink:0 on the row is the fix. UIManager.ts's leftCol keeps max-height (not height): when the column's content overflows, max-height clamps its used height to a definite value, which is exactly what each panel's own max-height:100% resolves against — reverting that line alone keeps this scenario green, while reverting the roster row's flex-shrink:0 fails it, which is how the single root cause was isolated. Proving it needs a real wheel gesture: clickSelector and expect.usable/blocked both call Element.scrollIntoView internally before acting (interaction-executor.ts's clickSelector; interaction-driver.ts's blockedReason, deliberately, for the ordinary case of a row below the fold in a genuinely scrollable list), a DOM API no player has an equivalent for and one that is not gated by pointer-events — it would have scrolled straight past the bug undetected. This file dispatches mousemove + wheel through Puppeteer's CDP input pipeline, the way a genuine gesture hit-tests, then reads bodyEl's own scrollTop. The read is `waitForProperty` rather than a bare `assert` because page.mouse.wheel() resolving does not mean Chrome has committed the scroll — it can land on the compositor thread after the CDP call returns, which is what turned CI red on this very scenario (PR #888, shard 6/10, Chrome 127: 'expected scrollTop=50, got 0', reproducible there and never locally on Chrome 141 with a dedicated browser per run). waitForProperty polls for the value instead of padding with a fixed delay, so it costs only the time the browser actually takes and still fails by name, reporting the last scrollTop it saw, when the scroll never lands — which is what the negative control depends on.",
+  "description": "Regression for the tutorial step 8 report: on a short browser window the Crew panel's roster and the sections below it had no way to scroll into view. Since #1765 roster rows no longer expand inline (selecting a row opens the inspector instead), so the roster itself must overflow its bounded wrapper at 1280x600 and scroll under a real wheel gesture. Proving it needs a real wheel gesture: clickSelector and expect.usable/blocked both call Element.scrollIntoView internally before acting, a DOM API no player has an equivalent for and one that is not gated by pointer-events. This file dispatches mousemove + wheel through Puppeteer's CDP input pipeline, the way a genuine gesture hit-tests, then reads the roster's own scrollTop. The read is waitForProperty rather than a bare assert because page.mouse.wheel() resolving does not mean Chrome has committed the scroll; waitForProperty polls instead of padding with a fixed delay and fails by name, reporting the last scrollTop it saw. The roster keeps the scroll while crew activity changes (#1592), and the Train action lives in the inspector's Training section, reached by clicking the roster row.",
   "steps": [
     {
       "command": "new_game seed:42 cash:150000",
@@ -19,7 +19,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Employees #1 and #2 — two drillers, so the crew keeps changing activity (walking to the site, working it) while the roster is open (#1592). The first is the tutorial's own train-driller subject; courses grant new qualifications only (#1388), so the driller (who starts with blasting and driving.drill_rig) takes the rock fragmenter licence.",
+      "description": "Employees #1 and #2 are drillers (#1 is the tutorial's train-driller subject; courses grant new qualifications only (#1388), so the driller takes the rock fragmenter licence), #3 a third driller; #4 and #5 blasters. Five rows make the roster overflow its bounded wrapper without any inline-expanded row (#1765), and crew keeps changing activity while the roster is open (#1592).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -40,6 +40,30 @@
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -92,7 +116,7 @@
     },
     {
       "command": "employee list",
-      "description": "#1592 regression, part 1. Command is a harmless placeholder (command mode has no 'wheel-scroll a panel'). While the driving_center is still a construction order, shrink to 1280x600, open Crew, expand employee #1 and wheel-scroll the roster by a real gesture. The Train button is not asserted here — it only exists once the school stands.",
+      "description": "#1592 regression, part 1. Command is a harmless placeholder (command mode has no 'wheel-scroll a panel'). While the driving_center is still a construction order, shrink to 1280x600, open Crew and wheel-scroll the overflowing roster by a real gesture. Rows are not expanded (#1765). The Train button is not asserted here; it lives in the inspector once the school stands.",
       "interaction": [
         {
           "type": "viewport",
@@ -105,15 +129,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-employee-role=\"blaster\"] .bs-detail-toggle"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-crew-detail"
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
         },
         {
           "type": "assert",
@@ -124,7 +144,7 @@
         {
           "type": "mousemove",
           "x": 190,
-          "y": 300
+          "y": 160
         },
         {
           "type": "wheel",
@@ -173,7 +193,7 @@
     },
     {
       "command": "employee list",
-      "description": "#1592 regression, part 2. The ticks of the previous step changed the crew's activity repeatedly; the roster must still sit where the wheel left it (scrollTop 50 — a refresh may not teleport it back). Nothing in this step re-expands the card or scrolls: employee #1's row is still open from part 1. The Train button is reachable by the same wheel gesture.",
+      "description": "#1592 regression, part 2. The ticks of the previous step changed the crew's activity repeatedly; the roster must still sit where the wheel left it (scrollTop 50 - a refresh may not teleport it back). Nothing in this step clicks or scrolls.",
       "interaction": [
         {
           "type": "assert",
@@ -183,7 +203,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
         },
         {
           "type": "assert",
@@ -197,17 +217,27 @@
       ],
       "role": "player",
       "expect": {
-        "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]",
-        "note": "The scroll position survived the whole construction (asserted twice, before and after the Train button appeared); the button is reachable."
+        "equals": {
+          "buildingCount": 1
+        },
+        "note": "The scroll position survived the whole construction; nothing was expanded inline."
       }
     },
     {
       "command": "employee train 1 skill:driving.rock_fragmenter",
-      "description": "Completes the train-driller target. NOTE (#1592): the harness has no 'click by selector without scrollIntoView' action — clickSelector's own scrollIntoView still runs here. The regression is therefore proven by the scrollTop asserts above, not by this click; when such an action exists, switch this step to it.",
+      "description": "Completes the train-driller target. Clicking the roster row selects employee #1 and opens the inspector (#1765); its Training section carries the Train button, as in tutorial-placement-cancel.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail[data-employee-role=\"driller\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"employee\"][data-id=\"1\"] .bs-employee-detail[data-employee-role=\"driller\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]"
         }
       ],
       "role": "player",
