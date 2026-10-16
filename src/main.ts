@@ -10,7 +10,8 @@ import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
 import { wireLogisticsNotifications } from './ui/notify/logisticsNotifications.js';
 import { wireResearchNotifications } from './ui/notify/researchNotifications.js';
 import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
-import { SavesModal } from './ui/panels/SavesModal.js';
+import { SavesModal, autosaveLossText } from './ui/panels/SavesModal.js';
+import { buildStartLevelConfirm } from './ui/screens/startLevelConfirm.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { shouldAutoStartTutorial, shouldKeepTutorialRunning, shouldRestartTutorialOnRetry, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
 import { probeTutorialState } from './ui/tutorialStateProbe.js';
@@ -341,15 +342,18 @@ function startLevel(levelId: string): void {
     if (shouldAutoStartTutorial(levelId, TutorialOverlay.isCompleted())) tutorial.start(ctx.state ?? undefined);
   });
 }
+let startLevelConfirmPending = false;
 worldMap.setOnStartLevel((levelId) => {
   if (!isLiveGame()) { startLevel(levelId); return; }
-  uiManager.showConfirm({
-    icon: 'blast',
-    title: t('ui.portfolio.restart_confirm_title'),
-    body: t('ui.portfolio.restart_confirm_body'),
-    confirmLabel: t('ui.portfolio.restart_confirm_button'),
-    onConfirm: () => startLevel(levelId),
-  });
+  if (startLevelConfirmPending) return;
+  startLevelConfirmPending = true;
+  const liveLevelId = ctx.state?.campaign.activeLevelId ?? null;
+  void autosaveLossText(saveBackend, liveLevelId)
+    .then((autosaveText) => {
+      uiManager.showConfirm(buildStartLevelConfirm({ liveLevelId, targetLevelId: levelId, autosaveText }, () => startLevel(levelId)));
+    })
+    .catch((err) => console.error('start-level confirm failed', err))
+    .finally(() => { startLevelConfirmPending = false; });
 });
 
 // --- Level End Screen (redesign P8) ---

@@ -45,11 +45,18 @@ const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
 
 /** Text telling the player what leaving the live game costs: age of its auto-save, or that none exists. */
 export async function autosaveLossText(
-  _backend: SaveBackend | null,
-  _levelId: string | null | undefined,
+  backend: SaveBackend | null,
+  levelId: string | null | undefined,
 ): Promise<string> {
-  // TODO: implement
-  return '';
+  if (!backend) return t('ui.settings.return_confirm_body_none');
+  try {
+    const metas = await backend.list();
+    const auto = metas.find(m => m.slotId === autoSaveSlotFor(levelId));
+    if (!auto) return t('ui.settings.return_confirm_body_none');
+    return t('ui.settings.return_confirm_body', { time: relativeTime(auto.timestamp) });
+  } catch {
+    return t('ui.settings.return_confirm_body_none');
+  }
 }
 
 export function relativeTime(timestampMs: number): string {
