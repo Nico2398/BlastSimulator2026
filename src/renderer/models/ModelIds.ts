@@ -5,12 +5,11 @@
 
 import type { EmployeeRole } from '../../core/entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
-import { isSingleTierType, type BuildingTier, type BuildingType } from '../../core/entities/Building.js';
+import { BUILDING_TIERS, isSingleTierType, type BuildingTier, type BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
 import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
 
 export const EMPLOYEE_ROLES: readonly EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
-const BUILDING_TIERS: readonly BuildingTier[] = [1, 2, 3];
 
 /** Rubble stand-in for any building at hp 0, scaled to its footprint. */
 export const BUILDING_RUIN_MODEL_ID = 'building_ruin';

@@ -252,7 +252,7 @@ describe('entities.ts — build upgrade to an unresearched tier', () => {
 // through buildCommand without mocking anything.
 
 describe('entities.ts — build upgrade failure (re-placement rejected by an overlap)', () => {
-  const EN = 'Upgrade failed: Space is occupied — a building or construction site covers part of that spot.';
+  const EN = 'Upgrade failed: Space is occupied by the Management Office at (0, 2) — move or demolish it first.';
 
   function setupBlockedUpgrade(ctx: GameContext): number {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
@@ -452,16 +452,16 @@ describe('build <type> at: — placement refusals', () => {
     placeTestBuilding(ctx);
     const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
     expect(result.success).toBe(false);
-    expectEnglish(result.output, 'shell.placement.refused_occupied');
+    expectEnglish(result.output, 'shell.placement.refused_occupied_by', { building: 'Management Office', x: 0, z: 0 });
   });
 
-  it('occupied — fr prints the exact refused_occupied text', () => {
+  it('occupied — fr prints the exact refused_occupied_by text naming the blocker', () => {
     const ctx = makeCtx();
     placeTestBuilding(ctx);
     setLocale('fr');
     const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
     expect(result.success).toBe(false);
-    expect(result.output).toBe(fr('shell.placement.refused_occupied'));
+    expect(result.output).toBe(fr('shell.placement.refused_occupied_by', { building: 'Bureau de Gestion', x: 0, z: 0 }));
   });
 });
 
@@ -537,17 +537,17 @@ describe('build move — placement refusals', () => {
     expect(frResult.output).toBe(fr('shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD }));
   });
 
-  it('occupied destination — en keeps the English text, fr prints refused_occupied', () => {
+  it('occupied destination — en keeps the English text, fr prints refused_occupied_by', () => {
     const ctx = makeCtx();
     const id = placeAt(ctx, 'management_office', 1, 4, 4);
     placeAt(ctx, 'management_office', 1, 8, 8);
     const enResult = buildCommand(ctx, ['move', String(id)], { to: '8,8' });
     expect(enResult.success).toBe(false);
-    expectEnglish(enResult.output, 'shell.placement.refused_occupied');
+    expectEnglish(enResult.output, 'shell.placement.refused_occupied_by', { building: 'Management Office', x: 8, z: 8 });
     setLocale('fr');
     const frResult = buildCommand(ctx, ['move', String(id)], { to: '8,8' });
     expect(frResult.success).toBe(false);
-    expect(frResult.output).toBe(fr('shell.placement.refused_occupied'));
+    expect(frResult.output).toBe(fr('shell.placement.refused_occupied_by', { building: 'Bureau de Gestion', x: 8, z: 8 }));
   });
 });
 
@@ -559,13 +559,13 @@ describe('build upgrade — blocked upgrade wraps the translated inner refusal',
     return id;
   }
 
-  it('fr output is build_upgrade_failed around the fr refused_occupied text', () => {
+  it('fr output is build_upgrade_failed around the fr refused_occupied_by text', () => {
     const ctx = makeCtx();
     const id = setupBlockedUpgrade(ctx);
     setLocale('fr');
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
-    expect(result.output).toBe(fr('entities.build_upgrade_failed', { error: fr('shell.placement.refused_occupied') }));
+    expect(result.output).toBe(fr('entities.build_upgrade_failed', { error: fr('shell.placement.refused_occupied_by', { building: 'Bureau de Gestion', x: 0, z: 2 }) }));
     expect(result.output).not.toContain('Space is occupied');
   });
 
@@ -575,7 +575,7 @@ describe('build upgrade — blocked upgrade wraps the translated inner refusal',
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
     expect(result.output).toMatch(/^Upgrade failed: /);
-    expect(result.output).toContain('Space is occupied');
+    expect(result.output).toContain('Space is occupied by the Management Office at (0, 2)');
   });
 });
 

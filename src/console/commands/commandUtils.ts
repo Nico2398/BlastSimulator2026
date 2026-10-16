@@ -21,7 +21,13 @@ export function staffedSuffix(staffed: boolean): string {
 
 /** Player-facing text of a core refusal: `errorKey` translated with `errorParams` when core supplied a key, else its plain English `error`. */
 export function refusalText(refusal: { error?: string } & RefusalKey): string {
-  return refusal.errorKey ? t(refusal.errorKey, refusal.errorParams) : refusal.error!;
+  if (!refusal.errorKey) return refusal.error!;
+  const params = refusal.errorParams;
+  // Convention: a `building` param carries a BuildingType id; show its translated name.
+  if (params !== undefined && typeof params.building === 'string') {
+    return t(refusal.errorKey, { ...params, building: buildingTypeName(params.building as BuildingType) });
+  }
+  return t(refusal.errorKey, params);
 }
 
 /** Translated display name of a building type for refusal text. */
