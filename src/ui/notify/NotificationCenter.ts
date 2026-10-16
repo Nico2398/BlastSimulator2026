@@ -21,7 +21,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
+import { buildBlockedOrderMessage, isFailureBlock } from './blockedOrders.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 import type { UiCues } from '../../audio/ui/UiCues.js';
@@ -222,8 +222,8 @@ export class NotificationCenter {
     const queuedBlocked = state.pendingActions.filter(
       a => a.status === 'queued' && a.blockedReason != null,
     );
-    const strandedCount = queuedBlocked.filter(a => a.blockedReason === 'debris_out_of_reach').length;
-    const blockedActions = queuedBlocked.filter(a => a.blockedReason !== 'debris_out_of_reach');
+    const strandedCount = queuedBlocked.filter(a => !isFailureBlock(a)).length;
+    const blockedActions = queuedBlocked.filter(isFailureBlock);
     // Hundreds of haul actions share one cause: toast once per reason, not per action.
     const haulActions = new Map<BlockedOrderReason, PendingAction>();
     for (const a of blockedActions) {
@@ -308,51 +308,5 @@ export class NotificationCenter {
     for (const key of map instanceof Map ? map.keys() : map) {
       if (!currentIds.has(key)) map.delete(key);
     }
-  }
-}
-
-/** Builds the notification body naming the blocked order and its missing requirement (#1061). */
-export function buildBlockedOrderMessage(action: PendingAction): string {
-  const order = t(ACTION_LABEL_KEY[action.type]);
-  switch (action.blockedReason) {
-    case 'no_vehicle_in_fleet':
-      return t('notification.order_blocked_no_vehicle', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
-    case 'no_licensed_driver':
-      return t('notification.order_blocked_no_driver', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
-    case 'licence_level_too_low':
-      return t('notification.order_blocked_licence_level', {
-        order,
-        licence: t(`vehicle_type.${action.requiredVehicleRole}`),
-        level: action.blockedLicenceLevel ?? 1,
-      });
-    case 'no_reaching_vehicle':
-      return t('notification.order_blocked_no_reaching_vehicle', {
-        order,
-        tier: action.blockedLicenceLevel ?? 1,
-        role: t(`vehicle_type.${action.requiredVehicleRole}`),
-      });
-    case 'no_qualified_employee':
-      return action.requiredSkill !== null
-        ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })
-        : t('notification.order_blocked_no_staff', { order });
-    case 'no_dual_qualified_employee':
-      return t('notification.order_blocked_no_dual_employee', {
-        order,
-        licence: t(`vehicle_type.${action.requiredVehicleRole}`),
-        skill: t(`skill.${action.requiredSkill}`),
-      });
-    case 'target_unreachable':
-      return t('notification.order_blocked_target_unreachable', { order });
-    case 'no_freight_warehouse':
-      return t('notification.order_blocked_no_warehouse', { order });
-    case 'no_spoil_heap':
-      return t('notification.order_blocked_no_spoil_heap', { order });
-    case 'storage_full':
-      return t('notification.order_blocked_storage_full', { order });
-    case 'debris_out_of_reach':
-      // Unreachable from update(): stranded debris is surfaced as one summary pip, not a per-order toast. Kept for exhaustiveness.
-      return t('notification.pip.stranded_debris_tip', { count: 1 });
-    default:
-      return order;
   }
 }

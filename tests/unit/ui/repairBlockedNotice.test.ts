@@ -2,7 +2,7 @@
 // BlastSimulator2026 — blocked repair order names the missing Repair training, en + fr (#1393)
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { buildBlockedOrderMessage } from '../../../src/ui/notify/NotificationCenter.js';
+import { buildBlockedOrderMessage } from '../../../src/ui/notify/blockedOrders.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 

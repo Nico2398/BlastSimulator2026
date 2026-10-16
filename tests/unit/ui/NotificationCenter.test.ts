@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { NotificationCenter, buildBlockedOrderMessage } from '../../../src/ui/notify/NotificationCenter.js';
+import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
+import { buildBlockedOrderMessage, isFailureBlock } from '../../../src/ui/notify/blockedOrders.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction, PlannedRamp } from '../../../src/core/state/GameState.js';
 import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
@@ -1079,3 +1080,22 @@ describe('NotificationCenter — interface cue', () => {
   });
 });
 
+
+describe('isFailureBlock (#1810)', () => {
+  it('is false for no block', () => {
+    expect(isFailureBlock({ blockedReason: null })).toBe(false);
+    expect(isFailureBlock({})).toBe(false);
+  });
+
+  it('is false for stranded debris', () => {
+    expect(isFailureBlock({ blockedReason: 'debris_out_of_reach' })).toBe(false);
+  });
+
+  it.each([
+    'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver',
+    'target_unreachable', 'no_freight_warehouse', 'storage_full', 'licence_level_too_low',
+    'no_spoil_heap', 'no_reaching_vehicle',
+  ] as const)('is true for %s', (reason) => {
+    expect(isFailureBlock({ blockedReason: reason })).toBe(true);
+  });
+});

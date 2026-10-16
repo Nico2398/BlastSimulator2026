@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { OperationsPanel } from '../../../../src/ui/panels/OperationsPanel.js';
+import { OperationsPanel, countQueuedByBlock } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
-import type { GameState, PendingAction } from '../../../../src/core/state/GameState.js';
+import { buildBlockedOrderMessage } from '../../../../src/ui/notify/blockedOrders.js';
+import type { GameState, PendingAction, BlockedOrderReason } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
 
@@ -604,5 +605,182 @@ describe('OperationsPanel — scroll survives a refresh (#1592)', () => {
 
     const after = bounded(panel);
     expect(after.map(s => s.scrollTop)).toEqual(before.map((_, i) => 20 + i * 10));
+  });
+});
+
+// ── Blocked orders in the Work Queue and Unclaimed Work (#1810) ──
+
+const ALL_BLOCK_REASONS: BlockedOrderReason[] = [
+  'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver',
+  'target_unreachable', 'debris_out_of_reach', 'no_freight_warehouse', 'storage_full',
+  'licence_level_too_low', 'no_spoil_heap', 'no_reaching_vehicle',
+];
+const UNCLAIMED_NOTE = 'Open to any qualified, available worker.';
+
+function blockedFixture(id: number, reason: BlockedOrderReason | null, overrides: Partial<PendingAction> = {}): PendingAction {
+  return makePendingActionFixture({
+    id, type: 'demolish_building', requiredSkill: 'driving.excavator', requiredVehicleRole: 'building_destroyer',
+    blockedReason: reason, ...overrides,
+  });
+}
+
+function renderWith(actions: PendingAction[]): { panel: OperationsPanel; state: GameState } {
+  const { panel } = makePanel();
+  const state = makeState();
+  state.pendingActions.push(...actions);
+  panel.show();
+  panel.update(state);
+  return { panel, state };
+}
+
+function chipTexts(root: HTMLElement): string[] {
+  return Array.from(root.querySelectorAll('.bsx-chip')).map(c => c.textContent ?? '');
+}
+
+describe('OperationsPanel — blocked orders (#1810)', () => {
+  it('shows a Blocked chip and the toast reason for no_vehicle_in_fleet', () => {
+    const action = blockedFixture(1, 'no_vehicle_in_fleet');
+    const { panel } = renderWith([action]);
+    expect(t('ui.operations.work_queue_status_blocked')).toBe('Blocked');
+    expect(chipTexts(panel.root)).toContain('Blocked');
+    expect(chipTexts(panel.root)).not.toContain('Queued');
+    const reason = panel.root.querySelector('[data-blocked-reason]');
+    expect(reason).not.toBeNull();
+    expect(reason!.textContent).toBe(buildBlockedOrderMessage(action));
+    expect(reason!.textContent).toContain('Building Destroyer');
+  });
+
+  it.each(ALL_BLOCK_REASONS.filter(r => r !== 'debris_out_of_reach'))('row text equals toast text for %s', (reason) => {
+    const action = blockedFixture(2, reason, { blockedLicenceLevel: 2 });
+    const { panel } = renderWith([action]);
+    const el = panel.root.querySelector('[data-blocked-reason]');
+    expect(el).not.toBeNull();
+    expect(el!.textContent).toBe(buildBlockedOrderMessage(action));
+    expect(chipTexts(panel.root)).toContain('Blocked');
+  });
+
+  it('a queued action without blockedReason reads Queued / Unclaimed with no blocked chip or reason', () => {
+    const { panel } = renderWith([blockedFixture(3, null)]);
+    const text = panel.root.textContent ?? '';
+    expect(chipTexts(panel.root)).toContain('Queued');
+    expect(text).toContain('Unclaimed');
+    expect(chipTexts(panel.root)).not.toContain('Blocked');
+    expect(panel.root.querySelector('[data-blocked-reason]')).toBeNull();
+  });
+
+  it('debris_out_of_reach is neutral: Out of reach chip, reason line, no Blocked or warn chip', () => {
+    const action = blockedFixture(4, 'debris_out_of_reach', { type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' });
+    const { panel } = renderWith([action]);
+    expect(chipTexts(panel.root)).not.toContain('Blocked');
+    expect(chipTexts(panel.root)).toContain('Out of reach');
+    expect(panel.root.querySelector('.bsx-chip-warn')).toBeNull();
+    expect(panel.root.querySelector('.bsx-chip-critical')).toBeNull();
+    const out = Array.from(panel.root.querySelectorAll('.bsx-chip')).find(c => c.textContent === 'Out of reach');
+    expect(out!.className).toContain('bsx-chip-neutral');
+    const reason = panel.root.querySelector('[data-blocked-reason]');
+    expect(reason).not.toBeNull();
+    expect(reason!.textContent).toBe(buildBlockedOrderMessage(action));
+  });
+
+  it('assigned and in_progress actions never show blocked, even with a stale blockedReason', () => {
+    const { panel } = renderWith([
+      blockedFixture(5, 'no_vehicle_in_fleet', { status: 'assigned', holderId: 9 }),
+      blockedFixture(6, 'no_vehicle_in_fleet', { status: 'in_progress', holderId: 9 }),
+    ]);
+    expect(chipTexts(panel.root)).not.toContain('Blocked');
+    expect(panel.root.querySelector('[data-blocked-reason]')).toBeNull();
+  });
+
+  it('update() re-renders when blockedReason appears and clears', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const action = blockedFixture(7, null);
+    state.pendingActions.push(action);
+    panel.show();
+    panel.update(state);
+    expect(panel.root.querySelector('[data-blocked-reason]')).toBeNull();
+    action.blockedReason = 'no_vehicle_in_fleet';
+    panel.update(state);
+    expect(panel.root.querySelector('[data-blocked-reason]')).not.toBeNull();
+    expect(chipTexts(panel.root)).toContain('Blocked');
+    action.blockedReason = null;
+    panel.update(state);
+    expect(panel.root.querySelector('[data-blocked-reason]')).toBeNull();
+    expect(chipTexts(panel.root)).not.toContain('Blocked');
+    expect(chipTexts(panel.root)).toContain('Queued');
+  });
+
+  it('update() re-renders when the reason changes', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const action = blockedFixture(8, 'no_vehicle_in_fleet');
+    state.pendingActions.push(action);
+    panel.show();
+    panel.update(state);
+    action.blockedReason = 'no_licensed_driver';
+    panel.update(state);
+    expect(panel.root.querySelector('[data-blocked-reason]')!.textContent).toBe(buildBlockedOrderMessage(action));
+  });
+});
+
+describe('OperationsPanel — Unclaimed Work with blocked orders (#1810)', () => {
+  it('counts only open orders in "N tasks"', () => {
+    const { panel } = renderWith([
+      blockedFixture(1, null),
+      blockedFixture(2, 'no_vehicle_in_fleet'),
+      blockedFixture(3, 'no_qualified_employee'),
+    ]);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('1 tasks');
+    expect(text).not.toContain('3 tasks');
+    expect(text).toContain(UNCLAIMED_NOTE);
+  });
+
+  it('does not describe blocked-only work as open to any worker', () => {
+    const { panel } = renderWith([blockedFixture(1, 'no_vehicle_in_fleet')]);
+    const text = panel.root.textContent ?? '';
+    expect(text).not.toContain(UNCLAIMED_NOTE);
+    expect(text).not.toContain('1 tasks');
+  });
+
+  it('keeps the open-to-anyone note for unblocked work', () => {
+    const { panel } = renderWith([blockedFixture(1, null)]);
+    expect(panel.root.textContent).toContain(UNCLAIMED_NOTE);
+  });
+
+  it('note shows both the blocked and out-of-reach clauses for a mixed queue', () => {
+    const { panel } = renderWith([
+      blockedFixture(1, 'no_vehicle_in_fleet'),
+      blockedFixture(2, 'debris_out_of_reach', { type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' }),
+    ]);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('1 blocked - waiting on the site');
+    expect(text).toContain('1 out of reach - waiting on the site');
+    expect(text).not.toContain(UNCLAIMED_NOTE);
+  });
+
+  it('i18n has the blocked-note wording with a {blocked} placeholder', () => {
+    expect(t('ui.operations.unclaimed_work_note_blocked', { blocked: 2 })).toContain('2');
+    expect(t('ui.operations.work_queue_status_stranded')).toBe('Out of reach');
+  });
+});
+
+describe('countQueuedByBlock (#1810)', () => {
+  const q = (blockedReason: BlockedOrderReason | null | undefined, status: PendingAction['status'] = 'queued'): Pick<PendingAction, 'status' | 'blockedReason'> =>
+    (blockedReason === undefined ? { status } : { status, blockedReason });
+
+  it('returns zeros for no actions', () => {
+    expect(countQueuedByBlock([])).toEqual({ open: 0, blocked: 0, stranded: 0 });
+  });
+
+  it('splits queued actions into open, blocked and stranded', () => {
+    expect(countQueuedByBlock([
+      q(null), q(undefined), q('no_vehicle_in_fleet'), q('no_licensed_driver'), q('debris_out_of_reach'),
+    ])).toEqual({ open: 2, blocked: 2, stranded: 1 });
+  });
+
+  it('ignores assigned and in_progress actions', () => {
+    expect(countQueuedByBlock([q(null, 'assigned'), q('no_vehicle_in_fleet', 'in_progress')]))
+      .toEqual({ open: 0, blocked: 0, stranded: 0 });
   });
 });
