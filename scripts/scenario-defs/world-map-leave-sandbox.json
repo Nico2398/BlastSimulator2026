@@ -1,0 +1,66 @@
+{
+  "name": "world-map-leave-sandbox",
+  "description": "Issue #1809: starting a campaign level while a sandbox game is live asks before discarding it. Player returns to the main menu through Settings, opens New Campaign, clicks Start on Dusty Hollow's card; a leave-confirm modal appears (it names the sandbox, unit-tested in startLevelConfirm.test.ts), the player confirms and Dusty Hollow starts. Every beat after setup is a real click.",
+  "steps": [
+    {
+      "command": "sandbox start seed:42",
+      "description": "Setup: a live sandbox game.",
+      "interaction": [
+        { "type": "command", "command": "sandbox start seed:42" }
+      ],
+      "role": "setup",
+      "timeout": 60
+    },
+    {
+      "command": "state",
+      "description": "Player opens Settings and clicks Return to Main Menu, then confirms; the main menu returns. `state` is the inert paired command.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" },
+        { "type": "clickSelector", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" },
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" },
+        { "type": "awaitUsable", "selector": "#bs-main-menu #bs-menu-new-campaign" }
+      ],
+      "role": "player",
+      "expect": { "usable": "#bs-main-menu #bs-menu-new-campaign" },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player clicks New Campaign; the Portfolio offers Dusty Hollow's Start. `state` is the inert paired command.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-main-menu #bs-menu-new-campaign" },
+        { "type": "awaitUsable", "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]" }
+      ],
+      "role": "player",
+      "expect": { "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]" },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player clicks Start on Dusty Hollow while the sandbox is still live; the leave-confirm modal appears and the Portfolio stays up behind it. `state` is the inert paired command.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" }
+      ],
+      "role": "player",
+      "expect": { "usable": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "description": "Player confirms leaving the sandbox; Dusty Hollow starts and the HUD is reachable. Command mode has no portfolio, so the paired command starts the same level.",
+      "interaction": [
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" },
+        { "type": "awaitUsable", "selector": "#bs-saveload-btn", "timeoutMs": 60000 }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "equals": { "levelEnded": false }
+      },
+      "timeout": 120
+    }
+  ]
+}

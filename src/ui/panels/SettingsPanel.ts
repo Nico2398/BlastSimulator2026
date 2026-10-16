@@ -23,7 +23,7 @@ import type { UiCues } from '../../audio/ui/UiCues.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
 import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from '../settingsHooks.js';
-import { autoSaveSlotFor, relativeTime } from './SavesModal.js';
+import { autosaveLossText } from './SavesModal.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import { AUDIO_CREDITS_URL } from '../../core/config/audio/ui.js';
 
@@ -292,7 +292,7 @@ export class SettingsPanel extends PanelBase {
 
   private async confirmReturnToMenu(): Promise<void> {
     const state = this.getState?.() ?? null;
-    const body = await this.returnConfirmBody(state);
+    const body = await autosaveLossText(state ? this.backend : null, state?.campaign.activeLevelId);
     this.onConfirmRequestCb?.({
       icon: 'warn',
       title: t('ui.settings.return_confirm_title'),
@@ -303,17 +303,5 @@ export class SettingsPanel extends PanelBase {
         this.onReturnToMenuCb?.();
       },
     });
-  }
-
-  private async returnConfirmBody(state: GameState | null): Promise<string> {
-    if (!this.backend || !state) return t('ui.settings.return_confirm_body_none');
-    try {
-      const metas = await this.backend.list();
-      const auto = metas.find(m => m.slotId === autoSaveSlotFor(state.campaign.activeLevelId));
-      if (!auto) return t('ui.settings.return_confirm_body_none');
-      return t('ui.settings.return_confirm_body', { time: relativeTime(auto.timestamp) });
-    } catch {
-      return t('ui.settings.return_confirm_body_none');
-    }
   }
 }
