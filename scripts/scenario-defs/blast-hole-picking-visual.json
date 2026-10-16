@@ -1,6 +1,6 @@
 {
   "name": "blast-hole-picking-visual",
-  "description": "Redesign P4/#21: drill holes join the P2 scene-picking system. Clicking a hole marker shows a selection ring plus the inspector with the hole's id, depth, and a Focus action; Esc deselects both. #553: a hole ordered by drill_plan grid sits as an undrilled ghost (plannedDrillHoles) until its own drill_hole action completes — this scenario confirms the plan, then ticks until the single hole actually lands (drillHoles) before clicking it, exercising the real, drilled marker the click-selection system targets.",
+  "description": "Redesign P4/#21: drill holes join the P2 scene-picking system. Clicking a hole marker shows a selection ring plus the inspector with the hole's id, depth, and a Focus action; Esc deselects both. #553: a hole ordered by drill_plan grid sits as an undrilled ghost (plannedDrillHoles) until its own drill_hole action completes — this scenario confirms the plan, then ticks until the single hole actually lands (drillHoles) before clicking it, exercising the real, drilled marker the click-selection system targets. #1769: the inspector also reads the hole's facts — uncharged before the Blast Workshop charges it, charged afterwards.",
   "shots": [
     {
       "name": "overview",
@@ -125,7 +125,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Click the hole marker — a dashed selection ring appears on the ground and the inspector shows the hole's id/depth and a Focus action",
+      "description": "Click the hole marker — a dashed selection ring appears on the ground and the inspector shows the hole's id, depth, diameter, drilled state and that it is uncharged, plus a Focus action",
       "interaction": [
         {
           "type": "command",
@@ -151,13 +151,117 @@
           "selector": "#bs-inspector [data-action=\"locate\"]"
         },
         {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"hole\"] [data-hole-charge=\"none\"]"
+        },
+        {
           "type": "screenshot"
         }
       ],
       "role": "observe",
       "expect": {
-        "usable": "#bs-inspector [data-action=\"locate\"]",
-        "note": "waitForSelector above only proved the button exists; usable proves it is genuinely clickable"
+        "usable": "#bs-inspector[data-kind=\"hole\"] [data-hole-charge=\"none\"]",
+        "note": "the inspector reads the hole's facts: drilled, uncharged"
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "timeout": 60,
+      "description": "Charge the hole through the Blast Workshop (the inspector only reads it): step tab Charge, amount and stemming steppers, charge-all.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "timeout": 125,
+      "description": "Drain the queued charge order before re-reading the hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "Re-click the hole — the inspector now reads it as charged, with the explosive, kg and stemming.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "cameraFocus",
+          "x": 10,
+          "z": 10,
+          "distance": 8
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"hole\"] [data-hole-charge=\"charged\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"hole\"] [data-hole-charge=\"charged\"]",
+        "note": "charged hole shows its charge"
       }
     },
     {

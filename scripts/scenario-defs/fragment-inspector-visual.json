@@ -1,0 +1,417 @@
+{
+  "name": "fragment-inspector-visual",
+  "description": "The fragment inspector (#1769). After a blast a player clicks a loose fragment and reads its mass, rock and ore kg; follows it while a hauler carries it (In transit on <vehicle>, linked) and once the warehouse stores it (Stored in <warehouse>, linked). Waits are on conditions, never delays.",
+  "steps": [
+    {
+      "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:500000",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:500000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 500000,
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:18,19 diameter:0.089",
+      "description": "9-hole grid, deterministic under seed 10 -- sandbox-confirmed to expose ~250 ore-bearing ground fragments alongside plenty of plain rock once blasted. diameter:0.089 added to match the real grid-tool confirm's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter fell back to a different console-only default (0.15, mining.ts), desyncing drill duration/tick timing against interaction mode (same fix as rock-fragmenter-breaking.json's own drill_plan step).",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "dragTiles",
+          "x1": 18,
+          "z1": 19,
+          "x2": 24,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:9 max_ticks:220",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 9 holes well inside this budget (sandbox-measured landing at tick 166 under real, un-cheated needs gauges).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 220,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 90,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
+      "description": "#1774: 6 kg breakout charge (BURDEN_BREAKOUT_MAX, balance.ts) -- the 5 kg shot left the rubble sealed under the cap, and sealed rock gets no haul/fragment order, so collectedOreTotal never rose. Amount is set through its stepper so interaction mode charges the same 6 kg; stemming 2 matches DEFAULT_STEMMING_M (Charge.ts).",
+      "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "timeout": 125,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "description": "#1801: rest-completion morale shifts the crew's pace and so the weather at blast time. Boomite is water-sensitive: a wet hole fizzles and the shot no longer breaks out (measured: 9 wet holes at tick 233, none at tick 251). Waiting for the holes to dry is what a player does; blasting is unchanged.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 65,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "collectedOreTotal": 0
+        },
+        "note": "a fired blast clears the plan back to zero -- nothing has been hauled anywhere yet, so collectedOreTotal is still 0 at this point"
+      }
+    },
+    {
+      "command": "build freight_warehouse at:12,17",
+      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "storedMassKg": 0,
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "fragments status",
+      "description": "A player clicks a loose fragment (clickEntity ids are tuned for seed 10 and this 9-hole blast in interaction mode; 749 is the top rock of the pile at the pick point, a sandite boulder, so a barren one). The inspector shows its mass and localized rock, and says it lies on the ground. Command mode stand-in is a read-only status.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "fragment",
+          "id": 749,
+          "distance": 4
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-location"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"fragment\"][data-id=\"749\"] .bs-fragment-rock",
+        "note": "rock and ore kg are readable where the player clicks"
+      }
+    },
+    {
+      "command": "wait_until field:vehicleLoaded equals:true max_ticks:600",
+      "description": "Advance until a hauler carries cargo. Condition-based wait.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "vehicleLoaded",
+          "equals": true,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleLoaded": true
+        }
+      }
+    },
+    {
+      "command": "fragments status",
+      "description": "With the hauler loaded the player clicks a fragment it carries (whichever one the pick lands on: ids and pile depth are tuned for seed 10 only loosely, so the checks name no id). The location section reads In transit on <vehicle>, with the hauler as a link.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "fragment",
+          "id": 761,
+          "distance": 4
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"vehicle\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"vehicle\"]",
+        "note": "the carrying hauler is a link"
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "Let the hauler reach the warehouse and unload. The delivery takes a few ticks after pickup; the fixed pad only advances the sim, the assertion below waits on the DOM.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedMassKg"
+        ]
+      }
+    },
+    {
+      "command": "fragments status",
+      "description": "Once stored the location section reads Stored in <warehouse> with the warehouse as a link; following it switches the inspector to the building.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"building\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"fragment\"] .bs-fragment-location [data-select-kind=\"building\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"building\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-inspector[data-kind=\"building\"]",
+        "note": "the warehouse link leads to the building inspector"
+      }
+    },
+    {
+      "command": "fragments status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments status"
+        }
+      ]
+    }
+  ]
+}
