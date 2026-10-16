@@ -30,6 +30,7 @@ import {
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
+import { playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -888,4 +889,72 @@ describe('Level courses through the console (#1726)', () => {
     expect(employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' }).success).toBe(false);
     expect(state.cash).toBe(cashBefore);
   });
+});
+
+// ── Hauling and fragmenting earn licence XP (#1833) ──────────────────────────
+//
+// Repro: sandbox Easy, desert_badlands seed 42, the standard opening of #1747
+// (see sandbox-economy-balance.integration.test.ts). The debris hauler and rock
+// fragmenter drivers spent hundreds of ticks on haul_debris / fragment_debris
+// between t1221 and t1821 and gained no XP: phase-driven work has no work timer.
+
+describe('debris haul and fragment drivers gain licence XP over the whole scripted opening to t1821 (#1833)', () => {
+  // The issue's t1221-t1821 slice is not reproducible here: this scripted opening fires its blast earlier,
+  // so fragmenting happens before t1221. The test therefore observes the entire opening, t0 to t1821.
+  const WINDOW_END = 1821;
+  const MIN_ACTIVE_TICKS = 20;
+
+  interface Probe { ticks: number; xpStart: number; xpEnd: number }
+
+  function playOpening(): { haul: Map<number, Probe>; fragment: Map<number, Probe> } {
+    const { runner, ctx } = createRunner();
+    const run: Run = (c) => runner.run(c);
+    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42').success).toBe(true);
+    run('time resume');
+    const state = ctx.state!;
+    const startTick = state.tickCount;
+    const elapsed = () => state.tickCount - startTick;
+    const haul = new Map<number, Probe>();
+    const fragment = new Map<number, Probe>();
+    const xpOf = (id: number, skill: string) =>
+      state.employees.employees.find(e => e.id === id)!.qualifications.find(q => q.category === skill)?.xp ?? 0;
+    const observe = (map: Map<number, Probe>, id: number, skill: string) => {
+      const p = map.get(id) ?? { ticks: 0, xpStart: xpOf(id, skill), xpEnd: 0 };
+      p.ticks++;
+      p.xpEnd = xpOf(id, skill);
+      map.set(id, p);
+    };
+    const sample = () => {
+      const t = elapsed();
+      if (t > WINDOW_END) return;
+      for (const e of state.employees.employees) {
+        const type = state.pendingActions.find(a => a.id === e.activeActionId)?.type;
+        if (type === 'haul_debris') observe(haul, e.id, 'driving.truck');
+        else if (type === 'fragment_debris') observe(fragment, e.id, 'driving.rock_fragmenter');
+      }
+    };
+    const play = () => { playContracts(run, state); playTick(run, state); sample(); };
+    const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !state.levelEnded && elapsed() < WINDOW_END && !done(); i++) play(); };
+
+    expect(run('build living_quarters at:30,48 tier:1').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    run('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(run, state);
+    run('blast');
+    playUntil(WINDOW_END, () => false);
+    expect(state.levelEnded, `level ended: ${String(state.levelEndReason)}`).toBe(false);
+    return { haul, fragment };
+  }
+
+  it('a debris hauler driver and a rock fragmenter driver each gain XP in their licence', () => {
+    const { haul, fragment } = playOpening();
+    const active = (m: Map<number, Probe>) => [...m.values()].filter(p => p.ticks >= MIN_ACTIVE_TICKS);
+
+    expect(active(haul).length, 'a driver worked haul_debris in the opening').toBeGreaterThan(0);
+    expect(active(fragment).length, 'a driver worked fragment_debris in the opening').toBeGreaterThan(0);
+    for (const p of active(haul)) expect(p.xpEnd, 'driving.truck XP rose while hauling').toBeGreaterThan(p.xpStart);
+    for (const p of active(fragment)) expect(p.xpEnd, 'driving.rock_fragmenter XP rose while fragmenting').toBeGreaterThan(p.xpStart);
+  }, 600_000);
 });

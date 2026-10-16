@@ -24,6 +24,9 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD, isOversized } from '../../../src/core/mining/BlastCalc.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
+import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';
+import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import {
   applyHaulLoad,
   applyHaulUnload,
@@ -494,5 +497,56 @@ describe('applyHaulUnload with a multi-fragment cargo (#1370)', () => {
 
     expect(applyHaulUnload(state, vehicle)).toBe(false);
     expect(state.logistics.storedMassKg).toBe(before);
+  });
+});
+
+// ── Phase-driven XP across a haul cycle (#1833) ──────────────────────────────
+//
+// A haul has no work timer: load and unload are arrival effects. The driver's
+// licence XP must rise on the ticks spent between them, and a failed unload
+// must neither drop the cargo nor stop the XP.
+
+describe('driver XP across applyHaulLoad / applyHaulUnload (#1833)', () => {
+  const TICKS_BETWEEN = 6;
+
+  function setupCycle() {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
+    const driver = state.employees.employees.find(e => e.id === driverId)!;
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 0.3, 850)], state.navGrid);
+    const action = reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, { x: 5, z: 5 });
+    driver.activeActionId = action.id;
+    driver.taskTicksRemaining = null;
+    const itinerary: Itinerary = {
+      legs: [{ mode: 'drive', vehicleId: vehicle.id, destX: 9, destZ: 9, arrival: 'exact', onArrive: { kind: 'effect', effectId: 'haul_unload' }, estTicks: 10 }],
+      goal: { kind: 'work', actionId: action.id }, workTicks: 0, estTotalTicks: 10,
+    };
+    driver.itinerary = itinerary;
+    const xp = () => driver.qualifications.find(q => q.category === 'driving.truck')!.xp;
+    return { state, vehicle, driver, xp };
+  }
+
+  it('driving.truck XP rises on the ticks between load and unload', () => {
+    const { state, vehicle, driver, xp } = setupCycle();
+    const before = xp();
+
+    expect(applyHaulLoad(state, vehicle)).toBe(true);
+    for (let i = 0; i < TICKS_BETWEEN; i++) tickTaskProgress(state, driver);
+    expect(applyHaulUnload(state, vehicle)).toBe(true);
+
+    expect(xp() - before).toBeGreaterThanOrEqual(TICKS_BETWEEN * computeXpPerTick(1));
+  });
+
+  it('a failed unload keeps the cargo and the driver keeps earning XP', () => {
+    const { state, vehicle, driver, xp } = setupCycle();
+    vehicle.cargo = [{ fragmentId: 999, massKg: 500 }]; // not tracked in_transit: delivery fails
+    const before = xp();
+
+    for (let i = 0; i < TICKS_BETWEEN; i++) tickTaskProgress(state, driver);
+    expect(applyHaulUnload(state, vehicle)).toBe(false);
+
+    expect(vehicle.cargo).toEqual([{ fragmentId: 999, massKg: 500 }]);
+    expect(xp() - before).toBe(TICKS_BETWEEN * computeXpPerTick(1));
   });
 });
