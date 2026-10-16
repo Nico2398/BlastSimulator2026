@@ -59,6 +59,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   trafficJams: { type: 'array', description: 'One {kind, rampId} per active traffic jam; kind is ramp_head, pit_exit or passage (#1208)' },
   pendingEvent: { type: 'boolean', description: 'An event awaits the player\'s decision (state.events.pendingEvent !== null)' },
   vehicleBoardingCount: { type: 'number', description: 'Fleet-wide count of driver-boarding events (state.vehicles.driverBoardingCount, #1083)' },
+  vehicleLoaded: { type: 'boolean', description: 'At least one vehicle carries cargo (vehicle.cargo non-empty, #1761)' },
   employeeCount: { type: 'number' },
   qualificationCount: { type: 'number', description: 'Qualifications held across the whole roster' },
   proficiencyTotal: { type: 'number', description: 'Sum of every held qualification\'s proficiency level' },

@@ -869,6 +869,7 @@ window.__gameState = () => {
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
+    vehicleLoaded: s.vehicles.vehicles.some(v => v.cargo.length > 0), // mirrors serializeGameState
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // Typed mirror of `ctx.state.events.pendingEvent !== null` (EventSystem.ts)

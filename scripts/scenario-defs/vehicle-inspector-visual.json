@@ -268,35 +268,24 @@
       }
     },
     {
-      "command": "wait_until field:storedMassKg equals:3425.125 max_ticks:200",
-      "description": "The hauler's first delivery lands in the warehouse (seed 10 trajectory, sandbox-measured at tick 337). waitForSelector never advances the simulation in scenario mode, so the sim must be driven to a loaded hauler before the cargo section can be read.",
-      "timeout": 65,
+      "command": "wait_until field:vehicleLoaded equals:true max_ticks:600",
+      "description": "A hauler is carrying cargo (a condition, not a pinned storedMassKg figure that differs between command and interaction trajectories). waitForSelector never advances the simulation in scenario mode, so the sim must be driven to a loaded hauler before the cargo section can be read; the sim then stays paused on that loaded hauler.",
+      "timeout": 125,
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "storedMassKg",
-          "equals": 3425.125,
-          "maxTicks": 200,
-          "timeoutMs": 60000
+          "field": "vehicleLoaded",
+          "equals": true,
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "storedMassKg": 3425.125
+          "vehicleLoaded": true
         }
       }
-    },
-    {
-      "command": "tick 13",
-      "description": "Thirteen ticks later the hauler is back on the road with its second load (sandbox-measured: 3785/4000 kg at tick 345).",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -366,6 +355,26 @@
       "role": "player",
       "expect": {
         "usable": "#bs-inspector[data-kind=\"employee\"] .bs-employee-detail"
+      }
+    },
+    {
+      "command": "wait_until field:vehicleLoaded equals:false max_ticks:600",
+      "description": "Let the hauler deliver and unload at the warehouse, away from the idle fragmenter it was passing at pickup. clickEntity aims at a vehicle's screen position, so a hauler parked on top of vehicle 4 would swallow the click. Condition-based: no pinned tick count.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "vehicleLoaded",
+          "equals": false,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleLoaded": false
+        }
       }
     },
     {
