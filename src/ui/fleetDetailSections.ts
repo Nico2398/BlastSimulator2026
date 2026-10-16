@@ -107,16 +107,31 @@ export function vehicleDriverState(v: Vehicle, employees: readonly Employee[]): 
   return rosterCanDriveVehicleTier(employees, v.type, v.tier) ? { kind: 'unmanned' } : { kind: 'no_licensed' };
 }
 
-/** Driver name line for a Fleet row: driver, pending driver, or muted "Unmanned". No warning, no Train button. */
-export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[]): HTMLElement {
+/** Driver line content: text plus colour token. */
+function driverLineContent(v: Vehicle, employees: readonly Employee[]): { text: string; color: string } {
   const driver = vehicleDriverState(v, employees);
   const seatedId = vehicleDriverId(v);
-  const text = driver.kind === 'driver' ? driver.employee.name
-    : driver.kind === 'pending' ? t('ui.fleet.walking_to_board', { name: driver.employee.name })
-      : seatedId !== null ? `#${seatedId}` // seated but off the roster
-        : driver.kind === 'no_licensed' ? t('ui.fleet.row_no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`), level: v.tier })
-          : t('ui.fleet.unmanned');
-  const muted = driver.kind === 'driver' ? 'var(--bsx-text-secondary)'
-    : driver.kind === 'no_licensed' && seatedId === null ? 'var(--bsx-amber)' : 'var(--bsx-text-micro)';
+  switch (driver.kind) {
+    case 'driver':
+      return { text: driver.employee.name, color: 'var(--bsx-text-secondary)' };
+    case 'pending':
+      return { text: t('ui.fleet.walking_to_board', { name: driver.employee.name }), color: 'var(--bsx-text-micro)' };
+    case 'unmanned':
+    case 'no_licensed':
+      if (seatedId !== null) return { text: `#${seatedId}`, color: 'var(--bsx-text-micro)' }; // seated but off the roster
+      if (driver.kind === 'unmanned') return { text: t('ui.fleet.unmanned'), color: 'var(--bsx-text-micro)' };
+      return {
+        text: t('ui.fleet.row_no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`), level: v.tier }),
+        color: 'var(--bsx-amber)',
+      };
+  }
+}
+
+/**
+ * Driver name line for a Fleet row: driver, pending driver, muted "Unmanned", or an amber
+ * "no licensed driver" hint when nobody on the roster could drive it. No Train button.
+ */
+export function makeDriverNameLine(v: Vehicle, employees: readonly Employee[]): HTMLElement {
+  const { text, color: muted } = driverLineContent(v, employees);
   return el('div', { text, className: 'bs-fleet-driver', attrs: { style: `font:500 10px/1.2 var(--bsx-font-ui);color:${muted}` } });
 }
