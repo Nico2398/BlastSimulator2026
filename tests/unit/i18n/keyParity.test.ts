@@ -596,3 +596,23 @@ describe('inspector occupants and research keys (#1760)', () => {
     expect(fr[key], `fr ${key}`).toBeTruthy();
   });
 });
+
+describe('inspector fragment/hole/ramp keys (#1769)', () => {
+  const keys = [
+    'inspector.fragment.section.rock', 'inspector.fragment.section.location', 'inspector.fragment.mass',
+    'inspector.fragment.rock', 'inspector.fragment.barren', 'inspector.fragment.on_ground',
+    'inspector.fragment.in_transit', 'inspector.fragment.bound_for', 'inspector.fragment.stored',
+    'inspector.hole.section.charge', 'inspector.hole.diameter', 'inspector.hole.state',
+    'inspector.hole.state_drilled', 'inspector.hole.state_ordered', 'inspector.hole.explosive',
+    'inspector.hole.charge_kg', 'inspector.hole.from_stock', 'inspector.hole.stemming',
+    'inspector.hole.uncharged', 'inspector.hole.charge_ordered', 'inspector.hole.ground',
+    'inspector.hole.ground_dry', 'inspector.hole.ground_wet', 'inspector.hole.ground_tubed',
+    'inspector.hole.workshop_note',
+    'inspector.ramp.width', 'inspector.ramp.depth', 'inspector.ramp.length',
+    'inspector.ramp.widen', 'inspector.ramp.widen_in_progress', 'inspector.ramp.widen_short_funds',
+  ];
+  it.each(keys)('%s exists in en and fr with non-empty text', key => {
+    expect(en[key], `en ${key}`).toBeTruthy();
+    expect(fr[key], `fr ${key}`).toBeTruthy();
+  });
+});
