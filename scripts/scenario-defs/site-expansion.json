@@ -401,7 +401,13 @@
     },
     {
       "command": "event choose 0",
+      "description": "Resolves a spontaneous event if one fired during the chunk above. The evacuation can finish in the same chunk, so the detonation's blast report may be open: it defers the event dialog (UIManager.update) and the dialog never mounts behind it. The player closes the report first, then answers the event.",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 20000
+        },
         {
           "type": "resolveEventIfPending"
         }
@@ -430,9 +436,9 @@
           "timeoutMs": 3000
         },
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "[data-action=\"report-close\"]",
-          "timeout": 20000
+          "timeoutMs": 20000
         }
       ],
       "role": "player",
