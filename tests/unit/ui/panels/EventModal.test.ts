@@ -4,8 +4,10 @@ import { EventModal } from '../../../../src/ui/panels/EventModal.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { setupEvents } from '../../../../src/core/events/index.js';
-import { registerEvents, clearEvents, type EventDef } from '../../../../src/core/events/EventPool.js';
+import { registerEvents, clearEvents, getEventById, type EventDef } from '../../../../src/core/events/EventPool.js';
 import type { EventEffect } from '../../../../src/core/events/EventSystem.js';
+import { effectChips, effectChipText } from '../../../../src/core/events/EventEffectText.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
 
 setupEvents();
@@ -301,5 +303,104 @@ describe('EventModal', () => {
       modal.update(stateWithPendingEvent('test_risky_event'));
       expect(container.innerHTML).toContain('--bsx-ore');
     });
+  });
+});
+
+describe('EventModal hint chip amounts (#1893)', () => {
+  function choiceChips(container: HTMLElement, index: number): string[] {
+    const choice = container.querySelectorAll('#bs-event-dialog .bs-event-choice')[index]!;
+    return Array.from(choice.querySelectorAll('.bsx-chip')).map(c => c.textContent ?? '');
+  }
+
+  afterEach(() => {
+    clearEvents();
+    setupEvents();
+    setLocale('en');
+  });
+
+  it('Coffee Uprising option 0 shows -$8,000 Cash and +12 WELL, formatted like outcome chips', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const chips = choiceChips(container, 0);
+    expect(chips).toContain('-$8,000 Cash');
+    expect(chips).toContain('+12 WELL');
+    modal.dispose();
+    container.remove();
+  });
+
+  it('Coffee Uprising option 2 shows -$2,000 Cash and +3 WELL', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const chips = choiceChips(container, 2);
+    expect(chips).toContain('-$2,000 Cash');
+    expect(chips).toContain('+3 WELL');
+    modal.dispose();
+    container.remove();
+  });
+
+  it('a certain lasting effect chip text equals the effectChipText sentence', () => {
+    const { container, modal } = mount();
+    modal.update(stateWithPendingEvent('union_coffee_uprising'));
+    const def = getEventById('union_coffee_uprising')!;
+    const spec = def.consequences[0]!.effects![0]!;
+    const sentence = effectChipText(effectChips([spec])[0]!)!;
+    expect(sentence.length).toBeGreaterThan(0);
+    expect(choiceChips(container, 0)).toContain(sentence);
+    modal.dispose();
+    container.remove();
+  });
+
+  describe('risky options', () => {
+    beforeEach(() => {
+      clearEvents();
+      registerEvents([{
+        id: 'test_risky_amounts',
+        category: 'mafia',
+        titleKey: 'event.test.title',
+        descKey: 'event.test.desc',
+        options: [
+          { labelKey: 'event.test.opt0', resultKey: 'event.test.res0' },
+          { labelKey: 'event.test.opt1', resultKey: 'event.test.res1' },
+        ],
+        consequences: [
+          { cashDelta: -9000, scoreDelta: { safety: 7 }, probability: 0.5, altConsequence: { cashDelta: -100 } },
+          { effects: [{ type: 'work_stoppage', hours: 4 }], probability: 0.5 },
+        ],
+        weightCoeff: () => 1,
+        canFire: () => true,
+      }]);
+    });
+
+    it('a risky option chip shows "?" and no digits', () => {
+      const { container, modal } = mount();
+      modal.update(stateWithPendingEvent('test_risky_amounts'));
+      const chips = choiceChips(container, 0);
+      expect(chips.length).toBeGreaterThan(0);
+      for (const c of chips) {
+        expect(c).toContain('?');
+        expect(c).not.toMatch(/\d/);
+      }
+      modal.dispose();
+      container.remove();
+    });
+
+    it('a risky lasting effect renders the generic "Lasting effect?" chip', () => {
+      const { container, modal } = mount();
+      modal.update(stateWithPendingEvent('test_risky_amounts'));
+      const label = t('ui.event.effect_lasting');
+      expect(label).not.toBe('ui.event.effect_lasting');
+      const chips = choiceChips(container, 1);
+      expect(chips.some(c => c.includes(label) && c.includes('?'))).toBe(true);
+      modal.dispose();
+      container.remove();
+    });
+  });
+
+  it('amountLabel formats cash with $ and grouping, scores plain, with sign', async () => {
+    const { amountLabel } = await import('../../../../src/ui/panels/EventModal.js');
+    expect(amountLabel('cash', 'cash', -8000)).toBe('-$8,000');
+    expect(amountLabel('cash', 'cash', 2000)).toBe('+$2,000');
+    expect(amountLabel('score', 'wellBeing', 12)).toBe('+12');
+    expect(amountLabel('score', 'safety', -3)).toBe('-3');
   });
 });
