@@ -20,6 +20,7 @@ import {
   makeRestSection,
   makeStatusTags,
   makeIdentitySection,
+  makeUnionTradeoffLine,
   type LinkFactory,
 } from '../../../src/ui/crewDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -607,5 +608,33 @@ describe('makeStatusTags / makeIdentitySection (#1762)', () => {
   it('identity does not throw for a legacy employee without hiredAtTick', () => {
     const fn = vi.fn(() => makeIdentitySection(makeEmployee(), makeState()));
     expect(fn).not.toThrow();
+  });
+});
+
+describe('makeUnionTradeoffLine (#1873)', () => {
+  it('returns the trade-off line for a union member', () => {
+    const line = makeUnionTradeoffLine({ unionized: true });
+    expect(line).not.toBeNull();
+    expect(line!.textContent).toBe(t('ui.crew.union_tradeoff_detail'));
+    expect(t('ui.crew.union_tradeoff_detail')).not.toBe('ui.crew.union_tradeoff_detail');
+  });
+
+  it('returns null for a non-member', () => {
+    expect(makeUnionTradeoffLine({ unionized: false })).toBeNull();
+  });
+});
+
+describe('union trade-off i18n (#1873)', () => {
+  it.each(['ui.crew.candidate_union_tradeoff', 'ui.crew.union_tradeoff_detail'])('%s exists in en and fr and differs', (key) => {
+    const en = (enLocale as Record<string, string>)[key];
+    const fr = (frLocale as Record<string, string>)[key];
+    expect(en).toBeTruthy();
+    expect(fr).toBeTruthy();
+    expect(fr).not.toBe(en);
+  });
+
+  it('the candidate line interpolates {pct} in both languages', () => {
+    expect((enLocale as Record<string, string>)['ui.crew.candidate_union_tradeoff']).toContain('{pct}');
+    expect((frLocale as Record<string, string>)['ui.crew.candidate_union_tradeoff']).toContain('{pct}');
   });
 });

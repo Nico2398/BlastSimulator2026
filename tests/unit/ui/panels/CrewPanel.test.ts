@@ -677,3 +677,23 @@ describe('CrewPanel — scene selection highlight (#1765)', () => {
     expect(panel.root.querySelector('.bs-build-row-selected')).toBeNull();
   });
 });
+
+describe('CrewPanel — union trade-off on hire cards (#1873)', () => {
+  it('a union candidate card states the lower pay and the no-dismissal catch; a non-union card does not', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    const cands = candidatesForRole(state.hiringPool, 'driller');
+    cands[0]!.unionized = true;
+    cands[1]!.unionized = false;
+    panel.update(state);
+    const line = t('ui.crew.candidate_union_tradeoff', { pct: 15 });
+    expect(line).not.toBe('ui.crew.candidate_union_tradeoff');
+    const cardText = (c: HireCandidate): string => {
+      let node: HTMLElement | null = panel.root.querySelector(`button[data-candidate-id="${c.id}"]`);
+      while (node && !(node.textContent ?? '').includes(c.name)) node = node.parentElement;
+      return node!.textContent!;
+    };
+    expect(cardText(cands[0]!)).toContain(line);
+    expect(cardText(cands[1]!)).not.toContain(line);
+  });
+});
