@@ -2000,16 +2000,20 @@
       "command": "contract deliver type:ore_sale fillable:true amount:100",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "contracts"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-amount"
         },
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-deliver"
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-amount",
+          "value": "100"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
         }
       ],
-      "role": "player",
-      "description": "#1871: ore_sale contracts auto-deliver stored ore every tick, and a real browser spends ticks between the accept click and this one, so the accepted sale may already be delivered and gone from the panel (command mode, which spends none, still delivers by hand). Click Deliver only if the card is still there; the clickIfPresent is for exactly this nondeterministic beat."
+      "role": "player"
     },
     {
       "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:2000",
@@ -2090,16 +2094,20 @@
       "command": "contract deliver type:ore_sale fillable:true amount:40",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "contracts"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-amount"
         },
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-deliver"
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-amount",
+          "value": "40"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
         }
       ],
-      "role": "player",
-      "description": "#1871: ore_sale contracts auto-deliver stored ore every tick, and a real browser spends ticks between the accept click and this one, so the accepted sale may already be delivered and gone from the panel (command mode, which spends none, still delivers by hand). Click Deliver only if the card is still there; the clickIfPresent is for exactly this nondeterministic beat."
+      "role": "player"
     },
     {
       "command": "finances",
