@@ -19,7 +19,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
-import { addHole } from '../../../src/core/mining/DrillPlan.js';
+import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import { columnOreValuePerM3 } from '../../../src/core/mining/BlastValueEstimate.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
@@ -505,5 +505,104 @@ describe('GameRenderer.syncFromContext — state replacement redraws fragments (
     expect(renderer.blastPlayback.elapsedS).toBe(0);
     expect(renderer.entityWorldPosition('fragment', 100)).toBeNull();
     expect(renderer.entityWorldPosition('fragment', 1)).not.toBeNull();
+  });
+});
+
+// ── Replacing the state of a live scene redraws the blast plan overlay (#1877) ──
+
+describe('GameRenderer.syncFromContext — state replacement redraws the blast plan overlay (#1877)', () => {
+  const counter = { nextHoleId: 1 };
+
+  /** State with `ordered` ghost holes, `drilled` drilled holes and a charge on every drilled hole. */
+  function planState(ordered: Array<[number, number]>, drilled: Array<[number, number]>, firstId = 1): GameState {
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    counter.nextHoleId = firstId;
+    for (const [x, z] of drilled) {
+      const h = addHole(counter, state.drillHoles, x, z, 6, 0.089);
+      state.chargesByHole[h.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: 2 };
+    }
+    for (const [x, z] of ordered) addHole(counter, state.plannedDrillHoles, x, z, 6, 0.089, state.drillHoles);
+    return state;
+  }
+
+  const pickIds = (r: GameRenderer): Set<number> =>
+    new Set(r.pickables().filter(o => o.userData['entityKind'] === 'hole').map(o => o.userData['entityId'] as number));
+
+  it('replacing an empty state with one that has drilled, charged and ordered holes draws them all', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(false);
+
+    ctx.state = planState([[20, 20]], [[10, 10], [12, 10]]);
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.entityWorldPosition('hole', holeNumericId('H1'))).not.toBeNull();
+    expect(renderer.entityWorldPosition('hole', holeNumericId('H2'))).not.toBeNull();
+    expect(renderer.entityWorldPosition('hole', holeNumericId('H3'))).not.toBeNull();
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(true);
+  });
+
+  it('replacing a state with holes by one with none hides the overlay and drops the old positions', () => {
+    const ctx = makeCtx();
+    ctx.state = planState([], [[10, 10], [12, 10]]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    renderer.showBlastPlanOverlay(ctx);
+    expect(renderer.entityWorldPosition('hole', 1)).not.toBeNull();
+
+    ctx.state = createGame({ seed: 42, startingCash: 100_000 });
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.pickables().filter(o => o.userData['entityKind'] === 'hole')).toHaveLength(0);
+    expect(renderer.entityWorldPosition('hole', 1)).toBeNull();
+    expect(renderer.entityWorldPosition('hole', 2)).toBeNull();
+  });
+
+  it('swapping plans drops the old game\'s holes and draws only the new state\'s', () => {
+    const ctx = makeCtx();
+    ctx.state = planState([[20, 20], [22, 20]], [], 10); // H10, H11 ghosts
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    renderer.showBlastPlanOverlay(ctx);
+    expect(renderer.entityWorldPosition('hole', 10)).not.toBeNull();
+
+    ctx.state = planState([], [[8, 8]], 1); // H1 drilled
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.entityWorldPosition('hole', 10)).toBeNull();
+    expect(renderer.entityWorldPosition('hole', 11)).toBeNull();
+    expect(renderer.entityWorldPosition('hole', 1)).not.toBeNull();
+    expect(pickIds(renderer).has(10)).toBe(false);
+    expect(pickIds(renderer).has(1)).toBe(true);
+  });
+
+  it('redraws through showBlastPlanOverlay exactly once per replaced state, not on repeated syncs', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    const spy = vi.spyOn(renderer, 'showBlastPlanOverlay');
+
+    ctx.state = planState([], [[10, 10]]);
+    renderer.syncFromContext(ctx);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(ctx);
+
+    renderer.syncFromContext(ctx);
+    renderer.syncFromContext(ctx);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not redraw over a hidden overlay when the same state object is synced again', () => {
+    const ctx = makeCtx();
+    ctx.state = planState([], [[10, 10]]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    renderer.showBlastPlanOverlay(ctx);
+    (renderer as any).blastOverlay.hide(); // as blast playback does
+
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.pickables().filter(o => o.userData['entityKind'] === 'hole')).toHaveLength(0);
   });
 });
