@@ -93,6 +93,8 @@ Unionized employees cannot be fired (only an arranged accident or an event remov
 ### Architecture
 Events grouped into categories with independent timers. Timer fires → check available events → roll weighted selection → fire event. Weights + values depend on player scores.
 
+Option balance (#1894): no option of an event may dominate a sibling; rule and tooling (`npm run events:balance`) in `agentic-decision-autonomy`, section "Event option comparison".
+
 Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employee exists and `lawsuit` until some cause exists (environmental cause, a death, or staff). Environmental lawsuits additionally require `hasEnvironmentalCause` (a blast fired, or ecology/neighbour relations (`nuisance`) strictly below `ENV_CAUSE_*_MAX` = 45, under the initial 50). `lawsuitCount` counts fired lawsuit-category events.
 
 ### Categories

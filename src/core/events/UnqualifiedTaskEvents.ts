@@ -11,7 +11,7 @@ export const UNQUALIFIED_TASK_EVENTS: EventDef[] = [
     weight: () => 1,
     options: [
       { effectTag: 'train_employee' },
-      { cashDelta: -UNQUALIFIED_CONTRACTOR_FEE, effectTag: 'hire_contractor' },
+      { cashDelta: -UNQUALIFIED_CONTRACTOR_FEE, scoreDelta: { wellBeing: 2 }, effectTag: 'hire_contractor' },
       { effectTag: 'cancel_task' },
     ],
   }),

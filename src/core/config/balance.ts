@@ -2925,3 +2925,10 @@ export const WB_ACCIDENT_DRAG = 0.15;
 
 /** Morale every remaining crew member loses when a colleague is dismissed (not for cause). */
 export const DISMISSAL_CREW_MORALE_DENT = 6;
+
+// ── Event option balance (#1894) ──
+
+/** Days a permanent effect is counted over when comparing event options for dominance. */
+export const EVENT_BALANCE_PERMANENT_DAYS = 365;
+/** Reference crew size used to turn per-employee event effects into totals when comparing options. */
+export const EVENT_BALANCE_REFERENCE_CREW = 5;
