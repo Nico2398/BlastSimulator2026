@@ -263,15 +263,15 @@ export class SandboxPanel {
   }
 
   private renderKitDetails(kit: SandboxKitId): void {
-    const diff = sandboxKitDetails(kit);
+    const details = sandboxKitDetails(kit);
     const list = (items: string[]): string => items.length > 0 ? items.join(', ') : t('sandbox.detail.none');
     const opening = t('sandbox.detail.opens_with', {
-      crew: list(diff.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
-      vehicles: list(diff.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
-      buildings: list(diff.buildings.map(b => `${b.count}× ${buildingDisplayName(b.type, b.tier)}`)),
+      crew: list(details.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
+      vehicles: list(details.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
+      buildings: list(details.buildings.map(b => `${b.count}× ${buildingDisplayName(b.type, b.tier)}`)),
     });
     this.kitBlock.replaceChildren(
-      detailLine('bs-sandbox-kit-cash', t('sandbox.detail.cash', { cash: formatMoney(diff.startingCash) })),
+      detailLine('bs-sandbox-kit-cash', t('sandbox.detail.cash', { cash: formatMoney(details.startingCash) })),
       detailLine('bs-sandbox-kit-opening', opening),
     );
   }

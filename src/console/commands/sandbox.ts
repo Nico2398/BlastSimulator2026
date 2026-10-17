@@ -74,12 +74,8 @@ export function sandboxCommand(
     return { success: false, output: t('sandbox.unknown_biome', { biome: requested.biome, valid }) };
   }
   const rawKit = rawKitArg(named);
-  if (rawKit !== undefined) {
-    const kit = resolveSandboxKitId(rawKit);
-    if (!kit) {
-      return { success: false, output: t('sandbox.unknown_kit', { kit: rawKit, valid: SANDBOX_KIT_ORDER.join(', ') }) };
-    }
-    requested.kit = kit;
+  if (rawKit !== undefined && requested.kit === undefined) {
+    return { success: false, output: t('sandbox.unknown_kit', { kit: rawKit, valid: SANDBOX_KIT_ORDER.join(', ') }) };
   }
 
   const flags = parseOptionalStaffedFlag(named['staffed']);

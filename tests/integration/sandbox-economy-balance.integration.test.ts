@@ -310,7 +310,7 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
    * The full kit's cash at tick 2000 on the scripted opening: today's run, #1747.
    * Measured on current main behaviour (seed 42, desert_badlands).
    */
-  const EASY_CASH_AT_HORIZON_FLOOR = 681_127;
+  const FULL_KIT_CASH_AT_HORIZON_FLOOR = 681_127;
 
   interface OpeningTrace {
     endedAtTick: number | null;
@@ -397,7 +397,7 @@ describe('sandbox economy: the standard opening on every starting kit (#1891)', 
   it('full: the same opening ends at least at the pinned cash (today\'s run, #1747)', () => {
     const t = playOpening('full');
     expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
-    expect(t.cashAtHorizon).toBeGreaterThanOrEqual(EASY_CASH_AT_HORIZON_FLOOR);
+    expect(t.cashAtHorizon).toBeGreaterThanOrEqual(FULL_KIT_CASH_AT_HORIZON_FLOOR);
     expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 });

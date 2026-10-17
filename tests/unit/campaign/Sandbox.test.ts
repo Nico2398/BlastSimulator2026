@@ -450,7 +450,7 @@ describe('sandbox starting site per kit (#1671, #1891)', () => {
     expect(skillsOf('full').has('driving.excavator')).toBe(true);
   });
 
-  it('hard no longer shares the Dusty Hollow site, and Dusty Hollow keeps its own start (#1874)', () => {
+  it('the digger kit no longer shares the Dusty Hollow site, and Dusty Hollow keeps its own start (#1874)', () => {
     expect(siteOf('digger')).not.toEqual(DUSTY_HOLLOW_STARTING_SITE);
     expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.some(v => v.role === 'rock_digger')).toBe(false);
     expect(DUSTY_HOLLOW_STARTING_SITE.employees.some(e => e.qualifications.some(q => q.category === 'driving.excavator'))).toBe(false);
