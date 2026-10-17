@@ -23,7 +23,7 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
-import { ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
+import { ACTION_STUCK_BACKOFF_TICKS, DISMISSAL_CREW_MORALE_DENT } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
 const DEAD_ID = 7;
@@ -816,6 +816,45 @@ describe('fireEmployeeFromWorld (#1378)', () => {
     expect(result.success).toBe(true);
     expect(state.employees.employees.find(e => e.id === employee.id)).toBeUndefined();
     expect(state.pendingActions.find(a => a.id === 64)!.holderId).toBeNull();
+  });
+});
+
+describe('fireEmployeeFromWorld crew morale dent (#1872)', () => {
+  function crewOf3() {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const rng = new Random(SEED);
+    const [a, b, c] = [1, 2, 3].map(() => hireEmployee(state.employees, 'driller', rng, 5, 5).employee);
+    for (const e of [a!, b!, c!]) { e.unionized = false; e.morale = 70; }
+    return { state, a: a!, b: b!, c: c! };
+  }
+
+  it('an ordinary dismissal dents every remaining crew member', () => {
+    const { state, a, b, c } = crewOf3();
+    expect(fireEmployeeFromWorld(state, a.id).success).toBe(true);
+    expect(b.morale).toBe(70 - DISMISSAL_CREW_MORALE_DENT);
+    expect(c.morale).toBe(70 - DISMISSAL_CREW_MORALE_DENT);
+  });
+
+  it('forCause: true dents nobody', () => {
+    const { state, a, b, c } = crewOf3();
+    expect(fireEmployeeFromWorld(state, a.id, { force: true, forCause: true }).success).toBe(true);
+    expect(b.morale).toBe(70);
+    expect(c.morale).toBe(70);
+  });
+
+  it('a refused dismissal dents nobody', () => {
+    const { state, a, b, c } = crewOf3();
+    a.unionized = true;
+    expect(fireEmployeeFromWorld(state, a.id).success).toBe(false);
+    expect(b.morale).toBe(70);
+    expect(c.morale).toBe(70);
+  });
+
+  it('a forced dismissal without forCause still dents the crew', () => {
+    const { state, a, b } = crewOf3();
+    fireEmployeeFromWorld(state, a.id, { force: true });
+    expect(b.morale).toBe(70 - DISMISSAL_CREW_MORALE_DENT);
   });
 });
 

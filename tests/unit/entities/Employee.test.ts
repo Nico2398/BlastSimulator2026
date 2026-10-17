@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { DISMISSAL_CREW_MORALE_DENT } from '../../../src/core/config/balance.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { restCompletionMoraleCredit } from '../../../src/core/entities/EmployeeNeeds.js';
 import { isResting } from '../../../src/core/entities/EmployeeRestState.js';
@@ -9,6 +10,7 @@ import {
   giveRaise,
   calculateQualificationBonus,
   fireEmployee,
+  applyDismissalMoraleDent,
   killEmployee,
   processPayCycle,
   getEffectiveness,
@@ -1838,5 +1840,41 @@ describe('Employee - restCompletionMoraleCredit (#1801)', () => {
     it('continuous (threshold 0): morale stays at 0', () => {
       expect(moraleAfterCycles(0)).toBe(0);
     });
+  });
+});
+
+describe('applyDismissalMoraleDent (#1872)', () => {
+  function crew(morales: number[]) {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    return { state, emps: morales.map(m => { const e = hireEmployee(state, 'driller', rng).employee; e.morale = m; return e; }) };
+  }
+
+  it('every other alive employee loses the configured dent; the dismissed one is untouched', () => {
+    const { state, emps } = crew([80, 70, 60]);
+    applyDismissalMoraleDent(state, emps[0]!.id);
+    expect(emps[0]!.morale).toBe(80);
+    expect(emps[1]!.morale).toBe(70 - DISMISSAL_CREW_MORALE_DENT);
+    expect(emps[2]!.morale).toBe(60 - DISMISSAL_CREW_MORALE_DENT);
+  });
+
+  it('clamps at 0', () => {
+    const { state, emps } = crew([50, DISMISSAL_CREW_MORALE_DENT - 1, 0]);
+    applyDismissalMoraleDent(state, emps[0]!.id);
+    expect(emps[1]!.morale).toBe(0);
+    expect(emps[2]!.morale).toBe(0);
+  });
+
+  it('leaves dead employees unaffected', () => {
+    const { state, emps } = crew([50, 40]);
+    emps[1]!.alive = false;
+    applyDismissalMoraleDent(state, emps[0]!.id);
+    expect(emps[1]!.morale).toBe(40);
+  });
+
+  it('is a no-op for a lone employee', () => {
+    const { state, emps } = crew([50]);
+    applyDismissalMoraleDent(state, emps[0]!.id);
+    expect(emps[0]!.morale).toBe(50);
   });
 });

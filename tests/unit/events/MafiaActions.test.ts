@@ -26,6 +26,8 @@ import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../../../src
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { board } from '../../../src/core/engine/Mount.js';
+import { DISMISSAL_CREW_MORALE_DENT } from '../../../src/core/config/balance.js';
+import { frameRefusal } from '../../../src/core/events/MafiaActions.js';
 
 const EMPLOYEE_DEFAULTS = {
   activeActionId: null, fatigue: 100,
@@ -98,7 +100,7 @@ describe('Mafia gameplay mechanics', () => {
   it('framing an employee requires planting evidence (cost + time)', () => {
     const mafia = createMafiaState();
     const employees = createEmployeeState();
-    const emp = addTestEmployee(employees, true); // unionized
+    const emp = addTestEmployee(employees);
 
     const result = startFraming(mafia, employees, emp.id, 100);
     expect(result.success).toBe(true);
@@ -312,5 +314,113 @@ describe('Arranged accident is booked as a workplace death (#1700)', () => {
       return;
     }
     expect.unreachable('No successful accident in 200 seeds');
+  });
+});
+
+describe('Framing refuses union members; accident is the only shady way out (#1872)', () => {
+  const REFUSED = 'mafia.frame_union_refused';
+
+  it('frameRefusal names the refusal for a union member and is null otherwise', () => {
+    expect(frameRefusal({ unionized: true })).toBe(REFUSED);
+    expect(frameRefusal({ unionized: false })).toBeNull();
+  });
+
+  it('startFraming on a union target fails, costs nothing, adds no exposure and queues nothing', () => {
+    const mafia = createMafiaState();
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees, true);
+    const result = startFraming(mafia, employees, emp.id, 100);
+    expect(result.success).toBe(false);
+    expect(result.cost).toBe(0);
+    expect(result.exposureIncrease).toBe(0);
+    expect(result.outcomeKey).toBe(REFUSED);
+    expect(result.investigationTriggered).toBe(false);
+    expect(mafia.pendingFrames).toEqual([]);
+    expect(mafia.exposureRisk).toBe(0);
+  });
+
+  it('startFraming on a non-union target still works', () => {
+    const mafia = createMafiaState();
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees, false);
+    const result = startFraming(mafia, employees, emp.id, 100);
+    expect(result.success).toBe(true);
+    expect(result.cost).toBeGreaterThan(0);
+    expect(mafia.pendingFrames).toHaveLength(1);
+  });
+
+  it('completeFrame on a target that joined the union meanwhile never dismisses, rolls nothing, adds no exposure, drops the frame', () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const mafia = createMafiaState();
+      const employees = createEmployeeState();
+      const emp = addTestEmployee(employees, false);
+      startFraming(mafia, employees, emp.id, 0);
+      const exposureAfterStart = mafia.exposureRisk;
+      emp.unionized = true;
+      const state = stateOf(employees);
+      const result = completeFrame(mafia, state, emp.id, 1_000_000, new Random(seed));
+      expect(result.success).toBe(false);
+      expect(result.exposureIncrease).toBe(0);
+      expect(result.investigationTriggered).toBe(false);
+      expect(mafia.exposureRisk).toBe(exposureAfterStart);
+      expect(mafia.pendingFrames).toEqual([]);
+      expect(state.employees.employees).toContain(emp);
+      expect(emp.alive).toBe(true);
+    }
+  });
+
+  it('completeFrame on a vanished target drops the frame and dismisses nobody', () => {
+    const mafia = createMafiaState();
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees, false);
+    const bystander = addTestEmployee(employees, false);
+    startFraming(mafia, employees, emp.id, 0);
+    employees.employees = employees.employees.filter(e => e.id !== emp.id);
+    const result = completeFrame(mafia, stateOf(employees), emp.id, 1_000_000, new Random(1));
+    expect(result.success).toBe(false);
+    expect(result.outcomeKey).toMatch(/target_not_found/);
+    expect(mafia.pendingFrames).toEqual([]);
+    expect(employees.employees).toEqual([bystander]);
+  });
+
+  it('arrangeAccident still removes a union member and books the death', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const mafia = createMafiaState();
+      const employees = createEmployeeState();
+      const emp = addTestEmployee(employees, true);
+      const state = stateOf(employees);
+      const result = arrangeAccident(mafia, state, createCorruptionState(), emp.id, new Random(seed));
+      if (!result.success) continue;
+      expect(emp.alive).toBe(false);
+      expect(state.damage.deathCount).toBe(1);
+      expect(state.employees.employees.find(e => e.id === emp.id && e.alive)).toBeUndefined();
+      return;
+    }
+    expect.unreachable('no successful accident in 200 seeds');
+  });
+});
+
+describe('A successful frame is dismissal for cause: no crew morale dent (#1872)', () => {
+  function frameSucceeds(): { employees: ReturnType<typeof createEmployeeState>; victimId: number; others: Employee[] } {
+    for (let seed = 0; seed < 200; seed++) {
+      const mafia = createMafiaState();
+      const employees = createEmployeeState();
+      const victim = addTestEmployee(employees, false);
+      const others = [addTestEmployee(employees), addTestEmployee(employees)];
+      startFraming(mafia, employees, victim.id, 0);
+      const result = completeFrame(mafia, stateOf(employees), victim.id, 1_000_000, new Random(seed));
+      if (result.success) return { employees, victimId: victim.id, others };
+    }
+    throw new Error('no seed produced a successful frame');
+  }
+
+  it('removes the target and leaves every other employee morale unchanged', () => {
+    const { employees, victimId, others } = frameSucceeds();
+    expect(employees.employees.find(e => e.id === victimId)).toBeUndefined();
+    for (const o of others) expect(o.morale).toBe(60);
+  });
+
+  it('the dent an ordinary dismissal would cost is real (so the frame benefit is non-zero)', () => {
+    expect(DISMISSAL_CREW_MORALE_DENT).toBeGreaterThan(0);
   });
 });
