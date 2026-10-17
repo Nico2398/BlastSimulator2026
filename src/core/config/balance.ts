@@ -2392,6 +2392,18 @@ export const UNION_MEMBER_SALARY_DISCOUNT_PCT = 15;
 export const UNION_TIMER_MIN_SHARE_FACTOR = 0.25;
 /** Union members needed before a strike can fire (#1873). */
 export const UNION_STRIKE_MIN_MEMBERS = 1;
+/** Grievance added when the player refuses a union demand (#1890). */
+export const UNION_GRIEVANCE_PER_REFUSAL = 20;
+/** Grievance removed when the player meets a union demand (#1890). */
+export const UNION_GRIEVANCE_EASE_PER_MET = 15;
+/** Grievance at which a strike falls due (#1890). */
+export const UNION_GRIEVANCE_STRIKE_THRESHOLD = 60;
+/** Upper clamp on union grievance (#1890). */
+export const UNION_GRIEVANCE_MAX = 100;
+/** Grievance left after a strike fires (#1890). */
+export const UNION_GRIEVANCE_AFTER_STRIKE = 20;
+/** Extra selection weight for strike events while a strike is due (#1890). */
+export const UNION_STRIKE_WEIGHT_BOOST = 50;
 
 /** Chance a candidate has a bonus skill level over the role's starting qualifications. */
 export const CANDIDATE_SKILL_BONUS_CHANCE = 0.35;

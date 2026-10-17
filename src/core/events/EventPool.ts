@@ -99,6 +99,8 @@ export interface EventContext {
   protections?: ActiveProtection[];
   /** Living union members on the crew (#1873). */
   unionMemberCount?: number;
+  /** Current union grievance, 0..UNION_GRIEVANCE_MAX (#1890). */
+  unionGrievance?: number;
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */

@@ -75,6 +75,8 @@ export interface EventSystemState {
   activeModifiers: ActiveModifier[];
   /** Next id handed to an ActiveModifier. */
   nextModifierId: number;
+  /** Union grievance 0..UNION_GRIEVANCE_MAX: refusals raise it, met demands ease it (#1890). */
+  unionGrievance: number;
 }
 
 export interface FiredEvent {
@@ -128,6 +130,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     actionCountSinceEvent: 0,
     eventFreqMultiplier,
     cooldownMinIntervalTicks: null,
+    unionGrievance: 0,
   };
 }
 
