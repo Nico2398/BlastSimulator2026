@@ -183,7 +183,7 @@ describe('dominates', () => {
   it('missing dim counts as zero (union of dims)', () => {
     expect(dominates(v({ scoreDelta: { safety: 2 } }), v({}))).toBe(true);
     expect(dominates(v({}), v({ scoreDelta: { safety: -2 } }))).toBe(true);
-    expect(dominates(v({ scoreDelta: { safety: 2 } }), v({ cashDelta: -5 }))).toBe(false);
+    expect(dominates(v({ scoreDelta: { safety: 2 } }), v({ cashDelta: 5 }))).toBe(false);
   });
 
   it('expected value with probability and alt is used', () => {

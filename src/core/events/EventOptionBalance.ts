@@ -3,17 +3,17 @@ import type { EventEffectSpec } from './EventEffectCatalog.js';
 import { EVENT_BALANCE_PERMANENT_DAYS, EVENT_BALANCE_REFERENCE_CREW } from '../config/balance.js';
 
 /** Signed expected-value dimensions of one option; higher is always better for the player. */
-export type OptionDims = Readonly<Record<string, number>>;
+type OptionDims = Readonly<Record<string, number>>;
 
 /** Expected value of one option. */
-export interface OptionValue {
+interface OptionValue {
   dims: OptionDims;
   /** Signature of effects that cannot be compared numerically; options only dominate on equal signatures. */
   opaque: string;
 }
 
 /** One option of an event that is strictly worse than another option of the same event. */
-export interface DominatedPair {
+interface DominatedPair {
   eventId: string;
   winner: number;
   loser: number;
@@ -53,7 +53,7 @@ function specDims(spec: EventEffectSpec): DimEntry[] | null {
 function addBranch(c: EventConsequence, w: number, dims: Record<string, number>, opaque: string[]): void {
   const add = (dim: string, v: number): void => { dims[dim] = (dims[dim] ?? 0) + v * w; };
   if (c.cashDelta) add('cash', c.cashDelta);
-  for (const [key, v] of Object.entries(c.scoreDelta ?? {})) if (v) add(`score.${key}`, v);
+  for (const [key, v] of Object.entries(c.scoreDelta ?? {})) if (v) add(key, v);
   if (c.corruptionDelta) add('corruption', -c.corruptionDelta);
   if (c.exposureDelta) add('exposure', -c.exposureDelta);
   if (c.followUpEventId) opaque.push(`fu:${c.followUpEventId}@${w}`);
