@@ -49,6 +49,7 @@ describe('buildingActionRules — upgrade', () => {
     s.buildings.unlockedTiers['management_office'] = 2;
     const r = buildingActionRules(s, b);
     expect(r.upgrade).toMatchObject({ kind: 'available', nextTier: 2, cost: getUpgradeCost(b.type, 2), reasonKey: null });
+    expect(r.upgrade.cost).toBe(16_000); // #1905: T2 20,000 minus half of T1 8,000
     expect(r.research).toBeNull();
   });
 
@@ -110,6 +111,7 @@ describe('buildingActionRules — upgrade', () => {
     expect(cashRefusal.kind).toBe('refused');
     expect(cashRefusal.reasonKey).toBeTruthy();
     expect(cashRefusal.cost).toBe(getUpgradeCost(b.type, 2));
+    expect(cashRefusal.cost).toBe(16_000);
     const maxB = makeBuilding({ tier: 3 });
     expect(cashRefusal.reasonKey).not.toBe(buildingActionRules(stateWith(maxB), maxB).upgrade.reasonKey);
   });
