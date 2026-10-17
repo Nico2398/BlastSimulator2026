@@ -446,13 +446,16 @@ describe('build upgrade as in-place construction (#1875)', () => {
 
   it('refunds and leaves no site when the building is demolished by other means before the work lands', () => {
     const { ctx, id } = upgradeSetup();
-    const before = ctx.state!.cash;
-    buildCommand(ctx, ['upgrade', String(id)], {});
+    const spent = cashSpentBy(ctx, () => { buildCommand(ctx, ['upgrade', String(id)], {}); });
+    expect(spent).toBeGreaterThan(0);
     ctx.state!.buildings.buildings = ctx.state!.buildings.buildings.filter(b => b.id !== id);
     for (let i = 0; i < 1500 && ctx.state!.plannedBuildings.length > 0; i++) tick(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.id === id)).toBe(false);
     expect(ctx.state!.plannedBuildings).toHaveLength(0);
-    expect(ctx.state!.cash).toBeGreaterThanOrEqual(before - 1); // refunded (income may add)
+    // Payroll and upkeep run meanwhile, so assert the refund transaction rather than the cash balance.
+    expect(ctx.state!.finances.transactions.some(
+      tx => tx.type === 'income' && tx.category === 'refund' && tx.amount === spent,
+    )).toBe(true);
   });
 });
 

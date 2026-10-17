@@ -27,7 +27,8 @@ describe('isUpgradeOrdered', () => {
 
   it('ignores a plain construction site that merely shares the id', () => {
     expect(isUpgradeOrdered({ plannedBuildings: [site({ upgrade: false })] }, 4)).toBe(false);
-    expect(isUpgradeOrdered({ plannedBuildings: [site({ upgrade: undefined })] }, 4)).toBe(false);
+    const { upgrade: _omit, ...plain } = site();
+    expect(isUpgradeOrdered({ plannedBuildings: [plain] }, 4)).toBe(false);
   });
 });
 

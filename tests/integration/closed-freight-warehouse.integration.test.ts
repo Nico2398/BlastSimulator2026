@@ -86,7 +86,7 @@ describe('closed freight warehouse keeps stock (#1813)', () => {
     const events: Array<{ buildingId: number; massKg: number }> = [];
     ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e as { buildingId: number; massKg: number }));
     completeDemolition(state, null, ctx.emitter, {
-      buildingId: id, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+      buildingId: id, cost: 0, durationTicks: 1, footprint: [],
     });
     expect(events).toEqual([expect.objectContaining({ buildingId: id, massKg: MASS })]);
     expect(state.logistics.fragments).toHaveLength(0);

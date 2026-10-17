@@ -298,7 +298,7 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
   it('no building destroyer in the fleet: demolish waits for a vehicle, upgrade does not (#1875)', () => {
     const b = makeBuilding();
     const r = buildingActionRules(unlockedState(b), b);
-    expect(r.upgrade.waitKey).toBeNull();
+    expect(r.upgrade).not.toHaveProperty('waitKey');
     expect(r.upgrade.kind).toBe('available');
     expect(r.demolish.waitKey).toBe('inspector.wait.no_vehicle');
   });
@@ -309,7 +309,6 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     purchaseVehicle(s.vehicles, 'building_destroyer');
     hireEmployee(s.employees, 'driller', new Random(5), 0, 0);
     const r = buildingActionRules(s, b);
-    expect(r.upgrade.waitKey).toBeNull();
     expect(r.demolish.waitKey).toBe('inspector.wait.no_driver');
   });
 
@@ -319,7 +318,7 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     purchaseVehicle(s.vehicles, 'building_destroyer');
     licensedDriver(s);
     s.employees.employees[s.employees.employees.length - 1]!.injured = true;
-    expect(buildingActionRules(s, b).upgrade.waitKey).toBeNull();
+    expect(buildingActionRules(s, b).upgrade).not.toHaveProperty('waitKey');
     expect(buildingActionRules(s, b).demolish.waitKey).toBe('inspector.wait.no_driver');
   });
 
@@ -329,7 +328,6 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     purchaseVehicle(s.vehicles, 'building_destroyer');
     licensedDriver(s);
     const r = buildingActionRules(s, b);
-    expect(r.upgrade.waitKey).toBeNull();
     expect(r.demolish.waitKey).toBeNull();
   });
 
@@ -344,6 +342,6 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
 
   it('a refused upgrade carries no wait key', () => {
     const b = makeBuilding({ tier: 3 });
-    expect(buildingActionRules(stateWith(b), b).upgrade.waitKey).toBeNull();
+    expect(buildingActionRules(stateWith(b), b).upgrade).not.toHaveProperty('waitKey');
   });
 });
