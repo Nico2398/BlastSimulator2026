@@ -13,6 +13,7 @@ import { TRAFFIC_JAM_EFFECTS, type EventWorld, type EffectOutcome } from './Traf
 import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
 import { applyEventEffects } from './EventEffectCatalog.js';
+import { applyUnionDecision } from './UnionGrievance.js';
 import { effectChips, type EventEffectChip } from './EventEffectText.js';
 
 // ── Resolution result ──
@@ -79,6 +80,7 @@ export function resolveEvent(
     eventSystem,
     tick,
   );
+  applyUnionDecision(eventSystem, eventDef, resolved);
 
   // A jam or unqualified-task event carries what it concerns: the option's
   // effect tag names the world change to make.
