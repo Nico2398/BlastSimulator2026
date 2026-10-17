@@ -284,6 +284,9 @@ export class GameRenderer {
     // fragment meshes; loadGame() already seeded its own (#1868).
     if (stateReplaced && !rebuilt) this.redrawGroundFragments(ctx.state.logistics);
 
+    // Terrain and grid are bound by now; draw the loaded state's holes (#1877).
+    if (stateReplaced) this.showBlastPlanOverlay(ctx);
+
     this.lastState = ctx.state;
     this.syncEntities(ctx);
   }
@@ -311,6 +314,7 @@ export class GameRenderer {
     this.lastCtx = ctx;
     this.frameCameraOnGrid();
     this.loadedSeed = ctx.state.seed;
+    if (this.lastState !== ctx.state) this.showBlastPlanOverlay(ctx);
     this.lastState = ctx.state;
     this.syncEntities(ctx);
   }

@@ -153,7 +153,8 @@ export class BlastPlanOverlay {
 
   /** Hide and drop every marker and its pick position. */
   reset(): void {
-    // TODO: implement
+    this.hide();
+    this.clear();
   }
 
   clear(): void {
