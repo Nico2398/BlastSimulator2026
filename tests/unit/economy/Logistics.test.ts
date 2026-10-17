@@ -348,21 +348,19 @@ describe('consumeStoredOre', () => {
     expect(collectedOre.oreL).toBe(200);
   });
 
-  it('rubble (materialId "") prefers barren fragments, leaving ore-bearing stock and collectedOre untouched when barren stock alone covers the request', () => {
+  it('rubble (materialId "") takes only barren fragments, leaving ore-bearing stock and collectedOre untouched', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     // One ore-bearing fragment, one barren fragment — a rubble contract pays
-    // cents per kg where an ore_sale pays dollars, so disposal reaches for
-    // genuinely worthless waste before it ever touches ore-bearing rock
-    // (#959: FIFO-over-everything let a rubble sale scrap ore a same-tick
-    // ore_sale contract could have sold for real money instead).
+    // cents per kg where an ore_sale pays dollars, so disposal may only take
+    // genuinely worthless waste and never ore-bearing rock (#959, #1871).
     const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
     const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
     putInStorage(state, oreFrag);
     putInStorage(state, barrenFrag);
     const collectedOre: Record<string, number> = { oreE: 100 };
 
-    // 300kg — exactly the barren fragment's own mass, so barren stock alone
-    // covers it and the ore-bearing fragment is never reached.
+    // 300kg — exactly the barren fragment's own mass; the ore-bearing
+    // fragment is not eligible.
     const result = consumeStoredOre(state, collectedOre, '', 300, []);
 
     expect(result.success).toBe(true);
@@ -512,6 +510,8 @@ describe('consumeStoredOre', () => {
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(400);
     expect(state.storedMassKg).toBe(0);
+    // Trace ore left with the fragment: the ledger is debited too.
+    expect(collectedOre.oreX).toBeCloseTo(0, 6);
   });
 
   it('rubble draws the spoil heap first, then barren stored fragments (#1871)', () => {

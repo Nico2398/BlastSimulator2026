@@ -10,7 +10,7 @@ export type HaulDestination = 'warehouse' | 'spoil_heap';
 /**
  * Whether a fragment's ore densities make it barren: summed density at or below
  * SPOIL_BARREN_ORE_FRACTION_THRESHOLD (empty = barren). Decides haul destination
- * and the rubble-draw order in Logistics.consumeStoredOre.
+ * and which rock rubble may take (a filter: only barren fragments qualify).
  */
 export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>): boolean {
   let total = 0;
@@ -38,11 +38,16 @@ export interface StoredFragmentLike {
   fragment: { mass: number; oreDensities: Readonly<Record<string, number>> };
 }
 
-/** Mass (kg) of stored fragments that are barren (state 'stored' and isBarrenFragment). */
+/** True for a fragment held in storage whose ore densities make it barren. */
+export function isStoredBarren(f: StoredFragmentLike): boolean {
+  return f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities);
+}
+
+/** Mass (kg) of stored fragments that are barren (isStoredBarren). */
 export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[]): number {
   let total = 0;
   for (const f of fragments) {
-    if (f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities)) total += f.fragment.mass;
+    if (isStoredBarren(f)) total += f.fragment.mass;
   }
   return total;
 }
