@@ -210,6 +210,23 @@ describe('tick pipeline refresh', () => {
   });
 });
 
+describe('tick pipeline refresh avoids duplicate names (#1886)', () => {
+  it.each([1, 5, 42, 77])('seed %i: refreshed pool shares no name with a living employee or between candidates', (seed) => {
+    const state = quietGame(seed);
+    for (const role of ROLES) {
+      hireEmployee(state.employees, role, new Random(seed + role.length), 0, 0, 0, undefined, new Set(state.hiringPool.candidates.map(c => c.name)));
+    }
+    const living = new Set(state.employees.employees.filter(e => e.alive).map(e => e.name));
+    expect(living.size).toBe(ROLES.length);
+    for (let i = 0; i < HIRING_POOL_REFRESH_INTERVAL + 2; i++) step(state);
+    expect(state.hiringPool.lastRefreshTick).toBeGreaterThan(0);
+    const names = state.hiringPool.candidates.map(c => c.name);
+    expect(names.length).toBe(ROLES.length * 3);
+    expect(new Set(names).size).toBe(names.length);
+    for (const n of names) expect(living.has(n)).toBe(false);
+  });
+});
+
 describe('save / load', () => {
   it('round-trips the pool exactly, including taken slots', () => {
     const state = createGame({ seed: SEED });

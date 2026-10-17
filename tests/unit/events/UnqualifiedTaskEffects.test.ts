@@ -1,14 +1,20 @@
 // BlastSimulator2026 — Each unqualified_task_error option does what its outcome text says (#1380)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { UNQUALIFIED_TASK_EFFECTS } from '../../../src/core/events/UnqualifiedTaskEffects.js';
 import { UNQUALIFIED_CONTRACTOR_FEE } from '../../../src/core/config/balance.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, generateName } from '../../../src/core/entities/Employee.js';
+import { createHiringPool } from '../../../src/core/entities/HiringPool.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { planTraining } from '../../../src/core/entities/EmployeeTraining.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 import { SURVEY_FEE, setupUnqualified, totalDebit } from '../../helpers/unqualifiedWorld.js';
+
+vi.mock('../../../src/core/entities/Employee.js', async (orig) => {
+  const actual = await orig<typeof import('../../../src/core/entities/Employee.js')>();
+  return { ...actual, hireEmployee: vi.fn(actual.hireEmployee) };
+});
 
 const TICK = 40;
 
@@ -78,6 +84,27 @@ describe('hire_contractor', () => {
     UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId], s.world, TICK);
     expect(s.state.pendingActions.find(a => a.id === s.actionId)).toBeUndefined();
     expect(s.state.ghostPreviews.find(g => g.id === s.actionId)).toBeUndefined();
+  });
+});
+
+describe('hire_contractor name (#1886)', () => {
+  it('avoids a living employee holding the first drawn name and a pool candidate holding the next', () => {
+    const s = setupUnqualified();
+    const rng = () => new Random(s.state.seed + TICK + s.actionId);
+    const first = generateName(rng());
+    const second = generateName(rng(), new Set([first]));
+    s.state.employees.employees.push({ ...s.surveyor, id: 9001, name: first, alive: true });
+    s.state.hiringPool = createHiringPool(s.state.seed, 0);
+    s.state.hiringPool.candidates[0]!.name = second;
+    const spy = vi.mocked(hireEmployee);
+    spy.mockClear();
+    UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId], s.world, TICK);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const name = spy.mock.results[0]!.value.employee.name as string;
+    expect(name).not.toBe(first);
+    expect(name).not.toBe(second);
+    expect(s.state.employees.employees.some(e => e.name === name && e.alive)).toBe(false);
+    expect(s.state.hiringPool.candidates.some(c => c.name === name)).toBe(false);
   });
 });
 
