@@ -457,9 +457,8 @@ export function getFragmentCounts(state: LogisticsState): FragmentCounts {
 }
 
 /** Fragment data of every fragment lying on the ground, in tracking order (#1868). */
-export function onGroundFragmentData(_logistics: Pick<LogisticsState, 'fragments'>): FragmentData[] {
-  // TODO: implement
-  return [];
+export function onGroundFragmentData(logistics: Pick<LogisticsState, 'fragments'>): FragmentData[] {
+  return logistics.fragments.filter(f => f.state === 'on_ground').map(f => f.fragment);
 }
 
 /** Free storage room in kg (capacity minus stored and in-transit mass) (#1369, #1370). */

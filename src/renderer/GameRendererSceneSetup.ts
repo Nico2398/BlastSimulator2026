@@ -12,6 +12,7 @@
 
 import type { MiningContext } from '../console/commands/mining.js';
 import { ensureLandscape, terrainConfigOf, type LandscapeHandle } from '../console/commands/world.js';
+import { onGroundFragmentData } from '../core/economy/Logistics.js';
 import { getBiome } from '../core/world/BiomeCatalog.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
@@ -201,10 +202,12 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
   // Rain (#1601): world-anchored around the view, falling on game time.
   deps.rain = new RainField(scene, state.seed, deps.getRainGroundY);
 
-  // Fragments (empty until blast runs) — shares terrain's material so a
-  // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
+  // Fragments — shares terrain's material so a fresh cut face matches the
+  // rock it broke off from (#458 T4.1/D9). Seeded with the state's on-ground
+  // pile so a loaded save shows its rubble; blasts spawn their own (#1868).
   deps.fragments = new FragmentMesh(scene, deps.terrain.sharedMaterial);
   deps.fragmentAnimator = new FragmentAnimator(deps.fragments);
+  deps.fragments.spawnFragments(onGroundFragmentData(state.logistics));
 
   // Blast effects
   deps.blastEffects = new BlastEffects(scene, deps.sm.camera);

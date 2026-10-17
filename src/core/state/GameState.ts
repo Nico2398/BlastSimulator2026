@@ -24,7 +24,7 @@ import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
 import { createContractState } from '../economy/Contract.js';
 import type { LogisticsState } from '../economy/Logistics.js';
-import { createLogisticsState } from '../economy/Logistics.js';
+import { createLogisticsState, onGroundFragmentData } from '../economy/Logistics.js';
 import type { BuildingState, BuildingType, BuildingTier, FootprintOccupant } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
 import { NavGrid, type NavCell } from '../nav/NavGrid.js';
@@ -736,9 +736,7 @@ export function buildGameNavGrid(
   // Re-seed occupancy (#954) from the fragments/vehicles already live on
   // state — a rebuild would otherwise lose every fragment/vehicle cell the
   // previous navgrid had marked impassable for foot traffic.
-  const groundFragments = state.logistics.fragments
-    .filter(f => f.state === 'on_ground')
-    .map(f => f.fragment);
+  const groundFragments = onGroundFragmentData(state.logistics);
   state.navGrid = NavGrid.buildNavGrid(
     voxelGrid, buildings, drillHoles, groundFragments, state.vehicles.vehicles, state.employees.employees,
   );
