@@ -398,9 +398,9 @@ describe('EventModal hint chip amounts (#1893)', () => {
 
   it('amountLabel formats cash with $ and grouping, scores plain, with sign', async () => {
     const { amountLabel } = await import('../../../../src/ui/panels/EventModal.js');
-    expect(amountLabel('cash', 'cash', -8000)).toBe('-$8,000');
-    expect(amountLabel('cash', 'cash', 2000)).toBe('+$2,000');
-    expect(amountLabel('score', 'wellBeing', 12)).toBe('+12');
-    expect(amountLabel('score', 'safety', -3)).toBe('-3');
+    expect(amountLabel('cash', 'cash', -8000)).toBe('-$8,000 Cash');
+    expect(amountLabel('cash', 'cash', 2000)).toBe('+$2,000 Cash');
+    expect(amountLabel('score', 'wellBeing', 12)).toBe('+12 WELL');
+    expect(amountLabel('score', 'safety', -3)).toBe('-3 SAFE');
   });
 });
