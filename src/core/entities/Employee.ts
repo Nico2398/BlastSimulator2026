@@ -44,8 +44,31 @@ const LAST_NAMES = [
   'Quartzman', 'Slagheap', 'Bedrock', 'Pitman', 'Drillbit',
 ];
 
-export function generateName(rng: Random): string {
-  return `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
+/**
+ * Draws a first then a last name (always exactly two draws). When the drawn name
+ * is in `taken`, steps to the next unused first/last combination by index, then,
+ * once every combination is taken, suffixes the drawn name with the smallest free " k" (k >= 2).
+ */
+export function generateName(rng: Random, taken?: ReadonlySet<string>): string {
+  const first = FIRST_NAMES.indexOf(rng.pick(FIRST_NAMES));
+  const last = LAST_NAMES.indexOf(rng.pick(LAST_NAMES));
+  const total = FIRST_NAMES.length * LAST_NAMES.length;
+  const start = first * LAST_NAMES.length + last;
+  const nameAt = (i: number): string => `${FIRST_NAMES[Math.floor(i / LAST_NAMES.length)]} ${LAST_NAMES[i % LAST_NAMES.length]}`;
+  const base = nameAt(start);
+  if (!taken || !taken.has(base)) return base;
+  for (let step = 1; step < total; step++) {
+    const candidate = nameAt((start + step) % total);
+    if (!taken.has(candidate)) return candidate;
+  }
+  let k = 2;
+  while (taken.has(`${base} ${k}`)) k++;
+  return `${base} ${k}`;
+}
+
+/** Names of the employees still alive (the dead free their name). */
+export function livingNames(employees: readonly Pick<Employee, 'name' | 'alive'>[]): Set<string> {
+  return new Set(employees.filter(e => e.alive).map(e => e.name));
 }
 
 // ── Skills & Training ──
@@ -319,10 +342,11 @@ export function hireEmployee(
   z: number = 0,
   tickCount: number = 0,
   candidate?: Pick<HireCandidate, 'name' | 'unionized' | 'qualifications'>,
+  takenNames?: ReadonlySet<string>,
 ): HireResult {
   const employee: Employee = {
     id: state.nextId++,
-    name: candidate ? candidate.name : generateName(rng),
+    name: candidate ? candidate.name : generateName(rng, new Set([...livingNames(state.employees), ...(takenNames ?? [])])),
     role,
     salary: BASE_SALARIES[role],
     raises: 0,

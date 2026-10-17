@@ -5,6 +5,7 @@ import type { Employee, EmployeeRole } from '../entities/Employee.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
 import type { EffectOutcome, EventWorld } from './TrafficJamEffects.js';
 import { getLivingEmployees, hireEmployee, injureEmployee } from '../entities/Employee.js';
+import { poolNames } from '../entities/HiringPool.js';
 import { hireSpawnPoint } from '../entities/HireSpawn.js';
 import { fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import { offerSpecialContract, outstandingPenalty } from '../economy/Contract.js';
@@ -48,7 +49,7 @@ export function applyInstantEffect(
     case 'employee_joins': {
       const role: EmployeeRole = spec.role ?? EVENT_EFFECT_JOIN_DEFAULT_ROLE;
       const { x, z } = hireSpawnPoint(state);
-      hireEmployee(state.employees, role, rng, x, z, tick);
+      hireEmployee(state.employees, role, rng, x, z, tick, undefined, poolNames(state.hiringPool));
       return outcome();
     }
     case 'employee_injured': {
