@@ -157,7 +157,7 @@ Inspector Research Center: shows the running task (target tier name, percent, ti
   the settling dust from a blast (a ~2,344 t pile, blast every ~600 ticks); extra heaps shorten and soften
   the dips. Hauling rock off the ground shrinks the settled loss and the next fresh dust pulse.
 - With no heap placed, barren hauls are blocked as `no_spoil_heap` ("place a spoil heap"), never
-  `storage_full`. Rubble-disposal contracts draw on heap stock first, then storage.
+  `storage_full`. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed (#1871).
 - **Starting heap (#1574):** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial
   (`TUTORIAL_STARTING_SITE`) open with one free, active heap placed at tick 0, so the first blast's
   barren rock has a dump and no "place a spoil heap" notice appears. Later levels still build their own.

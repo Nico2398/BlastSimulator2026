@@ -40,14 +40,16 @@ export interface StoredFragmentLike {
 
 /** Mass (kg) of stored fragments that are barren (state 'stored' and isBarrenFragment). */
 export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[]): number {
-  void fragments;
-  return 0; // TODO: implement
+  let total = 0;
+  for (const f of fragments) {
+    if (f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities)) total += f.fragment.mass;
+  }
+  return total;
 }
 
-/** Rubble a rubble_disposal contract can draw on: stored barren fragments plus every heap's barren rock. */
+/** Barren rock a rubble_disposal contract can draw on: stored barren fragments plus every heap's rock. Ore-bearing stock is never rubble (#1871). */
 export function rubbleStockKg(fragments: readonly StoredFragmentLike[], buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[]): number {
-  void fragments;
-  return totalSpoilKg(buildings); // TODO: implement
+  return barrenStoredMassKg(fragments) + totalSpoilKg(buildings);
 }
 
 /** rubbleStockKg for any state slice carrying logistics and buildings (GameState fits). */

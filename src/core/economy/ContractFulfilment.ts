@@ -44,7 +44,7 @@ export function deliverStoredOre(
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
 
   let request = Math.min(requestedKg, remainingKg(contract));
-  // Partial delivery: take what storage holds; an empty store falls through to the insufficient-stock error.
+  // Partial delivery: take what stock holds (rubble: barren rock only, #1871); an empty store falls through to the insufficient-stock error.
   const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings));
   if (stock > FRAGMENT_SPLIT_EPSILON_KG) request = Math.min(request, stock);
   if (!(request > 0)) return { success: false, error: t('economy.contract.deliver_fulfilled', { id: contractId }) };

@@ -469,7 +469,7 @@ export function setContractHeld(state: ContractState, contractId: number, held: 
   return true;
 }
 
-/** Stored kilograms that can fill the contract: raw stored mass for rubble, the ore ledger entry otherwise. */
+/** Stored kilograms that can fill the contract: barren rock (heaps plus barren stored fragments) for rubble, the ore ledger entry otherwise. */
 export function storedStockKg(
   c: Pick<Contract, 'type' | 'materialId'>,
   collectedOre: Readonly<Record<string, number>>,

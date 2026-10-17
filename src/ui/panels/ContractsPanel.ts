@@ -174,7 +174,7 @@ export class ContractsPanel extends PanelBase {
     return Math.max(0, c.acceptedAtTick + c.deadlineTicks - tickCount);
   }
 
-  /** Kilograms of `materialId` available to deliver — collected ore by type, or raw stored mass for rubble ('' materialId). */
+  /** Kilograms of `materialId` available to deliver — collected ore by type, or barren rock (heaps plus barren stored fragments) for rubble ('' materialId). */
   private storedOf(materialId: string, state: GameState): number {
     return materialId === '' ? stateRubbleStockKg(state) : (state.collectedOre[materialId] ?? 0);
   }
