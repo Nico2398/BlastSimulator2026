@@ -30,7 +30,7 @@ import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.
 import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { MORALE_THRESHOLDS, UNION_MEMBER_SALARY_DISCOUNT_PCT, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, UNION_GRIEVANCE_STRIKE_THRESHOLD, UNION_MEMBER_SALARY_DISCOUNT_PCT, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -636,5 +636,80 @@ describe('union trade-off i18n (#1873)', () => {
   it('the candidate line interpolates {pct} in both languages', () => {
     expect((enLocale as Record<string, string>)['ui.crew.candidate_union_tradeoff']).toContain('{pct}');
     expect((frLocale as Record<string, string>)['ui.crew.candidate_union_tradeoff']).toContain('{pct}');
+  });
+});
+
+describe('makePaySection union discount row (#1890)', () => {
+  const spansOf = (e: Employee): string[] =>
+    Array.from(makePaySection(e, () => {}).querySelectorAll('span')).map(s => s.textContent ?? '');
+  const num = (spans: string[], prefix: RegExp): number => {
+    const m = spans.map(s => prefix.exec(s)).find(Boolean);
+    expect(m, `no row matching ${prefix}`).toBeTruthy();
+    return parseFloat(m![1]!);
+  };
+  const memberFixture = (unionized: boolean): Employee => {
+    const e = makeEmployee({
+      role: 'driller', unionized, raises: 250,
+      qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }],
+    });
+    e.salary = calculateSalary(e);
+    return e;
+  };
+
+  it('a member has a union discount row naming the percentage', () => {
+    const spans = spansOf(memberFixture(true));
+    expect(spans.some(s => s.includes(`union ${UNION_MEMBER_SALARY_DISCOUNT_PCT}%`))).toBe(true);
+  });
+
+  it('base + skills + raises - discount equals the shown total for a member', () => {
+    const spans = spansOf(memberFixture(true));
+    const base = num(spans, /^Base \$([\d.]+)\/h$/);
+    const skills = num(spans, /^\+ skills \$([\d.]+)\/h$/);
+    const raises = num(spans, /^\+ raises \$([\d.]+)\/h$/);
+    const discount = num(spans, /^- union \d+% \$([\d.]+)\/h$/);
+    const total = num(spans, /^\$([\d.]+)\/h$/);
+    expect(discount).toBeGreaterThan(0);
+    expect(Math.abs(base + skills + raises - discount - total)).toBeLessThanOrEqual(0.2 + 1e-9);
+  });
+
+  it('a non-member has no discount row', () => {
+    const spans = spansOf(memberFixture(false));
+    expect(spans.some(s => /union/i.test(s))).toBe(false);
+  });
+
+  it('the pay i18n discount key exists in en and fr with the same placeholders', () => {
+    const en = (enLocale as Record<string, string>)['ui.crew.pay_union_discount'] ?? '';
+    const fr = (frLocale as Record<string, string>)['ui.crew.pay_union_discount'] ?? '';
+    const ph = (s: string): string[] => (s.match(/\{\w+\}/g) ?? []).sort();
+    expect(ph(fr)).toEqual(ph(en));
+    expect(ph(en)).toEqual(['{amount}', '{pct}']);
+  });
+});
+
+describe('strike pressure in the crew detail (#1890)', () => {
+  const detailText = (e: Employee, grievance: number): string => {
+    const s = makeState();
+    s.events.unionGrievance = grievance;
+    return (makeIdentitySection(e, s).textContent ?? '') + (makeStatusTags(e, s).textContent ?? '');
+  };
+
+  it('a member shows the strike pressure as a percentage of the threshold', () => {
+    const text = detailText(makeEmployee({ unionized: true }), UNION_GRIEVANCE_STRIKE_THRESHOLD / 2);
+    expect(text).toContain(t('ui.crew.strike_pressure', { pct: 50 }));
+    expect(t('ui.crew.strike_pressure', { pct: 50 })).not.toBe('ui.crew.strike_pressure');
+  });
+
+  it('a member with no grievance shows 0%', () => {
+    expect(detailText(makeEmployee({ unionized: true }), 0)).toContain(t('ui.crew.strike_pressure', { pct: 0 }));
+  });
+
+  it('pressure caps at 100%', () => {
+    expect(detailText(makeEmployee({ unionized: true }), 100)).toContain(t('ui.crew.strike_pressure', { pct: 100 }));
+  });
+
+  it('a non-member shows no strike pressure row', () => {
+    const text = detailText(makeEmployee({ unionized: false }), 40);
+    expect(text).not.toContain(t('ui.crew.strike_pressure', { pct: 67 }));
+    expect(text).not.toMatch(/strike pressure/i);
   });
 });
