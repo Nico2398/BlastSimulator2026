@@ -586,7 +586,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -596,7 +596,8 @@
         },
         "changedBy": {
           "cash": -1000
-        }
+        },
+        "note": "#1890: the stretched shared event cooldown shifts the event draws and charge timing (tick 184 -> 173); every downstream tickCount/score pin re-measured, outcomes (deaths, level state) unchanged."
       }
     },
     {
@@ -614,7 +615,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -642,7 +643,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -670,7 +671,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -698,7 +699,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -726,7 +727,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -754,7 +755,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -778,7 +779,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -802,7 +803,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 184,
+          "tickCount": 173,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -905,9 +906,9 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 61.30333000000021,
-          "safety": 59.30000000000015,
-          "ecology": 50.13863403876703,
+          "wellBeing": 73.6428700000002,
+          "safety": 50,
+          "ecology": 44.83863403876688,
           "nuisance": 37.096585096917195,
           "levelEnded": false,
           "levelEndReason": null
@@ -1067,9 +1068,9 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 61.30333000000021,
-          "safety": 59.30000000000015,
-          "ecology": 50.13863403876703,
+          "wellBeing": 73.6428700000002,
+          "safety": 50,
+          "ecology": 44.83863403876688,
           "nuisance": 37.096585096917195,
           "levelEnded": false,
           "levelEndReason": null
@@ -1093,7 +1094,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 204,
+          "tickCount": 193,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
@@ -1119,14 +1120,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 204,
+          "tickCount": 193,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 23.943330000000202,
+          "wellBeing": 34.73787000000018,
           "safety": 0,
-          "ecology": 46.08221429884347,
+          "ecology": 40.782214298843314,
           "nuisance": 36.482925484585905,
           "levelEnded": false,
           "levelEndReason": null
@@ -1147,7 +1148,7 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 204,
+          "tickCount": 193,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1168,12 +1169,12 @@
       "expect": {
         "note": "#1778: pins re-measured for comfort-band morale recovery.",
         "equals": {
-          "tickCount": 204,
+          "tickCount": 193,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 23.943330000000202,
+          "wellBeing": 34.73787000000018,
           "safety": 0,
-          "ecology": 46.08221429884347,
+          "ecology": 40.782214298843314,
           "nuisance": 36.482925484585905,
           "levelEnded": false,
           "levelEndReason": null
@@ -1193,12 +1194,12 @@
       "expect": {
         "note": "#1778: pins re-measured for comfort-band morale recovery.",
         "equals": {
-          "tickCount": 204,
+          "tickCount": 193,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 23.943330000000202,
+          "wellBeing": 34.73787000000018,
           "safety": 0,
-          "ecology": 46.08221429884347,
+          "ecology": 40.782214298843314,
           "nuisance": 36.482925484585905,
           "levelEnded": false,
           "levelEndReason": null,
