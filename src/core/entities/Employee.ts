@@ -10,7 +10,7 @@ import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
 import type { VehicleTier } from './Vehicle.js';
 import type { Itinerary } from '../engine/Itinerary.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY, DISMISSAL_CREW_MORALE_DENT } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -433,8 +433,9 @@ export function fireEmployee(
 
 /** Every alive employee except the dismissed one loses DISMISSAL_CREW_MORALE_DENT morale, clamped at 0. */
 export function applyDismissalMoraleDent(state: EmployeeState, dismissedId: number): void {
-  // TODO: implement
-  void state; void dismissedId;
+  for (const e of state.employees) {
+    if (e.alive && e.id !== dismissedId) e.morale = Math.max(0, e.morale - DISMISSAL_CREW_MORALE_DENT);
+  }
 }
 
 /**

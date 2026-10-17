@@ -17,7 +17,7 @@ import { BRIBE_PROFILES, isProtectionLingering, protectionRemainingTicks, type A
 import { CORRUPTION_MAX, SMUGGLING_VOLUME_LEVELS } from '../../core/config/balance.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import {
-  ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS,
+  ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS, frameRefusal,
 } from '../../core/events/MafiaActions.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -30,6 +30,11 @@ const TARGETS: readonly { id: CorruptionTarget; nameKey: string; noteKey: string
   { id: 'politician', nameKey: 'ui.shady.target.politician', noteKey: 'ui.shady.target.politician.note' },
   { id: 'witness', nameKey: 'ui.shady.target.witness', noteKey: 'ui.shady.target.witness.note' },
 ];
+
+/** True when the select's chosen option is a union member (the frame refuses them). */
+function selectedIsUnion(select: HTMLSelectElement): boolean {
+  return select.selectedOptions[0]?.dataset['union'] === '1';
+}
 
 /** "Time left" label for an active protection row. */
 function remainingLabel(p: ActiveProtection, tickCount: number): string {
@@ -185,7 +190,7 @@ export class ShadyPanel extends PanelBase {
     if (frameStartBtn) {
       const select = this.servicesEl.querySelector<HTMLSelectElement>('[data-action="mafia-frame-employee"]');
       const noEligible = !select || select.disabled;
-      frameStartBtn.disabled = noEligible || cash < FRAME_COST;
+      frameStartBtn.disabled = noEligible || cash < FRAME_COST || (!!select && selectedIsUnion(select));
     }
   }
 
@@ -212,6 +217,7 @@ export class ShadyPanel extends PanelBase {
       state.corruption.protections.map(p => `${p.target}:${p.expiresAtTick}:${p.dismissalsLeft}:${p.shielded ? 1 : 0}`).join(','),
       state.mafia.smugglingVolume,
       framesSig,
+      state.employees.employees.filter(e => e.alive && e.unionized).map(e => e.id).join(','),
       rosterSig,
     ].join('|');
   }
@@ -413,11 +419,22 @@ export class ShadyPanel extends PanelBase {
     const select = this.employeeSelect(eligible);
     select.dataset['action'] = 'mafia-frame-employee';
     const startBtn = button('ghost', t('ui.shady.frame_start_button'), { dataAction: 'mafia-frame-start' });
+    const refusalEl = el('span', {
+      text: t('ui.shady.frame_union_refused'),
+      attrs: { 'data-role': 'frame-union-refused', style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-critical-text)' },
+    });
+    refusalEl.hidden = true;
     startBtn.disabled = eligible.length === 0 || cash < FRAME_COST;
+    // Toggled in place on selection: the refusal shows before the player pays, no rebuild.
+    select.addEventListener('change', () => {
+      const refused = selectedIsUnion(select);
+      refusalEl.hidden = !refused;
+      startBtn.disabled = refused || eligible.length === 0 || (this.lastState?.cash ?? cash) < FRAME_COST;
+    });
     startBtn.addEventListener('click', () => {
       const empId = Number(select.value);
       const emp = eligible.find(e => e.id === empId);
-      if (!emp) return;
+      if (!emp || frameRefusal(emp) !== null) return;
       this.onConfirmRequestCb?.({
         icon: 'gavel',
         title: t('ui.shady.frame_start_confirm_title'),
@@ -429,12 +446,12 @@ export class ShadyPanel extends PanelBase {
         },
       });
     });
-    children.push(el('div', { attrs: { style: 'display:flex;gap:6px' }, children: [select, startBtn] }));
+    children.push(refusalEl, el('div', { attrs: { style: 'display:flex;gap:6px' }, children: [select, startBtn] }));
 
     return card(children);
   }
 
-  private employeeSelect(employees: readonly { id: number; name: string }[]): HTMLSelectElement {
+  private employeeSelect(employees: readonly { id: number; name: string; unionized?: boolean }[]): HTMLSelectElement {
     const select = el('select', { attrs: { style: 'flex:1;height:30px;border-radius:4px;background:var(--bsx-well);border:1px solid var(--bsx-hairline);color:var(--bsx-text-primary);font:400 10px/1 var(--bsx-font-ui)' } });
     if (employees.length === 0) {
       select.appendChild(el('option', { text: t('ui.shady.no_employees'), attrs: { value: '' } }));
@@ -443,7 +460,10 @@ export class ShadyPanel extends PanelBase {
     }
     select.appendChild(el('option', { text: t('ui.shady.select_employee'), attrs: { value: '' } }));
     for (const emp of employees) {
-      select.appendChild(el('option', { text: `${emp.name} #${emp.id}`, attrs: { value: String(emp.id) } }));
+      const tag = emp.unionized ? ` ${t('ui.shady.union_tag')}` : '';
+      const option = el('option', { text: `${emp.name} #${emp.id}${tag}`, attrs: { value: String(emp.id) } });
+      if (emp.unionized) option.dataset['union'] = '1';
+      select.appendChild(option);
     }
     return select;
   }

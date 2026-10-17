@@ -8,7 +8,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import { SURVEY_COSTS, ACTION_STUCK_BACKOFF_TICKS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
-import { canFireEmployee, removeFromRoster, type Employee } from '../entities/Employee.js';
+import { canFireEmployee, removeFromRoster, applyDismissalMoraleDent, type Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, isMidVehicleGatedWork, isCommittedToOwnCargo, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { syncItineraryMirrors } from './MoveTo.js';
@@ -600,6 +600,8 @@ export function fireEmployeeFromWorld(
 
   releaseEmployeeFromWorld(state, employeeId);
   removeFromRoster(state.employees, employeeId);
+  // A dismissal for cause (a successful frame) does not rattle the rest of the crew.
+  if (!opts?.forCause) applyDismissalMoraleDent(state.employees, employeeId);
   return { success: true };
 }
 

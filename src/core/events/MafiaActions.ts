@@ -118,14 +118,12 @@ export function arrangeAccident(
 
 /** Refusal outcome key when the framing target cannot be framed (union members), else null. */
 export function frameRefusal(emp: Pick<Employee, 'unionized'>): string | null {
-  // TODO: implement
-  void emp;
-  return null;
+  return emp.unionized ? 'mafia.frame_union_refused' : null;
 }
 
 /**
- * Frame an employee for a crime to justify firing (even unionized).
- * Requires planting evidence (cost + time).
+ * Frame a non-union employee for a crime to justify firing "for cause".
+ * Union members are refused before any state change. Requires planting evidence (cost + time).
  */
 export function startFraming(
   mafia: MafiaState,
@@ -137,6 +135,11 @@ export function startFraming(
   if (!emp || !emp.alive) {
     return { success: false, cost: 0, exposureIncrease: 0,
       outcomeKey: 'mafia.target_not_found', investigationTriggered: false };
+  }
+  const refusal = frameRefusal(emp);
+  if (refusal) {
+    return { success: false, cost: 0, exposureIncrease: 0,
+      outcomeKey: refusal, outcomeParams: { name: emp.name }, investigationTriggered: false };
   }
 
   mafia.pendingFrames.push({
@@ -156,7 +159,7 @@ export function startFraming(
 }
 
 /**
- * Complete a framing. Can fire even unionized employees.
+ * Complete a framing. A target who has since unionized is refused; a success fires them for cause (no crew morale dent).
  * Probabilistic: may be detected.
  */
 export function completeFrame(
@@ -175,10 +178,21 @@ export function completeFrame(
   }
 
   mafia.pendingFrames.splice(frameIdx, 1);
+
+  const target = state.employees.employees.find(e => e.id === targetId);
+  if (!target) {
+    return { success: false, cost: 0, exposureIncrease: 0,
+      outcomeKey: 'mafia.target_not_found', investigationTriggered: false };
+  }
+  const refusal = frameRefusal(target);
+  if (refusal) {
+    return { success: false, cost: 0, exposureIncrease: 0,
+      outcomeKey: refusal, outcomeParams: { name: target.name }, investigationTriggered: false };
+  }
   mafia.lastActivityTick = currentTick;
 
   if (rng.chance(FRAME_SUCCESS_RATE)) {
-    fireEmployeeFromWorld(state, targetId, { force: true });
+    fireEmployeeFromWorld(state, targetId, { forCause: true });
     return {
       success: true, cost: 0, exposureIncrease: 0,
       outcomeKey: 'mafia.frame_success',
