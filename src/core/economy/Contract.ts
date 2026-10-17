@@ -222,7 +222,9 @@ function generateRubbleOffer(
   const wanted = Math.min(rng.nextFloat(range.min, range.max), rubbleStockKg * share);
   const quantityKg = Math.floor(wanted / step) * step;
   if (quantityKg < range.min) {
-    return availableOres.length > 0 ? generateOreSaleOffer(state, rng, priceMultiplier, availableOres) : null;
+    if (availableOres.length === 0) return null;
+    rng.nextFloat(0, 1); // keeps the RNG stream of the earlier fallback (it re-rolled the offer type), so recorded scenario timelines hold
+    return generateOreSaleOffer(state, rng, priceMultiplier, availableOres);
   }
   const deadlineTicks = rng.nextInt(LEGACY_OFFER_DEADLINE_TICKS.min, LEGACY_OFFER_DEADLINE_TICKS.max);
   const fee = paid ? rng.nextFloat(profile.rubbleFeePerKg.min, profile.rubbleFeePerKg.max) : 0;
