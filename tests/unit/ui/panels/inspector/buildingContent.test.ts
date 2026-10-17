@@ -539,7 +539,7 @@ describe('building inspector — upgrade ordered (#1875)', () => {
     const operating = viewOf(stateWith(makeBuilding())).status;
     const status = viewOf(s).status;
     expect(status).not.toBe(operating);
-    expect(status).not.toMatch(/^inspector\./);
-    expect(status.length).toBeGreaterThan(0);
+    // No builder holds the site yet, so the line is the waiting variant.
+    expect(status).toBe(t('inspector.status.upgrading_waiting', { tier: 2 }));
   });
 });

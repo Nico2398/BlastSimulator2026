@@ -2147,7 +2147,7 @@ describe('selectBestActionForEmployee — demolition outranks debris hauling (#1
     }));
     const demolition = makeAction({
       id: 100, type: 'demolish_building', requiredVehicleRole: 'building_destroyer', targetX: 28, targetZ: 28,
-      payload: { buildingId: 1, cost: 0, durationTicks: 10, footprint: [], rebuildOrderId: null },
+      payload: { buildingId: 1, cost: 0, durationTicks: 10, footprint: [] },
     });
     return { hauls, demolition };
   }

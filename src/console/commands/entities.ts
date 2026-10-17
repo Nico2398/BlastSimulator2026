@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Console commands for entities (Phase 5)
 
 import type { CommandResult } from '../ConsoleRunner.js';
+import type { GameState } from '../../core/state/GameState.js';
 import type { GameContext } from './world.js';
 import {
   moveBuilding,
@@ -37,6 +38,13 @@ import { terrainReservations } from '../../core/entities/PlacementReservations.j
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
+/** Refusal for a building that already has an in-place upgrade ordered, null otherwise. */
+function refuseIfUpgradeOrdered(state: GameState, id: number): CommandResult | null {
+  return isUpgradeOrdered(state, id)
+    ? { success: false, output: t('entities.build_upgrade_already_ordered', { id }) }
+    : null;
+}
+
 export { employeeCommand } from './employees.js';
 
 // ── build command ──
@@ -78,9 +86,8 @@ export function buildCommand(
       if (isDemolitionOrdered(state, id)) {
         return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
       }
-      if (isUpgradeOrdered(state, id)) {
-        return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
-      }
+      const upgradeRefusal = refuseIfUpgradeOrdered(state, id);
+      if (upgradeRefusal) return upgradeRefusal;
       const demolishCost = getDemolishCost(toDestroy);
       if (state.cash < demolishCost) {
         return {
@@ -113,9 +120,8 @@ export function buildCommand(
       if (isDemolitionOrdered(state, id)) {
         return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
       }
-      if (isUpgradeOrdered(state, id)) {
-        return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
-      }
+      const upgradeRefusal = refuseIfUpgradeOrdered(state, id);
+      if (upgradeRefusal) return upgradeRefusal;
       return orderBuildingUpgrade(ctx, toUpgrade, (toUpgrade.tier + 1) as BuildingTier);
     }
     case 'move': {
@@ -126,9 +132,8 @@ export function buildCommand(
       }
       const building = state.buildings.buildings.find(b => b.id === id);
       if (!building) return { success: false, output: t('entities.building_not_found', { id }) };
-      if (isUpgradeOrdered(state, id)) {
-        return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
-      }
+      const upgradeRefusal = refuseIfUpgradeOrdered(state, id);
+      if (upgradeRefusal) return upgradeRefusal;
       const moveDef = getBuildingDef(building.type, building.tier);
       const { sizeX, sizeZ } = getDefSize(moveDef);
       const moveCost = getMoveCost(building);

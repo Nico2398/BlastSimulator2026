@@ -8,7 +8,6 @@
 
 import { autoChargeHole } from '../mining/ChargeOrder.js';
 import type { GameState, PlannedBuilding } from '../state/GameState.js';
-import { terrainReservations } from '../entities/PlacementReservations.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -24,10 +23,10 @@ import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { recordBuiltRamp } from '../mining/RampWidening.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { placeBuilding, getDefSize, getBuildingDef, checkFootprintPlacement } from '../entities/Building.js';
+import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { addIncome } from '../economy/Finance.js';
-import { completeUpgrade } from './BuildingUpgrade.js';
+import { completeUpgrade, checkUpgradeFootprint } from './BuildingUpgrade.js';
 import { completeDemolition } from './BuildingDemolition.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import {
@@ -45,18 +44,9 @@ function checkUpgradeSite(
   order: PlannedBuilding,
   bounds: ReturnType<typeof siteBoundsForGrid>,
 ): { success: boolean; error?: string } {
-  if (!state.buildings.buildings.some(b => b.id === order.buildingId)) {
-    return { success: false, error: 'building is gone' };
-  }
-  const occupants = [
-    ...state.buildings.buildings.filter(b => b.id !== order.buildingId),
-    ...state.plannedBuildings.filter(pb => pb.id !== order.id),
-  ];
-  const check = checkFootprintPlacement(
-    occupants, order.type, order.x, order.z, order.tier,
-    bounds.width, bounds.depth, bounds.originX, bounds.originZ, grid ?? undefined,
-    terrainReservations(state),
-  );
+  const building = state.buildings.buildings.find(b => b.id === order.buildingId);
+  if (!building) return { success: false, error: 'building is gone' };
+  const check = checkUpgradeFootprint(state, grid, bounds, building, order.tier, [order]);
   return check.valid ? { success: true } : { success: false, error: check.error ?? 'footprint no longer valid' };
 }
 

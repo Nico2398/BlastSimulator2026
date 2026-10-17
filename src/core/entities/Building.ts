@@ -425,10 +425,7 @@ export function getDemolishCost(building: Building): number {
   return getBuildingDef(building.type, building.tier).demolishCost;
 }
 
-/**
- * Cost to upgrade a building to `nextTier` ($): demolishing the current tier
- * plus constructing the next one.
- */
+/** Cost to upgrade a building to `nextTier` ($): the next tier's construction cost only; nothing is demolished. */
 export function getUpgradeCost(type: BuildingType, nextTier: BuildingTier): number {
   return getBuildingDef(type, nextTier).constructionCost;
 }

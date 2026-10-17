@@ -1,8 +1,9 @@
 // BlastSimulator2026 — In-place building upgrade (#1875)
 
 import { describe, it, expect } from 'vitest';
-import { isUpgradeOrdered, completeUpgrade } from '../../../src/core/engine/BuildingUpgrade.js';
-import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { isUpgradeOrdered, completeUpgrade, checkUpgradeFootprint } from '../../../src/core/engine/BuildingUpgrade.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { PlannedBuilding } from '../../../src/core/state/GameState.js';
 
@@ -54,5 +55,31 @@ describe('completeUpgrade', () => {
     const state = { buildings: { buildings: [building({ id: 9 })] } } as unknown as Parameters<typeof completeUpgrade>[0];
     expect(completeUpgrade(state, 4, 2)).toBeNull();
     expect(state.buildings.buildings.map(b => b.tier)).toEqual([1]);
+  });
+});
+
+describe('checkUpgradeFootprint', () => {
+  const bounds = { width: 64, depth: 64, originX: 0, originZ: 0 };
+
+  function world() {
+    const state = createGame({ seed: 1 } as Parameters<typeof createGame>[0]);
+    const b = building({ type: 'freight_warehouse', x: 20, z: 20 });
+    state.buildings.buildings.push(b);
+    return { state, b };
+  }
+
+  it('accepts a clear footprint; the building itself and an ignored site do not block', () => {
+    const { state, b } = world();
+    expect(checkUpgradeFootprint(state, null, bounds, b, 2).valid).toBe(true);
+    const own = site({ type: 'freight_warehouse', x: 20, z: 20 });
+    state.plannedBuildings.push(own);
+    expect(checkUpgradeFootprint(state, null, bounds, b, 2, [own]).valid).toBe(true);
+  });
+
+  it('refuses when another building sits on the larger footprint', () => {
+    const { state, b } = world();
+    const t1 = getDefSize(getBuildingDef('freight_warehouse', 1));
+    state.buildings.buildings.push(building({ id: 9, type: 'management_office', x: 20 + t1.sizeX, z: 20 }));
+    expect(checkUpgradeFootprint(state, null, bounds, b, 2).valid).toBe(false);
   });
 });

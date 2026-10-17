@@ -85,7 +85,7 @@ export function resolveSelection(
   }
 }
 
-/** A destroyed building being rebuilt: a site holds its id and no live building does. */
+/** A planned site holds this building id while no live building does (not yet built, or destroyed and being rebuilt). */
 export function isUnderRebuild(
   world: Pick<GameState, 'buildings' | 'plannedBuildings'>,
   id: number,

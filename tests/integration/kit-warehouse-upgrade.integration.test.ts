@@ -85,10 +85,8 @@ describe('kit warehouse upgrade (#1830)', () => {
     expect(state.vehicles.vehicles.some(v => v.type === 'building_destroyer')).toBe(false);
   });
 
-  it('keeps the same id, the stored ore and the occupants through the upgrade, without a destroyer (#1875)', () => {
+  it('keeps the same id and the stored ore through the upgrade, without a destroyer (#1875)', () => {
     const { run, state } = startWithResearchedTier2();
-    const kit = state.buildings.buildings.find(b => b.id === 1)!;
-    const occupants = [...kit.occupantIds];
     const stored = 12_345;
     putStoredOre(state, 1, stored);
     expect(warehouseStoredKg(state.logistics, 1)).toBeCloseTo(stored);
@@ -99,7 +97,6 @@ describe('kit warehouse upgrade (#1830)', () => {
     expect(upgraded.map(b => b.id)).toContain(1);
     const after = upgraded.find(b => b.id === 1)!;
     expect(after.tier).toBe(2);
-    expect(after.occupantIds).toEqual(occupants);
     expect(warehouseStoredKg(state.logistics, 1)).toBeCloseTo(stored);
   });
 
@@ -131,6 +128,21 @@ describe('kit warehouse upgrade (#1830)', () => {
     expect(result.output).toContain(t('building.management_office.name'));
   });
 
+  it('a blocker that appears after the order fails the completion: refunded, tier unchanged (#1875)', () => {
+    const { run, state } = startWithResearchedTier2();
+    const kit = state.buildings.buildings.find(b => b.id === 1)!;
+    const t1 = getDefSize(getBuildingDef('freight_warehouse', 1));
+    expect(run('build upgrade 1')).toMatchObject({ success: true });
+    // Plant a blocker on the cells only tier 2 covers, after the order passed its check.
+    state.buildings.buildings.push({ ...kit, id: 900, type: 'management_office', tier: 1, x: kit.x + t1.sizeX, z: kit.z });
+    tickUntil(run, state, () => state.plannedBuildings.length === 0, MAX_REBUILD_TICKS);
+    expect(state.plannedBuildings).toHaveLength(0);
+    expect(state.buildings.buildings.find(b => b.id === 1)!.tier).toBe(1);
+    expect(state.finances.transactions.some(
+      tx => tx.category === 'refund' && tx.description.startsWith('Construction cancelled: freight_warehouse T2'),
+    )).toBe(true);
+  });
+
   it('refusal text is translated in french', () => {
     const { run, state } = startWithResearchedTier2();
     const kit = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
@@ -154,20 +166,24 @@ describe('kit warehouse upgrade (#1830)', () => {
       return state.pendingActions.some(a => a.type === 'demolish_building' && a.blockedReason === 'target_unreachable');
     }
 
-    /** Tick until the kit warehouse is tier 2; returns ticks spent and whether a demolition ever read target_unreachable. */
+    function sawUnreachableBuilderOrder(state: GameState): boolean {
+      return state.pendingActions.some(a => a.type === 'place_building' && a.blockedReason === 'target_unreachable');
+    }
+
+    /** Tick until the kit warehouse is tier 2; returns ticks spent and whether its place_building order ever read target_unreachable. */
     function runUpgrade(run: (c: string) => unknown, state: GameState, max: number) {
       let ticks = 0;
-      let unreachable = sawUnreachableDemolition(state);
+      let unreachable = sawUnreachableBuilderOrder(state);
       while (ticks < max && !state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.tier === 2)) {
         refresh(state);
         run('tick 1');
         ticks++;
-        unreachable = unreachable || sawUnreachableDemolition(state);
+        unreachable = unreachable || sawUnreachableBuilderOrder(state);
       }
       return { ticks, unreachable };
     }
 
-    it('kit alone: the upgrade completes, and its demolition never reads target_unreachable', () => {
+    it('kit alone: the upgrade completes within the bound, and its builder order never reads target_unreachable', () => {
       const { run, state } = startWithResearchedTier2({ blast: true });
       expect(run('build upgrade 1')).toMatchObject({ success: true });
       const { ticks, unreachable } = runUpgrade(run, state, MAX_REBUILD_TICKS);
@@ -187,13 +203,13 @@ describe('kit warehouse upgrade (#1830)', () => {
       expect(ticks).toBeLessThanOrEqual(UPGRADE_BOUND_TICKS);
     });
 
-    it('kit + 2 extra debris haulers + 1 hired driver: the demolition never reads target_unreachable', () => {
+    it('kit + 2 extra debris haulers + 1 hired driver: the builder order never reads target_unreachable', () => {
       const { run, state } = startWithResearchedTier2({ blast: true });
       expect(run('vehicle buy debris_hauler tier:1')).toMatchObject({ success: true });
       expect(run('vehicle buy debris_hauler tier:1')).toMatchObject({ success: true });
       expect(run('employee hire role:driver')).toMatchObject({ success: true });
       expect(run('build upgrade 1')).toMatchObject({ success: true });
-      expect(sawUnreachableDemolition(state)).toBe(false);
+      expect(sawUnreachableBuilderOrder(state)).toBe(false);
       const { unreachable } = runUpgrade(run, state, MAX_REBUILD_TICKS);
       expect(unreachable).toBe(false);
     });

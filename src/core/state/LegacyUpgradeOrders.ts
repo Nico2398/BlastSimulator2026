@@ -2,6 +2,8 @@
 // An old upgrade was a Building Destroyer demolition plus a reserved rebuild site. Neither exists
 // any more, so a load cancels what is still pending and refunds it in full; the standing
 // building, if any, is left as it was.
+// Removal point: delete this module and its call in SaveLoad.ts once saves that predate #1875 are
+// no longer supported (no such save format can carry a `rebuild` site or `rebuildOrderId` payload).
 
 import type { GameState } from './GameState.js';
 import { cancelAction } from '../engine/TaskCancellation.js';
@@ -14,7 +16,9 @@ type LegacySite = { rebuild?: boolean };
 export function cancelLegacyUpgradeOrders(state: GameState): void {
   for (const action of [...state.pendingActions]) {
     if (action.type !== 'demolish_building') continue;
-    const orderId = action.payload['rebuildOrderId'];
+    const payload: unknown = action.payload;
+    if (typeof payload !== 'object' || payload === null) continue;
+    const orderId = (payload as Record<string, unknown>)['rebuildOrderId'];
     if (typeof orderId !== 'number') continue;
     cancelAction(state, action.id);
     const idx = state.plannedBuildings.findIndex(pb => pb.id === orderId);
@@ -23,14 +27,10 @@ export function cancelLegacyUpgradeOrders(state: GameState): void {
 
   for (const site of [...state.plannedBuildings]) {
     if ((site as LegacySite).rebuild !== true) continue;
-    if (state.buildings.buildings.some(b => b.id === site.buildingId)) {
-      delete (site as LegacySite).rebuild;
-      continue;
-    }
-    // The building is gone: its rebuild can only fail or never finish, so it is refunded.
+    // A rebuild site can only fail or never finish, whether or not its building still stands: refund it.
     if (state.pendingActions.some(a => a.id === site.actionId)) {
       cancelAction(state, site.actionId);
-    } else {
+    } else if (Number.isFinite(site.cost) && site.cost > 0) {
       state.cash += site.cost;
       addIncome(state.finances, site.cost, 'refund', `Upgrade cancelled: ${site.type} #${site.buildingId}`, state.tickCount);
     }

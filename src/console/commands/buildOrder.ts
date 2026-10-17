@@ -23,6 +23,7 @@ import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
+import { isUpgradeOrdered, checkUpgradeFootprint } from '../../core/engine/BuildingUpgrade.js';
 import { dispatchPlaceBuildingAction } from '../../core/engine/PlaceBuildingAction.js';
 import { settleBuiltFootprint } from '../../core/engine/BuildingTaskHelpers.js';
 import { terrainReservations } from '../../core/entities/PlacementReservations.js';
@@ -163,6 +164,9 @@ export function orderBuildingCommand(
 export function orderBuildingUpgrade(ctx: GameContext, building: Building, nextTier: BuildingTier): CommandResult {
   const state = ctx.state!;
   const { type, id, x, z } = building;
+  if (isUpgradeOrdered(state, id)) {
+    return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
+  }
   if (isPlacementBlockedByResearch(state.buildings, type, nextTier)) {
     return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: buildingTypeName(type) }) };
   }
@@ -178,11 +182,7 @@ export function orderBuildingUpgrade(ctx: GameContext, building: Building, nextT
   // the site bounds, overlap a neighbour or cover uneven ground. The building
   // itself does not count as an occupant of its own cells.
   const bounds = siteBounds(ctx);
-  const check = checkFootprintPlacement(
-    buildingFootprintOccupants(state).filter(o => o !== building), type, x, z, nextTier,
-    bounds.width, bounds.depth, bounds.originX, bounds.originZ, ctx.grid ?? undefined,
-    terrainReservations(state),
-  );
+  const check = checkUpgradeFootprint(state, ctx.grid, bounds, building, nextTier);
   if (!check.valid) return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(check) }) };
 
   const refused = queueConstructionSite(ctx, { buildingId: id, type, tier: nextTier, x, z, upgrade: true });
