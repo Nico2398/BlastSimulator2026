@@ -1025,7 +1025,7 @@
       "role": "setup"
     },
     {
-      "command": "contract accept type:rubble_disposal",
+      "command": "contract accept type:ore_sale fillable:true",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1033,7 +1033,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 240000
         },
         {
@@ -1042,7 +1042,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1052,7 +1052,7 @@
           "activeContractCount": 1
         }
       },
-      "description": "#1817: the game is paused (HUD pause-toggle) just before the accept click and stays paused through the deliver step below. Stored stock now auto-delivers to an active contract on the first tick after it is accepted (#1367); demand-weighted haul ranking (#1817) shifts hauling order so less stock sits in storage at this point, and at speed 8 the interaction-mode ticks between accept and deliver drained all of it into the contract, leaving the card's amount box disabled (min(remaining, stored) = 0). Command mode has no ticks between the two steps, so its trajectory is unchanged. #513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match. #554: `contract accept 6` -> `contract accept type:rubble_disposal` -- charging is real work too now, and the extra ticks the charge-order waits above spend shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. This file only ever accepts one contract, so `type:rubble_disposal` is unambiguous both in `available` at accept time and in `active` at deliver time below -- no `[data-contract-id]` scoping is needed to disambiguate multiple same-type offers the way core-loop-visual.json's guard steps do. #554-followup (issue #586 CI): a widened 90s `waitForSelector` timeout (and a matching 100s step-level `timeout` so the harness's own step budget doesn't cut it off first) plus `time speed 8` beforehand (the step above) replace a bare 10s wait against a single pool snapshot -- see that step's own description for why the type-scoped selector alone wasn't enough. `time speed 1` restored in a separate setup step below -- role:player's own interaction array may never contain a `command` action (`checkStepActionAllowed`), so the restore can't live inside this step."
+      "description": "#1871: rubble contracts take barren rock only and this blast hauls only ore-bearing stock, so the scenario sells that stored ore through a fillable ore_sale offer instead of a rubble_disposal one. #1817: the game is paused (HUD pause-toggle) just before the accept click and stays paused through the deliver step below. Stored stock now auto-delivers to an active contract on the first tick after it is accepted (#1367); demand-weighted haul ranking (#1817) shifts hauling order so less stock sits in storage at this point, and at speed 8 the interaction-mode ticks between accept and deliver drained all of it into the contract, leaving the card's amount box disabled (min(remaining, stored) = 0). Command mode has no ticks between the two steps, so its trajectory is unchanged. #513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match. #554: `contract accept 6` -> `contract accept type:ore_sale fillable:true` -- charging is real work too now, and the extra ticks the charge-order waits above spend shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. This file only ever accepts one contract, so `type:rubble_disposal` is unambiguous both in `available` at accept time and in `active` at deliver time below -- no `[data-contract-id]` scoping is needed to disambiguate multiple same-type offers the way core-loop-visual.json's guard steps do. #554-followup (issue #586 CI): a widened 90s `waitForSelector` timeout (and a matching 100s step-level `timeout` so the harness's own step budget doesn't cut it off first) plus `time speed 8` beforehand (the step above) replace a bare 10s wait against a single pool snapshot -- see that step's own description for why the type-scoped selector alone wasn't enough. `time speed 1` restored in a separate setup step below -- role:player's own interaction array may never contain a `command` action (`checkStepActionAllowed`), so the restore can't live inside this step."
     },
     {
       "command": "time speed 1",
@@ -1070,7 +1070,7 @@
       "role": "setup"
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:200",
+      "command": "contract deliver type:ore_sale fillable:true amount:200",
       "interaction": [
         {
           "type": "awaitUsable",
