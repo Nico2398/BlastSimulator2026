@@ -119,7 +119,7 @@ export function buildCommand(
       }
       const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
       const newDef = getBuildingDef(toUpgrade.type, nextTier);
-      const totalCost = getUpgradeCost(toUpgrade, nextTier);
+      const totalCost = getUpgradeCost(toUpgrade.type, nextTier);
       if (state.cash < totalCost) {
         return {
           success: false,

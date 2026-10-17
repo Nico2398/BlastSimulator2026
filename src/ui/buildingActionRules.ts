@@ -105,7 +105,7 @@ function upgradeRules(
   if (isSingleTierType(b.type)) return refused('inspector.reason.single_tier', null, null);
   if (b.tier >= 3) return refused('inspector.reason.max_tier', null, null);
   const nextTier = (b.tier + 1) as 2 | 3; // b.tier < 3 here
-  const cost = getUpgradeCost(b, nextTier);
+  const cost = getUpgradeCost(b.type, nextTier);
   if (ordered) return refused('inspector.reason.demolition_ordered', nextTier, cost);
 
   if (!isTierUnlocked(state.buildings, b.type, nextTier)) {
