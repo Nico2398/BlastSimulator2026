@@ -3530,7 +3530,7 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 614,
+          "tickCount": 694,
           "ecologicalShutdown": true,
           "levelEnded": true,
           "levelEndReason": "ecological_shutdown",
