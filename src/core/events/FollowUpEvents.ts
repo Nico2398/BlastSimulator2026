@@ -73,7 +73,7 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
       // Mega-settlement: the ambulance chaser found 200 plaintiffs
       { cashDelta: -120000, scoreDelta: { safety: 10, wellBeing: 5 }, effectTag: 'mega_payout' },
       // Fight it — very expensive legal battle
-      { cashDelta: -60000, scoreDelta: { safety: -5 }, probability: 0.3,
+      { cashDelta: -60000, scoreDelta: { safety: -5 }, probability: 0.6,
         alt: { cashDelta: -200000, scoreDelta: { safety: -10, wellBeing: -10 } } },
       // Declare bankruptcy and restructure (drastic)
       { cashDelta: -80000, scoreDelta: { wellBeing: -20 }, effectTag: 'bankruptcy_restructure',

@@ -146,8 +146,9 @@ describe('tutorial event definitions', () => {
     const ev = getEventById('tutorial_synergy_consultant')!;
     const con = ev.consequences[2]!;
 
+    // Safety penalty is relational: it must cost more safety than dismissing, else it dominates option 1 (#1894).
     expect(con.scoreDelta?.wellBeing).toBe(5);
-    expect(con.scoreDelta?.safety).toBe(-5);
+    expect(con.scoreDelta?.safety).toBeLessThan(ev.consequences[1]!.scoreDelta!.safety!);
     expect(con.cashDelta).toBeUndefined();
   });
 
@@ -190,7 +191,7 @@ describe('tutorial event resolution', () => {
   it.each([
     [0, 'Hire consultant',  -3000, 97000, 65, 50, 50, 50],
     [1, 'Dismiss consultant',    0, 100000, 40, 45, 50, 50],
-    [2, 'Equity deal',           0, 100000, 55, 45, 50, 50],
+    [2, 'Equity deal',           0, 100000, 55, 42, 50, 50],
   ] as const)('option %i — %s', (
     optionIdx,
     _name,

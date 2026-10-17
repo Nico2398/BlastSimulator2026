@@ -85,7 +85,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
         effects: [
           { type: 'event_weight', category: 'mafia', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },
-      { cashDelta: -15000, scoreDelta: { wellBeing: 5 }, effectTag: 'poach_their_workers',
+      { cashDelta: -30000, scoreDelta: { wellBeing: 5 }, effectTag: 'poach_their_workers',
         effects: [{ type: 'employee_joins' }] },
     ],
   }),
@@ -227,7 +227,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.4 + 1.5 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.scores.ecology < 45,
     options: [
-      { cashDelta: -30000, corruptionDelta: 25, effectTag: 'fund_opponent' },
+      { cashDelta: -12000, corruptionDelta: 25, effectTag: 'fund_opponent' },
       { cashDelta: -20000, scoreDelta: { ecology: 12, nuisance: 8 }, effectTag: 'go_green_pr' },
       { cashDelta: 0, scoreDelta: { ecology: -10 }, followUp: 'politics_mayor_wins' },
     ],
@@ -302,7 +302,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.employeeCount > 4,
     options: [
-      { cashDelta: -5000, scoreDelta: { ecology: -10, nuisance: -10 }, effectTag: 'unfiltered_access',
+      { cashDelta: 10000, scoreDelta: { ecology: -10, nuisance: -10 }, effectTag: 'unfiltered_access',
         effects: [{ type: 'contract_price', pct: EVENT_TARIFF_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'curated_footage' },
       { cashDelta: 0, scoreDelta: { ecology: -5 }, effectTag: 'ban_cameras' },
@@ -324,7 +324,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 1.0 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 60,
     options: [
-      { cashDelta: 20000, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'green_reforms',
+      { cashDelta: -25000, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'green_reforms',
         effects: [
           { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS },
         ] },

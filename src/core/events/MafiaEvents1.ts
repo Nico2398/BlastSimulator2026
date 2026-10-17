@@ -152,7 +152,7 @@ export const MAFIA_EVENTS_1: EventDef[] = [
       { cashDelta: 18000, corruptionDelta: 15, scoreDelta: { ecology: -10 },
         effects: [{ type: 'contract_price', pct: EVENT_BOOM_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: 0, scoreDelta: { ecology: 5 } },
-      { cashDelta: 8000, corruptionDelta: 8, probability: 0.65,
+      { cashDelta: 12000, corruptionDelta: 8, probability: 0.65,
         alt: { cashDelta: -20000, corruptionDelta: 5, effectTag: 'certificate_fraud_caught' } },
     ],
   }),
@@ -216,7 +216,7 @@ export const MAFIA_EVENTS_1: EventDef[] = [
       { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'fee_refused_arson',
         effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: -6000, corruptionDelta: 6, effectTag: 'counter_offer', probability: 0.5,
-        alt: { cashDelta: -18000, corruptionDelta: 2, effectTag: 'intimidation_escalation' } },
+        alt: { cashDelta: -14000, corruptionDelta: 2, effectTag: 'intimidation_escalation' } },
     ],
   }),
   // 16 — Hire specific "employees" (mob plants)
@@ -246,7 +246,7 @@ export const MAFIA_EVENTS_1: EventDef[] = [
         ] },
       { cashDelta: 0, scoreDelta: { ecology: 5 } },
       { cashDelta: 10000, corruptionDelta: 10, scoreDelta: { ecology: -12 }, probability: 0.55,
-        alt: { cashDelta: -30000, scoreDelta: { ecology: -20 }, effectTag: 'epa_raid' } },
+        alt: { cashDelta: -10000, scoreDelta: { ecology: -20 }, effectTag: 'epa_raid' } },
     ],
   }),
   // 18 — Offer to "solve" your union problem
