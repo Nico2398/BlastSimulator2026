@@ -21,6 +21,7 @@ import {
 } from '../../../src/core/economy/Logistics.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
 import { totalSpoilKg } from '../../../src/core/economy/SpoilHeaps.js';
+import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -519,7 +520,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
     putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 200 };
 
     const heapOnly = consumeStoredOre(state, collectedOre, '', 150, [heap]);
     expect(heapOnly.success).toBe(true);
@@ -540,7 +541,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
     putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 200 };
 
     const result = consumeStoredOre(state, collectedOre, '', 500, [heap]);
 
@@ -559,7 +560,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
     putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 200 };
 
     const result = consumeStoredOre(state, collectedOre, '', 501, [heap]);
 
@@ -1176,8 +1177,8 @@ describe('extractOreFromFragment (#1371)', () => {
 
 // ── barren leftover leaves storage as spoil (#1690) ──────────────────────────
 
-type HeapStub = { type: 'spoil_heap'; storedSpoilKg: number };
-const heapStub = (kg = 0): HeapStub => ({ type: 'spoil_heap', storedSpoilKg: kg });
+type HeapStub = { type: 'spoil_heap'; tier: 1; storedSpoilKg: number };
+const heapStub = (kg = 0): HeapStub => ({ type: 'spoil_heap', tier: 1, storedSpoilKg: kg });
 
 /** Fragment 1: 1000 kg, 400 kg of oreA (density 0.5) -> selling it all leaves 500 kg barren rock. */
 function singleOreStorage(): { state: LogisticsState; collectedOre: Record<string, number> } {
@@ -1358,6 +1359,19 @@ describe('releaseBarrenStoredFragments (#1690)', () => {
     expect(state.storedMassKg).toBe(500);
     expect(collectedOre).toEqual({ dirtite: 250 });
     expect(heap.storedSpoilKg).toBe(0);
+  });
+
+  it('does not release into room an in-transit haul has reserved on the heap (#1892)', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 400, 0.16, {}));
+    state.fragments.push({ fragment: makeStoredFragment(2, 700, 0.28, {}), state: 'in_transit', vehicleId: 'v1', warehouseId: 7 });
+    const heap = { ...heapStub(), id: 7 };
+    // Heap capacity minus the 700 kg already promised to the hauler leaves less than 400 kg.
+    heap.storedSpoilKg = getBuildingDef('spoil_heap', 1).capacity - 900;
+
+    expect(releaseBarrenStoredFragments(state, {}, [heap])).toBe(0);
+    expect(heap.storedSpoilKg).toBe(getBuildingDef('spoil_heap', 1).capacity - 900);
+    expect(state.fragments).toHaveLength(2);
   });
 
   it('returns 0 on empty storage', () => {

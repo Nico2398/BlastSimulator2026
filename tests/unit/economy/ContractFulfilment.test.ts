@@ -2,8 +2,10 @@
 
 import { describe, it, expect } from 'vitest';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { createLogisticsState, type LogisticsState } from '../../../src/core/economy/Logistics.js';
 import {
+  checkDeadlines,
   createContractState,
   type Contract,
   type ContractState,
@@ -11,6 +13,7 @@ import {
 import {
   autoDeliverContracts,
   deliverStoredOre,
+  bookDeliveryCashflow,
 } from '../../../src/core/economy/ContractFulfilment.js';
 
 /** Ore kg of a stored fragment = volume x density x 2500, so kg/2500 volume at density 1 gives `kg`. */
@@ -257,7 +260,7 @@ describe('autoDeliverContracts', () => {
     const stock = stockWith(100); // 500 kg ore-bearing, off limits
     addBarren(stock, 2, 120);
     const { logistics, collectedOre } = stock;
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 100 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 100 };
     const out = autoDeliverContracts(contracts, logistics, collectedOre, 5, [heap]);
     expect(out).toHaveLength(1);
     expect(out[0]!.payment).toBeCloseTo(400, 6);
@@ -364,5 +367,84 @@ describe('mixed fragments shared by several contracts (#1371)', () => {
     expect(out.find(o => o.contractId === 2)!.kg).toBeCloseTo(800, 6);
     expect(out.every(o => o.completed)).toBe(true);
     expect(contracts.active).toHaveLength(0);
+  });
+});
+
+describe('paid clearances (#1892)', () => {
+  const paidRubble = () => contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 0.5, playerPays: true, penaltyAmount: 0, earlyBonus: 0 });
+
+  it('deliverStoredOre marks the outcome as a fee for a paid clearance', () => {
+    const contracts = stateWith(paidRubble());
+    const stock = stockWith(0);
+    addBarren(stock, 2, 300);
+    const r = deliverStoredOre(contracts, stock.logistics, stock.collectedOre, 1, 200, 10, []);
+    expect(r.success && r.data.fee).toBe(true);
+    expect(r.success && r.data.payment).toBeCloseTo(100, 6);
+  });
+
+  it('deliverStoredOre marks a cheap clearance and an ore sale as income, not fee', () => {
+    const cheap = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2 }));
+    const stock = stockWith(0);
+    addBarren(stock, 2, 300);
+    const r = deliverStoredOre(cheap, stock.logistics, stock.collectedOre, 1, 200, 10, []);
+    expect(r.success && r.data.fee).toBe(false);
+    const sale = stateWith(contract({ quantityKg: 50 }));
+    const s2 = stockWith(100);
+    const r2 = deliverStoredOre(sale, s2.logistics, s2.collectedOre, 1, 50, 10, []);
+    expect(r2.success && r2.data.fee).toBe(false);
+  });
+
+  it('autoDeliverContracts reports the fee flag of a paid clearance', () => {
+    const contracts = stateWith(paidRubble());
+    const stock = stockWith(0);
+    addBarren(stock, 2, 80);
+    const out = autoDeliverContracts(contracts, stock.logistics, stock.collectedOre, 5, []);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.fee).toBe(true);
+  });
+
+  it('a rubble contract with too little rubble delivers what exists and never fines', () => {
+    const contracts = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2, deadlineTicks: 10, penaltyAmount: 0 }));
+    const stock = stockWith(0);
+    addBarren(stock, 2, 60);
+    autoDeliverContracts(contracts, stock.logistics, stock.collectedOre, 5, []);
+    const [expired] = checkDeadlines(contracts, 1_000);
+    expect(expired!.penalty).toBe(0);
+  });
+});
+
+describe('bookDeliveryCashflow (#1892)', () => {
+  const account = () => ({ cash: 1_000, finances: createFinanceState(1_000) });
+
+  it('credits income for a paying delivery: payment, then early bonus', () => {
+    const a = account();
+    bookDeliveryCashflow(a, 1, { payment: 50, bonus: 10, fee: false }, 7);
+    expect(a.cash).toBe(1_060);
+    expect(a.finances.cash).toBe(1_060);
+    expect(a.finances.transactions.every(tx => tx.type === 'income')).toBe(true);
+    expect(a.finances.transactions.map(tx => tx.amount)).toEqual([50, 10]);
+  });
+
+  it('debits cash and logs one expense for a fee', () => {
+    const a = account();
+    bookDeliveryCashflow(a, 3, { payment: 120, bonus: 0, fee: true }, 9);
+    expect(a.cash).toBe(880);
+    expect(a.finances.cash).toBe(880);
+    expect(a.finances.transactions).toHaveLength(1);
+    expect(a.finances.transactions[0]).toMatchObject({ type: 'expense', amount: 120, tick: 9 });
+  });
+
+  it('a fee never credits a bonus', () => {
+    const a = account();
+    bookDeliveryCashflow(a, 3, { payment: 100, bonus: 40, fee: true }, 9);
+    expect(a.cash).toBe(900);
+    expect(a.finances.transactions.some(tx => tx.type === 'income')).toBe(false);
+  });
+
+  it('a zero fee changes nothing', () => {
+    const a = account();
+    bookDeliveryCashflow(a, 3, { payment: 0, bonus: 0, fee: true }, 9);
+    expect(a.cash).toBe(1_000);
+    expect(a.finances.transactions).toEqual([]);
   });
 });

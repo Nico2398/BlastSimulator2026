@@ -654,6 +654,12 @@ export function warehouseFreeKg(b: Pick<Building, 'type' | 'tier' | 'storedExplo
   return Math.max(0, getBuildingDef(b.type, b.tier).capacity - warehouseStockKg(b));
 }
 
+/** Room (kg) left on one building's spoil heap; 0 for a non-heap. */
+export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>): number {
+  if (b.type !== 'spoil_heap') return 0;
+  return Math.max(0, getBuildingDef(b.type, b.tier).capacity - (b.storedSpoilKg ?? 0));
+}
+
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
 
 export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';

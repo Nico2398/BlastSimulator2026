@@ -1014,6 +1014,26 @@
       "role": "observe"
     },
     {
+      "command": "tick 80",
+      "description": "#1892: moved ahead of the contract accept. The warehouse holds 25000kg, so hauling is nowhere near capacity; the old plateau-then-reopen reasoning (a rubble delivery freeing headroom) no longer applies. Sales pay far above the profit target at this point, so the ore_sale below completes the level on its first tick after accept and no further tick can run: the proof that hauling keeps landing stock (storedMassKg grows over this window) has to come first. History: window widened 20 -> 40 (#1151, slope-gated routes) and 40 -> 80 (#1263, agent occupancy crossing) because the next load into storage lands after a long drive.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        },
+        {
+          "type": "command",
+          "command": "tick 80"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedMassKg"
+        ]
+      }
+    },
+    {
       "command": "time speed 8",
       "description": "#554-followup (issue #586 CI): the accept step below waits on a specific *type* of offer (rubble_disposal, 30% of generated contracts, Contract.ts's generateOneContract) being present in the pool at the moment of the click, not a fixed id -- but the pool only regenerates every REFRESH_INTERVAL=20 ticks (Contract.ts), and interaction mode's own real-clock tick pacing (no GPU, ~6s/frame, #475) advances the game far slower in real time than command mode's tick-driven loop, so a static `waitForSelector` at its 10s default timeout could easily expire inside a single lull between refreshes, or catch a refresh whose 3 fresh slots (CONTRACTS_PER_REFRESH) happened not to roll rubble_disposal. Speeding up time here (matching the charge steps' own `time speed 8`/`time speed 1` convention elsewhere in this file) and widening the wait's own timeout below buys enough real-time-to-game-tick throughput to cover several refresh cycles instead of a fraction of one, so the wait resolves on the pool's own eventual regeneration rather than racing a single snapshot of it.",
       "interaction": [
@@ -1096,26 +1116,6 @@
       }
     },
     {
-      "command": "tick 80",
-      "description": "#1091-followup: new step -- carries the 'storedMassKg must have grown' proof that used to live on the much-earlier tick-20 step above (see its own #1091-followup note). That step's own window now lands with the freight_warehouse already almost full (1837.5/2000kg (pre#1531 T1 capacity; now 25000kg), no remaining ground fragment small enough for the last 162.5kg of headroom), a plateau that holds for hundreds of further ticks on its own. The rubble_disposal delivery just above drops storage by the 200kg it disposes of, reopening headroom the debris_hauler can fill again -- direct-traced (command mode): storedMassKg climbs from 1637.5 to 1900 within this 20-tick window, the genuine proof that hauling (not just the one delivery) is still working, before plateauing again on the next, smaller headroom. #1151: widened 20 -> 40 ticks. Hauling a load into storage is a drive, and under the 30-degree slope gate the route is longer: measured at this exact point, storedMassKg next grows 28 ticks after the step starts, so the old 20-tick window closed just before the delivery it exists to observe. The claim itself is unchanged and still directional. #1263: widened 40 -> 80 ticks under agent occupancy -- the debris_hauler's route to the crater now funnels past a driverless rock_fragmenter its own multi-role driver parked mid-corridor while working the other vehicle; Locomotion.ts's occupancy ladder now crosses a confirmed-idle, driverless vehicle blocker directly instead of paying the full stuck/abandon/backoff cost, but the crossing only becomes reachable once AGENT_OCCUPANCY_WAIT_TICKS elapses, and the delivery this step observes now lands at tick 238 (direct-traced, command mode) rather than 194 -- comfortably inside an 80-tick window from this step's own start, with room to spare.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "time resume"
-        },
-        {
-          "type": "command",
-          "command": "tick 80"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "storedMassKg"
-        ]
-      }
-    },
-    {
       "command": "finances",
       "interaction": [
         {
@@ -1133,14 +1133,14 @@
           "command": "state full"
         }
       ],
-      "description": "#553: employeeCount/vehicleCount bumped over the pre-#553 baseline -- employee #2 (the driller, needed to drive the drill_rig) and employee #4 (the second driver, crewing the rock_fragmenter) are both new. vehicleCount is 2: the debris_hauler and rock_fragmenter are both still alive; the drill_rig (#1) was destroyed by the blast and no longer counts. #1367: activeContractCount is 0 -- the manual 200kg deliver above leaves 130kg of the 330kg rubble_disposal contract, and the 80 ticks since auto-deliver the hauled stock to it (nearest deadline first), completing it.",
+      "description": "#553: employeeCount/vehicleCount bumped over the pre-#553 baseline -- employee #2 (the driller, needed to drive the drill_rig) and employee #4 (the second driver, crewing the rock_fragmenter) are both new. vehicleCount is 2: the debris_hauler and rock_fragmenter are both still alive; the drill_rig (#1) was destroyed by the blast and no longer counts. #1367: activeContractCount is 0 -- the manual 200kg deliver above leaves 130kg of the 330kg rubble_disposal contract, and the 80 ticks since auto-deliver the hauled stock to it (nearest deadline first), completing it. #1892: one contract stays active -- the fillable ore sale accepted above is only part-delivered (200kg of its total); contract generation now shares the rng stream with events, which moved which offer is fillable.",
       "role": "observe",
       "expect": {
         "equals": {
           "employeeCount": 4,
           "buildingCount": 2,
           "vehicleCount": 2,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 1
         }
       }

@@ -13,7 +13,7 @@
 // below is expected to fail until #552 is implemented.
 
 import { setFreightRoom, setFreightRoomExact, sitesOf } from "../../helpers/freightWarehouse.js";
-import { DEBRIS_DISPATCH_PER_TICK } from '../../../src/core/config/balance.js';
+import { DEBRIS_DISPATCH_PER_TICK, SPOIL_HEAP_CAPACITY_KG } from '../../../src/core/config/balance.js';
 import { describe, it, expect } from 'vitest';
 import type { ActionType } from '../../../src/core/state/GameState.js';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
@@ -1140,5 +1140,75 @@ describe('syncHaulDispatch — sealed fragments (#1774)', () => {
     syncHaulDispatch(state, null);
 
     expect(debrisFragmentIds(state)).toEqual([1]);
+  });
+});
+
+describe('haulBlockedReason — full spoil heaps (#1892)', () => {
+  const action = () => makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
+  const fillHeaps = (state: ReturnType<typeof createGame>, kg: number) => {
+    for (const b of state.buildings.buildings) if (b.type === 'spoil_heap') b.storedSpoilKg = kg;
+  };
+
+  it('isHaulBlockedReason accepts spoil_heap_full', () => {
+    expect(isHaulBlockedReason('spoil_heap_full')).toBe(true);
+  });
+
+  it('a barren fragment is spoil_heap_full when the only heap lacks room for its mass', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    fillHeaps(state, SPOIL_HEAP_CAPACITY_KG - 100);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBe('spoil_heap_full');
+  });
+
+  it('a completely full heap blocks even a small barren fragment', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    fillHeaps(state, SPOIL_HEAP_CAPACITY_KG);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 1)]);
+    expect(haulBlockedReason(state, action())).toBe('spoil_heap_full');
+  });
+
+  it('is spoil_heap_full only when every heap lacks room', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state, 30, 30);
+    addHeap(state, 40, 40);
+    fillHeaps(state, SPOIL_HEAP_CAPACITY_KG);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBe('spoil_heap_full');
+    state.buildings.buildings.filter(b => b.type === 'spoil_heap')[1]!.storedSpoilKg = 0;
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('a heap with exactly the fragment mass of room is unblocked (boundary)', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    fillHeaps(state, SPOIL_HEAP_CAPACITY_KG - 400);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('no heap is still no_spoil_heap, not spoil_heap_full', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBe('no_spoil_heap');
+  });
+
+  it('a full heap does not block an ore fragment with warehouse room', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    addHeap(state);
+    setFreightRoomExact(state, 1000);
+    fillHeaps(state, SPOIL_HEAP_CAPACITY_KG);
+    addBlastFragments(state.logistics, [ore(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('a full heap does not claim a barren haul (claim gate follows the blocked reason)', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    fillHeaps(state, SPOIL_HEAP_CAPACITY_KG);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 400)]);
+    expect(isHaulOrFragmentActionClaimable(state, action())).toBe(false);
   });
 });

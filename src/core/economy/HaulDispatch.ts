@@ -242,7 +242,7 @@ export function isHaulOrFragmentActionClaimable(
   return fits(tracked);
 }
 
-/** Whether a fragment can be delivered now: barren rock needs any spoil heap (unbounded room), ore a warehouse with room for its mass. */
+/** Whether a fragment can be delivered now: barren rock needs a spoil heap with room for its mass, ore a warehouse with room for its mass. */
 type StorageFit = (tracked: TrackedFragment) => boolean;
 
 /**
@@ -253,17 +253,16 @@ type StorageFit = (tracked: TrackedFragment) => boolean;
  */
 export function createStorageFit(state: GameState): StorageFit {
   let sites: ReturnType<typeof freightWarehouseSites> | null = null;
-  let hasHeap: boolean | null = null;
+  let heaps: ReturnType<typeof spoilHeapSites> | null = null;
   let used: Map<number, number> | null = null;
   return (tracked) => {
-    if (isBarrenFragment(tracked.fragment.oreDensities)) {
-      hasHeap ??= spoilHeapSites(state.buildings).length > 0;
-      return hasHeap;
-    }
-    sites ??= freightWarehouseSites(state.buildings);
+    const barren = isBarrenFragment(tracked.fragment.oreDensities);
+    let candidates: ReturnType<typeof freightWarehouseSites>;
+    if (barren) candidates = heaps ??= spoilHeapSites(state.buildings);
+    else candidates = sites ??= freightWarehouseSites(state.buildings);
     used ??= warehouseUsedKgMap(state.logistics);
     const { x, z } = tracked.fragment.position;
-    return pickWarehouse(state.logistics, sites, x, z, tracked.fragment.mass, used) !== null;
+    return pickWarehouse(state.logistics, candidates, x, z, tracked.fragment.mass, used) !== null;
   };
 }
 
@@ -351,10 +350,10 @@ export function isAutoDebrisAction(type: ActionType): boolean {
   return type === 'haul_debris' || type === 'fragment_debris';
 }
 
-const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full', 'no_spoil_heap']);
+const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full', 'no_spoil_heap', 'spoil_heap_full']);
 
 /** True for the blocked reasons haulBlockedReason can produce (#1369). */
-export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefined): reason is 'no_freight_warehouse' | 'storage_full' | 'no_spoil_heap' {
+export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefined): reason is 'no_freight_warehouse' | 'storage_full' | 'no_spoil_heap' | 'spoil_heap_full' {
   return reason != null && HAUL_BLOCKED_REASONS.has(reason);
 }
 
@@ -363,8 +362,8 @@ export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefine
  * when no active warehouse provides storage (zero synced capacity),
  * 'storage_full' when its on-ground fragment is heavier than the room left
  * (#1369). A barren fragment instead gets 'no_spoil_heap' when no heap is
- * placed (#1530) — never storage_full, whatever warehouses exist; heaps have
- * unlimited room. Never set for oversized (fragment_debris) work, nor for a fragment
+ * placed (#1530), 'spoil_heap_full' when heaps exist but none has room for it
+ * (#1892) — never storage_full, whatever warehouses exist. Never set for oversized (fragment_debris) work, nor for a fragment
  * that is gone or not on the ground.
  */
 export function haulBlockedReason(
@@ -376,7 +375,10 @@ export function haulBlockedReason(
   if (action.type !== 'haul_debris') return null;
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked || tracked.state !== 'on_ground') return null;
-  if (isBarrenFragment(tracked.fragment.oreDensities)) return fits(tracked) ? null : 'no_spoil_heap';
+  if (isBarrenFragment(tracked.fragment.oreDensities)) {
+    if (fits(tracked)) return null;
+    return spoilHeapSites(state.buildings).length === 0 ? 'no_spoil_heap' : 'spoil_heap_full';
+  }
   if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
   return fits(tracked) ? null : 'storage_full';
 }

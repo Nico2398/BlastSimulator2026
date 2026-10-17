@@ -2,6 +2,7 @@
 // Cash is a float; printing it raw leaks the accumulated rounding error
 // ("have $-5839.852589446586") into messages the player reads.
 import { PAY_CYCLE_TICKS } from '../config/balance.js';
+import { t } from '../i18n/I18n.js';
 
 /** Stored salary is per pay cycle; 1 tick = 1 game-hour, so hourly = salary / PAY_CYCLE_TICKS (1 decimal, no trailing .0). */
 export function perHour(perCycle: number): number {
@@ -48,4 +49,14 @@ export function formatPricePerKg(price: number): string {
 export function formatDollars(amount: number): string {
   const body = formatMoney(amount);
   return body.startsWith('-') ? `-$${body.slice(1)}` : `$${body}`;
+}
+
+/** Kilograms as a whole, en-US grouped number: contract cards never show fractions. */
+export function wholeKg(kg: number): string {
+  return Math.round(kg).toLocaleString('en-US');
+}
+
+/** The "Insufficient funds: need $X, have $Y" message shared by console and UI. */
+export function insufficientFundsText(need: number, have: number): string {
+  return t('console.insufficient_funds', { need: formatMoney(need), have: formatMoney(have) });
 }

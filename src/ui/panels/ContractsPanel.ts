@@ -23,14 +23,14 @@ import { t } from '../../core/i18n/I18n.js';
 import { el, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
-import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
+import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '../../core/economy/formatMoney.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { contractAcceptBlocker, isFillableSaleOffer, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { contractAcceptBlocker, contractTotal, isFillableSaleOffer, isPaidClearance, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -98,7 +98,7 @@ export class ContractsPanel extends PanelBase {
       stored: Math.round(state.logistics.storedMassKg), spoil: Math.round(totalSpoilKg(state.buildings.buildings)), storedTenths: deliverableAmountKg(stateRubbleStockKg(state)), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre, oreTenths: Object.values(state.collectedOre).map(deliverableAmountKg),
       active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}:${c.held ? 1 : 0}`),
-      available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
+      available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}:${contractAcceptBlocker(c, true, state.cash) === null ? 1 : 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
@@ -260,10 +260,12 @@ export class ContractsPanel extends PanelBase {
     const progressLine = el('div');
     progressLine.style.cssText = 'display:flex;gap:12px;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
     progressLine.append(
-      el('span', { text: t('ui.contracts.delivered_line', { delivered: c.deliveredKg.toLocaleString('en-US'), total: c.quantityKg.toLocaleString('en-US') }) }),
-      el('span', { text: `+$${formatMoney(c.quantityKg * c.pricePerKg)}`, attrs: { style: 'color:var(--bsx-positive)' } }),
-      el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' } }),
+      el('span', { text: t('ui.contracts.delivered_line', { delivered: wholeKg(c.deliveredKg), total: wholeKg(c.quantityKg) }) }),
+      this.activeMoneyLabel(c),
     );
+    if (c.type !== 'rubble_disposal') {
+      progressLine.append(el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' } }));
+    }
 
     const amountValue = maxDeliverable > 0 ? maxDeliverable : 0.1;
     const amountInput = el('input', { className: 'bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(amountValue), 'data-preserve-key': `contract-amount-${c.id}` } }) as HTMLInputElement;
@@ -301,7 +303,9 @@ export class ContractsPanel extends PanelBase {
     deliverRow.append(holdBtn);
 
     const storedNote = el('span', {
-      text: t('ui.contracts.stored_note', { kg: Math.round(stored).toLocaleString('en-US'), material: this.materialLabel(c.materialId) }),
+      text: c.type === 'rubble_disposal'
+        ? t('ui.contracts.stock_spoil_heaps', { kg: wholeKg(stored) })
+        : t('ui.contracts.stored_note', { kg: wholeKg(stored), material: this.materialLabel(c.materialId) }),
       attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
     });
 
@@ -311,6 +315,21 @@ export class ContractsPanel extends PanelBase {
     cardEl.dataset['contractType'] = c.type;
     cardEl.dataset['contractMaterial'] = c.materialId;
     return cardEl;
+  }
+
+  /** Money figure on an active card: rubble says Costs/Pays (#1892), other contracts a signed amount. */
+  private activeMoneyLabel(c: Contract): HTMLElement {
+    if (c.type === 'rubble_disposal') return this.rubbleMoneyLabel(c);
+    return el('span', { text: `+$${formatMoney(contractTotal(c))}`, attrs: { style: 'color:var(--bsx-positive)' } });
+  }
+
+  /** Costs/Pays figure of a rubble contract, shared by the offered and the active card (#1892). */
+  private rubbleMoneyLabel(c: Contract, attrs: Record<string, string> = {}): HTMLElement {
+    const paid = isPaidClearance(c);
+    return el('span', {
+      text: t(paid ? 'ui.contracts.rubble_costs' : 'ui.contracts.rubble_pays', { amount: formatMoney(contractTotal(c)) }),
+      attrs: { ...attrs, style: `color:var(${paid ? '--bsx-critical-text' : '--bsx-positive'})` },
+    });
   }
 
   // ── Offered ──
@@ -337,7 +356,7 @@ export class ContractsPanel extends PanelBase {
     statRow.append(
       this.miniStat(t('ui.contracts.qty'), `${c.quantityKg.toLocaleString('en-US')} kg`),
       this.miniStat(t('ui.contracts.price'), `$${formatPricePerKg(c.pricePerKg)}/kg`),
-      this.miniStat(t('ui.contracts.total'), `$${formatMoney(c.quantityKg * c.pricePerKg)}`, 'var(--bsx-positive)', true),
+      this.miniStat(t('ui.contracts.total'), `$${formatMoney(contractTotal(c))}`, isPaidClearance(c) ? 'var(--bsx-critical-text)' : 'var(--bsx-positive)', true),
     );
 
     const haveRow = el('div');
@@ -345,25 +364,41 @@ export class ContractsPanel extends PanelBase {
     const haveLabels = el('div');
     haveLabels.style.cssText = 'display:flex;justify-content:space-between;font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
     haveLabels.append(
-      el('span', { text: t('ui.contracts.have_line', { kg: Math.round(stored).toLocaleString('en-US') }) }),
+      el('span', { text: t(c.type === 'rubble_disposal' ? 'ui.contracts.stock_spoil_heaps' : 'ui.contracts.have_line', { kg: wholeKg(stored) }) }),
       el('span', { text: t('ui.contracts.deadline_line', { hours: c.deadlineTicks }), attrs: { style: 'color:var(--bsx-text-micro)' } }),
     );
     haveRow.append(haveLabels, progressBar(havePct, haveColor));
 
     const termsRow = el('div');
     termsRow.style.cssText = 'display:flex;gap:10px;font:400 10px/1 var(--bsx-font-mono)';
-    termsRow.append(
-      el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'color:var(--bsx-critical-text)' } }),
-      el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { style: 'color:var(--bsx-positive)' } }),
-    );
+    // Rubble is never fined, and a paid clearance has no early bonus either (#1892).
+    if (c.type === 'rubble_disposal') {
+      termsRow.append(
+        el('span', { text: t('ui.contracts.rubble_removes', { kg: wholeKg(c.quantityKg) }), attrs: { class: 'bs-contract-removes' } }),
+        this.rubbleMoneyLabel(c, { class: isPaidClearance(c) ? 'bs-contract-costs' : 'bs-contract-pays' }),
+      );
+      if (!isPaidClearance(c)) {
+        termsRow.append(el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { style: 'color:var(--bsx-positive)' } }));
+      }
+    } else {
+      termsRow.append(
+        el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'color:var(--bsx-critical-text)' } }),
+        el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { style: 'color:var(--bsx-positive)' } }),
+      );
+    }
 
     const neg = state.contracts.lastNegotiation;
     const negBox = neg && neg.contractId === c.id && neg.changes.length > 0 ? this.makeNegotiateResult(neg) : null;
 
-    const blocked = contractAcceptBlocker(c, freightWarehouseSites(state.buildings).length > 0);
+    const blocked = contractAcceptBlocker(c, freightWarehouseSites(state.buildings).length > 0, state.cash);
     const acceptBtn = button('primary', t('ui.contracts.accept'), {
       dataAction: 'accept',
-      ...(blocked === null ? {} : { disabled: true, title: t('economy.contract.needs_warehouse') }),
+      ...(blocked === null ? {} : {
+        disabled: true,
+        title: blocked === 'insufficient_funds_for_fee'
+          ? insufficientFundsText(contractTotal(c), state.cash)
+          : t('economy.contract.needs_warehouse'),
+      }),
       onClick: () => this.gameConsole?.(`contract accept id:${c.id}`),
     });
     acceptBtn.classList.add('bs-contract-accept');
@@ -416,6 +451,7 @@ export class ContractsPanel extends PanelBase {
     // true across a re-timing that re-rolls the pool.
     const onSite = offSiteBadge === null;
     cardEl.dataset['contractOnsite'] = String(onSite);
+    if (c.type === 'rubble_disposal') cardEl.dataset['contractPays'] = String(!isPaidClearance(c));
     cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, stateRubbleStockKg(state)));
     // Whether this sale alone lifts operating profit to the level's target, so a click can be
     // scoped to the offer that wins (the pool's fillable offers differ widely in payout, #1724).
@@ -452,13 +488,15 @@ export class ContractsPanel extends PanelBase {
 
   private makeHistoryRow(c: Contract): HTMLElement {
     const ok = c.completed && !c.expired;
-    const color = ok ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
-    const outcome = ok
-      ? `+$${formatMoney(c.paidTotal ?? c.deliveredKg * c.pricePerKg)}`
+    const color = ok && !isPaidClearance(c) ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
+    const settled = c.paidTotal ?? c.deliveredKg * c.pricePerKg;
+    // Rubble carries no penalty: its row shows what was settled, expired or not (#1892).
+    const outcome = ok || c.type === 'rubble_disposal'
+      ? `${isPaidClearance(c) ? '-' : '+'}$${formatMoney(settled)}`
       : `-$${formatMoney(c.penaltyCharged ?? c.penaltyAmount)}`;
     // An expired contract may still have paid for what was delivered before the deadline.
     const paid = c.paidTotal ?? 0;
-    const detail = !ok && paid > 0 ? ` · ${t('ui.contracts.history_paid', { amount: formatMoney(paid) })}` : '';
+    const detail = !ok && paid > 0 && c.type !== 'rubble_disposal' ? ` · ${t('ui.contracts.history_paid', { amount: formatMoney(paid) })}` : '';
     const row = el('div');
     row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:4px;background:var(--bsx-well)';
     const col = el('div');

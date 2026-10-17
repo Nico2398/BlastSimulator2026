@@ -832,6 +832,23 @@ describe('blocked haul orders: warehouse gating (#1369)', () => {
     expect(JSON.stringify(entries[0])).toContain(t('notification.order_blocked_no_spoil_heap', { order: t(ACTION_LABEL_KEY.haul_debris) }).slice(0, 12));
   });
 
+  it('buildBlockedOrderMessage returns a translated message for spoil_heap_full (#1892)', () => {
+    const msg = buildBlockedOrderMessage(makeHaulAction(1, 'spoil_heap_full'));
+    expect(msg).not.toContain('notification.order_blocked_spoil_heap_full');
+    expect(msg).toBe(t('notification.order_blocked_spoil_heap_full', { order: t(ACTION_LABEL_KEY.haul_debris) }));
+    expect(msg).not.toBe(buildBlockedOrderMessage(makeHaulAction(1, 'no_spoil_heap')));
+  });
+
+  it('raises one localized toast for N haul actions blocked by spoil_heap_full (#1892)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 12; i++) state.pendingActions.push(makeHaulAction(i, 'spoil_heap_full'));
+    center.update(state);
+    const entries = blockedEntries(center);
+    expect(entries).toHaveLength(1);
+    expect(JSON.stringify(entries[0])).not.toContain('notification.order_blocked_spoil_heap_full');
+  });
+
   it('re-toasts when the shared reason changes (warehouse built, then storage fills)', () => {
     const center = new NotificationCenter();
     const state = makeState();
@@ -1094,7 +1111,7 @@ describe('isFailureBlock (#1810)', () => {
   it.each([
     'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver',
     'target_unreachable', 'no_freight_warehouse', 'storage_full', 'licence_level_too_low',
-    'no_spoil_heap', 'no_reaching_vehicle',
+    'no_spoil_heap', 'spoil_heap_full', 'no_reaching_vehicle',
   ] as const)('is true for %s', (reason) => {
     expect(isFailureBlock({ blockedReason: reason })).toBe(true);
   });

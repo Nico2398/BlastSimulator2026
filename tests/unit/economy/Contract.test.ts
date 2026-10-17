@@ -20,6 +20,8 @@ import {
   sortByDeadline,
   contractShortOfStock,
   contractAcceptBlocker,
+  offerSpecialContract,
+  isPaidClearance,
 } from '../../../src/core/economy/Contract.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -33,6 +35,9 @@ import {
   PRODUCTION_SUPPLY_DEADLINE_TICKS,
   PRODUCTION_OFFER_QTY_STEP_KG,
   CONTRACT_PENALTY_RATE,
+  PRODUCTION_RUBBLE_FEE_PER_KG,
+  RUBBLE_CHEAP_STOCK_SHARE_MAX,
+  RUBBLE_PAID_STOCK_SHARE_MAX,
 } from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 import { resolveMarket, oreContractBasePrice } from '../../../src/core/economy/Market.js';
@@ -52,14 +57,16 @@ describe('Contract system', () => {
   it('generated contracts have valid fields within expected ranges', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     expect(state.available.length).toBeGreaterThan(0);
     for (const c of state.available) {
       expect(c.quantityKg).toBeGreaterThan(0);
       expect(c.pricePerKg).toBeGreaterThan(0);
       expect(c.deadlineTicks).toBeGreaterThan(0);
-      expect(c.penaltyAmount).toBeGreaterThan(0);
+      // Rubble is never fined (#1892); ore contracts are.
+      if (c.type === 'rubble_disposal') expect(c.penaltyAmount).toBe(0);
+      else expect(c.penaltyAmount).toBeGreaterThan(0);
       expect(['ore_sale', 'rubble_disposal', 'supply']).toContain(c.type);
     }
   });
@@ -73,10 +80,10 @@ describe('Contract system', () => {
   describe('priceMultiplier', () => {
     it('scales every generated contract\'s pricePerKg by the given multiplier, relative to the unmultiplied baseline', () => {
       const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES, Infinity);
 
       const multiplied = createContractState();
-      generateContracts(multiplied, new Random(42), 0, 1.5, ALL_ORES);
+      generateContracts(multiplied, new Random(42), 0, 1.5, ALL_ORES, Infinity);
 
       expect(multiplied.available.length).toBe(baseline.available.length);
       for (let i = 0; i < baseline.available.length; i++) {
@@ -86,16 +93,17 @@ describe('Contract system', () => {
         expect(scaled.type).toBe(base.type);
         expect(scaled.materialId).toBe(base.materialId);
         expect(scaled.quantityKg).toBe(base.quantityKg);
-        expect(scaled.pricePerKg).toBeCloseTo(base.pricePerKg * 1.5, 6);
+        // A paid clearance's fee is what the player pays, not what the market pays: the lever leaves it alone (#1892).
+        expect(scaled.pricePerKg).toBeCloseTo(base.playerPays ? base.pricePerKg : base.pricePerKg * 1.5, 6);
       }
     });
 
     it('leaves the missed-deadline penalty on the unmultiplied base price, while the early-delivery bonus scales (#959)', () => {
       const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES, Infinity);
 
       const multiplied = createContractState();
-      generateContracts(multiplied, new Random(42), 0, 16, ALL_ORES);
+      generateContracts(multiplied, new Random(42), 0, 16, ALL_ORES, Infinity);
 
       expect(multiplied.available.length).toBe(baseline.available.length);
       for (let i = 0; i < baseline.available.length; i++) {
@@ -107,20 +115,21 @@ describe('Contract system', () => {
         // market rate, and a 16x fine on one unfillable contract would end the
         // level the tutorial exists to teach.
         expect(scaled.penaltyAmount).toBe(base.penaltyAmount);
-        // The bonus rides on the price, so it does scale.
-        expect(scaled.earlyBonus).toBe(Math.round(base.quantityKg * base.pricePerKg * 16 * 0.15));
+        // The bonus rides on the price, so it does scale. A paid clearance has no bonus (#1892).
+        expect(scaled.earlyBonus).toBe(base.playerPays ? 0 : Math.round(base.quantityKg * base.pricePerKg * 16 * 0.15));
       }
     });
 
     it('a sub-1 multiplier (a tight, lowball market) scales prices down, not just up', () => {
       const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES, Infinity);
 
       const discounted = createContractState();
-      generateContracts(discounted, new Random(42), 0, 0.85, ALL_ORES);
+      generateContracts(discounted, new Random(42), 0, 0.85, ALL_ORES, Infinity);
 
       for (let i = 0; i < baseline.available.length; i++) {
-        expect(discounted.available[i]!.pricePerKg).toBeCloseTo(baseline.available[i]!.pricePerKg * 0.85, 6);
+        const base = baseline.available[i]!;
+        expect(discounted.available[i]!.pricePerKg).toBeCloseTo(base.playerPays ? base.pricePerKg : base.pricePerKg * 0.85, 6);
       }
     });
   });
@@ -128,22 +137,22 @@ describe('Contract system', () => {
   it('contract list refreshes periodically (new contracts appear)', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
     const initialCount = state.available.length;
 
     // Refresh too early — no change
-    generateContracts(state, rng, 5, 1, ALL_ORES);
+    generateContracts(state, rng, 5, 1, ALL_ORES, Infinity);
     expect(state.available.length).toBe(initialCount);
 
     // After refresh interval — new contracts added
-    generateContracts(state, rng, 25, 1, ALL_ORES);
+    generateContracts(state, rng, 25, 1, ALL_ORES, Infinity);
     expect(state.available.length).toBeGreaterThan(initialCount);
   });
 
   it('accepting a contract adds it to active contracts', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contractId = state.available[0]!.id;
     const contract = acceptContract(state, contractId, 10);
@@ -157,7 +166,7 @@ describe('Contract system', () => {
   it('delivering materials against a contract updates progress', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contractId = state.available[0]!.id;
     const quantity = state.available[0]!.quantityKg;
@@ -174,7 +183,7 @@ describe('Contract system', () => {
   it('completing a contract credits payment', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contractId = state.available[0]!.id;
     const quantity = state.available[0]!.quantityKg;
@@ -190,9 +199,10 @@ describe('Contract system', () => {
   it('missing a deadline triggers penalty deduction', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
-    const contract = state.available[0]!;
+    // Rubble is never fined (#1892), so the fined offer is an ore contract.
+    const contract = state.available.find(c => c.type !== 'rubble_disposal')!;
     const deadline = contract.deadlineTicks;
     acceptContract(state, contract.id, 0);
 
@@ -212,7 +222,7 @@ describe('Contract system', () => {
   describe('findContract', () => {
     it('finds a contract by id', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       const target = state.available[1]!;
 
       expect(findContract(state.available, { id: target.id })).toBe(target);
@@ -298,7 +308,7 @@ describe('Contract system', () => {
 
     it('returns null when no selector field is set — nothing to search for', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       expect(findContract(state.available, {})).toBeNull();
     });
 
@@ -309,7 +319,7 @@ describe('Contract system', () => {
 
     it('an id that has rotated out of the available pool is no longer resolvable, but a type/materialId selector still is if a matching contract is still offered', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       const evictedId = state.available[0]!.id;
       const survivingType = state.available[0]!.type;
       const survivingMaterial = state.available[0]!.materialId;
@@ -320,7 +330,7 @@ describe('Contract system', () => {
       let tick = 0;
       while (state.available.some(c => c.id === evictedId)) {
         tick += 20;
-        generateContracts(state, new Random(42 + tick), tick, 1, ALL_ORES);
+        generateContracts(state, new Random(42 + tick), tick, 1, ALL_ORES, Infinity);
       }
 
       expect(findContract(state.available, { id: evictedId })).toBeNull();
@@ -335,7 +345,7 @@ describe('Contract system', () => {
 
     it('accepting by a material/type selector resolves the same contract accepting by its id would', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       const target = state.available[0]!;
 
       const byId = findContract(state.available, { id: target.id });
@@ -454,7 +464,7 @@ describe('Contract system', () => {
 
     it('first refresh on an empty board yields exactly 3 offers', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       expect(state.available).toHaveLength(3);
     });
 
@@ -463,7 +473,7 @@ describe('Contract system', () => {
       state.available = Array.from({ length: 8 }, (_, i) => offer({ id: i + 1 }));
       state.nextId = 9;
       state.lastRefreshTick = 0;
-      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual([4, 5, 6, 7, 8, 9, 10, 11]);
     });
 
@@ -472,7 +482,7 @@ describe('Contract system', () => {
       state.available = Array.from({ length: 6 }, (_, i) => offer({ id: i + 1 }));
       state.nextId = 7;
       state.lastRefreshTick = 0;
-      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
     });
 
@@ -481,7 +491,7 @@ describe('Contract system', () => {
       state.available = Array.from({ length: 5 }, (_, i) => offer({ id: i + 1 }));
       state.nextId = 6;
       state.lastRefreshTick = 0;
-      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     });
 
@@ -490,7 +500,7 @@ describe('Contract system', () => {
       const rng = new Random(42);
       for (let n = 0; n < 7; n++) {
         const before = new Set(ids(state));
-        generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+        generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
         const added = ids(state).filter(id => !before.has(id));
         expect(added, `refresh ${n}`).toHaveLength(3);
         expect(state.available.length).toBeLessThanOrEqual(MAX_AVAILABLE_CONTRACTS);
@@ -501,9 +511,9 @@ describe('Contract system', () => {
     it('refresh before the interval elapsed on a non-empty board is a no-op', () => {
       const state = createContractState();
       const rng = new Random(42);
-      generateContracts(state, rng, 0, 1, ALL_ORES);
+      generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
       const before = ids(state);
-      generateContracts(state, rng, CONTRACT_REFRESH_INTERVAL - 1, 1, ALL_ORES);
+      generateContracts(state, rng, CONTRACT_REFRESH_INTERVAL - 1, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual(before);
       expect(state.nextId).toBe(4);
     });
@@ -514,7 +524,7 @@ describe('Contract system', () => {
       for (let seed = 1; seed <= 60; seed++) {
         const state = createContractState();
         const rng = new Random(seed);
-        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
         for (const c of state.available.filter(o => o.type === 'ore_sale')) {
           const b = base[c.materialId];
           if (b === undefined) continue;
@@ -535,7 +545,7 @@ describe('Contract system', () => {
       for (let seed = 1; seed <= 30; seed++) {
         const state = createContractState();
         const rng = new Random(seed);
-        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
         for (const c of state.available.filter(o => o.type === 'rubble_disposal')) {
           saw = true;
           expect(c.pricePerKg).toBeGreaterThanOrEqual(0.5);
@@ -584,7 +594,7 @@ describe('contract offers draw only from the available ores (#1364)', () => {
     const all: Contract[] = [];
     for (let seed = 1; seed <= seeds; seed++) {
       const state = createContractState();
-      generateContracts(state, new Random(seed), 0, 1, availableOres);
+      generateContracts(state, new Random(seed), 0, 1, availableOres, Infinity);
       all.push(...state.available);
     }
     return all;
@@ -891,7 +901,7 @@ function boardsOver(market: 'legacy' | 'production' | undefined, seed: number, r
   const rng = new Random(seed);
   const seen: Contract[] = [];
   for (let i = 0; i < refreshes; i++) {
-    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, multiplier, ALL_ORES);
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, multiplier, ALL_ORES, Infinity);
     seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH));
   }
   return seen;
@@ -936,7 +946,7 @@ describe('production market contracts (#1681)', () => {
   });
 
   it('rubble disposal offers are large and priced inside the profile range', () => {
-    const rubble = offers.filter((c) => c.type === 'rubble_disposal');
+    const rubble = offers.filter((c) => c.type === 'rubble_disposal' && !c.playerPays);
     expect(rubble.length).toBeGreaterThan(5);
     for (const c of rubble) {
       expect(c.quantityKg).toBeGreaterThanOrEqual(profile.rubbleQtyKg.min);
@@ -1072,5 +1082,179 @@ describe('legacy supply offers keep their terms (#1789)', () => {
 
   it('the legacy profile supply deadline is the legacy offer range', () => {
     expect(resolveMarket('legacy').supplyDeadlineTicks).toEqual(LEGACY_OFFER_DEADLINE_TICKS);
+  });
+});
+
+
+// ── Rubble clearances: fillable from the site's barren rock, cheap and paid (#1892) ──
+
+/** Every rubble offer from `refreshes` boards generated against `stockKg` of barren rock. */
+function rubbleOffersOver(market: 'legacy' | 'production', seed: number, refreshes: number, stockKg: number): Contract[] {
+  const state = createContractState();
+  state.market = market;
+  const rng = new Random(seed);
+  const seen: Contract[] = [];
+  for (let i = 0; i < refreshes; i++) {
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, stockKg);
+    seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH).filter(c => c.type === 'rubble_disposal'));
+  }
+  return seen;
+}
+
+describe('rubble offers are sized to the barren stock (#1892)', () => {
+  const profile = resolveMarket('production');
+  const STOCK = 400_000;
+  const offers = rubbleOffersOver('production', 42, 60, STOCK);
+  const cheap = offers.filter(c => !c.playerPays);
+  const paid = offers.filter(c => c.playerPays === true);
+
+  it('no rubble offer is bigger than the stock times its kind share', () => {
+    expect(offers.length).toBeGreaterThan(0);
+    for (const c of cheap) expect(c.quantityKg).toBeLessThanOrEqual(STOCK * RUBBLE_CHEAP_STOCK_SHARE_MAX);
+    for (const c of paid) expect(c.quantityKg).toBeLessThanOrEqual(STOCK * RUBBLE_PAID_STOCK_SHARE_MAX);
+  });
+
+  it('every rubble offer is at least the market minimum and on the quantity step', () => {
+    for (const c of offers) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(profile.rubbleQtyKg.min);
+      expect(c.quantityKg).toBeLessThanOrEqual(profile.rubbleQtyKg.max);
+      expect(c.quantityKg % profile.qtyStepKg).toBe(0);
+    }
+  });
+
+  it('both kinds are offered over a seeded run', () => {
+    expect(cheap.length).toBeGreaterThan(0);
+    expect(paid.length).toBeGreaterThan(0);
+  });
+
+  it('a cheap clearance pays the player: playerPays is unset, price inside the pay range', () => {
+    for (const c of cheap) {
+      expect(c.playerPays).toBeUndefined();
+      expect(isPaidClearance(c)).toBe(false);
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(profile.rubblePricePerKg.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(profile.rubblePricePerKg.max + 1e-9);
+    }
+  });
+
+  it('a paid clearance has playerPays true, a fee inside the fee range, no bonus', () => {
+    for (const c of paid) {
+      expect(isPaidClearance(c)).toBe(true);
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(PRODUCTION_RUBBLE_FEE_PER_KG.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(PRODUCTION_RUBBLE_FEE_PER_KG.max + 1e-9);
+      expect(c.earlyBonus).toBe(0);
+    }
+  });
+
+  it('no rubble offer ever carries a penalty', () => {
+    for (const c of offers) expect(c.penaltyAmount).toBe(0);
+  });
+
+  it('a stock below the market minimum yields no rubble offer at all', () => {
+    expect(rubbleOffersOver('production', 42, 60, profile.rubbleQtyKg.min - 1)).toEqual([]);
+  });
+
+  it('zero stock never yields a rubble offer, and the board still fills with other kinds', () => {
+    const state = createContractState();
+    state.market = 'production';
+    const rng = new Random(7);
+    for (let i = 0; i < 40; i++) generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, 0);
+    expect(state.available.length).toBeGreaterThan(0);
+    expect(state.available.filter(c => c.type === 'rubble_disposal')).toEqual([]);
+  });
+
+  it('zero stock with no ores offers nothing, without throwing', () => {
+    const state = createContractState();
+    state.market = 'production';
+    expect(() => generateContracts(state, new Random(3), 0, 1, [], 0)).not.toThrow();
+    // A site with no ore to sell and no barren rock to clear has nothing fillable to offer.
+    expect(state.available).toEqual([]);
+  });
+
+  it('the legacy market sizes against stock too', () => {
+    const legacy = rubbleOffersOver('legacy', 42, 60, 200);
+    expect(legacy.length).toBeGreaterThan(0);
+    for (const c of legacy) {
+      expect(c.quantityKg).toBeLessThanOrEqual(c.playerPays ? 200 * RUBBLE_PAID_STOCK_SHARE_MAX : 200 * RUBBLE_CHEAP_STOCK_SHARE_MAX);
+      expect(c.penaltyAmount).toBe(0);
+    }
+  });
+
+  it('an event special contract is sized to the stock as well', () => {
+    for (let seed = 1; seed <= 80; seed++) {
+      const state = createContractState();
+      state.market = 'production';
+      const c = offerSpecialContract(state, new Random(seed), 1, ALL_ORES, 0);
+      expect(c?.type === 'rubble_disposal').toBe(false);
+    }
+  });
+});
+
+describe('isPaidClearance (#1892)', () => {
+  it('is true only when playerPays is true', () => {
+    expect(isPaidClearance({ playerPays: true })).toBe(true);
+    expect(isPaidClearance({ playerPays: false })).toBe(false);
+    expect(isPaidClearance({})).toBe(false);
+  });
+});
+
+describe('a rubble contract never fines for lack of rubble (#1892)', () => {
+  function expiredRubble(overrides: Partial<Contract>) {
+    const state = createContractState();
+    state.active.push(offer({
+      id: 1, type: 'rubble_disposal', materialId: '', acceptedAtTick: 0, deadlineTicks: 10,
+      penaltyAmount: 300, quantityKg: 100, ...overrides,
+    }));
+    return state;
+  }
+
+  it('closes with penaltyCharged 0 even with nothing delivered', () => {
+    const state = expiredRubble({});
+    const out = checkDeadlines(state, 11);
+    expect(out).toEqual([{ contractId: 1, penalty: 0, deliveredKg: 0, paid: 0 }]);
+    expect(state.completedHistory[0]!.penaltyCharged).toBe(0);
+    expect(state.completedHistory[0]!.expired).toBe(true);
+  });
+
+  it('closes with no penalty on a part delivery', () => {
+    const state = expiredRubble({ deliveredKg: 40, paidTotal: 400 });
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(0);
+  });
+
+  it('a paid clearance closes without penalty too', () => {
+    const state = expiredRubble({ playerPays: true });
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(0);
+  });
+
+  it('other contract types still fine at expiry', () => {
+    const state = createContractState();
+    state.active.push(offer({ id: 2, type: 'supply', acceptedAtTick: 0, deadlineTicks: 10, penaltyAmount: 300 }));
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(300);
+  });
+});
+
+describe('contractAcceptBlocker — paid clearance fee (#1892)', () => {
+  const paidOffer = () => offer({ type: 'rubble_disposal', materialId: '', playerPays: true, quantityKg: 1000, pricePerKg: 0.04 });
+
+  it('blocks a paid clearance when cash is below the full fee', () => {
+    expect(contractAcceptBlocker(paidOffer(), true, 39.99)).toBe('insufficient_funds_for_fee');
+    expect(contractAcceptBlocker(paidOffer(), true, 0)).toBe('insufficient_funds_for_fee');
+  });
+
+  it('allows a paid clearance when cash equals the fee (boundary) or exceeds it', () => {
+    expect(contractAcceptBlocker(paidOffer(), true, 40)).toBeNull();
+    expect(contractAcceptBlocker(paidOffer(), true, 5_000)).toBeNull();
+  });
+
+  it('never blocks a cheap clearance for funds', () => {
+    const cheapOffer = offer({ type: 'rubble_disposal', materialId: '', quantityKg: 1000, pricePerKg: 0.02 });
+    expect(contractAcceptBlocker(cheapOffer, true, 0)).toBeNull();
+  });
+
+  it('without a cash argument a paid clearance is not blocked', () => {
+    expect(contractAcceptBlocker(paidOffer(), true)).toBeNull();
+  });
+
+  it('the ore_sale warehouse blocker is unchanged', () => {
+    expect(contractAcceptBlocker(offer({ type: 'ore_sale' }), false, 0)).toBe('needs_freight_warehouse');
   });
 });

@@ -37,6 +37,7 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
   }
   switch (b.type) {
     case 'explosive_warehouse': return kgUtilization(warehouseStockKg(b), capacity);
+    case 'spoil_heap': return kgUtilization(b.storedSpoilKg ?? 0, capacity);
     case 'freight_warehouse': return kgUtilization(warehouseStoredKg(state.logistics, b.id), capacity);
     case 'research_center': {
       const busy = state.buildings.researchQueue.length > 0;

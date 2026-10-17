@@ -30,7 +30,7 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
 | Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Bulk explosive stock, cheaper per kg |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
-| Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; unlimited capacity; no crew needed |
+| Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; 50,000 kg capacity (`SPOIL_HEAP_CAPACITY_KG`); no crew needed |
 
 ## Tier System
 
@@ -109,7 +109,7 @@ Inspector Research Center: shows the running task (target tier name, percent, ti
 - Charge orders draw matching stock first, the remainder is paid in cash at the list price; stock is reserved at order time. No warehouse (or no matching stock) = today's flow and price, unchanged.
 - Cancelling a charge order refunds in the currency paid: stock goes back to the warehouses; kg that no longer fit are refunded as cash at the bulk price (booked as a `refund`).
 - UI (#1685): the Blast Workshop Charge step lists each offered explosive's stock (`[data-stock]`), buys into stock in `STOCK_BUY_STEP_KG` (50 kg) steps (`[data-action="stock-buy"]`, disabled with a visible reason from the pure `buyStockBlockReason`), and shows how much of the current pattern is paid from stock (`[data-info="paid-from"]`). A selected Explosive Warehouse shows its stock and free kg in the inspector (`[data-info="warehouse-stock"]`).
-- Inspector contents (#1757, `storageContent.ts`): a Contents section for every storage building. Explosive Warehouse: a row per explosive held, used/capacity gauge, and the secondary-blast detonation radius while stocked (replaced by "stock unavailable" while closed). Freight Warehouse: gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre` (`FreightWarehouses.ts`, one pass over the stored fragments; `loseOrphanedStock` reuses it). Spoil Heap: spoil kg, no capacity. Rows of 0.5 kg or less are hidden.
+- Inspector contents (#1757, `storageContent.ts`): a Contents section for every storage building. Explosive Warehouse: a row per explosive held, used/capacity gauge, and the secondary-blast detonation radius while stocked (replaced by "stock unavailable" while closed). Freight Warehouse: gauge, free and in-transit-reserved kg, per-ore rows and a barren row from `warehouseStockByOre` (`FreightWarehouses.ts`, one pass over the stored fragments; `loseOrphanedStock` reuses it). Spoil Heap: spoil kg, used/capacity gauge and free kg. Rows of 0.5 kg or less are hidden.
 - Previews are net of stock at list price (`stockAwareChargesCost`): Charge All label, footer and Preflight cost read the cash part of the recorded orders (`recordedChargesCost`, from each charge's `fromStockKg`, absent = 0 in old saves). The blast report's `spent` is cash only; `spentFromStock` is the list value of the stock-supplied kg.
 - Capacity scales with tier; an order for more kg than free space is refused entirely (whole-kg purchases only).
 - `plannedChargesCost` and UI cost previews stay at list price.
@@ -148,8 +148,13 @@ Inspector Research Center: shows the running task (target tier name, percent, ti
 6. **Ramps are not buildings** (#1298): a ramp is a dug terrain feature (`state.builtRamps`, see `gameplay-navmesh`), never in `state.buildings`. It takes the selection plumbing only (click picks it, corridor highlighted, inspector) and offers a widen action — no demolish, no tier upgrade, no move, no occupants.
 
 **Spoil Heap (#1530):**
-- Cost $2000 (`constructionCost`), demolish $500, 2x2, no upkeep, unlimited capacity (`spoilHeapSites`
-  report `capacityKg: Infinity`). Barren rock never uses freight storage.
+- Cost $2000 (`constructionCost`), demolish $500, 2x2, no upkeep, finite capacity
+  `SPOIL_HEAP_CAPACITY_KG` = 50,000 kg (#1892; `spoilHeapSites` report the room left, `capacity - storedSpoilKg`,
+  and in-transit reservations count against it like a warehouse's). Barren rock never uses freight storage.
+  Probe (desert_badlands seed 42, sandbox full kit, 3x3 krackle shot at 36,30, ramp, crews as played): the
+  heap held 3.7 t at +500 ticks after the blast, 24 t at +750 and was full at ~+1,230 (tick ~1,500 of the
+  opening); the issue's own measurement (54 t at t3,068) puts it near t3,000, so 50 t sits at the fast end of the
+  2,000-3,000 tick target and is the one lever (`SPOIL_HEAP_CAPACITY_KG`) to retune.
 - **Barren** = a fragment whose summed ore density is at most `SPOIL_BARREN_ORE_FRACTION_THRESHOLD`
   (`isBarrenFragment`, `SpoilHeaps.ts`; an empty density map is barren). Barren fragments haul to the
   nearest heap (`pickSpoilHeap`: squared distance, tie lowest id), ore fragments to warehouses. On
@@ -159,7 +164,10 @@ Inspector Research Center: shows the running task (target tier name, percent, ti
   the settling dust from a blast (a ~2,344 t pile, blast every ~600 ticks); extra heaps shorten and soften
   the dips. Hauling rock off the ground shrinks the settled loss and the next fresh dust pulse.
 - With no heap placed, barren hauls are blocked as `no_spoil_heap` ("place a spoil heap"), never
-  `storage_full`. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed (#1871).
+  `storage_full`. With heaps placed but none having room for the fragment they are blocked as
+  `spoil_heap_full` ("build another heap or take a rubble contract"); the rock stays in the pit.
+  `releaseBarrenStoredFragments` moves a stored barren fragment to a heap only when one has room for all of it;
+  otherwise it stays stored. A rubble contract (or `drawSpoilKg`) frees room and hauls resume. Rubble-disposal contracts take barren rock only: heap stock first, then barren stored fragments; ore-bearing stock is never consumed (#1871).
 - **Starting heap (#1574):** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial
   (`TUTORIAL_STARTING_SITE`) open with one free, active heap placed at tick 0, so the first blast's
   barren rock has a dump and no "place a spoil heap" notice appears. Later levels still build their own.

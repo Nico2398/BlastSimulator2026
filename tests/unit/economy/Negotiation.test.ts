@@ -21,7 +21,7 @@ const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 function setupContracts(seed: number) {
   const state = createContractState();
   const rng = new Random(seed);
-  generateContracts(state, rng, 0, 1, ALL_ORES);
+  generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
   return { state, rng };
 }
 
@@ -194,7 +194,7 @@ describe('earlyBonus follows price (#1366)', () => {
   it('matches generated offers', () => {
     for (const mult of [1, 4]) {
       const state = createContractState();
-      generateContracts(state, new Random(21), 0, mult, ALL_ORES);
+      generateContracts(state, new Random(21), 0, mult, ALL_ORES, Infinity);
       for (const c of state.available) {
         expect(c.earlyBonus).toBe(computeEarlyBonus(c.quantityKg, c.pricePerKg));
       }
@@ -211,7 +211,8 @@ describe('earlyBonus follows price (#1366)', () => {
         negotiateContract(state, c.id, rep, rng, 1);
         if (c.pricePerKg !== origPrice) {
           priceChanges++;
-          expect(c.earlyBonus).toBe(computeEarlyBonus(c.quantityKg, c.pricePerKg));
+          // A paid clearance (#1892) has no early bonus to follow its fee.
+          expect(c.earlyBonus).toBe(c.playerPays ? 0 : computeEarlyBonus(c.quantityKg, c.pricePerKg));
         }
       }
       expect(priceChanges).toBeGreaterThan(0);
@@ -364,5 +365,21 @@ describe('negotiationRefusalReason (#1340)', () => {
   it('is null for a fresh offer with a manager', () => {
     const { state } = setupContracts(1);
     expect(negotiationRefusalReason(state.available[0]!, 1)).toBeNull();
+  });
+});
+
+describe('Rubble negotiation (#1892)', () => {
+  it('never touches the hidden penalty of a rubble offer', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const state = createContractState();
+      generateContracts(state, new Random(seed), 0, 1, ALL_ORES, Infinity);
+      const offer = state.available[0]!;
+      offer.type = 'rubble_disposal';
+      offer.materialId = '';
+      offer.penaltyAmount = 0;
+      const result = performed(negotiateContract(state, offer.id, 0, new Random(seed), 1));
+      expect(result!.changes.every(c => c.field !== 'penalty')).toBe(true);
+      expect(offer.penaltyAmount).toBe(0);
+    }
   });
 });

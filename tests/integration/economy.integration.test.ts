@@ -287,7 +287,7 @@ describe('Economy', () => {
     // Initially empty
     expect(cs.available).toHaveLength(0);
 
-    generateContracts(cs, rng, 0, 1, ALL_ORES);
+    generateContracts(cs, rng, 0, 1, ALL_ORES, Infinity);
     expect(cs.available.length).toBeGreaterThan(0);
     expect(cs.lastRefreshTick).toBe(0);
 
@@ -297,7 +297,9 @@ describe('Economy', () => {
       expect(c.quantityKg).toBeGreaterThan(0);
       expect(c.pricePerKg).toBeGreaterThan(0);
       expect(c.deadlineTicks).toBeGreaterThan(0);
-      expect(c.penaltyAmount).toBeGreaterThan(0);
+      // Rubble is never fined (#1892); ore contracts are.
+      if (c.type === 'rubble_disposal') expect(c.penaltyAmount).toBe(0);
+      else expect(c.penaltyAmount).toBeGreaterThan(0);
       expect(c.completed).toBe(false);
       expect(c.expired).toBe(false);
       expect(['ore_sale', 'rubble_disposal', 'supply']).toContain(c.type);
@@ -305,7 +307,7 @@ describe('Economy', () => {
 
     // Consecutive calls within refresh interval should not generate more
     const countBefore = cs.available.length;
-    generateContracts(cs, rng, 5, 1, ALL_ORES); // tick 5, still within interval
+    generateContracts(cs, rng, 5, 1, ALL_ORES, Infinity); // tick 5, still within interval
     expect(cs.available).toHaveLength(countBefore);
   });
 
@@ -648,7 +650,7 @@ describe('Economy', () => {
   it('contract accept by material: selector still finds a same-kind contract after the numeric id it started as has rotated out of the pool', () => {
     ensureFreightWarehouse(ctx);
     const rng = new Random(7);
-    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount, 1, ALL_ORES);
+    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount, 1, ALL_ORES, Infinity);
     const target = ctx.state!.contracts.available[0]!;
     const evictedId = target.id;
 
@@ -657,7 +659,7 @@ describe('Economy', () => {
     let tick = ctx.state!.tickCount;
     while (ctx.state!.contracts.available.some(c => c.id === evictedId)) {
       tick += 20;
-      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick, 1, ALL_ORES);
+      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick, 1, ALL_ORES, Infinity);
     }
     expect(contractCommand(ctx, ['accept', String(evictedId)], {}).success).toBe(false);
 

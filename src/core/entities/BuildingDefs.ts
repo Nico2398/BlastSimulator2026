@@ -2,7 +2,7 @@
 // 9 canonical building types × 3 tiers. Data file — line-limit exempt.
 
 import type { BuildingDef, BuildingTier, BuildingType } from './Building.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG, SPOIL_HEAP_CAPACITY_KG } from '../config/balance.js';
 
 // ── Footprint helpers ──
 
@@ -260,7 +260,7 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.spoil_heap.t1.name',
       footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
       constructionCost: 2000, demolishCost: 500, operatingCostPerTick: 0,
-      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      capacity: SPOIL_HEAP_CAPACITY_KG, maxHp: 100, structuralResistance: 1000,
       scoreEffects: { ecology: 2 },
     },
     get 2() { return BUILDING_DEFS.spoil_heap[1]; },

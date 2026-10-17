@@ -239,11 +239,11 @@ describe('storageContents: freight warehouse', () => {
 });
 
 describe('storageContents: spoil heap', () => {
-  it('shows the spoil kg without a capacity gauge', () => {
+  it('shows the spoil kg with a capacity gauge, the heap being finite (#1892)', () => {
     const b = makeBuilding('spoil_heap', { storedSpoilKg: 12345 });
     const { root } = mount(b, stateWith(b));
     expect(root.textContent).toContain(fmt(12345));
-    expect(live(root, 'gauge')).toBeNull();
+    expect(live(root, 'gauge')).not.toBeNull();
     expect(live(root, 'reserved')).toBeNull();
   });
 

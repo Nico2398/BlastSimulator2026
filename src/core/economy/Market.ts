@@ -9,6 +9,8 @@ import {
   ORE_PRICES,
   PRODUCTION_ORE_PRICES,
   RUBBLE_DISPOSAL_PRICE_RANGE,
+  RUBBLE_FEE_PER_KG,
+  PRODUCTION_RUBBLE_FEE_PER_KG,
   LEGACY_OFFER_QTY_KG,
   LEGACY_OFFER_QTY_STEP_KG,
   LEGACY_OFFER_DEADLINE_TICKS,
@@ -41,6 +43,8 @@ interface MarketProfile {
   oreSalePriceFactor: MarketRange;
   supplyPriceFactor: MarketRange;
   rubblePricePerKg: MarketRange;
+  /** Fee per kg the player pays for a paid rubble clearance (#1892). */
+  rubbleFeePerKg: MarketRange;
 }
 
 const MARKETS: Record<MarketId, MarketProfile> = {
@@ -53,6 +57,7 @@ const MARKETS: Record<MarketId, MarketProfile> = {
     oreSalePriceFactor: LEGACY_ORE_SALE_PRICE_FACTOR,
     supplyPriceFactor: LEGACY_SUPPLY_PRICE_FACTOR,
     rubblePricePerKg: RUBBLE_DISPOSAL_PRICE_RANGE,
+    rubbleFeePerKg: RUBBLE_FEE_PER_KG,
   },
   production: {
     oreSaleQtyKg: PRODUCTION_ORE_SALE_QTY_KG,
@@ -63,6 +68,7 @@ const MARKETS: Record<MarketId, MarketProfile> = {
     oreSalePriceFactor: PRODUCTION_ORE_SALE_PRICE_FACTOR,
     supplyPriceFactor: PRODUCTION_SUPPLY_PRICE_FACTOR,
     rubblePricePerKg: PRODUCTION_RUBBLE_PRICE_PER_KG,
+    rubbleFeePerKg: PRODUCTION_RUBBLE_FEE_PER_KG,
   },
 };
 

@@ -613,7 +613,7 @@ describe('OperationsPanel — scroll survives a refresh (#1592)', () => {
 const ALL_BLOCK_REASONS: BlockedOrderReason[] = [
   'no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver',
   'target_unreachable', 'debris_out_of_reach', 'no_freight_warehouse', 'storage_full',
-  'licence_level_too_low', 'no_spoil_heap', 'no_reaching_vehicle',
+  'licence_level_too_low', 'no_spoil_heap', 'spoil_heap_full', 'no_reaching_vehicle',
 ];
 const UNCLAIMED_NOTE = 'Open to any qualified, available worker.';
 

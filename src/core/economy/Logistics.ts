@@ -5,9 +5,9 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass, clampCollectedOre, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
-import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
-import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
-import { creditFirstSpoilHeap, drawSpoilKg, haulDestinationOf, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
+import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
+import { pickWarehouse, warehouseFreeKg, warehouseUsedKgMap } from './FreightWarehouses.js';
+import { creditSpoilHeaps, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
@@ -65,7 +65,7 @@ export function addBlastFragments(state: LogisticsState, fragments: FragmentData
 /**
  * Pick up a fragment with a vehicle and reserve room for it in the nearest
  * freight warehouse (from the vehicle's position) that can hold it. A barren
- * fragment reserves the nearest of `heapSites` instead (unbounded room, #1530).
+ * fragment reserves the nearest of `heapSites` with room for it instead (#1530, #1892).
  * Returns false when no suitable site has room (or none exist).
  */
 export function pickupFragment(
@@ -82,9 +82,11 @@ export function pickupFragment(
   );
   if (!tracked) return false;
 
-  const site = haulDestinationOf(tracked.fragment) === 'spoil_heap'
-    ? nearestSite(heapSites, vehicleX, vehicleZ)
-    : pickWarehouse(state, sites, vehicleX, vehicleZ, tracked.fragment.mass);
+  const site = pickWarehouse(
+    state,
+    haulDestinationOf(tracked.fragment) === 'spoil_heap' ? heapSites : sites,
+    vehicleX, vehicleZ, tracked.fragment.mass,
+  );
   if (!site) return false;
 
   tracked.state = 'in_transit';
@@ -135,7 +137,7 @@ export function deliverToDepot(
  * leaves logistics entirely — storedMassKg and collectedOre are untouched
  * (heaps are not freight storage). Returns the heap and mass dumped so the
  * caller can credit the heap building (logistics never imports buildings),
- * or null without mutating anything when no heap can take it (#1530).
+ * or null without mutating anything when no heap has room for it (#1530, #1892).
  */
 export function deliverToSpoilHeap(
   state: LogisticsState,
@@ -147,7 +149,11 @@ export function deliverToSpoilHeap(
   const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked || haulDestinationOf(tracked.fragment) !== 'spoil_heap') return null;
 
-  const target = heapSites.find(s => s.id === tracked.warehouseId) ?? nearestSite(heapSites, atX, atZ);
+  // The fragment's own reservation is already counted in warehouseFreeKg.
+  const reserved = heapSites.find(s => s.id === tracked.warehouseId);
+  const target = reserved && warehouseFreeKg(state, reserved) >= 0
+    ? reserved
+    : pickWarehouse(state, heapSites, atX, atZ, tracked.fragment.mass);
   if (!target) return null;
 
   state.fragments.splice(state.fragments.indexOf(tracked), 1);
@@ -312,14 +318,14 @@ export function extractOreFromFragment(
  * fragment's trace ore still debits the ledger. `buildings` is where the
  * heaps are. After an ore sale (and before it, for legacy leftovers) barren
  * stored rock is released to the first heap (releaseBarrenStoredFragments,
- * #1690); with no heap it stays stored.
+ * #1690); with no heap, or no room on one, it stays stored.
  */
 export function consumeStoredOre(
   state: LogisticsState,
   collectedOre: Record<string, number>,
   materialId: string,
   amountKg: number,
-  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
+  buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
 ): { success: boolean; consumedKg: number; error?: string } {
   if (!Number.isFinite(amountKg) || amountKg <= 0) {
     return {
@@ -533,28 +539,29 @@ export function onGroundMassKg(state: LogisticsState): number {
 }
 
 /**
- * Move every stored barren fragment (isStoredBarren) out of state.fragments onto
- * the first spoil heap: debits storedMassKg and any residual ore (decrementCollectedOre),
- * credits the heap. Returns kg released. No heap in `buildings` => no-op, returns 0.
+ * Move stored barren fragments (isStoredBarren) out of state.fragments onto the
+ * first spoil heap with room for each, oldest first: debits storedMassKg and any
+ * residual ore (decrementCollectedOre), credits the heap. A fragment no heap has
+ * room for stays stored (#1892). Returns kg released; no heap => 0.
  */
 export function releaseBarrenStoredFragments(
   state: LogisticsState,
   collectedOre: Record<string, number>,
-  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
+  buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
 ): number {
-  if (!buildings.some(b => b.type === 'spoil_heap')) return 0;
-  const barren = state.fragments.filter(isStoredBarren);
-  if (barren.length === 0) return 0;
-
+  if (totalSpoilRoomKg(buildings) <= 0) return 0; // no heap, or every heap full: the rock stays stored
+  const reservedKg = warehouseUsedKgMap(state); // in-flight hauls hold room on a heap too
+  const released = new Set<TrackedFragment>();
   let releasedKg = 0;
-  for (const tracked of barren) {
+  for (const tracked of state.fragments.filter(isStoredBarren)) {
+    if (!creditSpoilHeaps(buildings, tracked.fragment.mass, reservedKg)) continue;
     decrementCollectedOre(collectedOre, tracked.fragment);
     releasedKg += tracked.fragment.mass;
+    released.add(tracked);
   }
+  if (released.size === 0) return 0;
   clampCollectedOre(collectedOre);
-  const released = new Set(barren);
   state.fragments = state.fragments.filter(f => !released.has(f));
   state.storedMassKg = Math.max(0, state.storedMassKg - releasedKg);
-  creditFirstSpoilHeap(buildings, releasedKg);
   return releasedKg;
 }

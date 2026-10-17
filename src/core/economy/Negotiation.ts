@@ -1,8 +1,8 @@
 // BlastSimulator2026 — Contract negotiation system
 // Probabilistic negotiation that can improve or worsen contract terms.
 
-import type { Contract, ContractState, NegotiationChange } from './Contract.js';
-import { computeEarlyBonus } from './Contract.js';
+import type { Contract, ContractState, NegotiationChange, NegotiationField } from './Contract.js';
+import { computeEarlyBonus, isPaidClearance } from './Contract.js';
 import { Random } from '../math/Random.js';
 import { hash32, hashCombine } from '../math/Hash.js';
 import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../config/balance.js';
@@ -83,6 +83,11 @@ export function negotiateContractAtTick(
   return negotiateContract(state, contractId, reputation, rng, managerLevel) ?? { refused: 'not_found' };
 }
 
+/** Terms a negotiation may move: rubble carries no penalty (hidden, always 0), so it is never one of them (#1892). */
+function negotiableFields(contract: Pick<Contract, 'type'>): NegotiationField[] {
+  return contract.type === 'rubble_disposal' ? ['price', 'deadline'] : ['price', 'deadline', 'penalty'];
+}
+
 /**
  * Negotiate a contract in the available list.
  * Success probability = BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR
@@ -117,14 +122,14 @@ export function negotiateContract(
   if (isSuccess) {
     // Improve 1-2 terms
     const improvements = rng.nextInt(1, 2);
-    const options = shuffleOptions(['price', 'deadline', 'penalty'], rng);
+    const options = shuffleOptions(negotiableFields(contract), rng);
 
     for (let i = 0; i < improvements && i < options.length; i++) {
       const factor = rng.nextFloat(0.05, MAX_IMPROVEMENT);
       const pct = Math.round(factor * 100);
       switch (options[i]) {
         case 'price':
-          contract.pricePerKg *= (1 + factor);
+          contract.pricePerKg *= isPaidClearance(contract) ? 1 - factor : 1 + factor; // a fee improves by falling
           changes.push({ field: 'price', improved: true, pct });
           break;
         case 'deadline':
@@ -139,13 +144,13 @@ export function negotiateContract(
     }
   } else {
     // Worsen 1 term
-    const options = shuffleOptions(['price', 'deadline', 'penalty'], rng);
+    const options = shuffleOptions(negotiableFields(contract), rng);
     const factor = rng.nextFloat(0.05, MAX_WORSENING);
     const pct = Math.round(factor * 100);
 
     switch (options[0]) {
       case 'price':
-        contract.pricePerKg *= (1 - factor);
+        contract.pricePerKg *= isPaidClearance(contract) ? 1 + factor : 1 - factor;
         changes.push({ field: 'price', improved: false, pct });
         break;
       case 'deadline':
@@ -159,13 +164,13 @@ export function negotiateContract(
     }
   }
 
-  if (changes.some(c => c.field === 'price')) {
+  if (changes.some(c => c.field === 'price') && !isPaidClearance(contract)) {
     contract.earlyBonus = computeEarlyBonus(contract.quantityKg, contract.pricePerKg);
   }
   return { success: isSuccess, changes, contract };
 }
 
-function shuffleOptions(options: string[], rng: Random): string[] {
+function shuffleOptions(options: NegotiationField[], rng: Random): NegotiationField[] {
   const arr = [...options];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = rng.nextInt(0, i);

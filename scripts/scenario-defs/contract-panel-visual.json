@@ -138,28 +138,26 @@
       "role": "observe"
     },
     {
-      "command": "contract accept type:rubble_disposal",
+      "command": "contract accept type:ore_sale",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept type:ore_sale"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "changedBy": {
           "cash": 0
         },
         "equals": {
-          "activeContractCount": 2
+          "activeContractCount": 1
         },
-        "note": "2nd real click, now scoped to the rubble_disposal offer -- with the supply/dirtite contract already moved to active, the panel's first available row is now #2 (Dispose of rubble); verified via a real interaction-mode run rather than assumed from panel-ordering logic"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept",
+        "note": "Accept on an ore_sale offer is disabled and the console refuses: no Freight Warehouse is built in this file (#1892 sized rubble offers to barren stock held, so none is offered here; ore sales need a warehouse)."
       },
-      "description": "#513/#581/#635: the accept click is scoped to `[data-contract-type=\"rubble_disposal\"]` (no `material:` clause -- rubble contracts carry `materialId=''`), the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the rubble_disposal contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it -- and, unlike the numeric id it replaces (#635), survives the offer pool rotating past it."
+      "description": "#1892: this step used to accept a rubble_disposal offer. Rubble offers are now sized to the barren stock the site holds, and this file never hauls, so none is offered. The only other offer type left is ore_sale, which needs a Freight Warehouse this file never builds, so the accept is guarded instead: console refuses, UI button disabled, activeContractCount stays 1.",
+      "commandOutcome": "refused"
     },
     {
       "command": "contract status",
@@ -198,23 +196,23 @@
       "commandOutcome": "either"
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:300",
+      "command": "contract deliver type:supply amount:300",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:rubble_disposal amount:300"
+          "command": "contract deliver type:supply amount:300"
         }
       ],
-      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-type=\"rubble_disposal\"]`, issue #513/#635) rather than performing one.",
+      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here — `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) — because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-type=\"supply\"]`, issue #513/#635) rather than performing one. #1892: now targets the supply/dirtite contract accepted earlier (rubble offers are no longer offered without barren stock).",
       "expect": {
         "changedBy": {
           "cash": 0
         },
         "equals": {
-          "activeContractCount": 2
+          "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"] .bs-contract-deliver",
         "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
       },
       "role": "guard",
@@ -259,7 +257,7 @@
           "cash": 0
         },
         "equals": {
-          "activeContractCount": 2
+          "activeContractCount": 1
         }
       }
     }

@@ -1,4 +1,5 @@
 /** Inspector storage section for warehouse buildings (#1757). */
+import { spoilHeapRoomKg } from '../../../core/economy/SpoilHeaps.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { warehouseReservedKg, warehouseStockByOre } from '../../../core/economy/FreightWarehouses.js';
 import { getBuildingDef, warehouseFreeKg, warehouseStockKg, type Building } from '../../../core/entities/Building.js';
@@ -83,11 +84,12 @@ function freightModel(b: Building, state: GameState): Model {
 }
 
 function spoilModel(b: Building): Model {
+  const stored = b.storedSpoilKg ?? 0;
   return {
-    rows: [{ key: 'spoil', label: t('inspector.spoil'), text: kgText(b.storedSpoilKg ?? 0) }],
-    gauge: null,
-    lines: [],
-    note: t('inspector.spoil_no_cap'),
+    rows: [{ key: 'spoil', label: t('inspector.spoil'), text: kgText(stored) }],
+    gauge: gaugeOf(stored, getBuildingDef(b.type, b.tier).capacity),
+    lines: [{ key: 'free', text: t('inspector.free_kg', { kg: kgText(spoilHeapRoomKg(b)) }) }],
+    note: null,
     stockAttrs: null,
   };
 }

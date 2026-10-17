@@ -2,7 +2,7 @@
 // Explosive Warehouse stock management and Freight Warehouse capacity checks.
 
 import type { Building, BuildingState } from './Building.js';
-import { getBuildingDef, getStorageCapacity, isOperating, warehouseFreeKg, warehouseStockKg } from './Building.js';
+import { getBuildingDef, getStorageCapacity, isOperating, spoilHeapRoomKg, warehouseFreeKg, warehouseStockKg } from './Building.js';
 
 // ── Explosive Warehouse ──────────────────────────────────────────────────────
 
@@ -154,12 +154,12 @@ export function nearestSite(
   return best;
 }
 
-/** Active spoil heaps as logistics sites (#1530); capacityKg is unbounded. */
+/** Active spoil heaps as logistics sites (#1530); capacityKg is the room left (#1892). */
 export function spoilHeapSites(state: BuildingState): WarehouseSite[] {
   const sites: WarehouseSite[] = [];
   for (const b of state.buildings) {
     if (isOperating(b) && b.type === 'spoil_heap') {
-      sites.push({ id: b.id, x: b.x, z: b.z, capacityKg: Infinity });
+      sites.push({ id: b.id, x: b.x, z: b.z, capacityKg: spoilHeapRoomKg(b) });
     }
   }
   return sites;

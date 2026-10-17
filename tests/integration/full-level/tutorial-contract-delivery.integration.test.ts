@@ -130,30 +130,21 @@ describe('Tutorial Level — Contract Delivery', () => {
   }
 
   /**
-   * Accept a live rubble_disposal contract (materialId '', drawn from
-   * storedMassKg regardless of which ore the blast happened to yield) and
-   * return its id. NOT hardcoded to id 1 (#1166): the contract board is
-   * deterministic but timed off real elapsed ticks, and drilling/charging
-   * now take real, mechanics-driven time (#553/#554, and slower still under
-   * #1151's stricter slope-based traversal) — by the time
-   * executeTutorialBlast returns, tickCount has already run well past
-   * CONTRACT_REFRESH_INTERVAL (20) more than once, so the tutorial's very
-   * first contract (id 1) has long since rotated off the board. Mirrors
-   * tutorial.integration.test.ts's own step-16 fix for the identical
-   * staleness: ticking forward and re-rolling (up to 60 refreshes, 1200
-   * ticks) finds a genuine live rubble_disposal contract instead of
-   * gambling on a fixed id.
+   * Put an accepted rubble_disposal contract (materialId '') on the active list
+   * and return its id. A fixture rather than a board offer (#1892): rubble
+   * offers are sized to the barren rock the site holds, and this test acts
+   * before anything has been hauled to a heap, so the board offers none by
+   * design. The contract is what the inventory gate is exercised against.
    */
-  function acceptRubbleDisposalContract(): number {
-    const findOne = () => ctx.state!.contracts.available.find(c => c.type === 'rubble_disposal');
-    for (let attempt = 0; attempt < 60 && findOne() === undefined; attempt++) {
-      tickWithEvents(ctx, 20);
-    }
-    const contract = findOne();
-    expect(contract, 'no rubble_disposal contract ever appeared on the board').toBeDefined();
-    const acceptResult = contractCommand(ctx, ['accept', String(contract!.id)], {});
-    expect(acceptResult.success).toBe(true);
-    return contract!.id;
+  function activateRubbleDisposalFixture(): number {
+    const id = ctx.state!.contracts.nextId++;
+    ctx.state!.contracts.active.push({
+      id, type: 'rubble_disposal', materialId: '',
+      description: '[test fixture] clear rubble', quantityKg: 5_000, deliveredKg: 0, pricePerKg: 0.02,
+      deadlineTicks: 5000, acceptedAtTick: ctx.state!.tickCount, penaltyAmount: 0, earlyBonus: 0,
+      completed: false, expired: false,
+    });
+    return id;
   }
 
   /**
@@ -286,14 +277,12 @@ describe('Tutorial Level — Contract Delivery', () => {
     executeTutorialBlast();
     tickWithEvents(ctx, 2);
 
-    // A rubble_disposal contract (materialId '') draws from storedMassKg,
-    // which is still 0 because nothing has been hauled into a warehouse yet
-    // — any live one on the board proves the same inventory gate. Ticks
-    // forward while searching for one, so cashBefore is captured after
-    // accepting (not before) — otherwise the payroll/upkeep drain from those
-    // extra ticks would fail this test's own untouched-cash assertion below
-    // for a reason unrelated to what it means to exercise.
-    const contractId = acceptRubbleDisposalContract();
+    // A rubble_disposal contract draws on barren rock (heaps and barren
+    // stored fragments, #1871), none of which exists yet because nothing has
+    // been hauled — it proves the inventory gate. cashBefore is captured after
+    // the contract is placed so any payroll/upkeep drain from earlier ticks
+    // cannot fail the untouched-cash assertion below.
+    const contractId = activateRubbleDisposalFixture();
     const cashBefore = ctx.state!.cash;
 
     const deliverResult = contractCommand(ctx, ['deliver', String(contractId)], { amount: '200' });
