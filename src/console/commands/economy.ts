@@ -20,11 +20,11 @@ import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js'
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { deliverStoredOre, bookDeliveryIncome } from '../../core/economy/ContractFulfilment.js';
+import { deliverStoredOre, bookDeliveryCashflow } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
 import type { Building } from '../../core/entities/Building.js';
-import { formatDollars } from '../../core/economy/formatMoney.js';
+import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
@@ -165,8 +165,12 @@ export function contractCommand(
       const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
       const offer = state.contracts.available.find(c => c.id === resolved.id);
-      if (offer && contractAcceptBlocker(offer, freightWarehouseSites(state.buildings).length > 0) === 'needs_freight_warehouse') {
+      const blocker = offer ? contractAcceptBlocker(offer, freightWarehouseSites(state.buildings).length > 0, state.cash) : null;
+      if (offer && blocker === 'needs_freight_warehouse') {
         return { success: false, output: t('economy.contract.needs_warehouse') };
+      }
+      if (offer && blocker === 'insufficient_funds_for_fee') {
+        return { success: false, output: t('console.insufficient_funds', { need: formatMoney(offer.quantityKg * offer.pricePerKg), have: formatMoney(state.cash) }) };
       }
       const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
       if (!contract) return { success: false, output: `Contract #${resolved.id} not found in available list.` };
@@ -216,7 +220,7 @@ export function contractCommand(
       const delivery = deliverStoredOre(state.contracts, state.logistics, state.collectedOre, id, amount, state.tickCount, state.buildings.buildings);
       if (!delivery.success) return { success: false, output: delivery.error };
       const result = delivery.data;
-      bookDeliveryIncome(state, id, result, state.tickCount);
+      bookDeliveryCashflow(state, id, result, state.tickCount);
       const msg = result.completed
         ? `Contract #${id} COMPLETED! Payment: $${result.payment.toFixed(2)}` +
           (result.bonus > 0 ? ` + early bonus: $${result.bonus.toFixed(2)}` : '')

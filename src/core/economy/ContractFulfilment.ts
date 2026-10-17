@@ -2,14 +2,14 @@
 
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
-import { deliverMaterials, isAutoDeliverable, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
-import { addIncome, type FinanceState } from './Finance.js';
+import { deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
+import { addExpense, addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 import { rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 
 /** The slice of a building a rubble delivery reads and draws down: its spoil heap stock. */
-type SpoilBuildings = readonly Pick<Building, 'type' | 'storedSpoilKg'>[];
+type SpoilBuildings = readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[];
 
 type DeliveryResult<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -64,7 +64,7 @@ export function deliverStoredOre(
 
   const result = deliverMaterials(contracts, contractId, kg, tick);
   contract.paidTotal = (contract.paidTotal ?? 0) + result.payment;
-  return { success: true, data: { kg, ...result, fee: false } };
+  return { success: true, data: { kg, ...result, fee: isPaidClearance(contract) } };
 }
 
 /**
@@ -92,27 +92,24 @@ export function autoDeliverContracts(
   return deliveries;
 }
 
-/** Credit a delivery's payment (and early bonus) to cash and the books. */
-export function bookDeliveryIncome(
-  account: { cash: number; finances: FinanceState },
-  contractId: number,
-  outcome: Pick<DeliveryOutcome, 'payment' | 'bonus'>,
-  tick: number,
-): void {
-  account.cash += outcome.payment;
-  addIncome(account.finances, outcome.payment, 'contracts', `Contract #${contractId} delivery`, tick);
-  if (outcome.bonus > 0) {
-    account.cash += outcome.bonus;
-    addIncome(account.finances, outcome.bonus, 'bonus', `Contract #${contractId} early bonus`, tick);
-  }
-}
-
-/** Book a delivery's cashflow: income for a paying contract, an expense when the outcome is a fee (#1892). */
+/** Book a delivery's cashflow: income for a paying contract (payment and early bonus), an expense when the outcome is a fee (#1892). */
 export function bookDeliveryCashflow(
   account: { cash: number; finances: FinanceState },
   contractId: number,
   outcome: Pick<DeliveryOutcome, 'payment' | 'bonus' | 'fee'>,
   tick: number,
 ): void {
-  void account; void contractId; void outcome; void tick; // TODO: implement
+  const label = `Contract #${contractId} delivery`;
+  if (outcome.fee) {
+    if (outcome.payment <= 0) return;
+    account.cash -= outcome.payment;
+    addExpense(account.finances, outcome.payment, 'contracts', label, tick);
+    return;
+  }
+  account.cash += outcome.payment;
+  addIncome(account.finances, outcome.payment, 'contracts', label, tick);
+  if (outcome.bonus > 0) {
+    account.cash += outcome.bonus;
+    addIncome(account.finances, outcome.bonus, 'bonus', `Contract #${contractId} early bonus`, tick);
+  }
 }

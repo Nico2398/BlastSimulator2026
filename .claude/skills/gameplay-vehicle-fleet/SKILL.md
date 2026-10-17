@@ -267,7 +267,7 @@ ground. A destination targeting a depot resolves through the building-approach-c
 Hauling destination (#1530): `haulDestinationOf` sends barren fragments (`isBarrenFragment`) to the
 nearest Spoil Heap and ore-bearing ones to a Freight Warehouse. The depot leg, the batch (never mixed)
 and the claim gate all use the fragment's destination; a destroyed target heap falls back to another
-heap. Heaps have unlimited room, so a barren haul is blocked only as `no_spoil_heap` (no heap placed).
+heap. Heaps are finite (#1892): a barren haul is blocked as `no_spoil_heap` (no heap placed) or `spoil_heap_full` (no heap has room for the fragment); the depot pick, the claim gate and delivery use `pickWarehouse` over `spoilHeapSites` like warehouses do.
 
 Barren yields to ore (#1870): `selectBestActionForEmployee` does not start an unheld, ground (not
 loaded) barren `haul_debris` while any unheld ore-bearing `haul_debris` is claimable (reachable,

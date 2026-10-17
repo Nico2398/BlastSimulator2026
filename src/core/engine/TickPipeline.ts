@@ -53,7 +53,7 @@ import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, ensureScriptedOreSale, generateContracts } from '../economy/Contract.js';
-import { autoDeliverContracts, bookDeliveryIncome } from '../economy/ContractFulfilment.js';
+import { autoDeliverContracts, bookDeliveryCashflow } from '../economy/ContractFulfilment.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -208,7 +208,7 @@ export function runTick(
   // can still fill pays out and completes before the penalty is assessed.
   const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings);
   for (const delivery of contractsDelivered) {
-    bookDeliveryIncome(state, delivery.contractId, delivery, state.tickCount);
+    bookDeliveryCashflow(state, delivery.contractId, delivery, state.tickCount);
   }
   // Expire overdue contracts and apply penalties
   const expired = checkDeadlines(state.contracts, state.tickCount);

@@ -12,6 +12,9 @@ import {
   CONTRACT_PENALTY_RATE,
   SUPPLY_COMMON_ORE_COUNT,
   LEGACY_OFFER_DEADLINE_TICKS,
+  RUBBLE_CHEAP_STOCK_SHARE_MAX,
+  RUBBLE_PAID_STOCK_SHARE_MAX,
+  RUBBLE_PAID_OFFER_CHANCE,
 } from '../config/balance.js';
 
 // ── Contract types ──
@@ -98,8 +101,7 @@ export function createContractState(): ContractState {
 
 /** True for a paid clearance: the player pays the contract's price instead of earning it (#1892). */
 export function isPaidClearance(c: Pick<Contract, 'playerPays'>): boolean {
-  void c;
-  return false; // TODO: implement
+  return c.playerPays === true;
 }
 
 // ── Generation ──
@@ -123,8 +125,10 @@ export function generateContracts(
   const overflow = state.available.length + CONTRACTS_PER_REFRESH - MAX_AVAILABLE_CONTRACTS;
   if (overflow > 0) state.available.splice(0, overflow);
 
+  // A refresh may add fewer offers than CONTRACTS_PER_REFRESH: a rubble-only site with too little barren rock offers nothing.
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    state.available.push(generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg));
+    const offer = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg);
+    if (offer) state.available.push(offer);
   }
   state.lastRefreshTick = currentTick;
 }
@@ -132,9 +136,10 @@ export function generateContracts(
 /** Puts one extra offer on the board outside the refresh cycle (an event's special contract); the oldest offer makes room when full. */
 export function offerSpecialContract(
   state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number,
-): Contract {
-  if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
+): Contract | null {
   const contract = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg);
+  if (!contract) return null;
+  if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
   state.available.push(contract);
   return contract;
 }
@@ -146,8 +151,12 @@ function commonOres(ores: readonly string[], market: MarketId | undefined): stri
     .slice(0, SUPPLY_COMMON_ORE_COUNT);
 }
 
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number): Contract {
-  void rubbleStockKg;
+/**
+ * One random offer, or null when the site can offer nothing (no ores to sell and too little
+ * barren rock for the smallest rubble offer). A rubble offer is sized to `rubbleStockKg`
+ * (#1892); when the stock is under the market's smallest rubble quantity the roll becomes an ore sale.
+ */
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number, forceOreSale = false): Contract | null {
   const market = state.market;
   const profile = resolveMarket(market);
   const typeRoll = rng.nextFloat(0, 1);
@@ -160,7 +169,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   let qtyRange: MarketRange;
   let deadlineRange: MarketRange = LEGACY_OFFER_DEADLINE_TICKS;
 
-  if (!rubbleOnly && typeRoll < 0.5) {
+  if (!rubbleOnly && (forceOreSale || typeRoll < 0.5)) {
     // Ore sale contract
     type = 'ore_sale';
     materialId = rng.pick(availableOres);
@@ -168,12 +177,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
     qtyRange = profile.oreSaleQtyKg;
     description = `Deliver ${materialId} ore`;
   } else if (rubbleOnly || typeRoll < 0.8) {
-    // Rubble disposal
-    type = 'rubble_disposal';
-    materialId = '';
-    basePricePerKg = rng.nextFloat(profile.rubblePricePerKg.min, profile.rubblePricePerKg.max);
-    qtyRange = profile.rubbleQtyKg;
-    description = 'Dispose of rubble';
+    return generateRubbleOffer(state, rng, priceMultiplier, availableOres, rubbleStockKg);
   } else {
     // Supply contract (larger quantity, lower price, longer deadline)
     type = 'supply';
@@ -197,6 +201,36 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   const quantityKg = Math.round(rng.nextFloat(qtyRange.min, qtyRange.max) / profile.qtyStepKg) * profile.qtyStepKg;
   const deadlineTicks = rng.nextInt(deadlineRange.min, deadlineRange.max);
   return buildOffer(state, type, materialId, description, quantityKg, deadlineTicks, basePricePerKg, priceMultiplier);
+}
+
+/**
+ * A rubble offer no bigger than the barren rock the site holds: a cheap clearance that pays
+ * the player, or (RUBBLE_PAID_OFFER_CHANCE) a paid one where the player pays the fee. Never fined.
+ * Stock under the market minimum re-rolls as an ore sale; a rubble-only site then has no offer (null).
+ */
+function generateRubbleOffer(
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number,
+): Contract | null {
+  const profile = resolveMarket(state.market);
+  const paid = rng.chance(RUBBLE_PAID_OFFER_CHANCE);
+  const share = paid ? RUBBLE_PAID_STOCK_SHARE_MAX : RUBBLE_CHEAP_STOCK_SHARE_MAX;
+  const range = profile.rubbleQtyKg;
+  const step = profile.qtyStepKg;
+  const wanted = Math.min(rng.nextFloat(range.min, range.max), rubbleStockKg * share);
+  const quantityKg = Math.floor(wanted / step) * step;
+  if (quantityKg < range.min) {
+    return availableOres.length > 0 ? generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg, true) : null;
+  }
+  const deadlineTicks = rng.nextInt(LEGACY_OFFER_DEADLINE_TICKS.min, LEGACY_OFFER_DEADLINE_TICKS.max);
+  const fee = paid ? rng.nextFloat(profile.rubbleFeePerKg.min, profile.rubbleFeePerKg.max) : 0;
+  const base = paid ? fee : rng.nextFloat(profile.rubblePricePerKg.min, profile.rubblePricePerKg.max);
+  const offer = buildOffer(state, 'rubble_disposal', '', 'Dispose of rubble', quantityKg, deadlineTicks, base, paid ? 1 : priceMultiplier);
+  offer.penaltyAmount = 0; // rubble is something the mine wants gone: no fine for missing it (#1892)
+  if (paid) {
+    offer.playerPays = true;
+    offer.earlyBonus = 0;
+  }
+  return offer;
 }
 
 /**
@@ -515,7 +549,7 @@ export function checkDeadlines(
     const elapsed = currentTick - c.acceptedAtTick;
     if (elapsed > c.deadlineTicks) {
       c.expired = true;
-      const penalty = outstandingPenalty(c);
+      const penalty = c.type === 'rubble_disposal' ? 0 : outstandingPenalty(c);
       c.penaltyCharged = penalty;
       penalties.push({ contractId: c.id, penalty, deliveredKg: c.deliveredKg, paid: c.paidTotal ?? 0 });
       state.active.splice(i, 1);
@@ -530,8 +564,12 @@ export function checkDeadlines(
 export function contractAcceptBlocker(
   c: Contract,
   hasFreightWarehouse: boolean,
+  /** Cash in hand; when given, a paid clearance whose full fee exceeds it cannot be accepted. */
+  cash?: number,
 ): 'needs_freight_warehouse' | 'insufficient_funds_for_fee' | null {
-  return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
+  if (c.type === 'ore_sale' && !hasFreightWarehouse) return 'needs_freight_warehouse';
+  if (isPaidClearance(c) && cash !== undefined && cash < c.quantityKg * c.pricePerKg) return 'insufficient_funds_for_fee';
+  return null;
 }
 
 /**

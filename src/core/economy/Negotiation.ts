@@ -2,7 +2,7 @@
 // Probabilistic negotiation that can improve or worsen contract terms.
 
 import type { Contract, ContractState, NegotiationChange } from './Contract.js';
-import { computeEarlyBonus } from './Contract.js';
+import { computeEarlyBonus, isPaidClearance } from './Contract.js';
 import { Random } from '../math/Random.js';
 import { hash32, hashCombine } from '../math/Hash.js';
 import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../config/balance.js';
@@ -124,7 +124,7 @@ export function negotiateContract(
       const pct = Math.round(factor * 100);
       switch (options[i]) {
         case 'price':
-          contract.pricePerKg *= (1 + factor);
+          contract.pricePerKg *= isPaidClearance(contract) ? 1 - factor : 1 + factor; // a fee improves by falling
           changes.push({ field: 'price', improved: true, pct });
           break;
         case 'deadline':
@@ -145,7 +145,7 @@ export function negotiateContract(
 
     switch (options[0]) {
       case 'price':
-        contract.pricePerKg *= (1 - factor);
+        contract.pricePerKg *= isPaidClearance(contract) ? 1 + factor : 1 - factor;
         changes.push({ field: 'price', improved: false, pct });
         break;
       case 'deadline':
@@ -159,7 +159,7 @@ export function negotiateContract(
     }
   }
 
-  if (changes.some(c => c.field === 'price')) {
+  if (changes.some(c => c.field === 'price') && !isPaidClearance(contract)) {
     contract.earlyBonus = computeEarlyBonus(contract.quantityKg, contract.pricePerKg);
   }
   return { success: isSuccess, changes, contract };

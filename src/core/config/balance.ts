@@ -2828,8 +2828,8 @@ export const PRODUCTION_SUPPLY_QTY_KG = { min: 4_000, max: 8_000 } as const;
 export const LEGACY_OFFER_DEADLINE_TICKS = { min: 30, max: 100 } as const;
 /** Deadline range (ticks) of production-market supply offers; see the fillability invariant above. */
 export const PRODUCTION_SUPPLY_DEADLINE_TICKS = { min: 1_500, max: 2_500 } as const;
-/** Rubble is ~1,500 t per shot; disposal offers take a meaningful share of it. */
-export const PRODUCTION_RUBBLE_QTY_KG = { min: 100_000, max: 300_000 } as const;
+/** Rubble offers are sized down to the barren rock on site (#1892), so the range spans a small heap to a full one. */
+export const PRODUCTION_RUBBLE_QTY_KG = { min: 2_500, max: 50_000 } as const;
 /** Rounding step (kg) of production offer sizes. */
 export const PRODUCTION_OFFER_QTY_STEP_KG = 250;
 /** Ore sales pay close to base price; supply deals discount for volume. */
@@ -2837,7 +2837,7 @@ export const PRODUCTION_ORE_SALE_PRICE_FACTOR = { min: 0.9, max: 1.1 } as const;
 export const PRODUCTION_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
 /** Rubble disposal pay (dollars/kg): cents, since the volume is huge. */
 export const PRODUCTION_RUBBLE_PRICE_PER_KG = { min: 0.01, max: 0.03 } as const;
-/** Barren rock (kg) one spoil heap holds before it is full (#1892). Not yet wired into BuildingDefs. */
+/** Barren rock (kg) one spoil heap holds before it is full (#1892). */
 export const SPOIL_HEAP_CAPACITY_KG = 50_000;
 /** Largest share of the site's barren stock a cheap rubble clearance asks for (#1892). */
 export const RUBBLE_CHEAP_STOCK_SHARE_MAX = 0.5;

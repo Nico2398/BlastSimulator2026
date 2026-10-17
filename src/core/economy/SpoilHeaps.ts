@@ -2,6 +2,7 @@
 // Barren fragments are dumped on a spoil heap instead of a freight warehouse.
 
 import type { Building } from '../entities/Building.js';
+import { getBuildingDef } from '../entities/Building.js';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
 
 /** Where a hauled fragment is delivered. */
@@ -25,14 +26,15 @@ export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<stri
 
 /** Room (kg) left on one building's spoil heap; 0 for a non-heap. */
 export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>): number {
-  void b;
-  return 0; // TODO: implement
+  if (b.type !== 'spoil_heap') return 0;
+  return Math.max(0, getBuildingDef(b.type, b.tier).capacity - (b.storedSpoilKg ?? 0));
 }
 
 /** Room (kg) left across every spoil heap in the given buildings. */
 export function totalSpoilRoomKg(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[]): number {
-  void buildings;
-  return 0; // TODO: implement
+  let total = 0;
+  for (const b of buildings) total += spoilHeapRoomKg(b);
+  return total;
 }
 
 /** Total barren rock (kg) stored across the given buildings' spoil heaps. */
@@ -96,21 +98,12 @@ export function creditSpoilKg(heap: Pick<Building, 'storedSpoilKg'>, amountKg: n
 }
 
 /**
- * Credit `amountKg` of barren rock to the first spoil_heap building (building order).
- * Returns false, crediting nothing, when no heap exists.
+ * Credit `amountKg` of barren rock to the first spoil heap (building order) with room for all of it.
+ * Returns false, crediting nothing, when no heap has that much room.
  */
-export function creditFirstSpoilHeap(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], amountKg: number): boolean {
-  const heap = buildings.find(b => b.type === 'spoil_heap');
+export function creditSpoilHeaps(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[], amountKg: number): boolean {
+  const heap = buildings.find(b => spoilHeapRoomKg(b) >= amountKg && b.type === 'spoil_heap');
   if (!heap) return false;
   creditSpoilKg(heap, amountKg);
   return true;
-}
-
-/**
- * Credit `amountKg` of barren rock across the spoil heaps, filling in building order.
- * Returns false, crediting nothing, when no heap has room for it.
- */
-export function creditSpoilHeaps(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[], amountKg: number): boolean {
-  void buildings; void amountKg;
-  return false; // TODO: implement
 }

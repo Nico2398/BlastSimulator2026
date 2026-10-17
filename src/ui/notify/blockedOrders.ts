@@ -47,6 +47,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_no_warehouse', { order });
     case 'no_spoil_heap':
       return t('notification.order_blocked_no_spoil_heap', { order });
+    case 'spoil_heap_full':
+      return t('notification.order_blocked_spoil_heap_full', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
     case 'debris_out_of_reach':
