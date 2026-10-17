@@ -118,8 +118,8 @@ export function thinDebrisCandidates(
   const kept = [0, 0]; // per destination class: the low bit of a bin's key
   const tried = [0, 0, 0, 0]; // per bin kind: the low two bits of its key
   for (const i of order) {
-    const kind = bins[i]!.key & 3;
-    const destination = kind & 1;
+    const kind = kindOfKey(bins[i]!.key);
+    const destination = destinationOfKey(bins[i]!.key);
     if (kept[destination]! >= DEBRIS_SELECTION_MAX_BINS) continue;
     if (tried[kind]! >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) continue;
     const members = bins[i]!.members.filter(m => isCandidate(m) && reachable(m));
@@ -214,6 +214,16 @@ const binKeys = new WeakMap<PendingAction, number>();
 
 /** Bin coordinates are offset so a negative tile still packs to a non-negative integer. */
 const BIN_COORD_OFFSET = 1 << 16;
+
+/** Bin kind (type + destination class): the low two bits `binKeyOf` packs last. */
+function kindOfKey(key: number): number {
+  return key & 3;
+}
+
+/** Destination class (1 = ore-carrying): the low bit of the key. */
+function destinationOfKey(key: number): number {
+  return key & 1;
+}
 
 function binKeyOf(action: PendingAction, carriesOre: (action: PendingAction) => boolean): number {
   let key = binKeys.get(action);

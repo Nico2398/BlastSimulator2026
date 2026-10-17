@@ -410,7 +410,8 @@ describe('selectBestActionForEmployee — a barren haul waits while an ore haul 
   it('every barren haul waits: with several nearer barren hauls the ore haul is still the pick', () => {
     const { state, emp, ore } = layout();
     addBlastFragments(state.logistics, [makeFragment(3, 2, 0, {}), makeFragment(4, 3, 1, {}), makeFragment(5, 1, 4, {})]);
-    const extras = [3, 4, 5].map(id => makeHaulAction({ id, targetX: 2, targetZ: 0, payload: { fragmentId: id } }));
+    const extraSpots: Record<number, [number, number]> = { 3: [2, 0], 4: [3, 1], 5: [1, 4] };
+    const extras = [3, 4, 5].map(id => makeHaulAction({ id, targetX: extraSpots[id]![0], targetZ: extraSpots[id]![1], payload: { fragmentId: id } }));
     const barren = makeHaulAction({ id: 1, targetX: NEAR_X, targetZ: 0, payload: { fragmentId: 1 } });
     expect(selectBestActionForEmployee(state, emp, [barren, ...extras, ore])!.action.id).toBe(ore.id);
   });
@@ -448,7 +449,7 @@ describe('selectBestActionForEmployee — a barren haul waits while an ore haul 
     expect(result!.action.id).toBe(ore.id);
   });
 
-  it('every ore fragment out of reach (walled in): the driver takes the barren haul', () => {
+  it('every ore fragment out of reach (walled in, no costed ore haul): barren competes as usual and is taken', () => {
     const { state, emp, barren, ore } = layout();
     // A full-height wall between the employee (and depot) and the ore: no route, no climb.
     const wallX = Math.round(FAR_X) - 2;
@@ -457,6 +458,25 @@ describe('selectBestActionForEmployee — a barren haul waits while an ore haul 
     expect(resolveActionCost(state, emp, ore)).toBeNull();
 
     const result = selectBestActionForEmployee(state, emp, [barren, ore]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(barren.id);
+  });
+
+  it('walled-in ore does not let another tier-0 action displace the cheapest barren haul', () => {
+    const { state, emp, barren, ore } = layout();
+    const wallX = Math.round(FAR_X) - 2;
+    for (let z = 0; z < 260; z++) state.navGrid!.cells[z]![wallX] = makeCell('blocked');
+    expect(resolveActionCost(state, emp, ore)).toBeNull();
+    // Same tier as a haul, but farther than the barren haul on the reachable side of the wall.
+    const work: PendingAction = {
+      id: 20, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+      targetX: NEAR_X + 15, targetZ: 0, targetY: 0, targetEmployeeId: null, status: 'queued', holderId: null,
+      queuedAtTick: 0, payload: { durationTicks: 10 },
+    };
+    expect(estimateActionCost(state, emp, barren)).toBeLessThan(estimateActionCost(state, emp, work));
+
+    const result = selectBestActionForEmployee(state, emp, [work, ore, barren]);
 
     expect(result).not.toBeNull();
     expect(result!.action.id).toBe(barren.id);

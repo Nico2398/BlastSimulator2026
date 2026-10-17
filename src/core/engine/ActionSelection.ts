@@ -224,6 +224,12 @@ export function estimateActionCost(
   return estimateWithBonus(state, employee, action, fragmentOf).cost;
 }
 
+/** A ranking cost estimate with the bonuses it subtracted. */
+type Estimate = { cost: number; bonus: number; demandBonus: number };
+
+/** An action with its tier and estimate, as sorted for selection. */
+type CostedAction = Estimate & { action: PendingAction; tier: number };
+
 /**
  * `estimateActionCost` plus the ranking bonuses it subtracted, so selection can apply them to the real cost too.
  * `cost` is a sort key: the base ore bonus clamps it at 0, the demand bonus (#1817, scaled by the optional
@@ -235,7 +241,7 @@ function estimateWithBonus(
   action: PendingAction,
   fragmentOf?: FragmentLookup,
   urgency?: ReadonlyMap<string, number>,
-): { cost: number; bonus: number; demandBonus: number } {
+): Estimate {
   const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'estimate', { action });
   const rawCost = itinerary !== null ? itinerary.estTotalTicks : Infinity;
   const bonus = haulActionCarriesOre(state, action, fragmentOf) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
@@ -534,7 +540,7 @@ function selectWithinIndex(
   // action's fragment, and a comparator re-resolving it O(n log n) times
   // over a post-blast pool of thousands is the same per-tick blow-up
   // createFragmentLookup exists for (HaulDispatch.ts).
-  const costed = claimable.map(action => ({ action, tier: actionRankTier(action.type), ...estimateWithBonus(state, employee, action, fragmentOf, urgency) }));
+  const costed: CostedAction[] = claimable.map(action => ({ action, tier: actionRankTier(action.type), ...estimateWithBonus(state, employee, action, fragmentOf, urgency) }));
   // Tier first (higher wins, #1742), then cost ascending, id ascending on a tie.
   costed.sort((a, b) => {
     if (a.tier !== b.tier) return b.tier - a.tier;
@@ -542,21 +548,28 @@ function selectWithinIndex(
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
 
-  // Barren rock yields to ore (#1870): while any ore haul is claimable (it survived the thinning,
-  // so it is reachable, allowed and has warehouse room), an unheld ground barren haul is not
-  // started. Pass 2 lets barren move when the ore hauls all fail to resolve a cost (blocked way).
-  const isUnheldGroundHaul = (a: PendingAction): boolean =>
-    a.type === 'haul_debris' && a.holderId === null && !haulActionIsLoaded(state, a, fragmentOf);
-  const oreWaits = claimable.some(a => isUnheldGroundHaul(a) && haulActionCarriesOre(state, a, fragmentOf));
+  // Barren rock yields to ore (#1870): while an ore haul with a resolvable route is costed (it survived
+  // the thinning, so it is reachable, allowed and has warehouse room), an unheld ground barren haul is
+  // not started. Without one the barren hauls compete as usual, and pass 2 lets barren move when the
+  // ore hauls fail to resolve a cost during the search (blocked way).
+  const isBarren = (a: PendingAction): boolean => isBarrenGroundHaul(state, a, fragmentOf);
+  const oreWaits = costed.some(c => Number.isFinite(c.cost) && isUnheldGroundHaul(state, c.action, fragmentOf) && !isBarren(c.action));
   if (oreWaits) {
-    const withoutBarren = costed.filter(c => !(isUnheldGroundHaul(c.action) && !haulActionCarriesOre(state, c.action, fragmentOf)));
-    const preferred = searchTiers(state, employee, withoutBarren, reachable);
+    const preferred = searchTiers(state, employee, costed.filter(c => !isBarren(c.action)), reachable);
     if (preferred !== null) return preferred;
   }
   return searchTiers(state, employee, costed, reachable);
 }
 
-type CostedAction = { action: PendingAction; tier: number; cost: number; bonus: number; demandBonus: number };
+/** An unheld haul_debris order whose fragment is still on the ground (not loaded in a vehicle). */
+function isUnheldGroundHaul(state: GameState, action: PendingAction, fragmentOf: FragmentLookup): boolean {
+  return action.type === 'haul_debris' && action.holderId === null && !haulActionIsLoaded(state, action, fragmentOf);
+}
+
+/** An unheld ground haul that carries no ore: it yields to ore hauls (#1870). */
+function isBarrenGroundHaul(state: GameState, action: PendingAction, fragmentOf: FragmentLookup): boolean {
+  return isUnheldGroundHaul(state, action, fragmentOf) && !haulActionCarriesOre(state, action, fragmentOf);
+}
 
 /** Bounded per-tier search over `costed` (sorted: tier, then cost), see the notes inside. */
 function searchTiers(
