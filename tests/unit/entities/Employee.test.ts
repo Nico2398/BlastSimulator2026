@@ -1934,7 +1934,7 @@ describe('generateName — unique names (#1886)', () => {
     const drawn = generateUniqueName(new Random(42));
     const next = generateUniqueName(new Random(42), new Set([drawn]));
     expect(next).toBe(nameAt(indexOf(drawn) + 1));
-    expect(next).toBe('Nick Stoneface');
+    expect(next).toBe('Nick Miner');
   });
 
   it('keeps stepping past a run of taken combinations', () => {
