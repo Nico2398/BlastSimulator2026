@@ -77,7 +77,7 @@ export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => 
   if (!anyLicensed) {
     const warn = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px;padding:9px;border-radius:4px;background:var(--bsx-well)' } });
     const line = el('div', { attrs: { style: 'display:flex;gap:6px;align-items:center;color:var(--bsx-amber)' } });
-    line.append(iconEl('warn', 11), el('span', { text: t('ui.fleet.no_licensed', { licence: t(`skill.${licence}`) }), attrs: { style: 'font:500 10px/1.3 var(--bsx-font-ui)' } }));
+    line.append(iconEl('warn', 11), el('span', { text: t('ui.fleet.no_licensed', { licence: t(`skill.${licence}`), level: v.tier }), attrs: { style: 'font:500 10px/1.3 var(--bsx-font-ui)' } }));
     const trainBtn = button('ghost', t('ui.fleet.train_someone'));
     trainBtn.style.cssText = 'height:26px;font-size:10px';
     trainBtn.addEventListener('click', onGoToCrew);

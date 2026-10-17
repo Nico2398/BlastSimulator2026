@@ -8,6 +8,7 @@ import {
   formatPerHour,
   vehicleCardLine,
   vehicleCardTooltip,
+  vehicleCapacityText,
 } from '../../../src/ui/catalogCardText.js';
 import {
   getAllVehicleRoles, getVehicleDefByTier, type VehicleRole, type VehicleTier,
@@ -264,4 +265,31 @@ describe('locale keys for catalog cards', () => {
       expect(FR[key]).not.toBe(EN[key]);
     });
   }
+});
+
+describe('vehicleCapacityText (#1850)', () => {
+  it('drill rig reads in holes/h', () => {
+    setLocale('en');
+    expect(vehicleCapacityText('drill_rig', 2)).toBe('2 holes/h');
+  });
+
+  it('debris hauler reads a plain kg payload', () => {
+    setLocale('en');
+    expect(vehicleCapacityText('debris_hauler', 12)).toBe('12 kg');
+  });
+
+  it('rock digger reads m3/h and destroyer/fragmenter kg/h', () => {
+    setLocale('en');
+    expect(vehicleCapacityText('rock_digger', 5)).toBe(`5 ${t('ui.fleet.unit.m3_per_hour')}`);
+    expect(vehicleCapacityText('building_destroyer', 5)).toBe('5 kg/h');
+    expect(vehicleCapacityText('rock_fragmenter', 5)).toBe('5 kg/h');
+  });
+
+  it('agrees with the dealership tooltip capacity line for every role', () => {
+    setLocale('en');
+    for (const role of getAllVehicleRoles()) {
+      const def = getVehicleDefByTier(role, 1);
+      expect(vehicleCardTooltip(def)).toContain(vehicleCapacityText(role, def.capacity));
+    }
+  });
 });

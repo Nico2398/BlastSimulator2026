@@ -499,7 +499,7 @@ describe('FleetPanel — rows hold no actions (#1767)', () => {
 
   it('driver line reads Unmanned with no driver, and never warns or offers Train', () => {
     const { panel } = makePanel();
-    panel.update(makeState([makeVehicle({ id: 2, type: 'drill_rig' })], []));
+    panel.update(makeState([makeVehicle({ id: 2, type: 'drill_rig' })], [makeEmployee({ id: 6, qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0, licenceLevel: 1 }] })]));
     const row = rowOf(panel, 2);
     expect(row.querySelector('.bs-fleet-driver')!.textContent).toContain('Unmanned');
     expect(row.textContent).not.toContain('Nobody is licensed');
@@ -524,7 +524,8 @@ describe('FleetPanel — rows hold no actions (#1767)', () => {
   it('a driver change patches the driver line in place; the row DOM identity survives', () => {
     const { panel } = makePanel();
     const vehicle = makeVehicle({ id: 2 });
-    const state = makeState([vehicle], []);
+    const licensed = makeEmployee({ id: 7, name: 'Lia Holder', qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: 1 }] });
+    const state = makeState([vehicle], [licensed]);
     panel.update(state);
     const row = rowOf(panel, 2);
     expect(row.querySelector('.bs-fleet-driver')!.textContent).toContain('Unmanned');
