@@ -4,7 +4,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EmployeeRole } from '../../core/entities/Employee.js';
 import { HIRING_COSTS } from '../../core/entities/Employee.js';
 import { HIRING_ROLES, candidatesForRole, type HireCandidate } from '../../core/entities/HiringPool.js';
-import { ROLE_STARTING_QUALIFICATIONS } from '../../core/config/balance.js';
+import { ROLE_STARTING_QUALIFICATIONS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
 import { perHour } from '../crewDetailSections.js';
@@ -32,6 +32,12 @@ function makeCandidateCard(
       attrs: { style: 'font:400 10px/1.2 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
     }),
   );
+  if (c.unionized) {
+    info.append(el('span', {
+      text: t('ui.crew.candidate_union_tradeoff', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT }),
+      attrs: { style: 'font:400 10px/1.2 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+    }));
+  }
   const btn = el('button', {
     className: 'bsx-btn',
     text: t('ui.crew.hire'),

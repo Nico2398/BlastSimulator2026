@@ -9,6 +9,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventContext } from '../events/EventPool.js';
 import { getEventsByCategory } from '../events/EventPool.js';
 import { getLivingEmployees } from '../entities/Employee.js';
+import { unionMemberCount } from '../entities/UnionMembership.js';
 
 /** Build the EventContext from the current GameState. */
 export function buildTickEventContext(s: GameState): EventContext {
@@ -17,6 +18,7 @@ export function buildTickEventContext(s: GameState): EventContext {
   return {
     scores: s.scores,
     employeeCount: getLivingEmployees(s.employees.employees).length,
+    unionMemberCount: unionMemberCount(s.employees.employees),
     deathCount: s.damage.deathCount,
     corruptionLevel: s.corruption.level,
     hasBuilding: (type: string) => s.buildings.buildings.some(b => b.type === type),
