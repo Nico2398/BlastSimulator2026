@@ -12,39 +12,7 @@
 
 import type { EventDef } from '../src/core/events/EventPool.js';
 import { findDominatedPairs, optionValue } from '../src/core/events/EventOptionBalance.js';
-import { UNION_EVENTS_1 } from '../src/core/events/UnionEvents1.js';
-import { UNION_EVENTS_2 } from '../src/core/events/UnionEvents2.js';
-import { POLITICS_EVENTS_1 } from '../src/core/events/PoliticsEvents1.js';
-import { POLITICS_EVENTS_2 } from '../src/core/events/PoliticsEvents2.js';
-import { WEATHER_EVENTS_1 } from '../src/core/events/WeatherEvents1.js';
-import { WEATHER_EVENTS_2 } from '../src/core/events/WeatherEvents2.js';
-import { MAFIA_EVENTS_1 } from '../src/core/events/MafiaEvents1.js';
-import { MAFIA_EVENTS_2 } from '../src/core/events/MafiaEvents2.js';
-import { LAWSUIT_EVENTS_1 } from '../src/core/events/LawsuitEvents1.js';
-import { LAWSUIT_EVENTS_2 } from '../src/core/events/LawsuitEvents2.js';
-import { FOLLOWUP_EVENTS } from '../src/core/events/FollowUpEvents.js';
-import { TRAFFIC_JAM_EVENTS } from '../src/core/events/TrafficJamEvents.js';
-import { UNQUALIFIED_TASK_EVENTS } from '../src/core/events/UnqualifiedTaskEvents.js';
-import { ORE_REPORT_EVENTS } from '../src/core/events/OreReportEvents.js';
-import { TUTORIAL_EVENTS } from '../src/core/events/TutorialEvents.js';
-
-const EVENT_FILES: Record<string, readonly EventDef[]> = {
-  'UnionEvents1.ts': UNION_EVENTS_1,
-  'UnionEvents2.ts': UNION_EVENTS_2,
-  'PoliticsEvents1.ts': POLITICS_EVENTS_1,
-  'PoliticsEvents2.ts': POLITICS_EVENTS_2,
-  'WeatherEvents1.ts': WEATHER_EVENTS_1,
-  'WeatherEvents2.ts': WEATHER_EVENTS_2,
-  'MafiaEvents1.ts': MAFIA_EVENTS_1,
-  'MafiaEvents2.ts': MAFIA_EVENTS_2,
-  'LawsuitEvents1.ts': LAWSUIT_EVENTS_1,
-  'LawsuitEvents2.ts': LAWSUIT_EVENTS_2,
-  'FollowUpEvents.ts': FOLLOWUP_EVENTS,
-  'TrafficJamEvents.ts': TRAFFIC_JAM_EVENTS,
-  'UnqualifiedTaskEvents.ts': UNQUALIFIED_TASK_EVENTS,
-  'OreReportEvents.ts': ORE_REPORT_EVENTS,
-  'TutorialEvents.ts': TUTORIAL_EVENTS,
-};
+import { EVENT_FILES } from '../src/core/events/index.js';
 
 function vector(ev: EventDef, index: number): string {
   const { dims, opaque } = optionValue(ev.consequences[index]!);

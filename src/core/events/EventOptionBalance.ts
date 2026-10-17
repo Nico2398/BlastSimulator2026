@@ -64,7 +64,11 @@ function addBranch(c: EventConsequence, w: number, dims: Record<string, number>,
   }
 }
 
-/** Expected value of one option: signed dimensions (higher = better) plus an opaque signature. */
+/**
+ * Expected value of one option: signed dimensions (higher = better) plus an opaque signature.
+ * Outcomes produced by effectTag handlers (traffic, unqualified) are unvalued here and
+ * must be reviewed by hand.
+ */
 export function optionValue(c: EventConsequence): OptionValue {
   const dims: Record<string, number> = {};
   const opaque: string[] = [];
