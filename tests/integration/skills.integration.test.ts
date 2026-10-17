@@ -272,6 +272,9 @@ describe('Employee skills', () => {
 
   it('calculateSalary reflects qualifications', () => {
     const emp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
+    // Union membership discounts salary (#1873); this test measures qualification bonuses only.
+    emp().unionized = false;
+    emp().salary = calculateSalary(emp());
 
     // Measured rather than hardcoded: a blaster is hired holding 'blasting' at
     // Rookie level, so the starting salary already carries that level's bonus.
@@ -828,6 +831,9 @@ describe('Level courses through the console (#1726)', () => {
     state.buildings.unlockedTiers['geology_lab'] = 2;
     expect(placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 2).success).toBe(true);
     const cashBefore = state.cash;
+    // Union discount (#1873) would round the bonus difference; measure qualifications only.
+    surveyor().unionized = false;
+    surveyor().salary = calculateSalary(surveyor());
     const salaryBefore = surveyor().salary;
 
     const result = employeeCommand(ctx, ['train', String(surveyorId)], { skill: 'geology' });

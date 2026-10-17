@@ -68,8 +68,10 @@ describe(`${SCENARIO} at 8x`, () => {
     // BLAST_AUDIO_CONFIG.scrap.maxCount), and the distant-life ambience (LIFE_CONFIG.sounds, spaced >= 22 s apart) can
     // pick vehicle_scrap once inside the same thirty seconds — measured: one lands 1.6 s after the fourth shot since the
     // rally point moved the crew's spawns and shifted the shots' timing.
+    // level_up reaches 4 (#1873: union members draw a 15% lower salary and the hiring pool's candidates changed, which shifts
+    // the 28-person crew's job timing so four XP thresholds now land inside one thirty-second window).
     const scrapBound = 2 * BLAST_AUDIO_CONFIG.scrap.maxCount + 1;
-    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 17, per30s: 38 }, { drill_done: 10, charge_loaded: 10, vehicle_scrap: scrapBound });
+    expectWorldWithinBudget(sim(), { per1s: 5, per10s: 17, per30s: 38 }, { drill_done: 10, charge_loaded: 10, vehicle_scrap: scrapBound, level_up: 4 });
   });
 
   it('plays under 97 sounds a minute, a scripted player hiring 28 people included', () => {

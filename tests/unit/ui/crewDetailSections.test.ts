@@ -30,7 +30,7 @@ import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.
 import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, UNION_MEMBER_SALARY_DISCOUNT_PCT, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -615,7 +615,7 @@ describe('makeUnionTradeoffLine (#1873)', () => {
   it('returns the trade-off line for a union member', () => {
     const line = makeUnionTradeoffLine({ unionized: true });
     expect(line).not.toBeNull();
-    expect(line!.textContent).toBe(t('ui.crew.union_tradeoff_detail'));
+    expect(line!.textContent).toBe(t('ui.crew.union_tradeoff_detail', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT }));
     expect(t('ui.crew.union_tradeoff_detail')).not.toBe('ui.crew.union_tradeoff_detail');
   });
 
