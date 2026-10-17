@@ -19,7 +19,7 @@ import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import type { Contract } from '../../src/core/economy/Contract.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { syncHaulDispatch, haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
-import { isBarrenFragment, totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
+import { isBarrenFragment, totalSpoilKg, totalSpoilRoomKg } from '../../src/core/economy/SpoilHeaps.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.js';
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
@@ -29,6 +29,7 @@ import { drillChargeAndBlast, tickUntilFresh } from '../helpers/blastFixtures.js
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { tickUntil } from './helpers.js';
 import { playContracts, playTick, clearBlastZone, FORBIDDEN_COMMAND, type Run } from '../helpers/playthrough.js';
+import { SPOIL_HEAP_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { resolveActionCost } from '../../src/core/engine/ActionSelection.js';
 import { octileHeuristic } from '../../src/core/nav/Pathfinding.js';
 
@@ -657,4 +658,127 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
     expectNoWorldInvariantViolations(state);
   }, 900_000);
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Finite heaps: a full heap stops barren hauls, a rubble contract clears it (#1892)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('a full spoil heap stops barren hauls until a rubble contract clears it (#1892)', () => {
+  function fullHeapSite() {
+    const site = haulSite();
+    heaps(site.state)[0]!.storedSpoilKg = SPOIL_HEAP_CAPACITY_KG;
+    return site;
+  }
+
+  function rubbleContract(state: GameState, over: Partial<Contract>): Contract {
+    const pool = state.contracts;
+    const c: Contract = {
+      id: pool.nextId++, type: 'rubble_disposal', materialId: '', description: '[fixture] clearance',
+      quantityKg: 10_000, deliveredKg: 0, pricePerKg: 0.02, deadlineTicks: 5000, acceptedAtTick: 0,
+      penaltyAmount: 0, earlyBonus: 0, completed: false, expired: false, ...over,
+    };
+    pool.available.push(c);
+    return c;
+  }
+
+  const orderFor = (state: GameState, id: number) =>
+    state.pendingActions.find(a => a.type === 'haul_debris' && a.payload['fragmentId'] === id)!;
+
+  it('a full heap has no room and blocks a barren haul with spoil_heap_full, not no_spoil_heap', () => {
+    const { state } = fullHeapSite();
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(0);
+    addBlastFragments(state.logistics, [barren(9701, 5, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    expect(haulBlockedReason(state, orderFor(state, 9701))).toBe('spoil_heap_full');
+  });
+
+  it('after ticking the barren order carries blockedReason spoil_heap_full and the rock stays in the pit', () => {
+    const { run, state } = fullHeapSite();
+    addBlastFragments(state.logistics, [barren(9702, 5, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    run('tick 20');
+    expect(orderFor(state, 9702)?.blockedReason).toBe('spoil_heap_full');
+    expect(stateOf(state, 9702)?.state).toBe('on_ground');
+    expect(heaps(state)[0]!.storedSpoilKg).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('a full heap does not stop an ore haul to the warehouse', () => {
+    const { state } = fullHeapSite();
+    addBlastFragments(state.logistics, [rich(9703, 6, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    refreshLogisticsCapacity(state);
+    expect(haulBlockedReason(state, orderFor(state, 9703))).toBeNull();
+  });
+
+  it('delivering a rubble contract frees heap room and the barren haul is unblocked', () => {
+    const { run, state } = fullHeapSite();
+    addBlastFragments(state.logistics, [barren(9704, 5, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    expect(haulBlockedReason(state, orderFor(state, 9704))).toBe('spoil_heap_full');
+
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const offer = rubbleContract(state, { quantityKg: 10_000 });
+    expect(contractCommand(ctx, ['accept', String(offer.id)], {}).success).toBe(true);
+    const r = contractCommand(ctx, ['deliver', String(offer.id)], { amount: '10000' });
+    expect(r.success).toBe(true);
+
+    expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(10_000);
+    expect(haulBlockedReason(state, orderFor(state, 9704))).toBeNull();
+    run('tick 1');
+    expect(orderFor(state, 9704)?.blockedReason).toBeUndefined();
+  });
+
+  it('hauls resume: once cleared, a hauler carries the barren rock onto the heap', () => {
+    const { run, state, vehicle } = fullHeapSite();
+    addBlastFragments(state.logistics, [barren(9705, 5, 6, 900)], state.navGrid);
+    syncHaulDispatch(state);
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const offer = rubbleContract(state, { quantityKg: 5_000 });
+    contractCommand(ctx, ['accept', String(offer.id)], {});
+    contractCommand(ctx, ['deliver', String(offer.id)], { amount: '5000' });
+    const before = totalSpoilKg(state.buildings.buildings);
+
+    expect(run(`vehicle haul ${vehicle.id} fragment:9705`)).toMatchObject({ success: true });
+    tickUntil(run, () => stateOf(state, 9705) === undefined, 1500);
+
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(before + 900);
+  });
+
+  it('a cheap clearance pays the player on delivery', () => {
+    const { state } = fullHeapSite();
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.02 });
+    contractCommand(ctx, ['accept', String(offer.id)], {});
+    const cash = state.cash;
+    expect(contractCommand(ctx, ['deliver', String(offer.id)], { amount: '10000' }).success).toBe(true);
+    expect(state.cash - cash).toBeCloseTo(200, 6);
+  });
+
+  it('a paid clearance costs the player the fee on delivery and logs an expense', () => {
+    const { state } = fullHeapSite();
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.04, playerPays: true });
+    state.cash = 5_000;
+    state.finances.cash = 5_000;
+    expect(contractCommand(ctx, ['accept', String(offer.id)], {}).success).toBe(true);
+    const txBefore = state.finances.transactions.length;
+    expect(contractCommand(ctx, ['deliver', String(offer.id)], { amount: '10000' }).success).toBe(true);
+    expect(state.cash).toBeCloseTo(5_000 - 400, 6);
+    const added = state.finances.transactions.slice(txBefore);
+    expect(added.some(tx => tx.type === 'expense' && tx.amount === 400)).toBe(true);
+    expect(added.some(tx => tx.type === 'income')).toBe(false);
+  });
+
+  it('accepting a paid clearance is refused when cash cannot cover the fee', () => {
+    const { state } = fullHeapSite();
+    const ctx = { state } as unknown as Parameters<typeof contractCommand>[0];
+    const offer = rubbleContract(state, { quantityKg: 10_000, pricePerKg: 0.04, playerPays: true });
+    state.cash = 399;
+    const r = contractCommand(ctx, ['accept', String(offer.id)], {});
+    expect(r.success).toBe(false);
+    expect(state.contracts.available.some(c => c.id === offer.id)).toBe(true);
+    expect(state.contracts.active.some(c => c.id === offer.id)).toBe(false);
+  });
 });

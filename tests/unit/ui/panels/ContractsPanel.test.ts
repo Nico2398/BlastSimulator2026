@@ -8,6 +8,8 @@ import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { addFreightWarehouseToState } from '../../../helpers/freightWarehouse.js';
 import type { Contract } from '../../../../src/core/economy/Contract.js';
+import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
+import { placeBuilding } from '../../../../src/core/entities/Building.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -949,5 +951,111 @@ describe('ContractsPanel — tick refresh keeps scroll and typed input (#1592)',
 
     expect(panel.root.textContent).toContain(t('ui.contracts.time_left', { hours: 35 }));
     expect(panel.root.textContent).not.toContain(before);
+  });
+});
+
+
+// ── Rubble cards: heaps, pays/costs, whole-kilogram amounts (#1892) ──
+
+function putHeapRock(state: GameState, kg: number): void {
+  const r = placeBuilding(state.buildings, 'spoil_heap', 40, 40, 200, 200);
+  if (!r.success || !r.building) throw new Error('fixture heap refused');
+  r.building.storedSpoilKg = kg;
+}
+
+describe('ContractsPanel — rubble cards (#1892)', () => {
+  const rubble = (over: Partial<Contract> = {}) => makeContract({
+    id: 4, type: 'rubble_disposal', materialId: '', description: 'Dispose of rubble',
+    quantityKg: 20_000, pricePerKg: 0.02, penaltyAmount: 0, earlyBonus: 0, ...over,
+  });
+
+  function offerText(c: Contract, prepare: (s: GameState) => void = () => {}): string {
+    const { panel } = makePanel();
+    const state = makeState();
+    prepare(state);
+    state.contracts.available.push(c);
+    panel.show();
+    panel.update(state);
+    return panel.root.querySelector('[data-contract-id="' + c.id + '"]')!.textContent ?? '';
+  }
+
+  it('an offered rubble card names the heaps, not storage', () => {
+    const text = offerText(rubble(), s => putHeapRock(s, 53_846.4));
+    expect(text).toContain(t('ui.contracts.stock_spoil_heaps', { kg: '53,846' }));
+    expect(text).not.toContain(t('ui.contracts.have_line', { kg: '53,846' }));
+  });
+
+  it('an ore card keeps the in-storage line', () => {
+    const text = offerText(makeContract({ id: 4 }), s => { s.collectedOre['dirtite'] = 70; });
+    expect(text).toContain(t('ui.contracts.have_line', { kg: '70' }));
+    expect(text).not.toContain(t('ui.contracts.stock_spoil_heaps', { kg: '70' }));
+  });
+
+  it('a cheap clearance says how much it removes and what it pays', () => {
+    const text = offerText(rubble());
+    expect(text).toContain(t('ui.contracts.rubble_removes', { kg: '20,000' }));
+    expect(text).toContain(t('ui.contracts.rubble_pays', { amount: formatMoney(400) }));
+    expect(text).not.toContain(t('ui.contracts.rubble_costs', { amount: formatMoney(400) }));
+  });
+
+  it('a paid clearance says what it costs the player', () => {
+    const text = offerText(rubble({ playerPays: true, pricePerKg: 0.04 }));
+    expect(text).toContain(t('ui.contracts.rubble_removes', { kg: '20,000' }));
+    expect(text).toContain(t('ui.contracts.rubble_costs', { amount: formatMoney(800) }));
+    expect(text).not.toContain(t('ui.contracts.rubble_pays', { amount: formatMoney(800) }));
+  });
+
+  it('accept is disabled when the player cannot afford a paid clearance fee', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.cash = 10;
+    state.contracts.available.push(rubble({ playerPays: true, pricePerKg: 0.04 }));
+    panel.show();
+    panel.update(state);
+    expect((panel.root.querySelector('.bs-contract-accept') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('accept is enabled for a paid clearance the player can afford', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.cash = 100_000;
+    state.contracts.available.push(rubble({ playerPays: true, pricePerKg: 0.04 }));
+    panel.show();
+    panel.update(state);
+    expect((panel.root.querySelector('.bs-contract-accept') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('an active rubble card names the heaps and its fee or payment', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    putHeapRock(state, 30_000.7);
+    state.contracts.active.push(rubble({ playerPays: true, pricePerKg: 0.04 }));
+    panel.show();
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.contracts.rubble_costs', { amount: formatMoney(800) }));
+  });
+
+  it('delivered kilograms are rounded to whole numbers on an active card', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5, quantityKg: 299_500, deliveredKg: 53_846.339 }));
+    panel.show();
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.contracts.delivered_line', { delivered: '53,846', total: '299,500' }));
+    expect(text).not.toContain('53,846.339');
+  });
+
+  it('a delivered amount of 0.5 kg rounds up, a whole amount stays whole', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5, quantityKg: 1_000, deliveredKg: 100.5 }));
+    state.contracts.active.push(makeContract({ id: 6, quantityKg: 1_000, deliveredKg: 250 }));
+    panel.show();
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.contracts.delivered_line', { delivered: '101', total: '1,000' }));
+    expect(text).toContain(t('ui.contracts.delivered_line', { delivered: '250', total: '1,000' }));
   });
 });

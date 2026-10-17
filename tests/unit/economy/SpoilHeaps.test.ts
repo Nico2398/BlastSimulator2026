@@ -4,13 +4,14 @@
 // are dumped on a spoil heap instead of a freight warehouse.
 
 import { describe, it, expect } from 'vitest';
-import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../../../src/core/config/balance.js';
+import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG } from '../../../src/core/config/balance.js';
 import {
-  creditFirstSpoilHeap, creditSpoilKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
+  creditFirstSpoilHeap, creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
 import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import type { Building } from '../../../src/core/entities/Building.js';
+import { BUILDING_DEFS } from '../../../src/core/entities/BuildingDefs.js';
 import { createBuildingState, placeBuilding } from '../../../src/core/entities/Building.js';
 import { nearestSite, spoilHeapSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import type { WarehouseSite } from '../../../src/core/entities/BuildingWarehouse.js';
@@ -322,5 +323,105 @@ describe('creditFirstSpoilHeap (#1690)', () => {
     expect(creditFirstSpoilHeap([w], 500)).toBe(false);
     expect(w.storedSpoilKg).toBeUndefined();
     expect(creditFirstSpoilHeap([], 500)).toBe(false);
+  });
+});
+
+// ── #1892: finite spoil heaps ───────────────────────────────────────────────
+
+type Pile = { type: 'spoil_heap' | 'freight_warehouse'; tier: 1 | 2 | 3; storedSpoilKg?: number };
+const pile = (kg?: number): Pile => (kg === undefined ? { type: 'spoil_heap', tier: 1 } : { type: 'spoil_heap', tier: 1, storedSpoilKg: kg });
+
+describe('spoil heap capacity (#1892)', () => {
+  it('SPOIL_HEAP_CAPACITY_KG is the spoil heap tier 1 capacity in BuildingDefs', () => {
+    expect(BUILDING_DEFS.spoil_heap[1].capacity).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+});
+
+describe('spoilHeapRoomKg (#1892)', () => {
+  it('an empty heap has its whole capacity free', () => {
+    expect(spoilHeapRoomKg(pile())).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('room is capacity minus stored rock', () => {
+    expect(spoilHeapRoomKg(pile(12_000))).toBe(SPOIL_HEAP_CAPACITY_KG - 12_000);
+  });
+
+  it('a full heap has no room (boundary)', () => {
+    expect(spoilHeapRoomKg(pile(SPOIL_HEAP_CAPACITY_KG))).toBe(0);
+  });
+
+  it('an overfull heap clamps to 0, never negative', () => {
+    expect(spoilHeapRoomKg(pile(SPOIL_HEAP_CAPACITY_KG + 5_000))).toBe(0);
+  });
+
+  it('a non-heap building has no room', () => {
+    expect(spoilHeapRoomKg({ type: 'freight_warehouse', tier: 1 })).toBe(0);
+  });
+});
+
+describe('totalSpoilRoomKg (#1892)', () => {
+  it('is 0 for no buildings', () => {
+    expect(totalSpoilRoomKg([])).toBe(0);
+  });
+
+  it('sums the room over every heap', () => {
+    expect(totalSpoilRoomKg([pile(10_000), pile(SPOIL_HEAP_CAPACITY_KG)])).toBe(2 * SPOIL_HEAP_CAPACITY_KG - 10_000 - SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('ignores non-heap buildings', () => {
+    expect(totalSpoilRoomKg([{ type: 'freight_warehouse', tier: 1 }, pile(0)])).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('is 0 when every heap is full', () => {
+    expect(totalSpoilRoomKg([pile(SPOIL_HEAP_CAPACITY_KG), pile(SPOIL_HEAP_CAPACITY_KG)])).toBe(0);
+  });
+});
+
+describe('creditSpoilHeaps (#1892)', () => {
+  it('credits a heap with room and returns true', () => {
+    const heaps = [pile(0)];
+    expect(creditSpoilHeaps(heaps, 1_000)).toBe(true);
+    expect(heaps[0]!.storedSpoilKg).toBe(1_000);
+  });
+
+  it('fills exactly to capacity (boundary)', () => {
+    const heaps = [pile(SPOIL_HEAP_CAPACITY_KG - 400)];
+    expect(creditSpoilHeaps(heaps, 400)).toBe(true);
+    expect(heaps[0]!.storedSpoilKg).toBe(SPOIL_HEAP_CAPACITY_KG);
+  });
+
+  it('refuses, crediting nothing, when no heap has room for the amount', () => {
+    const heaps = [pile(SPOIL_HEAP_CAPACITY_KG - 399)];
+    expect(creditSpoilHeaps(heaps, 400)).toBe(false);
+    expect(heaps[0]!.storedSpoilKg).toBe(SPOIL_HEAP_CAPACITY_KG - 399);
+  });
+
+  it('skips a full heap and credits the next heap with room', () => {
+    const heaps = [pile(SPOIL_HEAP_CAPACITY_KG), pile(0)];
+    expect(creditSpoilHeaps(heaps, 700)).toBe(true);
+    expect(heaps[0]!.storedSpoilKg).toBe(SPOIL_HEAP_CAPACITY_KG);
+    expect(heaps[1]!.storedSpoilKg).toBe(700);
+  });
+
+  it('credits the first heap with room in building order', () => {
+    const heaps = [pile(10), pile(20)];
+    creditSpoilHeaps(heaps, 5);
+    expect(heaps[0]!.storedSpoilKg).toBe(15);
+    expect(heaps[1]!.storedSpoilKg).toBe(20);
+  });
+
+  it('returns false with no heap at all', () => {
+    expect(creditSpoilHeaps([{ type: 'freight_warehouse', tier: 1 }], 1)).toBe(false);
+    expect(creditSpoilHeaps([], 1)).toBe(false);
+  });
+});
+
+describe('drawSpoilKg frees room (#1892)', () => {
+  it('a rubble draw from a full heap gives its room back', () => {
+    const heaps = [pile(SPOIL_HEAP_CAPACITY_KG)];
+    expect(totalSpoilRoomKg(heaps)).toBe(0);
+    drawSpoilKg(heaps, 8_000);
+    expect(totalSpoilRoomKg(heaps)).toBe(8_000);
+    expect(creditSpoilHeaps(heaps, 8_000)).toBe(true);
   });
 });

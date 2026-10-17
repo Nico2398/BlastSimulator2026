@@ -20,6 +20,8 @@ import {
   sortByDeadline,
   contractShortOfStock,
   contractAcceptBlocker,
+  offerSpecialContract,
+  isPaidClearance,
 } from '../../../src/core/economy/Contract.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -33,6 +35,9 @@ import {
   PRODUCTION_SUPPLY_DEADLINE_TICKS,
   PRODUCTION_OFFER_QTY_STEP_KG,
   CONTRACT_PENALTY_RATE,
+  PRODUCTION_RUBBLE_FEE_PER_KG,
+  RUBBLE_CHEAP_STOCK_SHARE_MAX,
+  RUBBLE_PAID_STOCK_SHARE_MAX,
 } from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 import { resolveMarket, oreContractBasePrice } from '../../../src/core/economy/Market.js';
@@ -936,7 +941,7 @@ describe('production market contracts (#1681)', () => {
   });
 
   it('rubble disposal offers are large and priced inside the profile range', () => {
-    const rubble = offers.filter((c) => c.type === 'rubble_disposal');
+    const rubble = offers.filter((c) => c.type === 'rubble_disposal' && !c.playerPays);
     expect(rubble.length).toBeGreaterThan(5);
     for (const c of rubble) {
       expect(c.quantityKg).toBeGreaterThanOrEqual(profile.rubbleQtyKg.min);
@@ -1072,5 +1077,179 @@ describe('legacy supply offers keep their terms (#1789)', () => {
 
   it('the legacy profile supply deadline is the legacy offer range', () => {
     expect(resolveMarket('legacy').supplyDeadlineTicks).toEqual(LEGACY_OFFER_DEADLINE_TICKS);
+  });
+});
+
+
+// ── Rubble clearances: fillable from the site's barren rock, cheap and paid (#1892) ──
+
+/** Every rubble offer from `refreshes` boards generated against `stockKg` of barren rock. */
+function rubbleOffersOver(market: 'legacy' | 'production', seed: number, refreshes: number, stockKg: number): Contract[] {
+  const state = createContractState();
+  state.market = market;
+  const rng = new Random(seed);
+  const seen: Contract[] = [];
+  for (let i = 0; i < refreshes; i++) {
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, stockKg);
+    seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH).filter(c => c.type === 'rubble_disposal'));
+  }
+  return seen;
+}
+
+describe('rubble offers are sized to the barren stock (#1892)', () => {
+  const profile = resolveMarket('production');
+  const STOCK = 400_000;
+  const offers = rubbleOffersOver('production', 42, 60, STOCK);
+  const cheap = offers.filter(c => !c.playerPays);
+  const paid = offers.filter(c => c.playerPays === true);
+
+  it('no rubble offer is bigger than the stock times its kind share', () => {
+    expect(offers.length).toBeGreaterThan(0);
+    for (const c of cheap) expect(c.quantityKg).toBeLessThanOrEqual(STOCK * RUBBLE_CHEAP_STOCK_SHARE_MAX);
+    for (const c of paid) expect(c.quantityKg).toBeLessThanOrEqual(STOCK * RUBBLE_PAID_STOCK_SHARE_MAX);
+  });
+
+  it('every rubble offer is at least the market minimum and on the quantity step', () => {
+    for (const c of offers) {
+      expect(c.quantityKg).toBeGreaterThanOrEqual(profile.rubbleQtyKg.min);
+      expect(c.quantityKg).toBeLessThanOrEqual(profile.rubbleQtyKg.max);
+      expect(c.quantityKg % profile.qtyStepKg).toBe(0);
+    }
+  });
+
+  it('both kinds are offered over a seeded run', () => {
+    expect(cheap.length).toBeGreaterThan(0);
+    expect(paid.length).toBeGreaterThan(0);
+  });
+
+  it('a cheap clearance pays the player: playerPays is unset, price inside the pay range', () => {
+    for (const c of cheap) {
+      expect(c.playerPays).toBeUndefined();
+      expect(isPaidClearance(c)).toBe(false);
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(profile.rubblePricePerKg.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(profile.rubblePricePerKg.max + 1e-9);
+    }
+  });
+
+  it('a paid clearance has playerPays true, a fee inside the fee range, no bonus', () => {
+    for (const c of paid) {
+      expect(isPaidClearance(c)).toBe(true);
+      expect(c.pricePerKg).toBeGreaterThanOrEqual(PRODUCTION_RUBBLE_FEE_PER_KG.min - 1e-9);
+      expect(c.pricePerKg).toBeLessThanOrEqual(PRODUCTION_RUBBLE_FEE_PER_KG.max + 1e-9);
+      expect(c.earlyBonus).toBe(0);
+    }
+  });
+
+  it('no rubble offer ever carries a penalty', () => {
+    for (const c of offers) expect(c.penaltyAmount).toBe(0);
+  });
+
+  it('a stock below the market minimum yields no rubble offer at all', () => {
+    expect(rubbleOffersOver('production', 42, 60, profile.rubbleQtyKg.min - 1)).toEqual([]);
+  });
+
+  it('zero stock never yields a rubble offer, and the board still fills with other kinds', () => {
+    const state = createContractState();
+    state.market = 'production';
+    const rng = new Random(7);
+    for (let i = 0; i < 40; i++) generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, 0);
+    expect(state.available.length).toBeGreaterThan(0);
+    expect(state.available.filter(c => c.type === 'rubble_disposal')).toEqual([]);
+  });
+
+  it('zero stock with no ores still generates a full refresh without throwing', () => {
+    const state = createContractState();
+    state.market = 'production';
+    expect(() => generateContracts(state, new Random(3), 0, 1, [], 0)).not.toThrow();
+    expect(state.available.length).toBeGreaterThan(0);
+    expect(state.available.every(c => c.type !== 'rubble_disposal')).toBe(true);
+  });
+
+  it('the legacy market sizes against stock too', () => {
+    const legacy = rubbleOffersOver('legacy', 42, 60, 200);
+    expect(legacy.length).toBeGreaterThan(0);
+    for (const c of legacy) {
+      expect(c.quantityKg).toBeLessThanOrEqual(c.playerPays ? 200 * RUBBLE_PAID_STOCK_SHARE_MAX : 200 * RUBBLE_CHEAP_STOCK_SHARE_MAX);
+      expect(c.penaltyAmount).toBe(0);
+    }
+  });
+
+  it('an event special contract is sized to the stock as well', () => {
+    for (let seed = 1; seed <= 80; seed++) {
+      const state = createContractState();
+      state.market = 'production';
+      const c = offerSpecialContract(state, new Random(seed), 1, ALL_ORES, 0);
+      expect(c.type === 'rubble_disposal').toBe(false);
+    }
+  });
+});
+
+describe('isPaidClearance (#1892)', () => {
+  it('is true only when playerPays is true', () => {
+    expect(isPaidClearance({ playerPays: true })).toBe(true);
+    expect(isPaidClearance({ playerPays: false })).toBe(false);
+    expect(isPaidClearance({})).toBe(false);
+  });
+});
+
+describe('a rubble contract never fines for lack of rubble (#1892)', () => {
+  function expiredRubble(overrides: Partial<Contract>) {
+    const state = createContractState();
+    state.active.push(offer({
+      id: 1, type: 'rubble_disposal', materialId: '', acceptedAtTick: 0, deadlineTicks: 10,
+      penaltyAmount: 300, quantityKg: 100, ...overrides,
+    }));
+    return state;
+  }
+
+  it('closes with penaltyCharged 0 even with nothing delivered', () => {
+    const state = expiredRubble({});
+    const out = checkDeadlines(state, 11);
+    expect(out).toEqual([{ contractId: 1, penalty: 0, deliveredKg: 0, paid: 0 }]);
+    expect(state.completedHistory[0]!.penaltyCharged).toBe(0);
+    expect(state.completedHistory[0]!.expired).toBe(true);
+  });
+
+  it('closes with no penalty on a part delivery', () => {
+    const state = expiredRubble({ deliveredKg: 40, paidTotal: 400 });
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(0);
+  });
+
+  it('a paid clearance closes without penalty too', () => {
+    const state = expiredRubble({ playerPays: true });
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(0);
+  });
+
+  it('other contract types still fine at expiry', () => {
+    const state = createContractState();
+    state.active.push(offer({ id: 2, type: 'supply', acceptedAtTick: 0, deadlineTicks: 10, penaltyAmount: 300 }));
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(300);
+  });
+});
+
+describe('contractAcceptBlocker — paid clearance fee (#1892)', () => {
+  const paidOffer = () => offer({ type: 'rubble_disposal', materialId: '', playerPays: true, quantityKg: 1000, pricePerKg: 0.04 });
+
+  it('blocks a paid clearance when cash is below the full fee', () => {
+    expect(contractAcceptBlocker(paidOffer(), true, 39.99)).toBe('insufficient_funds_for_fee');
+    expect(contractAcceptBlocker(paidOffer(), true, 0)).toBe('insufficient_funds_for_fee');
+  });
+
+  it('allows a paid clearance when cash equals the fee (boundary) or exceeds it', () => {
+    expect(contractAcceptBlocker(paidOffer(), true, 40)).toBeNull();
+    expect(contractAcceptBlocker(paidOffer(), true, 5_000)).toBeNull();
+  });
+
+  it('never blocks a cheap clearance for funds', () => {
+    const cheapOffer = offer({ type: 'rubble_disposal', materialId: '', quantityKg: 1000, pricePerKg: 0.02 });
+    expect(contractAcceptBlocker(cheapOffer, true, 0)).toBeNull();
+  });
+
+  it('without a cash argument a paid clearance is not blocked', () => {
+    expect(contractAcceptBlocker(paidOffer(), true)).toBeNull();
+  });
+
+  it('the ore_sale warehouse blocker is unchanged', () => {
+    expect(contractAcceptBlocker(offer({ type: 'ore_sale' }), false, 0)).toBe('needs_freight_warehouse');
   });
 });

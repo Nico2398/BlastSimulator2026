@@ -640,3 +640,15 @@ describe('inspector fragment/hole/ramp keys (#1769)', () => {
     expect(fr[key], `fr ${key}`).toBeTruthy();
   });
 });
+
+describe('rubble clearance and full spoil heap keys (#1892)', () => {
+  const keys = [
+    'ui.contracts.stock_spoil_heaps', 'ui.contracts.rubble_pays', 'ui.contracts.rubble_costs',
+    'ui.contracts.rubble_removes', 'notification.order_blocked_spoil_heap_full',
+  ];
+  it.each(keys)('%s exists in en and fr with non-empty, different text', key => {
+    expect(en[key], `en ${key}`).toBeTruthy();
+    expect(fr[key], `fr ${key}`).toBeTruthy();
+    expect(fr[key], `fr differs ${key}`).not.toBe(en[key]);
+  });
+});
