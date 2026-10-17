@@ -25,6 +25,10 @@ import { Random } from '../../../src/core/math/Random.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { RampArrowLayer } from '../../../src/renderer/RampArrow.js';
 import type { PlannedRamp } from '../../../src/core/state/GameState.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
+import { makeMockSceneManager, makeCtx } from '../../helpers/rendererFixtures.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -373,5 +377,131 @@ describe('syncGameRendererEntities() — ramp arrows (#1211)', () => {
     expect(arrows.count).toBe(1);
     expect(arrows.getArrow(1)).toBeNull();
     expect(arrows.getArrow(2)).not.toBeNull();
+  });
+});
+
+function frag(id: number, x: number, y: number, z: number): FragmentData {
+  return {
+    id,
+    position: { x, y, z },
+    volume: 0.1, mass: 200, rockId: 'sandite', oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+    halfExtents: { x: 0.2, y: 0.2, z: 0.2 }, shapeSeed: id, origin: { x, y, z },
+  };
+}
+
+/** Fragment instances currently drawn by the renderer's FragmentMesh. */
+function drawnFragments(renderer: GameRenderer): number {
+  return (renderer as any).fragments.count as number;
+}
+
+// ── Replacing the state of a live scene (#1868) ──
+//
+// The Saves modal's load handler swaps ctx.state and calls syncFromContext():
+// same seed, same biome, so no level reload runs. The previous game's fragment
+// meshes used to stay drawn and the loaded state's were never spawned.
+
+describe('GameRenderer.syncFromContext — state replacement redraws fragments (#1868)', () => {
+  function stateWith(frags: FragmentData[], seed = 42): GameState {
+    const state = createGame({ seed, startingCash: 100_000 });
+    addBlastFragments(state.logistics, frags);
+    return state;
+  }
+
+  it('replacing a state that has fragments with one that has none leaves nothing drawn', () => {
+    const ctx = makeCtx();
+    ctx.state = stateWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    expect(drawnFragments(renderer)).toBe(2);
+
+    ctx.state = stateWith([]);
+    renderer.syncFromContext(ctx);
+
+    expect(drawnFragments(renderer)).toBe(0);
+    expect(renderer.entityWorldPosition('fragment', 1)).toBeNull();
+  });
+
+  it('replacing a state that has none with one that has fragments draws the new ones', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    expect(drawnFragments(renderer)).toBe(0);
+
+    ctx.state = stateWith([frag(7, 10, 5, 10), frag(8, 12, 5, 10), frag(9, 14, 5, 10)]);
+    renderer.syncFromContext(ctx);
+
+    expect(drawnFragments(renderer)).toBe(3);
+    const p = renderer.entityWorldPosition('fragment', 8)!;
+    expect(p.x).toBeCloseTo(12, 4);
+    expect(p.z).toBeCloseTo(10, 4);
+  });
+
+  it('swapping piles drops the old fragments and draws only the new state\'s', () => {
+    const ctx = makeCtx();
+    ctx.state = stateWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+
+    ctx.state = stateWith([frag(50, 20, 5, 20)]);
+    renderer.syncFromContext(ctx);
+
+    expect(drawnFragments(renderer)).toBe(1);
+    expect(renderer.entityWorldPosition('fragment', 1)).toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 50)).not.toBeNull();
+  });
+
+  it('only draws on-ground fragments of the replacing state', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+
+    const next = stateWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)]);
+    next.logistics.fragments[1]!.state = 'stored';
+    ctx.state = next;
+    renderer.syncFromContext(ctx);
+
+    expect(drawnFragments(renderer)).toBe(1);
+    expect(renderer.entityWorldPosition('fragment', 2)).toBeNull();
+  });
+
+  it('repeated syncs of the same state object neither clear nor respawn a blast-spawned pile', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    // Fragments spawned by a blast live in the mesh; the state's logistics
+    // list is not what drew them here.
+    ctx.lastBlastFragmentData = [frag(100, 10, 5, 10), frag(101, 12, 5, 10)];
+    renderer.onBlast(ctx);
+    expect(drawnFragments(renderer)).toBe(2);
+    const spawnSpy = vi.spyOn((renderer as any).fragments, 'spawnFragments');
+
+    renderer.syncFromContext(ctx);
+    renderer.syncFromContext(ctx);
+
+    expect(drawnFragments(renderer)).toBe(2);
+    expect(renderer.entityWorldPosition('fragment', 100)).not.toBeNull();
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('resets an in-flight blast animation when the state is replaced', () => {
+    const ctx = makeCtx();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    renderer.syncFromContext(ctx);
+    ctx.lastBlastFlights = [{
+      fragmentId: 100, from: { x: 10, y: 20, z: 10 }, to: { x: 10, y: 5, z: 10 },
+      delayS: 0, durationS: 5, impactSpeed: 10, thrown: false,
+    }];
+    ctx.lastBlastFragmentData = [frag(100, 10, 5, 10)];
+    renderer.onBlast(ctx);
+    expect(renderer.fragmentPlaybackDuration).toBeGreaterThan(0);
+
+    ctx.state = stateWith([frag(1, 20, 5, 20)]);
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.fragmentPlaybackDuration).toBe(0);
+    expect(renderer.blastPlayback.isPlaying).toBe(false);
+    expect(renderer.entityWorldPosition('fragment', 100)).toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 1)).not.toBeNull();
   });
 });

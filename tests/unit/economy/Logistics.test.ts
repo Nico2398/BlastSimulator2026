@@ -15,6 +15,7 @@ import {
   storageRoomKg,
   inTransitMassKg,
   onGroundMassKg,
+  onGroundFragmentData,
   releaseBarrenStoredFragments,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
@@ -1530,5 +1531,34 @@ describe('extractOreFromFragment on densities summing above 1 (#1786)', () => {
     expect(out!.oreKg).toBeCloseTo(dirtiteKg, 6);
     expect(storedOreKg(state, 'rustite')).toBeCloseTo(rustiteKg, 6);
     expect(storedOreKg(state, 'dirtite')).toBeCloseTo(0, 6);
+  });
+});
+
+describe('onGroundFragmentData (#1868)', () => {
+  it('is empty for an empty state', () => {
+    expect(onGroundFragmentData(createLogisticsState())).toEqual([]);
+  });
+
+  it('returns the fragment data of every on_ground fragment, in tracking order', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 250), makeFragment(3, 400)]);
+    expect(onGroundFragmentData(state).map(f => f.id)).toEqual([1, 2, 3]);
+    expect(onGroundFragmentData(state)[1]).toBe(state.fragments[1]!.fragment);
+  });
+
+  it('skips in_transit and stored fragments', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 250), makeFragment(3, 400), makeFragment(4, 50)]);
+    state.fragments[1]!.state = 'in_transit';
+    state.fragments[2]!.state = 'stored';
+    expect(onGroundFragmentData(state).map(f => f.id)).toEqual([1, 4]);
+  });
+
+  it('is empty when nothing lies on the ground', () => {
+    const state = createLogisticsState();
+    addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 250)]);
+    state.fragments[0]!.state = 'stored';
+    state.fragments[1]!.state = 'in_transit';
+    expect(onGroundFragmentData(state)).toEqual([]);
   });
 });
