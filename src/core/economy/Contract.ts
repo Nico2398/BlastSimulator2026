@@ -349,7 +349,7 @@ export function hasWinningOreSaleOffer(
 /**
  * True when `offer` is a sale the site can fill in full today: an `ore_sale`
  * asking no more of its ore than `collectedOre` holds, or a `rubble_disposal`
- * asking no more than the raw `storedMassKg` (rubble has no material of its
+ * asking no more than the barren `rubbleStockKg` (rubble has no material of its
  * own). `supply` is never a one-click sale (#1338): it is a bulk deal completed by delivery
  * over time. On the production market it is sized so the kit can deliver it in full by its
  * deadline (#1789), so it is fillable that way, just not by this predicate.
@@ -357,10 +357,10 @@ export function hasWinningOreSaleOffer(
 export function isFillableSaleOffer(
   offer: Contract,
   collectedOre: Readonly<Record<string, number>>,
-  storedMassKg: number,
+  rubbleStockKg: number,
 ): boolean {
   if (offer.type === 'ore_sale') return (collectedOre[offer.materialId] ?? 0) >= offer.quantityKg;
-  if (offer.type === 'rubble_disposal') return storedMassKg >= offer.quantityKg;
+  if (offer.type === 'rubble_disposal') return rubbleStockKg >= offer.quantityKg;
   return false;
 }
 
@@ -373,9 +373,9 @@ export function isFillableSaleOffer(
 export function hasFillableSaleOffer(
   available: readonly Contract[],
   collectedOre: Readonly<Record<string, number>>,
-  storedMassKg: number,
+  rubbleStockKg: number,
 ): boolean {
-  return available.some(c => isFillableSaleOffer(c, collectedOre, storedMassKg));
+  return available.some(c => isFillableSaleOffer(c, collectedOre, rubbleStockKg));
 }
 
 /**
@@ -393,7 +393,7 @@ export function hasFillableSaleOffer(
  * different pool instance, which is what turning on agent occupancy did to
  * the tutorial's own crew-dispatch timing. No ore-quantity check is
  * needed here (unlike the ore_sale sibling): `rubble_disposal` contracts
- * carry `materialId: ''` and are fulfilled from raw `storedMassKg`, so mere
+ * carry `materialId: ''` and are fulfilled from the barren `rubbleStockKg`, so mere
  * presence in the pool is the whole condition to wait on.
  */
 export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean {
@@ -421,7 +421,7 @@ export function findContract(
   pool: readonly Contract[],
   selector: ContractSelector,
   collectedOre: Readonly<Record<string, number>> = {},
-  storedMassKg = 0,
+  rubbleStockKg = 0,
 ): Contract | null {
   if (selector.id === undefined && selector.type === undefined && selector.materialId === undefined && !selector.fillable) {
     return null;
@@ -430,7 +430,7 @@ export function findContract(
     (selector.id === undefined || c.id === selector.id)
     && (selector.type === undefined || c.type === selector.type)
     && (selector.materialId === undefined || c.materialId === selector.materialId)
-    && (!selector.fillable || isFillableSaleOffer(c, collectedOre, storedMassKg)),
+    && (!selector.fillable || isFillableSaleOffer(c, collectedOre, rubbleStockKg)),
   ) ?? null;
 }
 
@@ -469,22 +469,22 @@ export function setContractHeld(state: ContractState, contractId: number, held: 
   return true;
 }
 
-/** Stored kilograms that can fill the contract: raw stored mass for rubble, the ore ledger entry otherwise. */
+/** Stored kilograms that can fill the contract: barren rock (heaps plus barren stored fragments) for rubble, the ore ledger entry otherwise. */
 export function storedStockKg(
   c: Pick<Contract, 'type' | 'materialId'>,
   collectedOre: Readonly<Record<string, number>>,
-  storedMassKg: number,
+  rubbleStockKg: number,
 ): number {
-  return c.type === 'rubble_disposal' ? storedMassKg : (collectedOre[c.materialId] ?? 0);
+  return c.type === 'rubble_disposal' ? rubbleStockKg : (collectedOre[c.materialId] ?? 0);
 }
 
 /** True when stored stock of the contract's material cannot cover what it still needs (held contracts included). */
 export function contractShortOfStock(
   c: Contract,
   collectedOre: Readonly<Record<string, number>>,
-  storedMassKg: number,
+  rubbleStockKg: number,
 ): boolean {
-  return storedStockKg(c, collectedOre, storedMassKg) < remainingKg(c);
+  return storedStockKg(c, collectedOre, rubbleStockKg) < remainingKg(c);
 }
 
 /**

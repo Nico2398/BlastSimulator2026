@@ -147,4 +147,66 @@ describe('contract fillable:true (#1338)', () => {
     expect(ctx.state!.collectedOre['dirtite']).toBeCloseTo(dirtiteKg - offer.quantityKg, 6);
     expect(ctx.state!.collectedOre['rustite']).toBeCloseTo(rustiteKg, 6);
   });
+
+  describe('rubble_disposal offers count barren stock only (#1871)', () => {
+    function addRubbleOffer(quantityKg: number): Contract {
+      const c = addOffer(ctx, '', quantityKg);
+      c.type = 'rubble_disposal';
+      return c;
+    }
+
+    function storeBarren(kg: number): void {
+      const fragment: FragmentData = {
+        id: 9500 + Math.floor(kg),
+        position: { x: 0, y: 0, z: 0 },
+        volume: kg / 2500,
+        mass: kg,
+        rockId: 'sandite',
+        oreDensities: {},
+        initialVelocity: { x: 0, y: 0, z: 0 },
+        isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+        shapeSeed: 1,
+        origin: { x: 0, y: 0, z: 0 },
+      };
+      ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: ensureFreightWarehouse(ctx) });
+      ctx.state!.logistics.storedMassKg += kg;
+    }
+
+    it('accepts a rubble offer covered by barren stored rock', () => {
+      const c = addRubbleOffer(100);
+      storeBarren(150);
+      expect(contractCommand(ctx, ['accept'], { type: 'rubble_disposal', fillable: 'true' }).success).toBe(true);
+      expect(ctx.state!.contracts.active.map(a => a.id)).toEqual([c.id]);
+    });
+
+    it('does not count ore-bearing stored mass toward a rubble offer', () => {
+      addRubbleOffer(100);
+      store(ctx, 'blingite', 5000);
+      const r = contractCommand(ctx, ['accept'], { type: 'rubble_disposal', fillable: 'true' });
+      expect(r.success).toBe(false);
+      expect(r.output.toLowerCase()).toContain('fillable');
+      expect(ctx.state!.contracts.active).toHaveLength(0);
+    });
+
+    it('counts only the barren part of a mixed stock', () => {
+      const big = addRubbleOffer(1000);
+      const small = addRubbleOffer(100);
+      store(ctx, 'blingite', 5000);
+      storeBarren(150);
+      expect(contractCommand(ctx, ['accept'], { type: 'rubble_disposal', fillable: 'true' }).success).toBe(true);
+      expect(ctx.state!.contracts.active.map(a => a.id)).toEqual([small.id]);
+      expect(ctx.state!.contracts.available.some(a => a.id === big.id)).toBe(true);
+    });
+
+    it('deliver refuses an amount only ore-bearing stock could cover, leaving the ore ledger alone', () => {
+      const c = addRubbleOffer(100);
+      expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+      store(ctx, 'blingite', 5000);
+      const r = contractCommand(ctx, ['deliver', String(c.id)], { amount: '100' });
+      expect(r.success).toBe(false);
+      expect(ctx.state!.collectedOre['blingite']).toBe(5000);
+      expect(ctx.state!.logistics.storedMassKg).toBe(5000);
+    });
+  });
 });

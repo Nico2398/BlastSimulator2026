@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../../../src/core/config/balance.js';
 import {
-  creditFirstSpoilHeap, creditSpoilKg, drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
+  creditFirstSpoilHeap, creditSpoilKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
 import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
@@ -137,17 +137,66 @@ describe('spoilHeapSites', () => {
 type Stock = { type: 'spoil_heap' | 'freight_warehouse'; storedSpoilKg?: number };
 const heap = (kg?: number): Stock => (kg === undefined ? { type: 'spoil_heap' } : { type: 'spoil_heap', storedSpoilKg: kg });
 
+const frag = (mass: number, oreDensities: Record<string, number> = {}, state = 'stored') => ({ state, fragment: { mass, oreDensities } });
+
+describe('barrenStoredMassKg (#1871)', () => {
+  it('is 0 for no fragments', () => {
+    expect(barrenStoredMassKg([])).toBe(0);
+  });
+
+  it('sums the mass of stored barren fragments', () => {
+    expect(barrenStoredMassKg([frag(100), frag(250, { blingite: 0.01 })])).toBe(350);
+  });
+
+  it('excludes ore-bearing stored fragments', () => {
+    expect(barrenStoredMassKg([frag(100), frag(500, { blingite: 0.5 })])).toBe(100);
+  });
+
+  it('is 0 when every stored fragment bears ore', () => {
+    expect(barrenStoredMassKg([frag(500, { blingite: 0.5 }), frag(300, { cruite: 0.2 })])).toBe(0);
+  });
+
+  it('excludes barren fragments that are not in state stored', () => {
+    expect(barrenStoredMassKg([
+      frag(100, {}, 'on_ground'), frag(200, {}, 'in_transit'), frag(300, {}, 'sold'), frag(40),
+    ])).toBe(40);
+  });
+
+  it('counts a fragment exactly at the threshold as barren', () => {
+    expect(barrenStoredMassKg([frag(70, { blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD })])).toBe(70);
+  });
+
+  it('does not count a fragment just above the threshold', () => {
+    expect(barrenStoredMassKg([frag(70, { blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD + 0.001 })])).toBe(0);
+  });
+});
+
 describe('rubbleStockKg / stateRubbleStockKg', () => {
-  it('adds freight-stored mass to every heap', () => {
-    expect(rubbleStockKg(100, [heap(30), heap(20)])).toBe(150);
+  it('adds stored barren mass to every heap', () => {
+    expect(rubbleStockKg([frag(100)], [heap(30), heap(20)])).toBe(150);
   });
 
-  it('is just the freight mass with no heaps', () => {
-    expect(rubbleStockKg(100, [])).toBe(100);
+  it('is just the barren stored mass with no heaps', () => {
+    expect(rubbleStockKg([frag(100)], [])).toBe(100);
   });
 
-  it('reads the same total from a state slice', () => {
-    const slice = { logistics: { storedMassKg: 100 }, buildings: { buildings: [heap(30), heap(20)] } };
+  it('is just the heaps with no fragments', () => {
+    expect(rubbleStockKg([], [heap(30), heap(20)])).toBe(50);
+  });
+
+  it('excludes ore-bearing stored mass (#1871)', () => {
+    expect(rubbleStockKg([frag(100), frag(900, { blingite: 0.6 })], [heap(30)])).toBe(130);
+  });
+
+  it('is 0 when only ore-bearing mass is stored and no heap holds spoil', () => {
+    expect(rubbleStockKg([frag(900, { blingite: 0.6 })], [heap(0)])).toBe(0);
+  });
+
+  it('reads the same total from a state slice, ore excluded', () => {
+    const slice = {
+      logistics: { fragments: [frag(100), frag(900, { blingite: 0.6 })] },
+      buildings: { buildings: [heap(30), heap(20)] },
+    };
     expect(stateRubbleStockKg(slice)).toBe(150);
   });
 });

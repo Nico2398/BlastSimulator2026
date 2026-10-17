@@ -28,6 +28,8 @@ A blast resolves in four steps, all inside `src/core/mining/`. Every tuning cons
 (`src/renderer/FragmentAnimator.ts`), so a headless run — console, scenario runner — reaches exactly
 the same state with no animation. Never move an outcome into the renderer.
 
+The blast plan overlay (ordered-hole ghosts, drilled/charged tubes) is redrawn from the state on every state replacement (save load) and level load, not only after planning commands; an empty state resets it so no old hole stays drawn or clickable (#1877).
+
 ## Voxel Data Model
 
 **Voxel size:** 1 m × 1 m × 1 m cells (SI units throughout).

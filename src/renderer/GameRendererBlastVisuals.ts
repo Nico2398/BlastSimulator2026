@@ -155,7 +155,7 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
   if (!deps.blastOverlay || !ctx.state) return;
   const { drillHoles, plannedDrillHoles, chargesByHole, plannedChargesByHole, softwareTier } = ctx.state;
   const allHoles = [...drillHoles, ...plannedDrillHoles];
-  if (allHoles.length === 0) { deps.blastOverlay.hide(); return; }
+  if (allHoles.length === 0) { deps.blastOverlay.reset(); return; }
 
   const cx = allHoles.reduce((s, h) => s + h.x, 0) / allHoles.length;
   const cz = allHoles.reduce((s, h) => s + h.z, 0) / allHoles.length;

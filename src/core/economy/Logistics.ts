@@ -7,7 +7,7 @@ import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
-import { creditFirstSpoilHeap, drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg } from './SpoilHeaps.js';
+import { creditFirstSpoilHeap, drawSpoilKg, haulDestinationOf, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
@@ -306,12 +306,13 @@ export function extractOreFromFragment(
  * that ore from each fragment it touches (via extractOreFromFragment); other
  * ores in the same fragments stay stored and in collectedOre. Only
  * collectedOre[materialId] is decremented, by the exact kg extracted.
- * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
- * ore content — any fragment, ore-bearing or not — and debits every ore the
- * removed mass carried. Rubble draws on the spoil heaps first (#1530), then
- * storage; `buildings` is where the heaps are. After an ore sale (and before it,
- * for legacy leftovers) barren stored rock is released to the first heap
- * (releaseBarrenStoredFragments, #1690); with no heap it stays stored.
+ * materialId === '' (rubble_disposal) consumes barren rock only: the spoil
+ * heaps first (#1530), then barren stored fragments oldest-first. Ore-bearing
+ * fragments and their collectedOre are never touched (#1871); a barren
+ * fragment's trace ore still debits the ledger. `buildings` is where the
+ * heaps are. After an ore sale (and before it, for legacy leftovers) barren
+ * stored rock is released to the first heap (releaseBarrenStoredFragments,
+ * #1690); with no heap it stays stored.
  */
 export function consumeStoredOre(
   state: LogisticsState,
@@ -368,30 +369,24 @@ export function consumeStoredOre(
     return { success: true, consumedKg: Math.min(tally, amountKg) };
   }
 
-  // Rubble / no-ore materials: consume raw stored mass, any fragment. Barren
-  // fragments (ore below the spoil-heap threshold) go first, oldest-first within each
-  // group, only reaching into ore-bearing fragments once barren stock runs
-  // out — a rubble contract pays cents per kg where an ore_sale pays
-  // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
-  // genuinely worthless waste would squander it for no reason (#959).
-  const available = rubbleStockKg(state.storedMassKg, buildings);
+  // Rubble: barren rock only (ore below the spoil-heap threshold) — heaps, then
+  // barren stored fragments oldest-first. Ore-bearing rock is never scrapped as
+  // cheap rubble (#1871).
+  const available = rubbleStockKg(state.fragments, buildings);
   if (amountKg > available) {
     return {
       success: false,
       consumedKg: 0,
-      error: `Not enough stored material: ${available.toFixed(1)} kg available, ${amountKg.toFixed(1)} kg requested.`,
+      error: t('logistics.insufficient_rubble', { available: available.toFixed(1), requested: amountKg.toFixed(1) }),
     };
   }
 
   const fromHeaps = drawSpoilKg(buildings, amountKg);
   const storageKg = amountKg - fromHeaps;
 
-  const stored = state.fragments.filter(f => f.state === 'stored');
-  const isBarren = (f: TrackedFragment) => isBarrenFragment(f.fragment.oreDensities);
-  const storedIds = [
-    ...stored.filter(isBarren).map(f => f.fragment.id),
-    ...stored.filter(f => !isBarren(f)).map(f => f.fragment.id),
-  ];
+  const storedIds = state.fragments
+    .filter(isStoredBarren)
+    .map(f => f.fragment.id);
 
   let removedMass = 0;
   for (const id of storedIds) {
@@ -402,12 +397,8 @@ export function consumeStoredOre(
     const remaining = storageKg - removedMass;
     const contribution = tracked.fragment.mass;
 
-    // A rubble_disposal sale draws on every stored fragment regardless of ore
-    // content, so it can consume an ore-bearing fragment same as any other.
-    // Without decrementing collectedOre, the ledger stays stale — still
-    // showing ore that is physically gone — so a LATER ore_sale contract can
-    // be accepted against stock that no longer exists in storage, silently
-    // under-deliver, and expire for a penalty instead of completing (#959).
+    // Trace ore in a barren fragment must leave the collectedOre ledger too,
+    // else a LATER ore_sale could be accepted against stock that is gone (#959).
     if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
       const sold = sellFragment(state, id);
       if (!sold) continue;
@@ -542,7 +533,7 @@ export function onGroundMassKg(state: LogisticsState): number {
 }
 
 /**
- * Move every stored barren fragment (isBarrenFragment) out of state.fragments onto
+ * Move every stored barren fragment (isStoredBarren) out of state.fragments onto
  * the first spoil heap: debits storedMassKg and any residual ore (decrementCollectedOre),
  * credits the heap. Returns kg released. No heap in `buildings` => no-op, returns 0.
  */
@@ -552,7 +543,7 @@ export function releaseBarrenStoredFragments(
   buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
 ): number {
   if (!buildings.some(b => b.type === 'spoil_heap')) return 0;
-  const barren = state.fragments.filter(f => f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities));
+  const barren = state.fragments.filter(isStoredBarren);
   if (barren.length === 0) return 0;
 
   let releasedKg = 0;

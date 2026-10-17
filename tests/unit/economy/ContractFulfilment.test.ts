@@ -47,6 +47,13 @@ function stockWith(kg: number, material = 'blingite'): Stock {
   return { logistics, collectedOre };
 }
 
+/** Add a barren stored fragment (no ore) of `mass` kg to `stock`. */
+function addBarren(stock: Stock, id: number, mass: number): void {
+  const f: FragmentData = { ...oreFragment(id, 1), volume: mass / 2500, mass, oreDensities: {} };
+  stock.logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null, warehouseId: null });
+  stock.logistics.storedMassKg += mass;
+}
+
 function contract(overrides: Partial<Contract>): Contract {
   return {
     id: 1, type: 'ore_sale', materialId: 'blingite', description: 'fixture',
@@ -120,12 +127,26 @@ describe('deliverStoredOre', () => {
     expect(contracts.active[0]!.completed).toBe(false);
   });
 
-  it('rubble_disposal draws raw stored mass', () => {
+  it('rubble_disposal draws barren stored mass, never ore-bearing (#1871)', () => {
     const contracts = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2 }));
-    const { logistics, collectedOre } = stockWith(100); // 500 kg mass
+    const stock = stockWith(100); // 500 kg of ore-bearing mass
+    addBarren(stock, 2, 250);
+    const { logistics, collectedOre } = stock;
     const r = deliverStoredOre(contracts, logistics, collectedOre, 1, 200, 10, []);
     expect(r.success && r.data.kg).toBeCloseTo(200, 6);
     expect(r.success && r.data.payment).toBeCloseTo(400, 6);
+    expect(collectedOre['blingite']).toBe(100);
+    expect(logistics.fragments.find(f => f.fragment.id === 1)!.fragment.mass).toBe(500);
+  });
+
+  it('rubble_disposal on ore-only stock delivers nothing and leaves the ore ledger alone (#1871)', () => {
+    const contracts = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2 }));
+    const { logistics, collectedOre } = stockWith(100);
+    const r = deliverStoredOre(contracts, logistics, collectedOre, 1, 200, 10, []);
+    expect(r.success).toBe(false);
+    expect(contracts.active[0]!.deliveredKg).toBe(0);
+    expect(collectedOre['blingite']).toBe(100);
+    expect(logistics.storedMassKg).toBe(500);
   });
 
   it('fails for an unknown contract id and leaves storage alone', () => {
@@ -231,12 +252,50 @@ describe('autoDeliverContracts', () => {
     expect(out[0]!.completed).toBe(true);
   });
 
-  it('delivers rubble_disposal contracts from raw stored mass', () => {
+  it('delivers rubble_disposal contracts from barren stored mass and spoil heap only (#1871)', () => {
     const contracts = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2 }));
-    const { logistics, collectedOre } = stockWith(100);
-    const out = autoDeliverContracts(contracts, logistics, collectedOre, 5, []);
+    const stock = stockWith(100); // 500 kg ore-bearing, off limits
+    addBarren(stock, 2, 120);
+    const { logistics, collectedOre } = stock;
+    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 100 };
+    const out = autoDeliverContracts(contracts, logistics, collectedOre, 5, [heap]);
     expect(out).toHaveLength(1);
     expect(out[0]!.payment).toBeCloseTo(400, 6);
+    expect(heap.storedSpoilKg).toBe(0);
+    expect(logistics.fragments.find(f => f.fragment.id === 2)!.fragment.mass).toBe(20);
+    expect(collectedOre['blingite']).toBe(100);
+    expect(logistics.fragments.find(f => f.fragment.id === 1)!.fragment.mass).toBe(500);
+  });
+
+  it('delivers rubble_disposal partially up to the barren stock (#1871)', () => {
+    const contracts = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2 }));
+    const stock = stockWith(100);
+    addBarren(stock, 2, 60);
+    const out = autoDeliverContracts(contracts, stock.logistics, stock.collectedOre, 5, []);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.completed).toBe(false);
+    expect(contracts.active[0]!.deliveredKg).toBeCloseTo(60, 6);
+    expect(out[0]!.payment).toBeCloseTo(120, 6);
+    expect(stock.collectedOre['blingite']).toBe(100);
+  });
+
+  it('does not deliver rubble_disposal from ore-bearing stock alone (#1871)', () => {
+    const contracts = stateWith(contract({ type: 'rubble_disposal', materialId: '', quantityKg: 200, pricePerKg: 2 }));
+    const { logistics, collectedOre } = stockWith(100);
+    expect(autoDeliverContracts(contracts, logistics, collectedOre, 5, [])).toEqual([]);
+    expect(contracts.active[0]!.deliveredKg).toBe(0);
+    expect(collectedOre['blingite']).toBe(100);
+    expect(logistics.storedMassKg).toBe(500);
+  });
+
+  it('ore_sale still delivers while barren rock sits beside the ore (#1871)', () => {
+    const contracts = stateWith(contract({ quantityKg: 50 }));
+    const stock = stockWith(100);
+    addBarren(stock, 2, 300);
+    const out = autoDeliverContracts(contracts, stock.logistics, stock.collectedOre, 5, []);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.completed).toBe(true);
+    expect(stock.collectedOre['blingite']).toBeCloseTo(50, 6);
   });
 
   it('does nothing when storage is empty', () => {

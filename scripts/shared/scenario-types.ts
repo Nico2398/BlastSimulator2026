@@ -136,7 +136,7 @@ export type InteractionStepAction =
    */
   | { type: 'focusTile'; x: number; z: number; distance?: number; pitch?: number; yaw?: number }
   /** Click a live scene entity by kind + id rather than a baked coordinate. */
-  | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
+  | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole'; id: number; distance?: number }
   /**
    * Click a control **only if** it is on screen and usable; do nothing when it
    * is absent. Models a player who answers a dialog when one appears and
