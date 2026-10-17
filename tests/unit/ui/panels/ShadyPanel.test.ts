@@ -718,3 +718,95 @@ describe('ShadyPanel', () => {
     });
   });
 });
+
+describe('ShadyPanel frame service and union members (#1872)', () => {
+  afterEach(() => {
+    setLocale('en');
+    while (mounted.length > 0) mounted.pop()!.dispose();
+  });
+
+  function setup(unionized: boolean, cash = 1_000_000) {
+    const { container, panel } = mount();
+    const state = stateWithMafiaUnlocked();
+    state.cash = cash;
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+    employee.unionized = unionized;
+    panel.update(state);
+    panel.show();
+    const requests: ConfirmModalConfig[] = [];
+    panel.setConfirmHandler((config) => { requests.push(config); });
+    const calls: string[] = [];
+    panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+    const select = container.querySelector<HTMLSelectElement>('[data-action="mafia-frame-employee"]')!;
+    const startBtn = () => container.querySelector<HTMLButtonElement>('[data-action="mafia-frame-start"]')!;
+    const choose = () => {
+      select.value = String(employee.id);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    return { container, panel, employee, select, startBtn, choose, requests, calls };
+  }
+
+  it('selecting a union employee shows the refusal and disables the start button', () => {
+    const { container, startBtn, choose } = setup(true);
+    expect(container.textContent).not.toContain(t('ui.shady.frame_union_refused'));
+    choose();
+    expect(container.textContent).toContain(t('ui.shady.frame_union_refused'));
+    expect(startBtn().disabled).toBe(true);
+  });
+
+  it('clicking the disabled start button for a union employee runs no command and requests no confirm', () => {
+    const { startBtn, choose, requests, calls } = setup(true);
+    choose();
+    startBtn().click();
+    expect(requests).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('selecting a non-union employee shows no refusal and enables the start button with enough cash', () => {
+    const { container, startBtn, choose } = setup(false);
+    choose();
+    expect(container.textContent).not.toContain(t('ui.shady.frame_union_refused'));
+    expect(startBtn().disabled).toBe(false);
+  });
+
+  it('switching from a union employee back to the empty choice clears the refusal', () => {
+    const { container, select, choose } = setup(true);
+    choose();
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(container.textContent).not.toContain(t('ui.shady.frame_union_refused'));
+  });
+
+  it('the union employee option carries the union tag; a non-union one does not', () => {
+    const union = setup(true);
+    const unionOpt = Array.from(union.select.options).find(o => o.value === String(union.employee.id))!;
+    expect(unionOpt.textContent).toContain(t('ui.shady.union_tag'));
+    const plain = setup(false);
+    const plainOpt = Array.from(plain.select.options).find(o => o.value === String(plain.employee.id))!;
+    expect(plainOpt.textContent).not.toContain(t('ui.shady.union_tag'));
+  });
+
+  it('the accident select still offers a union employee, and accident works on them', () => {
+    const { container, employee, requests, calls } = setup(true);
+    const sel = container.querySelector<HTMLSelectElement>('#bs-shady-panel [data-action="mafia-accident-employee"]')!;
+    sel.value = String(employee.id);
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const go = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-accident"]')!;
+    expect(go.disabled).toBe(false);
+    go.click();
+    requests[0]!.onConfirm();
+    expect(calls).toEqual([`mafia accident employee:${employee.id}`]);
+  });
+
+  it('refusal and union tag texts exist in English and French and differ', () => {
+    for (const key of ['ui.shady.frame_union_refused', 'ui.shady.union_tag']) {
+      setLocale('en');
+      const en = t(key);
+      setLocale('fr');
+      const fr = t(key);
+      expect(en).not.toBe(key);
+      expect(fr).not.toBe(key);
+      expect(fr).not.toBe(en);
+    }
+  });
+});
