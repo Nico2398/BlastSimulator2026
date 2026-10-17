@@ -11,7 +11,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { GameState } from '../state/GameState.js';
 
 /** Site extent a footprint is validated against. */
-export interface UpgradeSiteBounds { width: number; depth: number; originX: number; originZ: number }
+interface UpgradeSiteBounds { width: number; depth: number; originX: number; originZ: number }
 
 /**
  * Can `building` grow to `tier` on its own origin? Used at order time and again at
