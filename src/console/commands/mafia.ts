@@ -7,6 +7,7 @@ import { Random, rollSeed } from '../../core/math/Random.js';
 import {
   arrangeAccident,
   startFraming,
+  frameRefusal,
   completeFrame,
   setSmugglingVolume,
   type MafiaActionResult,
@@ -87,11 +88,16 @@ export function mafiaCommand(
       );
       if (pending) {
         const rng = new Random(rollSeed(state.seed, state.tickCount, state.mafia.rollCount));
-        state.mafia.rollCount++;
         const result = completeFrame(state.mafia, state, empId, state.tickCount, rng);
+        // A refused or targetless completion draws no roll, so it consumes no salt.
+        if (result.rolled) state.mafia.rollCount++;
         raiseInvestigation(ctx, result);
         return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
       }
+
+      const target = state.employees.employees.find(e => e.id === empId && e.alive);
+      const refusal = target ? frameRefusal(target) : null;
+      if (target && refusal) return { success: false, output: t(refusal, { name: target.name }) };
 
       if (state.cash < FRAME_COST) {
         return {

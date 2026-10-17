@@ -1054,46 +1054,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
       "command": "state full",
       "interaction": [
         {
@@ -1102,11 +1062,11 @@
         }
       ],
       "role": "observe",
-      "description": "290 ticks (29 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish all 49 planned holes. Previously pinned at 48 -- an idle drill_rig could permanently park on H46 at (11,17), the exact tile a different pending drill_hole action needed, deadlocking it (#689). Fixed: an idle, unreserved vehicle occupying another action's target is now relocated out of the way (driving a vehicle was never licence-gated, only claiming its role-specific task was), so H46 drills like every other hole. #1189: restored real terrain relief (clamp removed) changed travel cost/path shape enough that a different hole near the grid's far corner now gets mid-drive-interrupted and pinned (`walkOnlyPinnedBy`) more than it used to, pushing completion from tick ~230 to tick ~283 -- 6 more `tick 10`/`event choose 0` pairs (60 ticks) were added ahead of this step so the one-shot `charge hole:*` a few steps later still always sees all 49 holes drilled, not 48 (see the drill_plan step's own description for why the box wasn't moved instead). #1773 (well-being stays a managed score; overwork drag): the drilling crew's wellBeing now reaches 0 at tick ~178 instead of ~187, and the zero streak (REVOLT_TICKS=120) ran out at tick 297, six ticks after the fresh filler wave was hired at 290 and before its morale could lift wellBeing off 0 -- worker_revolt ended the level before charging began. Drilling itself finishes at tick 180, so two of the surplus tick-10/event pairs before this step are dropped: the wave is hired at 270 with the streak at ~93, and wellBeing is off 0 again by tick 291.",
+      "description": "290 ticks (29 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish all 49 planned holes. Previously pinned at 48 -- an idle drill_rig could permanently park on H46 at (11,17), the exact tile a different pending drill_hole action needed, deadlocking it (#689). Fixed: an idle, unreserved vehicle occupying another action's target is now relocated out of the way (driving a vehicle was never licence-gated, only claiming its role-specific task was), so H46 drills like every other hole. #1189: restored real terrain relief (clamp removed) changed travel cost/path shape enough that a different hole near the grid's far corner now gets mid-drive-interrupted and pinned (`walkOnlyPinnedBy`) more than it used to, pushing completion from tick ~230 to tick ~283 -- 6 more `tick 10`/`event choose 0` pairs (60 ticks) were added ahead of this step so the one-shot `charge hole:*` a few steps later still always sees all 49 holes drilled, not 48 (see the drill_plan step's own description for why the box wasn't moved instead). #1773 (well-being stays a managed score; overwork drag): the drilling crew's wellBeing now reaches 0 at tick ~178 instead of ~187, and the zero streak (REVOLT_TICKS=120) ran out at tick 297, six ticks after the fresh filler wave was hired at 290 and before its morale could lift wellBeing off 0 -- worker_revolt ended the level before charging began. Drilling itself finishes at tick 180, so two of the surplus tick-10/event pairs before this step are dropped: the wave is hired at 270 with the streak at ~93, and wellBeing is off 0 again by tick 291. #1872: pad cut from 270 to 250 (two tick-10/event pairs dropped) after the dismissal morale dent delayed the blast and let worker_revolt win; all 49 holes are still drilled by 250.",
       "expect": {
         "equals": {
           "holeCount": 49,
-          "tickCount": 270
+          "tickCount": 250
         }
       }
     },
@@ -3154,7 +3114,7 @@
           "ecology": 0,
           "deathCount": 10
         },
-        "note": " #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false). #1649: charging is truck-worked (4 charging trucks, 4 dual-qualified blasters incl. the starting one), so the blast lands later and kills 8 (re-measured); the other temporary crew are away from the drill site. #1667: every hired blaster now arrives with the tier-1 truck licence, so later-wave temporary blasters can also take charging-truck work; one more of them is at the drill site at the blast, deathCount re-measured 8 -> 9 (a real consequence of the licence, not a bug: the charges still land and the level still ends in ecological_shutdown). Rally point: a fifth charging truck (see the added purchase above) puts two more truck-licensed blasters at the drill site at the blast; deathCount re-measured 9 -> 11. The level still ends in ecological_shutdown. #1770 (blaster takes charge orders ahead of debris hauling): charging finishes at tick 490 (was 497) and one fewer blaster stands at the drill site when the pattern fires; deathCount re-measured 11 -> 10. The level still ends in ecological_shutdown. #1773: the filler wave is hired 20 ticks earlier (see the state-full step), so the blast lands at tick 478 with two more truck-licensed blasters at the drill site; deathCount re-measured 10 -> 12. #1778: comfort-band morale recovery shifts crew positions slightly, so one fewer worker stands in the throw radius; deathCount re-measured 12 -> 11, still ecological_shutdown."
+        "note": "Current values: blast lands at tick 486 and kills 10 (unchanged from before #1872). #1872: the three ordinary `employee fire` dismissals each dent every surviving employee's morale by DISMISSAL_CREW_MORALE_DENT (6), which shifts rest and charging timing chaotically; with the old 270-tick drilling pad the blast slid to tick 616 (13 deaths) and worker_revolt (~694) beat ecological_shutdown (766). Two tick-10/event pairs were dropped from the drilling pad (270 -> 250; drilling itself still finishes all 49 holes) so the filler wave is hired earlier and the blast lands at 486.  #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false). #1649: charging is truck-worked (4 charging trucks, 4 dual-qualified blasters incl. the starting one), so the blast lands later and kills 8 (re-measured); the other temporary crew are away from the drill site. #1667: every hired blaster now arrives with the tier-1 truck licence, so later-wave temporary blasters can also take charging-truck work; one more of them is at the drill site at the blast, deathCount re-measured 8 -> 9 (a real consequence of the licence, not a bug: the charges still land and the level still ends in ecological_shutdown). Rally point: a fifth charging truck (see the added purchase above) puts two more truck-licensed blasters at the drill site at the blast; deathCount re-measured 9 -> 11. The level still ends in ecological_shutdown. #1770 (blaster takes charge orders ahead of debris hauling): charging finishes at tick 490 (was 497) and one fewer blaster stands at the drill site when the pattern fires; deathCount re-measured 11 -> 10. The level still ends in ecological_shutdown. #1773: the filler wave is hired 20 ticks earlier (see the state-full step), so the blast lands at tick 478 with two more truck-licensed blasters at the drill site; deathCount re-measured 10 -> 12. #1778: comfort-band morale recovery shifts crew positions slightly, so one fewer worker stands in the throw radius; deathCount re-measured 12 -> 11, still ecological_shutdown. #1872: the dismissal morale dent (and main's later changes) shift rest timing, so the blast lands later than the previous 478 and more crew stand at the drill site -- deathCount re-measured 10 -> 13."
       }
     },
     {
@@ -3177,6 +3137,166 @@
       ],
       "role": "setup",
       "description": "150 more ticks (15 x tick 10) after the blast -- ECOLOGICAL_SHUTDOWN_TICKS (EcologicalDisaster.ts). Ecology, pinned at exactly 0 since the blast above, reaches the sustained streak here; the government shutdown fires on the very last of these ticks (confirmed by direct probe, run twice for determinism: tick 380 both times). wellBeing recovers only partway (the surviving 15 filler's own morale has also been draining on pure idle-gauge decay since tick 0 -- REVOLT_TICKS=120 is close enough behind ECOLOGICAL_SHUTDOWN_TICKS=150 that this file's pacing is the whole point: worker_revolt's own ticksAtZero streak reaches only ~97 of the 120 it needs by the time shutdown locks the outcome in -- events.ts's tick loop sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`), so once shutdown claims it here, revolt's own later-arriving streak can never overwrite it."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -3530,13 +3650,13 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 656,
+          "tickCount": 636,
           "ecologicalShutdown": true,
           "levelEnded": true,
           "levelEndReason": "ecological_shutdown",
           "revolted": false
         },
-        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 562 (blast now lands at tick 412: #1189 pushed drilling's own end from tick 230 to tick 290 -- see the state-full and hiring step descriptions above -- and landing all 49 drilled charge_hole orders with the 31-strong temporary blaster crew above (#680 recalibration, up from #554's original 30) still takes ~122 ticks, unaffected by the drilling-phase shift). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 502 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~622, well after shutdown already claims levelEndReason at 562, confirmed by direct probe. Every one of these numbers is the pre-#1189 value plus the same flat 60-tick shift drilling absorbed; nothing else about the race changed. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself. #1339: roles arrive able to do their own job, so the charge queue's last hole lands 5 ticks later than before (the blast now fires at tick 417 and shutdown at 567); the step before waits on chargedCount instead of pinning a tick. #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false). #1586: shutdown now fires at tick 561, not 622 (#1648: 563 after the charging truck joined the opening fleet) -- action selection takes the lowest real-cost action, so the crews finish drilling and charging sooner and the blast lands earlier; the shutdown is still ECOLOGICAL_SHUTDOWN_TICKS after the blast and still beats the worker revolt (revolted:false). The pad grows by one tick-10/event pair because the pads before it ran out 5 ticks short of the new shutdown tick. #1649: truck-worked charging moves the blast later; ecological_shutdown now fires at tick 680 (re-measured), still ahead of worker_revolt. Rally point: hires and purchases spawn around the rally flag; with four trucks the last charge jammed in the pattern and worker_revolt won at tick 727. A fifth charging truck (added above) lands the blast at tick 497 and ecological_shutdown at 647 (re-measured); wellBeing reaches 0 near tick 610, so worker_revolt (120 ticks later) stays ~80 ticks behind. #1770: blaster charge orders now outrank debris hauling, so the blast lands at tick 490 and ecological_shutdown at 640 (re-measured, was 647); wellBeing reaches 0 near tick 611, so worker_revolt (120 ticks later, ~731) stays ~90 ticks behind. #1773: with the drilling pad shortened to 270 (see the state-full step) the blast lands at 478 and ecological_shutdown at 628 (re-measured); wellBeing reaches 0 near tick 562, so the revolt streak stands at 66 of 120 when the shutdown claims the level."
+        "note": "Current values: ecological_shutdown fires at tick 636 (blast at 486 + ECOLOGICAL_SHUTDOWN_TICKS 150), revolted:false. #1872: dismissal morale dent (DISMISSAL_CREW_MORALE_DENT=6 per ordinary fire) shifted timing; the drilling pad was shortened 270 -> 250 so the blast still lands early enough for shutdown to beat worker_revolt. Earlier history: Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 562 (blast now lands at tick 412: #1189 pushed drilling's own end from tick 230 to tick 290 -- see the state-full and hiring step descriptions above -- and landing all 49 drilled charge_hole orders with the 31-strong temporary blaster crew above (#680 recalibration, up from #554's original 30) still takes ~122 ticks, unaffected by the drilling-phase shift). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 502 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~622, well after shutdown already claims levelEndReason at 562, confirmed by direct probe. Every one of these numbers is the pre-#1189 value plus the same flat 60-tick shift drilling absorbed; nothing else about the race changed. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself. #1339: roles arrive able to do their own job, so the charge queue's last hole lands 5 ticks later than before (the blast now fires at tick 417 and shutdown at 567); the step before waits on chargedCount instead of pinning a tick. #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false). #1586: shutdown now fires at tick 561, not 622 (#1648: 563 after the charging truck joined the opening fleet) -- action selection takes the lowest real-cost action, so the crews finish drilling and charging sooner and the blast lands earlier; the shutdown is still ECOLOGICAL_SHUTDOWN_TICKS after the blast and still beats the worker revolt (revolted:false). The pad grows by one tick-10/event pair because the pads before it ran out 5 ticks short of the new shutdown tick. #1649: truck-worked charging moves the blast later; ecological_shutdown now fires at tick 680 (re-measured), still ahead of worker_revolt. Rally point: hires and purchases spawn around the rally flag; with four trucks the last charge jammed in the pattern and worker_revolt won at tick 727. A fifth charging truck (added above) lands the blast at tick 497 and ecological_shutdown at 647 (re-measured); wellBeing reaches 0 near tick 610, so worker_revolt (120 ticks later) stays ~80 ticks behind. #1770: blaster charge orders now outrank debris hauling, so the blast lands at tick 490 and ecological_shutdown at 640 (re-measured, was 647); wellBeing reaches 0 near tick 611, so worker_revolt (120 ticks later, ~731) stays ~90 ticks behind. #1773: with the drilling pad shortened to 270 (see the state-full step) the blast lands at 478 and ecological_shutdown at 628 (re-measured); wellBeing reaches 0 near tick 562, so the revolt streak stands at 66 of 120 when the shutdown claims the level. #1872: the three ordinary `employee fire` dismissals early in the file now each dent every surviving employee's morale by DISMISSAL_CREW_MORALE_DENT (6); morale feeds the fatigue-drain band (NEED_MORALE_DRAIN_MULTIPLIERS) and the wellBeing score, so rest timing shifts and the blast and shutdown land earlier -- shutdown re-measured 628 -> 614, still ecological_shutdown with revolted:false; every other assertion is unchanged. #1872 (final): shutdown re-measured at tick 694 (blast ~544); the pad gained eight tick-10/event pairs because the old pads ended before it. Still ecological_shutdown, revolted:false."
       }
     }
   ]

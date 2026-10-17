@@ -12,7 +12,11 @@ function ctxFor(seed: number): { ctx: GameContext; ids: number[] } {
   s.corruption.mafiaUnlocked = true;
   s.cash = 100_000_000;
   s.tickCount = 50;
-  const ids = [1, 2].map(i => hireEmployee(s.employees, 'driver', new Random(i), 5, 5).employee.id);
+  const ids = [1, 2].map(i => {
+    const e = hireEmployee(s.employees, 'driver', new Random(i), 5, 5).employee;
+    e.unionized = false; // framing refuses union members (#1872)
+    return e.id;
+  });
   return { ctx, ids };
 }
 

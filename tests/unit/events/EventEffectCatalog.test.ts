@@ -147,6 +147,18 @@ describe('applyEventEffects', () => {
     });
   });
 
+  describe('employee_leaves is not a dismissal (#1872)', () => {
+    it('applies no crew morale dent to the remaining employees', () => {
+      const { world, rng, state } = makeEffectWorld();
+      for (const e of state.employees.employees) e.morale = 70;
+      const before = state.employees.employees.length;
+      const out = applyEventEffects([{ type: 'employee_leaves', pick: 'random' }], world, 0, rng);
+      expect(out.resultKeySuffix).not.toBe('_alt');
+      expect(state.employees.employees).toHaveLength(before - 1);
+      for (const e of state.employees.employees) expect(e.morale).toBe(70);
+    });
+  });
+
   describe('_alt fallbacks', () => {
     it('employee_leaves with no employees falls back to _alt', () => {
       const { world, rng } = makeEffectWorld({ empty: true });
