@@ -387,9 +387,9 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
   it('hard: the opening kit holds a rock digger and an excavator-licensed driver at game start (#1874)', () => {
     const { ctx } = startSandbox(DESERT, 42, 'hard');
     const state = ctx.state!;
-    const digger = [...state.vehicles.values()].find(v => v.role === 'rock_digger');
+    const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');
     expect(digger, 'a rock digger in the kit').toBeDefined();
-    const driver = [...state.employees.values()].find(e => e.qualifications.some(q => q.category === 'driving.excavator'));
+    const driver = state.employees.employees.find(e => e.qualifications.some(q => q.category === 'driving.excavator'));
     expect(driver, 'an excavator-licensed employee').toBeDefined();
   });
 
