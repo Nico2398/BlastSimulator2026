@@ -9,7 +9,7 @@ import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { createRunner } from '../../../src/console/createRunner.js';
-import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 
 function makeCtx(): MiningContext {
   // Staffed (#556): confirming a placement only queues a construction site —
@@ -171,45 +171,81 @@ describe('build command — upgrade', () => {
     tickUntilConstructionDone(ctx);
   });
 
-  it('orders an upgrade of a T1 building to T2; the building keeps its id (#1392)', () => {
+  it('orders an upgrade with no Building Destroyer or driver; the building keeps its id (#1875)', () => {
     // #410: research-gated — unlock tier 2 for management_office before upgrading.
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
-    equipDemolition(ctx);
     const originalId = ctx.state!.buildings.buildings[0]!.id;
     const result = buildCommand(ctx, ['upgrade', String(originalId)], {});
-    expect(result.success).toBe(true);
-    // Still tier 1 until the Building Destroyer has done its work.
+    expect(result.success, result.output).toBe(true);
+    // Still tier 1 until the construction crew has done its work, and still standing.
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
-    tickUntilDemolished(ctx);
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
     expect(ctx.state!.buildings.buildings[0]!.id).toBe(originalId);
   });
 
-  it('deducts demolish + construction cost at order time', () => {
+  it('queues one place_building action and no demolish_building action (#1875)', () => {
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
-    equipDemolition(ctx);
+    const b = ctx.state!.buildings.buildings[0]!;
+    buildCommand(ctx, ['upgrade', String(b.id)], {});
+    const actions = ctx.state!.pendingActions;
+    expect(actions.filter(a => a.type === 'place_building')).toHaveLength(1);
+    expect(actions.filter(a => a.type === 'demolish_building')).toHaveLength(0);
+    const site = ctx.state!.plannedBuildings.find(pb => pb.buildingId === b.id)!;
+    expect(site.upgrade).toBe(true);
+    expect(site.tier).toBe(2);
+    expect(actions.find(a => a.id === site.actionId)?.type).toBe('place_building');
+  });
+
+  it('charges only the next tier construction cost at order time (#1875)', () => {
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
     const b = ctx.state!.buildings.buildings[0]!;
     const cashBefore = ctx.state!.cash;
-    const oldDef = getBuildingDef(b.type, b.tier);
     const newDef = getBuildingDef(b.type, 2);
     buildCommand(ctx, ['upgrade', String(b.id)], {});
-    expect(ctx.state!.cash).toBe(cashBefore - (oldDef.demolishCost + newDef.constructionCost));
+    expect(ctx.state!.cash).toBe(cashBefore - newDef.constructionCost);
+  });
+
+  it('refuses a second upgrade, a destroy and a move while the upgrade is ordered', () => {
+    ctx.state!.buildings.unlockedTiers['management_office'] = 3;
+    ctx.state!.cash += 1_000_000;
+    const id = ctx.state!.buildings.buildings[0]!.id;
+    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
+    const cash = ctx.state!.cash;
+    const key = { id };
+    for (const [args, named] of [[['upgrade', String(id)], {}], [['destroy', String(id)], {}], [['move', String(id)], { to: '20,20' }]] as const) {
+      const r = buildCommand(ctx, [...args], { ...named });
+      expect(r.success, args[0]).toBe(false);
+      expect(r.output, args[0]).toBe(t('entities.build_upgrade_already_ordered', key));
+    }
+    expect(ctx.state!.cash).toBe(cash);
+    expect(ctx.state!.plannedBuildings.filter(pb => pb.buildingId === id)).toHaveLength(1);
+  });
+
+  it('refuses for insufficient funds, mutating nothing', () => {
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+    const id = ctx.state!.buildings.buildings[0]!.id;
+    ctx.state!.cash = 1;
+    const pending = ctx.state!.pendingActions.length;
+    const r = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(r.success).toBe(false);
+    expect(ctx.state!.cash).toBe(1);
+    expect(ctx.state!.pendingActions).toHaveLength(pending);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
   });
 
   it('rejects upgrade of a T3 building', () => {
     // Research-gated: unlock tiers 2 and 3 so the setup upgrades (T1→T2→T3)
     // succeed, leaving only the max-tier rejection under test.
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
-    // Fund the two setup upgrades (funds-guarded, #511) so only the max-tier
-    // rejection is under test here, not affordability.
     ctx.state!.cash += 100000;
-    equipDemolition(ctx);
-    // upgrade to T2 then T3 — the id is stable across upgrades (#1392)
+    // upgrade to T2 then T3 — the id is stable across upgrades
     const id = ctx.state!.buildings.buildings[0]!.id;
     buildCommand(ctx, ['upgrade', String(id)], {});
-    tickUntilDemolished(ctx);
+    tickUntilConstructionDone(ctx);
     buildCommand(ctx, ['upgrade', String(id)], {});
-    tickUntilDemolished(ctx);
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);

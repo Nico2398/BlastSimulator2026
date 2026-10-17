@@ -6,9 +6,6 @@ import type { Building } from '../entities/Building.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { destroyBuilding, getBuildingDef, getDefSize } from '../entities/Building.js';
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
-import { getSurfaceY } from '../entities/BuildingPlacement.js';
-import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
-import { dispatchPlaceBuildingAction } from './PlaceBuildingAction.js';
 import type { DemolishBuildingActionPayload } from './DemolishPayload.js';
 import { dispatchPendingAction } from './TaskDispatch.js';
 import { releaseOccupantsOfRemovedBuildings } from './Mount.js';
@@ -22,7 +19,6 @@ export const DEMOLITION_VEHICLE_ROLE = 'building_destroyer' as const;
 
 interface DemolitionOptions {
   cost: number;
-  rebuildOrderId: number | null;
   approach: { x: number; z: number };
   targetY: number;
 }
@@ -30,8 +26,6 @@ interface DemolitionOptions {
 /** Result of a finished demolition. */
 interface DemolitionOutcome {
   buildingId: number;
-  /** Id of the queued rebuild action, when a rebuild order was attached. */
-  rebuildActionId: number | null;
 }
 
 /** Queue a demolish_building pending action for `building`; returns the action id. */
@@ -51,7 +45,6 @@ export function queueDemolition(state: GameState, building: Building, opts: Demo
       cost: opts.cost,
       durationTicks: computeDemolitionDurationTicks(def.footprint.length, building.tier, 1),
       footprint: def.footprint,
-      rebuildOrderId: opts.rebuildOrderId,
     } satisfies DemolishBuildingActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
@@ -63,26 +56,8 @@ export function isDemolitionOrdered(state: Pick<GameState, 'pendingActions'>, bu
   return state.pendingActions.some(a => a.type === 'demolish_building' && a.payload['buildingId'] === buildingId);
 }
 
-/** Dispatch the place_building action reserved by an upgrade order, keeping its pre-claimed action id. */
-function dispatchRebuild(state: GameState, grid: VoxelGrid | null, rebuildOrderId: number): number | null {
-  const order = state.plannedBuildings.find(pb => pb.id === rebuildOrderId);
-  if (!order) return null;
-  const def = getBuildingDef(order.type, order.tier);
-  const approach = findBuildingApproachCell(state.navGrid, { x: order.x, z: order.z }, def, order.x, order.z);
-  dispatchPlaceBuildingAction(state, {
-    actionId: order.actionId,
-    buildingOrderId: order.id,
-    tier: order.tier,
-    cost: order.cost,
-    footprint: def.footprint,
-    approach,
-    targetY: grid ? getSurfaceY(grid, approach.x, approach.z) : 0,
-  });
-  return order.actionId;
-}
-
 /**
- * Remove the building, release occupants, refresh logistics, emit occupancy, queue any rebuild.
+ * Remove the building, release occupants, refresh logistics, emit occupancy.
  * A building already gone is a no-op: the order cost is refunded and nothing throws.
  */
 export function completeDemolition(
@@ -95,17 +70,12 @@ export function completeDemolition(
   if (!building) {
     state.cash += payload.cost;
     addIncome(state.finances, payload.cost, 'refund', `Demolition cancelled: building #${payload.buildingId} is gone`, state.tickCount);
-    if (payload.rebuildOrderId !== null) {
-      const idx = state.plannedBuildings.findIndex(pb => pb.id === payload.rebuildOrderId);
-      if (idx !== -1) state.plannedBuildings.splice(idx, 1);
-    }
-    return { buildingId: payload.buildingId, rebuildActionId: null };
+    return { buildingId: payload.buildingId };
   }
   const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
   destroyBuilding(state.buildings, building.id);
   releaseOccupantsOfRemovedBuildings(state, emitter);
   for (const loss of refreshLogisticsCapacity(state)) emitter.emit('logistics:warehouse_stock_lost', loss);
   if (grid) emitFootprintRegionChanged(emitter, grid, building.x, building.z, sizeX, sizeZ);
-  const rebuildActionId = payload.rebuildOrderId !== null ? dispatchRebuild(state, grid, payload.rebuildOrderId) : null;
-  return { buildingId: building.id, rebuildActionId };
+  return { buildingId: building.id };
 }

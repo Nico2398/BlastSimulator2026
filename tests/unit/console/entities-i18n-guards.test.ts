@@ -279,7 +279,7 @@ describe('entities.ts — build upgrade failure (re-placement rejected by an ove
   });
 });
 
-// ── build_upgrade_success ────────────────────────────────────────────────
+// ── build_upgrade_ordered ────────────────────────────────────────────────
 
 describe('entities.ts — build upgrade ordered message (#1392)', () => {
   function setupUpgradableBuilding(ctx: GameContext): number {
@@ -291,9 +291,8 @@ describe('entities.ts — build upgrade ordered message (#1392)', () => {
     return placeAt(ctx, 'management_office', 1, 2, 0);
   }
 
-  const OLD_DEF = getBuildingDef('management_office', 1);
   const NEW_DEF = getBuildingDef('management_office', 2);
-  const TOTAL_COST = OLD_DEF.demolishCost + NEW_DEF.constructionCost;
+  const TOTAL_COST = NEW_DEF.constructionCost;
 
   it('matches the exact English literal, naming the building id; cash is charged at order time', () => {
     const ctx = makeCtx();
@@ -301,7 +300,7 @@ describe('entities.ts — build upgrade ordered message (#1392)', () => {
     const cashBefore = ctx.state!.cash;
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).toBe(`Upgrade of building #${id} ordered. Demolition first, then rebuild.`);
+    expect(result.output).toBe(`Upgrade of building #${id} to T2 ordered. A builder will raise it in place; it keeps working. Cost: $${TOTAL_COST}.`);
     expect(ctx.state!.cash).toBe(cashBefore - TOTAL_COST);
   });
 
@@ -311,7 +310,7 @@ describe('entities.ts — build upgrade ordered message (#1392)', () => {
     setLocale('fr');
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toBe(`Upgrade of building #${id} ordered. Demolition first, then rebuild.`);
+    expect(result.output).not.toBe(`Upgrade of building #${id} to T2 ordered. A builder will raise it in place; it keeps working. Cost: $${getBuildingDef('management_office', 2).constructionCost}.`);
     expect(result.output).toContain(`#${id}`);
   });
 });

@@ -1,8 +1,8 @@
-// BlastSimulator2026 — Integration: demolition and upgrade are building_destroyer work (#1392)
+// BlastSimulator2026 — Integration: demolition is building_destroyer work (#1392); an upgrade is in-place construction (#1875)
 //
-// `build destroy` / `build upgrade` queue an order a Building Destroyer and a
-// truck-licensed driver carry out. Cash moves at order time, the building
-// stands until the work finishes, and an upgrade keeps the building's id.
+// `build destroy` queues an order a Building Destroyer and a truck-licensed
+// driver carry out. `build upgrade` queues a place_building action any free
+// worker does; the building stands, operating, and keeps its id.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
@@ -154,17 +154,6 @@ describe('build destroy as a queued order', () => {
     expect(ctx.state!.cash).toBe(cash);
   });
 
-  it('refuses a destroy on a building with a pending upgrade', () => {
-    const ctx = staffedCtx();
-    ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
-    const id = constructBuilding(ctx);
-    equipDemolition(ctx);
-    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
-    const res = buildCommand(ctx, ['destroy', String(id)], {});
-    expect(res.success).toBe(false);
-    expect(res.output).toBe(t('entities.build_demolish_already_ordered', { id }));
-  });
-
   it('refuses unknown ids and insufficient funds at order time with no cash change', () => {
     const ctx = staffedCtx();
     const id = constructBuilding(ctx);
@@ -284,76 +273,111 @@ describe('demolition timing', () => {
   });
 });
 
-describe('build upgrade as demolition then construction', () => {
+describe('build upgrade as in-place construction (#1875)', () => {
   function upgradeSetup() {
     const ctx = staffedCtx();
     ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     const id = constructBuilding(ctx);
-    equipDemolition(ctx);
+    // No equipDemolition: an upgrade needs no Building Destroyer and no driver.
     const old = { ...ctx.state!.buildings.buildings.find(b => b.id === id)! };
     return { ctx, id, old };
   }
 
-  it('charges getUpgradeCost at order time and nothing changes in the building yet', () => {
+  function placeActionFor(ctx: GameContext, id: number): PendingAction | undefined {
+    const site = ctx.state!.plannedBuildings.find(pb => pb.buildingId === id);
+    return ctx.state!.pendingActions.find(a => a.type === 'place_building' && a.id === site?.actionId);
+  }
+
+  it('is accepted with no Building Destroyer and queues place_building, never demolish_building', () => {
+    const { ctx, id } = upgradeSetup();
+    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'building_destroyer')).toBe(false);
+    const res = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(res.success, res.output).toBe(true);
+    expect(demolishAction(ctx)).toBeUndefined();
+    expect(placeActionFor(ctx, id)).toBeDefined();
+  });
+
+  it('charges only the next tier construction cost (getUpgradeCost) and leaves the building at its tier', () => {
     const { ctx, id, old } = upgradeSetup();
     const spent = cashSpentBy(ctx, () => {
       const res = buildCommand(ctx, ['upgrade', String(id)], {});
       expect(res.success, res.output).toBe(true);
     });
-    expect(spent).toBe(getUpgradeCost(old, 2));
-    const still = ctx.state!.buildings.buildings.find(b => b.id === id)!;
-    expect(still.tier).toBe(1);
+    expect(spent).toBe(getUpgradeCost(old.type, 2));
+    expect(spent).toBe(getBuildingDef(old.type, 2).constructionCost);
+    expect(ctx.state!.buildings.buildings.find(b => b.id === id)!.tier).toBe(1);
   });
 
-  it('the old building keeps operating until demolition finishes', () => {
+  it('the planned site carries the standing building id and upgrade: true', () => {
+    const { ctx, id, old } = upgradeSetup();
+    buildCommand(ctx, ['upgrade', String(id)], {});
+    const site = ctx.state!.plannedBuildings.find(pb => pb.buildingId === id);
+    expect(site).toBeDefined();
+    expect(site!.upgrade).toBe(true);
+    expect(site!.tier).toBe(2);
+    expect([site!.x, site!.z]).toEqual([old.x, old.z]);
+  });
+
+  it('the building stays in state and keeps operating for the whole work', () => {
     const { ctx, id } = upgradeSetup();
     buildCommand(ctx, ['upgrade', String(id)], {});
-    tick(ctx, 2);
-    expect(ctx.state!.buildings.buildings.find(b => b.id === id)?.tier).toBe(1);
+    for (let i = 0; i < 1500 && ctx.state!.plannedBuildings.length > 0; i++) {
+      tick(ctx);
+      const b = ctx.state!.buildings.buildings.find(x => x.id === id);
+      expect(b, `building ${id} vanished at tick ${i}`).toBeDefined();
+    }
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
   });
 
-  it('reserves the upgraded site at order time so nothing else can claim it', () => {
+  it('ends with the SAME id at tier+1, same position, hp at the new max', () => {
     const { ctx, id, old } = upgradeSetup();
     buildCommand(ctx, ['upgrade', String(id)], {});
-    const reserved = ctx.state!.plannedBuildings.find(pb => pb.buildingId === id);
-    expect(reserved).toBeDefined();
-    expect(reserved!.tier).toBe(2);
-    expect([reserved!.x, reserved!.z]).toEqual([old.x, old.z]);
-  });
-
-  it('ends with the SAME id at tier+1 and the same position', () => {
-    const { ctx, id, old } = upgradeSetup();
-    buildCommand(ctx, ['upgrade', String(id)], {});
-    tickUntilDemolished(ctx);
+    for (let i = 0; i < 1500 && ctx.state!.plannedBuildings.length > 0; i++) tick(ctx);
     const after = ctx.state!.buildings.buildings.filter(b => b.type === 'living_quarters');
     expect(after).toHaveLength(1);
     expect(after[0]!.id).toBe(id);
     expect(after[0]!.tier).toBe(2);
     expect([after[0]!.x, after[0]!.z]).toEqual([old.x, old.z]);
-    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(after[0]!.hp).toBe(getBuildingDef('living_quarters', 2).maxHp);
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'place_building')).toHaveLength(0);
   });
 
-  it('the building is absent from state while the rebuild runs, then dispatches a place_building order', () => {
+  it('refuses a second upgrade while one is ordered, charging nothing', () => {
     const { ctx, id } = upgradeSetup();
-    buildCommand(ctx, ['upgrade', String(id)], {});
-    let sawGap = false;
-    for (let i = 0; i < 1500 && (demolishAction(ctx) || ctx.state!.plannedBuildings.length > 0); i++) {
-      tick(ctx);
-      const present = ctx.state!.buildings.buildings.some(b => b.id === id);
-      const rebuilding = ctx.state!.pendingActions.some(a => a.type === 'place_building');
-      if (!present) {
-        expect(demolishAction(ctx)).toBeUndefined();
-        if (rebuilding) sawGap = true;
-      }
-    }
-    expect(sawGap).toBe(true);
-    expect(ctx.state!.buildings.buildings.some(b => b.id === id && b.tier === 2)).toBe(true);
+    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
+    const cash = ctx.state!.cash;
+    const again = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(again.success).toBe(false);
+    expect(again.output).toBe(t('entities.build_upgrade_already_ordered', { id }));
+    expect(ctx.state!.cash).toBe(cash);
+    expect(ctx.state!.plannedBuildings.filter(pb => pb.buildingId === id)).toHaveLength(1);
+  });
+
+  it('refuses a destroy while an upgrade is ordered', () => {
+    const { ctx, id } = upgradeSetup();
+    equipDemolition(ctx);
+    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
+    const cash = ctx.state!.cash;
+    const res = buildCommand(ctx, ['destroy', String(id)], {});
+    expect(res.success).toBe(false);
+    expect(res.output).toBe(t('entities.build_upgrade_already_ordered', { id }));
+    expect(ctx.state!.cash).toBe(cash);
+    expect(demolishAction(ctx)).toBeUndefined();
+  });
+
+  it('refuses a move while an upgrade is ordered', () => {
+    const { ctx, id } = upgradeSetup();
+    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
+    const cash = ctx.state!.cash;
+    const res = buildCommand(ctx, ['move', String(id)], { to: '20,20' });
+    expect(res.success).toBe(false);
+    expect(res.output).toBe(t('entities.build_upgrade_already_ordered', { id }));
+    expect(ctx.state!.cash).toBe(cash);
   });
 
   it('upgrade refusals happen at order time with no cash change', () => {
     const ctx = staffedCtx();
     const id = constructBuilding(ctx);
-    equipDemolition(ctx);
     const cash = ctx.state!.cash;
 
     const unresearched = buildCommand(ctx, ['upgrade', String(id)], {});
@@ -377,7 +401,6 @@ describe('build upgrade as demolition then construction', () => {
     ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '3' });
     for (let i = 0; i < 400 && ctx.state!.plannedBuildings.length > 0; i++) tick(ctx);
-    equipDemolition(ctx);
     const cash = ctx.state!.cash;
     const res = buildCommand(ctx, ['upgrade', '1'], {});
     expect(res.success).toBe(false);
@@ -385,21 +408,54 @@ describe('build upgrade as demolition then construction', () => {
     expect(ctx.state!.cash).toBe(cash);
   });
 
-  it('refuses at order time when the larger footprint is blocked, with no cash change and no reservation', () => {
+  it('refuses at order time when the larger footprint is blocked, naming the blocker, with nothing mutated', () => {
     const ctx = staffedCtx();
     ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     const id = constructBuilding(ctx, 'living_quarters', '9,14');
-    equipDemolition(ctx);
     // Tier 1 covers x 9..11; tier 2 (4 wide) reaches x 12. Reserve a site there.
     ctx.state!.plannedBuildings.push({
       id: 99, buildingId: 99, type: 'management_office', tier: 1, x: 12, z: 14, actionId: 9999, cost: 0,
     });
     const cash = ctx.state!.cash;
+    const pendingBefore = ctx.state!.pendingActions.length;
     const res = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(res.success).toBe(false);
+    expect(res.output).toContain(t('building.management_office.name'));
     expect(ctx.state!.cash).toBe(cash);
     expect(ctx.state!.plannedBuildings.filter(pb => pb.buildingId === id)).toHaveLength(0);
+    expect(ctx.state!.pendingActions).toHaveLength(pendingBefore);
     expect(demolishAction(ctx)).toBeUndefined();
+  });
+
+  it('cancelling the pending upgrade refunds the cost, drops the site and leaves the building untouched', () => {
+    const { ctx, id } = upgradeSetup();
+    const before = ctx.state!.cash;
+    buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(ctx.state!.plannedBuildings.some(pb => pb.buildingId === id)).toBe(true);
+
+    const actionId = placeActionFor(ctx, id)!.id;
+    expect(employeeCommand(ctx, ['cancel', String(actionId)], {}).success).toBe(true);
+
+    expect(ctx.state!.cash).toBe(before);
+    expect(ctx.state!.plannedBuildings.some(pb => pb.buildingId === id)).toBe(false);
+    const b = ctx.state!.buildings.buildings.find(x => x.id === id)!;
+    expect(b.tier).toBe(1);
+    // and it can be ordered again
+    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
+  });
+
+  it('refunds and leaves no site when the building is demolished by other means before the work lands', () => {
+    const { ctx, id } = upgradeSetup();
+    const spent = cashSpentBy(ctx, () => { buildCommand(ctx, ['upgrade', String(id)], {}); });
+    expect(spent).toBeGreaterThan(0);
+    ctx.state!.buildings.buildings = ctx.state!.buildings.buildings.filter(b => b.id !== id);
+    for (let i = 0; i < 1500 && ctx.state!.plannedBuildings.length > 0; i++) tick(ctx);
+    expect(ctx.state!.buildings.buildings.some(b => b.id === id)).toBe(false);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    // Payroll and upkeep run meanwhile, so assert the refund transaction rather than the cash balance.
+    expect(ctx.state!.finances.transactions.some(
+      tx => tx.type === 'income' && tx.category === 'refund' && tx.amount === spent,
+    )).toBe(true);
   });
 });
 
@@ -416,23 +472,6 @@ describe('cancelling demolition orders', () => {
     expect(ctx.state!.cash).toBe(before);
     expect(demolishAction(ctx)).toBeUndefined();
     expect(ctx.state!.buildings.buildings.some(b => b.id === id)).toBe(true);
-  });
-
-  it('cancelling a pending upgrade refunds the full cost and releases the reserved site', () => {
-    const ctx = staffedCtx();
-    ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
-    const id = constructBuilding(ctx);
-    equipDemolition(ctx);
-    const before = ctx.state!.cash;
-    buildCommand(ctx, ['upgrade', String(id)], {});
-    expect(ctx.state!.plannedBuildings.some(pb => pb.buildingId === id)).toBe(true);
-
-    const actionId = demolishAction(ctx)!.id;
-    expect(employeeCommand(ctx, ['cancel', String(actionId)], {}).success).toBe(true);
-
-    expect(ctx.state!.cash).toBe(before);
-    expect(ctx.state!.plannedBuildings.some(pb => pb.buildingId === id)).toBe(false);
-    expect(ctx.state!.buildings.buildings.find(b => b.id === id)?.tier).toBe(1);
   });
 
   it('after a cancel the building can be ordered again', () => {

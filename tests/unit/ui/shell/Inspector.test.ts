@@ -772,12 +772,13 @@ describe('Inspector — window frame (#1756)', () => {
     expect(root.style.display).toBe('none');
   });
 
-  it('shows a rebuild site as Rebuilding with upgrade, move and demolish disabled', () => {
+  it('shows a standing building with an upgrade site as Upgrading with upgrade, move and demolish disabled', () => {
     const { bar, root } = makeBar();
     const state = makeState();
-    state.plannedBuildings.push({ buildingId: 77, type: 'management_office', tier: 2, rebuild: true } as never);
-    bar.show(entity('building', 77), state);
-    expect(root.textContent).toContain(t('inspector.status.rebuilding_waiting', { tier: 2 }));
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    state.plannedBuildings.push({ id: 5, buildingId: building.id, type: 'management_office', tier: 2, x: 2, z: 2, actionId: 1, cost: 1, upgrade: true });
+    bar.show(entity('building', building.id), state);
+    expect(root.textContent).toContain(t('inspector.status.upgrading_waiting', { tier: 2 }));
     for (const a of ['upgrade', 'move', 'demolish']) {
       expect(root.querySelector<HTMLButtonElement>(`[data-action="${a}"]`)!.disabled, a).toBe(true);
     }
@@ -937,14 +938,15 @@ describe('Inspector — inline note on an enabled action (#1820)', () => {
     return { bar, root, state, id: building.id };
   }
 
-  it('an enabled Upgrade and Demolish share one wait line inline (keyed upgrade) while the buttons stay enabled', () => {
+  it('only Demolish carries the destroyer wait line; Upgrade has none (#1875) and both buttons stay enabled', () => {
     const { bar, root, state, id } = upgradable();
     bar.show(entity('building', id), state);
     const expected = t('inspector.wait.no_vehicle', { role: t('vehicle_type.building_destroyer') });
     const lines = root.querySelectorAll<HTMLElement>('[data-reason]');
     expect(lines.length).toBe(1);
-    expect(lines[0]!.dataset['reason']).toBe('upgrade');
+    expect(lines[0]!.dataset['reason']).toBe('demolish');
     expect(lines[0]!.textContent).toBe(expected);
+    expect(root.querySelector('[data-reason="upgrade"]')).toBeNull();
     for (const action of ['upgrade', 'demolish']) {
       expect(root.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`)!.disabled, action).toBe(false);
     }
@@ -953,7 +955,7 @@ describe('Inspector — inline note on an enabled action (#1820)', () => {
   it('the line is removed once a destroyer and a licensed driver exist', () => {
     const { bar, root, state, id } = upgradable();
     bar.show(entity('building', id), state);
-    expect(root.querySelector('[data-reason="upgrade"]')).not.toBeNull();
+    expect(root.querySelector('[data-reason="demolish"]')).not.toBeNull();
     purchaseVehicle(state.vehicles, 'building_destroyer');
     const { employee } = hireEmployee(state.employees, 'driver', new Random(3), 0, 0);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.building_destroyer, 1);
@@ -967,7 +969,7 @@ describe('Inspector — inline note on an enabled action (#1820)', () => {
     bar.show(entity('building', id), state);
     purchaseVehicle(state.vehicles, 'building_destroyer');
     bar.show(entity('building', id), state);
-    expect(root.querySelector('[data-reason="upgrade"]')!.textContent)
+    expect(root.querySelector('[data-reason="demolish"]')!.textContent)
       .toBe(t('inspector.wait.no_driver', { role: t('vehicle_type.building_destroyer') }));
   });
 });

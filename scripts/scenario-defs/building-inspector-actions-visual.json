@@ -1,6 +1,6 @@
 {
   "name": "building-inspector-actions-visual",
-  "description": "The building inspector acts in place (#1758). A player selects buildings by clicking them in the scene, never opening the Build panel: researches then upgrades a management office (Research gives way to Upgrade; the status follows demolition ordered, rebuilding, operating at tier 2), moves it with the footprint placement tool armed straight from the inspector, and demolishes a freight warehouse holding hauled ore through the confirm that names the ore lost. The hauling prefix is hauling-gate's own.",
+  "description": "The building inspector acts in place (#1758). A player selects buildings by clicking them in the scene, never opening the Build panel: researches then upgrades a management office (Research gives way to Upgrade; no Building Destroyer needed: the status follows upgrading, operating at tier 2), moves it with the footprint placement tool armed straight from the inspector, and demolishes a freight warehouse holding hauled ore through the confirm that names the ore lost. The hauling prefix is hauling-gate's own.",
   "shots": [
     {
       "name": "overview",
@@ -71,7 +71,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20 diameter:0.089",
-      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m \u2014 this file's whole point is hauling dispatch, not drilling, so the plan only needs to produce enough on-ground fragments to prove auto-haul works, at a workload the staffed roster's driller lands quickly. The click drags the (20,20)-(22,22) rectangle at 2m spacing to compute the declared 2x2. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent, a $54 divergence carried into both downstream cash checkpoints below. Confirmed exact: adding the real default reproduces interaction mode's own $79,268 figure precisely.",
+      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m — this file's whole point is hauling dispatch, not drilling, so the plan only needs to produce enough on-ground fragments to prove auto-haul works, at a workload the staffed roster's driller lands quickly. The click drags the (20,20)-(22,22) rectangle at 2m spacing to compute the declared 2x2. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent, a $54 divergence carried into both downstream cash checkpoints below. Confirmed exact: adding the real default reproduces interaction mode's own $79,268 figure precisely.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -125,7 +125,7 @@
     },
     {
       "command": "tick 130",
-      "description": "#553: drain the ordered plan \u2014 the staffed driller/drill_rig lands all 4 holes well inside this pad. Bumped from tick 100 (sandbox-measured landing at tick 88) to tick 130 by #1154's fixer round: the drill_rig now needs vehicle clearance (NAV_CLEARANCE_VEHICLE_CELLS=2) to route to a hole, so it can no longer cut through the 1-cell-wide gap between the freight_warehouse's footprint and the map edge the way a clearance-blind point-agent used to \u2014 it correctly detours around the building's east side instead, and that detour route happens to pass near the other freshly-purchased fleet vehicles idling by the depot, costing a few more ticks waiting out real (not phantom) vehicle-occupancy contention before rerouting clear. Sandbox-measured new landing: tick 103 for the 4th hole (H3) \u2014 130 keeps the same proportional margin the original tick-88/tick-100 pair had.",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad. Bumped from tick 100 (sandbox-measured landing at tick 88) to tick 130 by #1154's fixer round: the drill_rig now needs vehicle clearance (NAV_CLEARANCE_VEHICLE_CELLS=2) to route to a hole, so it can no longer cut through the 1-cell-wide gap between the freight_warehouse's footprint and the map edge the way a clearance-blind point-agent used to — it correctly detours around the building's east side instead, and that detour route happens to pass near the other freshly-purchased fleet vehicles idling by the depot, costing a few more ticks waiting out real (not phantom) vehicle-occupancy contention before rerouting clear. Sandbox-measured new landing: tick 103 for the 4th hole (H3) — 130 keeps the same proportional margin the original tick-88/tick-100 pair had.",
       "interaction": [
         {
           "type": "command",
@@ -163,7 +163,7 @@
     },
     {
       "command": "state",
-      "description": "#1820: select the freight warehouse (#1) before any Research Center or Building Destroyer exists. The inspector shows signed money (Research \u00b7 $5,000, Move \u00b7 $7,500, Demolish \u00b7 $4,000, upkeep $10/h), Research is disabled with the inline reason 'Needs a Research Center', and Demolish stays enabled with the note 'The order will wait: no Building Destroyer in the fleet.'",
+      "description": "#1820: select the freight warehouse (#1) before any Research Center or Building Destroyer exists. The inspector shows signed money (Research · $5,000, Move · $7,500, Demolish · $4,000, upkeep $10/h), Research is disabled with the inline reason 'Needs a Research Center', and Demolish stays enabled with the note 'The order will wait: no Building Destroyer in the fleet.'",
       "role": "player",
       "interaction": [
         {
@@ -450,7 +450,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "#553: idempotent \u2014 a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired during the tick 10 block above. A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls the tick 20 step below before the driver ever gets to deliver -- sandbox-measured, an event can fire in this window on seed 42, and events.ts's tick command stops dead the instant one fires mid-block, silently short of the requested count.",
+      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired during the tick 10 block above. A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls the tick 20 step below before the driver ever gets to deliver -- sandbox-measured, an event can fire in this window on seed 42, and events.ts's tick command stops dead the instant one fires mid-block, silently short of the requested count.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -480,7 +480,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "#554: idempotent (resolveEventIfPending \u2014 no-op when nothing is pending). tickCommand itself stops early and auto-pauses the instant any event fires mid-window (\"Pending event! Resolve it first\"), and the earlier charge-order wait above shifts tickCount enough that a spontaneous event now sometimes lands inside the tick 20 window right above, cutting it short before the hauler's fragment-to-depot round trip has a chance to even start. Clearing it here, before the tick 60 step below actually asserts hauling progress, keeps that assertion honest regardless of exactly when the event happened to fire.",
+      "description": "#554: idempotent (resolveEventIfPending — no-op when nothing is pending). tickCommand itself stops early and auto-pauses the instant any event fires mid-window (\"Pending event! Resolve it first\"), and the earlier charge-order wait above shifts tickCount enough that a spontaneous event now sometimes lands inside the tick 20 window right above, cutting it short before the hauler's fragment-to-depot round trip has a chance to even start. Clearing it here, before the tick 60 step below actually asserts hauling progress, keeps that assertion honest regardless of exactly when the event happened to fire.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -671,38 +671,15 @@
       }
     },
     {
-      "command": "vehicle buy building_destroyer tier:1",
-      "description": "The Wrecking Rascal that carries out the upgrade and the demolition below; without one those orders sit blocked (#1392).",
-      "timeout": 30,
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "vehicles"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ],
-        "changedBy": {
-          "cash": -30000
-        }
-      }
-    },
-    {
       "command": "state",
-      "description": "Select the management office (#3) by clicking it in the scene. The Fleet panel opened for the purchase above replaced the Build panel, so every action below is provably the inspector's own. Its next tier is locked, so the action strip offers Research, not Upgrade.",
+      "description": "Close the Build panel left open by the placements above, then select the management office (#3) by clicking it in the scene, so every action below is provably the inspector's own; no Building Destroyer exists in the fleet, and none is needed for the upgrade below (#1875). Its next tier is locked, so the action strip offers Research, not Upgrade.",
       "role": "player",
       "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
         {
           "type": "clickEntity",
           "kind": "building",
@@ -759,7 +736,7 @@
     },
     {
       "command": "build upgrade 3",
-      "description": "Research done: Upgrade replaces Research in the strip. Clicking it orders the rebuild; the inspector keeps following building #3 and every action is disabled while the demolition is ordered and the site rebuilds.",
+      "description": "Research done: Upgrade replaces Research in the strip, with no destroyer wait note (#1875). Clicking it orders in-place construction; the inspector keeps following building #3 and Upgrade, Move and Demolish are all disabled while the upgrade is ordered.",
       "role": "player",
       "interaction": [
         {
@@ -786,7 +763,7 @@
     },
     {
       "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
-      "description": "Wait until the same id reaches tier 2: demolition done, rebuild finished. The inspector status goes from demolition ordered through rebuilding to operating.",
+      "description": "Wait until the same id reaches tier 2: the in-place upgrade finished. The inspector status goes from upgrading to operating.",
       "timeout": 95,
       "interaction": [
         {
@@ -858,6 +835,34 @@
         "blocked": "#bs-build-panel .bs-build-buy-btn",
         "equals": {
           "buildingCount": 3
+        }
+      }
+    },
+    {
+      "command": "vehicle buy building_destroyer tier:1",
+      "description": "The Wrecking Rascal for the demolition below (#1392). Bought only now: the upgrade earlier needed no Building Destroyer (#1875). The Fleet panel replaces the Build panel and clears the scene selection.",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ],
+        "changedBy": {
+          "cash": -30000
         }
       }
     },

@@ -7,6 +7,7 @@ import {
 } from '../core/entities/Building.js';
 import { RESERVATION_REFUSAL, reservationBlocking, terrainReservations, type TerrainReservation } from '../core/entities/PlacementReservations.js';
 import { DEMOLITION_VEHICLE_ROLE, isDemolitionOrdered } from '../core/engine/BuildingDemolition.js';
+import { isUpgradeOrdered } from '../core/engine/BuildingUpgrade.js';
 import { getResearchTaskDef } from '../core/config/balance.js';
 import { getQueueBlockCode, getUnmetConditions } from '../core/entities/BuildingResearch.js';
 import { roleShortfall } from '../core/engine/OrderReachability.js';
@@ -33,8 +34,6 @@ export interface BuildingActionRules {
     nextTier: BuildingTier | null;
     /** What the upgraded footprint would strand from the crew (#1391); null when nothing or not applicable. */
     cutoff: PlacementCutoff | null;
-    /** Why the order will wait for want of a vehicle or driver; null when none. */
-    waitKey: InspectorWaitKey | null;
   };
   research: {
     type: BuildingType;
@@ -55,14 +54,16 @@ export function buildingActionRules(
   reservations: ReadonlyArray<TerrainReservation> = terrainReservations(state),
 ): BuildingActionRules {
   const ordered = isDemolitionOrdered(state, b.id);
+  const upgrading = isUpgradeOrdered(state, b.id);
   const orderedOr = (cost: number): string | null => {
     if (ordered) return 'inspector.reason.demolition_ordered';
+    if (upgrading) return 'inspector.reason.upgrade_ordered';
     return state.cash < cost ? REASON_CASH : null;
   };
   const moveCost = getMoveCost(b);
   const demolishCost = getDemolishCost(b);
-  const { upgrade, research } = upgradeRules(state, b, ordered, reservations);
-  const demolishWait = ordered ? null : demolitionWaitKey(state.vehicles, state.employees);
+  const { upgrade, research } = upgradeRules(state, b, ordered, upgrading, reservations);
+  const demolishWait = ordered || upgrading ? null : demolitionWaitKey(state.vehicles, state.employees);
   return {
     upgrade,
     research,
@@ -73,7 +74,6 @@ export function buildingActionRules(
 
 /**
  * Why a demolition order would wait for want of a Building Destroyer or a licensed driver; null when none.
- * Demolish and upgrade both queue a demolition (an upgrade tears the old tier down), so both use this.
  */
 function demolitionWaitKey(vehicles: GameState['vehicles'], employees: GameState['employees']): InspectorWaitKey | null {
   const shortfall = roleShortfall(vehicles.vehicles, employees.employees.filter(isEligibleForWork), DEMOLITION_VEHICLE_ROLE);
@@ -95,18 +95,19 @@ function researchBlock(state: GameState, type: BuildingType, tier: 2 | 3): Resea
 
 type UpgradeRules = Pick<BuildingActionRules, 'upgrade' | 'research'>;
 
-/** Upgrade verdict in the console's `build upgrade` order: max tier, demolition, locked, reserved terrain, cash. */
+/** Upgrade verdict in the console's `build upgrade` order: max tier, demolition, upgrade ordered, locked, reserved terrain, cash. */
 function upgradeRules(
-  state: GameState, b: Building, ordered: boolean, reservations: ReadonlyArray<TerrainReservation>,
+  state: GameState, b: Building, ordered: boolean, upgrading: boolean, reservations: ReadonlyArray<TerrainReservation>,
 ): UpgradeRules {
   const refused = (reasonKey: string, nextTier: BuildingTier | null, cost: number | null, params?: Record<string, string | number>): UpgradeRules => ({
-    upgrade: { kind: 'refused', cost, reasonKey, ...(params ? { reasonParams: params } : {}), nextTier, cutoff: null, waitKey: null }, research: null,
+    upgrade: { kind: 'refused', cost, reasonKey, ...(params ? { reasonParams: params } : {}), nextTier, cutoff: null }, research: null,
   });
   if (isSingleTierType(b.type)) return refused('inspector.reason.single_tier', null, null);
   if (b.tier >= 3) return refused('inspector.reason.max_tier', null, null);
   const nextTier = (b.tier + 1) as 2 | 3; // b.tier < 3 here
-  const cost = getUpgradeCost(b, nextTier);
+  const cost = getUpgradeCost(b.type, nextTier);
   if (ordered) return refused('inspector.reason.demolition_ordered', nextTier, cost);
+  if (upgrading) return refused('inspector.reason.upgrade_ordered', nextTier, cost);
 
   if (!isTierUnlocked(state.buildings, b.type, nextTier)) {
     const def = getResearchTaskDef(b.type, nextTier);
@@ -114,7 +115,7 @@ function upgradeRules(
     return {
       upgrade: {
         kind: 'locked', cost, reasonKey: 'ui.build.research_required', reasonParams: { tier: nextTier },
-        nextTier, cutoff: null, waitKey: null,
+        nextTier, cutoff: null,
       },
       research: {
         type: b.type,
@@ -136,10 +137,8 @@ function upgradeRules(
   }
   const { sizeX: curX, sizeZ: curZ } = getDefSize(getBuildingDef(b.type, b.tier));
   const cutoff = memoizedPlacementCutoff(state, next, { minX: b.x, minZ: b.z, maxX: b.x + curX, maxZ: b.z + curZ });
-  // An upgrade queues a demolition of the current tier, so it waits on the same vehicle and driver.
-  const upgradeWait = demolitionWaitKey(state.vehicles, state.employees);
   return {
-    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff, waitKey: upgradeWait },
+    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff },
     research: null,
   };
 }

@@ -314,9 +314,7 @@ describe('build destroy — insufficient funds guard', () => {
 // ── build upgrade — issue #511 ──
 
 describe('build upgrade — insufficient funds guard', () => {
-  const OLD_DEF = getBuildingDef('management_office', 1);
-  const NEW_DEF = getBuildingDef('management_office', 2);
-  const UPGRADE_COST = OLD_DEF.demolishCost + NEW_DEF.constructionCost;
+  const UPGRADE_COST = getBuildingDef('management_office', 2).constructionCost;
 
   function unlockTier2(ctx: MiningContext): void {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
@@ -331,7 +329,7 @@ describe('build upgrade — insufficient funds guard', () => {
     expect(result.output).toContain('Insufficient funds');
   });
 
-  it('changes nothing at all when it refuses — original building untouched, destroyBuilding never ran', () => {
+  it('changes nothing at all when it refuses — original building untouched', () => {
     const ctx = makeCtx(UPGRADE_COST - 1);
     unlockTier2(ctx);
     const id = placeTestBuilding(ctx);
@@ -344,7 +342,7 @@ describe('build upgrade — insufficient funds guard', () => {
     expect(building.tier).toBe(1);
   });
 
-  it('orders the upgrade when cash exactly equals the upgrade cost (#1392: tier changes when the rebuild lands)', () => {
+  it('orders the upgrade when cash exactly equals the upgrade cost (#1875: tier changes when the in-place work lands)', () => {
     const ctx = makeCtx(UPGRADE_COST);
     unlockTier2(ctx);
     // Upgrade re-places at (2,0), flat across T1/T2 footprints on this
@@ -353,7 +351,8 @@ describe('build upgrade — insufficient funds guard', () => {
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).toBe(0);
-    expect(ctx.state!.pendingActions.some(a => a.type === 'demolish_building')).toBe(true);
+    expect(ctx.state!.pendingActions.some(a => a.type === 'place_building')).toBe(true);
+    expect(ctx.state!.pendingActions.some(a => a.type === 'demolish_building')).toBe(false);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
   });
 

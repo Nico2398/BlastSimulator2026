@@ -17,7 +17,7 @@ import { researchSection } from './researchContent.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
-/** Lifecycle status line: operating, closed by an event, demolition ordered, rebuilding or under construction. */
+/** Lifecycle status line: operating, closed by an event, demolition ordered, upgrading or under construction. */
 function statusText(status: BuildingStatus): string {
   const percent = status.progress === null ? null : Math.round(status.progress * 100);
   switch (status.kind) {
@@ -30,9 +30,9 @@ function statusText(status: BuildingStatus): string {
           ? t('ui.modifier.permanent')
           : t('ui.modifier.remaining', { hours: status.closureTicksRemaining }),
       });
-    case 'rebuilding':
+    case 'upgrading':
     case 'under_construction': {
-      const key = status.kind === 'rebuilding' ? 'inspector.status.rebuilding' : 'inspector.status.under_construction';
+      const key = status.kind === 'upgrading' ? 'inspector.status.upgrading' : 'inspector.status.under_construction';
       return percent === null
         ? t(`${key}_waiting`, { tier: status.targetTier ?? 1 })
         : t(key, { tier: status.targetTier ?? 1, percent });
@@ -102,7 +102,7 @@ function standingActions(state: GameState, rules: BuildingActionRules): ActionSp
     const reason = reasonText(upgrade.reasonKey, upgrade.cost ?? 0, state.cash, upgrade.reasonParams);
     actions.push(upgrade.cost === null
       ? { action: 'upgrade', labelKey: 'inspector.action.upgrade', icon: 'up', variant: 'ghost', disabled: true, ...(reason ? { title: reason } : {}) }
-      : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason, 'ghost', waitNote(upgrade.waitKey)), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
+      : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
   }
   actions.push(
     withCost('move', 'inspector.action.move', 'drive', move.cost, reasonText(move.disabledReasonKey, move.cost, state.cash)),

@@ -343,23 +343,22 @@ describe('getDemolishCost()', () => {
 });
 
 describe('getUpgradeCost()', () => {
-  it('is the sum of the current tier demolish cost and the next tier construction cost', () => {
-    const building: Building = { id: 1, type: 'living_quarters', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
-    const currentDemolish = getBuildingDef('living_quarters', 1).demolishCost;
+  it('is the next tier construction cost alone: nothing is demolished (#1875)', () => {
     const nextConstruction = getBuildingDef('living_quarters', 2).constructionCost;
+    const currentDemolish = getBuildingDef('living_quarters', 1).demolishCost;
 
-    expect(getUpgradeCost(building, 2)).toBe(currentDemolish + nextConstruction);
-    // Not just the next tier's construction cost alone...
-    expect(getUpgradeCost(building, 2)).not.toBe(nextConstruction);
-    // ...and not just the current tier's demolish cost alone.
-    expect(getUpgradeCost(building, 2)).not.toBe(currentDemolish);
+    expect(getUpgradeCost('living_quarters', 2)).toBe(nextConstruction);
+    expect(getUpgradeCost('living_quarters', 2)).not.toBe(currentDemolish + nextConstruction);
   });
 
-  it('computes the same demolish-plus-construction sum for a tier-2 to tier-3 upgrade', () => {
-    const building: Building = { id: 2, type: 'geology_lab', tier: 2, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
-    const expected = getBuildingDef('geology_lab', 2).demolishCost + getBuildingDef('geology_lab', 3).constructionCost;
+  it('is the tier-3 construction cost for a tier-2 to tier-3 upgrade', () => {
+    expect(getUpgradeCost('geology_lab', 3)).toBe(getBuildingDef('geology_lab', 3).constructionCost);
+  });
 
-    expect(getUpgradeCost(building, 3)).toBe(expected);
+  it('is positive for every upgradable type and tier', () => {
+    for (const type of ['living_quarters', 'geology_lab', 'freight_warehouse', 'management_office'] as const) {
+      for (const tier of [2, 3] as const) expect(getUpgradeCost(type, tier)).toBeGreaterThan(0);
+    }
   });
 });
 

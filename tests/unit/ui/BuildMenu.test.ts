@@ -1480,10 +1480,10 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
     return container.querySelector<HTMLElement>(`.bs-build-site-row[data-building-id="${id}"]`);
   }
 
-  function addSite(s: GameState, buildingId: number, rebuild = false): void {
+  function addSite(s: GameState, buildingId: number, upgrade = false): void {
     s.plannedBuildings.push({
       id: 900 + buildingId, buildingId, type: 'management_office', tier: 1, x: 17, z: 23,
-      actionId: 60 + buildingId, cost: 1000, ...(rebuild ? { rebuild: true } : {}),
+      actionId: 60 + buildingId, cost: 1000, ...(upgrade ? { upgrade: true } : {}),
     });
   }
 
@@ -1762,7 +1762,7 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
     it('each planned building gets a site row that is not a placed row', () => {
       const s = stateWith([]);
       addSite(s, 7);
-      addSite(s, 8, true);
+      addSite(s, 8);
       menu.update(s);
       expect(siteRow(7)).not.toBeNull();
       expect(siteRow(8)).not.toBeNull();
@@ -1818,23 +1818,16 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       expect(siteRow(7)!.querySelector('[data-live="progress"]')!.textContent!.trim()).not.toBe('');
     });
 
-    it('a rebuild site row shows the rebuilding badge, and flipping the flag rebuilds the row', () => {
+    it('an upgrade site gets no site row, and appears when the flag is cleared', () => {
       const s = stateWith([]);
       addSite(s, 8, true);
       menu.update(s);
-      const badgeOf = (): HTMLElement | null => siteRow(8)!.querySelector<HTMLElement>('[data-live="badge"]');
-      expect(badgeOf()).not.toBeNull();
-      expect(badgeOf()!.textContent).toContain('Rebuilding');
+      expect(siteRow(8)).toBeNull();
 
-      const before = siteRow(8)!;
-      delete s.plannedBuildings[0]!.rebuild;
+      delete s.plannedBuildings[0]!.upgrade;
       menu.update(s);
-      expect(siteRow(8)).not.toBe(before);
-      expect(badgeOf()).toBeNull();
-
-      s.plannedBuildings[0]!.rebuild = true;
-      menu.update(s);
-      expect(badgeOf()!.textContent).toContain('Rebuilding');
+      expect(siteRow(8)).not.toBeNull();
+      expect(siteRow(8)!.querySelector('[data-live="badge"]')).toBeNull();
     });
 
     it('removes the site row once the planned entry is gone', () => {

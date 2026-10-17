@@ -1,6 +1,6 @@
 {
   "name": "building-demolish-upgrade-visual",
-  "description": "Demolition and tier upgrades are Building Destroyer work (#1392): a player buys a Wrecking Rascal, demolishes a building and upgrades another by clicking the real Build and Fleet panel controls, waiting on state (buildingCount, maxBuildingTier) rather than tick pads. The upgraded building keeps its id.",
+  "description": "Tier upgrades are in-place construction (#1875) and demolition is Building Destroyer work (#1392): a player upgrades a building with no destroyer in the fleet, then buys a Wrecking Rascal and demolishes another, by clicking the real Build and Fleet panel controls, waiting on state (buildingCount, maxBuildingTier) rather than tick pads. The upgraded building keeps its id.",
   "shots": [
     {
       "name": "overview",
@@ -305,8 +305,64 @@
       }
     },
     {
+      "command": "build upgrade 2",
+      "description": "Click living_quarters #2's Upgrade button with no Building Destroyer in the fleet (#1875). The building keeps operating and is upgraded in place by whoever is free, under the SAME id.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 3
+        },
+        "note": "An upgrade is ordinary construction (#1875): charged the next tier's construction cost now, no demolition, no vehicle. The building keeps standing, so buildingCount stays 3."
+      }
+    },
+    {
+      "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
+      "description": "waitUntil the same id (#2) reaches tier 2: the in-place construction finished.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "maxBuildingTier",
+          "equals": 2,
+          "maxTicks": 900,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "maxBuildingTier": 2
+        }
+      }
+    },
+    {
       "command": "vehicle buy building_destroyer tier:1",
-      "description": "Buy the Wrecking Rascal (Building Destroyer) through the Fleet panel dealership button; without one, demolition orders sit blocked (#1392).",
+      "description": "Buy the Wrecking Rascal (Building Destroyer) through the Fleet panel dealership button; only the demolition below needs it (#1392) - the upgrade above did not.",
       "timeout": 30,
       "role": "player",
       "interaction": [
@@ -397,64 +453,8 @@
       }
     },
     {
-      "command": "build upgrade 2",
-      "description": "Click living_quarters #2's Upgrade button. The old building keeps operating while the Wrecking Rascal demolishes it; the tier-2 building is then rebuilt under the SAME id.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"upgrade\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"upgrade\"]"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "buildingCount": 2
-        },
-        "note": "The order is charged now, but the old building keeps standing: the Building Destroyer demolishes it, then the tier-2 building is rebuilt under the SAME id (#1392), so buildingCount stays 2."
-      }
-    },
-    {
-      "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
-      "description": "waitUntil the same id (#2) reaches tier 2: demolition done, rebuild finished.",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "maxBuildingTier",
-          "equals": 2,
-          "maxTicks": 900,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "maxBuildingTier": 2
-        }
-      }
-    },
-    {
       "command": "build list",
-      "description": "Building #2 is still living_quarters, now T2; no building with a new id appeared.",
+      "description": "Building #2 is still living_quarters, now T2, with its original id; no building with a new id appeared.",
       "timeout": 30,
       "interaction": [
         {

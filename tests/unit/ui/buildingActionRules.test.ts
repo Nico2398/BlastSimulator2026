@@ -48,7 +48,7 @@ describe('buildingActionRules — upgrade', () => {
     const s = stateWith(b);
     s.buildings.unlockedTiers['management_office'] = 2;
     const r = buildingActionRules(s, b);
-    expect(r.upgrade).toMatchObject({ kind: 'available', nextTier: 2, cost: getUpgradeCost(b, 2), reasonKey: null });
+    expect(r.upgrade).toMatchObject({ kind: 'available', nextTier: 2, cost: getUpgradeCost(b.type, 2), reasonKey: null });
     expect(r.research).toBeNull();
   });
 
@@ -109,14 +109,14 @@ describe('buildingActionRules — upgrade', () => {
     const cashRefusal = buildingActionRules(s, b).upgrade;
     expect(cashRefusal.kind).toBe('refused');
     expect(cashRefusal.reasonKey).toBeTruthy();
-    expect(cashRefusal.cost).toBe(getUpgradeCost(b, 2));
+    expect(cashRefusal.cost).toBe(getUpgradeCost(b.type, 2));
     const maxB = makeBuilding({ tier: 3 });
     expect(cashRefusal.reasonKey).not.toBe(buildingActionRules(stateWith(maxB), maxB).upgrade.reasonKey);
   });
 
   it('cash exactly equal to the cost is not a refusal', () => {
     const b = makeBuilding();
-    const s = stateWith(b, getUpgradeCost(b, 2));
+    const s = stateWith(b, getUpgradeCost(b.type, 2));
     s.buildings.unlockedTiers['management_office'] = 2;
     expect(buildingActionRules(s, b).upgrade.kind).toBe('available');
   });
@@ -164,6 +164,41 @@ describe('buildingActionRules — upgrade', () => {
     s3.buildings.unlockedTiers['management_office'] = 2;
     addRampOver(s3, b);
     expect(buildingActionRules(s3, b).upgrade.reasonKey).toBe(RESERVATION_REFUSAL.ramp.errorKey);
+  });
+});
+
+describe('buildingActionRules — upgrade ordered (#1875)', () => {
+  function upgradeOrder(s: GameState, b: Building): void {
+    s.plannedBuildings.push({
+      id: 91, buildingId: b.id, type: b.type, tier: 2, x: b.x, z: b.z, actionId: 61, cost: 1, upgrade: true,
+    });
+    s.pendingActions.push({
+      id: 61, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
+      targetX: b.x, targetZ: b.z, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+  }
+
+  it('upgrade, move and demolish are refused with upgrade_ordered while an upgrade is ordered', () => {
+    const b = makeBuilding();
+    const s = stateWith(b);
+    s.buildings.unlockedTiers['management_office'] = 2;
+    upgradeOrder(s, b);
+    const r = buildingActionRules(s, b);
+    expect(r.upgrade.kind).toBe('refused');
+    expect(r.upgrade.reasonKey).toBe('inspector.reason.upgrade_ordered');
+    expect(r.move.disabledReasonKey).toBe('inspector.reason.upgrade_ordered');
+    expect(r.demolish.disabledReasonKey).toBe('inspector.reason.upgrade_ordered');
+  });
+
+  it('without an upgrade order none of them carries that reason', () => {
+    const b = makeBuilding();
+    const s = stateWith(b);
+    s.buildings.unlockedTiers['management_office'] = 2;
+    const r = buildingActionRules(s, b);
+    expect(r.upgrade.reasonKey).toBeNull();
+    expect(r.move.disabledReasonKey).not.toBe('inspector.reason.upgrade_ordered');
+    expect(r.demolish.disabledReasonKey).not.toBe('inspector.reason.upgrade_ordered');
   });
 });
 
@@ -260,10 +295,11 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     assignSkill(s.employees, employee.id, ROLE_LICENCE_REQUIRED.building_destroyer, 1);
   }
 
-  it('no building destroyer in the fleet: upgrade and demolish wait for a vehicle', () => {
+  it('no building destroyer in the fleet: demolish waits for a vehicle, upgrade does not (#1875)', () => {
     const b = makeBuilding();
     const r = buildingActionRules(unlockedState(b), b);
-    expect(r.upgrade.waitKey).toBe('inspector.wait.no_vehicle');
+    expect(r.upgrade).not.toHaveProperty('waitKey');
+    expect(r.upgrade.kind).toBe('available');
     expect(r.demolish.waitKey).toBe('inspector.wait.no_vehicle');
   });
 
@@ -273,7 +309,6 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     purchaseVehicle(s.vehicles, 'building_destroyer');
     hireEmployee(s.employees, 'driller', new Random(5), 0, 0);
     const r = buildingActionRules(s, b);
-    expect(r.upgrade.waitKey).toBe('inspector.wait.no_driver');
     expect(r.demolish.waitKey).toBe('inspector.wait.no_driver');
   });
 
@@ -283,7 +318,8 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     purchaseVehicle(s.vehicles, 'building_destroyer');
     licensedDriver(s);
     s.employees.employees[s.employees.employees.length - 1]!.injured = true;
-    expect(buildingActionRules(s, b).upgrade.waitKey).toBe('inspector.wait.no_driver');
+    expect(buildingActionRules(s, b).upgrade).not.toHaveProperty('waitKey');
+    expect(buildingActionRules(s, b).demolish.waitKey).toBe('inspector.wait.no_driver');
   });
 
   it('a destroyer and a licensed eligible employee: nothing to wait for', () => {
@@ -292,7 +328,6 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
     purchaseVehicle(s.vehicles, 'building_destroyer');
     licensedDriver(s);
     const r = buildingActionRules(s, b);
-    expect(r.upgrade.waitKey).toBeNull();
     expect(r.demolish.waitKey).toBeNull();
   });
 
@@ -307,6 +342,6 @@ describe('buildingActionRules — wait for a Building Destroyer (#1820)', () => 
 
   it('a refused upgrade carries no wait key', () => {
     const b = makeBuilding({ tier: 3 });
-    expect(buildingActionRules(stateWith(b), b).upgrade.waitKey).toBeNull();
+    expect(buildingActionRules(stateWith(b), b).upgrade).not.toHaveProperty('waitKey');
   });
 });

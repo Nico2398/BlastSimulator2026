@@ -128,12 +128,11 @@ describe('placedRowModel — badge (#1759)', () => {
     expect(placedRowModel(b, s).badge).toBe('demolition_ordered');
   });
 
-  it('a building id with only a rebuild site left in plannedBuildings reports rebuilding', () => {
+  it('a standing building with an upgrade site reports upgrading (#1875)', () => {
     const b = mk({ id: 1, type: 'management_office' });
     const s = stateWith(b);
-    s.buildings.buildings = [];
-    s.plannedBuildings.push({ id: 90, buildingId: 1, type: 'management_office', tier: 2, x: 5, z: 5, actionId: 60, cost: 1, rebuild: true });
-    expect(placedRowModel(b, s).badge).toBe('rebuilding');
+    s.plannedBuildings.push({ id: 90, buildingId: 1, type: 'management_office', tier: 2, x: 5, z: 5, actionId: 60, cost: 1, upgrade: true });
+    expect(placedRowModel(b, s).badge).toBe('upgrading');
   });
 });
 
@@ -142,11 +141,11 @@ describe('siteRowModel (#1759)', () => {
     id: 90, buildingId: 7, type: 'management_office', tier: 1, x: 17, z: 23, actionId: 60, cost: 1000, ...over,
   });
 
-  it('progress is null and rebuild false for an unstarted new site', () => {
+  it('progress is null for an unstarted new site', () => {
     const pb = site();
     const s = stateWith();
     s.plannedBuildings.push(pb);
-    expect(siteRowModel(pb, s)).toEqual({ progress: null, rebuild: false });
+    expect(siteRowModel(pb, s)).toEqual({ progress: null });
   });
 
   it('progress follows the builder task', () => {
@@ -160,12 +159,5 @@ describe('siteRowModel (#1759)', () => {
       status: 'in_progress', holderId: 5, queuedAtTick: 0,
     } as never);
     expect(siteRowModel(pb, s).progress).toBeCloseTo(0.6);
-  });
-
-  it('rebuild flag is true for a rebuild site', () => {
-    const pb = site({ rebuild: true });
-    const s = stateWith();
-    s.plannedBuildings.push(pb);
-    expect(siteRowModel(pb, s).rebuild).toBe(true);
   });
 });

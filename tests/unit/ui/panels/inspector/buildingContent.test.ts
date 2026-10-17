@@ -209,7 +209,7 @@ describe('building inspector — action strip', () => {
     expect(view.actions.map(a => a.action)).toEqual(['upgrade', 'move', 'demolish']);
     for (const a of view.actions) expect(a.disabled ?? false).toBe(false);
     expect(actionOf(view, 'upgrade')!.title).toBeTruthy();
-    expect(getUpgradeCost(makeBuilding(), 2)).toBeGreaterThan(0);
+    expect(getUpgradeCost('management_office', 2)).toBeGreaterThan(0);
   });
 
   it('research replaces upgrade when the next tier is locked, carrying cost and duration', () => {
@@ -367,7 +367,7 @@ describe('building inspector — money carries the currency sign (#1820)', () =>
     const b = warehouse();
     const s = stateWith(b);
     s.buildings.unlockedTiers['freight_warehouse'] = 2;
-    expect(actionOf(viewOf(s), 'upgrade')!.label).toBe(`${t('inspector.action.upgrade')} · $${formatMoney(getUpgradeCost(b, 2))}`);
+    expect(actionOf(viewOf(s), 'upgrade')!.label).toBe(`${t('inspector.action.upgrade')} · $${formatMoney(getUpgradeCost(b.type, 2))}`);
   });
 
   it('a cash refusal title carries $ on both amounts', () => {
@@ -464,7 +464,7 @@ describe('building inspector — research prerequisite (#1820)', () => {
   });
 });
 
-describe('building inspector — upgrade and demolish wait for a Building Destroyer (#1820)', () => {
+describe('building inspector — only Demolish waits for a Building Destroyer (#1820, #1875)', () => {
   const waitNoVehicle = () => t('inspector.wait.no_vehicle', { role: t('vehicle_type.building_destroyer') });
 
   function upgradable(): GameState {
@@ -473,23 +473,23 @@ describe('building inspector — upgrade and demolish wait for a Building Destro
     return s;
   }
 
-  it('with no destroyer, Upgrade and Demolish stay enabled and carry the wait note', () => {
+  it('with no destroyer, Demolish carries the wait note and Upgrade has none', () => {
     const view = viewOf(upgradable());
-    for (const name of ['upgrade', 'demolish'] as const) {
-      const a = actionOf(view, name)!;
-      expect(a.disabled ?? false, name).toBe(false);
-      expect(a.note, name).toBe(waitNoVehicle());
-    }
+    const up = actionOf(view, 'upgrade')!;
+    expect(up.disabled ?? false).toBe(false);
+    expect(up.note).toBeUndefined();
+    const demolish = actionOf(view, 'demolish')!;
+    expect(demolish.disabled ?? false).toBe(false);
+    expect(demolish.note).toBe(waitNoVehicle());
     expect(actionOf(view, 'move')!.note).toBeUndefined();
   });
 
-  it('with a destroyer but no licensed driver the note names the driver', () => {
+  it('with a destroyer but no licensed driver Demolish names the driver; Upgrade still has no note', () => {
     const s = upgradable();
     purchaseVehicle(s.vehicles, 'building_destroyer');
-    const a = actionOf(viewOf(s), 'upgrade')!;
-    expect(a.disabled ?? false).toBe(false);
-    expect(a.note).toBe(t('inspector.wait.no_driver', { role: t('vehicle_type.building_destroyer') }));
-    expect(a.note).not.toBe(waitNoVehicle());
+    const view = viewOf(s);
+    expect(actionOf(view, 'upgrade')!.note).toBeUndefined();
+    expect(actionOf(view, 'demolish')!.note).toBe(t('inspector.wait.no_driver', { role: t('vehicle_type.building_destroyer') }));
   });
 
   it('with a destroyer and a licensed driver there is no note', () => {
@@ -506,5 +506,40 @@ describe('building inspector — upgrade and demolish wait for a Building Destro
     const up = actionOf(viewOf(s), 'upgrade')!;
     expect(up.disabled).toBe(true);
     expect(up.note).toBeUndefined();
+  });
+
+  it('the Upgrade tooltip is inspector.tip.upgrade and no longer mentions demolishing', () => {
+    const up = actionOf(viewOf(upgradable()), 'upgrade')!;
+    expect(up.title).toBe(t('inspector.tip.upgrade'));
+    expect(t('inspector.tip.upgrade').toLowerCase()).not.toContain('demolish');
+  });
+});
+
+describe('building inspector — upgrade ordered (#1875)', () => {
+  function upgradeOrdered(): GameState {
+    const s = stateWith(makeBuilding());
+    s.buildings.unlockedTiers['management_office'] = 2;
+    addSite(s, 3, null, 100);
+    s.plannedBuildings[0]!.tier = 2;
+    s.plannedBuildings[0]!.upgrade = true;
+    return s;
+  }
+
+  it('Upgrade, Move and Demolish are disabled with the upgrade_ordered reason', () => {
+    const view = viewOf(upgradeOrdered());
+    for (const name of ['upgrade', 'move', 'demolish'] as const) {
+      const a = actionOf(view, name)!;
+      expect(a.disabled, name).toBe(true);
+      expect(a.title, name).toBe(t('inspector.reason.upgrade_ordered'));
+    }
+  });
+
+  it('the standing building reads as upgrading, not as a construction site', () => {
+    const s = upgradeOrdered();
+    const operating = viewOf(stateWith(makeBuilding())).status;
+    const status = viewOf(s).status;
+    expect(status).not.toBe(operating);
+    // No builder holds the site yet, so the line is the waiting variant.
+    expect(status).toBe(t('inspector.status.upgrading_waiting', { tier: 2 }));
   });
 });

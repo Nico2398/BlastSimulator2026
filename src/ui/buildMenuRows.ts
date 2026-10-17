@@ -100,11 +100,9 @@ export function makeSiteRow(pb: PlannedBuilding, model: SiteRowModel, onSelect: 
 export function syncSiteRow(row: HTMLElement, model: SiteRowModel): void {
   const progress = findLive(row, 'progress');
   if (progress) writeText(progress, progressText(model.progress));
-  syncOptional(row, 'badge', model.rebuild ? t('ui.build.row.badge.rebuilding') : null,
-    makeBadge);
 }
 
 /** Signature that names a site row set: a change rebuilds the rows. */
-export function siteSignature(sites: ReadonlyArray<PlannedBuilding>, isRebuild: (pb: PlannedBuilding) => boolean): string {
-  return sites.map((pb) => `${pb.buildingId}:${pb.type}:${pb.tier}:${isRebuild(pb)}`).join(',');
+export function siteSignature(sites: ReadonlyArray<PlannedBuilding>): string {
+  return sites.map((pb) => `${pb.buildingId}:${pb.type}:${pb.tier}`).join(',');
 }

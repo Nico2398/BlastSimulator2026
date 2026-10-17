@@ -7,7 +7,7 @@ import type { GameState, PlannedBuilding } from '../state/GameState.js';
 import { isDemolitionOrdered } from '../engine/BuildingDemolition.js';
 
 type BuildingStatusKind =
-  | 'operating' | 'out_of_service' | 'demolition_ordered' | 'rebuilding' | 'under_construction';
+  | 'operating' | 'out_of_service' | 'demolition_ordered' | 'upgrading' | 'under_construction';
 
 export interface BuildingStatus {
   kind: BuildingStatusKind;
@@ -15,11 +15,11 @@ export interface BuildingStatus {
   closureTicksRemaining: number | null;
   /** Event behind the closure, set only for 'out_of_service'. */
   closureEventId: string | null;
-  /** 0..1 build progress, set only for 'rebuilding' / 'under_construction'. */
+  /** 0..1 build progress, set only for 'upgrading' / 'under_construction'. */
   progress: number | null;
   /** Employee carrying out the work, when one is assigned. */
   builderId: number | null;
-  /** Tier being built, set only for 'rebuilding' / 'under_construction'. */
+  /** Tier being built, set only for 'upgrading' / 'under_construction'. */
   targetTier: BuildingTier | null;
 }
 
@@ -42,35 +42,32 @@ function siteWork(s: BuildingStatusInput, site: PlannedBuilding): { builderId: n
   return { builderId: holder.id, progress: Math.min(1, Math.max(0, 1 - remaining / total)) };
 }
 
-/** A site is a rebuild when its upgrade order says so, or a pending demolition still carries its order id. */
-function isRebuildSite(s: BuildingStatusInput, site: PlannedBuilding): boolean {
-  return site.rebuild === true
-    || s.pendingActions.some(a => a.type === 'demolish_building' && a.payload['rebuildOrderId'] === site.id);
+/** Status of a standing building whose upgrade site is being worked. */
+function upgradingStatus(s: BuildingStatusInput, site: PlannedBuilding): BuildingStatus {
+  return { ...BASE, kind: 'upgrading', targetTier: site.tier, ...siteWork(s, site) };
 }
 
 /**
  * Status of the placed building `buildingId`, or null when it does not exist.
- * Priority: a site with no standing building, then a queued demolition, then a live closure.
+ * Priority: a site with no standing building, then a queued demolition, then a live closure,
+ * then an in-place upgrade (the building keeps operating while the builder works).
  */
 export function computeBuildingStatus(s: BuildingStatusInput, buildingId: number): BuildingStatus | null {
   const standing = s.buildings.buildings.some(b => b.id === buildingId);
   const site = standing ? undefined : s.plannedBuildings.find(pb => pb.buildingId === buildingId);
   if (site) {
-    return {
-      ...BASE,
-      kind: isRebuildSite(s, site) ? 'rebuilding' : 'under_construction',
-      targetTier: site.tier,
-      ...siteWork(s, site),
-    };
+    return { ...BASE, kind: 'under_construction', targetTier: site.tier, ...siteWork(s, site) };
   }
   if (!standing) return null;
   if (isDemolitionOrdered(s, buildingId)) return { ...BASE, kind: 'demolition_ordered' };
+
+  const upgrade = s.plannedBuildings.find(pb => pb.buildingId === buildingId && pb.upgrade === true);
 
   const closures = s.events.activeModifiers.filter(
     m => m.kind === 'out_of_service' && m.targetKind === 'building' && m.targetId === buildingId
       && (m.endTick === null || m.endTick > s.tickCount),
   );
-  if (closures.length === 0) return BASE;
+  if (closures.length === 0) return upgrade ? upgradingStatus(s, upgrade) : BASE;
   // The closure that lasts longest decides the countdown; a permanent one never ends.
   const latest = closures.reduce((a, b) => (a.endTick === null ? a : b.endTick === null || b.endTick > a.endTick ? b : a));
   return {

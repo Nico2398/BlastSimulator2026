@@ -7,7 +7,7 @@
 // rather than pushing console-formatted strings.
 
 import { autoChargeHole } from '../mining/ChargeOrder.js';
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PlannedBuilding } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -26,12 +26,29 @@ import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { addIncome } from '../economy/Finance.js';
+import { completeUpgrade, checkUpgradeFootprint } from './BuildingUpgrade.js';
 import { completeDemolition } from './BuildingDemolition.js';
 import { readDemolishPayload } from './DemolishPayload.js';
 import {
   siteBoundsForGrid, settleBuiltFootprint,
   emitFootprintRegionChanged,
 } from './BuildingTaskHelpers.js';
+
+/**
+ * Can the standing building still grow into the upgrade site's footprint? The
+ * building itself and the site's own reservation do not count as occupants.
+ */
+function checkUpgradeSite(
+  state: GameState,
+  grid: VoxelGrid | null,
+  order: PlannedBuilding,
+  bounds: ReturnType<typeof siteBoundsForGrid>,
+): { success: boolean; error?: string } {
+  const building = state.buildings.buildings.find(b => b.id === order.buildingId);
+  if (!building) return { success: false, error: 'building is gone' };
+  const check = checkUpgradeFootprint(state, grid, bounds, building, order.tier, [order]);
+  return check.valid ? { success: true } : { success: false, error: check.error ?? 'footprint no longer valid' };
+}
 
 /**
  * Apply the world effects of `emp`'s just-completed task (per `progress`)
@@ -234,14 +251,18 @@ export function applyTaskCompletion(
 
       if (order) {
         const bounds = siteBoundsForGrid(grid);
-        const result = placeBuilding(
-          state.buildings, order.type, order.x, order.z,
-          bounds.width, bounds.depth, order.tier, bounds.originX, bounds.originZ,
-          order.buildingId, grid ?? undefined,
-        );
+        const result = order.upgrade === true
+          ? checkUpgradeSite(state, grid, order, bounds)
+          : placeBuilding(
+            state.buildings, order.type, order.x, order.z,
+            bounds.width, bounds.depth, order.tier, bounds.originX, bounds.originZ,
+            order.buildingId, grid ?? undefined,
+          );
 
         if (result.success) {
           state.plannedBuildings.splice(orderIdx, 1);
+          // An upgrade raises the standing building in place; a new site lands as a fresh one.
+          if (order.upgrade === true) completeUpgrade(state, order.buildingId, order.tier);
           // Level, patch the nav grid and relocate anyone caught on the footprint (the builder
           // included — #816, #556): see settleBuiltFootprint.
           const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
@@ -250,7 +271,7 @@ export function applyTaskCompletion(
             outcome: 'built',
             type: order.type,
             tier: order.tier,
-            buildingId: result.building!.id,
+            buildingId: order.buildingId,
             x: order.x,
             z: order.z,
             footprintLevelled,

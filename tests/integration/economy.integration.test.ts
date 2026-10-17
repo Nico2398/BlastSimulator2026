@@ -1491,7 +1491,7 @@ describe('Economy — per-warehouse freight storage (#1372)', () => {
     const ordered = buildCommand(ctx, ['destroy', String(a)], {});
     expect(ordered.success).toBe(true);
     completeDemolition(ctx.state!, null, ctx.emitter, {
-      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [],
     });
 
     expect(storedIn(a)).toBe(0);
@@ -1510,7 +1510,7 @@ describe('Economy — per-warehouse freight storage (#1372)', () => {
     const events: Array<{ buildingId: number; massKg: number }> = [];
     ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
     completeDemolition(ctx.state!, null, ctx.emitter, {
-      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [],
     });
     expect(events).toEqual([expect.objectContaining({ buildingId: a, massKg: 400 })]);
   });
@@ -1520,7 +1520,7 @@ describe('Economy — per-warehouse freight storage (#1372)', () => {
     const events: unknown[] = [];
     ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
     completeDemolition(ctx.state!, null, ctx.emitter, {
-      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [],
     });
     expect(events).toEqual([]);
   });
@@ -1534,11 +1534,8 @@ describe('Economy — per-warehouse freight storage (#1372)', () => {
     ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
     const ordered = buildCommand(ctx, ['upgrade', String(a)], {});
     expect(ordered.success, ordered.output).toBe(true);
-    const order = ctx.state!.plannedBuildings.find(pb => pb.buildingId === a)!;
-    completeDemolition(ctx.state!, null, ctx.emitter, {
-      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: order.id,
-    });
-    // Another building change mid-rebuild must not wipe it either.
+    expect(ctx.state!.plannedBuildings.find(pb => pb.buildingId === a)?.upgrade).toBe(true);
+    // Another building change mid-upgrade must not wipe it either.
     refreshLogisticsCapacity(ctx.state!);
     expect(events).toEqual([]);
     expect(storedIn(a)).toBe(300);
