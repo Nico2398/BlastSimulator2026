@@ -412,6 +412,7 @@ describe('sandbox starting site per difficulty (#1671)', () => {
   it('hard cash is 195k, below normal and above the old 170k (#1874)', () => {
     expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(195_000);
     expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBeLessThan(SANDBOX_DIFFICULTIES.normal.startingCash);
+    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBeGreaterThan(170_000);
   });
 
   it('hard no longer shares the Dusty Hollow site, and Dusty Hollow keeps its own start (#1874)', () => {

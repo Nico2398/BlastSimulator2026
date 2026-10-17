@@ -1639,10 +1639,9 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
  * Free starting kit per sandbox difficulty (#1671): every difficulty can drill,
  * charge, fire, haul and sell its first blast with no purchases. Hard is the
  * digger kit (a rock digger, a ramp into the crater, and its dedicated
- * excavator-licensed driver, #1874); easy adds a rock fragmenter and its
- * licensed driver. Hard and normal share a kit and differ by opening cash only,
- * so hard is not a kit that cannot ramp into the crater. Each kit is a superset
- * of the smaller one.
+ * excavator-licensed driver, #1874), shared with normal: the two differ by
+ * opening cash only, so hard can always ramp into the crater. Easy adds a
+ * rock fragmenter and its licensed driver to that kit.
  */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
   hard: DIGGER_STARTING_SITE,
@@ -1663,13 +1662,10 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
  * at (30,48), then one 3x3 Krackle 8 kg pattern (spacing 4, depth 8, start
  * 36,32), charge, clear zone, blast (~t562), haul, sell. Payroll and upkeep
  * drain cash until the first sale, whose low point is linear in the start:
- * normal bottoms at (start - 181.5k), hard at (start - 147.5k), so the
- * minimum positive-cash start is ~181.6k normal / ~147.6k hard (normal 170k
- * fails with a -11.5k low, 185k passes). Chosen with ~15% margin: 210k / 170k.
- * #1874: hard now carries the digger kit and its dedicated excavator driver
- * (same as normal), so the hard low point is the shared kit's start - $181.5k,
- * not start - $147.5k; 195k leaves ~7% margin. Hard stays cheaper than normal
- * through lower cash only.
+ * the shared normal/hard kit (#1874) bottoms at (start - 181.5k), so the
+ * minimum positive-cash start is ~181.6k (170k fails with a -11.5k low, 185k
+ * passes). Normal keeps ~15% margin at 210k; hard takes ~7% at 195k and stays
+ * cheaper than normal through lower cash only.
  * Easy keeps 250k (low $36.9k, cash 681,127 at t2000) and stays strictly
  * above normal. The old 150k / 120k went bankrupt at ~t609 / ~t582.
  */

@@ -423,7 +423,7 @@ describe('SandboxPanel', () => {
     expect(easy.trim()).not.toBe('');
     expect(easy).not.toBe(hard);
 
-    // The easy kit adds a rock digger and a rock fragmenter over the hard kit.
+    // The easy kit adds a rock fragmenter over the hard kit.
     const names = (id: SandboxDifficultyId) => sandboxDifficultyDetails(id).vehicles
       .map(v => t(getVehicleDefByTier(v.role, v.tier).nameKey));
     for (const name of names('hard')) expect(hard, name).toContain(name);
