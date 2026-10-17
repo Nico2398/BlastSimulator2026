@@ -26,6 +26,14 @@ export interface ChargeHoleActionPayload {
   orderCost: number;
   /** Kg of the order drawn from warehouse stock at order time (#1678); returned on cancel. */
   orderStock?: OrderStockDraw;
+  /** Tick the cash-bought part of the order is delivered (#1895); absent when fully drawn from stock. */
+  deliveryArrivalTick?: number;
+}
+
+/** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */
+export function earliestChargeDeliveryTick(_state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
+  // TODO: implement
+  return null;
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */

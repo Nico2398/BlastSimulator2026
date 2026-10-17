@@ -109,3 +109,15 @@ export function returnOrderStock(
   }
   return { restockedKg, cashRefund };
 }
+
+/** Delivery wait in ticks for the part of an order bought with cash (#1895); 0 when nothing is bought. */
+export function orderDeliveryTicks(_fromCashKg: number): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Delivery arrival tick recorded on a charge action's payload, if any (#1895). */
+export function readOrderDeliveryTick(_action: Pick<PendingAction, 'payload'>): number | undefined {
+  // TODO: implement
+  return undefined;
+}

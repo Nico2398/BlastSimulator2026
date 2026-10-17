@@ -27,6 +27,13 @@ interface StockView {
   paidFromStockKg: number;
   paidCash: number;
   selectedId: string;
+  /** Kg of the planned pattern neither covered by stock nor yet delivered (#1895). */
+  uncoveredKg: number;
+  /** Delivery wait in ticks for the cash-bought part (#1895). */
+  deliveryTicks: number;
+  hasWarehouse: boolean;
+  /** Tick an in-transit delivery arrives, or null (#1895). */
+  inTransitUntilTick: number | null;
 }
 
 /** Stock view for the Charge step; `holeCount` x `amountKg` of the selected explosive is the current pattern. */
@@ -48,6 +55,10 @@ export function buildStockView(
     need: Math.ceil(buyCost),
     paidFromStockKg: Math.round(split.fromStockKg),
     paidCash: split.cashCost,
+    uncoveredKg: 0,
+    deliveryTicks: 0,
+    hasWarehouse: false,
+    inTransitUntilTick: null,
   };
 }
 
