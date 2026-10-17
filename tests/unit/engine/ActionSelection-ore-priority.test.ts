@@ -36,6 +36,9 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../
 import { Random } from '../../../src/core/math/Random.js';
 import { ORE_HAUL_PRIORITY_BONUS_TICKS } from '../../../src/core/config/balance.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
+import { haulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
+import { refreshLogisticsCapacity } from '../../../src/core/engine/BuildingTaskHelpers.js';
 
 // #1090: haul_debris is requiredVehicleRole: 'debris_hauler' — planItinerary
 // now reports a vehicle-gated goal genuinely unresolvable (Infinity/null)
@@ -352,5 +355,168 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
     const resolvedControl = resolveActionCost(state, emp, oreControl);
     expect(resolvedControl).not.toBeNull();
     expect(result!.totalTicks).toBeCloseTo(resolvedControl!.totalTicks, 10);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Barren rock yields to any claimable ore haul (#1870)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('selectBestActionForEmployee — a barren haul waits while an ore haul can be taken (#1870)', () => {
+  /** An ore candidate this many bonus-widths farther than the barren one: cost alone picks the barren haul. */
+  const BEYOND_BONUS_CELLS = 3 * ORE_HAUL_PRIORITY_BONUS_TICKS * DEBRIS_HAULER_SPEED;
+  const NEAR_X = 6;
+  const FAR_X = NEAR_X + BEYOND_BONUS_CELLS;
+
+  /** Leaves `freeKg` of room in the warehouse by parking a stored filler fragment in it (what a stocked warehouse is). */
+  function leaveWarehouseRoom(state: GameState, freeKg: number): void {
+    const warehouse = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    refreshLogisticsCapacity(state);
+    const filler = makeFragment(9000, 0, 0, {});
+    filler.mass = state.logistics.storageCapacityKg - freeKg;
+    state.logistics.fragments.push({ fragment: filler, state: 'stored', vehicleId: null, warehouseId: warehouse.id });
+    state.logistics.storedMassKg += filler.mass;
+  }
+
+  function layout() {
+    const state = makeState(260, 260);
+    const emp = makeHaulerEmployee(state, 0, 0);
+    addBlastFragments(state.logistics, [
+      makeFragment(1, NEAR_X, 0, {}),
+      makeFragment(2, FAR_X, 0, { gloomium: 0.2 }),
+    ]);
+    const barren = makeHaulAction({ id: 1, targetX: NEAR_X, targetZ: 0, payload: { fragmentId: 1 } });
+    const ore = makeHaulAction({ id: 2, targetX: FAR_X, targetZ: 0, payload: { fragmentId: 2 } });
+    return { state, emp, barren, ore };
+  }
+
+  it('fixture: on cost alone the nearer barren haul beats the ore haul even with the ore bonus', () => {
+    const { state, emp, barren, ore } = layout();
+    expect(estimateActionCost(state, emp, barren)).toBeLessThan(estimateActionCost(state, emp, ore));
+  });
+
+  it('a reachable ore haul and a much nearer barren haul: the driver takes the ore haul', () => {
+    const { state, emp, barren, ore } = layout();
+    const result = selectBestActionForEmployee(state, emp, [barren, ore]);
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(ore.id);
+  });
+
+  it('candidate order does not matter', () => {
+    const { state, emp, barren, ore } = layout();
+    expect(selectBestActionForEmployee(state, emp, [ore, barren])!.action.id).toBe(ore.id);
+  });
+
+  it('every barren haul waits: with several nearer barren hauls the ore haul is still the pick', () => {
+    const { state, emp, ore } = layout();
+    addBlastFragments(state.logistics, [makeFragment(3, 2, 0, {}), makeFragment(4, 3, 1, {}), makeFragment(5, 1, 4, {})]);
+    const extras = [3, 4, 5].map(id => makeHaulAction({ id, targetX: 2, targetZ: 0, payload: { fragmentId: id } }));
+    const barren = makeHaulAction({ id: 1, targetX: NEAR_X, targetZ: 0, payload: { fragmentId: 1 } });
+    expect(selectBestActionForEmployee(state, emp, [barren, ...extras, ore])!.action.id).toBe(ore.id);
+  });
+
+  it('the reported totalTicks stays the real cost of the ore haul', () => {
+    const { state, emp, barren, ore } = layout();
+    const result = selectBestActionForEmployee(state, emp, [barren, ore])!;
+    expect(result.totalTicks).toBeCloseTo(resolveActionCost(state, emp, ore)!.totalTicks, 10);
+  });
+
+  it('the warehouse refuses the ore (isClaimable false): the driver takes the barren haul', () => {
+    const { state, emp, barren, ore } = layout();
+    const result = selectBestActionForEmployee(state, emp, [barren, ore], a => a.id !== ore.id);
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(barren.id);
+  });
+
+  it('a really full warehouse (storage_full) lets barren rock go to the heap', () => {
+    const { state, emp, barren, ore } = layout();
+    leaveWarehouseRoom(state, 500); // fragments weigh 1000 kg: none fits
+    expect(haulBlockedReason(state, ore)).toBe('storage_full');
+    expect(haulBlockedReason(state, barren)).toBeNull();
+
+    const result = selectBestActionForEmployee(state, emp, [barren, ore], a => haulBlockedReason(state, a) === null);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(barren.id);
+  });
+
+  it('room left in the warehouse for the ore: the ore haul still goes first', () => {
+    const { state, emp, barren, ore } = layout();
+    leaveWarehouseRoom(state, 1500); // fragments weigh 1000 kg: one fits
+    expect(haulBlockedReason(state, ore)).toBeNull();
+    const result = selectBestActionForEmployee(state, emp, [barren, ore], a => haulBlockedReason(state, a) === null);
+    expect(result!.action.id).toBe(ore.id);
+  });
+
+  it('every ore fragment out of reach (walled in): the driver takes the barren haul', () => {
+    const { state, emp, barren, ore } = layout();
+    // A full-height wall between the employee (and depot) and the ore: no route, no climb.
+    const wallX = Math.round(FAR_X) - 2;
+    expect(wallX).toBeGreaterThan(40);
+    for (let z = 0; z < 260; z++) state.navGrid!.cells[z]![wallX] = makeCell('blocked');
+    expect(resolveActionCost(state, emp, ore)).toBeNull();
+
+    const result = selectBestActionForEmployee(state, emp, [barren, ore]);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(barren.id);
+  });
+
+  it('no ore on the ground at all: the nearest barren haul is chosen (no regression)', () => {
+    const state = makeState(260, 260);
+    const emp = makeHaulerEmployee(state, 0, 0);
+    addBlastFragments(state.logistics, [makeFragment(1, 30, 0, {}), makeFragment(2, 8, 0, {})]);
+    const far = makeHaulAction({ id: 1, targetX: 30, targetZ: 0, payload: { fragmentId: 1 } });
+    const near = makeHaulAction({ id: 2, targetX: 8, targetZ: 0, payload: { fragmentId: 2 } });
+    expect(selectBestActionForEmployee(state, emp, [far, near])!.action.id).toBe(near.id);
+  });
+
+  it('a loaded (in_transit) barren haul still finishes before a ground ore haul (#1709)', () => {
+    const { state, emp, barren, ore } = layout();
+    // The driver sits in a hauler that already carries the barren piece (interrupted trip, order back in the pool).
+    const vehicle = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    vehicle.occupantIds = [emp.id];
+    emp.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 1000 }];
+    const tracked = state.logistics.fragments.find(t => t.fragment.id === 1)!;
+    tracked.state = 'in_transit';
+    tracked.vehicleId = String(vehicle.id);
+    state.pendingActions.push(barren);
+    reserveVehicle(state.vehicles, vehicle.id, barren.id);
+    expect(resolveActionCost(state, emp, barren)).not.toBeNull();
+
+    const result = selectBestActionForEmployee(state, emp, [barren, ore]);
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(barren.id);
+  });
+
+  it('the ore weighting among ore hauls is unchanged: the nearer ore haul beats a farther one', () => {
+    const { state, emp, ore } = layout();
+    addBlastFragments(state.logistics, [makeFragment(6, FAR_X - 20, 0, { gloomium: 0.2 })]);
+    const nearerOre = makeHaulAction({ id: 6, targetX: FAR_X - 20, targetZ: 0, payload: { fragmentId: 6 } });
+    expect(selectBestActionForEmployee(state, emp, [ore, nearerOre])!.action.id).toBe(nearerOre.id);
+  });
+
+  it('a higher-tier charge_hole outranks both the ore haul and the barren haul', () => {
+    const { state, emp, barren, ore } = layout();
+    assignSkill(state.employees, emp.id, 'blasting', 1);
+    const charge: PendingAction = {
+      id: 10, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
+      targetX: 40, targetZ: 40, targetY: 0, targetEmployeeId: null, status: 'queued', holderId: null,
+      queuedAtTick: 0, payload: { holeId: 'H1', durationTicks: 10 },
+    };
+    expect(selectBestActionForEmployee(state, emp, [barren, ore, charge])!.action.id).toBe(charge.id);
+  });
+
+  it('with the charge_hole unclaimable the ore haul, not the barren one, is next', () => {
+    const { state, emp, barren, ore } = layout();
+    assignSkill(state.employees, emp.id, 'blasting', 1);
+    const charge: PendingAction = {
+      id: 10, type: 'charge_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
+      targetX: 40, targetZ: 40, targetY: 0, targetEmployeeId: null, status: 'queued', holderId: null,
+      queuedAtTick: 0, payload: { holeId: 'H1', durationTicks: 10 },
+    };
+    const result = selectBestActionForEmployee(state, emp, [barren, ore, charge], a => a.type !== 'charge_hole');
+    expect(result!.action.id).toBe(ore.id);
   });
 });
