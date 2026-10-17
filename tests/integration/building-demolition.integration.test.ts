@@ -325,6 +325,8 @@ describe('build upgrade as in-place construction (#1875)', () => {
       tick(ctx);
       const b = ctx.state!.buildings.buildings.find(x => x.id === id);
       expect(b, `building ${id} vanished at tick ${i}`).toBeDefined();
+      expect(b!.active, `building ${id} deactivated at tick ${i}`).toBe(true);
+      expect(b!.outOfService, `building ${id} out of service at tick ${i}`).toBeFalsy();
     }
     expect(ctx.state!.plannedBuildings).toHaveLength(0);
   });
