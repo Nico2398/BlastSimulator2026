@@ -22,7 +22,7 @@ import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { deliverStoredOre, bookDeliveryIncome } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
-import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
+import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
 import type { Building } from '../../core/entities/Building.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
@@ -122,7 +122,7 @@ function resolveContract(
   args: string[],
   named: Record<string, string>,
   usage: string,
-  stock: { collectedOre: Readonly<Record<string, number>>; logistics: { storedMassKg: number }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
+  stock: { collectedOre: Readonly<Record<string, number>>; logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
 ): Contract | CommandResult {
   const selector = parseContractSelector(args, named);
   if (!selector) return { success: false, output: usage };

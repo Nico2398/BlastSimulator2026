@@ -32,16 +32,29 @@ export function totalSpoilKg(buildings: readonly Pick<Building, 'type' | 'stored
   return total;
 }
 
-/** Rubble a rubble_disposal contract can draw on: freight-stored mass plus every heap's barren rock. */
-export function rubbleStockKg(storedMassKg: number, buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[]): number {
-  return storedMassKg + totalSpoilKg(buildings);
+/** Fragment shape needed to tell stored barren rock from stored ore. */
+export interface StoredFragmentLike {
+  state: string;
+  fragment: { mass: number; oreDensities: Readonly<Record<string, number>> };
+}
+
+/** Mass (kg) of stored fragments that are barren (state 'stored' and isBarrenFragment). */
+export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[]): number {
+  void fragments;
+  return 0; // TODO: implement
+}
+
+/** Rubble a rubble_disposal contract can draw on: stored barren fragments plus every heap's barren rock. */
+export function rubbleStockKg(fragments: readonly StoredFragmentLike[], buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[]): number {
+  void fragments;
+  return totalSpoilKg(buildings); // TODO: implement
 }
 
 /** rubbleStockKg for any state slice carrying logistics and buildings (GameState fits). */
 export function stateRubbleStockKg(
-  state: { logistics: { storedMassKg: number }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
+  state: { logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
 ): number {
-  return rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings);
+  return rubbleStockKg(state.logistics.fragments, state.buildings.buildings);
 }
 
 /** Remove up to `amountKg` of barren rock from the heaps, in building order; returns the kg removed. */

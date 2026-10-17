@@ -374,7 +374,7 @@ export function consumeStoredOre(
   // out — a rubble contract pays cents per kg where an ore_sale pays
   // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
   // genuinely worthless waste would squander it for no reason (#959).
-  const available = rubbleStockKg(state.storedMassKg, buildings);
+  const available = rubbleStockKg(state.fragments, buildings);
   if (amountKg > available) {
     return {
       success: false,

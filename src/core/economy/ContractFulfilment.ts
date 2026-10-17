@@ -45,7 +45,7 @@ export function deliverStoredOre(
 
   let request = Math.min(requestedKg, remainingKg(contract));
   // Partial delivery: take what storage holds; an empty store falls through to the insufficient-stock error.
-  const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.storedMassKg, buildings));
+  const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings));
   if (stock > FRAGMENT_SPLIT_EPSILON_KG) request = Math.min(request, stock);
   if (!(request > 0)) return { success: false, error: t('economy.contract.deliver_fulfilled', { id: contractId }) };
 
@@ -82,7 +82,7 @@ export function autoDeliverContracts(
   // Sorted copy: completing a contract splices it out of contracts.active.
   for (const contract of sortByDeadline(contracts.active)) {
     if (!isAutoDeliverable(contract)) continue;
-    const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.storedMassKg, buildings));
+    const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings));
     if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
     const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick, buildings);
     if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data });
