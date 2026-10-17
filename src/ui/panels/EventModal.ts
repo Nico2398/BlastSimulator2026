@@ -86,6 +86,12 @@ function hintChip(hint: EventOptionEffectHint): HTMLElement {
   return chip(label, tone);
 }
 
+/** Signed, formatted magnitude for a chip (cash with $, others plain). */
+export function amountLabel(_kind: 'cash' | 'score' | 'other', _key: string, _delta: number): string {
+  // TODO: implement
+  return '';
+}
+
 /** Outcome-phase effect chip: the real, resolved magnitude. */
 function effectChip(effect: EventEffect): HTMLElement {
   const sign = effect.delta > 0 ? '+' : effect.delta < 0 ? '-' : '';

@@ -33,6 +33,18 @@ export interface EventOptionEffectHint {
   direction: 'positive' | 'negative' | 'neutral';
   /** True when the option's consequence is probabilistic — this hint describes the main branch, which may not be what actually happens. */
   risky?: boolean;
+  /** Signed magnitude, set only when the outcome is certain (not risky). */
+  amount?: number;
+  /** Lasting effect, set only when the outcome is certain (not risky). */
+  spec?: EventEffectSpec;
+}
+
+/** Signed certain amount a consequence applies to one hint (kind, key), or undefined when unknown. */
+export function consequenceAmount(
+  _c: EventConsequence, _kind: EventOptionEffectHint['kind'], _key: string,
+): number | undefined {
+  // TODO: implement
+  return undefined;
 }
 
 export interface EventConsequence {
