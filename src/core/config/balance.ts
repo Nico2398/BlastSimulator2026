@@ -1638,12 +1638,14 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
 /**
  * Free starting kit per sandbox difficulty (#1671): every difficulty can drill,
  * charge, fire, haul and sell its first blast with no purchases. Hard is the
- * Dusty Hollow kit; normal adds a rock digger (a ramp into the crater) and its
- * excavator-licensed driver; easy adds a rock fragmenter and its licensed
- * driver. Each kit is a superset of the smaller one.
+ * digger kit (a rock digger, a ramp into the crater, and its dedicated
+ * excavator-licensed driver, #1874); easy adds a rock fragmenter and its
+ * licensed driver. Hard and normal share a kit and differ by opening cash only,
+ * so hard is not a kit that cannot ramp into the crater. Each kit is a superset
+ * of the smaller one.
  */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
-  hard: DUSTY_HOLLOW_STARTING_SITE,
+  hard: DIGGER_STARTING_SITE,
   normal: DIGGER_STARTING_SITE,
   easy: {
     employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
@@ -1664,13 +1666,17 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
  * normal bottoms at (start - 181.5k), hard at (start - 147.5k), so the
  * minimum positive-cash start is ~181.6k normal / ~147.6k hard (normal 170k
  * fails with a -11.5k low, 185k passes). Chosen with ~15% margin: 210k / 170k.
+ * #1874: hard now carries the digger kit and its dedicated excavator driver
+ * (same as normal), so the hard low point is the shared kit's start - $181.5k,
+ * not start - $147.5k; 195k leaves ~7% margin. Hard stays cheaper than normal
+ * through lower cash only.
  * Easy keeps 250k (low $36.9k, cash 681,127 at t2000) and stays strictly
  * above normal. The old 150k / 120k went bankrupt at ~t609 / ~t582.
  */
 export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxDifficultyId, number>> = {
   easy: 250_000,
   normal: 210_000,
-  hard: 170_000,
+  hard: 195_000,
 };
 
 /**
