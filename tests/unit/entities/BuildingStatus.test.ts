@@ -3,6 +3,7 @@ import { computeBuildingStatus } from '../../../src/core/entities/BuildingStatus
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction, PlannedBuilding } from '../../../src/core/state/GameState.js';
 import type { Building } from '../../../src/core/entities/Building.js';
+import { isOperating, syncBuildingServiceFlags } from '../../../src/core/entities/Building.js';
 import type { ActiveModifier } from '../../../src/core/events/ActiveModifiers.js';
 import { hireEmployee, createEmployeeState } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -240,6 +241,17 @@ describe('computeBuildingStatus — upgrading in place (#1875)', () => {
     s.pendingActions.push(action({ id: 21, type: 'place_building' }));
     const st = computeBuildingStatus(s, 3)!;
     expect(st).toMatchObject({ kind: 'upgrading', progress: null, builderId: null });
+  });
+
+  it('a building with a pending upgrade stays operating after a service-flag sync with no closures', () => {
+    const s = stateWith();
+    s.plannedBuildings.push({ ...site(3, 21, 2), upgrade: true });
+    s.pendingActions.push(action({ id: 21, type: 'place_building' }));
+    syncBuildingServiceFlags(s.buildings.buildings, new Set());
+    const b = s.buildings.buildings[0]!;
+    expect(isOperating(b)).toBe(true);
+    expect(b.outOfService).toBeFalsy();
+    expect(computeBuildingStatus(s, 3)!.kind).toBe('upgrading');
   });
 
   it('a site without the upgrade flag and no standing building stays under_construction', () => {
