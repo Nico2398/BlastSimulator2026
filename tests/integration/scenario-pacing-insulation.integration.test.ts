@@ -72,7 +72,11 @@ describe('scenario pacing insulation (#597)', () => {
 
     const modified = createRunner();
     runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
-    runCommand(modified, 'tick 5');
+    // A whole 10-tick slice, the grid the baseline ticks on. Sub-slice shifts (1, 3 ticks)
+    // already changed the first event on main before #1890 (probed: tick 1 -> tax_audit,
+    // tick 3 -> land_claim, vs minister_visit at 0/5/10); tick 5 passed there by coincidence.
+    // The first pick depends on the exact tick it lands on, which is outside #1890's scope.
+    runCommand(modified, 'tick 10');
     for (let i = 0; i < 15; i++) runCommand(modified, 'employee hire role:blaster');
     for (let i = 0; i < 60; i++) runCommand(modified, 'tick 10');
 

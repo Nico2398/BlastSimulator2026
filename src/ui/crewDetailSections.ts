@@ -19,6 +19,7 @@ import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 import { iconEl } from './icons.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { describeRamp } from './describeRamp.js';
+import { strikePressure } from '../core/events/UnionGrievance.js';
 import { resolveEmployeeLocation, resolveTaskTarget, trainingSchool, type EntityRef } from './crewFacts.js';
 
 /** Builds a clickable reference to another entity; the host decides what a click does (the inspector selects it). */
@@ -316,6 +317,11 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
     el('span', { text: t('ui.crew.pay_base', { amount: perHour(base) }) }),
     el('span', { text: t('ui.crew.pay_bonus', { amount: perHour(bonus) }), attrs: { style: 'margin-left:8px' } }),
     el('span', { text: t('ui.crew.pay_raises', { amount: perHour(e.raises ?? 0) }), attrs: { style: 'margin-left:8px' } }),
+    ...(e.unionized ? [el('span', {
+      className: 'bs-pay-union-discount',
+      text: t('ui.crew.pay_union_discount', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT, amount: perHour(Math.max(0, base + bonus + (e.raises ?? 0) - e.salary)) }),
+      attrs: { style: 'margin-left:8px' },
+    })] : []),
     el('span', { text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
   );
 
@@ -457,11 +463,17 @@ export function makeAvatar(e: Employee): HTMLElement {
   return el('div', { text: getInitials(e.name), attrs: { style: `width:30px;height:30px;flex:0 0 30px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:${roleColorHex(e.role)};color:#12161c;font:800 11px/1 var(--bsx-font-ui)` } });
 }
 
+/** Small 44px bar filled to `pct` percent; `fillClass` lets a caller repaint the fill in place. */
+function makeMiniBar(pct: number, color: string, fillClass?: string): HTMLElement {
+  const fill = el('div', { ...(fillClass ? { className: fillClass } : {}), attrs: { style: `height:100%;background:${color};width:${pct}%` } });
+  const track = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;overflow:hidden;background:#242c36' }, children: [fill] });
+  return track;
+}
+
 /** Morale bar + percentage; the `bs-crew-morale-*` classes are what the Crew panel repaints in place. */
 function makeMoraleMeter(e: Employee): HTMLElement[] {
   const color = moraleColor(e.morale);
-  const fill = el('div', { className: 'bs-crew-morale-fill', attrs: { style: `height:100%;background:${color};width:${e.morale}%` } });
-  const track = el('div', { attrs: { style: 'width:44px;height:4px;border-radius:2px;overflow:hidden;background:#242c36' }, children: [fill] });
+  const track = makeMiniBar(e.morale, color, 'bs-crew-morale-fill');
   const value = el('span', { className: 'bs-crew-morale-value bsx-mono', text: `${Math.round(e.morale)}%`, attrs: { style: `font-size:11px;color:${color}` } });
   return [track, value];
 }
@@ -481,7 +493,19 @@ export function makeIdentitySection(e: Employee, state: GameState): HTMLElement 
     makeRoleMoraleLine(e),
     el('span', { text: `${t('ui.crew.hired')} ${hiredText(e)}`, className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' } }),
   );
+  if (e.unionized) nameCol.appendChild(makeStrikePressureRow(state));
   return el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px' }, children: [makeAvatar(e), nameCol, makeStatusTags(e, state)] });
+}
+
+/** Union members' strike pressure: share of the grievance threshold, as text and a small bar (#1890). */
+function makeStrikePressureRow(state: Pick<GameState, 'events'>): HTMLElement {
+  const pct = Math.round(strikePressure(state.events.unionGrievance) * 100);
+  const track = makeMiniBar(pct, bandColor(100 - pct, 34, 67));
+  return el('div', {
+    className: 'bs-crew-strike-pressure',
+    attrs: { style: 'display:flex;align-items:center;gap:7px;font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)', title: t('ui.crew.strike_pressure_tip') },
+    children: [el('span', { text: t('ui.crew.strike_pressure', { pct }) }), track],
+  });
 }
 
 /** True when the employee is resting or walking to rest, i.e. `makeRestSection` renders. */

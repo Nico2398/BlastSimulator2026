@@ -8,6 +8,7 @@ import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Building } from '../../../../src/core/entities/Building.js';
+import frLocaleJson from '../../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 import { perHour } from '../../../../src/ui/crewDetailSections.js';
 import { hiringSignature } from '../../../../src/ui/panels/CrewHiring.js';
 import { candidatesForRole, takeCandidate, type HireCandidate } from '../../../../src/core/entities/HiringPool.js';
@@ -695,5 +696,28 @@ describe('CrewPanel — union trade-off on hire cards (#1873)', () => {
     };
     expect(cardText(cands[0]!)).toContain(line);
     expect(cardText(cands[1]!)).not.toContain(line);
+  });
+});
+
+describe('CrewPanel — hire card union line names demands and strikes (#1890)', () => {
+  it('a union candidate card shows the trade-off line naming demands and strikes (en)', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    const cands = candidatesForRole(state.hiringPool, 'driller');
+    cands[0]!.unionized = true;
+    panel.update(state);
+    const line = t('ui.crew.candidate_union_tradeoff', { pct: 15 });
+    let node: HTMLElement | null = panel.root.querySelector(`button[data-candidate-id="${cands[0]!.id}"]`);
+    while (node && !(node.textContent ?? '').includes(cands[0]!.name)) node = node.parentElement;
+    expect(node!.textContent).toContain(line);
+    expect(line).toMatch(/demand/i);
+    expect(line).toMatch(/strike/i);
+  });
+
+  it('the French line names revendications and grèves', () => {
+    const fr = (frLocaleJson as Record<string, string>)['ui.crew.candidate_union_tradeoff']!;
+    expect(fr).toMatch(/revendication/i);
+    expect(fr).toMatch(/gr[eè]ve/i);
+    expect(fr).toContain('{pct}');
   });
 });

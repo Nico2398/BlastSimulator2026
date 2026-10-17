@@ -11,6 +11,10 @@ import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { createEventSystemState, selectEvent, tickEventSystem } from '../../../src/core/events/EventSystem.js';
 import { MIN_EVENT_INTERVAL_ACTIONS, MIN_EVENT_INTERVAL_TICKS } from '../../../src/core/config/balance.js';
 import { resolveEvent } from '../../../src/core/events/EventResolver.js';
+import { strikeDue } from '../../../src/core/events/UnionGrievance.js';
+import { workRate } from '../../../src/core/events/ActiveModifiers.js';
+import { makeEffectWorld } from '../../helpers/eventEffectWorld.js';
+import { UNION_GRIEVANCE_STRIKE_THRESHOLD, UNION_GRIEVANCE_PER_REFUSAL, UNION_GRIEVANCE_EASE_PER_MET, UNION_GRIEVANCE_AFTER_STRIKE } from '../../../src/core/config/balance.js';
 
 function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
   return {
@@ -199,5 +203,111 @@ describe('union events scale with membership (#1873)', () => {
     const none = countUnionFires(0);
     const all = countUnionFires(10);
     expect(all).toBeGreaterThanOrEqual(2 * Math.max(none, 1));
+  });
+});
+
+describe('refusals build toward a strike (#1890)', () => {
+  beforeEach(() => {
+    clearEvents();
+    registerEvents(UNION_EVENTS_1);
+    registerEvents(UNION_EVENTS_2);
+  });
+
+  const highWellBeing = () => ({ ...createScoreState(), wellBeing: 90 });
+
+  /** Resolve option `opt` of a union event against a fresh finance/score state. */
+  function resolve(es: ReturnType<typeof createEventSystemState>, id: string, opt: number, world?: ReturnType<typeof makeEffectWorld>['world']) {
+    es.pendingEvent = { eventId: id, firedAtTick: 10 };
+    return resolveEvent(es, createFinanceState(1_000_000), createScoreState(), opt, 10, new Random(42), world);
+  }
+
+  it("union_strike_threat is tagged 'strike'", () => {
+    expect(getEventById('union_strike_threat')!.tags).toContain('strike');
+  });
+
+  it('union_strike_threat can fire on a happy crew once a strike is due', () => {
+    const ev = getEventById('union_strike_threat')!;
+    const calm = makeCtx({ scores: highWellBeing(), unionMemberCount: 3, unionGrievance: 0 });
+    const due = makeCtx({ scores: highWellBeing(), unionMemberCount: 3, unionGrievance: UNION_GRIEVANCE_STRIKE_THRESHOLD });
+    expect(ev.canFire(calm)).toBe(false);
+    expect(ev.canFire(due)).toBe(true);
+  });
+
+  it('union_strike_threat still fires on very low well-being (legacy)', () => {
+    const ev = getEventById('union_strike_threat')!;
+    expect(ev.canFire(makeCtx({ scores: { ...createScoreState(), wellBeing: 20 } }))).toBe(true);
+  });
+
+  it('resolving a refusal raises event-system grievance', () => {
+    const es = createEventSystemState();
+    resolve(es, 'union_ergo_chairs', 1); // refuse: wellBeing -6
+    expect(es.unionGrievance).toBe(UNION_GRIEVANCE_PER_REFUSAL);
+  });
+
+  it('resolving a met demand eases grievance', () => {
+    const es = createEventSystemState();
+    es.unionGrievance = 40;
+    resolve(es, 'union_ergo_chairs', 0); // meet: wellBeing +10
+    expect(es.unionGrievance).toBe(40 - UNION_GRIEVANCE_EASE_PER_MET);
+  });
+
+  it('refusing every demand reaches a due strike, and the strike stops all work', () => {
+    const es = createEventSystemState();
+    const refusals = Math.ceil(UNION_GRIEVANCE_STRIKE_THRESHOLD / UNION_GRIEVANCE_PER_REFUSAL);
+    for (let i = 0; i < refusals; i++) resolve(es, 'union_ergo_chairs', 1);
+    expect(strikeDue(es.unionGrievance, 3)).toBe(true);
+
+    const fx = makeEffectWorld();
+    const ev = getEventById('union_strike_threat')!;
+    expect(ev.canFire(makeCtx({ scores: highWellBeing(), unionMemberCount: 3, unionGrievance: es.unionGrievance }))).toBe(true);
+    resolve(es, 'union_strike_threat', 1, fx.world); // refuse the vote: full strike
+    const mods = fx.state.events.activeModifiers;
+    expect(workRate(mods, 'driller', 11)).toBe(0);
+    expect(es.unionGrievance).toBe(UNION_GRIEVANCE_AFTER_STRIKE);
+  });
+
+  it('meeting every demand never reaches the strike threshold', () => {
+    const es = createEventSystemState();
+    for (let i = 0; i < 50; i++) {
+      resolve(es, 'union_ergo_chairs', 0);
+      expect(strikeDue(es.unionGrievance, 3)).toBe(false);
+    }
+    expect(es.unionGrievance).toBe(0);
+  });
+
+  it('a mostly-met roster of demands does not strike', () => {
+    // Two met : one refused, starting mid-way: 30 -> 50 -> 35 -> 20 -> 40 -> 25 -> 10 (unclamped).
+    const es = createEventSystemState();
+    es.unionGrievance = 30;
+    for (let i = 0; i < 6; i++) {
+      resolve(es, 'union_ergo_chairs', i % 3 === 0 ? 1 : 0);
+      expect(strikeDue(es.unionGrievance, 3)).toBe(false);
+    }
+    expect(es.unionGrievance).toBe(10);
+  });
+
+  it('union_strike_threat is repeatable: a second strike can fire once grievance builds again', () => {
+    const es = createEventSystemState();
+    es.unionGrievance = UNION_GRIEVANCE_STRIKE_THRESHOLD;
+    const ctx = () => makeCtx({ scores: highWellBeing(), unionMemberCount: 3, unionGrievance: es.unionGrievance });
+    const first = selectEvent('union', ctx(), new Random(1), es.firedEventIds);
+    expect(first?.id).toBe('union_strike_threat');
+    es.firedEventIds.push('union_strike_threat');
+    resolve(es, 'union_strike_threat', 1);
+    expect(es.unionGrievance).toBe(UNION_GRIEVANCE_AFTER_STRIKE);
+    while (!strikeDue(es.unionGrievance, 3)) resolve(es, 'union_ergo_chairs', 1);
+    let second = false;
+    for (let seed = 1; seed <= 50 && !second; seed++) {
+      second = selectEvent('union', ctx(), new Random(seed), es.firedEventIds)?.id === 'union_strike_threat';
+    }
+    expect(second).toBe(true);
+  });
+
+  it('no strike is due with zero members however high grievance is', () => {
+    expect(strikeDue(100, 0)).toBe(false);
+    for (let seed = 1; seed <= 200; seed++) {
+      const ev = selectEvent('union', makeCtx({ unionMemberCount: 0, employeeCount: 5, scores: highWellBeing(), unionGrievance: 100 }), new Random(seed));
+      if (ev) expect(ev.tags ?? []).not.toContain('strike');
+    }
   });
 });

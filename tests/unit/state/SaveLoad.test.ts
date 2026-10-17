@@ -2404,3 +2404,17 @@ describe('debris classify cursor persistence (#1869)', () => {
     expect(deserialize(serialize(state)).debrisClassifyCursor).toBe(37);
   });
 });
+
+describe('serialize/deserialize — unionGrievance (#1890)', () => {
+  it('round-trips the union grievance', () => {
+    const state = createGame({ seed: 42 });
+    state.events.unionGrievance = 45;
+    expect(deserialize(serialize(state)).events.unionGrievance).toBe(45);
+  });
+
+  it('a save without unionGrievance loads as 0', () => {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
+    delete (parsed['events'] as Record<string, unknown>)['unionGrievance'];
+    expect(deserialize(JSON.stringify(parsed)).events.unionGrievance).toBe(0);
+  });
+});

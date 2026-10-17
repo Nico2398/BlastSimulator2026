@@ -255,7 +255,7 @@
     },
     {
       "command": "tick 150",
-      "description": "Checkpoint 3 (+150 ticks, target 221 cumulative) — with real-time auto-tick no longer racing this scripted sequence (#406), tick advance is deterministic for seed:42 and a random event (politics_ev_mandate) reliably fires and auto-pauses at cumulative tick 125, 54 ticks into this step — the same event the game would show a player, not a bug this scenario should paper over. The next step resolves it so the remaining ticks below can still reach the intended final state.",
+      "description": "Checkpoint 3 (+150 ticks, target 221 cumulative). Before #1890 a random event (politics_ev_mandate) reliably fired and auto-paused here for seed:42; the shared event cooldown is now stretched by union membership, so no event lands in this window. The next step still resolves one if it is pending, so the remaining ticks reach the intended final state either way.",
       "interaction": [
         {
           "type": "command",
@@ -278,10 +278,10 @@
         }
       ],
       "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "note": "seed:42's politics_ev_mandate always fires here (per this file's own checkpoint-3 description) -- option 0 costs $60,000, genuinely applied since Finding #29's fix"
+        "note": "#1890: no event is guaranteed to be pending after the stretched shared cooldown (politics_ev_mandate used to fire here and cost $60,000), so this step only resolves one if present and asserts no cash movement of its own; the resolveEventIfPending/either outcome already allowed this.",
+        "changedBy": {
+          "tickCount": 0
+        }
       },
       "role": "player",
       "commandOutcome": "either"

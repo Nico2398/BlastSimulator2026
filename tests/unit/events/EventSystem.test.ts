@@ -10,7 +10,7 @@ import {
   incrementActionCount,
   CATEGORY_PREREQUISITE,
 } from '../../../src/core/events/EventSystem.js';
-import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX } from '../../../src/core/config/balance.js';
+import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX, MIN_EVENT_INTERVAL_TICKS, UNION_GRIEVANCE_STRIKE_THRESHOLD } from '../../../src/core/config/balance.js';
 import { UNION_EVENTS_1 } from '../../../src/core/events/UnionEvents1.js';
 import { UNION_EVENTS_2 } from '../../../src/core/events/UnionEvents2.js';
 import { LAWSUIT_EVENTS_1 } from '../../../src/core/events/LawsuitEvents1.js';
@@ -44,7 +44,7 @@ function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
   };
 }
 
-function makeEvent(id: string, category: 'union' | 'politics', weight: number = 1): EventDef {
+function makeEvent(id: string, category: EventDef['category'], weight: number = 1): EventDef {
   return {
     id, category,
     titleKey: `event.${id}.title`,
@@ -716,5 +716,97 @@ describe('hasEnvironmentalCause (#1412)', () => {
     scores.ecology = ENV_CAUSE_ECOLOGY_MAX;
     scores.nuisance = ENV_CAUSE_NUISANCE_MAX;
     expect(hasEnvironmentalCause({ hasBlasted: false, scores })).toBe(false);
+  });
+});
+
+describe('union stretch applies to every category cooldown (#1890)', () => {
+  beforeEach(() => {
+    clearEvents();
+    registerEvents([
+      makeEvent('pol_ev', 'politics'),
+      makeEvent('union_ev', 'union'),
+      makeEvent('law_ev', 'lawsuit'),
+      makeEvent('weather_ev', 'weather'),
+      makeEvent('mafia_ev', 'mafia'),
+    ]);
+  });
+
+  /** Politics timer expires next tick with exactly the unstretched cooldown elapsed. */
+  function politicsAttempt(unionMemberCount: number | undefined) {
+    const state = createEventSystemState();
+    for (const t of state.timers) t.remaining = t.category === 'politics' ? 1 : 100000;
+    state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS;
+    state.lastEventTick = 0;
+    state.actionCountSinceEvent = 100;
+    const ctx = makeCtx({
+      tickCount: MIN_EVENT_INTERVAL_TICKS, employeeCount: 10,
+      ...(unionMemberCount === undefined ? {} : { unionMemberCount }),
+    });
+    return tickEventSystem(state, ctx, new Random(7));
+  }
+
+  it('a politics event fires for an all-member crew at the unstretched interval', () => {
+    expect(politicsAttempt(10)?.eventId).toBe('pol_ev');
+  });
+  it('the same politics event is held back for a zero-member crew', () => {
+    expect(politicsAttempt(0)).toBeNull();
+  });
+  it('an undefined member count keeps the legacy, unstretched cooldown', () => {
+    expect(politicsAttempt(undefined)?.eventId).toBe('pol_ev');
+  });
+
+  it('over the same seed and ticks a zero-member crew draws fewer events in total, none extra outside union', () => {
+    const run = (unionMemberCount: number) => {
+      const state = createEventSystemState();
+      const rng = new Random(99);
+      const counts: Record<string, number> = {};
+      for (let tick = 1; tick <= 6000; tick++) {
+        state.actionCountSinceEvent = Math.max(state.actionCountSinceEvent, 100);
+        const f = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount, corruptionLevel: 100 }), rng);
+        if (f) counts[f.eventId] = (counts[f.eventId] ?? 0) + 1;
+        state.pendingEvent = null;
+        state.firedEventIds = []; // fired ids are one-shot; reset so draws keep counting
+      }
+      return counts;
+    };
+    const all = run(10);
+    const none = run(0);
+    const total = (c: Record<string, number>) => Object.values(c).reduce((a, b) => a + b, 0);
+    for (const id of ['pol_ev', 'law_ev', 'weather_ev', 'mafia_ev']) {
+      expect(none[id] ?? 0).toBeLessThanOrEqual(all[id] ?? 0);
+    }
+    expect(total(none)).toBeLessThan(total(all));
+  });
+});
+
+describe('strike events are boosted while a strike is due (#1890)', () => {
+  beforeEach(() => {
+    clearEvents();
+    registerEvents([
+      { ...makeEvent('strike_ev', 'union'), tags: ['strike'] },
+      makeEvent('plain_ev', 'union'),
+    ]);
+  });
+
+  function strikeShare(unionGrievance: number, members: number): number {
+    let strikes = 0;
+    const n = 400;
+    for (let seed = 1; seed <= n; seed++) {
+      const ev = selectEvent('union', makeCtx({ employeeCount: 10, unionMemberCount: members, unionGrievance }), new Random(seed));
+      if (ev?.id === 'strike_ev') strikes++;
+    }
+    return strikes / n;
+  }
+
+  it('with no grievance the strike event is picked about as often as its peer', () => {
+    const share = strikeShare(0, 5);
+    expect(share).toBeGreaterThan(0.35);
+    expect(share).toBeLessThan(0.65);
+  });
+  it('once a strike is due the strike event dominates', () => {
+    expect(strikeShare(UNION_GRIEVANCE_STRIKE_THRESHOLD, 5)).toBeGreaterThan(0.9);
+  });
+  it('grievance without members does not boost it', () => {
+    expect(strikeShare(UNION_GRIEVANCE_STRIKE_THRESHOLD, 0)).toBeLessThan(0.9);
   });
 });

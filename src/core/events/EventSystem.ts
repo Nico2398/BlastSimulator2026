@@ -8,8 +8,9 @@ import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
 import { isEventShielded, markShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS } from '../config/balance.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS, UNION_STRIKE_WEIGHT_BOOST } from '../config/balance.js';
 import { unionEventStretch } from '../entities/UnionMembership.js';
+import { STRIKE_EVENT_TAG, strikeDue } from './UnionGrievance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -75,6 +76,8 @@ export interface EventSystemState {
   activeModifiers: ActiveModifier[];
   /** Next id handed to an ActiveModifier. */
   nextModifierId: number;
+  /** Union grievance 0..UNION_GRIEVANCE_MAX: refusals raise it, met demands ease it (#1890). */
+  unionGrievance: number;
 }
 
 export interface FiredEvent {
@@ -128,6 +131,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     actionCountSinceEvent: 0,
     eventFreqMultiplier,
     cooldownMinIntervalTicks: null,
+    unionGrievance: 0,
   };
 }
 
@@ -191,8 +195,8 @@ export function tickEventSystem(
       if (state.cooldownMinIntervalTicks === null) {
         state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
       }
-      // The cached draw stays unscaled; the union stretch applies at the check (no extra rng draws).
-      const minInterval = state.cooldownMinIntervalTicks * categoryStretch(timer.category, ctx);
+      // The cached draw stays unscaled; the membership stretch applies to every category at the check (no extra rng draws).
+      const minInterval = state.cooldownMinIntervalTicks * unionEventStretch(ctx.unionMemberCount, ctx.employeeCount);
       const ticksSinceLastEvent = ctx.tickCount - state.lastEventTick;
       if (ticksSinceLastEvent < minInterval || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS) {
         // Short retry delay (5 ticks) before re-checking cooldown — avoids tight loop
@@ -244,7 +248,7 @@ export function incrementActionCount(state: EventSystemState): void {
 
 // ── Selection ──
 
-/** Union events come less often to a crew with few members (#1873); other categories are unaffected. */
+/** Union timers reset longer for a crew with few members (#1873); other categories' timers are unaffected (the shared cooldown is stretched separately, #1890). */
 function categoryStretch(category: EventCategory, ctx: EventContext): number {
   return category === 'union' ? unionEventStretch(ctx.unionMemberCount, ctx.employeeCount) : 1;
 }
@@ -280,7 +284,7 @@ export function selectEvent(
   if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
   const strikeless = category === 'union' && ctx.unionMemberCount !== undefined && ctx.unionMemberCount < UNION_STRIKE_MIN_MEMBERS;
-  const eligible = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx)
+  const eligible = events.filter(e => !e.followUpOnly && (e.repeatable === true || !firedEventIds.includes(e.id)) && e.canFire(ctx)
     && !(strikeless && hasWorkStoppage(e)));
   const protections = ctx.protections ?? [];
   const shielded = eligible.filter(e => isEventShielded(e, protections, ctx.tickCount));
@@ -290,7 +294,9 @@ export function selectEvent(
   if (available.length === 0) return null;
 
   // Calculate weights
-  const weights = available.map(e => Math.max(0.01, e.weightCoeff(ctx.scores)));
+  const boost = strikeDue(ctx.unionGrievance, ctx.unionMemberCount);
+  const weights = available.map(e => Math.max(0.01, e.weightCoeff(ctx.scores))
+    * (boost && e.tags?.includes(STRIKE_EVENT_TAG) ? UNION_STRIKE_WEIGHT_BOOST : 1));
   const totalWeight = weights.reduce((a, b) => a + b, 0);
 
   // Weighted random selection

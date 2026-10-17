@@ -29,5 +29,6 @@ export function buildTickEventContext(s: GameState): EventContext {
     weatherId: s.weather.current,
     hasBlasted: s.damage.blastCount > 0,
     protections: s.corruption.protections,
+    unionGrievance: s.events.unionGrievance,
   };
 }

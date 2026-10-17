@@ -2,6 +2,7 @@
 // Satirical labor disputes, absurd demands, and workplace comedy in open-pit mining.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import { STRIKE_EVENT_TAG, strikeDue } from './UnionGrievance.js';
 import {
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CHEER_HOURS,
@@ -62,8 +63,11 @@ export const UNION_EVENTS_1: EventDef[] = [
   }),
   // 4 — General strike vote
   ev('union_strike_threat', 'union', {
+    // Repeatable: grievance resets after a strike and can build to a second one.
+    repeatable: true,
     weight: (s) => 2 + 3 * (1 - r.wb(s)),
-    canFire: (ctx) => ctx.scores.wellBeing < 35,
+    tags: [STRIKE_EVENT_TAG],
+    canFire: (ctx) => strikeDue(ctx.unionGrievance, ctx.unionMemberCount) || ctx.scores.wellBeing < 35,
     options: [
       { cashDelta: -25000, scoreDelta: { wellBeing: 20 },
         effects: [{ type: 'salary', pct: EVENT_RAISE_SALARY_PCT, days: EVENT_RAISE_DAYS }] },
