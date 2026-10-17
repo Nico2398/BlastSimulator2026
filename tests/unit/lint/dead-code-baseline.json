@@ -31,7 +31,7 @@
     "src/core/campaign/Campaign.ts:LevelProgress",
     "src/core/campaign/LevelTransition.ts:LevelCompleteResult",
     "src/core/campaign/LevelTransition.ts:LevelCompleteSummary",
-    "src/core/campaign/Sandbox.ts:SandboxDifficultyDef",
+    "src/core/campaign/Sandbox.ts:SandboxKitDef",
     "src/core/campaign/Sandbox.ts:SandboxFieldKind",
     "src/core/campaign/SuccessTracker.ts:StarRating",
     "src/core/economy/Finance.ts:FinancialReport",

@@ -481,7 +481,7 @@ mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
 sandboxPanel.setOnBack(() => { mainMenu.show(); });
 function startSandbox(config: SandboxConfig): void {
   void enterLevel([
-    `sandbox start biome:${config.biome} difficulty:${config.difficulty} seed:${config.seed}`,
+    `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`,
   ], buildSandboxLoadingSiteInfo(config));
 }
 sandboxPanel.setOnStart(startSandbox);

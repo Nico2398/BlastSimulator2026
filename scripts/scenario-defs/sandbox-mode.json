@@ -1,10 +1,10 @@
 {
   "name": "sandbox-mode",
-  "description": "Sandbox mode: a site built from biome/difficulty/seed starts from nothing, honours the seed, and is fully playable through to a blast (#504: 3-control setup).",
+  "description": "Sandbox mode: a site built from biome/kit/seed starts from nothing, honours the seed, and is fully playable through to a blast (#504: 3-control setup).",
   "steps": [
     {
-      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777",
-      "description": "No new_game first \u2014 a sandbox site is created from nothing, which is the point of the mode. #1671: with no staffed: flag the difficulty opens on its free starting kit (crew, drill rig, charging truck, debris hauler, freight warehouse, spoil heap), so the full drill/charge/blast cycle needs no purchases. Interaction mode (#1671): a player opens the Sandbox panel from the main menu, picks biome, Hard and the seed, and clicks Start \u2014 no console command stands in. #1731: ore depth reads 'from 0 m down' (no 999) and each vehicle reads 'Type (Model)'. #1686: before picking the final settings the player previews Volcanic Flats on Easy and the details elements (description, hardness, ores, terrain, starting cash, opening) appear -- every wait is on a condition, no fixed delay.",
+      "command": "sandbox start biome:alpine_granite kit:digger seed:777",
+      "description": "No new_game first \u2014 a sandbox site is created from nothing, which is the point of the mode. #1671: with no staffed: flag the site opens on the chosen kit's free crew, fleet and buildings (crew, drill rig, charging truck, debris hauler, freight warehouse, spoil heap), so the full drill/charge/blast cycle needs no purchases. Interaction mode (#1671): a player opens the Sandbox panel from the main menu, picks biome, the Digger kit and the seed, and clicks Start \u2014 no console command stands in. #1731: ore depth reads 'from 0 m down' (no 999) and each vehicle reads 'Type (Model)'. #1686: before picking the final settings the player previews Volcanic Flats with the Full kit and the details elements (description, hardness, ores, terrain, starting cash, opening) appear -- every wait is on a condition, no fixed delay.",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -25,8 +25,8 @@
         },
         {
           "type": "set",
-          "selector": "#bs-sandbox-difficulty",
-          "value": "easy"
+          "selector": "#bs-sandbox-kit",
+          "value": "full"
         },
         {
           "type": "waitForProperty",
@@ -56,15 +56,15 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-sandbox-difficulty-cash"
+          "selector": "#bs-sandbox-kit-cash"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-sandbox-difficulty-opening"
+          "selector": "#bs-sandbox-kit-opening"
         },
         {
           "type": "waitForProperty",
-          "selector": "#bs-sandbox-difficulty-opening",
+          "selector": "#bs-sandbox-kit-opening",
           "property": "textContent",
           "expectedValue": "Opens with: crew: 1\u00d7 Driller, 1\u00d7 Blaster, 3\u00d7 Driver; vehicles: 1\u00d7 Drill Rig (Pokey McPoke), 1\u00d7 Debris Hauler (Dumpster on Wheels), 1\u00d7 Charging Truck (Pour-Bucket Pete), 1\u00d7 Rock Digger (The Scratch), 1\u00d7 Rock Fragmenter (Cracky); buildings: 1\u00d7 Freight Warehouse (The Pile), 1\u00d7 Spoil Heap (The Dump)",
           "timeoutMs": 5000
@@ -76,8 +76,8 @@
         },
         {
           "type": "set",
-          "selector": "#bs-sandbox-difficulty",
-          "value": "hard"
+          "selector": "#bs-sandbox-kit",
+          "value": "digger"
         },
         {
           "type": "set",
@@ -289,12 +289,12 @@
       }
     },
     {
-      "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337",
-      "description": "A second site with a different biome, difficulty and seed, to confirm the mode can be re-entered.",
+      "command": "sandbox start biome:tropical_karst kit:full seed:31337",
+      "description": "A second site with a different biome, starting kit and seed, to confirm the mode can be re-entered.",
       "interaction": [
         {
           "type": "command",
-          "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337"
+          "command": "sandbox start biome:tropical_karst kit:full seed:31337"
         }
       ],
       "expect": {
@@ -306,7 +306,7 @@
           "mineType": "tropical_karst",
           "holeCount": 0
         },
-        "note": "difficulty:easy starts at $250,000 (SANDBOX_DIFFICULTIES.easy.startingCash, Sandbox.ts) -- grid extents stay the fixed 64x32x64 default (#504) regardless of biome/difficulty, same as the first site."
+        "note": "kit:full starts at $250,000 (SANDBOX_KITS.full.startingCash, Sandbox.ts) -- grid extents stay the fixed 64x32x64 default (#504) regardless of biome/kit, same as the first site."
       },
       "role": "setup"
     }

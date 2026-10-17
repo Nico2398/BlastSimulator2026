@@ -1,7 +1,7 @@
 // SandboxPanel — DOM tests (jsdom)
 // @vitest-environment jsdom
 //
-// #504: sandbox setup collapsed to 3 controls — biome, difficulty, seed —
+// #504: sandbox setup collapsed to 3 controls — biome, starting kit (#1891), seed —
 // plus reroll/back/start buttons. Everything else the old panel rendered
 // (size, depth, cash, goal, events, prices, decay, mixed_rock, explosives)
 // is gone.
@@ -11,15 +11,15 @@ import { SandboxPanel } from '../../../src/ui/SandboxPanel.js';
 import {
   SANDBOX_DEFAULTS,
   SANDBOX_FIELDS,
-  SANDBOX_DIFFICULTY_ORDER,
+  SANDBOX_KIT_ORDER,
   randomSandboxSeed,
 } from '../../../src/core/campaign/Sandbox.js';
 import type { SandboxConfig } from '../../../src/core/campaign/Sandbox.js';
 import {
-  SANDBOX_DIFFICULTIES,
+  SANDBOX_KITS,
   sandboxBiomeTraits,
-  sandboxDifficultyDetails,
-  type SandboxDifficultyId,
+  sandboxKitDetails,
+  type SandboxKitId,
 } from '../../../src/core/campaign/Sandbox.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
@@ -61,15 +61,15 @@ describe('SandboxPanel', () => {
 
   const control = (key: string) => document.getElementById(`bs-sandbox-${key}`);
 
-  /** Selects a biome then a difficulty the way a player clicking through the form would. */
-  function selectBiomeAndDifficulty(biome: string, difficulty: string): void {
+  /** Selects a biome then a kit the way a player clicking through the form would. */
+  function selectBiomeAndKit(biome: string, kit: string): void {
     const biomeSelect = control('biome') as HTMLSelectElement;
     biomeSelect.value = biome;
     biomeSelect.dispatchEvent(new Event('change'));
 
-    const difficultySelect = control('difficulty') as HTMLSelectElement;
-    difficultySelect.value = difficulty;
-    difficultySelect.dispatchEvent(new Event('change'));
+    const kitSelect = control('kit') as HTMLSelectElement;
+    kitSelect.value = kit;
+    kitSelect.dispatchEvent(new Event('change'));
   }
 
   it('starts hidden and shows on demand', () => {
@@ -80,9 +80,9 @@ describe('SandboxPanel', () => {
 
   it('renders exactly the three configurable controls, with stable ids', () => {
     panel.show();
-    expect(SANDBOX_FIELDS.map(f => String(f.key))).toEqual(['biome', 'difficulty', 'seed']);
+    expect(SANDBOX_FIELDS.map(f => String(f.key))).toEqual(['biome', 'kit', 'seed']);
     expect(control('biome')).toBeTruthy();
-    expect(control('difficulty')).toBeTruthy();
+    expect(control('kit')).toBeTruthy();
     expect(control('seed')).toBeTruthy();
   });
 
@@ -107,12 +107,12 @@ describe('SandboxPanel', () => {
     expect(select.options.length).toBe(SANDBOX_FIELDS.find(f => f.key === 'biome')!.options!().length);
   });
 
-  it('offers exactly the three named difficulty presets', () => {
+  it('offers exactly the two named starting kits', () => {
     panel.show();
-    const select = control('difficulty') as HTMLSelectElement;
+    const select = control('kit') as HTMLSelectElement;
     expect(select.tagName).toBe('SELECT');
     const values = Array.from(select.options).map(o => o.value);
-    expect(values).toEqual(SANDBOX_DIFFICULTY_ORDER);
+    expect(values).toEqual(SANDBOX_KIT_ORDER);
   });
 
   it('starts with the defaults and reports them back', () => {
@@ -142,12 +142,12 @@ describe('SandboxPanel', () => {
     expect(panel.getConfig().biome).toBe('alpine_granite');
   });
 
-  it('picks up a changed difficulty', () => {
+  it('picks up a changed kit', () => {
     panel.show();
-    const select = control('difficulty') as HTMLSelectElement;
-    select.value = 'hard';
+    const select = control('kit') as HTMLSelectElement;
+    select.value = 'digger';
     select.dispatchEvent(new Event('change'));
-    expect(panel.getConfig().difficulty).toBe('hard');
+    expect(panel.getConfig().kit).toBe('digger');
   });
 
   it('the reroll button writes a new value into the seed input', () => {
@@ -173,9 +173,9 @@ describe('SandboxPanel', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
-  it('reroll changes only the seed, leaving biome and difficulty untouched', () => {
+  it('reroll changes only the seed, leaving biome and kit untouched', () => {
     panel.show();
-    selectBiomeAndDifficulty('alpine_granite', 'hard');
+    selectBiomeAndKit('alpine_granite', 'digger');
 
     const seed = control('seed') as HTMLInputElement;
     const seedBefore = seed.value;
@@ -184,7 +184,7 @@ describe('SandboxPanel', () => {
 
     expect(seed.value).not.toBe(seedBefore);
     expect(panel.getConfig().biome).toBe('alpine_granite');
-    expect(panel.getConfig().difficulty).toBe('hard');
+    expect(panel.getConfig().kit).toBe('digger');
   });
 
   it('opening the panel twice with an injected rand sequence yields two different seed values', () => {
@@ -204,12 +204,12 @@ describe('SandboxPanel', () => {
     expect(second).not.toBe(first);
   });
 
-  it('hands the assembled config to onStart reflecting the selected biome and difficulty', () => {
+  it('hands the assembled config to onStart reflecting the selected biome and kit', () => {
     let got: SandboxConfig | null = null;
     panel.setOnStart((c) => { got = c; });
     panel.show();
 
-    selectBiomeAndDifficulty('tropical_karst', 'easy');
+    selectBiomeAndKit('tropical_karst', 'full');
 
     const seed = control('seed') as HTMLInputElement;
     seed.value = '999';
@@ -219,7 +219,7 @@ describe('SandboxPanel', () => {
 
     expect(got).not.toBeNull();
     expect(got!.biome).toBe('tropical_karst');
-    expect(got!.difficulty).toBe('easy');
+    expect(got!.kit).toBe('full');
     expect(got!.seed).toBe(999);
     expect(panel.visible).toBe(false);
   });
@@ -237,16 +237,16 @@ describe('SandboxPanel', () => {
     expect(panel.visible).toBe(false);
   });
 
-  it('keeps a biome/difficulty edit across a hide/show cycle', () => {
+  it('keeps a biome/kit edit across a hide/show cycle', () => {
     // The seed is documented to reroll on every show() (#504), but biome and
-    // difficulty are not — an edit there must survive re-opening the panel.
+    // kit are not — an edit there must survive re-opening the panel.
     panel.show();
-    selectBiomeAndDifficulty('alpine_granite', 'hard');
+    selectBiomeAndKit('alpine_granite', 'digger');
 
     panel.hide();
     panel.show();
     expect(panel.getConfig().biome).toBe('alpine_granite');
-    expect(panel.getConfig().difficulty).toBe('hard');
+    expect(panel.getConfig().kit).toBe('digger');
   });
 
   it('dispose removes the panel from the document', () => {
@@ -256,7 +256,7 @@ describe('SandboxPanel', () => {
     expect(document.getElementById('bs-sandbox-panel')).toBeNull();
   });
 
-  // ---- #1686: biome and difficulty details ----
+  // ---- #1686: biome and kit details ----
 
   const text = (id: string) => document.getElementById(id)?.textContent ?? '';
   const digits = (s: string) => s.replace(/\D/g, '');
@@ -270,7 +270,7 @@ describe('SandboxPanel', () => {
     panel.show();
     for (const id of [
       'bs-sandbox-biome-desc', 'bs-sandbox-biome-hardness', 'bs-sandbox-biome-ores',
-      'bs-sandbox-biome-terrain', 'bs-sandbox-difficulty-cash', 'bs-sandbox-difficulty-opening',
+      'bs-sandbox-biome-terrain', 'bs-sandbox-kit-cash', 'bs-sandbox-kit-opening',
     ]) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
@@ -281,8 +281,8 @@ describe('SandboxPanel', () => {
     const biome = getBiome(SANDBOX_DEFAULTS.biome)!;
     expect(text('bs-sandbox-biome-desc')).toBe(t(biome.descKey));
     expect(text('bs-sandbox-biome-hardness').trim()).not.toBe('');
-    expect(digits(text('bs-sandbox-difficulty-cash'))).toContain(String(SANDBOX_DIFFICULTIES[SANDBOX_DEFAULTS.difficulty].startingCash));
-    expect(text('bs-sandbox-difficulty-opening').trim()).not.toBe('');
+    expect(digits(text('bs-sandbox-kit-cash'))).toContain(String(SANDBOX_KITS[SANDBOX_DEFAULTS.kit].startingCash));
+    expect(text('bs-sandbox-kit-opening').trim()).not.toBe('');
   });
 
   it('changing the biome swaps in that biome description', () => {
@@ -370,10 +370,10 @@ describe('SandboxPanel', () => {
 
   it('opening line names each vehicle as "N× <type> (<model>)" (#1731)', () => {
     panel.show();
-    changeSelect('difficulty', 'easy');
-    const shown = text('bs-sandbox-difficulty-opening');
+    changeSelect('kit', 'full');
+    const shown = text('bs-sandbox-kit-opening');
     expect(shown).toContain('1× Drill Rig (Pokey McPoke)');
-    for (const v of sandboxDifficultyDetails('easy').vehicles) {
+    for (const v of sandboxKitDetails('full').vehicles) {
       expect(shown).toContain(`${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`);
     }
   });
@@ -386,9 +386,9 @@ describe('SandboxPanel', () => {
       const c = document.createElement('div');
       document.body.appendChild(c);
       new SandboxPanel(c).show();
-      changeSelect('difficulty', 'easy');
-      const shown = text('bs-sandbox-difficulty-opening');
-      for (const v of sandboxDifficultyDetails('easy').vehicles) {
+      changeSelect('kit', 'full');
+      const shown = text('bs-sandbox-kit-opening');
+      for (const v of sandboxKitDetails('full').vehicles) {
         const type = t(`vehicle_type.${v.role}`);
         expect(shown).toContain(`${v.count}× ${type} (${vehicleDisplayName(v.role, v.tier)})`);
       }
@@ -405,65 +405,122 @@ describe('SandboxPanel', () => {
     }
   });
 
-  it('changing the difficulty updates the starting cash', () => {
+  it('changing the kit updates the starting cash', () => {
     panel.show();
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
-      changeSelect('difficulty', id);
-      expect(digits(text('bs-sandbox-difficulty-cash')), id).toContain(String(SANDBOX_DIFFICULTIES[id].startingCash));
+    for (const id of SANDBOX_KIT_ORDER) {
+      changeSelect('kit', id);
+      expect(digits(text('bs-sandbox-kit-cash')), id).toContain(String(SANDBOX_KITS[id].startingCash));
     }
   });
 
-  it('changing the difficulty updates the opening text', () => {
+  it('changing the kit updates the opening text', () => {
     panel.show();
-    changeSelect('difficulty', 'hard');
-    const hard = text('bs-sandbox-difficulty-opening');
-    changeSelect('difficulty', 'easy');
-    const easy = text('bs-sandbox-difficulty-opening');
-    expect(hard.trim()).not.toBe('');
-    expect(easy.trim()).not.toBe('');
-    expect(easy).not.toBe(hard);
+    changeSelect('kit', 'digger');
+    const digger = text('bs-sandbox-kit-opening');
+    changeSelect('kit', 'full');
+    const full = text('bs-sandbox-kit-opening');
+    expect(digger.trim()).not.toBe('');
+    expect(full.trim()).not.toBe('');
+    expect(full).not.toBe(digger);
 
-    // The easy kit adds a rock fragmenter over the hard kit.
-    const names = (id: SandboxDifficultyId) => sandboxDifficultyDetails(id).vehicles
+    // The full kit adds a rock fragmenter over the digger kit.
+    const names = (id: SandboxKitId) => sandboxKitDetails(id).vehicles
       .map(v => t(getVehicleDefByTier(v.role, v.tier).nameKey));
-    for (const name of names('hard')) expect(hard, name).toContain(name);
-    for (const name of names('easy')) expect(easy, name).toContain(name);
-    const hardOnly = new Set(names('hard'));
-    const extra = names('easy').filter(n => !hardOnly.has(n));
+    for (const name of names('digger')) expect(digger, name).toContain(name);
+    for (const name of names('full')) expect(full, name).toContain(name);
+    const diggerOnly = new Set(names('digger'));
+    const extra = names('full').filter(n => !diggerOnly.has(n));
     expect(extra.length).toBeGreaterThan(0);
-    for (const name of extra) expect(hard, name).not.toContain(name);
+    for (const name of extra) expect(digger, name).not.toContain(name);
   });
 
-  it('hard kit line lists the rock digger (#1874)', () => {
+  it('digger kit line lists the rock digger (#1874)', () => {
     panel.show();
-    changeSelect('difficulty', 'hard');
-    const hard = text('bs-sandbox-difficulty-opening');
-    const digger = sandboxDifficultyDetails('hard').vehicles.find(v => v.role === 'rock_digger');
-    expect(digger, 'hard details list a rock digger').toBeDefined();
-    expect(hard).toContain(`${digger!.count}× ${t('vehicle_type.rock_digger')} (${vehicleDisplayName('rock_digger', digger!.tier)})`);
+    changeSelect('kit', 'digger');
+    const shown = text('bs-sandbox-kit-opening');
+    const digger = sandboxKitDetails('digger').vehicles.find(v => v.role === 'rock_digger');
+    expect(digger, 'digger details list a rock digger').toBeDefined();
+    expect(shown).toContain(`${digger!.count}× ${t('vehicle_type.rock_digger')} (${vehicleDisplayName('rock_digger', digger!.tier)})`);
   });
 
-  it('a biome change keeps the difficulty details, and vice versa', () => {
+  it('full kit line lists the rock fragmenter, digger kit line does not (#1891)', () => {
     panel.show();
-    changeSelect('difficulty', 'easy');
-    const cash = text('bs-sandbox-difficulty-cash');
-    const opening = text('bs-sandbox-difficulty-opening');
+    changeSelect('kit', 'full');
+    expect(text('bs-sandbox-kit-opening')).toContain(t('vehicle_type.rock_fragmenter'));
+    changeSelect('kit', 'digger');
+    expect(text('bs-sandbox-kit-opening')).not.toContain(t('vehicle_type.rock_fragmenter'));
+  });
+
+  it('renders a kit select with one option per kit and no difficulty control (#1891)', () => {
+    panel.show();
+    const select = document.getElementById('bs-sandbox-kit') as HTMLSelectElement;
+    expect(select.tagName).toBe('SELECT');
+    expect(Array.from(select.options).map(o => o.value)).toEqual(['digger', 'full']);
+    expect(document.getElementById('bs-sandbox-difficulty')).toBeNull();
+    expect(document.getElementById('bs-sandbox-difficulty-cash')).toBeNull();
+    expect(document.getElementById('bs-sandbox-difficulty-opening')).toBeNull();
+  });
+
+  it('kit option labels come from sandbox.kit.* and the field label reads "Starting kit" (#1891)', () => {
+    panel.show();
+    const select = document.getElementById('bs-sandbox-kit') as HTMLSelectElement;
+    for (const opt of Array.from(select.options)) {
+      expect(opt.textContent).toBe(t(`sandbox.kit.${opt.value}`));
+    }
+    const label = document.querySelector('label[for="bs-sandbox-kit"]');
+    expect(label?.textContent).toBe(t('sandbox.field.kit'));
+    expect(label?.textContent).toBe('Starting kit');
+  });
+
+  it.each(['en', 'fr'] as const)('no panel text mentions difficulty in %s (#1891)', (locale) => {
+    const prev = getLocale();
+    setLocale(locale);
+    try {
+      document.body.innerHTML = '';
+      const c = document.createElement('div');
+      document.body.appendChild(c);
+      const p = new SandboxPanel(c);
+      p.show();
+      for (const id of SANDBOX_KIT_ORDER) {
+        changeSelect('kit', id);
+        expect(document.getElementById('bs-sandbox-panel')!.textContent).not.toMatch(/difficult/i);
+      }
+    } finally {
+      setLocale(prev);
+    }
+  });
+
+  it('French kit field label is "Équipement de départ" (#1891)', () => {
+    const prev = getLocale();
+    setLocale('fr');
+    try {
+      expect(t('sandbox.field.kit')).toBe('Équipement de départ');
+    } finally {
+      setLocale(prev);
+    }
+  });
+
+  it('a biome change keeps the kit details, and vice versa', () => {
+    panel.show();
+    changeSelect('kit', 'full');
+    const cash = text('bs-sandbox-kit-cash');
+    const opening = text('bs-sandbox-kit-opening');
     changeSelect('biome', 'volcanic_flats');
-    expect(text('bs-sandbox-difficulty-cash')).toBe(cash);
-    expect(text('bs-sandbox-difficulty-opening')).toBe(opening);
+    expect(text('bs-sandbox-kit-cash')).toBe(cash);
+    expect(text('bs-sandbox-kit-opening')).toBe(opening);
 
     const desc = text('bs-sandbox-biome-desc');
-    changeSelect('difficulty', 'hard');
+    changeSelect('kit', 'digger');
     expect(text('bs-sandbox-biome-desc')).toBe(desc);
   });
 
   it('renders details for a retained selection when re-shown', () => {
     panel.show();
-    selectBiomeAndDifficulty('volcanic_flats', 'easy');
+    selectBiomeAndKit('volcanic_flats', 'full');
     panel.hide();
     panel.show();
     expect(text('bs-sandbox-biome-desc')).toBe(t(getBiome('volcanic_flats')!.descKey));
-    expect(digits(text('bs-sandbox-difficulty-cash'))).toContain(String(SANDBOX_DIFFICULTIES.easy.startingCash));
+    expect(digits(text('bs-sandbox-kit-cash'))).toContain(String(SANDBOX_KITS.full.startingCash));
   });
 
   it('changing selections retains the seed value and the other selection', () => {
@@ -471,11 +528,11 @@ describe('SandboxPanel', () => {
     const seed = control('seed') as HTMLInputElement;
     seed.value = '4242';
     seed.dispatchEvent(new Event('input'));
-    changeSelect('difficulty', 'hard');
+    changeSelect('kit', 'digger');
     changeSelect('biome', 'volcanic_flats');
     expect((control('seed') as HTMLInputElement).value).toBe('4242');
-    expect((control('difficulty') as HTMLSelectElement).value).toBe('hard');
-    expect(panel.getConfig()).toEqual({ biome: 'volcanic_flats', difficulty: 'hard', seed: 4242 });
+    expect((control('kit') as HTMLSelectElement).value).toBe('digger');
+    expect(panel.getConfig()).toEqual({ biome: 'volcanic_flats', kit: 'digger', seed: 4242 });
   });
 
   it('biome select option text is the full translated name, never shortened', () => {
@@ -508,10 +565,10 @@ describe('SandboxPanel', () => {
 
   it('opening line names each building as "N× <type> (<joke name>)" (#1739)', () => {
     panel.show();
-    changeSelect('difficulty', 'easy');
-    const shown = text('bs-sandbox-difficulty-opening');
+    changeSelect('kit', 'full');
+    const shown = text('bs-sandbox-kit-opening');
     expect(shown).toContain('buildings: 1× Freight Warehouse (The Pile), 1× Spoil Heap (The Dump)');
-    const buildings = sandboxDifficultyDetails('easy').buildings;
+    const buildings = sandboxKitDetails('full').buildings;
     expect(buildings.length).toBeGreaterThan(0);
     for (const b of buildings) {
       expect(shown).toContain(`${b.count}× ${buildingDisplayName(b.type, b.tier)}`);
@@ -526,9 +583,9 @@ describe('SandboxPanel', () => {
       const c = document.createElement('div');
       document.body.appendChild(c);
       new SandboxPanel(c).show();
-      changeSelect('difficulty', 'easy');
-      const shown = text('bs-sandbox-difficulty-opening');
-      for (const b of sandboxDifficultyDetails('easy').buildings) {
+      changeSelect('kit', 'full');
+      const shown = text('bs-sandbox-kit-opening');
+      for (const b of sandboxKitDetails('full').buildings) {
         const type = t(`building.${b.type}.name`);
         const joke = t(getBuildingDef(b.type, b.tier).nameKey);
         expect(type).not.toBe(`building.${b.type}.name`);
