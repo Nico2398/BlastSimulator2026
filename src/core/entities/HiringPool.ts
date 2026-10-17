@@ -65,7 +65,7 @@ function buildCandidate(id: number, role: EmployeeRole, name: string, unionized:
     const level = Math.min(5, primary.proficiencyLevel + skillBonus) as SkillQualification['proficiencyLevel'];
     qualifications[0] = qualificationAtLevel(primary.category, level);
   }
-  return { id, role, name, unionized, qualifications, salary: calculateSalary({ role, qualifications, raises: 0 }) };
+  return { id, role, name, unionized, qualifications, salary: calculateSalary({ role, qualifications, raises: 0, unionized }) };
 }
 
 export function generateCandidate(role: EmployeeRole, rng: Random, id: number): HireCandidate {
@@ -100,7 +100,7 @@ function scriptedCandidate(s: ScriptedCandidate): HireCandidate {
     }
   }
   // The role-default salary no longer covers the merged qualifications.
-  candidate.salary = calculateSalary({ role: candidate.role, qualifications: candidate.qualifications, raises: 0 });
+  candidate.salary = calculateSalary({ role: candidate.role, qualifications: candidate.qualifications, raises: 0, unionized: candidate.unionized });
   return candidate;
 }
 

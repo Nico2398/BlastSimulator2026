@@ -74,7 +74,7 @@ Trucks, excavators, drill rigs, bulldozers. Each has purchase/maintenance/fuel c
 
 ### Employees
 Hired with salaries. Specialized roles: drillers, blasters, drivers, surveyors, managers (managers run contract negotiation; hiring/firing/policy are not gated on one yet).
-Unionized employees cannot be fired (only an arranged accident or an event removes them). Affected by well-being score.
+Unionized employees cannot be fired (only an arranged accident or an event removes them). Affected by well-being score. Union benefit (#1873): members are paid `UNION_MEMBER_SALARY_DISCOUNT_PCT` (15%) less (`unionDiscountedSalary`, kept through raises and training); hiring cards and the crew card name the trade-off. Union events are stretched (timer and cooldown) by `unionEventStretch` up to 4x at zero members (`UNION_TIMER_MIN_SHARE_FACTOR`), and below `UNION_STRIKE_MIN_MEMBERS` events with a `work_stoppage` option are not selected (`EventContext.unionMemberCount`; undefined = legacy).
 
 ### Operating cost and runway (#1375)
 `src/core/economy/OperatingFinance.ts` owns the definition, in $/hour (1 tick = 1 hour). **Operating cost** = payroll (living employees' salaries / `PAY_CYCLE_TICKS`) + active-building upkeep + vehicle maintenance + fuel of reserved vehicles. **Operating income** = ledger `sales` + `contracts` over the trailing `OPERATING_INCOME_WINDOW_TICKS`, per hour. TopBar trend = income - cost; **runway** (days) = cash / (cost - income) / `TICKS_PER_DAY`, or "sustainable" when income covers cost. One-off spending (construction, equipment, fines) never enters either side. Ledger categories: building upkeep = `maintenance`, `vehicle_maintenance`, `fuel` booked separately.

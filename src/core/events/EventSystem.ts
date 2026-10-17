@@ -5,10 +5,11 @@ import type { TrafficJam } from './TrafficJams.js';
 import { eventWeightFactor, type ActiveModifier } from './ActiveModifiers.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
-import type { EventDef, EventCategory, EventContext } from './EventPool.js';
+import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
 import { isEventShielded, markShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS } from '../config/balance.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS } from '../config/balance.js';
+import { unionEventStretch } from '../entities/UnionMembership.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -179,6 +180,7 @@ export function tickEventSystem(
       timer.remaining = Math.max(MIN_EVENT_TIMER_TICKS, Math.round(
         getModulatedInterval(timer.category, ctx.scores, timer.baseInterval)
         * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)
+        * categoryStretch(timer.category, ctx)
         // A heavier category weight (#1414) brings its next event sooner.
         / eventWeightFactor(state.activeModifiers, timer.category, ctx.tickCount)));
 
@@ -189,7 +191,8 @@ export function tickEventSystem(
       if (state.cooldownMinIntervalTicks === null) {
         state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
       }
-      const minInterval = state.cooldownMinIntervalTicks;
+      // The cached draw stays unscaled; the union stretch applies at the check (no extra rng draws).
+      const minInterval = state.cooldownMinIntervalTicks * categoryStretch(timer.category, ctx);
       const ticksSinceLastEvent = ctx.tickCount - state.lastEventTick;
       if (ticksSinceLastEvent < minInterval || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS) {
         // Short retry delay (5 ticks) before re-checking cooldown — avoids tight loop
@@ -241,6 +244,18 @@ export function incrementActionCount(state: EventSystemState): void {
 
 // ── Selection ──
 
+/** Union events come less often to a crew with few members (#1873); other categories are unaffected. */
+function categoryStretch(category: EventCategory, ctx: EventContext): number {
+  return category === 'union' ? unionEventStretch(ctx.unionMemberCount, ctx.employeeCount) : 1;
+}
+
+/** True when any outcome of the event stops work (a strike needs members to strike) (#1873). */
+function hasWorkStoppage(e: EventDef): boolean {
+  const stops = (c: EventConsequence | undefined): boolean =>
+    c !== undefined && (c.effects?.some(f => f.type === 'work_stoppage') === true || stops(c.altConsequence));
+  return e.consequences.some(stops);
+}
+
 /** Per-category prerequisite gating event selection (#1412). */
 export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {
   union: (ctx) => ctx.employeeCount >= 1,
@@ -264,7 +279,9 @@ export function selectEvent(
 ): EventDef | null {
   if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
-  const eligible = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx));
+  const strikeless = category === 'union' && ctx.unionMemberCount !== undefined && ctx.unionMemberCount < UNION_STRIKE_MIN_MEMBERS;
+  const eligible = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx)
+    && !(strikeless && hasWorkStoppage(e)));
   const protections = ctx.protections ?? [];
   const shielded = eligible.filter(e => isEventShielded(e, protections, ctx.tickCount));
   if (shielded.length > 0 && ctx.protections) markShielded(ctx.protections, shielded, ctx.tickCount);

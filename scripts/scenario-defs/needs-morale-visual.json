@@ -31,7 +31,7 @@
       "description": "#1379: the default site policy (shift_8h, fatigue threshold 60) is always in force, so a staffed crew is force-rested on the shift clock or once fatigue reaches 60. This file is not about shift or rest policy, so continuous mode with the lowest threshold neutralizes it and the file keeps testing what it was written for."
     },
     {
-      "command": "employee hire role:driller",
+      "command": "employee hire role:driller candidate:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -39,11 +39,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"][data-candidate-id=\"2\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"][data-candidate-id=\"2\"]"
         }
       ],
       "role": "player",
@@ -225,7 +225,7 @@
         "increased": [
           "wellBeing"
         ],
-        "note": "verified via direct trace: the pending event here is union_pet_day, and choosing option 0 genuinely boosts wellBeing back up (30.17→38.17) rather than leaving it at its drained low — a real, surprising effect worth locking in, not assumed"
+        "note": "verified via direct trace: the pending event here is union_miner_month (the driller is hired from the union candidate, #1873: union events only fire at full cadence with union members on the roster), and choosing option 0 genuinely boosts wellBeing back up rather than leaving it at its drained low — a real, surprising effect worth locking in, not assumed"
       },
       "role": "player",
       "commandOutcome": "either"

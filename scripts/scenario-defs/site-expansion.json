@@ -378,11 +378,12 @@
       "role": "setup"
     },
     {
-      "command": "event choose 0",
-      "description": "#557: resolves a spontaneous event if one fired during the chunk above -- see that step's own note.",
+      "command": "event choose 1",
+      "description": "#557: resolves a spontaneous event if one fired during the chunk above -- see that step's own note. #1873: without union members on the roster the pending event is politics_ai_replacement, whose option 0 ('automate') makes a random crew member leave -- the rig's driver here, stranding it in the blast zone. Option 1 (humans-first pledge) keeps the whole crew, so the evacuation completes as measured.",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "resolveEventIfPending",
+          "option": 1
         }
       ],
       "role": "player",

@@ -3,18 +3,18 @@
   "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and a second skill the trainee lacks (geology) via real click-driven training, then complete a blast task. Courses grant new qualifications only (#1388); a held skill (a driller's blasting or driving.drill_rig) is never offered. #553: drill_hole is a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole); drillers start with driving.drill_rig, so only a drill_rig purchase is needed. campaign start was replaced with new_game: a manually-bought vehicle spawns at grid centre, and new_game's 64x64x64 default halves the trip. Schools are placed apart: driving_center at (3,5), geology_lab at (5,15). drill_plan grid is 2x2 (4 holes): a single driller/drill_rig lands one hole roughly every 40-45 ticks door-to-door, so 9 holes risked the site's own cash burn (no income anywhere in this file). `event choose 0` follows tick blocks: idempotent no-op when nothing is pending.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000",
-      "description": "#553: cash bumped from the default $50,000 to cover the drill_rig ($35,000) on top of the original curriculum's driving_center/geology_lab/training costs, with headroom for the ~250-tick runway's payroll/vehicle upkeep (no income anywhere in this file) and one lawsuit event (observed: Aesthetic Pollution, $15,000, seed 42).",
+      "command": "new_game seed:42 cash:200000",
+      "description": "#553: cash bumped from the default $50,000 to cover the drill_rig ($35,000) on top of the original curriculum's driving_center/geology_lab/training costs, with headroom for the ~250-tick runway's payroll/vehicle upkeep (no income anywhere in this file) and one lawsuit event (observed: Aesthetic Pollution, $15,000, seed 42). #1873: cash raised from $150,000 to $200,000 because union membership (stretched union event cadence, member salary discount) shifted payroll and event timing.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000"
+          "command": "new_game seed:42 cash:200000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000
+          "cash": 200000
         }
       }
     },

@@ -2386,6 +2386,13 @@ export const HIRING_POOL_REFRESH_INTERVAL = TICKS_PER_DAY;
 /** Chance a candidate is unionized. */
 export const CANDIDATE_UNION_CHANCE = 0.3;
 
+/** Percent taken off a unionized employee's salary (#1873). */
+export const UNION_MEMBER_SALARY_DISCOUNT_PCT = 15;
+/** Event-timer stretch at zero union members, as a fraction of the all-members pace (#1873). */
+export const UNION_TIMER_MIN_SHARE_FACTOR = 0.25;
+/** Union members needed before a strike can fire (#1873). */
+export const UNION_STRIKE_MIN_MEMBERS = 1;
+
 /** Chance a candidate has a bonus skill level over the role's starting qualifications. */
 export const CANDIDATE_SKILL_BONUS_CHANCE = 0.35;
 

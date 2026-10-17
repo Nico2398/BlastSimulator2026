@@ -14,7 +14,7 @@ import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining, trainingRefusal, isSchoolFull, heldCourseLevel } from '../core/entities/EmployeeTraining.js';
 import { perHour } from '../core/economy/formatMoney.js';
-import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
+import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, UNION_MEMBER_SALARY_DISCOUNT_PCT } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 import { iconEl } from './icons.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -329,7 +329,8 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
   }
 
   const note = el('span', { text: t('ui.crew.raise_note'), attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } });
-  wrap.appendChild(well([breakdownRow, raiseRow, note]));
+  const unionLine = makeUnionTradeoffLine(e);
+  wrap.appendChild(well(unionLine ? [breakdownRow, unionLine, raiseRow, note] : [breakdownRow, raiseRow, note]));
   return wrap;
 }
 
@@ -509,7 +510,7 @@ export function makeStatusTags(e: Employee, state: GameState): HTMLElement {
   const activity = computeEmployeeActivity(e, state.vehicles);
   const wrap = el('div', { className: 'bs-crew-status', attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
   const tags: Array<{ icon: Parameters<typeof iconEl>[0]; color: string; tip: string }> = [];
-  if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union') });
+  if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT }) });
   if (e.injured) tags.push({ icon: 'injured', color: 'var(--bsx-critical-text)', tip: t('ui.crew.injured_back_in', { hours: injuryHoursRemaining(e) ?? 0 }) });
   if (e.collapsing) tags.push({ icon: 'collapse', color: 'var(--bsx-critical)', tip: t('ui.crew.tag_collapsed') });
   if (e.trainingState) tags.push({ icon: 'training', color: 'var(--bsx-info)', tip: t('ui.crew.tag_training') });
@@ -519,4 +520,13 @@ export function makeStatusTags(e: Employee, state: GameState): HTMLElement {
     wrap.appendChild(el('span', { attrs: { style: `color:${tg.color}`, title: tg.tip }, children: [iconEl(tg.icon, 13)] }));
   }
   return wrap;
+}
+
+/** Crew-card line explaining the union trade-off (#1873); null when not applicable. */
+export function makeUnionTradeoffLine(e: Pick<Employee, 'unionized'>): HTMLElement | null {
+  if (!e.unionized) return null;
+  return el('div', {
+    text: t('ui.crew.union_tradeoff_detail', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT }),
+    attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+  });
 }

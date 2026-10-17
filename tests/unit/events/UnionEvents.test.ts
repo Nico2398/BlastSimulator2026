@@ -8,7 +8,8 @@ import { UNION_EVENTS_1 } from '../../../src/core/events/UnionEvents1.js';
 import { UNION_EVENTS_2 } from '../../../src/core/events/UnionEvents2.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
 import { createFinanceState } from '../../../src/core/economy/Finance.js';
-import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
+import { createEventSystemState, selectEvent, tickEventSystem } from '../../../src/core/events/EventSystem.js';
+import { MIN_EVENT_INTERVAL_ACTIONS, MIN_EVENT_INTERVAL_TICKS } from '../../../src/core/config/balance.js';
 import { resolveEvent } from '../../../src/core/events/EventResolver.js';
 
 function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
@@ -109,5 +110,94 @@ describe('Union events (6.3)', () => {
     const highScores = { ...createScoreState(), wellBeing: 90 };
 
     expect(ev.weightCoeff(lowScores)).toBeGreaterThan(ev.weightCoeff(highScores));
+  });
+});
+
+describe('union events scale with membership (#1873)', () => {
+  beforeEach(() => {
+    clearEvents();
+    registerEvents(UNION_EVENTS_1);
+    registerEvents(UNION_EVENTS_2);
+  });
+
+  const hasStoppage = (e: { consequences: Array<{ effects?: Array<{ type: string }>; altConsequence?: { effects?: Array<{ type: string }> } }> }) =>
+    e.consequences.some(c =>
+      (c.effects ?? []).some(x => x.type === 'work_stoppage')
+      || (c.altConsequence?.effects ?? []).some(x => x.type === 'work_stoppage'));
+
+  const lowWellBeing = () => ({ ...createScoreState(), wellBeing: 10 });
+
+  it('a strike-capable union event exists (sanity)', () => {
+    expect(getEventsByCategory('union').some(hasStoppage)).toBe(true);
+  });
+
+  it('with zero members no selected union event can cause a work stoppage', () => {
+    for (let seed = 1; seed <= 400; seed++) {
+      const ev = selectEvent('union', makeCtx({ unionMemberCount: 0, employeeCount: 5, scores: lowWellBeing() }), new Random(seed));
+      expect(ev).not.toBeNull();
+      expect(hasStoppage(ev!), `${ev!.id} seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('with a member a strike event can be selected', () => {
+    let seen = false;
+    for (let seed = 1; seed <= 600 && !seen; seed++) {
+      const ev = selectEvent('union', makeCtx({ unionMemberCount: 1, employeeCount: 5, scores: lowWellBeing() }), new Random(seed));
+      if (ev && hasStoppage(ev)) seen = true;
+    }
+    expect(seen).toBe(true);
+  });
+
+  it('an undefined member count behaves as legacy: strikes can still occur', () => {
+    let seen = false;
+    for (let seed = 1; seed <= 600 && !seen; seed++) {
+      const ev = selectEvent('union', makeCtx({ employeeCount: 5, scores: lowWellBeing() }), new Random(seed));
+      if (ev && hasStoppage(ev)) seen = true;
+    }
+    expect(seen).toBe(true);
+  });
+
+  it('still returns null with no employees at all (#1412)', () => {
+    expect(selectEvent('union', makeCtx({ employeeCount: 0, unionMemberCount: 0 }), new Random(1))).toBeNull();
+  });
+
+  function countUnionFires(unionMemberCount: number | undefined): number {
+    const state = createEventSystemState();
+    const rng = new Random(99);
+    let fired = 0;
+    const ticks = 6000;
+    for (let tick = 1; tick <= ticks; tick++) {
+      state.actionCountSinceEvent = Math.max(state.actionCountSinceEvent, MIN_EVENT_INTERVAL_ACTIONS);
+      const ctx = makeCtx({ tickCount: tick, employeeCount: 10, ...(unionMemberCount === undefined ? {} : { unionMemberCount }), scores: lowWellBeing() });
+      const f = tickEventSystem(state, ctx, rng);
+      if (f && getEventById(f.eventId)?.category === 'union') fired++;
+      state.pendingEvent = null; // resolve instantly
+    }
+    return fired;
+  }
+
+  it('the cooldown stretch alone refuses a zero-member crew where an all-member crew fires', () => {
+    const attempt = (unionMemberCount: number) => {
+      const state = createEventSystemState();
+      state.timers = state.timers.filter(t => t.category === 'union');
+      state.timers[0]!.remaining = 1; // expires on the next tick
+      state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS; // cached draw held fixed
+      state.lastEventTick = 0;
+      state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+      // Exactly the unstretched interval has elapsed.
+      const ctx = makeCtx({ tickCount: MIN_EVENT_INTERVAL_TICKS, employeeCount: 10, unionMemberCount, scores: lowWellBeing() });
+      return { state, fired: tickEventSystem(state, ctx, new Random(7)) };
+    };
+    const all = attempt(10);
+    expect(all.fired).not.toBeNull();
+    const none = attempt(0);
+    expect(none.fired).toBeNull();
+    expect(none.state.timers[0]!.remaining).toBe(5); // cooldown retry delay
+  });
+
+  it('an all-member crew gets at least twice the union events of a zero-member crew', () => {
+    const none = countUnionFires(0);
+    const all = countUnionFires(10);
+    expect(all).toBeGreaterThanOrEqual(2 * Math.max(none, 1));
   });
 });

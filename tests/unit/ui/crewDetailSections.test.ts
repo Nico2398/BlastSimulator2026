@@ -20,6 +20,7 @@ import {
   makeRestSection,
   makeStatusTags,
   makeIdentitySection,
+  makeUnionTradeoffLine,
   type LinkFactory,
 } from '../../../src/ui/crewDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -29,7 +30,7 @@ import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.
 import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, UNION_MEMBER_SALARY_DISCOUNT_PCT, PAY_CYCLE_TICKS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -607,5 +608,33 @@ describe('makeStatusTags / makeIdentitySection (#1762)', () => {
   it('identity does not throw for a legacy employee without hiredAtTick', () => {
     const fn = vi.fn(() => makeIdentitySection(makeEmployee(), makeState()));
     expect(fn).not.toThrow();
+  });
+});
+
+describe('makeUnionTradeoffLine (#1873)', () => {
+  it('returns the trade-off line for a union member', () => {
+    const line = makeUnionTradeoffLine({ unionized: true });
+    expect(line).not.toBeNull();
+    expect(line!.textContent).toBe(t('ui.crew.union_tradeoff_detail', { pct: UNION_MEMBER_SALARY_DISCOUNT_PCT }));
+    expect(t('ui.crew.union_tradeoff_detail')).not.toBe('ui.crew.union_tradeoff_detail');
+  });
+
+  it('returns null for a non-member', () => {
+    expect(makeUnionTradeoffLine({ unionized: false })).toBeNull();
+  });
+});
+
+describe('union trade-off i18n (#1873)', () => {
+  it.each(['ui.crew.candidate_union_tradeoff', 'ui.crew.union_tradeoff_detail'])('%s exists in en and fr and differs', (key) => {
+    const en = (enLocale as Record<string, string>)[key];
+    const fr = (frLocale as Record<string, string>)[key];
+    expect(en).toBeTruthy();
+    expect(fr).toBeTruthy();
+    expect(fr).not.toBe(en);
+  });
+
+  it('the candidate line interpolates {pct} in both languages', () => {
+    expect((enLocale as Record<string, string>)['ui.crew.candidate_union_tradeoff']).toContain('{pct}');
+    expect((frLocale as Record<string, string>)['ui.crew.candidate_union_tradeoff']).toContain('{pct}');
   });
 });

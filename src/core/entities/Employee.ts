@@ -4,6 +4,7 @@
 import type { HireCandidate } from './HiringPool.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import type { MovementTrail } from './MovementTrail.js';
+import { unionDiscountedSalary } from './UnionMembership.js';
 import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
@@ -469,8 +470,9 @@ export function calculateQualificationBonus(employee: Pick<Employee, 'qualificat
 }
 
 /** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */
-export function calculateSalary(employee: Pick<Employee, 'role' | 'qualifications' | 'raises'>): number {
-  return BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + (employee.raises ?? 0);
+export function calculateSalary(employee: Pick<Employee, 'role' | 'qualifications' | 'raises'> & { unionized?: boolean }): number {
+  const full = BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + (employee.raises ?? 0);
+  return unionDiscountedSalary(full, employee.unionized === true);
 }
 
 /** True when `requiredSkill` is null (no requirement) or the employee holds a qualification in it. */
