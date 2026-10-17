@@ -47,13 +47,13 @@ describe('queueDemolition', () => {
     expect([action.targetX, action.targetZ, action.targetY]).toEqual([8, 14, 3]);
   });
 
-  it('records building id, cost, footprint and rebuild order in the payload', () => {
+  it('records building id, cost and footprint in the payload; no rebuild order (#1875)', () => {
     const { ctx, building } = setup();
-    const id = queueDemolition(ctx.state!, building, { ...OPTS, rebuildOrderId: 7 });
+    const id = queueDemolition(ctx.state!, building, OPTS);
     const p = payloadOf(ctx, id);
     expect(p.buildingId).toBe(building.id);
     expect(p.cost).toBe(1234);
-    expect(p.rebuildOrderId).toBe(7);
+    expect(p).not.toHaveProperty('rebuildOrderId');
     expect(p.footprint.length).toBe(getDefSize(getBuildingDef(building.type, building.tier)).sizeX
       * getDefSize(getBuildingDef(building.type, building.tier)).sizeZ);
   });
@@ -123,9 +123,10 @@ describe('completeDemolition', () => {
     expect(ctx.state!.buildings.buildings.find(b => b.id === building.id)).toBeUndefined();
   });
 
-  it('reports no rebuild action for a plain destroy', () => {
+  it('reports no rebuild action: demolition never rebuilds (#1875)', () => {
     const { ctx, building } = setup();
-    expect(complete(ctx, building).rebuildActionId).toBeNull();
+    expect(complete(ctx, building)).not.toHaveProperty('rebuildActionId');
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'place_building')).toHaveLength(0);
   });
 
   it('emits nav:occupancy_changed so the footprint is freed', () => {
@@ -153,20 +154,5 @@ describe('completeDemolition', () => {
     const id = queueDemolition(ctx.state!, res.building!, OPTS);
     completeDemolition(ctx.state!, ctx.grid!, ctx.emitter, payloadOf(ctx, id));
     expect(ctx.state!.logistics.storageCapacityKg).not.toBe(999_999);
-  });
-
-  it('with a rebuild order queues a place_building action for that order and reports its id', () => {
-    const { ctx, building } = setup();
-    const state = ctx.state!;
-    state.plannedBuildings.push({
-      id: 50, buildingId: building.id, type: building.type, tier: 2,
-      x: building.x, z: building.z, actionId: 0, cost: 500,
-    });
-    const outcome = complete(ctx, building, { rebuildOrderId: 50 });
-    expect(outcome.rebuildActionId).not.toBeNull();
-    const rebuild = state.pendingActions.find(a => a.id === outcome.rebuildActionId)!;
-    expect(rebuild.type).toBe('place_building');
-    expect(rebuild.payload['buildingOrderId']).toBe(50);
-    expect(state.plannedBuildings.find(pb => pb.id === 50)!.actionId).toBe(outcome.rebuildActionId);
   });
 });

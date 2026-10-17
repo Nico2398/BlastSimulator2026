@@ -9,7 +9,6 @@ import { Random } from '../../../src/core/math/Random.js';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
-import { equipDemolition } from '../../helpers/demolition.js';
 
 // #1758: lifecycle status of a building id — pure core, locale-agnostic.
 
@@ -218,39 +217,54 @@ describe('computeBuildingStatus — planned site', () => {
   });
 });
 
-describe('computeBuildingStatus — a real upgrade order', () => {
+describe('computeBuildingStatus — upgrading in place (#1875)', () => {
   function tick(ctx: ReturnType<typeof makeGameContext>, n = 1): void {
     for (let i = 0; i < n; i++) tickCommand(ctx, ['1'], {});
   }
 
-  it('walks demolition_ordered -> rebuilding (same id, no standing building) -> operating at tier 2', () => {
+  it('a standing building with an upgrade site reads upgrading with target tier, progress and builder', () => {
+    const s = stateWith();
+    s.plannedBuildings.push({ ...site(3, 21, 2), upgrade: true });
+    s.pendingActions.push(action({ id: 21, type: 'place_building' }));
+    const builderId = withBuilder(s, 21, 25, 100);
+    const st = computeBuildingStatus(s, 3)!;
+    expect(st.kind).toBe('upgrading');
+    expect(st.targetTier).toBe(2);
+    expect(st.progress).toBeCloseTo(0.75);
+    expect(st.builderId).toBe(builderId);
+  });
+
+  it('an upgrade site with no worker yet has null progress and builder', () => {
+    const s = stateWith();
+    s.plannedBuildings.push({ ...site(3, 21, 2), upgrade: true });
+    s.pendingActions.push(action({ id: 21, type: 'place_building' }));
+    const st = computeBuildingStatus(s, 3)!;
+    expect(st).toMatchObject({ kind: 'upgrading', progress: null, builderId: null });
+  });
+
+  it('a site without the upgrade flag and no standing building stays under_construction', () => {
+    const s = stateWith([]);
+    s.plannedBuildings.push(site(8, 21));
+    s.pendingActions.push(action({ id: 21, type: 'place_building' }));
+    expect(computeBuildingStatus(s, 8)!.kind).toBe('under_construction');
+  });
+
+  it('a real upgrade order walks operating -> upgrading (building always standing) -> operating at tier 2', () => {
     const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32, staffed: true });
     const s = ctx.state!;
     expect(buildCommand(ctx, ['living_quarters'], { at: '9,14' }).success).toBe(true);
     for (let i = 0; i < 400 && s.plannedBuildings.length > 0; i++) tick(ctx);
     const id = s.buildings.buildings[s.buildings.buildings.length - 1]!.id;
     s.buildings.unlockedTiers['living_quarters'] = 2;
-    equipDemolition(ctx);
+    expect(computeBuildingStatus(s, id)!.kind).toBe('operating');
     const up = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(up.success, up.output).toBe(true);
 
-    expect(computeBuildingStatus(s, id)!.kind).toBe('demolition_ordered');
-
-    let rebuilding = false;
+    expect(computeBuildingStatus(s, id)).toMatchObject({ kind: 'upgrading', targetTier: 2 });
     for (let i = 0; i < 1500 && s.plannedBuildings.length > 0; i++) {
       tick(ctx);
-      const standing = s.buildings.buildings.some(b => b.id === id);
-      if (!standing && s.plannedBuildings.some(p => p.buildingId === id)) {
-        const st = computeBuildingStatus(s, id)!;
-        expect(st.kind).toBe('rebuilding');
-        expect(st.targetTier).toBe(2);
-        rebuilding = true;
-        break;
-      }
+      expect(s.buildings.buildings.some(b => b.id === id)).toBe(true);
     }
-    expect(rebuilding).toBe(true);
-
-    for (let i = 0; i < 1500 && s.plannedBuildings.length > 0; i++) tick(ctx);
     const done = computeBuildingStatus(s, id)!;
     expect(done.kind).toBe('operating');
     expect(s.buildings.buildings.find(b => b.id === id)!.tier).toBe(2);

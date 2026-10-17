@@ -128,12 +128,11 @@ describe('placedRowModel — badge (#1759)', () => {
     expect(placedRowModel(b, s).badge).toBe('demolition_ordered');
   });
 
-  it('a building id with only a rebuild site left in plannedBuildings reports rebuilding', () => {
+  it('a standing building with an upgrade site reports upgrading (#1875)', () => {
     const b = mk({ id: 1, type: 'management_office' });
     const s = stateWith(b);
-    s.buildings.buildings = [];
-    s.plannedBuildings.push({ id: 90, buildingId: 1, type: 'management_office', tier: 2, x: 5, z: 5, actionId: 60, cost: 1, rebuild: true });
-    expect(placedRowModel(b, s).badge).toBe('rebuilding');
+    s.plannedBuildings.push({ id: 90, buildingId: 1, type: 'management_office', tier: 2, x: 5, z: 5, actionId: 60, cost: 1, upgrade: true });
+    expect(placedRowModel(b, s).badge).toBe('upgrading');
   });
 });
 

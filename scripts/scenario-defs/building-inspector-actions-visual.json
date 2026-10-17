@@ -1,6 +1,6 @@
 {
   "name": "building-inspector-actions-visual",
-  "description": "The building inspector acts in place (#1758). A player selects buildings by clicking them in the scene, never opening the Build panel: researches then upgrades a management office (Research gives way to Upgrade; the status follows demolition ordered, rebuilding, operating at tier 2), moves it with the footprint placement tool armed straight from the inspector, and demolishes a freight warehouse holding hauled ore through the confirm that names the ore lost. The hauling prefix is hauling-gate's own.",
+  "description": "The building inspector acts in place (#1758). A player selects buildings by clicking them in the scene, never opening the Build panel: researches then upgrades a management office (Research gives way to Upgrade; no Building Destroyer needed: the status follows upgrading, operating at tier 2), moves it with the footprint placement tool armed straight from the inspector, and demolishes a freight warehouse holding hauled ore through the confirm that names the ore lost. The hauling prefix is hauling-gate's own.",
   "shots": [
     {
       "name": "overview",
@@ -671,36 +671,8 @@
       }
     },
     {
-      "command": "vehicle buy building_destroyer tier:1",
-      "description": "The Wrecking Rascal that carries out the upgrade and the demolition below; without one those orders sit blocked (#1392).",
-      "timeout": 30,
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "vehicles"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ],
-        "changedBy": {
-          "cash": -30000
-        }
-      }
-    },
-    {
       "command": "state",
-      "description": "Select the management office (#3) by clicking it in the scene. The Fleet panel opened for the purchase above replaced the Build panel, so every action below is provably the inspector's own. Its next tier is locked, so the action strip offers Research, not Upgrade.",
+      "description": "Select the management office (#3) by clicking it in the scene; no Building Destroyer exists in the fleet, and none is needed for the upgrade below (#1875). Its next tier is locked, so the action strip offers Research, not Upgrade.",
       "role": "player",
       "interaction": [
         {
@@ -759,7 +731,7 @@
     },
     {
       "command": "build upgrade 3",
-      "description": "Research done: Upgrade replaces Research in the strip. Clicking it orders the rebuild; the inspector keeps following building #3 and every action is disabled while the demolition is ordered and the site rebuilds.",
+      "description": "Research done: Upgrade replaces Research in the strip, with no destroyer wait note (#1875). Clicking it orders in-place construction; the inspector keeps following building #3 and Upgrade, Move and Demolish are all disabled while the upgrade is ordered.",
       "role": "player",
       "interaction": [
         {
@@ -786,7 +758,7 @@
     },
     {
       "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
-      "description": "Wait until the same id reaches tier 2: demolition done, rebuild finished. The inspector status goes from demolition ordered through rebuilding to operating.",
+      "description": "Wait until the same id reaches tier 2: the in-place upgrade finished. The inspector status goes from upgrading to operating.",
       "timeout": 95,
       "interaction": [
         {
@@ -858,6 +830,34 @@
         "blocked": "#bs-build-panel .bs-build-buy-btn",
         "equals": {
           "buildingCount": 3
+        }
+      }
+    },
+    {
+      "command": "vehicle buy building_destroyer tier:1",
+      "description": "The Wrecking Rascal for the demolition below (#1392). Bought only now: the upgrade earlier needed no Building Destroyer (#1875). The Fleet panel replaces the Build panel and clears the scene selection.",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ],
+        "changedBy": {
+          "cash": -30000
         }
       }
     },

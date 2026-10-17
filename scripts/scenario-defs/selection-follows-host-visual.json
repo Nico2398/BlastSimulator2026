@@ -1,6 +1,6 @@
 {
   "name": "selection-follows-host-visual",
-  "description": "A selection lasts as long as its entity exists in state, not as long as it has a mesh (#1755). A player clicks Locate on the Crew row of an employee resting inside Living Quarters and the inspector keeps showing them across ticks and after they step out; then selects a building, orders its upgrade, and it stays selected through demolition (Rebuilding, actions disabled) until the new tier stands.",
+  "description": "A selection lasts as long as its entity exists in state, not as long as it has a mesh (#1755). A player clicks Locate on the Crew row of an employee resting inside Living Quarters and the inspector keeps showing them across ticks and after they step out; then selects a building, orders its upgrade with no Building Destroyer needed (#1875), and it stays selected, actions disabled while the upgrade is ordered, until the new tier stands.",
   "steps": [
     {
       "command": "new_game seed:42 cash:200000",
@@ -205,34 +205,6 @@
       }
     },
     {
-      "command": "employee hire role:driver",
-      "description": "Hire a driver via the Crew panel (needed to crew the Wrecking Rascal).",
-      "timeout": 30,
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "employeeCount": 2
-        },
-        "changedBy": {
-          "cash": -800
-        }
-      }
-    },
-    {
       "command": "build research_center at:26,14",
       "description": "Order the Research Center (prerequisite for tier-2 research).",
       "timeout": 30,
@@ -361,34 +333,6 @@
       }
     },
     {
-      "command": "vehicle buy building_destroyer tier:1",
-      "description": "Buy the Wrecking Rascal through the Fleet panel; demolition for the upgrade needs it. Done before selecting a building because opening the Fleet panel clears the scene selection.",
-      "timeout": 40,
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "vehicles"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ],
-        "changedBy": {
-          "cash": -30000
-        }
-      }
-    },
-    {
       "command": "state",
       "description": "Player clicks the Living Quarters (building #1) in the scene; the inspector offers Upgrade.",
       "timeout": 40,
@@ -410,7 +354,7 @@
     },
     {
       "command": "build upgrade 1",
-      "description": "Click Upgrade in the inspector. The old building keeps standing until the Wrecking Rascal demolishes it.",
+      "description": "Click Upgrade in the inspector, with no Building Destroyer and no driver on the site (#1875). The building keeps standing and operating while it is upgraded in place.",
       "timeout": 40,
       "role": "player",
       "interaction": [
@@ -431,16 +375,16 @@
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:1200",
-      "description": "Wait on state for demolition to finish: building #1 leaves state.buildings but is held by a planned site. It must stay selected, showing Rebuilding.",
+      "command": "wait_until field:orderedBuildingCount equals:1 max_ticks:5",
+      "description": "The upgrade site is reserved while building #1 keeps standing (#1875): it stays selected, its Upgrade, Move and Demolish buttons are disabled while the upgrade is ordered.",
       "timeout": 95,
       "role": "setup",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "buildingCount",
+          "field": "orderedBuildingCount",
           "equals": 1,
-          "maxTicks": 1200,
+          "maxTicks": 5,
           "timeoutMs": 90000
         },
         {
@@ -453,17 +397,17 @@
       ],
       "expect": {
         "equals": {
-          "buildingCount": 1,
+          "buildingCount": 2,
           "orderedBuildingCount": 1
         },
         "usable": "#bs-inspector",
         "blocked": "#bs-inspector [data-action=\"demolish\"]",
-        "note": "Bar still visible (no mesh, held by site) and its Demolish button is disabled by the Rebuilding state"
+        "note": "Bar still visible (the building never left state) and its Demolish button is disabled by the upgrade_ordered state"
       }
     },
     {
       "command": "wait_until field:maxBuildingTier equals:2 max_ticks:1500",
-      "description": "Wait on state for the tier-2 building to finish; the selection is back on the new building.",
+      "description": "Wait on state for the in-place upgrade to finish; the selection never left the building.",
       "timeout": 95,
       "role": "setup",
       "interaction": [
@@ -482,7 +426,7 @@
           "orderedBuildingCount": 0
         },
         "usable": "#bs-inspector [data-action=\"demolish\"]",
-        "note": "Bar still showing, Demolish usable again: selected building is the new tier"
+        "note": "Bar still showing, Demolish usable again: the selected building is now the new tier"
       }
     }
   ]
