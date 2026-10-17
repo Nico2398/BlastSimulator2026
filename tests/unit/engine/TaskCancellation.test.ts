@@ -836,9 +836,9 @@ describe('fireEmployeeFromWorld crew morale dent (#1872)', () => {
     expect(c.morale).toBe(70 - DISMISSAL_CREW_MORALE_DENT);
   });
 
-  it('forCause: true dents nobody', () => {
+  it('skipCrewMoraleDent: true dents nobody', () => {
     const { state, a, b, c } = crewOf3();
-    expect(fireEmployeeFromWorld(state, a.id, { force: true, forCause: true }).success).toBe(true);
+    expect(fireEmployeeFromWorld(state, a.id, { force: true, skipCrewMoraleDent: true }).success).toBe(true);
     expect(b.morale).toBe(70);
     expect(c.morale).toBe(70);
   });
@@ -851,7 +851,7 @@ describe('fireEmployeeFromWorld crew morale dent (#1872)', () => {
     expect(c.morale).toBe(70);
   });
 
-  it('a forced dismissal without forCause still dents the crew', () => {
+  it('a forced dismissal without skipCrewMoraleDent still dents the crew', () => {
     const { state, a, b } = crewOf3();
     fireEmployeeFromWorld(state, a.id, { force: true });
     expect(b.morale).toBe(70 - DISMISSAL_CREW_MORALE_DENT);

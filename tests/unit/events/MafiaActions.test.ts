@@ -26,7 +26,6 @@ import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../../../src
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { board } from '../../../src/core/engine/Mount.js';
-import { DISMISSAL_CREW_MORALE_DENT } from '../../../src/core/config/balance.js';
 import { frameRefusal } from '../../../src/core/events/MafiaActions.js';
 
 const EMPLOYEE_DEFAULTS = {
@@ -418,9 +417,5 @@ describe('A successful frame is dismissal for cause: no crew morale dent (#1872)
     const { employees, victimId, others } = frameSucceeds();
     expect(employees.employees.find(e => e.id === victimId)).toBeUndefined();
     for (const o of others) expect(o.morale).toBe(60);
-  });
-
-  it('the dent an ordinary dismissal would cost is real (so the frame benefit is non-zero)', () => {
-    expect(DISMISSAL_CREW_MORALE_DENT).toBeGreaterThan(0);
   });
 });

@@ -42,7 +42,7 @@ export function applyInstantEffect(
     case 'employee_leaves': {
       const leaver = pickLeaver(spec, staff, rng);
       // Unionised staff are protected from the fire command; events may still take them. Not a dismissal: no crew morale dent.
-      if (!leaver || !fireEmployeeFromWorld(state, leaver.id, { force: true, forCause: true }).success) return alt();
+      if (!leaver || !fireEmployeeFromWorld(state, leaver.id, { force: true, skipCrewMoraleDent: true }).success) return alt();
       return outcome();
     }
     case 'employee_joins': {

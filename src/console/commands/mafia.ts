@@ -90,7 +90,7 @@ export function mafiaCommand(
         const rng = new Random(rollSeed(state.seed, state.tickCount, state.mafia.rollCount));
         const result = completeFrame(state.mafia, state, empId, state.tickCount, rng);
         // A refused or targetless completion draws no roll, so it consumes no salt.
-        if (result.outcomeKey === 'mafia.frame_success' || result.outcomeKey === 'mafia.frame_detected') state.mafia.rollCount++;
+        if (result.rolled) state.mafia.rollCount++;
         raiseInvestigation(ctx, result);
         return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
       }

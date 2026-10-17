@@ -593,7 +593,7 @@ export function releaseEmployeeFromWorld(state: GameState, employeeId: number, e
 export function fireEmployeeFromWorld(
   state: GameState,
   employeeId: number,
-  opts?: { force?: boolean; forCause?: boolean },
+  opts?: { force?: boolean; skipCrewMoraleDent?: boolean },
 ): { success: boolean; error?: string } & RefusalKey {
   const guard = canFireEmployee(state.employees, employeeId, opts);
   if (!guard.success) return guard;
@@ -601,7 +601,7 @@ export function fireEmployeeFromWorld(
   releaseEmployeeFromWorld(state, employeeId);
   removeFromRoster(state.employees, employeeId);
   // A dismissal for cause (a successful frame) does not rattle the rest of the crew.
-  if (!opts?.forCause) applyDismissalMoraleDent(state.employees, employeeId);
+  if (!opts?.skipCrewMoraleDent) applyDismissalMoraleDent(state.employees, employeeId);
   return { success: true };
 }
 
