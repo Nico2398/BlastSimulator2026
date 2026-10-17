@@ -953,7 +953,7 @@ describe('Mafia — frame and accident release the target from the world (#1378)
   function frameWorld(seed: number) {
     const c = makeCtx();
     const { driverId } = driverAboardHauler(c);
-    emp(c, driverId)!.unionized = true;
+    emp(c, driverId)!.unionized = false;
     c.state!.pendingActions.push(makeQueuedAction(914, { status: 'assigned', holderId: driverId, targetEmployeeId: driverId }));
     emp(c, driverId)!.taskQueue = [915];
     startFraming(c.state!.mafia, c.state!.employees, driverId, 0);
@@ -961,7 +961,7 @@ describe('Mafia — frame and accident release the target from the world (#1378)
     return { ctx: c, result, id: driverId };
   }
 
-  it('a successful frame fires even a unionized target and cleans up like firing', () => {
+  it('a successful frame fires a non-union target and cleans up like firing', () => {
     const { ctx: c, id } = runUntil(frameWorld, r => r.success);
 
     expect(emp(c, id)).toBeUndefined();

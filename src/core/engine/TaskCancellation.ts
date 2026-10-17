@@ -8,7 +8,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import { SURVEY_COSTS, ACTION_STUCK_BACKOFF_TICKS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
-import { canFireEmployee, removeFromRoster, type Employee } from '../entities/Employee.js';
+import { canFireEmployee, removeFromRoster, applyDismissalMoraleDent, type Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, isMidVehicleGatedWork, isCommittedToOwnCargo, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { syncItineraryMirrors } from './MoveTo.js';
@@ -593,13 +593,15 @@ export function releaseEmployeeFromWorld(state: GameState, employeeId: number, e
 export function fireEmployeeFromWorld(
   state: GameState,
   employeeId: number,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; skipCrewMoraleDent?: boolean },
 ): { success: boolean; error?: string } & RefusalKey {
   const guard = canFireEmployee(state.employees, employeeId, opts);
   if (!guard.success) return guard;
 
   releaseEmployeeFromWorld(state, employeeId);
   removeFromRoster(state.employees, employeeId);
+  // A dismissal for cause (a successful frame) does not rattle the rest of the crew.
+  if (!opts?.skipCrewMoraleDent) applyDismissalMoraleDent(state.employees, employeeId);
   return { success: true };
 }
 

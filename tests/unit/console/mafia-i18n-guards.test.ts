@@ -42,6 +42,8 @@ function makeUnlockedCtx(seed = 1): GameContext {
 /** Hires one driller via the same core entry point used elsewhere in this suite. */
 function hireTestEmployee(ctx: GameContext, seed = 1) {
   const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(seed));
+  // Hires roll `unionized`; union members are refused by the frame (#1872), so pin this to false.
+  employee.unionized = false;
   return employee;
 }
 

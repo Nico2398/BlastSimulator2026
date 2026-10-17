@@ -562,6 +562,7 @@ describe('mafia frame — insufficient funds guard', () => {
     const ctx = makeCtx(FRAME_COST - 1);
     unlockMafia(ctx);
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    employee.unionized = false; // framing refuses union members (#1872)
     const before = snapshot(ctx);
     const result = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
     expect(result.success).toBe(false);
@@ -574,6 +575,7 @@ describe('mafia frame — insufficient funds guard', () => {
     const ctx = makeCtx(FRAME_COST);
     unlockMafia(ctx);
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    employee.unionized = false; // framing refuses union members (#1872)
     const result = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).toBe(0);
@@ -584,6 +586,7 @@ describe('mafia frame — insufficient funds guard', () => {
     const ctx = makeCtx(FRAME_COST);
     unlockMafia(ctx);
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    employee.unionized = false; // framing refuses union members (#1872)
     const startResult = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
     expect(startResult.success).toBe(true);
     expect(ctx.state!.mafia.pendingFrames).toHaveLength(1);
