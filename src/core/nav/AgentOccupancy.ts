@@ -8,11 +8,12 @@
 // One ground cell holds at most one occupant. `AgentOccupancy` is the single
 // index of that relationship: cell -> occupant and occupant -> cell, kept in
 // step with each other so both directions are O(1) rather than a scan over
-// every employee/vehicle. Built once per tick batch (`rebuildAgentOccupancy`)
-// and reconciled incrementally as movement resolves (`reconcileAgentOccupancy`)
-// — never rebuilt from scratch per tick, which would make its cost scale with
-// total agent count on every single step instead of with the moves actually
-// made this tick.
+// every employee/vehicle. Built lazily, once (`rebuildAgentOccupancy`), then
+// reconciled each tick (`reconcileAgentOccupancy`): a liveness sweep releases
+// holders that no longer exist and a registration sweep registers agents not
+// yet held, so the live map holds what a rebuild from the same state would —
+// save/load safe. Reconcile is therefore linear in agent count per tick; only
+// the full rebuild is one-shot, never repeated per tick.
 
 import type { GameState } from '../state/GameState.js';
 import { isOccupyingHost } from '../entities/EmployeeLocomotion.js';
@@ -104,18 +105,27 @@ export class AgentOccupancy {
  */
 export function rebuildAgentOccupancy(state: GameState): AgentOccupancy {
   const occupancy = new AgentOccupancy();
+  registerUnheldAgents(state, occupancy);
+  return occupancy;
+}
 
+/**
+ * Claims the ground cell (Math.round of x/z, first claim wins: on-foot alive
+ * employees, then vehicles) for every agent `occupancy` does not already
+ * hold. The one claim order shared by rebuild and reconcile.
+ */
+function registerUnheldAgents(state: GameState, occupancy: AgentOccupancy): void {
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
     if (isOccupyingHost(emp.locomotion)) continue;
+    if (occupancy.cellOfOccupant({ kind: 'employee', id: emp.id }) !== null) continue;
     occupancy.tryMove({ kind: 'employee', id: emp.id }, Math.round(emp.x), Math.round(emp.z));
   }
 
   for (const vehicle of state.vehicles.vehicles) {
+    if (occupancy.cellOfOccupant({ kind: 'vehicle', id: vehicle.id }) !== null) continue;
     occupancy.tryMove({ kind: 'vehicle', id: vehicle.id }, Math.round(vehicle.x), Math.round(vehicle.z));
   }
-
-  return occupancy;
 }
 
 /**
@@ -142,4 +152,6 @@ export function reconcileAgentOccupancy(state: GameState, occupancy: AgentOccupa
       : vehicleIds.has(held.occupant.id);
     if (!exists) occupancy.release(held.occupant);
   }
+
+  registerUnheldAgents(state, occupancy);
 }

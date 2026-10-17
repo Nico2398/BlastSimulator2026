@@ -353,9 +353,6 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   return unqualifiedIds;
 }
 
-/** Where each game's rotating debris slice resumes (#1603) — derived, never serialized, like `reachCaches`. */
-const debrisCursors = new WeakMap<GameState, number>();
-
 /**
  * `queued` with its auto-debris orders cut to `perCall` of them, rotating so
  * successive calls cover every one (#1603). A large blast queues thousands of
@@ -370,9 +367,11 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
   const out: PendingAction[] = [];
   for (const action of queued) (isAutoDebrisAction(action.type) ? debris : out).push(action);
   if (debris.length <= perCall) return queued;
-  const start = (debrisCursors.get(state) ?? 0) % debris.length;
+  // A save is untrusted input: anything but a safe non-negative integer restarts the rotation.
+  const saved = state.debrisClassifyCursor;
+  const start = (Number.isSafeInteger(saved) && saved! >= 0 ? saved! : 0) % debris.length;
   for (let k = 0; k < perCall; k++) out.push(debris[(start + k) % debris.length]!);
-  debrisCursors.set(state, start + perCall);
+  state.debrisClassifyCursor = start + perCall;
   return out;
 }
 

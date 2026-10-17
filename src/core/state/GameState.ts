@@ -502,6 +502,8 @@ export interface GameState {
    *  (dispatch, claim, complete, interrupt) — lets the renderer detect "nothing
    *  changed" in O(1) instead of diffing the array. Mirrors sitePolicy.revision. */
   ghostPreviewsRevision: number;
+  /** Where the rotating auto-debris classification slice resumes (#1603). Saved so a load continues the rotation instead of restarting it (#1869); absent reads as 0. */
+  debrisClassifyCursor?: number;
   /** Ore report from the most recent blast, or null if no blast has occurred yet. */
   lastOreReport: BlastOreReport | null;
   /** Structured summary of the most recent blast, for BlastReportModal (redesign P4/§5.A). Null until the first blast. */
