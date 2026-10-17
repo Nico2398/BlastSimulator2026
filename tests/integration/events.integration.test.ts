@@ -704,8 +704,9 @@ describe('Event system', () => {
       // Pre-warm tickCount to skip past the initial no-timer-activity zone
       ctx.state!.tickCount = 110;
 
-      // Union events need at least one employee (#1412)
-      hireEmployee(ctx.state!.employees, 'driller', new Random(1), 0, 0);
+      // Union events need at least one employee (#1412). A unionised one keeps the union
+      // timer at its full pace (#1873) — this test measures the cooldown, not the stretch.
+      hireEmployee(ctx.state!.employees, 'driller', new Random(1), 0, 0).employee.unionized = true;
 
       // Set union timer to expire in 2 ticks
       const unionTimer = ctx.state!.events.timers.find(t => t.category === 'union')!;
@@ -1062,7 +1063,8 @@ describe('bribe protections shield the next event after a resolved one (#1816)',
       s.seed = seed;
       s.cash = 1_000_000;
       s.finances.cash = s.cash;
-      hireEmployee(s.employees, 'driller', new Random(1), 0, 0);
+      // Unionised: a member keeps union cooldowns at full pace (#1873); this suite times the bribe, not the stretch.
+      hireEmployee(s.employees, 'driller', new Random(1), 0, 0).employee.unionized = true;
       for (const t of s.events.timers) t.remaining = 1_000_000;
       s.events.pendingEvent = { eventId: 'weather_suspiciously_perfect', firedAtTick: s.tickCount };
       expect(runCommand(engine, 'event choose 0').success).toBe(true);
