@@ -97,6 +97,8 @@ export interface EventContext {
   hasBlasted: boolean;
   /** Bribe protections currently held by the player (#1407). */
   protections?: ActiveProtection[];
+  /** Living union members on the crew (#1873). */
+  unionMemberCount?: number;
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */

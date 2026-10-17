@@ -520,3 +520,8 @@ export function makeStatusTags(e: Employee, state: GameState): HTMLElement {
   }
   return wrap;
 }
+
+/** Crew-card line explaining the union trade-off (#1873); null when not applicable. */
+export function makeUnionTradeoffLine(_e: Pick<Employee, 'unionized'>): HTMLElement | null {
+  return null; // TODO: implement
+}

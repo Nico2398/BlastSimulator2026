@@ -469,7 +469,7 @@ export function calculateQualificationBonus(employee: Pick<Employee, 'qualificat
 }
 
 /** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */
-export function calculateSalary(employee: Pick<Employee, 'role' | 'qualifications' | 'raises'>): number {
+export function calculateSalary(employee: Pick<Employee, 'role' | 'qualifications' | 'raises'> & { unionized?: boolean }): number {
   return BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + (employee.raises ?? 0);
 }
 
