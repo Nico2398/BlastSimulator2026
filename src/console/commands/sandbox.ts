@@ -8,9 +8,11 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   SANDBOX_DEFAULTS,
-  SANDBOX_DIFFICULTY_ORDER,
+  SANDBOX_KIT_ORDER,
+  resolveSandboxKitId,
   clampSandboxConfig,
   randomSandboxSeed,
+  SANDBOX_KITS,
   sandboxLevelDef,
   type SandboxConfig,
 } from '../../core/campaign/Sandbox.js';
@@ -29,17 +31,28 @@ export function parseSandboxArgs(named: Record<string, string>): Partial<Sandbox
   const out: Partial<SandboxConfig> = {};
 
   if (named['biome'] !== undefined) out.biome = named['biome'];
-  if (named['difficulty'] !== undefined) out.difficulty = named['difficulty'] as SandboxConfig['difficulty'];
   // seed:random asks for a fresh map; any number replays a known one.
   if (named['seed'] !== undefined) {
     const seed = named['seed'] === 'random' ? randomSandboxSeed() : Number(named['seed']);
     if (Number.isFinite(seed)) out.seed = seed;
   }
+  // Unknown kit values are left unset here; sandboxCommand reports them.
+  const rawKit = rawKitArg(named);
+  const kit = rawKit === undefined ? undefined : resolveSandboxKitId(rawKit);
+  if (kit) out.kit = kit;
   return out;
 }
 
 /**
- * `sandbox start [biome:… seed:… size:… …]`
+ * The raw `kit:` value, else the legacy `difficulty:` alias (kit wins if both).
+ * Resolved separately from parseSandboxArgs so an unknown value can be reported.
+ */
+function rawKitArg(named: Record<string, string>): string | undefined {
+  return named['kit'] ?? named['difficulty'];
+}
+
+/**
+ * `sandbox start [biome:… kit:digger|full seed:… …]` (`difficulty:` is a legacy alias for `kit:`)
  *
  * Unlike `campaign start`, this needs no prior `new_game` and is gated by no
  * unlock: a sandbox site is created from nothing, which is the whole point of
@@ -60,9 +73,9 @@ export function sandboxCommand(
     const valid = getAllBiomes().map(b => b.id).join(', ');
     return { success: false, output: t('sandbox.unknown_biome', { biome: requested.biome, valid }) };
   }
-  if (requested.difficulty !== undefined && !SANDBOX_DIFFICULTY_ORDER.includes(requested.difficulty)) {
-    const valid = SANDBOX_DIFFICULTY_ORDER.join(', ');
-    return { success: false, output: t('sandbox.unknown_difficulty', { difficulty: requested.difficulty, valid }) };
+  const rawKit = rawKitArg(named);
+  if (rawKit !== undefined && requested.kit === undefined) {
+    return { success: false, output: t('sandbox.unknown_kit', { kit: rawKit, valid: SANDBOX_KIT_ORDER.join(', ') }) };
   }
 
   const flags = parseOptionalStaffedFlag(named['staffed']);
@@ -72,7 +85,7 @@ export function sandboxCommand(
 
   const config = clampSandboxConfig(requested);
   const level = sandboxLevelDef(config);
-  // Absent: the difficulty's free kit. true: the global staffed roster, no buildings. false: bare.
+  // Absent: the kit's free site. true: the global staffed roster, no buildings. false: bare.
   const startingSite = resolveStartingSite(level.startingSite, flags.staffed);
 
   ctx.state = createGame({
@@ -109,7 +122,7 @@ export function sandboxCommand(
       gridX: level.gridX,
       gridZ: level.gridZ,
       biome: config.biome,
-      difficulty: config.difficulty,
+      kit: t(SANDBOX_KITS[config.kit].labelKey),
       seed: config.seed,
       cash: level.startingCash.toLocaleString('en-US'),
       staffedSuffix: staffedSuffix(isStaffedComposition(startingSite)),

@@ -19,9 +19,9 @@ import {
   clampSandboxConfig,
   randomSandboxSeed,
   sandboxBiomeTraits,
-  sandboxDifficultyDetails,
+  sandboxKitDetails,
   type SandboxConfig,
-  type SandboxDifficultyId,
+  type SandboxKitId,
   type SandboxField,
 } from '../core/campaign/Sandbox.js';
 
@@ -46,9 +46,9 @@ export class SandboxPanel {
   private onBack?: OnSandboxBack;
   /** Live controls by config key, so randomising the seed can write back into its input. */
   private readonly inputs = new Map<string, HTMLInputElement>();
-  /** Biome and difficulty detail blocks, refreshed in place when a selection changes (#1686). */
+  /** Biome and kit detail blocks, refreshed in place when a selection changes (#1686). */
   private biomeBlock!: HTMLElement;
-  private difficultyBlock!: HTMLElement;
+  private kitBlock!: HTMLElement;
   /** Header title, retranslated on every open so a locale switch in the menu shows. */
   private titleEl!: HTMLElement;
   /** Injectable RNG for the seed, so tests stay deterministic (#504). */
@@ -92,7 +92,7 @@ export class SandboxPanel {
 
   show(): void {
     // A fresh random seed every time the panel opens, without touching the
-    // previously selected biome/difficulty (#504).
+    // previously selected biome/kit (#504).
     this.config = clampSandboxConfig({ ...this.config, seed: randomSandboxSeed(this.rand) });
     this.render();
     this.overlay.style.display = 'flex';
@@ -133,9 +133,9 @@ export class SandboxPanel {
 
     this.biomeBlock = document.createElement('div');
     this.biomeBlock.style.cssText = DETAIL_BLOCK_STYLE;
-    this.difficultyBlock = document.createElement('div');
-    this.difficultyBlock.style.cssText = DETAIL_BLOCK_STYLE;
-    this.body.append(this.biomeBlock, this.difficultyBlock);
+    this.kitBlock = document.createElement('div');
+    this.kitBlock.style.cssText = DETAIL_BLOCK_STYLE;
+    this.body.append(this.biomeBlock, this.kitBlock);
     this.renderDetails();
 
     const actions = document.createElement('div');
@@ -241,7 +241,7 @@ export class SandboxPanel {
   private renderDetails(): void {
     const config = this.getConfig();
     this.renderBiomeDetails(config.biome);
-    this.renderDifficultyDetails(config.difficulty);
+    this.renderKitDetails(config.kit);
   }
 
   private renderBiomeDetails(biomeId: string): void {
@@ -262,17 +262,17 @@ export class SandboxPanel {
     this.biomeBlock.replaceChildren(...lines.map(([key, text]) => detailLine(`bs-sandbox-biome-${key}`, text)));
   }
 
-  private renderDifficultyDetails(difficulty: SandboxDifficultyId): void {
-    const diff = sandboxDifficultyDetails(difficulty);
+  private renderKitDetails(kit: SandboxKitId): void {
+    const details = sandboxKitDetails(kit);
     const list = (items: string[]): string => items.length > 0 ? items.join(', ') : t('sandbox.detail.none');
     const opening = t('sandbox.detail.opens_with', {
-      crew: list(diff.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
-      vehicles: list(diff.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
-      buildings: list(diff.buildings.map(b => `${b.count}× ${buildingDisplayName(b.type, b.tier)}`)),
+      crew: list(details.crew.map(c => `${c.count}× ${t(`role.${c.role}`)}`)),
+      vehicles: list(details.vehicles.map(v => `${v.count}× ${t(`vehicle_type.${v.role}`)} (${vehicleDisplayName(v.role, v.tier)})`)),
+      buildings: list(details.buildings.map(b => `${b.count}× ${buildingDisplayName(b.type, b.tier)}`)),
     });
-    this.difficultyBlock.replaceChildren(
-      detailLine('bs-sandbox-difficulty-cash', t('sandbox.detail.cash', { cash: formatMoney(diff.startingCash) })),
-      detailLine('bs-sandbox-difficulty-opening', opening),
+    this.kitBlock.replaceChildren(
+      detailLine('bs-sandbox-kit-cash', t('sandbox.detail.cash', { cash: formatMoney(details.startingCash) })),
+      detailLine('bs-sandbox-kit-opening', opening),
     );
   }
 

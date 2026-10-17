@@ -147,7 +147,7 @@ describe('other levels and the tutorial are unchanged (#1363)', () => {
 
   it.each(['grumpstone_ridge', 'treranium_depths'])('%s opens with the level kit, not bare (#1672)', (levelId) => {
     const { state } = startLevel(levelId);
-    const kit = SANDBOX_STARTING_SITES.normal;
+    const kit = SANDBOX_STARTING_SITES.digger;
     expect(state.employees.employees.map((e) => e.role).sort()).toEqual(kit.employees.map((e) => e.role).sort());
     expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(kit.vehicles.map((v) => v.role).sort());
     expect(state.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
