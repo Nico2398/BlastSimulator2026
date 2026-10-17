@@ -19,6 +19,8 @@ interface DeliveryOutcome {
   payment: number;
   bonus: number;
   completed: boolean;
+  /** True when the player paid for the delivery (paid clearance): `payment` is a fee, not income (#1892). */
+  fee: boolean;
 }
 
 /** One automatic delivery, tagged with its contract. */
@@ -62,7 +64,7 @@ export function deliverStoredOre(
 
   const result = deliverMaterials(contracts, contractId, kg, tick);
   contract.paidTotal = (contract.paidTotal ?? 0) + result.payment;
-  return { success: true, data: { kg, ...result } };
+  return { success: true, data: { kg, ...result, fee: false } };
 }
 
 /**
@@ -103,4 +105,14 @@ export function bookDeliveryIncome(
     account.cash += outcome.bonus;
     addIncome(account.finances, outcome.bonus, 'bonus', `Contract #${contractId} early bonus`, tick);
   }
+}
+
+/** Book a delivery's cashflow: income for a paying contract, an expense when the outcome is a fee (#1892). */
+export function bookDeliveryCashflow(
+  account: { cash: number; finances: FinanceState },
+  contractId: number,
+  outcome: Pick<DeliveryOutcome, 'payment' | 'bonus' | 'fee'>,
+  tick: number,
+): void {
+  void account; void contractId; void outcome; void tick; // TODO: implement
 }

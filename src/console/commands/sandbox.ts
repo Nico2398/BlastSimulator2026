@@ -19,6 +19,7 @@ import {
 import { getAllBiomes, getBiome } from '../../core/world/BiomeCatalog.js';
 import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
@@ -114,7 +115,7 @@ export function sandboxCommand(
 
   if (level.market) ctx.state.contracts.market = level.market;
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state));
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state));
 
   return {
     success: true,

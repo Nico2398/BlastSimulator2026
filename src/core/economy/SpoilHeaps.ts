@@ -23,6 +23,18 @@ export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<stri
   return isBarrenFragment(fragment.oreDensities) ? 'spoil_heap' : 'warehouse';
 }
 
+/** Room (kg) left on one building's spoil heap; 0 for a non-heap. */
+export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>): number {
+  void b;
+  return 0; // TODO: implement
+}
+
+/** Room (kg) left across every spoil heap in the given buildings. */
+export function totalSpoilRoomKg(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[]): number {
+  void buildings;
+  return 0; // TODO: implement
+}
+
 /** Total barren rock (kg) stored across the given buildings' spoil heaps. */
 export function totalSpoilKg(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[]): number {
   let total = 0;
@@ -92,4 +104,13 @@ export function creditFirstSpoilHeap(buildings: readonly Pick<Building, 'type' |
   if (!heap) return false;
   creditSpoilKg(heap, amountKg);
   return true;
+}
+
+/**
+ * Credit `amountKg` of barren rock across the spoil heaps, filling in building order.
+ * Returns false, crediting nothing, when no heap has room for it.
+ */
+export function creditSpoilHeaps(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[], amountKg: number): boolean {
+  void buildings; void amountKg;
+  return false; // TODO: implement
 }

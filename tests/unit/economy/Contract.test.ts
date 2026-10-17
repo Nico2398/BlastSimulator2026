@@ -52,7 +52,7 @@ describe('Contract system', () => {
   it('generated contracts have valid fields within expected ranges', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     expect(state.available.length).toBeGreaterThan(0);
     for (const c of state.available) {
@@ -73,10 +73,10 @@ describe('Contract system', () => {
   describe('priceMultiplier', () => {
     it('scales every generated contract\'s pricePerKg by the given multiplier, relative to the unmultiplied baseline', () => {
       const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES, Infinity);
 
       const multiplied = createContractState();
-      generateContracts(multiplied, new Random(42), 0, 1.5, ALL_ORES);
+      generateContracts(multiplied, new Random(42), 0, 1.5, ALL_ORES, Infinity);
 
       expect(multiplied.available.length).toBe(baseline.available.length);
       for (let i = 0; i < baseline.available.length; i++) {
@@ -92,10 +92,10 @@ describe('Contract system', () => {
 
     it('leaves the missed-deadline penalty on the unmultiplied base price, while the early-delivery bonus scales (#959)', () => {
       const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES, Infinity);
 
       const multiplied = createContractState();
-      generateContracts(multiplied, new Random(42), 0, 16, ALL_ORES);
+      generateContracts(multiplied, new Random(42), 0, 16, ALL_ORES, Infinity);
 
       expect(multiplied.available.length).toBe(baseline.available.length);
       for (let i = 0; i < baseline.available.length; i++) {
@@ -114,10 +114,10 @@ describe('Contract system', () => {
 
     it('a sub-1 multiplier (a tight, lowball market) scales prices down, not just up', () => {
       const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES, Infinity);
 
       const discounted = createContractState();
-      generateContracts(discounted, new Random(42), 0, 0.85, ALL_ORES);
+      generateContracts(discounted, new Random(42), 0, 0.85, ALL_ORES, Infinity);
 
       for (let i = 0; i < baseline.available.length; i++) {
         expect(discounted.available[i]!.pricePerKg).toBeCloseTo(baseline.available[i]!.pricePerKg * 0.85, 6);
@@ -128,22 +128,22 @@ describe('Contract system', () => {
   it('contract list refreshes periodically (new contracts appear)', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
     const initialCount = state.available.length;
 
     // Refresh too early — no change
-    generateContracts(state, rng, 5, 1, ALL_ORES);
+    generateContracts(state, rng, 5, 1, ALL_ORES, Infinity);
     expect(state.available.length).toBe(initialCount);
 
     // After refresh interval — new contracts added
-    generateContracts(state, rng, 25, 1, ALL_ORES);
+    generateContracts(state, rng, 25, 1, ALL_ORES, Infinity);
     expect(state.available.length).toBeGreaterThan(initialCount);
   });
 
   it('accepting a contract adds it to active contracts', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contractId = state.available[0]!.id;
     const contract = acceptContract(state, contractId, 10);
@@ -157,7 +157,7 @@ describe('Contract system', () => {
   it('delivering materials against a contract updates progress', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contractId = state.available[0]!.id;
     const quantity = state.available[0]!.quantityKg;
@@ -174,7 +174,7 @@ describe('Contract system', () => {
   it('completing a contract credits payment', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contractId = state.available[0]!.id;
     const quantity = state.available[0]!.quantityKg;
@@ -190,7 +190,7 @@ describe('Contract system', () => {
   it('missing a deadline triggers penalty deduction', () => {
     const state = createContractState();
     const rng = new Random(42);
-    generateContracts(state, rng, 0, 1, ALL_ORES);
+    generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
     const contract = state.available[0]!;
     const deadline = contract.deadlineTicks;
@@ -212,7 +212,7 @@ describe('Contract system', () => {
   describe('findContract', () => {
     it('finds a contract by id', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       const target = state.available[1]!;
 
       expect(findContract(state.available, { id: target.id })).toBe(target);
@@ -298,7 +298,7 @@ describe('Contract system', () => {
 
     it('returns null when no selector field is set — nothing to search for', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       expect(findContract(state.available, {})).toBeNull();
     });
 
@@ -309,7 +309,7 @@ describe('Contract system', () => {
 
     it('an id that has rotated out of the available pool is no longer resolvable, but a type/materialId selector still is if a matching contract is still offered', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       const evictedId = state.available[0]!.id;
       const survivingType = state.available[0]!.type;
       const survivingMaterial = state.available[0]!.materialId;
@@ -320,7 +320,7 @@ describe('Contract system', () => {
       let tick = 0;
       while (state.available.some(c => c.id === evictedId)) {
         tick += 20;
-        generateContracts(state, new Random(42 + tick), tick, 1, ALL_ORES);
+        generateContracts(state, new Random(42 + tick), tick, 1, ALL_ORES, Infinity);
       }
 
       expect(findContract(state.available, { id: evictedId })).toBeNull();
@@ -335,7 +335,7 @@ describe('Contract system', () => {
 
     it('accepting by a material/type selector resolves the same contract accepting by its id would', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       const target = state.available[0]!;
 
       const byId = findContract(state.available, { id: target.id });
@@ -454,7 +454,7 @@ describe('Contract system', () => {
 
     it('first refresh on an empty board yields exactly 3 offers', () => {
       const state = createContractState();
-      generateContracts(state, new Random(42), 0, 1, ALL_ORES);
+      generateContracts(state, new Random(42), 0, 1, ALL_ORES, Infinity);
       expect(state.available).toHaveLength(3);
     });
 
@@ -463,7 +463,7 @@ describe('Contract system', () => {
       state.available = Array.from({ length: 8 }, (_, i) => offer({ id: i + 1 }));
       state.nextId = 9;
       state.lastRefreshTick = 0;
-      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual([4, 5, 6, 7, 8, 9, 10, 11]);
     });
 
@@ -472,7 +472,7 @@ describe('Contract system', () => {
       state.available = Array.from({ length: 6 }, (_, i) => offer({ id: i + 1 }));
       state.nextId = 7;
       state.lastRefreshTick = 0;
-      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
     });
 
@@ -481,7 +481,7 @@ describe('Contract system', () => {
       state.available = Array.from({ length: 5 }, (_, i) => offer({ id: i + 1 }));
       state.nextId = 6;
       state.lastRefreshTick = 0;
-      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     });
 
@@ -490,7 +490,7 @@ describe('Contract system', () => {
       const rng = new Random(42);
       for (let n = 0; n < 7; n++) {
         const before = new Set(ids(state));
-        generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+        generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
         const added = ids(state).filter(id => !before.has(id));
         expect(added, `refresh ${n}`).toHaveLength(3);
         expect(state.available.length).toBeLessThanOrEqual(MAX_AVAILABLE_CONTRACTS);
@@ -501,9 +501,9 @@ describe('Contract system', () => {
     it('refresh before the interval elapsed on a non-empty board is a no-op', () => {
       const state = createContractState();
       const rng = new Random(42);
-      generateContracts(state, rng, 0, 1, ALL_ORES);
+      generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
       const before = ids(state);
-      generateContracts(state, rng, CONTRACT_REFRESH_INTERVAL - 1, 1, ALL_ORES);
+      generateContracts(state, rng, CONTRACT_REFRESH_INTERVAL - 1, 1, ALL_ORES, Infinity);
       expect(ids(state)).toEqual(before);
       expect(state.nextId).toBe(4);
     });
@@ -514,7 +514,7 @@ describe('Contract system', () => {
       for (let seed = 1; seed <= 60; seed++) {
         const state = createContractState();
         const rng = new Random(seed);
-        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
         for (const c of state.available.filter(o => o.type === 'ore_sale')) {
           const b = base[c.materialId];
           if (b === undefined) continue;
@@ -535,7 +535,7 @@ describe('Contract system', () => {
       for (let seed = 1; seed <= 30; seed++) {
         const state = createContractState();
         const rng = new Random(seed);
-        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES);
+        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL, 1, ALL_ORES, Infinity);
         for (const c of state.available.filter(o => o.type === 'rubble_disposal')) {
           saw = true;
           expect(c.pricePerKg).toBeGreaterThanOrEqual(0.5);
@@ -584,7 +584,7 @@ describe('contract offers draw only from the available ores (#1364)', () => {
     const all: Contract[] = [];
     for (let seed = 1; seed <= seeds; seed++) {
       const state = createContractState();
-      generateContracts(state, new Random(seed), 0, 1, availableOres);
+      generateContracts(state, new Random(seed), 0, 1, availableOres, Infinity);
       all.push(...state.available);
     }
     return all;
@@ -891,7 +891,7 @@ function boardsOver(market: 'legacy' | 'production' | undefined, seed: number, r
   const rng = new Random(seed);
   const seen: Contract[] = [];
   for (let i = 0; i < refreshes; i++) {
-    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, multiplier, ALL_ORES);
+    generateContracts(state, rng, i * CONTRACT_REFRESH_INTERVAL, multiplier, ALL_ORES, Infinity);
     seen.push(...state.available.slice(-CONTRACTS_PER_REFRESH));
   }
   return seen;

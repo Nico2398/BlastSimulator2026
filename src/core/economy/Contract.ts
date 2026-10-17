@@ -51,6 +51,8 @@ export interface Contract {
   paidTotal?: number;
   /** Penalty already charged for this contract. Absent means none. */
   penaltyCharged?: number;
+  /** True for a paid rubble clearance: the player pays `pricePerKg` per kg removed. Absent means the contract pays the player. */
+  playerPays?: boolean;
 }
 
 // ── Negotiation outcome (types live here, not in Negotiation.ts, so
@@ -94,6 +96,12 @@ export function createContractState(): ContractState {
   };
 }
 
+/** True for a paid clearance: the player pays the contract's price instead of earning it (#1892). */
+export function isPaidClearance(c: Pick<Contract, 'playerPays'>): boolean {
+  void c;
+  return false; // TODO: implement
+}
+
 // ── Generation ──
 
 /** Generate new available contracts. */
@@ -105,6 +113,8 @@ export function generateContracts(
   priceMultiplier: number,
   /** Ore ids the level's rocks can yield (Level.ts's resolveContractOres). */
   availableOres: readonly string[],
+  /** Barren rock (kg) the site holds; rubble offers are sized to it (#1892). */
+  rubbleStockKg: number,
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
@@ -114,17 +124,17 @@ export function generateContracts(
   if (overflow > 0) state.available.splice(0, overflow);
 
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    state.available.push(generateOneContract(state, rng, priceMultiplier, availableOres));
+    state.available.push(generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg));
   }
   state.lastRefreshTick = currentTick;
 }
 
 /** Puts one extra offer on the board outside the refresh cycle (an event's special contract); the oldest offer makes room when full. */
 export function offerSpecialContract(
-  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[],
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number,
 ): Contract {
   if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
-  const contract = generateOneContract(state, rng, priceMultiplier, availableOres);
+  const contract = generateOneContract(state, rng, priceMultiplier, availableOres, rubbleStockKg);
   state.available.push(contract);
   return contract;
 }
@@ -136,7 +146,8 @@ function commonOres(ores: readonly string[], market: MarketId | undefined): stri
     .slice(0, SUPPLY_COMMON_ORE_COUNT);
 }
 
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[]): Contract {
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[], rubbleStockKg: number): Contract {
+  void rubbleStockKg;
   const market = state.market;
   const profile = resolveMarket(market);
   const typeRoll = rng.nextFloat(0, 1);
@@ -519,7 +530,7 @@ export function checkDeadlines(
 export function contractAcceptBlocker(
   c: Contract,
   hasFreightWarehouse: boolean,
-): 'needs_freight_warehouse' | null {
+): 'needs_freight_warehouse' | 'insufficient_funds_for_fee' | null {
   return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
 }
 

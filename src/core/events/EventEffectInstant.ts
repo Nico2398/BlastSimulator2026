@@ -10,6 +10,7 @@ import { hireSpawnPoint } from '../entities/HireSpawn.js';
 import { fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import { offerSpecialContract, outstandingPenalty } from '../economy/Contract.js';
 import { chargeFine, deductExpense } from '../economy/Finance.js';
+import { stateRubbleStockKg } from '../economy/SpoilHeaps.js';
 import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
 import {
   EVENT_EFFECT_FATIGUE_RELIEF_LEVEL, EVENT_EFFECT_JOIN_DEFAULT_ROLE, EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS,
@@ -68,7 +69,7 @@ export function applyInstantEffect(
     }
     case 'special_contract':
       offerSpecialContract(
-        state.contracts, rng, resolveContractPriceMultiplier(state) * EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS, resolveContractOres(state),
+        state.contracts, rng, resolveContractPriceMultiplier(state) * EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS, resolveContractOres(state), stateRubbleStockKg(state),
       );
       return outcome();
     case 'cancel_contract': {

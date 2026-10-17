@@ -351,7 +351,7 @@ export function isAutoDebrisAction(type: ActionType): boolean {
   return type === 'haul_debris' || type === 'fragment_debris';
 }
 
-const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full', 'no_spoil_heap']);
+const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full', 'no_spoil_heap', 'spoil_heap_full']);
 
 /** True for the blocked reasons haulBlockedReason can produce (#1369). */
 export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefined): reason is 'no_freight_warehouse' | 'storage_full' | 'no_spoil_heap' {

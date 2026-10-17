@@ -21,7 +21,7 @@ const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 function setupContracts(seed: number) {
   const state = createContractState();
   const rng = new Random(seed);
-  generateContracts(state, rng, 0, 1, ALL_ORES);
+  generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
   return { state, rng };
 }
 
@@ -194,7 +194,7 @@ describe('earlyBonus follows price (#1366)', () => {
   it('matches generated offers', () => {
     for (const mult of [1, 4]) {
       const state = createContractState();
-      generateContracts(state, new Random(21), 0, mult, ALL_ORES);
+      generateContracts(state, new Random(21), 0, mult, ALL_ORES, Infinity);
       for (const c of state.available) {
         expect(c.earlyBonus).toBe(computeEarlyBonus(c.quantityKg, c.pricePerKg));
       }

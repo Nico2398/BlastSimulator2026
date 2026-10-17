@@ -2837,6 +2837,18 @@ export const PRODUCTION_ORE_SALE_PRICE_FACTOR = { min: 0.9, max: 1.1 } as const;
 export const PRODUCTION_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
 /** Rubble disposal pay (dollars/kg): cents, since the volume is huge. */
 export const PRODUCTION_RUBBLE_PRICE_PER_KG = { min: 0.01, max: 0.03 } as const;
+/** Barren rock (kg) one spoil heap holds before it is full (#1892). Not yet wired into BuildingDefs. */
+export const SPOIL_HEAP_CAPACITY_KG = 50_000;
+/** Largest share of the site's barren stock a cheap rubble clearance asks for (#1892). */
+export const RUBBLE_CHEAP_STOCK_SHARE_MAX = 0.5;
+/** Largest share of the site's barren stock a paid rubble clearance asks for (#1892). */
+export const RUBBLE_PAID_STOCK_SHARE_MAX = 1.0;
+/** Chance a rubble offer is a paid clearance, where the player pays the fee (#1892). */
+export const RUBBLE_PAID_OFFER_CHANCE = 0.4;
+/** Fee (dollars/kg) the player pays for a paid clearance on the production market (#1892). */
+export const PRODUCTION_RUBBLE_FEE_PER_KG = { min: 0.02, max: 0.05 } as const;
+/** Fee (dollars/kg) the player pays for a paid clearance on the legacy market (#1892). */
+export const RUBBLE_FEE_PER_KG = { min: 0.5, max: 2.0 } as const;
 
 /** Market the sandbox uses. */
 export const SANDBOX_MARKET: 'legacy' | 'production' = 'production';

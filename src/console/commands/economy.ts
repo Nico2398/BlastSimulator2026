@@ -145,7 +145,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state));
       ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };

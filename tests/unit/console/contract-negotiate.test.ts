@@ -16,7 +16,7 @@ function setup(opts: { manager?: boolean } = {}) {
   const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
   const state = ctx.state!;
   if (opts.manager !== false) hireEmployee(state.employees, 'manager', new Random(3), 0, 0, 0);
-  generateContracts(state.contracts, new Random(5), state.tickCount, 1, ALL_ORES);
+  generateContracts(state.contracts, new Random(5), state.tickCount, 1, ALL_ORES, Infinity);
   return { ctx, state };
 }
 

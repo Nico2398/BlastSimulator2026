@@ -63,6 +63,7 @@ import {
 import { isExposed, smugglingIncomeForTick, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
 import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
 import { getOperatingIncomePerHour } from '../economy/OperatingFinance.js';
+import { stateRubbleStockKg } from '../economy/SpoilHeaps.js';
 import { resolveContractOres, resolveContractPriceMultiplier, resolveHiringScript, resolveScriptedOreSale } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
@@ -218,7 +219,7 @@ export function runTick(
 
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
-    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
+    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state), stateRubbleStockKg(state));
     ensureScriptedOreSale(state.contracts, resolveScriptedOreSale(state), resolveContractPriceMultiplier(state));
   }
 

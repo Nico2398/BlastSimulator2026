@@ -18,7 +18,7 @@ describe('Tutorial contract availability (Issue #328)', () => {
     const rng = new Random(42 + 0); // seed + tickCount
 
     // Act: generate contracts as the campaign initialization would
-    generateContracts(state.contracts, rng, 0, 1, ALL_ORES);
+    generateContracts(state.contracts, rng, 0, 1, ALL_ORES, Infinity);
 
     // Assert: available contracts exist
     expect(state.contracts.available.length).toBeGreaterThan(0);
@@ -47,7 +47,7 @@ describe('Tutorial contract availability (Issue #328)', () => {
     // Arrange: generate contracts at tick 0 (same setup as test 1)
     const state = createGame({ seed: 42, mineType: 'desert', startingCash: 20000 });
     const rng0 = new Random(42 + 0);
-    generateContracts(state.contracts, rng0, 0, 1, ALL_ORES);
+    generateContracts(state.contracts, rng0, 0, 1, ALL_ORES, Infinity);
 
     // Verify contracts were generated
     expect(state.contracts.available.length).toBeGreaterThan(0);
@@ -56,7 +56,7 @@ describe('Tutorial contract availability (Issue #328)', () => {
 
     // Act: simulate tick 3 — another call to generateContracts with tick 3
     const rng3 = new Random(42 + 3);
-    generateContracts(state.contracts, rng3, 3, 1, ALL_ORES);
+    generateContracts(state.contracts, rng3, 3, 1, ALL_ORES, Infinity);
 
     // Assert: contracts still available (no premature refresh)
     expect(state.contracts.available.length).toBeGreaterThan(0);

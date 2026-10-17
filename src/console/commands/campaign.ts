@@ -13,6 +13,7 @@ import { Random } from '../../core/math/Random.js';
 import { createHiringPool } from '../../core/entities/HiringPool.js';
 import { livingNames } from '../../core/entities/Employee.js';
 import { ensureScriptedOreSale, generateContracts } from '../../core/economy/Contract.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { sanitizeFiniteOverride, parseOptionalStaffedFlag, staffedSuffix } from './commandUtils.js';
@@ -202,7 +203,7 @@ export function campaignStartCommand(
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state));
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state));
   ensureScriptedOreSale(ctx.state.contracts, level.scriptedOreSale, level.contractPriceMultiplier);
 
   // Report the cash actually in hand, not the level default — an override that

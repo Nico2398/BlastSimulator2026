@@ -137,7 +137,7 @@ describe('sandbox economy: contract board offer volume against a shot', () => {
     const refreshes = Math.ceil((ABSORB_DAYS * TICKS_PER_DAY) / CONTRACT_REFRESH_INTERVAL);
     const seen = [];
     for (let i = 0; i < refreshes; i++) {
-      generateContracts(board, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ores);
+      generateContracts(board, rng, i * CONTRACT_REFRESH_INTERVAL, 1, ores, Infinity);
       seen.push(...board.available.slice(-3));
     }
     return seen;
