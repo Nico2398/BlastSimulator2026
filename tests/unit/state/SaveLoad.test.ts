@@ -2396,3 +2396,11 @@ describe('deserialize — ScoreState dust fields absent from an old save (#1733)
     expect(restored.scores.lastLooseRockKg).toBe(5678);
   });
 });
+
+describe('debris classify cursor persistence (#1869)', () => {
+  it('serialize/deserialize round-trips debrisClassifyCursor', () => {
+    const state = createGame({ seed: 42 });
+    state.debrisClassifyCursor = 37;
+    expect(deserialize(serialize(state)).debrisClassifyCursor).toBe(37);
+  });
+});
