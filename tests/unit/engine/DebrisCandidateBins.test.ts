@@ -233,4 +233,58 @@ describe('thinDebrisCandidates', () => {
       expect(out.filter(a => a === near)).toHaveLength(1);
     });
   });
+
+  describe('per destination class budget (#1870)', () => {
+    const debrisIds = (out: PendingAction[]) => out.filter(isDebris).map(a => a.id).sort((a, b) => a - b);
+
+    it('an ore bin farther than MAX_BINS barren bins is still returned, so a barren rule can see it', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const ore = state.pendingActions[state.pendingActions.length - 1]!;
+      const carriesOre = (a: PendingAction) => a === ore;
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, carriesOre, any);
+      expect(out).toContain(ore);
+    });
+
+    it('barren bins keep their own full budget beside the ore representative', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const ore = state.pendingActions[state.pendingActions.length - 1]!;
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, a => a === ore, any);
+      const barrenIds = debrisIds(out).filter(id => id !== ore.id);
+      expect(barrenIds).toEqual(Array.from({ length: DEBRIS_SELECTION_MAX_BINS }, (_, i) => i + 1));
+    });
+
+    it('each class fills its own MAX_BINS: many far ore bins and many near barren bins give both full', () => {
+      const total = DEBRIS_SELECTION_BINNING_MIN + 40;
+      const state = pool(total);
+      const firstOre = total - DEBRIS_SELECTION_MAX_BINS * 2 - 3; // ids above it are ore, all farther than every barren bin
+      const carriesOre = (a: PendingAction) => a.id > firstOre;
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, carriesOre, any);
+      const ids = debrisIds(out);
+      expect(ids.filter(id => id <= firstOre)).toEqual(Array.from({ length: DEBRIS_SELECTION_MAX_BINS }, (_, i) => i + 1));
+      // The ore class keeps its nearest bins.
+      expect(ids.filter(id => id > firstOre)).toEqual(Array.from({ length: DEBRIS_SELECTION_MAX_BINS }, (_, i) => firstOre + 1 + i));
+    });
+
+    it('ore bins that cannot be taken (allowed false) do not spend the barren budget', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const ore = state.pendingActions[state.pendingActions.length - 1]!;
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, a => a === ore, a => a !== ore);
+      expect(out).not.toContain(ore);
+      expect(debrisIds(out)).toEqual(Array.from({ length: DEBRIS_SELECTION_MAX_BINS }, (_, i) => i + 1));
+    });
+
+    it('an unreachable ore bin is not returned, barren stays as before', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const ore = state.pendingActions[state.pendingActions.length - 1]!;
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, a => a === ore, any, a => a !== ore);
+      expect(out).not.toContain(ore);
+      expect(debrisIds(out)).toHaveLength(DEBRIS_SELECTION_MAX_BINS);
+    });
+
+    it('a pool of ore only keeps MAX_BINS representatives, as before', () => {
+      const state = pool(DEBRIS_SELECTION_BINNING_MIN + 40);
+      const out = thinDebrisCandidates(state, origin, state.pendingActions, isDebris, any, any);
+      expect(debrisIds(out)).toEqual(Array.from({ length: DEBRIS_SELECTION_MAX_BINS }, (_, i) => i + 1));
+    });
+  });
 });
