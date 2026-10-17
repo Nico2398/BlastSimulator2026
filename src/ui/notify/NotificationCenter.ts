@@ -197,7 +197,8 @@ export class NotificationCenter {
       const remaining = urgentContract.acceptedAtTick + urgentContract.deadlineTicks - state.tickCount;
       const duration = formatGameDuration(remaining);
       pips.push({ kind: 'contract', icon: 'clock', label: t('notification.pip.contract_label', { id: urgentContract.id, duration }), tone: 'warn', tip: t('notification.pip.contract_tip', { id: urgentContract.id, duration }) });
-      if (!this.warnedContracts.has(urgentContract.id)) {
+      // Rubble is never fined, so the penalty toast has nothing to warn about (#1892).
+      if (urgentContract.type !== 'rubble_disposal' && !this.warnedContracts.has(urgentContract.id)) {
         this.warnedContracts.add(urgentContract.id);
         this.notify({
           severity: 'warn',

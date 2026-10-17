@@ -367,3 +367,19 @@ describe('negotiationRefusalReason (#1340)', () => {
     expect(negotiationRefusalReason(state.available[0]!, 1)).toBeNull();
   });
 });
+
+describe('Rubble negotiation (#1892)', () => {
+  it('never touches the hidden penalty of a rubble offer', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const state = createContractState();
+      generateContracts(state, new Random(seed), 0, 1, ALL_ORES, Infinity);
+      const offer = state.available[0]!;
+      offer.type = 'rubble_disposal';
+      offer.materialId = '';
+      offer.penaltyAmount = 0;
+      const result = performed(negotiateContract(state, offer.id, 0, new Random(seed), 1));
+      expect(result!.changes.every(c => c.field !== 'penalty')).toBe(true);
+      expect(offer.penaltyAmount).toBe(0);
+    }
+  });
+});

@@ -6,7 +6,7 @@ import { accumulateOreMass, clampCollectedOre, decrementCollectedOre, oreContrib
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
-import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
+import { pickWarehouse, warehouseFreeKg, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { creditSpoilHeaps, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
@@ -547,13 +547,14 @@ export function onGroundMassKg(state: LogisticsState): number {
 export function releaseBarrenStoredFragments(
   state: LogisticsState,
   collectedOre: Record<string, number>,
-  buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
+  buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
 ): number {
   if (totalSpoilRoomKg(buildings) <= 0) return 0; // no heap, or every heap full: the rock stays stored
+  const reservedKg = warehouseUsedKgMap(state); // in-flight hauls hold room on a heap too
   const released = new Set<TrackedFragment>();
   let releasedKg = 0;
   for (const tracked of state.fragments.filter(isStoredBarren)) {
-    if (!creditSpoilHeaps(buildings, tracked.fragment.mass)) continue;
+    if (!creditSpoilHeaps(buildings, tracked.fragment.mass, reservedKg)) continue;
     decrementCollectedOre(collectedOre, tracked.fragment);
     releasedKg += tracked.fragment.mass;
     released.add(tracked);

@@ -23,14 +23,14 @@ import { t } from '../../core/i18n/I18n.js';
 import { el, fieldStyle, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, replaceChildrenKeepingScroll, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
-import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
+import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '../../core/economy/formatMoney.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { contractAcceptBlocker, isFillableSaleOffer, isPaidClearance, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { contractAcceptBlocker, contractTotal, isFillableSaleOffer, isPaidClearance, isWinningSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import { stateRubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -53,11 +53,6 @@ const NEGOTIATE_KEY: Record<NegotiationField, { improved: string; worsened: stri
   deadline: { improved: 'ui.contracts.negotiate.deadline_improved', worsened: 'ui.contracts.negotiate.deadline_worsened' },
   penalty: { improved: 'ui.contracts.negotiate.penalty_improved', worsened: 'ui.contracts.negotiate.penalty_worsened' },
 };
-
-/** Kilograms as a whole, en-US grouped number: contract cards never show fractions. */
-function wholeKg(kg: number): string {
-  return Math.round(kg).toLocaleString('en-US');
-}
 
 /** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
 export function deliverableAmountKg(maxDeliverableKg: number): number {
@@ -324,13 +319,17 @@ export class ContractsPanel extends PanelBase {
 
   /** Money figure on an active card: rubble says Costs/Pays (#1892), other contracts a signed amount. */
   private activeMoneyLabel(c: Contract): HTMLElement {
-    const total = formatMoney(c.quantityKg * c.pricePerKg);
+    if (c.type === 'rubble_disposal') return this.rubbleMoneyLabel(c);
+    return el('span', { text: `+$${formatMoney(contractTotal(c))}`, attrs: { style: 'color:var(--bsx-positive)' } });
+  }
+
+  /** Costs/Pays figure of a rubble contract, shared by the offered and the active card (#1892). */
+  private rubbleMoneyLabel(c: Contract, attrs: Record<string, string> = {}): HTMLElement {
     const paid = isPaidClearance(c);
-    const style = `color:var(${paid ? '--bsx-critical-text' : '--bsx-positive'})`;
-    if (c.type === 'rubble_disposal') {
-      return el('span', { text: t(paid ? 'ui.contracts.rubble_costs' : 'ui.contracts.rubble_pays', { amount: total }), attrs: { style } });
-    }
-    return el('span', { text: `+$${total}`, attrs: { style } });
+    return el('span', {
+      text: t(paid ? 'ui.contracts.rubble_costs' : 'ui.contracts.rubble_pays', { amount: formatMoney(contractTotal(c)) }),
+      attrs: { ...attrs, style: `color:var(${paid ? '--bsx-critical-text' : '--bsx-positive'})` },
+    });
   }
 
   // ── Offered ──
@@ -357,7 +356,7 @@ export class ContractsPanel extends PanelBase {
     statRow.append(
       this.miniStat(t('ui.contracts.qty'), `${c.quantityKg.toLocaleString('en-US')} kg`),
       this.miniStat(t('ui.contracts.price'), `$${formatPricePerKg(c.pricePerKg)}/kg`),
-      this.miniStat(t('ui.contracts.total'), `$${formatMoney(c.quantityKg * c.pricePerKg)}`, isPaidClearance(c) ? 'var(--bsx-critical-text)' : 'var(--bsx-positive)', true),
+      this.miniStat(t('ui.contracts.total'), `$${formatMoney(contractTotal(c))}`, isPaidClearance(c) ? 'var(--bsx-critical-text)' : 'var(--bsx-positive)', true),
     );
 
     const haveRow = el('div');
@@ -374,12 +373,9 @@ export class ContractsPanel extends PanelBase {
     termsRow.style.cssText = 'display:flex;gap:10px;font:400 10px/1 var(--bsx-font-mono)';
     // Rubble is never fined, and a paid clearance has no early bonus either (#1892).
     if (c.type === 'rubble_disposal') {
-      const total = formatMoney(c.quantityKg * c.pricePerKg);
       termsRow.append(
         el('span', { text: t('ui.contracts.rubble_removes', { kg: wholeKg(c.quantityKg) }), attrs: { class: 'bs-contract-removes' } }),
-        isPaidClearance(c)
-          ? el('span', { text: t('ui.contracts.rubble_costs', { amount: total }), attrs: { class: 'bs-contract-costs', style: 'color:var(--bsx-critical-text)' } })
-          : el('span', { text: t('ui.contracts.rubble_pays', { amount: total }), attrs: { class: 'bs-contract-pays', style: 'color:var(--bsx-positive)' } }),
+        this.rubbleMoneyLabel(c, { class: isPaidClearance(c) ? 'bs-contract-costs' : 'bs-contract-pays' }),
       );
       if (!isPaidClearance(c)) {
         termsRow.append(el('span', { text: t('ui.contracts.bonus_line', { amount: formatMoney(c.earlyBonus) }), attrs: { style: 'color:var(--bsx-positive)' } }));
@@ -400,7 +396,7 @@ export class ContractsPanel extends PanelBase {
       ...(blocked === null ? {} : {
         disabled: true,
         title: blocked === 'insufficient_funds_for_fee'
-          ? t('console.insufficient_funds', { need: formatMoney(c.quantityKg * c.pricePerKg), have: formatMoney(state.cash) })
+          ? insufficientFundsText(contractTotal(c), state.cash)
           : t('economy.contract.needs_warehouse'),
       }),
       onClick: () => this.gameConsole?.(`contract accept id:${c.id}`),

@@ -273,6 +273,14 @@ describe('deliverToSpoilHeap', () => {
     expect(l.fragments).toHaveLength(1);
   });
 
+  it('returns null without mutating when the only heap is full', () => {
+    const l = inTransit(1, 500, {}, null);
+    const full: WarehouseSite = { id: 1, x: 0, z: 0, capacityKg: 100 };
+    expect(deliverToSpoilHeap(l, 1, [full], 0, 0)).toBeNull();
+    expect(l.fragments).toHaveLength(1);
+    expect(l.fragments[0]!.state).toBe('in_transit');
+  });
+
   it('returns null without mutating when no heap exists', () => {
     const l = inTransit(1, 500, {}, null);
     expect(deliverToSpoilHeap(l, 1, [], 0, 0)).toBeNull();

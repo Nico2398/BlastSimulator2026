@@ -1033,6 +1033,7 @@ describe('ContractsPanel — rubble cards (#1892)', () => {
     panel.show();
     panel.update(state);
     const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.contracts.stock_spoil_heaps', { kg: '30,001' }));
     expect(text).toContain(t('ui.contracts.rubble_costs', { amount: formatMoney(800) }));
   });
 

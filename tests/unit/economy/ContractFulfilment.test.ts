@@ -5,6 +5,7 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { createLogisticsState, type LogisticsState } from '../../../src/core/economy/Logistics.js';
 import {
+  checkDeadlines,
   createContractState,
   type Contract,
   type ContractState,
@@ -407,15 +408,10 @@ describe('paid clearances (#1892)', () => {
     const stock = stockWith(0);
     addBarren(stock, 2, 60);
     autoDeliverContracts(contracts, stock.logistics, stock.collectedOre, 5, []);
-    expect(checkDeadlinesPenalty(contracts)).toBe(0);
+    const [expired] = checkDeadlines(contracts, 1_000);
+    expect(expired!.penalty).toBe(0);
   });
 });
-
-function checkDeadlinesPenalty(contracts: ContractState): number {
-  const c = contracts.active[0]!;
-  const share = (c.quantityKg - c.deliveredKg) / c.quantityKg;
-  return Math.round(c.penaltyAmount * share);
-}
 
 describe('bookDeliveryCashflow (#1892)', () => {
   const account = () => ({ cash: 1_000, finances: createFinanceState(1_000) });

@@ -2,7 +2,7 @@
 // Barren fragments are dumped on a spoil heap instead of a freight warehouse.
 
 import type { Building } from '../entities/Building.js';
-import { getBuildingDef } from '../entities/Building.js';
+import { spoilHeapRoomKg } from '../entities/Building.js';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
 
 /** Where a hauled fragment is delivered. */
@@ -24,11 +24,8 @@ export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<stri
   return isBarrenFragment(fragment.oreDensities) ? 'spoil_heap' : 'warehouse';
 }
 
-/** Room (kg) left on one building's spoil heap; 0 for a non-heap. */
-export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>): number {
-  if (b.type !== 'spoil_heap') return 0;
-  return Math.max(0, getBuildingDef(b.type, b.tier).capacity - (b.storedSpoilKg ?? 0));
-}
+/** Re-exported: the room helper lives with the building (entities layer) so BuildingWarehouse needs no economy import. */
+export { spoilHeapRoomKg };
 
 /** Room (kg) left across every spoil heap in the given buildings. */
 export function totalSpoilRoomKg(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[]): number {
@@ -98,11 +95,18 @@ export function creditSpoilKg(heap: Pick<Building, 'storedSpoilKg'>, amountKg: n
 }
 
 /**
- * Credit `amountKg` of barren rock to the first spoil heap (building order) with room for all of it.
+ * Credit `amountKg` of barren rock to the first spoil heap (building order) whose room, net of
+ * `reservedKg` (in-transit mass already promised to a heap, keyed by building id), holds all of it.
  * Returns false, crediting nothing, when no heap has that much room.
  */
-export function creditSpoilHeaps(buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[], amountKg: number): boolean {
-  const heap = buildings.find(b => spoilHeapRoomKg(b) >= amountKg && b.type === 'spoil_heap');
+export function creditSpoilHeaps(
+  buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  amountKg: number,
+  reservedKg: ReadonlyMap<number, number> = new Map(),
+): boolean {
+  const heap = buildings.find(b =>
+    b.type === 'spoil_heap'
+    && spoilHeapRoomKg(b) - (b.id === undefined ? 0 : reservedKg.get(b.id) ?? 0) >= amountKg);
   if (!heap) return false;
   creditSpoilKg(heap, amountKg);
   return true;

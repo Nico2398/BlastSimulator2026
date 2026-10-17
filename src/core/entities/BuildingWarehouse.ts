@@ -2,8 +2,7 @@
 // Explosive Warehouse stock management and Freight Warehouse capacity checks.
 
 import type { Building, BuildingState } from './Building.js';
-import { spoilHeapRoomKg } from '../economy/SpoilHeaps.js';
-import { getBuildingDef, getStorageCapacity, isOperating, warehouseFreeKg, warehouseStockKg } from './Building.js';
+import { getBuildingDef, getStorageCapacity, isOperating, spoilHeapRoomKg, warehouseFreeKg, warehouseStockKg } from './Building.js';
 
 // ── Explosive Warehouse ──────────────────────────────────────────────────────
 

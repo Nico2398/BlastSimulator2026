@@ -15,6 +15,7 @@ import {
   type Contract,
   type ContractSelector,
   type ContractType,
+  contractTotal,
 } from '../../core/economy/Contract.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
@@ -24,7 +25,7 @@ import { deliverStoredOre, bookDeliveryCashflow } from '../../core/economy/Contr
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
 import type { Building } from '../../core/entities/Building.js';
-import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
+import { formatDollars, insufficientFundsText } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
@@ -170,7 +171,7 @@ export function contractCommand(
         return { success: false, output: t('economy.contract.needs_warehouse') };
       }
       if (offer && blocker === 'insufficient_funds_for_fee') {
-        return { success: false, output: t('console.insufficient_funds', { need: formatMoney(offer.quantityKg * offer.pricePerKg), have: formatMoney(state.cash) }) };
+        return { success: false, output: insufficientFundsText(contractTotal(offer), state.cash) };
       }
       const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
       if (!contract) return { success: false, output: `Contract #${resolved.id} not found in available list.` };
