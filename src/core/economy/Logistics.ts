@@ -33,6 +33,8 @@ export interface LogisticsState {
   storageCapacityKg: number;
   /** Current stored mass in kg. */
   storedMassKg: number;
+  /** Next unused fragment id; ids stay unique across blasts. */
+  nextFragmentId: number;
 }
 
 export function createLogisticsState(storageCapacityKg: number = INITIAL_STORAGE_CAPACITY_KG): LogisticsState {
@@ -40,7 +42,16 @@ export function createLogisticsState(storageCapacityKg: number = INITIAL_STORAGE
     fragments: [],
     storageCapacityKg,
     storedMassKg: 0,
+    nextFragmentId: 0,
   };
+}
+
+/** Reserve `count` consecutive fragment ids; returns the first id of the block. */
+export function reserveFragmentIds(state: LogisticsState, count: number): number {
+  // TODO: implement
+  void state;
+  void count;
+  return 0;
 }
 
 // ── Operations ──

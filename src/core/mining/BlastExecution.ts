@@ -301,8 +301,10 @@ export function executeBlast(
   /** Hole ids currently holding water (stored hole water past the wet threshold — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
   marketId?: MarketId,
+  /** First fragment id of this blast's block (see reserveFragmentIds). */
+  firstFragmentId: number = 0,
 ): BlastResult | null {
-  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds, marketId));
+  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds, marketId, firstFragmentId));
 }
 
 /**
@@ -321,7 +323,10 @@ export function* executeBlastSteps(
   emitter?: EventEmitter,
   wetHoleIds: ReadonlySet<string> = new Set(),
   marketId?: MarketId,
+  /** First fragment id of this blast's block (see reserveFragmentIds). */
+  firstFragmentId: number = 0,
 ): Steps<BlastResult | null> {
+  void firstFragmentId; // TODO: implement
   // 1. Validate
   const errors = validateBlastPlan(plan);
   if (errors.length > 0) return null;
