@@ -198,13 +198,14 @@ describe('build command — upgrade', () => {
     expect(actions.find(a => a.id === site.actionId)?.type).toBe('place_building');
   });
 
-  it('charges only the next tier construction cost at order time (#1875)', () => {
+  it('charges the discounted upgrade price at order time (#1875, #1905)', () => {
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
     const b = ctx.state!.buildings.buildings[0]!;
     const cashBefore = ctx.state!.cash;
-    const newDef = getBuildingDef(b.type, 2);
     buildCommand(ctx, ['upgrade', String(b.id)], {});
-    expect(ctx.state!.cash).toBe(cashBefore - newDef.constructionCost);
+    expect(ctx.state!.cash).toBe(cashBefore - 16_000); // T2 20,000 minus half of T1 8,000
+    const site = ctx.state!.plannedBuildings.find(pb => pb.buildingId === b.id)!;
+    expect(site.cost).toBe(16_000);
   });
 
   it('refuses a second upgrade, a destroy and a move while the upgrade is ordered', () => {

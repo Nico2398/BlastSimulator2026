@@ -203,11 +203,12 @@ function queueConstructionSite(
   const state = ctx.state!;
   const { type, tier, x, z } = planned;
   const def = getBuildingDef(type, tier);
+  const cost = planned.upgrade === true ? getUpgradeCost(type, tier) : def.constructionCost;
   const { sizeX: footprintX, sizeZ: footprintZ } = getDefSize(def);
   // The order's own id is claimed now too, for the same ordering reason.
   const buildingOrderId = state.nextPlannedBuildingId++;
   const actionId = state.nextPendingActionId++;
-  const plannedBuilding: PlannedBuilding = { ...planned, id: buildingOrderId, actionId, cost: def.constructionCost };
+  const plannedBuilding: PlannedBuilding = { ...planned, id: buildingOrderId, actionId, cost };
 
   // The footprint blocks routing from the instant it is ordered (#1200),
   // synchronously — before any tick runs, and before the approach-ring
@@ -238,7 +239,7 @@ function queueConstructionSite(
   chargeConstruction(
     state,
     planned.upgrade === true ? `Upgrade ${type} #${planned.buildingId} to T${tier}` : `Build ${type} T${tier}`,
-    def.constructionCost,
+    cost,
   );
 
   // Anyone caught standing on the new footprint is relocated off it.
@@ -259,7 +260,7 @@ function queueConstructionSite(
 
   // A build order queues silently even when the roster is empty (#556).
   dispatchPlaceBuildingAction(state, {
-    actionId, buildingOrderId, tier, cost: def.constructionCost, footprint: def.footprint, approach, targetY,
+    actionId, buildingOrderId, tier, cost, footprint: def.footprint, approach, targetY,
   });
 
   return null;
