@@ -276,9 +276,31 @@ describe('refusals build toward a strike (#1890)', () => {
   });
 
   it('a mostly-met roster of demands does not strike', () => {
+    // Two met : one refused, starting mid-way: 30 -> 50 -> 35 -> 20 -> 40 -> 25 -> 10 (unclamped).
     const es = createEventSystemState();
-    for (let i = 0; i < 40; i++) resolve(es, 'union_ergo_chairs', i % 4 === 3 ? 1 : 0);
-    expect(strikeDue(es.unionGrievance, 3)).toBe(false);
+    es.unionGrievance = 30;
+    for (let i = 0; i < 6; i++) {
+      resolve(es, 'union_ergo_chairs', i % 3 === 0 ? 1 : 0);
+      expect(strikeDue(es.unionGrievance, 3)).toBe(false);
+    }
+    expect(es.unionGrievance).toBe(10);
+  });
+
+  it('union_strike_threat is repeatable: a second strike can fire once grievance builds again', () => {
+    const es = createEventSystemState();
+    es.unionGrievance = UNION_GRIEVANCE_STRIKE_THRESHOLD;
+    const ctx = () => makeCtx({ scores: highWellBeing(), unionMemberCount: 3, unionGrievance: es.unionGrievance });
+    const first = selectEvent('union', ctx(), new Random(1), es.firedEventIds);
+    expect(first?.id).toBe('union_strike_threat');
+    es.firedEventIds.push('union_strike_threat');
+    resolve(es, 'union_strike_threat', 1);
+    expect(es.unionGrievance).toBe(UNION_GRIEVANCE_AFTER_STRIKE);
+    while (!strikeDue(es.unionGrievance, 3)) resolve(es, 'union_ergo_chairs', 1);
+    let second = false;
+    for (let seed = 1; seed <= 50 && !second; seed++) {
+      second = selectEvent('union', ctx(), new Random(seed), es.firedEventIds)?.id === 'union_strike_threat';
+    }
+    expect(second).toBe(true);
   });
 
   it('no strike is due with zero members however high grievance is', () => {

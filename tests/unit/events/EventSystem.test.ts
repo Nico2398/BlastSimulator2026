@@ -44,7 +44,7 @@ function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
   };
 }
 
-function makeEvent(id: string, category: 'union' | 'politics', weight: number = 1): EventDef {
+function makeEvent(id: string, category: EventDef['category'], weight: number = 1): EventDef {
   return {
     id, category,
     titleKey: `event.${id}.title`,
@@ -725,6 +725,9 @@ describe('union stretch applies to every category cooldown (#1890)', () => {
     registerEvents([
       makeEvent('pol_ev', 'politics'),
       makeEvent('union_ev', 'union'),
+      makeEvent('law_ev', 'lawsuit'),
+      makeEvent('weather_ev', 'weather'),
+      makeEvent('mafia_ev', 'mafia'),
     ]);
   });
 
@@ -759,7 +762,7 @@ describe('union stretch applies to every category cooldown (#1890)', () => {
       const counts: Record<string, number> = {};
       for (let tick = 1; tick <= 6000; tick++) {
         state.actionCountSinceEvent = Math.max(state.actionCountSinceEvent, 100);
-        const f = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount }), rng);
+        const f = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount, corruptionLevel: 100 }), rng);
         if (f) counts[f.eventId] = (counts[f.eventId] ?? 0) + 1;
         state.pendingEvent = null;
         state.firedEventIds = []; // fired ids are one-shot; reset so draws keep counting
@@ -769,7 +772,9 @@ describe('union stretch applies to every category cooldown (#1890)', () => {
     const all = run(10);
     const none = run(0);
     const total = (c: Record<string, number>) => Object.values(c).reduce((a, b) => a + b, 0);
-    expect(none['pol_ev'] ?? 0).toBeLessThanOrEqual(all['pol_ev'] ?? 0);
+    for (const id of ['pol_ev', 'law_ev', 'weather_ev', 'mafia_ev']) {
+      expect(none[id] ?? 0).toBeLessThanOrEqual(all[id] ?? 0);
+    }
     expect(total(none)).toBeLessThan(total(all));
   });
 });

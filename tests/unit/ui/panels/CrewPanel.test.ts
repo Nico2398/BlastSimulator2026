@@ -700,7 +700,7 @@ describe('CrewPanel — union trade-off on hire cards (#1873)', () => {
 });
 
 describe('CrewPanel — hire card union line names demands and strikes (#1890)', () => {
-  it('a union candidate card line mentions demands and strikes in en and fr', () => {
+  it('a union candidate card shows the trade-off line naming demands and strikes (en)', () => {
     const { panel } = makePanel();
     const state = makeState([]);
     const cands = candidatesForRole(state.hiringPool, 'driller');

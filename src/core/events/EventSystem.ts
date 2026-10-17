@@ -248,7 +248,7 @@ export function incrementActionCount(state: EventSystemState): void {
 
 // ── Selection ──
 
-/** Union events come less often to a crew with few members (#1873); other categories are unaffected. */
+/** Union timers reset longer for a crew with few members (#1873); other categories' timers are unaffected (the shared cooldown is stretched separately, #1890). */
 function categoryStretch(category: EventCategory, ctx: EventContext): number {
   return category === 'union' ? unionEventStretch(ctx.unionMemberCount, ctx.employeeCount) : 1;
 }
@@ -284,7 +284,7 @@ export function selectEvent(
   if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
   const strikeless = category === 'union' && ctx.unionMemberCount !== undefined && ctx.unionMemberCount < UNION_STRIKE_MIN_MEMBERS;
-  const eligible = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx)
+  const eligible = events.filter(e => !e.followUpOnly && (e.repeatable === true || !firedEventIds.includes(e.id)) && e.canFire(ctx)
     && !(strikeless && hasWorkStoppage(e)));
   const protections = ctx.protections ?? [];
   const shielded = eligible.filter(e => isEventShielded(e, protections, ctx.tickCount));

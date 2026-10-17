@@ -63,6 +63,8 @@ export const UNION_EVENTS_1: EventDef[] = [
   }),
   // 4 — General strike vote
   ev('union_strike_threat', 'union', {
+    // Repeatable: grievance resets after a strike and can build to a second one.
+    repeatable: true,
     weight: (s) => 2 + 3 * (1 - r.wb(s)),
     tags: [STRIKE_EVENT_TAG],
     canFire: (ctx) => strikeDue(ctx.unionGrievance, ctx.unionMemberCount) || ctx.scores.wellBeing < 35,

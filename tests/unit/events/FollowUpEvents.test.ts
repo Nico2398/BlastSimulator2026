@@ -114,10 +114,11 @@ describe('selectEvent never returns a follow-up', () => {
     }
   });
 
-  it('returns null when only follow-up events remain in the category', () => {
+  it('returns nothing but repeatable events when only follow-up events remain in the category', () => {
     const fired = getAllEvents().filter(e => !e.followUpOnly).map(e => e.id);
     for (const category of TIMER_CATEGORIES) {
-      expect(selectEvent(category, makeCtx(), new Random(3), fired)).toBeNull();
+      const picked = selectEvent(category, makeCtx(), new Random(3), fired);
+      if (picked) expect(picked.repeatable, `${category}: ${picked.id}`).toBe(true);
     }
   });
 });
