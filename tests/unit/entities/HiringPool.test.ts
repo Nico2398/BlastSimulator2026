@@ -439,3 +439,93 @@ describe('scripted extraQualifications (#1648)', () => {
     }
   });
 });
+
+// ── Unique names (#1886) ──
+
+import { poolNames } from '../../../src/core/entities/HiringPool.js';
+
+const dupNames = (names: string[]) => names.filter((n, i) => names.indexOf(n) !== i);
+
+describe('hiring pool names are unique (#1886)', () => {
+  it('no two candidates share a name at creation, over many seeds', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const names = createHiringPool(seed, 0).candidates.map(c => c.name);
+      expect(dupNames(names), `seed ${seed}`).toEqual([]);
+    }
+  });
+
+  it('no candidate matches a roster name at creation', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const roster = new Set(createHiringPool(seed, 0).candidates.slice(0, 6).map(c => c.name));
+      const pool = createHiringPool(seed, 0, undefined, roster);
+      for (const c of pool.candidates) expect(roster.has(c.name), `seed ${seed}`).toBe(false);
+      expect(dupNames(pool.candidates.map(c => c.name)), `seed ${seed}`).toEqual([]);
+    }
+  });
+
+  it('no duplicate and no roster match after a refresh', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const pool = createHiringPool(seed, 0);
+      const roster = new Set(pool.candidates.slice(0, 5).map(c => c.name));
+      refreshHiringPool(pool, seed, HIRING_POOL_REFRESH_INTERVAL, undefined, roster);
+      expect(pool.candidates).toHaveLength(HIRING_POOL_SIZE * ROLES.length);
+      expect(dupNames(pool.candidates.map(c => c.name)), `seed ${seed}`).toEqual([]);
+      for (const c of pool.candidates) expect(roster.has(c.name), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('non-name draws stay identical for every candidate when only names collide', () => {
+    for (const seed of [3, 9, 42]) {
+      const plain = createHiringPool(seed, 0);
+      const roster = new Set(plain.candidates.slice(0, 4).map(c => c.name));
+      const avoiding = createHiringPool(seed, 0, undefined, roster);
+      expect(avoiding.candidates.map(c => [c.id, c.role, c.unionized, c.salary]))
+        .toEqual(plain.candidates.map(c => [c.id, c.role, c.unionized, c.salary]));
+      expect(avoiding.candidates.map(c => c.qualifications)).toEqual(plain.candidates.map(c => c.qualifications));
+    }
+  });
+
+  it('candidates that do not collide keep their names', () => {
+    const plain = createHiringPool(42, 0);
+    const avoiding = createHiringPool(42, 0, undefined, new Set(['Nobody Atall']));
+    expect(avoiding.candidates.map(c => c.name)).toEqual(plain.candidates.map(c => c.name));
+  });
+
+  it('a candidate colliding with the roster is renamed', () => {
+    const plain = createHiringPool(42, 0);
+    const avoiding = createHiringPool(42, 0, undefined, new Set([plain.candidates[0].name]));
+    expect(avoiding.candidates[0].name).not.toBe(plain.candidates[0].name);
+  });
+
+  it('is deterministic: the same seed and roster give the same names', () => {
+    const roster = new Set(['Nick Rubble', 'Pete Crater']);
+    const a = createHiringPool(42, 0, undefined, roster);
+    const b = createHiringPool(42, 0, undefined, roster);
+    expect(a.candidates.map(c => c.name)).toEqual(b.candidates.map(c => c.name));
+  });
+
+  it('scripted pools keep their exact names even when the roster holds them', () => {
+    const roster = new Set(TUTORIAL_HIRING_SCRIPT.map(s => s.name));
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT, roster);
+    expect(pool.candidates.map(c => c.name)).toEqual(TUTORIAL_HIRING_SCRIPT.map(s => s.name));
+    refreshHiringPool(pool, 42, 100, TUTORIAL_HIRING_SCRIPT, roster);
+    expect(pool.candidates.map(c => c.name)).toEqual(TUTORIAL_HIRING_SCRIPT.map(s => s.name));
+  });
+
+  it('generateCandidate avoids the taken set', () => {
+    const drawn = generateCandidate('driller', new Random(42), 1).name;
+    const c = generateCandidate('driller', new Random(42), 1, new Set([drawn]));
+    expect(c.name).not.toBe(drawn);
+  });
+});
+
+describe('poolNames (#1886)', () => {
+  it('collects every candidate name', () => {
+    const pool = createHiringPool(42, 0);
+    expect(poolNames(pool)).toEqual(new Set(pool.candidates.map(c => c.name)));
+  });
+
+  it('is empty for an empty pool', () => {
+    expect(poolNames({ candidates: [] }).size).toBe(0);
+  });
+});

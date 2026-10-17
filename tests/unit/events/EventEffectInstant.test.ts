@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { applyEventEffects } from '../../../src/core/events/EventEffectCatalog.js';
 import { applyInstantEffect } from '../../../src/core/events/EventEffectInstant.js';
+import { generateName } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { makeEffectWorld } from '../../helpers/eventEffectWorld.js';
 
 const alive = (fx: ReturnType<typeof makeEffectWorld>) => fx.state.employees.employees.filter(e => e.alive);
@@ -75,5 +77,25 @@ describe('applyInstantEffect', () => {
     // Asset damage is raised with its out_of_service modifier by the catalog, not the instant handler.
     applyEventEffects([{ type: 'vehicle_breakdown', hpLoss: 15, hours: 12 }], fx.world, 0, fx.rng);
     expect(v.hp).toBe(hp - 15);
+  });
+});
+
+describe('employee_joins — unique names (#1886)', () => {
+  it('takes a name absent from the roster and the hiring pool', () => {
+    const fx = makeEffectWorld();
+    const drawn = generateName(new Random(7));
+    fx.state.hiringPool.candidates[0].name = drawn;
+    applyInstantEffect({ type: 'employee_joins', role: 'driver' }, fx.world, 5, new Random(7));
+    const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1];
+    expect(joined.name).not.toBe(drawn);
+  });
+
+  it('avoids the name of a living employee', () => {
+    const fx = makeEffectWorld();
+    const drawn = generateName(new Random(7));
+    fx.state.employees.employees[0].name = drawn;
+    applyInstantEffect({ type: 'employee_joins', role: 'driver' }, fx.world, 5, new Random(7));
+    const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1];
+    expect(joined.name).not.toBe(drawn);
   });
 });
