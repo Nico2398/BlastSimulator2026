@@ -434,6 +434,15 @@ describe('SandboxPanel', () => {
     for (const name of extra) expect(hard, name).not.toContain(name);
   });
 
+  it('hard kit line lists the rock digger (#1874)', () => {
+    panel.show();
+    changeSelect('difficulty', 'hard');
+    const hard = text('bs-sandbox-difficulty-opening');
+    const digger = sandboxDifficultyDetails('hard').vehicles.find(v => v.role === 'rock_digger');
+    expect(digger, 'hard details list a rock digger').toBeDefined();
+    expect(hard).toContain(`${digger!.count}× ${t('vehicle_type.rock_digger')} (${vehicleDisplayName('rock_digger', digger!.tier)})`);
+  });
+
   it('a biome change keeps the difficulty details, and vice versa', () => {
     panel.show();
     changeSelect('difficulty', 'easy');
