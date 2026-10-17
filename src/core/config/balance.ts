@@ -1627,10 +1627,7 @@ export const TUTORIAL_RALLY_POINT = { x: 15, z: 17 } as const;
  */
 export const TUTORIAL_STARTING_BUILDINGS_NEAR = { x: 4, z: 19 } as const;
 
-/** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
-export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
-
-/** Sandbox starting-kit ids (#1891): 'digger' = rock digger and driver, 'full' = richer kit. Replaces difficulty as the player-facing choice. */
+/** Sandbox starting-kit ids (#1671, #1891): 'digger' = rock digger and driver, 'full' = adds a rock fragmenter and its driver. Starting kits are keyed by it. */
 export type SandboxKitId = 'digger' | 'full';
 
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
@@ -1639,17 +1636,14 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
 };
 
 /**
- * Free starting kit per sandbox difficulty (#1671): every difficulty can drill,
- * charge, fire, haul and sell its first blast with no purchases. Hard is the
- * digger kit (a rock digger, a ramp into the crater, and its dedicated
- * excavator-licensed driver, #1874), shared with normal: the two differ by
- * opening cash only, so hard can always ramp into the crater. Easy adds a
- * rock fragmenter and its licensed driver to that kit.
+ * Free starting kit per sandbox kit (#1671, #1891): every kit can drill,
+ * charge, fire, haul and sell its first blast with no purchases. 'digger' is a
+ * rock digger, a ramp into the crater, and its dedicated excavator-licensed
+ * driver (#1874). 'full' adds a rock fragmenter and its licensed driver.
  */
-export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
-  hard: DIGGER_STARTING_SITE,
-  normal: DIGGER_STARTING_SITE,
-  easy: {
+export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteComposition>> = {
+  digger: DIGGER_STARTING_SITE,
+  full: {
     employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
     vehicles: [...BASE_STARTING_VEHICLES, { role: 'rock_digger', tier: 1 }, { role: 'rock_fragmenter', tier: 1 }],
     buildings: DIGGER_STARTING_SITE.buildings,
@@ -1657,25 +1651,22 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
 };
 
 /**
- * Opening cash per sandbox difficulty (#1747). Richer kits start with more
- * cash, so easy has the most and hard the least.
+ * Opening cash per sandbox kit (#1747, #1891). The richer kit starts with more
+ * cash. The retired 195k hard tier (same kit as digger, less cash) is gone.
  *
  * Bisected (#1747) on the standard opening (desert_badlands, seed 42, no cash
  * injection, contracts accepted once stock covers them): tier-1 living_quarters
  * at (30,48), then one 3x3 Krackle 8 kg pattern (spacing 4, depth 8, start
  * 36,32), charge, clear zone, blast (~t562), haul, sell. Payroll and upkeep
  * drain cash until the first sale, whose low point is linear in the start:
- * the shared normal/hard kit (#1874) bottoms at (start - 181.5k), so the
- * minimum positive-cash start is ~181.6k (170k fails with a -11.5k low, 185k
- * passes). Normal keeps ~15% margin at 210k; hard takes ~7% at 195k and stays
- * cheaper than normal through lower cash only.
- * Easy keeps 250k (low $36.9k, cash 681,127 at t2000) and stays strictly
- * above normal. The old 150k / 120k went bankrupt at ~t609 / ~t582.
+ * the digger kit (#1874) bottoms at (start - 181.5k), so the minimum
+ * positive-cash start is ~181.6k (170k fails with a -11.5k low, 185k passes).
+ * Digger keeps ~15% margin at 210k. Full keeps 250k (low $36.9k, cash 681,127
+ * at t2000). The old 150k / 120k went bankrupt at ~t609 / ~t582.
  */
-export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxDifficultyId, number>> = {
-  easy: 250_000,
-  normal: 210_000,
-  hard: 195_000,
+export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxKitId, number>> = {
+  digger: 210_000,
+  full: 250_000,
 };
 
 /**

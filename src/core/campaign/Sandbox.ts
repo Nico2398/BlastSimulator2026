@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Sandbox mode
 //
 // Free play on a site the player configures, rather than one of the authored
-// campaign levels. Reduced to three controls (#504) — biome, difficulty and
-// seed — everything else a LevelDef needs is either a fixed constant
-// (site extents) or derived from the named difficulty (starting cash).
+// campaign levels. Reduced to three controls (#504, #1891) — biome, starting
+// kit and seed — everything else a LevelDef needs is either a fixed constant
+// (site extents) or derived from the named kit (starting cash, crew, fleet).
 //
 // SANDBOX_FIELDS is the single description of what is configurable. The
 // console command parses against it and the UI builds its form from it, so
@@ -14,7 +14,7 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxDifficultyId, type SandboxKitId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxKitId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -24,11 +24,11 @@ import type { LevelDef } from './Level.js';
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
 
-export type { SandboxDifficultyId, SandboxKitId };
+export type { SandboxKitId };
 
-export interface SandboxDifficultyDef {
-  id: SandboxDifficultyId;
-  /** i18n key for the difficulty's label. */
+export interface SandboxKitDef {
+  id: SandboxKitId;
+  /** i18n key for the kit's label. */
   labelKey: string;
   startingCash: number;
   /** Free opening crew, fleet and buildings (#1671). */
@@ -36,29 +36,36 @@ export interface SandboxDifficultyDef {
 }
 
 /**
- * Named difficulty presets — starting cash and the size of the free starting kit vary (#504, #1671).
- *
- * Cash bisected twice. #1671 (first blast to first sale, no quarters): hard 82k fails
- * / 90k passes, normal 108k fails / 112k passes. #1747 (standard opening: tier-1
- * living_quarters at 30,48 first, 3x3 Krackle 8 kg pattern, sell, survive to
- * tick 2000 with cash above the first-blast level): the shared normal/hard
- * digger kit (#1874) needs ~181.6k (170k fails, 185k passes), easy has slack.
- * Chosen: 195k hard (~7% margin) / 210k normal / 250k easy, keeping
- * easy > normal > hard strictly. Rationale beside SANDBOX_STARTING_CASH in balance.ts.
+ * Named starting kits — opening cash and the free crew, fleet and buildings
+ * vary (#1671, #1891). Cash rationale beside SANDBOX_STARTING_CASH in balance.ts.
  */
-export const SANDBOX_DIFFICULTIES: Record<SandboxDifficultyId, SandboxDifficultyDef> = {
-  easy: { id: 'easy', labelKey: 'sandbox.difficulty.easy', startingSite: SANDBOX_STARTING_SITES.easy, startingCash: SANDBOX_STARTING_CASH.easy },
-  normal: { id: 'normal', labelKey: 'sandbox.difficulty.normal', startingSite: SANDBOX_STARTING_SITES.normal, startingCash: SANDBOX_STARTING_CASH.normal },
-  hard: { id: 'hard', labelKey: 'sandbox.difficulty.hard', startingSite: SANDBOX_STARTING_SITES.hard, startingCash: SANDBOX_STARTING_CASH.hard },
-} as const;
+export const SANDBOX_KITS: Record<SandboxKitId, SandboxKitDef> = {
+  digger: { id: 'digger', labelKey: 'sandbox.kit.digger', startingSite: SANDBOX_STARTING_SITES.digger, startingCash: SANDBOX_STARTING_CASH.digger },
+  full: { id: 'full', labelKey: 'sandbox.kit.full', startingSite: SANDBOX_STARTING_SITES.full, startingCash: SANDBOX_STARTING_CASH.full },
+};
 
-export const SANDBOX_DIFFICULTY_ORDER: readonly SandboxDifficultyId[] = ['easy', 'normal', 'hard'];
+export const SANDBOX_KIT_ORDER: readonly SandboxKitId[] = ['digger', 'full'];
+
+/**
+ * Retired difficulty names still accepted by the console `difficulty:` arg:
+ * easy -> full, normal/hard -> digger. Null-prototype so 'constructor' etc. miss.
+ */
+const SANDBOX_LEGACY_DIFFICULTY_ALIASES: Readonly<Record<string, SandboxKitId>> = Object.freeze(
+  Object.assign(Object.create(null) as Record<string, SandboxKitId>, { easy: 'full', normal: 'digger', hard: 'digger' }),
+);
+
+/** Resolve a kit id or legacy difficulty alias (case and edge whitespace ignored); undefined when unknown. */
+export function resolveSandboxKitId(raw: string): SandboxKitId | undefined {
+  const key = raw.trim().toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(SANDBOX_KITS, key)) return key as SandboxKitId;
+  return SANDBOX_LEGACY_DIFFICULTY_ALIASES[key];
+}
 
 export interface SandboxConfig {
   /** Biome id from BiomeCatalog — drives climate, rock mix and colour grade. */
   biome: string;
-  /** Named difficulty — sets starting cash and the free starting kit. */
-  difficulty: SandboxDifficultyId;
+  /** Named starting kit — sets starting cash and the free crew, fleet and buildings. */
+  kit: SandboxKitId;
   /** Terrain seed. The same seed and parameters always rebuild the same map. */
   seed: number;
 }
@@ -87,15 +94,15 @@ export const SANDBOX_FIELDS: readonly SandboxField[] = [
     options: () => getAllBiomes().map(b => ({ id: b.id, labelKey: b.nameKey })),
   },
   {
-    key: 'difficulty', labelKey: 'sandbox.field.difficulty', kind: 'choice',
-    options: () => SANDBOX_DIFFICULTY_ORDER.map(id => ({ id, labelKey: SANDBOX_DIFFICULTIES[id].labelKey })),
+    key: 'kit', labelKey: 'sandbox.field.kit', kind: 'choice',
+    options: () => SANDBOX_KIT_ORDER.map(id => ({ id, labelKey: SANDBOX_KITS[id].labelKey })),
   },
   { key: 'seed', labelKey: 'sandbox.field.seed', kind: 'number', min: 0, max: SANDBOX_SEED_MAX, step: 1 },
 ];
 
 export const SANDBOX_DEFAULTS: SandboxConfig = {
   biome: 'desert_badlands',
-  difficulty: 'normal',
+  kit: 'digger',
   seed: 12345,
 };
 
@@ -129,7 +136,7 @@ export function clampSandboxConfig(partial: Partial<SandboxConfig>): SandboxConf
   out.seed = Math.round(clampNumber(Number(out.seed), seedField, SANDBOX_DEFAULTS.seed));
 
   if (!getBiome(out.biome)) out.biome = SANDBOX_DEFAULTS.biome;
-  if (!SANDBOX_DIFFICULTY_ORDER.includes(out.difficulty)) out.difficulty = SANDBOX_DEFAULTS.difficulty;
+  if (!SANDBOX_KIT_ORDER.includes(out.kit)) out.kit = SANDBOX_DEFAULTS.kit;
 
   return out;
 }
@@ -161,8 +168,8 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     gridX: DEFAULT_GRID_SIZE,
     datum: SANDBOX_DATUM,
     gridZ: DEFAULT_GRID_SIZE,
-    startingCash: SANDBOX_DIFFICULTIES[clamped.difficulty].startingCash,
-    startingSite: SANDBOX_DIFFICULTIES[clamped.difficulty].startingSite,
+    startingCash: SANDBOX_KITS[clamped.kit].startingCash,
+    startingSite: SANDBOX_KITS[clamped.kit].startingSite,
     availableExplosives: getAllExplosives().map(e => e.id),
     unlockThreshold: SANDBOX_FIXED_UNLOCK_THRESHOLD,
     eventFreqMultiplier: SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER,
@@ -219,9 +226,9 @@ export function sandboxBiomeTraits(biomeId: string): SandboxBiomeTraits {
   };
 }
 
-/** What a difficulty hands the player at the start (#1686). */
-interface SandboxDifficultyDetails {
-  id: SandboxDifficultyId;
+/** What a kit hands the player at the start (#1686). */
+interface SandboxKitDetails {
+  id: SandboxKitId;
   labelKey: string;
   startingCash: number;
   crew: readonly { role: EmployeeRole; count: number }[];
@@ -242,11 +249,11 @@ function groupSlots<S extends object>(slots: readonly S[], keyOf: (slot: S) => s
 }
 
 /**
- * What a difficulty hands the player at the start: cash plus its starting
+ * What a kit hands the player at the start: cash plus its starting
  * site's crew, vehicles and buildings, each grouped into counted entries.
  */
-export function sandboxDifficultyDetails(id: SandboxDifficultyId): SandboxDifficultyDetails {
-  const def = SANDBOX_DIFFICULTIES[id];
+export function sandboxKitDetails(id: SandboxKitId): SandboxKitDetails {
+  const def = SANDBOX_KITS[id];
   const { employees, vehicles, buildings } = def.startingSite;
   return {
     id: def.id,
@@ -256,44 +263,4 @@ export function sandboxDifficultyDetails(id: SandboxDifficultyId): SandboxDiffic
     vehicles: groupSlots(vehicles.map(v => ({ role: v.role, tier: v.tier })), v => `${v.role}:${v.tier}`),
     buildings: groupSlots(buildings.map(b => ({ type: b.type, tier: b.tier })), b => `${b.type}:${b.tier}`),
   };
-}
-
-// ─── Starting kits (#1891) ─────────────────────────────────────────────────────
-
-export interface SandboxKitDef {
-  id: SandboxKitId;
-  /** i18n key for the kit's label. */
-  labelKey: string;
-  startingCash: number;
-  /** Free opening crew, fleet and buildings. */
-  startingSite: StartingSiteComposition;
-}
-
-/** Named starting kits: digger = today's normal kit, full = today's easy kit. */
-export const SANDBOX_KITS: Record<SandboxKitId, SandboxKitDef> = undefined as unknown as Record<SandboxKitId, SandboxKitDef>; // TODO: implement
-
-export const SANDBOX_KIT_ORDER: SandboxKitId[] = []; // TODO: implement ['digger', 'full']
-
-/** Legacy `difficulty:` names mapped onto kits (easy -> full, normal/hard -> digger). */
-export const SANDBOX_LEGACY_DIFFICULTY_ALIASES: Readonly<Record<string, SandboxKitId>> = {}; // TODO: implement
-
-/** Resolve a kit id or legacy difficulty alias; undefined when unknown. */
-export function resolveSandboxKitId(raw: string): SandboxKitId | undefined {
-  void raw;
-  return undefined; // TODO: implement
-}
-
-/** What a kit hands the player at the start. */
-export interface SandboxKitDetails {
-  id: SandboxKitId;
-  labelKey: string;
-  startingCash: number;
-  crew: readonly { role: EmployeeRole; count: number }[];
-  vehicles: readonly { role: VehicleRole; tier: VehicleTier; count: number }[];
-  buildings: readonly { type: BuildingType; tier: BuildingTier; count: number }[];
-}
-
-export function sandboxKitDetails(id: SandboxKitId): SandboxKitDetails {
-  void id;
-  return undefined as unknown as SandboxKitDetails; // TODO: implement
 }
