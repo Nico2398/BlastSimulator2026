@@ -269,6 +269,13 @@ nearest Spoil Heap and ore-bearing ones to a Freight Warehouse. The depot leg, t
 and the claim gate all use the fragment's destination; a destroyed target heap falls back to another
 heap. Heaps have unlimited room, so a barren haul is blocked only as `no_spoil_heap` (no heap placed).
 
+Barren yields to ore (#1870): `selectBestActionForEmployee` does not start an unheld, ground (not
+loaded) barren `haul_debris` while any unheld ore-bearing `haul_debris` is claimable (reachable,
+allowed, warehouse room). Barren still moves when no ore haul is claimable or none resolves a cost
+(barren blocks the only way, `storage_full`, nothing left). Grade/demand weighting among ore hauls,
+loaded trips, tier ranking and `fragment_debris` are unchanged. Debris thinning budgets
+`DEBRIS_SELECTION_MAX_BINS` per destination class so a near barren heap never crowds out ore.
+
 Storage capacity is what active Freight Warehouses provide: `INITIAL_STORAGE_CAPACITY_KG` is 0, so
 before the first warehouse nothing can be stored. `OrderReachability.ts` classifies a queued
 `haul_debris` that reachability and availability leave unblocked through `haulBlockedReason`

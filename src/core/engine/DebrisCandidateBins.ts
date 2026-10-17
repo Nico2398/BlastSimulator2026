@@ -51,7 +51,8 @@ interface DebrisIndex {
 
 /**
  * The candidates worth costing: every non-debris candidate `allowed` lets
- * through, plus up to `DEBRIS_SELECTION_MAX_BINS` debris representatives —
+ * through, plus up to `DEBRIS_SELECTION_MAX_BINS` debris representatives per
+ * destination class (ore, barren; so a nearer heap of one never crowds the other out, #1870) —
  * bins tried nearest `employee` first, at most
  * `DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND` of each kind, each represented by
  * its member nearest `employee` (lowest id on a tie) that is among
@@ -114,11 +115,12 @@ export function thinDebrisCandidates(
   const distance = bins.map(bin => octileHeuristic(employee.x, employee.z, bin.x, bin.z));
   const order = bins.map((_, i) => i).sort((a, b) => distance[a]! - distance[b]! || bins[a]!.key - bins[b]!.key);
 
-  let kept = 0;
+  const kept = [0, 0]; // per destination class: the low bit of a bin's key
   const tried = [0, 0, 0, 0]; // per bin kind: the low two bits of its key
   for (const i of order) {
-    if (kept >= DEBRIS_SELECTION_MAX_BINS) break;
-    const kind = bins[i]!.key & 3;
+    const kind = kindOfKey(bins[i]!.key);
+    const destination = destinationOfKey(bins[i]!.key);
+    if (kept[destination]! >= DEBRIS_SELECTION_MAX_BINS) continue;
     if (tried[kind]! >= DEBRIS_SELECTION_MAX_BINS_TRIED_PER_KIND) continue;
     const members = bins[i]!.members.filter(m => isCandidate(m) && reachable(m));
     if (members.length === 0) continue;
@@ -127,7 +129,7 @@ export function thinDebrisCandidates(
     near.sort(byDistanceThenId);
     const probes = Math.min(near.length, DEBRIS_SELECTION_BIN_PROBES);
     for (let k = 0; k < probes; k++) {
-      if (allowed(near[k]!.action)) { out.push(near[k]!.action); kept++; break; }
+      if (allowed(near[k]!.action)) { out.push(near[k]!.action); kept[destination]!++; break; }
     }
   }
   const alreadyKept = new Set(out);
@@ -212,6 +214,16 @@ const binKeys = new WeakMap<PendingAction, number>();
 
 /** Bin coordinates are offset so a negative tile still packs to a non-negative integer. */
 const BIN_COORD_OFFSET = 1 << 16;
+
+/** Bin kind (type + destination class): the low two bits `binKeyOf` packs last. */
+function kindOfKey(key: number): number {
+  return key & 3;
+}
+
+/** Destination class (1 = ore-carrying): the low bit of the key. */
+function destinationOfKey(key: number): number {
+  return key & 1;
+}
 
 function binKeyOf(action: PendingAction, carriesOre: (action: PendingAction) => boolean): number {
   let key = binKeys.get(action);

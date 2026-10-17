@@ -1076,7 +1076,7 @@ export const DEBRIS_SELECTION_BINNING_MIN = 128;
 export const DEBRIS_SELECTION_BIN_CELLS = 4;
 /** Members of a debris bin tried, nearest first, before giving the bin up for this pass. */
 export const DEBRIS_SELECTION_BIN_PROBES = 3;
-/** Debris bins, nearest first, whose representative is costed in one search. */
+/** Debris bins, nearest first, whose representative is costed in one search; applies per destination class (ore, barren). */
 export const DEBRIS_SELECTION_MAX_BINS = 16;
 /**
  * Debris bins of one kind (order type × ore or barren) tried in one search
