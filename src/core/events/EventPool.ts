@@ -39,12 +39,20 @@ export interface EventOptionEffectHint {
   spec?: EventEffectSpec;
 }
 
-/** Signed certain amount a consequence applies to one hint (kind, key), or undefined when unknown. */
+/** Signed certain amount a consequence applies to one hint (kind, key), or undefined when risky or absent. */
 export function consequenceAmount(
-  _c: EventConsequence, _kind: EventOptionEffectHint['kind'], _key: string,
+  c: EventConsequence, kind: EventOptionEffectHint['kind'], key: string,
 ): number | undefined {
-  // TODO: implement
-  return undefined;
+  if (isRisky(c)) return undefined;
+  const amount = kind === 'cash' ? c.cashDelta
+    : kind === 'score' ? c.scoreDelta?.[key as keyof ScoreState]
+    : key === 'corruption' ? c.corruptionDelta
+    : undefined;
+  return amount || undefined;
+}
+
+function isRisky(c: EventConsequence): boolean {
+  return c.probability !== undefined && c.probability < 1;
 }
 
 export interface EventConsequence {
@@ -165,18 +173,56 @@ export function getOptionEffectHints(
   option: EventOption,
   consequence: EventConsequence | undefined,
 ): EventOptionEffectHint[] {
-  if (option.effects) return option.effects;
+  if (option.effects) {
+    if (!consequence) return option.effects;
+    return option.effects.map(h => {
+      if (h.amount !== undefined) return h;
+      const amount = consequenceAmount(consequence, h.kind, h.key);
+      return amount === undefined ? h : { ...h, amount };
+    });
+  }
   if (!consequence) return [];
   return deriveEffectHints(consequence);
 }
 
+/** Direction of each lasting effect as the player reads it; the compiler names every new type. */
+const EFFECT_DIRECTION: Record<EventEffectSpec['type'], EventOptionEffectHint['direction']> = {
+  work_stoppage: 'negative',
+  work_rate: 'neutral',
+  morale_shift: 'neutral',
+  fatigue_relief: 'neutral',
+  employee_leaves: 'negative',
+  employee_joins: 'neutral',
+  employee_injured: 'negative',
+  salary: 'neutral',
+  bonus_per_employee: 'positive',
+  recurring_charge: 'neutral',
+  ban: 'negative',
+  cost_factor: 'neutral',
+  contract_price: 'neutral',
+  special_contract: 'neutral',
+  cancel_contract: 'negative',
+  vehicle_breakdown: 'negative',
+  building_closed: 'negative',
+  forced_weather: 'neutral',
+  event_weight: 'neutral',
+};
+
 function deriveEffectHints(c: EventConsequence): EventOptionEffectHint[] {
-  const risky = c.probability !== undefined && c.probability < 1;
+  const risky = isRisky(c);
   const hints: EventOptionEffectHint[] = [];
 
-  const push = (kind: EventOptionEffectHint['kind'], key: string, direction: EventOptionEffectHint['direction']) => {
+  const push = (
+    kind: EventOptionEffectHint['kind'], key: string, direction: EventOptionEffectHint['direction'],
+    spec?: EventEffectSpec,
+  ) => {
     const hint: EventOptionEffectHint = { kind, key, direction };
     if (risky) hint.risky = true;
+    else {
+      const amount = consequenceAmount(c, kind, key);
+      if (amount !== undefined) hint.amount = amount;
+      if (spec) hint.spec = spec;
+    }
     hints.push(hint);
   };
 
@@ -188,6 +234,9 @@ function deriveEffectHints(c: EventConsequence): EventOptionEffectHint[] {
   }
   if (c.corruptionDelta) push('other', 'corruption', c.corruptionDelta > 0 ? 'positive' : 'negative');
   if (c.followUpEventId) push('other', 'followUp', 'neutral');
+  for (const spec of c.effects ?? []) {
+    if (spec.type !== 'forced_weather') push('other', spec.type, EFFECT_DIRECTION[spec.type], spec);
+  }
 
   return hints;
 }
