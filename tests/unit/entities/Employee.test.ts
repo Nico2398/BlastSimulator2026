@@ -1903,7 +1903,7 @@ const nameAt = (i: number) => {
 };
 const indexOf = (name: string) => {
   const [f, l] = name.split(' ');
-  return UNIQUE_FIRST.indexOf(f) * UNIQUE_LAST.length + UNIQUE_LAST.indexOf(l);
+  return UNIQUE_FIRST.indexOf(f!) * UNIQUE_LAST.length + UNIQUE_LAST.indexOf(l!);
 };
 
 describe('generateName — unique names (#1886)', () => {

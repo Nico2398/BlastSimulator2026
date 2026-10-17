@@ -493,8 +493,8 @@ describe('hiring pool names are unique (#1886)', () => {
 
   it('a candidate colliding with the roster is renamed', () => {
     const plain = createHiringPool(42, 0);
-    const avoiding = createHiringPool(42, 0, undefined, new Set([plain.candidates[0].name]));
-    expect(avoiding.candidates[0].name).not.toBe(plain.candidates[0].name);
+    const avoiding = createHiringPool(42, 0, undefined, new Set([plain.candidates[0]!.name]));
+    expect(avoiding.candidates[0]!.name).not.toBe(plain.candidates[0]!.name);
   });
 
   it('is deterministic: the same seed and roster give the same names', () => {

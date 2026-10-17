@@ -84,18 +84,18 @@ describe('employee_joins — unique names (#1886)', () => {
   it('takes a name absent from the roster and the hiring pool', () => {
     const fx = makeEffectWorld();
     const drawn = generateName(new Random(7));
-    fx.state.hiringPool.candidates[0].name = drawn;
+    fx.state.hiringPool.candidates[0]!.name = drawn;
     applyInstantEffect({ type: 'employee_joins', role: 'driver' }, fx.world, 5, new Random(7));
-    const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1];
+    const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1]!;
     expect(joined.name).not.toBe(drawn);
   });
 
   it('avoids the name of a living employee', () => {
     const fx = makeEffectWorld();
     const drawn = generateName(new Random(7));
-    fx.state.employees.employees[0].name = drawn;
+    fx.state.employees.employees[0]!.name = drawn;
     applyInstantEffect({ type: 'employee_joins', role: 'driver' }, fx.world, 5, new Random(7));
-    const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1];
+    const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1]!;
     expect(joined.name).not.toBe(drawn);
   });
 });
