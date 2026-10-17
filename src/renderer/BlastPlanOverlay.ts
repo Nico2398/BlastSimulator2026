@@ -151,6 +151,11 @@ export class BlastPlanOverlay {
     this.heatmapLayer.setVisible(false);
   }
 
+  /** Hide and drop every marker and its pick position. */
+  reset(): void {
+    // TODO: implement
+  }
+
   clear(): void {
     this.heatmapLayer.clear();
     this.fallbackSampler.clearFlat();
