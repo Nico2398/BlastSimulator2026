@@ -206,12 +206,19 @@ export function isOperating(b: Pick<Building, 'active' | 'outOfService'>): boole
   return b.active && !b.outOfService;
 }
 
-/** Sets each building's `outOfService` flag from the set of closed building ids. */
-export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): void {
+/**
+ * Sets each building's `outOfService` flag from the set of closed building ids.
+ * Returns true when any building's flag flipped.
+ */
+export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): boolean {
+  let flipped = false;
   for (const b of buildings) {
-    if (closed.has(b.id)) b.outOfService = true;
+    const shut = closed.has(b.id);
+    if (shut !== !!b.outOfService) flipped = true;
+    if (shut) b.outOfService = true;
     else delete b.outOfService;
   }
+  return flipped;
 }
 
 // ── People capacity (#1202) ──
