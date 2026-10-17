@@ -1382,6 +1382,9 @@ export const LEVEL_GROUND_COST_PER_VOXEL = 12;
  */
 export const BUILDING_CONSTRUCTION_BASE_DURATION_TICKS = 15;
 
+/** Share of the current tier's construction cost credited against an in-place upgrade (#1905). */
+export const BUILDING_UPGRADE_CREDIT_SHARE = 0; // TODO: implement (set to 0.5)
+
 /** Per-tier multiplier applied to BUILDING_CONSTRUCTION_BASE_DURATION_TICKS (#556 construction sites) — a bigger tier takes longer to build. */
 export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number> = { 1: 1, 2: 1.6, 3: 2.4 };
 
