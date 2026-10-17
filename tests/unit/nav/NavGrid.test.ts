@@ -2454,3 +2454,116 @@ describe('NavGrid.revision (#1427)', () => {
     expect(nav.revision).toBe(before);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// patchNavGrid vs. a fresh buildNavGrid (#1869)
+//
+// classifyCellType types a cell from its CARDINAL NEIGHBOURS' heights, so a
+// column changing height changes the type of the cells around it too. A patch
+// that reclassifies only its own region leaves those neighbours stale — the
+// live grid then differs from the one a save/load rebuilds.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.patchNavGrid — equals a fresh buildNavGrid of the same voxels (#1869)', () => {
+  const SIZE = 9;
+  const BASE_HEIGHT = 6.0;
+
+  function makeGradedGrid(): { grid: VoxelGrid; compId: number } {
+    const grid = new VoxelGrid(SIZE, SIZE);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    for (let z = 0; z < SIZE; z++) {
+      for (let x = 0; x < SIZE; x++) setVoxelColumnSurfaceHeight(grid, x, z, BASE_HEIGHT, compId);
+    }
+    return { grid, compId };
+  }
+
+  /** First cell whose type, moveCost or surfaceY differs from a fresh build, as a readable string; null when none. */
+  function firstDifferenceFromFreshBuild(nav: NavGrid, grid: VoxelGrid): string | null {
+    const fresh = NavGrid.buildNavGrid(grid, [], []);
+    for (let z = 0; z < fresh.height; z++) {
+      for (let x = 0; x < fresh.width; x++) {
+        const live = nav.cells[z]![x]!;
+        const want = fresh.cells[z]![x]!;
+        if (live.type !== want.type) return `(${x},${z}) type live=${live.type} fresh=${want.type}`;
+        if (live.moveCost !== want.moveCost) return `(${x},${z}) moveCost live=${live.moveCost} fresh=${want.moveCost}`;
+        if (live.surfaceY !== want.surfaceY) return `(${x},${z}) surfaceY live=${live.surfaceY} fresh=${want.surfaceY}`;
+      }
+    }
+    return null;
+  }
+
+  it('lowering one column inside a one-cell region retypes the neighbours it turned into ramps', () => {
+    const { grid, compId } = makeGradedGrid();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    setVoxelColumnSurfaceHeight(grid, 4, 4, BASE_HEIGHT - IN_BAND_RAMP_DELTA, compId);
+
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 4, maxX: 4, minZ: 4, maxZ: 4 });
+
+    // A cardinal neighbour OUTSIDE the region must read ramp, as a full build types it.
+    expect(nav.cells[4]![3]!.type).toBe('ramp');
+    expect(nav.cells[4]![3]!.moveCost).toBe(1.8);
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+
+  it('raising a column back (ramp to walkable) retypes the neighbours that stop being ramps', () => {
+    const { grid, compId } = makeGradedGrid();
+    setVoxelColumnSurfaceHeight(grid, 4, 4, BASE_HEIGHT - IN_BAND_RAMP_DELTA, compId);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    expect(nav.cells[4]![5]!.type).toBe('ramp');
+    setVoxelColumnSurfaceHeight(grid, 4, 4, BASE_HEIGHT, compId);
+
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 4, maxX: 4, minZ: 4, maxZ: 4 });
+
+    expect(nav.cells[4]![5]!.type).toBe('walkable');
+    expect(nav.cells[4]![5]!.moveCost).toBe(1.0);
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+
+  it('lowering a column in a larger region retypes the ring just outside that region', () => {
+    const { grid, compId } = makeGradedGrid();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    for (let z = 3; z <= 5; z++) {
+      for (let x = 3; x <= 5; x++) setVoxelColumnSurfaceHeight(grid, x, z, BASE_HEIGHT - IN_BAND_RAMP_DELTA, compId);
+    }
+
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 3, maxX: 5, minZ: 3, maxZ: 5 });
+
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+
+  it('a region clamped at the grid corner still retypes its in-grid neighbours', () => {
+    const { grid, compId } = makeGradedGrid();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    setVoxelColumnSurfaceHeight(grid, 0, 0, BASE_HEIGHT - IN_BAND_RAMP_DELTA, compId);
+
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: -3, maxX: 0, minZ: -3, maxZ: 0 });
+
+    expect(nav.cells[0]![1]!.type).toBe('ramp');
+    expect(nav.cells[1]![0]!.type).toBe('ramp');
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+
+  it('a region clamped at the far grid edge still retypes its in-grid neighbours', () => {
+    const { grid, compId } = makeGradedGrid();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    setVoxelColumnSurfaceHeight(grid, SIZE - 1, 4, BASE_HEIGHT - IN_BAND_RAMP_DELTA, compId);
+
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: SIZE - 1, maxX: SIZE + 5, minZ: 4, maxZ: 4 });
+
+    expect(nav.cells[4]![SIZE - 2]!.type).toBe('ramp');
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+
+  it('two successive patches (a ramp dug column by column) still equal a fresh build', () => {
+    const { grid, compId } = makeGradedGrid();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    setVoxelColumnSurfaceHeight(grid, 3, 4, BASE_HEIGHT - IN_BAND_RAMP_DELTA, compId);
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 3, maxX: 3, minZ: 4, maxZ: 4 });
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+
+    setVoxelColumnSurfaceHeight(grid, 4, 4, BASE_HEIGHT - 2 * IN_BAND_RAMP_DELTA, compId);
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 4, maxX: 4, minZ: 4, maxZ: 4 });
+    expect(firstDifferenceFromFreshBuild(nav, grid)).toBeNull();
+  });
+});

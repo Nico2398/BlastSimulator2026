@@ -10,6 +10,10 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { board, alight } from '../../../src/core/engine/Mount.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import type { GameState } from '../../../src/core/state/GameState.js';
 import {
   AgentOccupancy,
   rebuildAgentOccupancy,
@@ -275,5 +279,140 @@ describe('reconcileAgentOccupancy', () => {
 
     expect(() => reconcileAgentOccupancy(state, occupancy)).not.toThrow();
     expect(occupancy.cellOfOccupant(emp(onFoot.id))).toEqual({ x: 6, z: 6 });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Live upkeep vs. rebuild (#1869)
+//
+// The live map (state.agentOccupancy) is kept incrementally and rebuilt only
+// lazily, so it must hold every agent a rebuild from the same state would hold.
+// An employee who alights and stands still never "moves", so nothing registers
+// them — a hauler then drives through their cell live, but waits for them after
+// a save/load rebuilds the map.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Sorted "kind:id@x,z" pairs for every held cell — the (occupant, cell) set. */
+function heldPairs(occupancy: AgentOccupancy): string[] {
+  return occupancy.heldOccupants()
+    .map(h => `${h.occupant.kind}:${h.occupant.id}@${h.x},${h.z}`)
+    .sort();
+}
+
+/** A state with a solid nav grid, a hauler and a licensed driver standing beside it, live map already built. */
+function stateWithDriverAndHauler(): { state: GameState; driverId: number; haulerId: number } {
+  const state = createGame({ seed: SEED });
+  const grid = new VoxelGrid(20, 20);
+  for (let z = 0; z < 20; z++) for (let x = 0; x < 20; x++) for (let y = 0; y <= 4; y++) {
+    grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+  }
+  state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+  const rng = new Random(SEED);
+  const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 10, 1);
+  const { employee } = hireEmployee(state.employees, 'driver', rng, 10, 11);
+  state.agentOccupancy = rebuildAgentOccupancy(state);
+  return { state, driverId: employee.id, haulerId: vehicle.id };
+}
+
+describe('live occupancy after alighting (#1869)', () => {
+  it('an employee who alights and stands still holds their cell, matching rebuildAgentOccupancy', () => {
+    const { state, driverId, haulerId } = stateWithDriverAndHauler();
+    expect(board(state, haulerId, driverId).success).toBe(true);
+    expect(alight(state, haulerId).success).toBe(true);
+    const driver = state.employees.employees.find(e => e.id === driverId)!;
+    expect(driver.locomotion.kind).toBe('on_foot');
+
+    // No tick runs between alighting and the check: nothing "moved" them.
+    const live = state.agentOccupancy!;
+    const cell = { x: Math.round(driver.x), z: Math.round(driver.z) };
+    expect(live.cellOfOccupant(emp(driverId))).toEqual(cell);
+    expect(live.holderOf(cell.x, cell.z)).toEqual(emp(driverId));
+    expect(heldPairs(live)).toEqual(heldPairs(rebuildAgentOccupancy(state)));
+  });
+
+  it('the vehicle keeps its own cell while its former driver stands beside it', () => {
+    const { state, driverId, haulerId } = stateWithDriverAndHauler();
+    board(state, haulerId, driverId);
+    alight(state, haulerId);
+    const vehicleCell = state.agentOccupancy!.cellOfOccupant(vehicle(haulerId));
+    expect(vehicleCell).toEqual({ x: 10, z: 10 });
+  });
+});
+
+describe('reconcileAgentOccupancy registers agents a rebuild would register (#1869)', () => {
+  it('registers an on-foot employee the live map does not hold', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 6, 7);
+    const occupancy = new AgentOccupancy();
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(occupancy.cellOfOccupant(emp(employee.id))).toEqual({ x: 6, z: 7 });
+    expect(heldPairs(occupancy)).toEqual(heldPairs(rebuildAgentOccupancy(state)));
+  });
+
+  it('registers a vehicle that never moved', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle: v } = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 5, 1);
+    const occupancy = new AgentOccupancy();
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(occupancy.cellOfOccupant(vehicle(v.id))).toEqual({ x: 4, z: 5 });
+  });
+
+  it('registers the employee at the rounded position', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 6.4, 7.6);
+    const occupancy = new AgentOccupancy();
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(occupancy.cellOfOccupant(emp(employee.id))).toEqual({ x: 6, z: 8 });
+  });
+
+  it('does not register a mounted employee', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { vehicle: v } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5, 1);
+    const { employee } = hireEmployee(state.employees, 'driver', rng, 5, 5);
+    employee.locomotion = { kind: 'mounted', vehicleId: v.id };
+    const occupancy = new AgentOccupancy();
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(occupancy.cellOfOccupant(emp(employee.id))).toBeNull();
+    expect(occupancy.holderOf(5, 5)).toEqual(vehicle(v.id));
+  });
+
+  it('does not register a dead employee, and still releases a dead or removed holder', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: dead } = hireEmployee(state.employees, 'driller', rng, 2, 3);
+    const { vehicle: gone } = purchaseVehicle(state.vehicles, 'debris_hauler', 4, 4, 1);
+    const occupancy = rebuildAgentOccupancy(state);
+    killEmployee(state.employees, dead.id);
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== gone.id);
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(occupancy.cellOfOccupant(emp(dead.id))).toBeNull();
+    expect(occupancy.cellOfOccupant(vehicle(gone.id))).toBeNull();
+    expect(heldPairs(occupancy)).toEqual([]);
+  });
+
+  it('boundary: reconciling an up-to-date map leaves the held pairs identical to a rebuild', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    hireEmployee(state.employees, 'driller', rng, 6, 6);
+    purchaseVehicle(state.vehicles, 'drill_rig', 7, 7, 1);
+    const occupancy = rebuildAgentOccupancy(state);
+    const before = heldPairs(occupancy);
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(heldPairs(occupancy)).toEqual(before);
   });
 });
