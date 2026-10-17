@@ -310,6 +310,7 @@ describe('applyBoulderSplit', () => {
     const { vehicle, driverId } = makeDrivenFragmenter(state, 5, 5);
     const fragment = makeFragment(1, 5, 5, 1.3, 2600);
     fragment.oreDensities = { blingite: 0.4, cruarium: 0.1 };
+    state.logistics.nextFragmentId = 2; // fixture id 1 is already on the ground
     addBlastFragments(state.logistics, [fragment], state.navGrid);
     reserveFragmentAction(state, vehicle, driverId, 'fragment_debris', 1, { x: 5, z: 5 });
     expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(1);
@@ -395,6 +396,7 @@ describe('applyArrivalEffect', () => {
     const state = createGame({ seed: SEED });
     const { vehicle, driverId } = makeDrivenFragmenter(state, 5, 5);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 1.3, 2600)]);
+    state.logistics.nextFragmentId = 2; // fixture id 1 is already on the ground
     reserveFragmentAction(state, vehicle, driverId, 'fragment_debris', 1, { x: 5, z: 5 });
 
     const result = applyArrivalEffect(state, vehicle, 'boulder_split');

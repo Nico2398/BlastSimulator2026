@@ -326,7 +326,6 @@ export function* executeBlastSteps(
   /** First fragment id of this blast's block (see reserveFragmentIds). */
   firstFragmentId: number = 0,
 ): Steps<BlastResult | null> {
-  void firstFragmentId; // TODO: implement
   // 1. Validate
   const errors = validateBlastPlan(plan);
   if (errors.length > 0) return null;
@@ -350,7 +349,7 @@ export function* executeBlastSteps(
   const fragmentation = field ? yield* identifyFragmentedVoxelsSteps(field, grid) : null;
 
   const fragments: FragmentData[] = [];
-  let fragmentIdCounter = 0;
+  let nextId = firstFragmentId;
   let totalRockVolume = 0;
   let totalOreValue = 0;
   let oversizedFragments = 0;
@@ -377,7 +376,7 @@ export function* executeBlastSteps(
       const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg, field, throwFraction);
 
       fragments.push({
-        id: fragmentIdCounter++,
+        id: nextId++,
         position: gen.origin,
         volume: gen.volumeM3,
         mass: gen.massKg,

@@ -48,10 +48,9 @@ export function createLogisticsState(storageCapacityKg: number = INITIAL_STORAGE
 
 /** Reserve `count` consecutive fragment ids; returns the first id of the block. */
 export function reserveFragmentIds(state: LogisticsState, count: number): number {
-  // TODO: implement
-  void state;
-  void count;
-  return 0;
+  const first = state.nextFragmentId;
+  state.nextFragmentId += count;
+  return first;
 }
 
 // ── Operations ──

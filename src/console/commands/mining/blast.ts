@@ -10,7 +10,7 @@ import { drain, type Steps } from '../../../core/engine/Steps.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { recordedChargesCost } from '../../../core/mining/ChargePlan.js';
-import { addBlastFragments } from '../../../core/economy/Logistics.js';
+import { addBlastFragments, reserveFragmentIds } from '../../../core/economy/Logistics.js';
 import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
@@ -128,8 +128,10 @@ export function* fireBlastSteps(
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
   yield;
-  const result = yield* executeBlastSteps(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds, resolveMarketId(ctx.state!));
+  const result = yield* executeBlastSteps(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds, resolveMarketId(ctx.state!), ctx.state!.logistics.nextFragmentId);
   if (!result) return { success: false, output: t('mining.blast.execution_failed') };
+  // Claim the ids before any yield so nothing else can reserve the same block.
+  reserveFragmentIds(ctx.state!.logistics, result.fragments.length);
 
   yield;
   // Store fragment data for renderer (localized remesh + mesh spawning)
