@@ -542,6 +542,29 @@ function selectWithinIndex(
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
 
+  // Barren rock yields to ore (#1870): while any ore haul is claimable (it survived the thinning,
+  // so it is reachable, allowed and has warehouse room), an unheld ground barren haul is not
+  // started. Pass 2 lets barren move when the ore hauls all fail to resolve a cost (blocked way).
+  const isUnheldGroundHaul = (a: PendingAction): boolean =>
+    a.type === 'haul_debris' && a.holderId === null && !haulActionIsLoaded(state, a, fragmentOf);
+  const oreWaits = claimable.some(a => isUnheldGroundHaul(a) && haulActionCarriesOre(state, a, fragmentOf));
+  if (oreWaits) {
+    const withoutBarren = costed.filter(c => !(isUnheldGroundHaul(c.action) && !haulActionCarriesOre(state, c.action, fragmentOf)));
+    const preferred = searchTiers(state, employee, withoutBarren, reachable);
+    if (preferred !== null) return preferred;
+  }
+  return searchTiers(state, employee, costed, reachable);
+}
+
+type CostedAction = { action: PendingAction; tier: number; cost: number; bonus: number; demandBonus: number };
+
+/** Bounded per-tier search over `costed` (sorted: tier, then cost), see the notes inside. */
+function searchTiers(
+  state: GameState,
+  employee: Employee,
+  costed: readonly CostedAction[],
+  reachable: (a: PendingAction) => boolean,
+): SelectedAction | null {
   // `reachable` (#953) is the cheap, exact pre-filter: a candidate outside the
   // employee's climb-aware reachable set (e.g. inside a fresh blast crater's
   // walled-off interior) can never be reached by any real findExactPath. It
