@@ -270,10 +270,10 @@ export class EventModal {
       const consequence = def.consequences[i];
       const btn = el('button', { className: 'bsx-btn bs-btn bs-event-choice' });
       btn.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;height:auto;min-height:36px;padding:9px 12px;white-space:normal';
-      btn.appendChild(el('span', { text: t(option.labelKey), attrs: { style: 'flex:1' } }));
+      btn.appendChild(el('span', { text: t(option.labelKey), attrs: { style: 'flex:1 1 40%;min-width:0' } }));
       const hints = getOptionEffectHints(option, consequence);
       if (hints.length > 0) {
-        const hintRow = el('div', { attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
+        const hintRow = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex:0 1 auto;min-width:0;max-width:60%' } });
         hintRow.append(...hints.map(hintChip));
         btn.appendChild(hintRow);
       }
