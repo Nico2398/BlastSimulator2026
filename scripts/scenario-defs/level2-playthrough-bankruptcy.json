@@ -778,7 +778,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7860
+          "cash": -7324
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       }
@@ -826,7 +826,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7860
+          "cash": -7324
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       }
@@ -874,7 +874,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7860
+          "cash": -7324
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       }
@@ -973,7 +973,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7961
+          "cash": -7425
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       },
@@ -1022,7 +1022,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -15715
+          "cash": -14643
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       }
@@ -1070,7 +1070,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -8045
+          "cash": -7509
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       }
@@ -1169,7 +1169,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -15715
+          "cash": -14643
         },
         "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1667: the two hired blasters now arrive with the tier-1 truck licence (+$50 salary each), so per-cycle payroll deltas rose by $100 and the tick-100 balance by $1,000 (-78648->-79648). #1843: licences pay flat (level-1 bonus), so payroll is lower again; cash re-measured (deterministic, exact checks kept)."
       }
@@ -1209,7 +1209,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -78936,
+          "cash": -73576,
           "tickCount": 100,
           "deathCount": 0,
           "employeeCount": 10,
