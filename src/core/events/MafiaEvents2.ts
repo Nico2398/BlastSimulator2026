@@ -82,7 +82,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 1.3 + 0.9 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(3) && ctx.employeeCount >= 5,
     options: [
-      { cashDelta: -4000, scoreDelta: { wellBeing: -8 }, corruptionDelta: 5, effectTag: 'mole_fired',
+      { cashDelta: -4000, scoreDelta: { wellBeing: -8, safety: 4 }, corruptionDelta: 5, effectTag: 'mole_fired',
         effects: [{ type: 'employee_leaves', pick: 'random' }] },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 }, corruptionDelta: -5, effectTag: 'cooperate_fbi' },
       { cashDelta: -2000, scoreDelta: { safety: -4 }, corruptionDelta: 3, effectTag: 'paranoia_sweep',
@@ -110,7 +110,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
         effects: [{ type: 'employee_injured' }] },
       { cashDelta: 0, scoreDelta: { wellBeing: 4 } },
       { cashDelta: 5000, corruptionDelta: 4, effectTag: 'minor_fraud', probability: 0.6,
-        alt: { cashDelta: -8000, corruptionDelta: 2, effectTag: 'fraud_caught' } },
+        alt: { cashDelta: -5000, corruptionDelta: 2, effectTag: 'fraud_caught' } },
     ],
   }),
   // 33 — Drug lab in abandoned section
@@ -149,7 +149,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_CALM_WEIGHT_FACTOR, days: EVENT_CALM_DAYS },
         ] },
       { cashDelta: 0, scoreDelta: { wellBeing: 5 }, corruptionDelta: -2 },
-      { cashDelta: -20000, corruptionDelta: 8, effectTag: 'partial_immunity' },
+      { cashDelta: -20000, scoreDelta: { safety: 3 }, corruptionDelta: 8, effectTag: 'partial_immunity' },
     ],
   }),
   // 36 — Mafia attack dogs for security
@@ -160,7 +160,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
       { cashDelta: -4000, scoreDelta: { safety: 6, wellBeing: -8 }, corruptionDelta: 4, effectTag: 'guard_dogs',
         effects: [{ type: 'employee_injured' }] },
       { cashDelta: 0, scoreDelta: { wellBeing: 3 } },
-      { cashDelta: -1500, scoreDelta: { wellBeing: -3 }, corruptionDelta: 2, effectTag: 'one_chihuahua' },
+      { cashDelta: -1500, scoreDelta: { safety: 2, wellBeing: -3 }, corruptionDelta: 2, effectTag: 'one_chihuahua' },
     ],
   }),
   // 37 — Offshore account opportunity
@@ -218,8 +218,8 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 0.6 + 1.4 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(4) && ctx.hasDrillPlan,
     options: [
-      { cashDelta: -5000, scoreDelta: { safety: -20, ecology: -15 }, corruptionDelta: 10, effectTag: 'mega_explosive',
-        probability: 0.5, alt: { cashDelta: -15000, scoreDelta: { safety: -30 }, effectTag: 'prototype_detonated' } },
+      { cashDelta: 15000, scoreDelta: { safety: -20, ecology: -15 }, corruptionDelta: 10, effectTag: 'mega_explosive',
+        probability: 0.5, alt: { cashDelta: -5000, scoreDelta: { safety: -30 }, effectTag: 'prototype_detonated' } },
       { cashDelta: 0, scoreDelta: { safety: 5 } },
       { cashDelta: -2000, scoreDelta: { safety: -8 }, corruptionDelta: 5, effectTag: 'small_sample',
         effects: [
@@ -232,7 +232,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 0.5 * r.wb(s),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(2),
     options: [
-      { cashDelta: -8000, scoreDelta: { nuisance: -10, wellBeing: -5 }, corruptionDelta: 5, effectTag: 'boss_party',
+      { cashDelta: -8000, scoreDelta: { nuisance: -10, wellBeing: -5, safety: 4 }, corruptionDelta: 5, effectTag: 'boss_party',
         effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: 0, scoreDelta: { safety: -8 }, corruptionDelta: -2, effectTag: 'party_declined',
         effects: [{ type: 'employee_injured' }] },
@@ -266,12 +266,12 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 1.0 + 1.0 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(3),
     options: [
-      { cashDelta: -10000, scoreDelta: { ecology: -8 }, corruptionDelta: 8, effectTag: 'zoning_bribed',
+      { cashDelta: 8000, scoreDelta: { ecology: -8 }, corruptionDelta: 8, effectTag: 'zoning_bribed',
         effects: [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },
       { cashDelta: 0, scoreDelta: { ecology: 4 } },
-      { cashDelta: -4000, corruptionDelta: 4, effectTag: 'minor_rezoning' },
+      { cashDelta: 2000, corruptionDelta: 4, effectTag: 'minor_rezoning' },
     ],
   }),
   // 46 — Mafia therapist available
@@ -290,7 +290,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 0.5 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(2),
     options: [
-      { cashDelta: -5000, scoreDelta: { nuisance: -12, wellBeing: -6 }, corruptionDelta: 5, effectTag: 'family_reunion',
+      { cashDelta: -5000, scoreDelta: { nuisance: -12, wellBeing: -6, safety: 4 }, corruptionDelta: 5, effectTag: 'family_reunion',
         effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: 0, scoreDelta: { safety: -6 }, corruptionDelta: -2,
         effects: [{ type: 'employee_injured' }] },
@@ -327,8 +327,8 @@ export const MAFIA_EVENTS_2: EventDef[] = [
         effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 }, corruptionDelta: 2, effectTag: 'mocked_boss',
         effects: [{ type: 'employee_injured' }] },
-      { cashDelta: -500, scoreDelta: { ecology: 5, wellBeing: 3 }, corruptionDelta: -1, effectTag: 'rock_collection',
-        probability: 0.8, alt: { cashDelta: 8000, scoreDelta: { ecology: -5 }, effectTag: 'found_gems' } },
+      { cashDelta: -1500, scoreDelta: { ecology: 5, wellBeing: 3 }, corruptionDelta: -1, effectTag: 'rock_collection',
+        probability: 0.8, alt: { cashDelta: 5000, scoreDelta: { ecology: -5 }, effectTag: 'found_gems' } },
     ],
   }),
 ];

@@ -10,7 +10,7 @@ export const TUTORIAL_EVENTS: EventDef[] = [
     options: [
       { cashDelta: -3000, scoreDelta: { wellBeing: 15 } },
       { scoreDelta: { wellBeing: -10, safety: -5 } },
-      { scoreDelta: { wellBeing: 5, safety: -5 } },
+      { scoreDelta: { wellBeing: 5, safety: -8 } },
     ],
   }),
 ];

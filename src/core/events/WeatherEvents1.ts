@@ -34,7 +34,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
       { cashDelta: -20000, scoreDelta: { ecology: 8, safety: 5 }, effectTag: 'pump_pit' },
       { cashDelta: 0, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'duck_sanctuary',
         effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
-      { cashDelta: -5000, scoreDelta: { safety: -5 }, effectTag: 'workers_swim',
+      { cashDelta: -5000, scoreDelta: { safety: -5, wellBeing: 8 }, effectTag: 'workers_swim',
         effects: [{ type: 'employee_injured' }] },
     ],
   }),
@@ -45,7 +45,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -30000, scoreDelta: { safety: 15 }, effectTag: 'lightning_rods' },
       { cashDelta: 0, scoreDelta: { safety: -20 }, probability: 0.4,
-        alt: { cashDelta: -80000, scoreDelta: { safety: -40 }, effectTag: 'magazine_explosion' } },
+        alt: { cashDelta: -40000, scoreDelta: { safety: -40 }, effectTag: 'magazine_explosion' } },
       { cashDelta: -10000, scoreDelta: { safety: 8 }, effectTag: 'emergency_relocation',
         effects: [{ type: 'ban', what: 'blast', hours: EVENT_CURFEW_BAN_HOURS }] },
     ],
@@ -124,7 +124,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
         effects: [
           { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_SURCHARGE_PCT, days: EVENT_UPKEEP_SURCHARGE_DAYS },
         ] },
-      { cashDelta: -4000, scoreDelta: { safety: 4 }, effectTag: 'fog_horns' },
+      { cashDelta: -4000, scoreDelta: { safety: 4, wellBeing: -3 }, effectTag: 'fog_horns' },
     ],
   }),
   // 9 — Unexpected snow in desert mine
@@ -257,7 +257,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 1.2 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.weatherId === 'storm' || ctx.weatherId === 'heavy_rain',
     options: [
-      { cashDelta: -30000, scoreDelta: { ecology: -15, safety: 8 }, effectTag: 'rubble_downstream',
+      { cashDelta: -6000, scoreDelta: { ecology: -15, safety: 8 }, effectTag: 'rubble_downstream',
         effects: [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },

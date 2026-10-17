@@ -150,3 +150,12 @@ Defaulted under `agentic-decision-autonomy` — none blocked this run.
 ```
 
 One entry per decision: what was open, what was chosen, why, and what a human would change to reverse it. The last line is what makes the decision cheap to revisit — a decision nobody can find the lever for is a decision nobody will revisit.
+
+## Event option comparison
+
+Rule for balancing event options (#1894): no option of an event may dominate a sibling. `optionValue` / `dominates` / `findDominatedPairs` (`src/core/events/EventOptionBalance.ts`) apply Pareto dominance, higher = better; `npm run events:balance` lists every dominated pair (exit 1 if any).
+
+- An option is valued at its expected value: a `probability` < 1 weights the main branch by p and `altConsequence` by 1 - p (a missing alt is empty); effects count at their branch weight.
+- Dimensions: cash; one per `scoreDelta` key (nuisance is not flipped); corruption and exposure are costs (a rise is worse); lasting effects (work lost, morale, crew, payroll, bans, cost factors, contract income, contracts, out-of-service time) are separate dimensions with no cash exchange rate.
+- Follow-up events, `forced_weather` and `event_weight` effects are opaque: options only dominate each other when their signatures are equal. `effectTag`-routed handler outcomes are unvalued and reviewed by hand.
+- Levers: `EVENT_BALANCE_PERMANENT_DAYS` (horizon of a permanent effect) and `EVENT_BALANCE_REFERENCE_CREW` (crew size for per-employee effects) in `src/core/config/balance.ts`.

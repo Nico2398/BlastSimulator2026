@@ -160,7 +160,7 @@ export const UNION_EVENTS_2: EventDef[] = [
       { cashDelta: -1200, scoreDelta: { wellBeing: 5 }, effectTag: 'fridge_cams' },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 },
         effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
-      { cashDelta: -3000, scoreDelta: { wellBeing: 3 }, effectTag: 'private_detective', probability: 0.6,
+      { cashDelta: -3000, scoreDelta: { wellBeing: 8 }, effectTag: 'private_detective', probability: 0.8,
         effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }],
         alt: { cashDelta: -3000, scoreDelta: { wellBeing: -2 }, effectTag: 'detective_ate_lunch' } },
     ],

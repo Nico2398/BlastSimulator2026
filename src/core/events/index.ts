@@ -2,6 +2,7 @@
 // Imports all event definitions and registers them in the global pool.
 
 import { registerEvents, clearEvents } from './EventPool.js';
+import type { EventDef } from './EventPool.js';
 
 import { UNION_EVENTS_1 } from './UnionEvents1.js';
 import { UNION_EVENTS_2 } from './UnionEvents2.js';
@@ -22,6 +23,28 @@ import { TUTORIAL_EVENTS } from './TutorialEvents.js';
 export { clearEvents } from './EventPool.js';
 
 /**
+ * Every event definition file, keyed by file name. Single source for pool
+ * registration and the balance report (#1894).
+ */
+export const EVENT_FILES: Readonly<Record<string, EventDef[]>> = {
+  'UnionEvents1.ts': UNION_EVENTS_1,
+  'UnionEvents2.ts': UNION_EVENTS_2,
+  'PoliticsEvents1.ts': POLITICS_EVENTS_1,
+  'PoliticsEvents2.ts': POLITICS_EVENTS_2,
+  'WeatherEvents1.ts': WEATHER_EVENTS_1,
+  'WeatherEvents2.ts': WEATHER_EVENTS_2,
+  'MafiaEvents1.ts': MAFIA_EVENTS_1,
+  'MafiaEvents2.ts': MAFIA_EVENTS_2,
+  'LawsuitEvents1.ts': LAWSUIT_EVENTS_1,
+  'LawsuitEvents2.ts': LAWSUIT_EVENTS_2,
+  'FollowUpEvents.ts': FOLLOWUP_EVENTS,
+  'TrafficJamEvents.ts': TRAFFIC_JAM_EVENTS,
+  'UnqualifiedTaskEvents.ts': UNQUALIFIED_TASK_EVENTS,
+  'OreReportEvents.ts': ORE_REPORT_EVENTS,
+  'TutorialEvents.ts': TUTORIAL_EVENTS,
+};
+
+/**
  * Register all event definitions into the global pool. Genuinely idempotent
  * (#597): every `createRunner()` call — one per scenario engine in a batch
  * run like `run-all-scenarios.ts` — used to call this again, and
@@ -36,19 +59,5 @@ export { clearEvents } from './EventPool.js';
  */
 export function setupEvents(): void {
   clearEvents();
-  registerEvents(UNION_EVENTS_1);
-  registerEvents(UNION_EVENTS_2);
-  registerEvents(POLITICS_EVENTS_1);
-  registerEvents(POLITICS_EVENTS_2);
-  registerEvents(WEATHER_EVENTS_1);
-  registerEvents(WEATHER_EVENTS_2);
-  registerEvents(MAFIA_EVENTS_1);
-  registerEvents(MAFIA_EVENTS_2);
-  registerEvents(LAWSUIT_EVENTS_1);
-  registerEvents(LAWSUIT_EVENTS_2);
-  registerEvents(FOLLOWUP_EVENTS);
-  registerEvents(TRAFFIC_JAM_EVENTS);
-  registerEvents(UNQUALIFIED_TASK_EVENTS);
-  registerEvents(ORE_REPORT_EVENTS);
-  registerEvents(TUTORIAL_EVENTS);
+  for (const events of Object.values(EVENT_FILES)) registerEvents(events);
 }

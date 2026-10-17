@@ -155,7 +155,7 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -15000, scoreDelta: { safety: 12 }, effectTag: 'climate_storage' },
       { cashDelta: 0, scoreDelta: { safety: -18 }, effectTag: 'ignore_sweating',
-        probability: 0.7, alt: { cashDelta: -50000, scoreDelta: { safety: -30 }, effectTag: 'accidental_detonation' } },
+        probability: 0.85, alt: { cashDelta: -30000, scoreDelta: { safety: -30 }, effectTag: 'accidental_detonation' } },
       { cashDelta: -5000, scoreDelta: { safety: 5 }, effectTag: 'replace_stock',
         effects: [
           { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_DISCOUNT_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
@@ -182,7 +182,7 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     weight: (s) => 0.4 + 0.3 * r.wb(s),
     canFire: (ctx) => ctx.weatherId === 'cloudy' || ctx.weatherId === 'sunny',
     options: [
-      { cashDelta: 5000, scoreDelta: { wellBeing: 8 }, effectTag: 'divine_marketing' },
+      { cashDelta: 5000, corruptionDelta: 3, scoreDelta: { wellBeing: 8 }, effectTag: 'divine_marketing' },
       { cashDelta: 0, scoreDelta: { wellBeing: -5 }, effectTag: 'omen_of_doom',
         effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -3000, scoreDelta: { wellBeing: 10, nuisance: -2 }, effectTag: 'cloud_merch' },
@@ -195,7 +195,7 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -12000, scoreDelta: { safety: 15 }, effectTag: 'grounding_system' },
       { cashDelta: 0, scoreDelta: { safety: -20 }, effectTag: 'static_ignored',
-        probability: 0.6, alt: { cashDelta: -40000, scoreDelta: { safety: -25 }, effectTag: 'static_detonation' } },
+        probability: 0.8, alt: { cashDelta: -20000, scoreDelta: { safety: -25 }, effectTag: 'static_detonation' } },
       { cashDelta: -5000, scoreDelta: { safety: 8 }, effectTag: 'antistatic_suits' },
     ],
   }),
