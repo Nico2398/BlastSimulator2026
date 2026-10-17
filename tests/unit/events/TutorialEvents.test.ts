@@ -7,6 +7,7 @@ import type { GameContext } from '../../../src/console/commands/world.js';
 import { eventCommand } from '../../../src/console/commands/events.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { getEventById, clearEvents } from '../../../src/core/events/EventPool.js';
+import { findDominatedPairs } from '../../../src/core/events/EventOptionBalance.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { resolveEvent } from '../../../src/core/events/EventResolver.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
@@ -135,17 +136,19 @@ describe('tutorial event definitions', () => {
     const ev = getEventById('tutorial_synergy_consultant')!;
     const con = ev.consequences[1]!;
 
-    expect(con.scoreDelta?.wellBeing).toBe(-10);
-    expect(con.scoreDelta?.safety).toBe(-5);
-    expect(con.cashDelta).toBeUndefined();
+    // Dismissing stays the unhappy-crew option; the balance pass (#1894) may add a perk so it is not dominated by option 2.
+    expect(con.scoreDelta?.wellBeing).toBeLessThan(0);
+    expect(con.scoreDelta?.safety).toBeLessThan(0);
+    expect(findDominatedPairs(ev).filter(p => p.loser === 1)).toEqual([]);
   });
 
   it('option 2 — Equity deal: well-being boost, safety penalty, no cash change', () => {
     const ev = getEventById('tutorial_synergy_consultant')!;
     const con = ev.consequences[2]!;
 
+    // Safety penalty is relational: it must cost more safety than dismissing, else it dominates option 1 (#1894).
     expect(con.scoreDelta?.wellBeing).toBe(5);
-    expect(con.scoreDelta?.safety).toBe(-5);
+    expect(con.scoreDelta?.safety).toBeLessThan(ev.consequences[1]!.scoreDelta!.safety!);
     expect(con.cashDelta).toBeUndefined();
   });
 
@@ -188,7 +191,7 @@ describe('tutorial event resolution', () => {
   it.each([
     [0, 'Hire consultant',  -3000, 97000, 65, 50, 50, 50],
     [1, 'Dismiss consultant',    0, 100000, 40, 45, 50, 50],
-    [2, 'Equity deal',           0, 100000, 55, 45, 50, 50],
+    [2, 'Equity deal',           0, 100000, 55, 42, 50, 50],
   ] as const)('option %i — %s', (
     optionIdx,
     _name,

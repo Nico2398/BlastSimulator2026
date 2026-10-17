@@ -51,7 +51,7 @@ export const POLITICS_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 0.6 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 20,
     options: [
-      { cashDelta: -40000, scoreDelta: { wellBeing: -5 }, effectTag: 'price_surge',
+      { cashDelta: -20000, scoreDelta: { wellBeing: -5 }, effectTag: 'price_surge',
         effects: [
           { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_SURCHARGE_PCT, days: EVENT_UPKEEP_SURCHARGE_DAYS },
         ] },
@@ -201,7 +201,7 @@ export const POLITICS_EVENTS_2: EventDef[] = [
   ev('politics_stock_bubble', 'politics', {
     weight: (s) => 0.7 + 0.5 * r.sf(s),
     options: [
-      { cashDelta: 50000, effectTag: 'ride_bubble', probability: 0.5,
+      { cashDelta: 55000, scoreDelta: { wellBeing: 2 }, effectTag: 'ride_bubble', probability: 0.5,
         alt: { cashDelta: -40000, effectTag: 'bubble_burst' } },
       { cashDelta: 10000, effectTag: 'cautious_invest' },
       { cashDelta: 0, scoreDelta: { wellBeing: 3 }, effectTag: 'ignore_market' },
