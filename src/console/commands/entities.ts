@@ -9,13 +9,9 @@ import {
   getDefSize,
   getMoveCost,
   getDemolishCost,
-  getUpgradeCost,
-  isPlacementBlockedByResearch,
-  checkFootprintPlacement,
   type BuildingType,
   type Building,
   type BuildingTier,
-  type FootprintOccupant,
   isSingleTierType,
 } from '../../core/entities/Building.js';
 import { warehouseStoredKg } from '../../core/economy/FreightWarehouses.js';
@@ -25,16 +21,17 @@ import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zo
 import { evacuateZone } from '../../core/engine/Evacuation.js';
 import { warehouseStockKg } from '../../core/entities/Building.js';
 import { queueDemolition, isDemolitionOrdered } from '../../core/engine/BuildingDemolition.js';
+import { isUpgradeOrdered } from '../../core/engine/BuildingUpgrade.js';
 import { findBuildingApproachCell } from '../../core/nav/BuildingApproach.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 
-import { requireGame, noEmployeesMessage, refusalText, buildingTypeName } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import {
   makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity,
   emitFootprintOccupancyChanged, relocateFootprintOccupants,
 } from './buildingHelpers.js';
-import { orderBuildingCommand } from './buildOrder.js';
+import { orderBuildingCommand, orderBuildingUpgrade } from './buildOrder.js';
 import { t } from '../../core/i18n/I18n.js';
 import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 
@@ -81,6 +78,9 @@ export function buildCommand(
       if (isDemolitionOrdered(state, id)) {
         return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
       }
+      if (isUpgradeOrdered(state, id)) {
+        return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
+      }
       const demolishCost = getDemolishCost(toDestroy);
       if (state.cash < demolishCost) {
         return {
@@ -93,7 +93,7 @@ export function buildCommand(
       }
       // The building stays standing and operating until a Building Destroyer
       // finishes the work (#1392); only the order is queued here.
-      queueDemolition(state, toDestroy, { cost: demolishCost, rebuildOrderId: null, ...demolitionSite(ctx, toDestroy) });
+      queueDemolition(state, toDestroy, { cost: demolishCost, ...demolitionSite(ctx, toDestroy) });
       state.cash -= demolishCost;
       addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       const lostKg = toDestroy.type === 'explosive_warehouse' ? warehouseStockKg(toDestroy) : 0;
@@ -113,65 +113,10 @@ export function buildCommand(
       if (isDemolitionOrdered(state, id)) {
         return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
       }
-      const nextTier = (toUpgrade.tier + 1) as BuildingTier;
-      if (isPlacementBlockedByResearch(state.buildings, toUpgrade.type, nextTier)) {
-        return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: buildingTypeName(toUpgrade.type) }) };
+      if (isUpgradeOrdered(state, id)) {
+        return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
       }
-      const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
-      const newDef = getBuildingDef(toUpgrade.type, nextTier);
-      const totalCost = getUpgradeCost(toUpgrade.type, nextTier);
-      if (state.cash < totalCost) {
-        return {
-          success: false,
-          output: t('console.insufficient_funds', {
-            need: formatMoney(totalCost),
-            have: formatMoney(state.cash),
-          }),
-        };
-      }
-      const { x, z, type: upgradeType } = toUpgrade;
-
-      // Validate the NEW tier's footprint at order time: the larger tier can
-      // run past the site bounds, overlap a neighbour or cover uneven ground
-      // (#1008). Occupants exclude this building itself, which the
-      // demolition clears before the rebuild; every other live building and
-      // reserved construction site still counts.
-      const upBounds = siteBounds(ctx);
-      const upgradeOccupants: FootprintOccupant[] = [
-        ...state.buildings.buildings.filter(b => b.id !== id).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
-        ...state.plannedBuildings.map(pb => ({ type: pb.type, tier: pb.tier, x: pb.x, z: pb.z })),
-      ];
-      const upgradeCheck = checkFootprintPlacement(
-        upgradeOccupants, upgradeType, x, z, nextTier,
-        upBounds.width, upBounds.depth, upBounds.originX, upBounds.originZ, ctx.grid ?? undefined,
-        terrainReservations(state),
-      );
-      if (!upgradeCheck.valid) {
-        return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(upgradeCheck) }) };
-      }
-
-      // Reserve the finished building under the SAME id: the planned site
-      // blocks the larger footprint from now, and its place_building action
-      // is dispatched when the demolition completes (#1392).
-      const { sizeX: newSizeX, sizeZ: newSizeZ } = getDefSize(newDef);
-      const { sizeX: oldSizeX, sizeZ: oldSizeZ } = getDefSize(oldDef);
-      const rebuildOrderId = state.nextPlannedBuildingId++;
-      state.plannedBuildings.push({
-        id: rebuildOrderId, buildingId: id, type: upgradeType, tier: nextTier, x, z,
-        actionId: state.nextPendingActionId++, cost: newDef.constructionCost, rebuild: true,
-      });
-      // Anyone standing on the larger new footprint is put off it now, as the
-      // old instant upgrade did.
-      if (ctx.grid) {
-        const maxX = Math.max(oldSizeX, newSizeX);
-        const maxZ = Math.max(oldSizeZ, newSizeZ);
-        emitFootprintOccupancyChanged(ctx, x, z, maxX, maxZ);
-        relocateFootprintOccupants(state, makeFootprintRegion(x, z, maxX, maxZ));
-      }
-      queueDemolition(state, toUpgrade, { cost: totalCost, rebuildOrderId, ...demolitionSite(ctx, toUpgrade) });
-      state.cash -= totalCost;
-      addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
-      return { success: true, output: t('entities.build_upgrade_ordered', { id }) };
+      return orderBuildingUpgrade(ctx, toUpgrade, (toUpgrade.tier + 1) as BuildingTier);
     }
     case 'move': {
       const id = parseInt(args[1] ?? '', 10);
@@ -181,6 +126,9 @@ export function buildCommand(
       }
       const building = state.buildings.buildings.find(b => b.id === id);
       if (!building) return { success: false, output: t('entities.building_not_found', { id }) };
+      if (isUpgradeOrdered(state, id)) {
+        return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
+      }
       const moveDef = getBuildingDef(building.type, building.tier);
       const { sizeX, sizeZ } = getDefSize(moveDef);
       const moveCost = getMoveCost(building);

@@ -14,12 +14,11 @@ export interface PlacedRowModel {
   hpFraction: number;
   hpText: string;
   utilization: { text: string; fraction: number | null } | null;
-  badge: 'out_of_service' | 'demolition_ordered' | 'rebuilding' | null;
+  badge: 'out_of_service' | 'demolition_ordered' | 'upgrading' | null;
 }
 
 export interface SiteRowModel {
   progress: number | null;
-  rebuild: boolean;
 }
 
 function kgUtilization(storedKg: number, capacity: number): NonNullable<PlacedRowModel['utilization']> {
@@ -50,7 +49,7 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
 export function placedRowModel(b: Building, state: RowModelState): PlacedRowModel {
   const maxHp = getBuildingDef(b.type, b.tier).maxHp;
   const kind = computeBuildingStatus(state, b.id)?.kind;
-  const badge = kind === 'out_of_service' || kind === 'demolition_ordered' || kind === 'rebuilding' ? kind : null;
+  const badge = kind === 'out_of_service' || kind === 'demolition_ordered' || kind === 'upgrading' ? kind : null;
   return {
     hpFraction: fractionOf(b.hp, maxHp),
     hpText: t('ui.build.row.hp', { hp: Math.round(b.hp), max: maxHp }),
@@ -61,5 +60,5 @@ export function placedRowModel(b: Building, state: RowModelState): PlacedRowMode
 
 export function siteRowModel(pb: PlannedBuilding, state: RowModelState): SiteRowModel {
   const status = computeBuildingStatus(state, pb.buildingId);
-  return { progress: status?.progress ?? null, rebuild: status?.kind === 'rebuilding' };
+  return { progress: status?.progress ?? null };
 }

@@ -7,8 +7,6 @@ export interface DemolishBuildingActionPayload {
   /** Ticks for a tier-1 destroyer; the live estimate rescales by the reserved vehicle's tier. */
   durationTicks: number;
   footprint: ReadonlyArray<readonly [number, number]>;
-  /** Place-building order to queue once the demolition finishes (upgrade/move), or null. */
-  rebuildOrderId: number | null;
 }
 
 /**
@@ -23,6 +21,5 @@ export function readDemolishPayload(payload: Readonly<Record<string, unknown>> |
     cost: typeof p['cost'] === 'number' ? p['cost'] : 0,
     durationTicks: typeof p['durationTicks'] === 'number' ? p['durationTicks'] : 1,
     footprint: Array.isArray(p['footprint']) ? p['footprint'] as DemolishBuildingActionPayload['footprint'] : [],
-    rebuildOrderId: typeof p['rebuildOrderId'] === 'number' ? p['rebuildOrderId'] : null,
   };
 }

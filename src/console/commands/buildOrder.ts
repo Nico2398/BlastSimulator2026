@@ -13,6 +13,8 @@ import {
   isSingleTierType,
   placeBuilding,
   isPlacementBlockedByResearch,
+  getUpgradeCost,
+  type Building,
   checkFootprintPlacement,
   type BuildingType,
   type BuildingTier,
@@ -68,10 +70,10 @@ function rescueStrandedApproachTargets(ctx: GameContext, state: GameState, justO
   }
 }
 
-/** Debit a building's construction cost from cash and book it as a construction expense. */
-function chargeConstruction(state: GameState, type: BuildingType, tier: BuildingTier, cost: number): void {
+/** Debit a construction cost from cash and book it as a construction expense. */
+function chargeConstruction(state: GameState, label: string, cost: number): void {
   state.cash -= cost;
-  addExpense(state.finances, cost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+  addExpense(state.finances, cost, 'construction', label, state.tickCount);
 }
 
 /**
@@ -130,7 +132,7 @@ export function orderBuildingCommand(
       state.buildings, type, x, z, bounds.width, bounds.depth, tier, bounds.originX, bounds.originZ, undefined, ctx.grid ?? undefined,
     );
     if (!placed.success) return { success: false, output: refusalText(placed) };
-    chargeConstruction(state, type, tier, def.constructionCost);
+    chargeConstruction(state, `Build ${type} T${tier}`, def.constructionCost);
     settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
     return {
       success: true,
@@ -138,17 +140,74 @@ export function orderBuildingCommand(
     };
   }
 
-  // Claim the order's own id and the finished building's id now, not when
-  // the site completes: sites are built in parallel and land in whatever
-  // order the crew reaches them, so numbering at completion would hand the
-  // player ids in an order they never chose (and make `build destroy 1`
-  // name a different building each run).
+  // Claim the finished building's id now, not when the site completes: sites
+  // are built in parallel and land in whatever order the crew reaches them, so
+  // numbering at completion would hand the player ids in an order they never
+  // chose (and make `build destroy 1` name a different building each run).
+  const refused = queueConstructionSite(ctx, { buildingId: state.buildings.nextId++, type, tier, x, z });
+  if (refused) return refused;
+
+  return {
+    success: true,
+    output: `${type} T${tier} ordered at (${x},${z}). Cost: $${def.constructionCost}`,
+  };
+}
+
+/**
+ * Order the next tier of a standing building to be raised in place (#1875):
+ * the same requirements as a new building of that tier (research, money,
+ * room for the footprint, a free worker) and no demolition. The building
+ * keeps its id, stock and residents, and keeps operating during the works.
+ * A refused order mutates nothing.
+ */
+export function orderBuildingUpgrade(ctx: GameContext, building: Building, nextTier: BuildingTier): CommandResult {
+  const state = ctx.state!;
+  const { type, id, x, z } = building;
+  if (isPlacementBlockedByResearch(state.buildings, type, nextTier)) {
+    return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: buildingTypeName(type) }) };
+  }
+  const cost = getUpgradeCost(type, nextTier);
+  if (state.cash < cost) {
+    return {
+      success: false,
+      output: t('console.insufficient_funds', { need: formatMoney(cost), have: formatMoney(state.cash) }),
+    };
+  }
+
+  // The larger footprint is validated at order time (#1008): it can run past
+  // the site bounds, overlap a neighbour or cover uneven ground. The building
+  // itself does not count as an occupant of its own cells.
+  const bounds = siteBounds(ctx);
+  const check = checkFootprintPlacement(
+    buildingFootprintOccupants(state).filter(o => o !== building), type, x, z, nextTier,
+    bounds.width, bounds.depth, bounds.originX, bounds.originZ, ctx.grid ?? undefined,
+    terrainReservations(state),
+  );
+  if (!check.valid) return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(check) }) };
+
+  const refused = queueConstructionSite(ctx, { buildingId: id, type, tier: nextTier, x, z, upgrade: true });
+  if (refused) return refused;
+  return { success: true, output: t('entities.build_upgrade_ordered', { id, tier: nextTier, cost }) };
+}
+
+/**
+ * Reserve a construction site, charge it and queue its `place_building`
+ * action. Shared by a new building and an in-place upgrade. Returns the
+ * refusal when no builder could ever reach the site (nothing is charged or
+ * left reserved), null once queued.
+ */
+function queueConstructionSite(
+  ctx: GameContext,
+  planned: Pick<PlannedBuilding, 'buildingId' | 'type' | 'tier' | 'x' | 'z' | 'upgrade'>,
+): CommandResult | null {
+  const state = ctx.state!;
+  const { type, tier, x, z } = planned;
+  const def = getBuildingDef(type, tier);
+  const { sizeX: footprintX, sizeZ: footprintZ } = getDefSize(def);
+  // The order's own id is claimed now too, for the same ordering reason.
   const buildingOrderId = state.nextPlannedBuildingId++;
   const actionId = state.nextPendingActionId++;
-  const plannedBuilding: PlannedBuilding = {
-    id: buildingOrderId, buildingId: state.buildings.nextId++,
-    type, tier, x, z, actionId, cost: def.constructionCost,
-  };
+  const plannedBuilding: PlannedBuilding = { ...planned, id: buildingOrderId, actionId, cost: def.constructionCost };
 
   // The footprint blocks routing from the instant it is ordered (#1200),
   // synchronously — before any tick runs, and before the approach-ring
@@ -170,11 +229,17 @@ export function orderBuildingCommand(
   const approach = ctx.grid ? findBuildingApproachCell(state.navGrid, { x, z }, def, x, z) : { x, z };
   if (state.navGrid && !isOnBuildingRing({ x, z }, def, approach.x, approach.z)) {
     state.plannedBuildings.pop();
+    state.nextPlannedBuildingId--;
+    state.nextPendingActionId--;
     emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
     return { success: false, output: t('entities.build_no_approach') };
   }
 
-  chargeConstruction(state, type, tier, def.constructionCost);
+  chargeConstruction(
+    state,
+    planned.upgrade === true ? `Upgrade ${type} #${planned.buildingId} to T${tier}` : `Build ${type} T${tier}`,
+    def.constructionCost,
+  );
 
   // Anyone caught standing on the new footprint is relocated off it.
   relocateFootprintOccupants(state, makeFootprintRegion(x, z, footprintX, footprintZ));
@@ -197,8 +262,5 @@ export function orderBuildingCommand(
     actionId, buildingOrderId, tier, cost: def.constructionCost, footprint: def.footprint, approach, targetY,
   });
 
-  return {
-    success: true,
-    output: `${type} T${tier} ordered at (${x},${z}). Cost: $${def.constructionCost}`,
-  };
+  return null;
 }

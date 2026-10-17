@@ -231,9 +231,9 @@ export class BuildMenu extends PanelBase {
     }
   }
 
-  /** Rebuild the site rows when the planned set (or a site turning into a rebuild) changed. */
+  /** Rebuild the site rows when the set of new-construction sites changed (an upgrade shows on its placed row). */
   private syncSites(state: GameState, models: ReadonlyMap<number, SiteRowModel>): void {
-    const sig = siteSignature(state.plannedBuildings, (pb) => models.get(pb.buildingId)?.rebuild ?? false);
+    const sig = siteSignature(state.plannedBuildings.filter((pb) => pb.upgrade !== true));
     if (sig === this.lastSiteSignature) return;
     this.lastSiteSignature = sig;
     this.refreshSiteList(models);
@@ -242,7 +242,7 @@ export class BuildMenu extends PanelBase {
   /** Rebuild the site rows; without `models` they are computed from the last observed state. */
   private refreshSiteList(models?: ReadonlyMap<number, SiteRowModel>): void {
     const state = this.lastState;
-    const sites = state?.plannedBuildings ?? [];
+    const sites = (state?.plannedBuildings ?? []).filter((pb) => pb.upgrade !== true);
     this.siteWrapEl.style.display = state && sites.length > 0 ? 'flex' : 'none';
     this.siteEl.replaceChildren(...(state ? sites : []).map((pb) =>
       makeSiteRow(pb, models?.get(pb.buildingId) ?? siteRowModel(pb, state!), () => this.selectBuildingCb?.(pb.buildingId))));

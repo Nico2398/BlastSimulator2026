@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Serialization / deserialization
 // Pure functions: GameState ↔ JSON string.
 
+import { cancelLegacyUpgradeOrders } from './LegacyUpgradeOrders.js';
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { createTaxAuditState } from '../events/TaxAudit.js';
@@ -979,6 +980,8 @@ export function deserialize(json: string): GameState {
   const restored = obj as unknown as GameState;
   // Capacity is derived from the warehouses, never trusted from the save (#1369).
   syncLogisticsCapacity(restored.logistics, getStorageCapacity(restored.buildings));
+  // Upgrades ordered before in-place upgrades existed (demolish + rebuild) are cancelled and refunded (#1875).
+  cancelLegacyUpgradeOrders(restored);
   // Older saves keep sold-out rock in storage; it becomes spoil on load (#1690).
   releaseBarrenStoredFragments(restored.logistics, restored.collectedOre, restored.buildings.buildings);
   return restored;
