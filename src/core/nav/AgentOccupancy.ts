@@ -8,13 +8,12 @@
 // One ground cell holds at most one occupant. `AgentOccupancy` is the single
 // index of that relationship: cell -> occupant and occupant -> cell, kept in
 // step with each other so both directions are O(1) rather than a scan over
-// every employee/vehicle. Built once per tick batch (`rebuildAgentOccupancy`)
-// and reconciled incrementally as movement resolves (`reconcileAgentOccupancy`:
-// releases holders that no longer exist, registers agents not yet held, so the
-// live map holds what a rebuild from the same state would — save/load safe)
-// — never rebuilt from scratch per tick, which would make its cost scale with
-// total agent count on every single step instead of with the moves actually
-// made this tick.
+// every employee/vehicle. Built lazily, once (`rebuildAgentOccupancy`), then
+// reconciled each tick (`reconcileAgentOccupancy`): a liveness sweep releases
+// holders that no longer exist and a registration sweep registers agents not
+// yet held, so the live map holds what a rebuild from the same state would —
+// save/load safe. Reconcile is therefore linear in agent count per tick; only
+// the full rebuild is one-shot, never repeated per tick.
 
 import type { GameState } from '../state/GameState.js';
 import { isOccupyingHost } from '../entities/EmployeeLocomotion.js';

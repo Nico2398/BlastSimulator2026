@@ -513,6 +513,36 @@ describe('classifyQueuedOrders (#1306)', () => {
   });
 });
 
+describe('classifyQueuedOrders debris rotation cursor (#1869)', () => {
+  function debrisState(count: number): GameState {
+    const state = makeState();
+    for (let i = 0; i < count; i++) {
+      queue(state, 'haul_debris', IN_A_TARGET, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: i + 1 } });
+    }
+    return state;
+  }
+
+  it('persists the rotation across calls through the state field', () => {
+    const state = debrisState(5);
+    classifyQueuedOrders(state, 2);
+    expect(state.debrisClassifyCursor).toBe(2);
+    classifyQueuedOrders(state, 2);
+    expect(state.debrisClassifyCursor).toBe(4);
+    classifyQueuedOrders(state, 2); // 4 % 5 -> 4, wraps past the end
+    expect(state.debrisClassifyCursor).toBe(6);
+    classifyQueuedOrders(state, 2); // 6 % 5 -> 1
+    expect(state.debrisClassifyCursor).toBe(3);
+  });
+
+  it.each([-3, 1.5, NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 10])('a tampered cursor %s falls back to 0 without undefined entries', (bad) => {
+    const state = debrisState(5);
+    state.debrisClassifyCursor = bad;
+    expect(() => classifyQueuedOrders(state, 2)).not.toThrow();
+    expect(state.debrisClassifyCursor).toBe(2);
+    expect(Number.isSafeInteger(state.debrisClassifyCursor)).toBe(true);
+  });
+});
+
 describe('classifyNewOrder (#1306)', () => {
   it('colours the ghost of one action without waiting for a tick', () => {
     const state = makeState();

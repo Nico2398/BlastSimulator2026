@@ -367,7 +367,9 @@ function sliceDebris(state: GameState, queued: PendingAction[], perCall: number)
   const out: PendingAction[] = [];
   for (const action of queued) (isAutoDebrisAction(action.type) ? debris : out).push(action);
   if (debris.length <= perCall) return queued;
-  const start = (state.debrisClassifyCursor ?? 0) % debris.length;
+  // A save is untrusted input: anything but a safe non-negative integer restarts the rotation.
+  const saved = state.debrisClassifyCursor;
+  const start = (Number.isSafeInteger(saved) && saved! >= 0 ? saved! : 0) % debris.length;
   for (let k = 0; k < perCall; k++) out.push(debris[(start + k) % debris.length]!);
   state.debrisClassifyCursor = start + perCall;
   return out;

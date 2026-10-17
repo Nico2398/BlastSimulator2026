@@ -48,7 +48,8 @@ function admitOccupant(host: OccupancyHost, capacity: number, employee: Employee
 /**
  * The one release step every host shares: removes `employeeId` from `host`'s
  * occupants and, when the employee still exists, stands them on foot at
- * (x, z) with no journey in flight.
+ * (x, z) with no journey in flight. It also claims that ground cell in the
+ * agent occupancy map.
  */
 function releaseOccupant(state: GameState, host: OccupancyHost | undefined, employeeId: number, employee: Employee | undefined, x: number, z: number): void {
   if (host) host.occupantIds = host.occupantIds.filter(id => id !== employeeId);
