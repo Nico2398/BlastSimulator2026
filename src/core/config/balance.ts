@@ -1638,12 +1638,13 @@ const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
 /**
  * Free starting kit per sandbox difficulty (#1671): every difficulty can drill,
  * charge, fire, haul and sell its first blast with no purchases. Hard is the
- * Dusty Hollow kit; normal adds a rock digger (a ramp into the crater) and its
- * excavator-licensed driver; easy adds a rock fragmenter and its licensed
- * driver. Each kit is a superset of the smaller one.
+ * digger kit (a rock digger, a ramp into the crater, and its dedicated
+ * excavator-licensed driver, #1874), shared with normal: the two differ by
+ * opening cash only, so hard can always ramp into the crater. Easy adds a
+ * rock fragmenter and its licensed driver to that kit.
  */
 export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, StartingSiteComposition>> = {
-  hard: DUSTY_HOLLOW_STARTING_SITE,
+  hard: DIGGER_STARTING_SITE,
   normal: DIGGER_STARTING_SITE,
   easy: {
     employees: [...BASE_STARTING_EMPLOYEES, DIGGER_KIT_DRIVER, SANDBOX_KIT_FRAGMENTER_DRIVER],
@@ -1661,16 +1662,17 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxDifficultyId, Starti
  * at (30,48), then one 3x3 Krackle 8 kg pattern (spacing 4, depth 8, start
  * 36,32), charge, clear zone, blast (~t562), haul, sell. Payroll and upkeep
  * drain cash until the first sale, whose low point is linear in the start:
- * normal bottoms at (start - 181.5k), hard at (start - 147.5k), so the
- * minimum positive-cash start is ~181.6k normal / ~147.6k hard (normal 170k
- * fails with a -11.5k low, 185k passes). Chosen with ~15% margin: 210k / 170k.
+ * the shared normal/hard kit (#1874) bottoms at (start - 181.5k), so the
+ * minimum positive-cash start is ~181.6k (170k fails with a -11.5k low, 185k
+ * passes). Normal keeps ~15% margin at 210k; hard takes ~7% at 195k and stays
+ * cheaper than normal through lower cash only.
  * Easy keeps 250k (low $36.9k, cash 681,127 at t2000) and stays strictly
  * above normal. The old 150k / 120k went bankrupt at ~t609 / ~t582.
  */
 export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxDifficultyId, number>> = {
   easy: 250_000,
   normal: 210_000,
-  hard: 170_000,
+  hard: 195_000,
 };
 
 /**

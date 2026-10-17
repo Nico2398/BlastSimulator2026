@@ -304,6 +304,8 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
   const HORIZON = 2000;
   const BUILD = 'living_quarters at:30,48 tier:1';
   const SHOT_START = '36,32';
+  /** The ramp Hard's kit digger carves into the first crater (#1874); same line as the solvent-sandbox test. */
+  const HARD_RAMP = 'start:12,34 end:34,34 depth:6';
   /**
    * Easy's cash at tick 2000 on the scripted opening: today's run, #1747.
    * Measured on current main behaviour (seed 42, desert_badlands).
@@ -319,13 +321,16 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     brokeBeforeSaleAtTick: number | null;
     commands: string[];
     buildOk: boolean;
+    /** Whether the optional ramp command succeeded; null when none was ordered. */
+    rampOk: boolean | null;
   }
 
   /** The scripted standard opening: living quarters (tier 1), one 3x3 shot on the deposit, then sell to the horizon. */
-  function playOpening(difficulty: string): OpeningTrace {
+  function playOpening(difficulty: string, ramp?: string): OpeningTrace {
+    let rampOk: boolean | null = null;
     const trace: OpeningTrace = {
       endedAtTick: null, endReason: '', cashAtFirstBlast: null, cashAtHorizon: 0,
-      brokeBeforeSaleAtTick: null, commands: [], buildOk: false,
+      brokeBeforeSaleAtTick: null, commands: [], buildOk: false, rampOk: null,
     };
     const saleDone = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
     const { state, commands, logged, over, playUntil } = startPlayLoop(difficulty, HORIZON, (elapsed) => {
@@ -347,9 +352,11 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     if (!over()) {
       trace.cashAtFirstBlast = state.cash;
       expect(logged('blast').success).toBe(true);
+      if (ramp) rampOk = logged(`build_ramp ${ramp}`).success;
     }
     playUntil(HORIZON, () => false);
     trace.cashAtHorizon = state.cash;
+    trace.rampOk = rampOk;
     return trace;
   }
 
@@ -366,6 +373,25 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     expect(t.cashAtHorizon, `cash at first blast ${t.cashAtFirstBlast} vs tick ${HORIZON} ${t.cashAtHorizon}`).toBeGreaterThan(t.cashAtFirstBlast!);
     expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
+
+  it('hard: the kit digger carves the ramp, and the opening stays solvent and ends richer than at the first blast (#1874)', () => {
+    const t = playOpening('hard', HARD_RAMP);
+    expect(t.rampOk, 'build_ramp accepted with the kit digger').toBe(true);
+    expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
+    expect(t.brokeBeforeSaleAtTick, 'cash hit zero before the first ore sale completed').toBeNull();
+    expect(t.cashAtFirstBlast).not.toBeNull();
+    expect(t.cashAtHorizon).toBeGreaterThan(t.cashAtFirstBlast!);
+    expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 600_000);
+
+  it('hard: the opening kit holds a rock digger and an excavator-licensed driver at game start (#1874)', () => {
+    const { ctx } = startSandbox(DESERT, 42, 'hard');
+    const state = ctx.state!;
+    const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');
+    expect(digger, 'a rock digger in the kit').toBeDefined();
+    const driver = state.employees.employees.find(e => e.qualifications.some(q => q.category === 'driving.excavator'));
+    expect(driver, 'an excavator-licensed employee').toBeDefined();
+  });
 
   it('easy: the same opening ends at least at the pinned cash (today\'s run, #1747)', () => {
     const t = playOpening('easy');

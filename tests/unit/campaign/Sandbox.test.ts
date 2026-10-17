@@ -18,9 +18,10 @@ import {
   type SandboxConfig,
   type SandboxDifficultyId,
 } from '../../../src/core/campaign/Sandbox.js';
+import { getLevel } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
@@ -36,7 +37,7 @@ describe('SANDBOX_DIFFICULTIES', () => {
   it('maps each named difficulty to its documented starting cash', () => {
     expect(SANDBOX_DIFFICULTIES.easy.startingCash).toBe(250_000);
     expect(SANDBOX_DIFFICULTIES.normal.startingCash).toBe(210_000);
-    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(170_000);
+    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(195_000);
   });
 
   it('carries the difficulty id and order consistently', () => {
@@ -219,7 +220,7 @@ describe('sandboxLevelDef', () => {
 
     // startingSite is the one other field allowed to differ (#1671); every other key is shared.
     expect(levels.easy.startingSite).not.toEqual(levels.normal.startingSite);
-    expect(levels.normal.startingSite).not.toEqual(levels.hard.startingSite);
+    expect(levels.easy.startingSite).not.toEqual(levels.hard.startingSite);
     // Cash presets must actually differ, or the "varies only cash" claim is vacuous.
     expect(levels.easy.startingCash).not.toBe(levels.normal.startingCash);
     expect(levels.normal.startingCash).not.toBe(levels.hard.startingCash);
@@ -393,10 +394,34 @@ describe('sandbox starting site per difficulty (#1671)', () => {
     expect(slotKeys('normal').length).toBeLessThanOrEqual(slotKeys('easy').length);
   });
 
-  it('keeps cash at 250k / 210k / 170k alongside the kit', () => {
+  it('keeps cash at 250k / 210k / 195k alongside the kit', () => {
     expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'easy' })).startingCash).toBe(250_000);
     expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'normal' })).startingCash).toBe(210_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(170_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(195_000);
+  });
+
+  it('hard kit includes a rock digger and a driver holding driving.excavator (#1874)', () => {
+    expect(siteOf('hard')!.vehicles.some(v => v.role === 'rock_digger' && v.tier === 1)).toBe(true);
+    expect(skillsOf('hard').has('driving.excavator')).toBe(true);
+  });
+
+  it('hard kit has the same composition as the Normal digger kit (#1874)', () => {
+    expect(slotKeys('hard').sort()).toEqual(slotKeys('normal').sort());
+  });
+
+  it('hard cash is 195k, below normal and above the old 170k (#1874)', () => {
+    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(195_000);
+    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBeLessThan(SANDBOX_DIFFICULTIES.normal.startingCash);
+    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBeGreaterThan(170_000);
+  });
+
+  it('hard no longer shares the Dusty Hollow site, and Dusty Hollow keeps its own start (#1874)', () => {
+    expect(siteOf('hard')).not.toEqual(DUSTY_HOLLOW_STARTING_SITE);
+    expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.some(v => v.role === 'rock_digger')).toBe(false);
+    expect(DUSTY_HOLLOW_STARTING_SITE.employees.some(e => e.qualifications.some(q => q.category === 'driving.excavator'))).toBe(false);
+    const level = getLevel('dusty_hollow')!;
+    expect(level.startingSite).toBe(DUSTY_HOLLOW_STARTING_SITE);
+    expect(level.startingCash).toBe(50_000);
   });
 
   it('a hostile difficulty falls back to the default difficulty kit', () => {
