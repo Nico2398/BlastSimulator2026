@@ -546,6 +546,18 @@ describe('barren rock yields to ore hauls (#1870): small site', () => {
   });
 });
 
+/**
+ * Fragments by id, first occurrence winning, exactly as the game's own lookup resolves an order's fragment
+ * (HaulDispatch createFragmentLookup). Fragment ids restart at 0 with every blast, so a second shot's
+ * fragments share ids with the first shot's still on the ground; a last-wins Map would classify an order
+ * by a different fragment than the one the game ranked it by.
+ */
+function firstFragmentById<T extends { fragment: { id: number } }>(fragments: readonly T[]): Map<number, T> {
+  const byId = new Map<number, T>();
+  for (const t of fragments) if (!byId.has(t.fragment.id)) byId.set(t.fragment.id, t);
+  return byId;
+}
+
 describe('barren rock yields to ore hauls (#1870): second shot beside the first', () => {
   const BUILD = 'living_quarters at:30,48 tier:1';
   const FIRST_SHOT = '36,32';
@@ -579,7 +591,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     const storedSeen = new Set<number>();
 
     const openOreHauls = () => {
-      const byId = new Map(state.logistics.fragments.map(t => [t.fragment.id, t]));
+      const byId = firstFragmentById(state.logistics.fragments);
       return state.pendingActions.filter(a => {
         if (a.type !== 'haul_debris' || a.status !== 'queued' || a.holderId !== null || a.blockedReason != null) return false;
         const t = byId.get(a.payload['fragmentId'] as number);
@@ -604,7 +616,7 @@ describe('barren rock yields to ore hauls (#1870): second shot beside the first'
     };
     const observe = () => {
       if (!tracking.on) return;
-      const byId = new Map(state.logistics.fragments.map(t => [t.fragment.id, t]));
+      const byId = firstFragmentById(state.logistics.fragments);
       for (const t of state.logistics.fragments) {
         if (t.state === 'in_transit' && !carried.has(t.fragment.id)) carried.set(t.fragment.id, { kg: t.fragment.mass, barren: isBarrenFragment(t.fragment.oreDensities) });
         if (t.state === 'stored' && !storedSeen.has(t.fragment.id) && !isBarrenFragment(t.fragment.oreDensities)) {
@@ -727,7 +739,8 @@ describe('a full spoil heap stops barren hauls until a rubble contract clears it
     expect(totalSpoilRoomKg(state.buildings.buildings)).toBe(10_000);
     expect(haulBlockedReason(state, orderFor(state, 9704))).toBeNull();
     run('tick 1');
-    expect(orderFor(state, 9704)?.blockedReason).toBeUndefined();
+    // The reachability pass writes null (not undefined) once an order is no longer blocked.
+    expect(orderFor(state, 9704)?.blockedReason ?? null).toBeNull();
   });
 
   it('hauls resume: once cleared, a hauler carries the barren rock onto the heap', () => {

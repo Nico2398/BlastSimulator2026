@@ -297,7 +297,9 @@ describe('Economy', () => {
       expect(c.quantityKg).toBeGreaterThan(0);
       expect(c.pricePerKg).toBeGreaterThan(0);
       expect(c.deadlineTicks).toBeGreaterThan(0);
-      expect(c.penaltyAmount).toBeGreaterThan(0);
+      // Rubble is never fined (#1892); ore contracts are.
+      if (c.type === 'rubble_disposal') expect(c.penaltyAmount).toBe(0);
+      else expect(c.penaltyAmount).toBeGreaterThan(0);
       expect(c.completed).toBe(false);
       expect(c.expired).toBe(false);
       expect(['ore_sale', 'rubble_disposal', 'supply']).toContain(c.type);

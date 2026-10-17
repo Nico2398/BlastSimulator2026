@@ -266,9 +266,7 @@ export class ContractsPanel extends PanelBase {
     progressLine.style.cssText = 'display:flex;gap:12px;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-secondary)';
     progressLine.append(
       el('span', { text: t('ui.contracts.delivered_line', { delivered: wholeKg(c.deliveredKg), total: wholeKg(c.quantityKg) }) }),
-      isPaidClearance(c)
-        ? el('span', { text: `-$${formatMoney(c.quantityKg * c.pricePerKg)}`, attrs: { style: 'color:var(--bsx-critical-text)' } })
-        : el('span', { text: `+$${formatMoney(c.quantityKg * c.pricePerKg)}`, attrs: { style: 'color:var(--bsx-positive)' } }),
+      this.activeMoneyLabel(c),
     );
     if (c.type !== 'rubble_disposal') {
       progressLine.append(el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' } }));
@@ -322,6 +320,17 @@ export class ContractsPanel extends PanelBase {
     cardEl.dataset['contractType'] = c.type;
     cardEl.dataset['contractMaterial'] = c.materialId;
     return cardEl;
+  }
+
+  /** Money figure on an active card: rubble says Costs/Pays (#1892), other contracts a signed amount. */
+  private activeMoneyLabel(c: Contract): HTMLElement {
+    const total = formatMoney(c.quantityKg * c.pricePerKg);
+    const paid = isPaidClearance(c);
+    const style = `color:var(${paid ? '--bsx-critical-text' : '--bsx-positive'})`;
+    if (c.type === 'rubble_disposal') {
+      return el('span', { text: t(paid ? 'ui.contracts.rubble_costs' : 'ui.contracts.rubble_pays', { amount: total }), attrs: { style } });
+    }
+    return el('span', { text: `+$${total}`, attrs: { style } });
   }
 
   // ── Offered ──

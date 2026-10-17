@@ -211,7 +211,8 @@ describe('earlyBonus follows price (#1366)', () => {
         negotiateContract(state, c.id, rep, rng, 1);
         if (c.pricePerKg !== origPrice) {
           priceChanges++;
-          expect(c.earlyBonus).toBe(computeEarlyBonus(c.quantityKg, c.pricePerKg));
+          // A paid clearance (#1892) has no early bonus to follow its fee.
+          expect(c.earlyBonus).toBe(c.playerPays ? 0 : computeEarlyBonus(c.quantityKg, c.pricePerKg));
         }
       }
       expect(priceChanges).toBeGreaterThan(0);

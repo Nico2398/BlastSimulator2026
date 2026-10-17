@@ -519,7 +519,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
     putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 200 };
 
     const heapOnly = consumeStoredOre(state, collectedOre, '', 150, [heap]);
     expect(heapOnly.success).toBe(true);
@@ -540,7 +540,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
     putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 200 };
 
     const result = consumeStoredOre(state, collectedOre, '', 500, [heap]);
 
@@ -559,7 +559,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
     putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
     const collectedOre: Record<string, number> = { oreE: 100 };
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 200 };
 
     const result = consumeStoredOre(state, collectedOre, '', 501, [heap]);
 
@@ -1176,8 +1176,8 @@ describe('extractOreFromFragment (#1371)', () => {
 
 // ── barren leftover leaves storage as spoil (#1690) ──────────────────────────
 
-type HeapStub = { type: 'spoil_heap'; storedSpoilKg: number };
-const heapStub = (kg = 0): HeapStub => ({ type: 'spoil_heap', storedSpoilKg: kg });
+type HeapStub = { type: 'spoil_heap'; tier: 1; storedSpoilKg: number };
+const heapStub = (kg = 0): HeapStub => ({ type: 'spoil_heap', tier: 1, storedSpoilKg: kg });
 
 /** Fragment 1: 1000 kg, 400 kg of oreA (density 0.5) -> selling it all leaves 500 kg barren rock. */
 function singleOreStorage(): { state: LogisticsState; collectedOre: Record<string, number> } {

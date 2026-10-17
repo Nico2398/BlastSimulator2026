@@ -64,7 +64,9 @@ describe('Contract system', () => {
       expect(c.quantityKg).toBeGreaterThan(0);
       expect(c.pricePerKg).toBeGreaterThan(0);
       expect(c.deadlineTicks).toBeGreaterThan(0);
-      expect(c.penaltyAmount).toBeGreaterThan(0);
+      // Rubble is never fined (#1892); ore contracts are.
+      if (c.type === 'rubble_disposal') expect(c.penaltyAmount).toBe(0);
+      else expect(c.penaltyAmount).toBeGreaterThan(0);
       expect(['ore_sale', 'rubble_disposal', 'supply']).toContain(c.type);
     }
   });
@@ -91,7 +93,8 @@ describe('Contract system', () => {
         expect(scaled.type).toBe(base.type);
         expect(scaled.materialId).toBe(base.materialId);
         expect(scaled.quantityKg).toBe(base.quantityKg);
-        expect(scaled.pricePerKg).toBeCloseTo(base.pricePerKg * 1.5, 6);
+        // A paid clearance's fee is what the player pays, not what the market pays: the lever leaves it alone (#1892).
+        expect(scaled.pricePerKg).toBeCloseTo(base.playerPays ? base.pricePerKg : base.pricePerKg * 1.5, 6);
       }
     });
 
@@ -112,8 +115,8 @@ describe('Contract system', () => {
         // market rate, and a 16x fine on one unfillable contract would end the
         // level the tutorial exists to teach.
         expect(scaled.penaltyAmount).toBe(base.penaltyAmount);
-        // The bonus rides on the price, so it does scale.
-        expect(scaled.earlyBonus).toBe(Math.round(base.quantityKg * base.pricePerKg * 16 * 0.15));
+        // The bonus rides on the price, so it does scale. A paid clearance has no bonus (#1892).
+        expect(scaled.earlyBonus).toBe(base.playerPays ? 0 : Math.round(base.quantityKg * base.pricePerKg * 16 * 0.15));
       }
     });
 
@@ -125,7 +128,8 @@ describe('Contract system', () => {
       generateContracts(discounted, new Random(42), 0, 0.85, ALL_ORES, Infinity);
 
       for (let i = 0; i < baseline.available.length; i++) {
-        expect(discounted.available[i]!.pricePerKg).toBeCloseTo(baseline.available[i]!.pricePerKg * 0.85, 6);
+        const base = baseline.available[i]!;
+        expect(discounted.available[i]!.pricePerKg).toBeCloseTo(base.playerPays ? base.pricePerKg : base.pricePerKg * 0.85, 6);
       }
     });
   });
@@ -197,7 +201,8 @@ describe('Contract system', () => {
     const rng = new Random(42);
     generateContracts(state, rng, 0, 1, ALL_ORES, Infinity);
 
-    const contract = state.available[0]!;
+    // Rubble is never fined (#1892), so the fined offer is an ore contract.
+    const contract = state.available.find(c => c.type !== 'rubble_disposal')!;
     const deadline = contract.deadlineTicks;
     acceptContract(state, contract.id, 0);
 
@@ -1157,12 +1162,12 @@ describe('rubble offers are sized to the barren stock (#1892)', () => {
     expect(state.available.filter(c => c.type === 'rubble_disposal')).toEqual([]);
   });
 
-  it('zero stock with no ores still generates a full refresh without throwing', () => {
+  it('zero stock with no ores offers nothing, without throwing', () => {
     const state = createContractState();
     state.market = 'production';
     expect(() => generateContracts(state, new Random(3), 0, 1, [], 0)).not.toThrow();
-    expect(state.available.length).toBeGreaterThan(0);
-    expect(state.available.every(c => c.type !== 'rubble_disposal')).toBe(true);
+    // A site with no ore to sell and no barren rock to clear has nothing fillable to offer.
+    expect(state.available).toEqual([]);
   });
 
   it('the legacy market sizes against stock too', () => {
@@ -1179,7 +1184,7 @@ describe('rubble offers are sized to the barren stock (#1892)', () => {
       const state = createContractState();
       state.market = 'production';
       const c = offerSpecialContract(state, new Random(seed), 1, ALL_ORES, 0);
-      expect(c.type === 'rubble_disposal').toBe(false);
+      expect(c?.type === 'rubble_disposal').toBe(false);
     }
   });
 });

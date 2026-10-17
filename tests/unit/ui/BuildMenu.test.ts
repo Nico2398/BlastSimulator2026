@@ -1677,10 +1677,12 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
       expect(util!.textContent).toContain(String(getBuildingDef('living_quarters', 1).capacity));
     });
 
-    it('a spoil heap shows no utilization text', () => {
-      menu.update(stateWith([makeBuilding({ id: 4, type: 'spoil_heap', tier: 1 })]));
+    it('a spoil heap shows its fill against the finite capacity (#1892)', () => {
+      menu.update(stateWith([makeBuilding({ id: 4, type: 'spoil_heap', tier: 1, storedSpoilKg: 1000 })]));
       const util = findPlacedRow(container, 4).querySelector<HTMLElement>('[data-live="util"]');
-      expect(util).toBeNull();
+      expect(util).not.toBeNull();
+      expect(util!.textContent).toContain('1000');
+      expect(util!.textContent).toContain(String(getBuildingDef('spoil_heap', 1).capacity));
     });
   });
 

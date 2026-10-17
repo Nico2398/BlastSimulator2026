@@ -95,9 +95,13 @@ describe('placedRowModel — utilization (#1759)', () => {
     expect(busy!.text).not.toBe(idle?.text);
   });
 
-  it('spoil heap has no utilization', () => {
-    const b = mk({ id: 1, type: 'spoil_heap' });
-    expect(placedRowModel(b, stateWith(b)).utilization).toBeNull();
+  it('spoil heap shows its fill against the finite capacity (#1892)', () => {
+    const b = mk({ id: 1, type: 'spoil_heap', storedSpoilKg: 25_000 });
+    const u = placedRowModel(b, stateWith(b)).utilization;
+    expect(u).not.toBeNull();
+    expect(u!.text).toContain('25000');
+    expect(u!.text).toContain('50000');
+    expect(u!.fraction).toBeCloseTo(0.5);
   });
 });
 

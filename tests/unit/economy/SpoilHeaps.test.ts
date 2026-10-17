@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD, SPOIL_HEAP_CAPACITY_KG } from '../../../src/core/config/balance.js';
 import {
-  creditFirstSpoilHeap, creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
+  creditSpoilHeaps, creditSpoilKg, spoilHeapRoomKg, totalSpoilRoomKg, drawSpoilKg, barrenStoredMassKg, haulDestinationOf, isBarrenFragment, rubbleStockKg, stateRubbleStockKg, totalSpoilKg,
 } from '../../../src/core/economy/SpoilHeaps.js';
 import { addBlastFragments, createLogisticsState, deliverToSpoilHeap } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
@@ -115,11 +115,11 @@ describe('spoilHeapSites', () => {
     return state;
   }
 
-  it('lists an active spoil heap with effectively unbounded capacity', () => {
+  it('lists an active spoil heap with the finite heap capacity (#1892)', () => {
     const sites = spoilHeapSites(stateWithHeap());
     expect(sites).toHaveLength(1);
     expect(sites[0]).toMatchObject({ x: 10, z: 12 });
-    expect(sites[0]!.capacityKg).toBeGreaterThan(1e9);
+    expect(sites[0]!.capacityKg).toBe(SPOIL_HEAP_CAPACITY_KG);
   });
 
   it('omits inactive heaps', () => {
@@ -294,35 +294,33 @@ describe('deliverToSpoilHeap', () => {
   });
 });
 
-describe('creditFirstSpoilHeap (#1690)', () => {
-  const heap = (kg?: number): Pick<Building, 'type' | 'storedSpoilKg'> =>
-    kg === undefined ? { type: 'spoil_heap' } : { type: 'spoil_heap', storedSpoilKg: kg };
-  const other = () => ({ type: 'freight_warehouse' as const }) as Pick<Building, 'type' | 'storedSpoilKg'>;
+describe('creditSpoilHeaps (#1690 coverage, ported from creditFirstSpoilHeap)', () => {
+  const other = () => ({ type: 'freight_warehouse' as const, tier: 1 }) as Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>;
 
   it('credits the first heap in building order and returns true', () => {
-    const [a, b] = [heap(10), heap(20)];
-    expect(creditFirstSpoilHeap([other(), a, b], 500)).toBe(true);
+    const [a, b] = [pile(10), pile(20)];
+    expect(creditSpoilHeaps([other(), a, b], 500)).toBe(true);
     expect(a.storedSpoilKg).toBe(510);
     expect(b.storedSpoilKg).toBe(20);
   });
 
   it('treats an unset storedSpoilKg as zero', () => {
-    const a = heap(undefined);
-    expect(creditFirstSpoilHeap([a], 75)).toBe(true);
+    const a = pile(undefined);
+    expect(creditSpoilHeaps([a], 75)).toBe(true);
     expect(a.storedSpoilKg).toBe(75);
   });
 
   it('crediting zero kg succeeds and leaves the heap unchanged (boundary)', () => {
-    const a = heap(30);
-    expect(creditFirstSpoilHeap([a], 0)).toBe(true);
+    const a = pile(30);
+    expect(creditSpoilHeaps([a], 0)).toBe(true);
     expect(a.storedSpoilKg).toBe(30);
   });
 
   it('returns false and credits nothing when there is no heap', () => {
     const w = other();
-    expect(creditFirstSpoilHeap([w], 500)).toBe(false);
+    expect(creditSpoilHeaps([w], 500)).toBe(false);
     expect(w.storedSpoilKg).toBeUndefined();
-    expect(creditFirstSpoilHeap([], 500)).toBe(false);
+    expect(creditSpoilHeaps([], 500)).toBe(false);
   });
 });
 

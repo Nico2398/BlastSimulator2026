@@ -13,7 +13,6 @@ import {
   autoDeliverContracts,
   deliverStoredOre,
   bookDeliveryCashflow,
-  bookDeliveryIncome,
 } from '../../../src/core/economy/ContractFulfilment.js';
 
 /** Ore kg of a stored fragment = volume x density x 2500, so kg/2500 volume at density 1 gives `kg`. */
@@ -260,7 +259,7 @@ describe('autoDeliverContracts', () => {
     const stock = stockWith(100); // 500 kg ore-bearing, off limits
     addBarren(stock, 2, 120);
     const { logistics, collectedOre } = stock;
-    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 100 };
+    const heap = { type: 'spoil_heap' as const, tier: 1 as const, storedSpoilKg: 100 };
     const out = autoDeliverContracts(contracts, logistics, collectedOre, 5, [heap]);
     expect(out).toHaveLength(1);
     expect(out[0]!.payment).toBeCloseTo(400, 6);
@@ -421,15 +420,13 @@ function checkDeadlinesPenalty(contracts: ContractState): number {
 describe('bookDeliveryCashflow (#1892)', () => {
   const account = () => ({ cash: 1_000, finances: createFinanceState(1_000) });
 
-  it('credits income for a paying delivery, like bookDeliveryIncome', () => {
+  it('credits income for a paying delivery: payment, then early bonus', () => {
     const a = account();
     bookDeliveryCashflow(a, 1, { payment: 50, bonus: 10, fee: false }, 7);
     expect(a.cash).toBe(1_060);
     expect(a.finances.cash).toBe(1_060);
     expect(a.finances.transactions.every(tx => tx.type === 'income')).toBe(true);
-    const b = account();
-    bookDeliveryIncome(b, 1, { payment: 50, bonus: 10 }, 7);
-    expect(a.finances.transactions.map(tx => tx.amount)).toEqual(b.finances.transactions.map(tx => tx.amount));
+    expect(a.finances.transactions.map(tx => tx.amount)).toEqual([50, 10]);
   });
 
   it('debits cash and logs one expense for a fee', () => {
