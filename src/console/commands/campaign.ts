@@ -11,6 +11,7 @@ import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { createHiringPool } from '../../core/entities/HiringPool.js';
+import { livingNames } from '../../core/entities/Employee.js';
 import { ensureScriptedOreSale, generateContracts } from '../../core/economy/Contract.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
@@ -197,7 +198,7 @@ export function campaignStartCommand(
   });
 
   // Scripted levels (tutorial) offer the same hires on every run (#1600).
-  ctx.state.hiringPool = createHiringPool(ctx.state.seed, ctx.state.tickCount, level.hiringScript);
+  ctx.state.hiringPool = createHiringPool(ctx.state.seed, ctx.state.tickCount, level.hiringScript, livingNames(ctx.state.employees.employees));
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);

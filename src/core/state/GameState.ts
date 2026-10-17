@@ -33,7 +33,7 @@ import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState, purchaseVehicle } from '../entities/Vehicle.js';
 import type { EmployeeState, SkillCategory, LicenceLevel } from '../entities/Employee.js';
-import { createEmployeeState, hireEmployee, calculateSalary, qualificationAtLevel } from '../entities/Employee.js';
+import { createEmployeeState, hireEmployee, calculateSalary, qualificationAtLevel, livingNames } from '../entities/Employee.js';
 import type { VehicleRole } from '../entities/Vehicle.js';
 import { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
@@ -651,7 +651,7 @@ export function createGame(config: GameConfig): GameState {
     revolt: createRevoltState(),
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
-    hiringPool: createHiringPool(config.seed, 0),
+    hiringPool: createHiringPool(config.seed, 0), // rebuilt after the starting crew is hired (names stay unique)
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],
@@ -679,6 +679,9 @@ export function createGame(config: GameConfig): GameState {
     applyStaffedComposition(state, config.startingSite);
   } else if (config.staffed) {
     applyStaffedComposition(state, STARTING_SITE_STAFFED_COMPOSITION);
+  }
+  if (state.employees.employees.length > 0) {
+    state.hiringPool = createHiringPool(config.seed, 0, undefined, livingNames(state.employees.employees));
   }
 
   return state;

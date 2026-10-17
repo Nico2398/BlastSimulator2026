@@ -20,6 +20,18 @@ function startLevel(levelId: string, args = '') {
   return { runner, ctx, state: ctx.state! };
 }
 
+describe('campaign start opening hiring pool avoids roster names (#1886)', () => {
+  it.each(['dusty_hollow', 'grumpstone_ridge'])('%s: no candidate shares a name with a living employee or another candidate', (levelId) => {
+    const { state } = startLevel(levelId);
+    const living = new Set(state.employees.employees.filter((e) => e.alive).map((e) => e.name));
+    expect(living.size).toBeGreaterThan(0);
+    const names = state.hiringPool.candidates.map((c) => c.name);
+    expect(names.length).toBeGreaterThan(0);
+    expect(new Set(names).size).toBe(names.length);
+    for (const n of names) expect(living.has(n)).toBe(false);
+  });
+});
+
 describe('campaign start level:dusty_hollow (default) opens staffed (#1363)', () => {
   it('has a driller, a blaster and a driver', () => {
     const { state } = startLevel('dusty_hollow');

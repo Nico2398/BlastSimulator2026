@@ -262,8 +262,8 @@ const UNSCRIPTED_GOLDEN = [
     refreshed: '16:Frank Dynamite:U:510|17:Frank Hardhat:N:600|18:Bob McBoom:N:600|19:Earl Miner:U:740|20:Kurt Shale:N:870|21:Dave Hardhat:U:825|22:Hank Dusty:N:500|23:Frank Crater:N:500|24:Lars Rubble:U:425|25:Frank Blaster:U:553|26:Lars Drillbit:U:553|27:Jake Shale:N:650|28:Bob Pickaxe:N:1050|29:Pete Pickaxe:N:1050|30:Jake Rubble:N:1050', nextId: 31 },
   { seed: 7, tick: 0, created: '1:Bob Diggins:N:600|2:Lars Rubble:N:670|3:Pete Dusty:U:510|4:Lars Rockwell:N:970|5:Gus Drillbit:U:740|6:Earl McBoom:U:825|7:Rick Diggins:N:500|8:Nick Dynamite:N:500|9:Vic Slagheap:U:425|10:Jake Blaster:U:553|11:Ivan Rubble:N:650|12:Pete Dynamite:N:650|13:Dave McBoom:N:1120|14:Nick Crater:U:893|15:Vic Stoneface:N:1050',
     refreshed: '16:Nick Diggins:N:600|17:Lars Dynamite:N:600|18:Bob Hardhat:U:570|19:Frank Stoneface:N:870|20:Gus Shale:N:870|21:Dave Hardhat:N:870|22:Nick Dynamite:U:425|23:Walt Gravel:U:425|24:Dave Blaster:N:500|25:Frank Crater:N:650|26:Lars McBoom:U:612|27:Hank Quartzman:U:612|28:Bob Pickaxe:N:1120|29:Tony Pitman:N:1050|30:Frank Blaster:U:952', nextId: 31 },
-  { seed: 7, tick: 24, created: '1:Otto Slagheap:N:670|2:Hank Diggins:N:600|3:Otto Crater:N:600|4:Jake Shale:U:740|5:Rick Slagheap:U:740|6:Stan Quartzman:N:870|7:Otto Pickaxe:U:425|8:Pete Dusty:U:425|9:Nick Drillbit:N:500|10:Tony Crater:N:650|11:Chuck Slagheap:U:553|12:Bob Rubble:N:650|13:Otto Slagheap:N:1050|14:Dave Drillbit:N:1050|15:Stan Dusty:N:1050',
-    refreshed: '16:Rick Rockwell:N:600|17:Kurt Rockwell:U:510|18:Hank Rubble:N:600|19:Lars Stoneface:N:870|20:Walt Miner:N:870|21:Pete McBoom:N:870|22:Chuck Blaster:U:425|23:Dave Bedrock:U:425|24:Earl Dusty:N:500|25:Frank Miner:N:720|26:Stan Boulder:N:650|27:Dave Bedrock:N:720|28:Frank Rubble:N:1050|29:Gus Gravel:U:952|30:Frank Hardhat:U:893', nextId: 31 },
+  { seed: 7, tick: 24, created: '1:Otto Slagheap:N:670|2:Hank Diggins:N:600|3:Otto Crater:N:600|4:Jake Shale:U:740|5:Rick Slagheap:U:740|6:Stan Quartzman:N:870|7:Otto Pickaxe:U:425|8:Pete Dusty:U:425|9:Nick Drillbit:N:500|10:Tony Crater:N:650|11:Chuck Slagheap:U:553|12:Bob Rubble:N:650|13:Otto Bedrock:N:1050|14:Dave Drillbit:N:1050|15:Stan Dusty:N:1050',
+    refreshed: '16:Rick Rockwell:N:600|17:Kurt Rockwell:U:510|18:Hank Rubble:N:600|19:Lars Stoneface:N:870|20:Walt Miner:N:870|21:Pete McBoom:N:870|22:Chuck Blaster:U:425|23:Dave Bedrock:U:425|24:Earl Dusty:N:500|25:Frank Miner:N:720|26:Stan Boulder:N:650|27:Dave Pitman:N:720|28:Frank Rubble:N:1050|29:Gus Gravel:U:952|30:Frank Hardhat:U:893', nextId: 31 },
 ];
 
 describe('scripted hiring pool (#1600)', () => {
@@ -437,5 +437,95 @@ describe('scripted extraQualifications (#1648)', () => {
     for (const c of pool.candidates) {
       expect(c.qualifications.map(q => q.category)).toEqual(ROLE_STARTING_QUALIFICATIONS[c.role].map(q => q.category));
     }
+  });
+});
+
+// ── Unique names (#1886) ──
+
+import { poolNames } from '../../../src/core/entities/HiringPool.js';
+
+const dupNames = (names: string[]) => names.filter((n, i) => names.indexOf(n) !== i);
+
+describe('hiring pool names are unique (#1886)', () => {
+  it('no two candidates share a name at creation, over many seeds', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const names = createHiringPool(seed, 0).candidates.map(c => c.name);
+      expect(dupNames(names), `seed ${seed}`).toEqual([]);
+    }
+  });
+
+  it('no candidate matches a roster name at creation', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const roster = new Set(createHiringPool(seed, 0).candidates.slice(0, 6).map(c => c.name));
+      const pool = createHiringPool(seed, 0, undefined, roster);
+      for (const c of pool.candidates) expect(roster.has(c.name), `seed ${seed}`).toBe(false);
+      expect(dupNames(pool.candidates.map(c => c.name)), `seed ${seed}`).toEqual([]);
+    }
+  });
+
+  it('no duplicate and no roster match after a refresh', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const pool = createHiringPool(seed, 0);
+      const roster = new Set(pool.candidates.slice(0, 5).map(c => c.name));
+      refreshHiringPool(pool, seed, HIRING_POOL_REFRESH_INTERVAL, undefined, roster);
+      expect(pool.candidates).toHaveLength(HIRING_POOL_SIZE * ROLES.length);
+      expect(dupNames(pool.candidates.map(c => c.name)), `seed ${seed}`).toEqual([]);
+      for (const c of pool.candidates) expect(roster.has(c.name), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('non-name draws stay identical for every candidate when only names collide', () => {
+    for (const seed of [3, 9, 42]) {
+      const plain = createHiringPool(seed, 0);
+      const roster = new Set(plain.candidates.slice(0, 4).map(c => c.name));
+      const avoiding = createHiringPool(seed, 0, undefined, roster);
+      expect(avoiding.candidates.map(c => [c.id, c.role, c.unionized, c.salary]))
+        .toEqual(plain.candidates.map(c => [c.id, c.role, c.unionized, c.salary]));
+      expect(avoiding.candidates.map(c => c.qualifications)).toEqual(plain.candidates.map(c => c.qualifications));
+    }
+  });
+
+  it('candidates that do not collide keep their names', () => {
+    const plain = createHiringPool(42, 0);
+    const avoiding = createHiringPool(42, 0, undefined, new Set(['Nobody Atall']));
+    expect(avoiding.candidates.map(c => c.name)).toEqual(plain.candidates.map(c => c.name));
+  });
+
+  it('a candidate colliding with the roster is renamed', () => {
+    const plain = createHiringPool(42, 0);
+    const avoiding = createHiringPool(42, 0, undefined, new Set([plain.candidates[0]!.name]));
+    expect(avoiding.candidates[0]!.name).not.toBe(plain.candidates[0]!.name);
+  });
+
+  it('is deterministic: the same seed and roster give the same names', () => {
+    const roster = new Set(['Nick Rubble', 'Pete Crater']);
+    const a = createHiringPool(42, 0, undefined, roster);
+    const b = createHiringPool(42, 0, undefined, roster);
+    expect(a.candidates.map(c => c.name)).toEqual(b.candidates.map(c => c.name));
+  });
+
+  it('scripted pools keep their exact names even when the roster holds them', () => {
+    const roster = new Set(TUTORIAL_HIRING_SCRIPT.map(s => s.name));
+    const pool = createHiringPool(42, 0, TUTORIAL_HIRING_SCRIPT, roster);
+    expect(pool.candidates.map(c => c.name)).toEqual(TUTORIAL_HIRING_SCRIPT.map(s => s.name));
+    refreshHiringPool(pool, 42, 100, TUTORIAL_HIRING_SCRIPT, roster);
+    expect(pool.candidates.map(c => c.name)).toEqual(TUTORIAL_HIRING_SCRIPT.map(s => s.name));
+  });
+
+  it('generateCandidate avoids the taken set', () => {
+    const drawn = generateCandidate('driller', new Random(42), 1).name;
+    const c = generateCandidate('driller', new Random(42), 1, new Set([drawn]));
+    expect(c.name).not.toBe(drawn);
+  });
+});
+
+describe('poolNames (#1886)', () => {
+  it('collects every candidate name', () => {
+    const pool = createHiringPool(42, 0);
+    expect(poolNames(pool)).toEqual(new Set(pool.candidates.map(c => c.name)));
+  });
+
+  it('is empty for an empty pool', () => {
+    expect(poolNames({ candidates: [] }).size).toBe(0);
   });
 });

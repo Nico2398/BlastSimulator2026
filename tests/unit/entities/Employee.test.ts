@@ -1878,3 +1878,172 @@ describe('applyDismissalMoraleDent (#1872)', () => {
     expect(emps[0]!.morale).toBe(50);
   });
 });
+
+// ── Unique names (#1886) ──
+
+import {
+  generateName as generateUniqueName,
+  livingNames,
+  hireEmployee as hireUnique,
+  createEmployeeState as createUniqueState,
+} from '../../../src/core/entities/Employee.js';
+
+const UNIQUE_FIRST = [
+  'Bob', 'Chuck', 'Dave', 'Earl', 'Frank', 'Gus', 'Hank', 'Ivan', 'Jake', 'Kurt',
+  'Lars', 'Mike', 'Nick', 'Otto', 'Pete', 'Rick', 'Stan', 'Tony', 'Vic', 'Walt',
+];
+const UNIQUE_LAST = [
+  'Blaster', 'Diggins', 'McBoom', 'Rockwell', 'Gravel', 'Dusty', 'Crater', 'Boulder', 'Rubble', 'Miner',
+  'Stoneface', 'Hardhat', 'Pickaxe', 'Dynamite', 'Shale', 'Quartzman', 'Slagheap', 'Bedrock', 'Pitman', 'Drillbit',
+];
+const COMBINATIONS = UNIQUE_FIRST.length * UNIQUE_LAST.length;
+const nameAt = (i: number) => {
+  const n = ((i % COMBINATIONS) + COMBINATIONS) % COMBINATIONS;
+  return `${UNIQUE_FIRST[Math.floor(n / UNIQUE_LAST.length)]} ${UNIQUE_LAST[n % UNIQUE_LAST.length]}`;
+};
+const indexOf = (name: string) => {
+  const [f, l] = name.split(' ');
+  return UNIQUE_FIRST.indexOf(f!) * UNIQUE_LAST.length + UNIQUE_LAST.indexOf(l!);
+};
+
+describe('generateName — unique names (#1886)', () => {
+  it('without a taken set returns the same names as before for the same seed', () => {
+    const golden: Record<number, string[]> = {
+      1: ['Nick Blaster', 'Lars Drillbit', 'Walt Dusty', 'Nick Shale', 'Jake Drillbit'],
+      42: ['Nick Rubble', 'Tony Dynamite', 'Earl Stoneface', 'Gus Pickaxe', 'Tony Miner'],
+      99: ['Gus Slagheap', 'Lars Dynamite', 'Bob Slagheap', 'Bob McBoom', 'Ivan Dynamite'],
+    };
+    for (const [seed, names] of Object.entries(golden)) {
+      const rng = new Random(Number(seed));
+      expect(names.map(() => generateUniqueName(rng))).toEqual(names);
+    }
+  });
+
+  it('an empty taken set behaves like no taken set', () => {
+    const a = new Random(42);
+    const b = new Random(42);
+    for (let i = 0; i < 10; i++) expect(generateUniqueName(a, new Set())).toBe(generateUniqueName(b));
+  });
+
+  it('returns the drawn name when it is free', () => {
+    const taken = new Set(['Bob Blaster', 'Walt Drillbit']);
+    expect(generateUniqueName(new Random(42), taken)).toBe('Nick Rubble');
+  });
+
+  it('steps to the next combination in index order when the drawn name is taken', () => {
+    const drawn = generateUniqueName(new Random(42));
+    const next = generateUniqueName(new Random(42), new Set([drawn]));
+    expect(next).toBe(nameAt(indexOf(drawn) + 1));
+    expect(next).toBe('Nick Miner');
+  });
+
+  it('keeps stepping past a run of taken combinations', () => {
+    const i = indexOf(generateUniqueName(new Random(42)));
+    const taken = new Set([nameAt(i), nameAt(i + 1), nameAt(i + 2)]);
+    expect(generateUniqueName(new Random(42), taken)).toBe(nameAt(i + 3));
+  });
+
+  it('wraps from the last combination to the first', () => {
+    // Seed 1 draws Nick Blaster; find a seed-independent wrap by taking everything from the drawn index to the end.
+    const i = indexOf(generateUniqueName(new Random(1)));
+    const taken = new Set<string>();
+    for (let k = i; k < COMBINATIONS; k++) taken.add(nameAt(k));
+    expect(generateUniqueName(new Random(1), taken)).toBe(nameAt(0));
+  });
+
+  it('never returns a taken name and consumes exactly two draws', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const probe = new Random(seed);
+      const taken = new Set([generateUniqueName(probe), generateUniqueName(probe)]);
+      const withTaken = new Random(seed);
+      const without = new Random(seed);
+      const name = generateUniqueName(withTaken, taken);
+      generateUniqueName(without);
+      expect(taken.has(name)).toBe(false);
+      expect(withTaken.next()).toBe(without.next());
+    }
+  });
+
+  it('suffixes " 2" when all combinations are taken', () => {
+    const taken = new Set<string>();
+    for (let k = 0; k < COMBINATIONS; k++) taken.add(nameAt(k));
+    const base = generateUniqueName(new Random(42));
+    const name = generateUniqueName(new Random(42), taken);
+    expect(name).toBe(`${base} 2`);
+  });
+
+  it('suffixes " 3" when the " 2" form is taken too, and still consumes two draws', () => {
+    const taken = new Set<string>();
+    for (let k = 0; k < COMBINATIONS; k++) taken.add(nameAt(k));
+    const base = generateUniqueName(new Random(42));
+    taken.add(`${base} 2`);
+    const rng = new Random(42);
+    const ref = new Random(42);
+    expect(generateUniqueName(rng, taken)).toBe(`${base} 3`);
+    generateUniqueName(ref);
+    expect(rng.next()).toBe(ref.next());
+  });
+});
+
+describe('livingNames (#1886)', () => {
+  it('collects the names of living employees', () => {
+    expect(livingNames([{ name: 'A B', alive: true }, { name: 'C D', alive: true }])).toEqual(new Set(['A B', 'C D']));
+  });
+
+  it('excludes dead employees', () => {
+    expect(livingNames([{ name: 'A B', alive: true }, { name: 'C D', alive: false }])).toEqual(new Set(['A B']));
+  });
+
+  it('is empty for an empty roster', () => {
+    expect(livingNames([]).size).toBe(0);
+  });
+});
+
+describe('hireEmployee — unique names (#1886)', () => {
+  it('without a candidate avoids the names of living employees', () => {
+    const es = createUniqueState();
+    const drawn = generateUniqueName(new Random(42));
+    hireUnique(es, 'driller', new Random(1), 0, 0, 0, { name: drawn, unionized: false, qualifications: [] });
+    const { employee } = hireUnique(es, 'driller', new Random(42));
+    expect(employee.name).not.toBe(drawn);
+    expect(employee.name).toBe(nameAt(indexOf(drawn) + 1));
+  });
+
+  it('a dead employee frees their name', () => {
+    const es = createUniqueState();
+    const drawn = generateUniqueName(new Random(42));
+    const first = hireUnique(es, 'driller', new Random(1), 0, 0, 0, { name: drawn, unionized: false, qualifications: [] }).employee;
+    first.alive = false;
+    expect(hireUnique(es, 'driller', new Random(42)).employee.name).toBe(drawn);
+  });
+
+  it('avoids names in takenNames', () => {
+    const es = createUniqueState();
+    const drawn = generateUniqueName(new Random(42));
+    const { employee } = hireUnique(es, 'blaster', new Random(42), 0, 0, 0, undefined, new Set([drawn]));
+    expect(employee.name).not.toBe(drawn);
+  });
+
+  it('avoids both living names and takenNames together', () => {
+    const es = createUniqueState();
+    const i = indexOf(generateUniqueName(new Random(42)));
+    hireUnique(es, 'driller', new Random(1), 0, 0, 0, { name: nameAt(i), unionized: false, qualifications: [] });
+    const { employee } = hireUnique(es, 'blaster', new Random(42), 0, 0, 0, undefined, new Set([nameAt(i + 1)]));
+    expect(employee.name).toBe(nameAt(i + 2));
+  });
+
+  it('keeps the candidate name even when it matches a living employee or takenNames', () => {
+    const es = createUniqueState();
+    const cand = { name: 'Nick Rubble', unionized: false, qualifications: [] };
+    hireUnique(es, 'driller', new Random(1), 0, 0, 0, cand);
+    const { employee } = hireUnique(es, 'driller', new Random(2), 0, 0, 0, cand, new Set(['Nick Rubble']));
+    expect(employee.name).toBe('Nick Rubble');
+  });
+
+  it('draws the same non-name rolls as before (union flag unchanged)', () => {
+    const a = hireUnique(createUniqueState(), 'driller', new Random(42));
+    const es = createUniqueState();
+    const b = hireUnique(es, 'driller', new Random(42), 0, 0, 0, undefined, new Set([a.employee.name]));
+    expect(b.employee.unionized).toBe(a.employee.unionized);
+  });
+});
