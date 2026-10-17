@@ -548,17 +548,24 @@ function selectWithinIndex(
     return costDiff !== 0 ? costDiff : a.action.id - b.action.id;
   });
 
-  // Barren rock yields to ore (#1870): while an ore haul with a resolvable route is costed (it survived
-  // the thinning, so it is reachable, allowed and has warehouse room), an unheld ground barren haul is
-  // not started. Without one the barren hauls compete as usual, and pass 2 lets barren move when the
-  // ore hauls fail to resolve a cost during the search (blocked way).
-  const isBarren = (a: PendingAction): boolean => isBarrenGroundHaul(state, a, fragmentOf);
-  const oreWaits = costed.some(c => Number.isFinite(c.cost) && isUnheldGroundHaul(state, c.action, fragmentOf) && !isBarren(c.action));
-  if (oreWaits) {
-    const preferred = searchTiers(state, employee, costed.filter(c => !isBarren(c.action)), reachable);
+  const oreFirst = oreHaulsOnly(state, costed, fragmentOf);
+  if (oreFirst !== null) {
+    const preferred = searchTiers(state, employee, oreFirst, reachable);
     if (preferred !== null) return preferred;
   }
   return searchTiers(state, employee, costed, reachable);
+}
+
+/**
+ * Barren rock yields to ore (#1870): while an ore haul with a resolvable route is costed (it survived
+ * the thinning, so it is reachable, allowed and has warehouse room), an unheld ground barren haul is
+ * not started. Returns `costed` minus those barren hauls, or null when no ore haul waits (barren hauls
+ * then compete as usual). The caller falls back to the full list when the ore hauls fail to resolve a
+ * cost during the search (blocked way). One pass over `costed`.
+ */
+function oreHaulsOnly(state: GameState, costed: readonly CostedAction[], fragmentOf: FragmentLookup): CostedAction[] | null {
+  const oreWaits = costed.some(c => Number.isFinite(c.cost) && isUnheldGroundHaul(state, c.action, fragmentOf) && haulActionCarriesOre(state, c.action, fragmentOf));
+  return oreWaits ? costed.filter(c => !isBarrenGroundHaul(state, c.action, fragmentOf)) : null;
 }
 
 /** An unheld haul_debris order whose fragment is still on the ground (not loaded in a vehicle). */
