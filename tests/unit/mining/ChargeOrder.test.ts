@@ -3,12 +3,13 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { buyExplosiveStock } from '../../../src/core/mining/ExplosiveStock.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   dispatchChargeAction, cancelOutstandingChargeAction,
   chargeFundsFailureAmount, isHoleChargeCovered, autoChargeHole, settleAwaitingFundsCharges,
-  chargePatternHoles, outstandingChargeBlockedReason,
+  chargePatternHoles, outstandingChargeBlockedReason, earliestChargeDeliveryTick,
 } from '../../../src/core/mining/ChargeOrder.js';
 
 const BOOMITE_5KG = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
@@ -332,5 +333,104 @@ describe('dispatchChargeAction records the stock draw on the planned charge (#16
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
     expect(state.plannedChargesByHole['H1']!.fromStockKg).toBe(5);
+  });
+});
+
+// ── Delivery wait for cash-bought explosives (#1895) ────────────────────────
+
+describe('dispatchChargeAction delivery wait (#1895)', () => {
+  function stockedState(kg: number): GameState {
+    const state = makeState();
+    placeBuilding(state.buildings, 'explosive_warehouse', 5, 5, 64, 64, 1);
+    expect(buyExplosiveStock(state, 'boomite', kg).success).toBe(true);
+    return state;
+  }
+  const arrival = (state: GameState, n = 0) => chargeActions(state)[n]!.payload['deliveryArrivalTick'];
+
+  it('stamps no arrival when stock fully covers the order', () => {
+    const state = stockedState(100);
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(arrival(state)).toBeUndefined();
+    expect(earliestChargeDeliveryTick(state)).toBeNull();
+  });
+
+  it('stamps tickCount + delivery ticks when nothing is stocked', () => {
+    const state = makeState();
+    state.tickCount = 120;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(arrival(state)).toBe(120 + EXPLOSIVE_DELIVERY_TICKS);
+  });
+
+  it('stamps an arrival when stock falls short by 1 kg', () => {
+    const state = stockedState(4);
+    state.tickCount = 10;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(arrival(state)).toBe(10 + EXPLOSIVE_DELIVERY_TICKS);
+  });
+
+  it('stamps no arrival when stock matches the order exactly', () => {
+    const state = stockedState(5);
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(arrival(state)).toBeUndefined();
+  });
+
+  it('is flat per order, not additive per hole', () => {
+    const state = makeState();
+    state.tickCount = 50;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    dispatchChargeAction(state, hole(2), BOOMITE_5KG);
+    dispatchChargeAction(state, hole(3), BOOMITE_5KG);
+    for (let i = 0; i < 3; i++) expect(arrival(state, i)).toBe(50 + EXPLOSIVE_DELIVERY_TICKS);
+  });
+
+  it('still draws stock at order time for the stocked part', () => {
+    const state = stockedState(3);
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(state.plannedChargesByHole['H1']!.fromStockKg).toBe(3);
+    expect(arrival(state)).toBeDefined();
+  });
+
+  it('cancel refunds the order as before', () => {
+    const state = makeState();
+    const cash = state.cash;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(state.cash).toBe(cash - COST_5KG);
+    cancelOutstandingChargeAction(state, 'H1');
+    expect(state.cash).toBe(cash);
+    expect(chargeActions(state)).toHaveLength(0);
+  });
+
+  it('a re-charge recomputes the arrival from the new tick', () => {
+    const state = makeState();
+    state.tickCount = 0;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    state.tickCount = 200;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    expect(chargeActions(state)).toHaveLength(1);
+    expect(arrival(state)).toBe(200 + EXPLOSIVE_DELIVERY_TICKS);
+  });
+});
+
+describe('earliestChargeDeliveryTick (#1895)', () => {
+  it('is null with no charge orders', () => {
+    expect(earliestChargeDeliveryTick(makeState())).toBeNull();
+  });
+
+  it('is the smallest arrival among waiting orders', () => {
+    const state = makeState();
+    state.tickCount = 100;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    state.tickCount = 300;
+    dispatchChargeAction(state, hole(2), BOOMITE_5KG);
+    state.tickCount = 150;
+    expect(earliestChargeDeliveryTick(state)).toBe(100 + EXPLOSIVE_DELIVERY_TICKS);
+  });
+
+  it('ignores orders whose arrival has already passed', () => {
+    const state = makeState();
+    state.tickCount = 0;
+    dispatchChargeAction(state, hole(1), BOOMITE_5KG);
+    state.tickCount = EXPLOSIVE_DELIVERY_TICKS + 1;
+    expect(earliestChargeDeliveryTick(state)).toBeNull();
   });
 });

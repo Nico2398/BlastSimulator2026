@@ -10,6 +10,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, destroyVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { dispatchChargeAction, outstandingChargeBlockedReason } from '../../../src/core/mining/ChargeOrder.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { classifyQueuedOrders } from '../../../src/core/engine/OrderReachability.js';
 
 const LICENCE = ROLE_LICENCE_REQUIRED.charging_truck;
@@ -115,5 +116,67 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
     classifyQueuedOrders(state);
 
     expect(outstandingChargeBlockedReason(state)).toBeNull();
+  });
+});
+
+describe('explosives_in_transit reason (#1895)', () => {
+  it('marks an otherwise serviceable cash-bought order in transit', () => {
+    const state = makeState();
+    hireDual(state);
+    purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
+    order(state, 1);
+    classifyQueuedOrders(state);
+    expect(chargeActions(state)[0]!.blockedReason).toBe('explosives_in_transit');
+    expect(outstandingChargeBlockedReason(state)).toBe('explosives_in_transit');
+  });
+
+  it('keeps no_vehicle_in_fleet when there is no charging truck', () => {
+    const state = makeState();
+    hireDual(state);
+    order(state, 1);
+    classifyQueuedOrders(state);
+    expect(chargeActions(state)[0]!.blockedReason).toBe('no_vehicle_in_fleet');
+  });
+
+  it('stays in transit one tick before arrival', () => {
+    const state = makeState();
+    hireDual(state);
+    purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
+    order(state, 1);
+    state.tickCount = EXPLOSIVE_DELIVERY_TICKS - 1;
+    classifyQueuedOrders(state);
+    expect(chargeActions(state)[0]!.blockedReason).toBe('explosives_in_transit');
+  });
+
+  it('clears at the arrival tick', () => {
+    const state = makeState();
+    hireDual(state);
+    purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
+    order(state, 1);
+    classifyQueuedOrders(state);
+    state.tickCount = EXPLOSIVE_DELIVERY_TICKS;
+    classifyQueuedOrders(state);
+    expect(chargeActions(state)[0]!.blockedReason).toBeNull();
+    expect(outstandingChargeBlockedReason(state)).toBeNull();
+  });
+
+  it('clears after the arrival tick', () => {
+    const state = makeState();
+    hireDual(state);
+    purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
+    order(state, 1);
+    state.tickCount = EXPLOSIVE_DELIVERY_TICKS + 50;
+    classifyQueuedOrders(state);
+    expect(chargeActions(state)[0]!.blockedReason).toBeNull();
+  });
+
+  it('never marks an order in transit when stock covered it', () => {
+    const state = makeState();
+    hireDual(state);
+    purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
+    order(state, 1);
+    delete chargeActions(state)[0]!.payload['deliveryArrivalTick'];
+    classifyQueuedOrders(state);
+    expect(chargeActions(state)[0]!.blockedReason).toBeNull();
   });
 });

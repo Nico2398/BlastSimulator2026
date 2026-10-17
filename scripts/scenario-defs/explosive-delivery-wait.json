@@ -1,0 +1,119 @@
+{
+  "name": "explosive-delivery-wait",
+  "description": "Cash-bought explosives are delivered, not instant (#1895): with no warehouse stock a charge order is paid at once but the hole is charged only after the delivery tick; a stocked order (explosive-warehouse-stock) charges at once. Command-mode proof.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0
+        }
+      },
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:1 max_ticks:300",
+      "timeout": 90,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "holeCount": 1,
+          "orderedHoleCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "No stock: the 5 kg are bought for cash now ($60) but ordered from a supplier.",
+      "expect": {
+        "changedBy": {
+          "cash": -60
+        },
+        "equals": {
+          "orderedChargeCount": 1
+        }
+      },
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "tick 300",
+      "description": "Still inside the 400-tick delivery window: nothing charged yet.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "orderedChargeCount": 1
+        }
+      },
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 300"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:chargedCount equals:1 max_ticks:900",
+      "description": "After the delivery tick the crew charges the hole.",
+      "timeout": 200,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 900,
+          "timeoutMs": 200000
+        }
+      ]
+    },
+    {
+      "command": "state full",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}
