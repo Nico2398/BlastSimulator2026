@@ -9,7 +9,7 @@ import {
   UNION_STRIKE_MIN_MEMBERS,
 } from '../config/balance.js';
 
-export type UnionStance = 'refused' | 'met' | 'neutral';
+type UnionStance = 'refused' | 'met' | 'neutral';
 
 /** Tag on union events that are the strike itself (#1890). */
 export const STRIKE_EVENT_TAG = 'strike';

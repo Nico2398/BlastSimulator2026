@@ -72,7 +72,10 @@ describe('scenario pacing insulation (#597)', () => {
 
     const modified = createRunner();
     runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
-    runCommand(modified, 'tick 5');
+    // A whole 10-tick slice: since #1890 the cooldown stretches every category, so the
+    // first event lands later (~tick 315) and a sub-slice shift moves it across the
+    // 5-tick retry grid, changing which union event the weighted pick reaches.
+    runCommand(modified, 'tick 10');
     for (let i = 0; i < 15; i++) runCommand(modified, 'employee hire role:blaster');
     for (let i = 0; i < 60; i++) runCommand(modified, 'tick 10');
 

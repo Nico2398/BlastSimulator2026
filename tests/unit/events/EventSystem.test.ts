@@ -762,6 +762,7 @@ describe('union stretch applies to every category cooldown (#1890)', () => {
         const f = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount }), rng);
         if (f) counts[f.eventId] = (counts[f.eventId] ?? 0) + 1;
         state.pendingEvent = null;
+        state.firedEventIds = []; // fired ids are one-shot; reset so draws keep counting
       }
       return counts;
     };
