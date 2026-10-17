@@ -695,13 +695,13 @@ describe('snapAgentsToNavigableGround', () => {
 // ── Unique names (#1886) ──
 
 import { SANDBOX_STARTING_SITES } from '../../../src/core/config/balance.js';
-import { SANDBOX_DIFFICULTY_ORDER } from '../../../src/core/campaign/Sandbox.js';
+import { SANDBOX_KIT_ORDER } from '../../../src/core/campaign/Sandbox.js';
 
 describe('createGame — unique crew and pool names (#1886)', () => {
-  for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
-    it(`sandbox ${difficulty}: seeds 1-20 give a crew with no repeated name, a pool with none, and no pool name equal to a crew name`, () => {
+  for (const kit of SANDBOX_KIT_ORDER) {
+    it(`sandbox ${kit}: seeds 1-20 give a crew with no repeated name, a pool with none, and no pool name equal to a crew name`, () => {
       for (let seed = 1; seed <= 20; seed++) {
-        const state = createGame({ seed, mineType: 'desert_badlands', startingSite: SANDBOX_STARTING_SITES[difficulty] });
+        const state = createGame({ seed, mineType: 'desert_badlands', startingSite: SANDBOX_STARTING_SITES[kit] });
         const crew = state.employees.employees.map(e => e.name);
         const pool = state.hiringPool.candidates.map(c => c.name);
         expect(new Set(crew).size, `seed ${seed} crew ${crew.join(',')}`).toBe(crew.length);
@@ -712,8 +712,8 @@ describe('createGame — unique crew and pool names (#1886)', () => {
     });
   }
 
-  it('seed 9 Easy no longer doubles a crew name', () => {
-    const state = createGame({ seed: 9, mineType: 'desert_badlands', startingSite: SANDBOX_STARTING_SITES.easy });
+  it('seed 9 full kit no longer doubles a crew name', () => {
+    const state = createGame({ seed: 9, mineType: 'desert_badlands', startingSite: SANDBOX_STARTING_SITES.full });
     const names = state.employees.employees.map(e => e.name);
     expect(names.filter(n => n === 'Gus Pitman').length).toBeLessThanOrEqual(1);
   });
@@ -728,7 +728,7 @@ describe('createGame — unique crew and pool names (#1886)', () => {
   });
 
   it('is deterministic: the same seed gives the same crew and pool names', () => {
-    const make = () => createGame({ seed: 9, mineType: 'desert_badlands', startingSite: SANDBOX_STARTING_SITES.easy });
+    const make = () => createGame({ seed: 9, mineType: 'desert_badlands', startingSite: SANDBOX_STARTING_SITES.full });
     const a = make();
     const b = make();
     expect(a.employees.employees.map(e => e.name)).toEqual(b.employees.employees.map(e => e.name));

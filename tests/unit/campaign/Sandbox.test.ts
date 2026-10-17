@@ -1,14 +1,14 @@
 // Sandbox config — pure-logic tests
 //
-// #504: sandbox setup collapsed from 11 controls to 3 — biome, difficulty,
-// seed. Grid extents are now fixed constants and starting cash comes from
-// the named difficulty rather than a free field.
+// #504: sandbox setup collapsed from 11 controls to 3 — biome, starting kit,
+// seed (#1891 replaced difficulty with kit). Grid extents are fixed constants
+// and starting cash comes from the named kit rather than a free field.
 
 import { describe, it, expect } from 'vitest';
 import {
   SANDBOX_DEFAULTS,
-  SANDBOX_DIFFICULTIES,
-  SANDBOX_DIFFICULTY_ORDER,
+  SANDBOX_KITS,
+  SANDBOX_KIT_ORDER,
   SANDBOX_FIELDS,
   SANDBOX_LEVEL_ID,
   SANDBOX_SEED_MAX,
@@ -16,7 +16,8 @@ import {
   randomSandboxSeed,
   sandboxLevelDef,
   type SandboxConfig,
-  type SandboxDifficultyId,
+  type SandboxKitId,
+  resolveSandboxKitId,
 } from '../../../src/core/campaign/Sandbox.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
@@ -25,7 +26,7 @@ import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE } from '..
 import { resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { WorldNoiseFields } from '../../../src/core/world/NoiseFields.js';
 
-const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
+const LEVEL_FIELDS_SHARED_ACROSS_KITS = [
   'unlockThreshold',
   'eventFreqMultiplier',
   'contractPriceMultiplier',
@@ -33,26 +34,56 @@ const LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY = [
   'mixedRockHardness',
 ] as const;
 
-describe('SANDBOX_DIFFICULTIES', () => {
-  it('maps each named difficulty to its documented starting cash', () => {
-    expect(SANDBOX_DIFFICULTIES.easy.startingCash).toBe(250_000);
-    expect(SANDBOX_DIFFICULTIES.normal.startingCash).toBe(210_000);
-    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(195_000);
+describe('SANDBOX_KITS (#1891)', () => {
+  it('maps each named kit to its documented starting cash', () => {
+    expect(SANDBOX_KITS.digger.startingCash).toBe(210_000);
+    expect(SANDBOX_KITS.full.startingCash).toBe(250_000);
   });
 
-  it('carries the difficulty id and order consistently', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
-      expect(SANDBOX_DIFFICULTIES[id].id).toBe(id);
-      expect(SANDBOX_DIFFICULTIES[id].labelKey).toBeTruthy();
+  it('carries the kit id and order consistently', () => {
+    for (const id of SANDBOX_KIT_ORDER) {
+      expect(SANDBOX_KITS[id].id).toBe(id);
+      expect(SANDBOX_KITS[id].labelKey).toBe(`sandbox.kit.${id}`);
     }
-    expect(SANDBOX_DIFFICULTY_ORDER).toEqual(['easy', 'normal', 'hard']);
+    expect(SANDBOX_KIT_ORDER).toEqual(['digger', 'full']);
   });
 
-  it('feeds sandboxLevelDef the matching starting cash for each difficulty', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
-      const level = sandboxLevelDef(clampSandboxConfig({ difficulty: id }));
-      expect(level.startingCash).toBe(SANDBOX_DIFFICULTIES[id].startingCash);
+  it('defaults to the digger kit', () => {
+    expect(SANDBOX_DEFAULTS.kit).toBe('digger');
+  });
+
+  it('feeds sandboxLevelDef the matching starting cash for each kit', () => {
+    for (const id of SANDBOX_KIT_ORDER) {
+      const level = sandboxLevelDef(clampSandboxConfig({ kit: id }));
+      expect(level.startingCash).toBe(SANDBOX_KITS[id].startingCash);
     }
+  });
+});
+
+describe('resolveSandboxKitId (#1891)', () => {
+  it('returns a kit id unchanged', () => {
+    expect(resolveSandboxKitId('digger')).toBe('digger');
+    expect(resolveSandboxKitId('full')).toBe('full');
+  });
+
+  it('maps legacy difficulty names: easy -> full, normal/hard -> digger', () => {
+    expect(resolveSandboxKitId('easy')).toBe('full');
+    expect(resolveSandboxKitId('normal')).toBe('digger');
+    expect(resolveSandboxKitId('hard')).toBe('digger');
+  });
+
+  it('lowercases and trims', () => {
+    expect(resolveSandboxKitId('  FULL ')).toBe('full');
+    expect(resolveSandboxKitId('Easy')).toBe('full');
+    expect(resolveSandboxKitId(' Digger')).toBe('digger');
+  });
+
+  it('returns undefined for unknown, empty and prototype-key input', () => {
+    expect(resolveSandboxKitId('legendary')).toBeUndefined();
+    expect(resolveSandboxKitId('')).toBeUndefined();
+    expect(resolveSandboxKitId('constructor')).toBeUndefined();
+    expect(resolveSandboxKitId('__proto__')).toBeUndefined();
+    expect(resolveSandboxKitId('toString')).toBeUndefined();
   });
 });
 
@@ -61,10 +92,10 @@ describe('clampSandboxConfig', () => {
     expect(clampSandboxConfig({})).toEqual(SANDBOX_DEFAULTS);
   });
 
-  it('keeps a biome, difficulty and seed that are already valid', () => {
-    const cfg = clampSandboxConfig({ biome: 'alpine_granite', difficulty: 'hard', seed: 777 });
+  it('keeps a biome, kit and seed that are already valid', () => {
+    const cfg = clampSandboxConfig({ biome: 'alpine_granite', kit: 'full', seed: 777 });
     expect(cfg.biome).toBe('alpine_granite');
-    expect(cfg.difficulty).toBe('hard');
+    expect(cfg.kit).toBe('full');
     expect(cfg.seed).toBe(777);
   });
 
@@ -78,20 +109,20 @@ describe('clampSandboxConfig', () => {
     }
   });
 
-  it('falls back to the default difficulty for an id that is not a named preset', () => {
-    const cfg = clampSandboxConfig({ difficulty: 'legendary' as SandboxDifficultyId });
-    expect(cfg.difficulty).toBe(SANDBOX_DEFAULTS.difficulty);
+  it('falls back to the default kit for an id that is not a named kit', () => {
+    const cfg = clampSandboxConfig({ kit: 'legendary' as SandboxKitId });
+    expect(cfg.kit).toBe(SANDBOX_DEFAULTS.kit);
   });
 
-  it('falls back to the default difficulty for an inherited Object.prototype key (#504 prototype pollution)', () => {
-    const cfg = clampSandboxConfig({ difficulty: 'constructor' as SandboxDifficultyId });
-    expect(cfg.difficulty).toBe(SANDBOX_DEFAULTS.difficulty);
-    expect(() => clampSandboxConfig({ difficulty: 'constructor' as SandboxDifficultyId })).not.toThrow();
+  it('falls back to the default kit for an inherited Object.prototype key (#504 prototype pollution)', () => {
+    const cfg = clampSandboxConfig({ kit: 'constructor' as SandboxKitId });
+    expect(cfg.kit).toBe(SANDBOX_DEFAULTS.kit);
+    expect(() => clampSandboxConfig({ kit: 'constructor' as SandboxKitId })).not.toThrow();
   });
 
-  it('accepts every named difficulty', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
-      expect(clampSandboxConfig({ difficulty: id }).difficulty).toBe(id);
+  it('accepts every named kit', () => {
+    for (const id of SANDBOX_KIT_ORDER) {
+      expect(clampSandboxConfig({ kit: id }).kit).toBe(id);
     }
   });
 
@@ -113,8 +144,8 @@ describe('clampSandboxConfig', () => {
   it('is a total function — never throws on garbage input', () => {
     const garbage: Partial<SandboxConfig>[] = [
       { biome: 123 as unknown as string },
-      { difficulty: 123 as unknown as SandboxDifficultyId },
-      { difficulty: null as unknown as SandboxDifficultyId },
+      { kit: 123 as unknown as SandboxKitId },
+      { kit: null as unknown as SandboxKitId },
       { seed: 'not-a-number' as unknown as number },
       { seed: -50 },
     ];
@@ -149,22 +180,22 @@ describe('randomSandboxSeed', () => {
 });
 
 describe('sandboxLevelDef', () => {
-  it('turns ore deposits on, for every biome and difficulty (#1682)', () => {
+  it('turns ore deposits on, for every biome and kit (#1682)', () => {
     for (const biome of getAllBiomes()) {
-      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
-        expect(sandboxLevelDef(clampSandboxConfig({ biome: biome.id, difficulty })).oreDeposits).toBe(true);
+      for (const kit of SANDBOX_KIT_ORDER) {
+        expect(sandboxLevelDef(clampSandboxConfig({ biome: biome.id, kit })).oreDeposits).toBe(true);
       }
     }
   });
 
   it('carries the chosen biome, seed and starting cash onto the level', () => {
     const level = sandboxLevelDef(clampSandboxConfig({
-      biome: 'alpine_granite', seed: 777, difficulty: 'hard',
+      biome: 'alpine_granite', seed: 777, kit: 'full',
     }));
     expect(level.id).toBe(SANDBOX_LEVEL_ID);
     expect(level.biome).toBe('alpine_granite');
     expect(level.terrainSeed).toBe(777);
-    expect(level.startingCash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
+    expect(level.startingCash).toBe(SANDBOX_KITS.full.startingCash);
   });
 
   it('solves climateBias per seed so terrain lands in the chosen biome', () => {
@@ -177,8 +208,8 @@ describe('sandboxLevelDef', () => {
 
   it('fixes grid extents to the shared constants regardless of config', () => {
     for (const biome of getAllBiomes()) {
-      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
-        const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id, difficulty, seed: 999 }));
+      for (const kit of SANDBOX_KIT_ORDER) {
+        const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id, kit, seed: 999 }));
         expect(level.gridX).toBe(DEFAULT_GRID_SIZE);
         expect(level.gridZ).toBe(DEFAULT_GRID_SIZE);
         expect(level.datum).toBe(SANDBOX_DATUM);
@@ -192,7 +223,7 @@ describe('sandboxLevelDef', () => {
   });
 
   it('is deterministic — the same config always yields the same level', () => {
-    const cfg = clampSandboxConfig({ biome: 'red_canyon', seed: 31337, difficulty: 'normal' });
+    const cfg = clampSandboxConfig({ biome: 'red_canyon', seed: 31337, kit: 'digger' });
     expect(sandboxLevelDef(cfg)).toEqual(sandboxLevelDef(cfg));
   });
 
@@ -200,46 +231,43 @@ describe('sandboxLevelDef', () => {
     expect(sandboxLevelDef(SANDBOX_DEFAULTS).difficultyTier).toBe(0);
   });
 
-  it('varies only startingCash and startingSite across difficulty presets, holding biome and seed fixed (#1671)', () => {
-    const levels: Record<SandboxDifficultyId, ReturnType<typeof sandboxLevelDef>> =
-      Object.fromEntries(SANDBOX_DIFFICULTY_ORDER.map(id => [
+  it('varies only startingCash and startingSite across kits, holding biome and seed fixed (#1671)', () => {
+    const levels: Record<SandboxKitId, ReturnType<typeof sandboxLevelDef>> =
+      Object.fromEntries(SANDBOX_KIT_ORDER.map(id => [
         id,
-        sandboxLevelDef(clampSandboxConfig({ biome: 'tropical_karst', seed: 555, difficulty: id })),
-      ])) as Record<SandboxDifficultyId, ReturnType<typeof sandboxLevelDef>>;
+        sandboxLevelDef(clampSandboxConfig({ biome: 'tropical_karst', seed: 555, kit: id })),
+      ])) as Record<SandboxKitId, ReturnType<typeof sandboxLevelDef>>;
 
-    const [first, ...rest] = SANDBOX_DIFFICULTY_ORDER;
-    for (const key of LEVEL_FIELDS_SHARED_ACROSS_DIFFICULTY) {
+    const [first, ...rest] = SANDBOX_KIT_ORDER;
+    for (const key of LEVEL_FIELDS_SHARED_ACROSS_KITS) {
       for (const id of rest) {
         expect(levels[id][key]).toEqual(levels[first!][key]);
       }
     }
 
-    expect(levels.easy.startingCash).toBe(SANDBOX_DIFFICULTIES.easy.startingCash);
-    expect(levels.normal.startingCash).toBe(SANDBOX_DIFFICULTIES.normal.startingCash);
-    expect(levels.hard.startingCash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
+    expect(levels.digger.startingCash).toBe(SANDBOX_KITS.digger.startingCash);
+    expect(levels.full.startingCash).toBe(SANDBOX_KITS.full.startingCash);
 
     // startingSite is the one other field allowed to differ (#1671); every other key is shared.
-    expect(levels.easy.startingSite).not.toEqual(levels.normal.startingSite);
-    expect(levels.easy.startingSite).not.toEqual(levels.hard.startingSite);
+    expect(levels.full.startingSite).not.toEqual(levels.digger.startingSite);
     // Cash presets must actually differ, or the "varies only cash" claim is vacuous.
-    expect(levels.easy.startingCash).not.toBe(levels.normal.startingCash);
-    expect(levels.normal.startingCash).not.toBe(levels.hard.startingCash);
+    expect(levels.full.startingCash).not.toBe(levels.digger.startingCash);
   });
 
   it('clamps a hostile config rather than passing it through', () => {
     const level = sandboxLevelDef({
-      biome: 'not_a_biome', difficulty: 'legendary' as SandboxDifficultyId, seed: -5,
+      biome: 'not_a_biome', kit: 'legendary' as SandboxKitId, seed: -5,
     });
     expect(level.gridX).toBe(DEFAULT_GRID_SIZE);
     expect(level.datum).toBe(SANDBOX_DATUM);
-    expect(level.startingCash).toBe(SANDBOX_DIFFICULTIES[SANDBOX_DEFAULTS.difficulty].startingCash);
+    expect(level.startingCash).toBe(SANDBOX_KITS[SANDBOX_DEFAULTS.kit].startingCash);
   });
 });
 
 describe('SANDBOX_FIELDS', () => {
   it('describes exactly the three configurable fields (#504)', () => {
     const keys = SANDBOX_FIELDS.map(f => f.key);
-    expect(keys).toEqual(['biome', 'difficulty', 'seed']);
+    expect(keys).toEqual(['biome', 'kit', 'seed']);
   });
 
   it('gives every numeric field a usable range containing its default', () => {
@@ -263,10 +291,11 @@ describe('SANDBOX_FIELDS', () => {
     }
   });
 
-  it('the difficulty field offers exactly the three named presets', () => {
-    const field = SANDBOX_FIELDS.find(f => f.key === 'difficulty')!;
+  it('the kit field offers exactly the two named kits and labels itself "Starting kit"', () => {
+    const field = SANDBOX_FIELDS.find(f => f.key === 'kit')!;
+    expect(field.labelKey).toBe('sandbox.field.kit');
     const ids = (field.options?.() ?? []).map(o => o.id);
-    expect(ids).toEqual(SANDBOX_DIFFICULTY_ORDER);
+    expect(ids).toEqual(SANDBOX_KIT_ORDER);
   });
 });
 
@@ -284,20 +313,20 @@ describe('sandboxLevelDef — generated biome equals the picked biome (#1668)', 
   it.each(pickable)('%s: resolveGeneratedBiome lands on the picked biome for every seed', (picked) => {
     const misses: string[] = [];
     for (const seed of SEEDS) {
-      const level = sandboxLevelDef(clampSandboxConfig({ biome: picked, difficulty: 'normal', seed }));
+      const level = sandboxLevelDef(clampSandboxConfig({ biome: picked, kit: 'digger', seed }));
       const generated = resolveGeneratedBiome(seed, level.gridX, level.gridZ, level.climateBias);
       if (generated.id !== picked) misses.push(`${seed}->${generated.id}`);
     }
     expect(misses.slice(0, 10)).toEqual([]);
   });
 
-  it('is deterministic across calls and across difficulties', () => {
+  it('is deterministic across calls and across kits', () => {
     for (const seed of [29, 34, 106, 4242]) {
-      const first = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', difficulty: 'normal', seed }));
-      const again = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', difficulty: 'normal', seed }));
+      const first = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', kit: 'digger', seed }));
+      const again = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', kit: 'digger', seed }));
       expect(again.climateBias).toEqual(first.climateBias);
-      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
-        const other = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', difficulty, seed }));
+      for (const kit of SANDBOX_KIT_ORDER) {
+        const other = sandboxLevelDef(clampSandboxConfig({ biome: 'desert_badlands', kit, seed }));
         expect(other.climateBias).toEqual(first.climateBias);
       }
     }
@@ -329,17 +358,17 @@ describe('sandboxLevelDef — generated biome equals the picked biome (#1668)', 
   });
 });
 
-// #1671: every difficulty opens on a free starting kit able to drill, charge, fire and haul.
-describe('sandbox starting site per difficulty (#1671)', () => {
-  const siteOf = (id: SandboxDifficultyId) =>
-    sandboxLevelDef(clampSandboxConfig({ difficulty: id, biome: 'desert_badlands', seed: 42 })).startingSite;
+// #1671: every kit opens on a free starting kit able to drill, charge, fire and haul.
+describe('sandbox starting site per kit (#1671, #1891)', () => {
+  const siteOf = (id: SandboxKitId) =>
+    sandboxLevelDef(clampSandboxConfig({ kit: id, biome: 'desert_badlands', seed: 42 })).startingSite;
 
   /** Every qualification category held by any employee in the kit. */
-  const skillsOf = (id: SandboxDifficultyId) =>
+  const skillsOf = (id: SandboxKitId) =>
     new Set(siteOf(id)!.employees.flatMap(e => e.qualifications.map(q => q.category)));
 
   /** One key per slot, so a kit compares as a multiset. */
-  const slotKeys = (id: SandboxDifficultyId): string[] => {
+  const slotKeys = (id: SandboxKitId): string[] => {
     const site = siteOf(id)!;
     return [
       ...site.employees.map(e => `e:${e.role}:${e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).sort().join('+')}`),
@@ -358,12 +387,12 @@ describe('sandbox starting site per difficulty (#1671)', () => {
     return true;
   };
 
-  it.each(SANDBOX_DIFFICULTY_ORDER)('%s level defines a startingSite', (id) => {
+  it.each(SANDBOX_KIT_ORDER)('%s level defines a startingSite', (id) => {
     expect(siteOf(id)).toBeDefined();
-    expect(SANDBOX_DIFFICULTIES[id].startingSite).toBe(siteOf(id));
+    expect(SANDBOX_KITS[id].startingSite).toBe(siteOf(id));
   });
 
-  it.each(SANDBOX_DIFFICULTY_ORDER)('%s crew covers blasting, drill rig and truck driving, plus a hauler driver', (id) => {
+  it.each(SANDBOX_KIT_ORDER)('%s crew covers blasting, drill rig and truck driving, plus a hauler driver', (id) => {
     const skills = skillsOf(id);
     expect(skills.has('blasting')).toBe(true);
     expect(skills.has('driving.drill_rig')).toBe(true);
@@ -374,49 +403,55 @@ describe('sandbox starting site per difficulty (#1671)', () => {
     expect(truckHolders.length).toBeGreaterThanOrEqual(2);
   });
 
-  it.each(SANDBOX_DIFFICULTY_ORDER)('%s fleet has a drill rig, debris hauler and charging truck', (id) => {
+  it.each(SANDBOX_KIT_ORDER)('%s fleet has a drill rig, debris hauler and charging truck', (id) => {
     const roles = siteOf(id)!.vehicles.map(v => v.role);
     expect(roles).toContain('drill_rig');
     expect(roles).toContain('debris_hauler');
     expect(roles).toContain('charging_truck');
   });
 
-  it.each(SANDBOX_DIFFICULTY_ORDER)('%s buildings include a freight warehouse and a spoil heap', (id) => {
+  it.each(SANDBOX_KIT_ORDER)('%s buildings include a freight warehouse and a spoil heap', (id) => {
     const types = siteOf(id)!.buildings.map(b => b.type);
     expect(types).toContain('freight_warehouse');
     expect(types).toContain('spoil_heap');
   });
 
-  it('hard kit is a subset of normal, normal of easy, so size never decreases with ease', () => {
-    expect(isSubMultiset(slotKeys('hard'), slotKeys('normal'))).toBe(true);
-    expect(isSubMultiset(slotKeys('normal'), slotKeys('easy'))).toBe(true);
-    expect(slotKeys('hard').length).toBeLessThanOrEqual(slotKeys('normal').length);
-    expect(slotKeys('normal').length).toBeLessThanOrEqual(slotKeys('easy').length);
+  it('digger kit is a subset of the full kit, which adds exactly a rock fragmenter and its driver (#1891)', () => {
+    expect(isSubMultiset(slotKeys('digger'), slotKeys('full'))).toBe(true);
+    const extra = [...slotKeys('full')];
+    for (const k of slotKeys('digger')) extra.splice(extra.indexOf(k), 1);
+    expect(extra.sort()).toEqual([
+      'e:driver:driving.rock_fragmenter1',
+      'v:rock_fragmenter:1',
+    ].sort());
   });
 
-  it('keeps cash at 250k / 210k / 195k alongside the kit', () => {
-    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'easy' })).startingCash).toBe(250_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'normal' })).startingCash).toBe(210_000);
-    expect(sandboxLevelDef(clampSandboxConfig({ difficulty: 'hard' })).startingCash).toBe(195_000);
+  it('keeps cash at 210k digger / 250k full alongside the kit', () => {
+    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'digger' })).startingCash).toBe(210_000);
+    expect(sandboxLevelDef(clampSandboxConfig({ kit: 'full' })).startingCash).toBe(250_000);
   });
 
-  it('hard kit includes a rock digger and a driver holding driving.excavator (#1874)', () => {
-    expect(siteOf('hard')!.vehicles.some(v => v.role === 'rock_digger' && v.tier === 1)).toBe(true);
-    expect(skillsOf('hard').has('driving.excavator')).toBe(true);
+  it('SANDBOX_STARTING_SITES and SANDBOX_STARTING_CASH are keyed by kit (#1891)', () => {
+    expect(Object.keys(SANDBOX_STARTING_SITES).sort()).toEqual(['digger', 'full']);
+    expect(Object.keys(SANDBOX_STARTING_CASH).sort()).toEqual(['digger', 'full']);
+    expect(SANDBOX_STARTING_CASH.digger).toBe(210_000);
+    expect(SANDBOX_STARTING_CASH.full).toBe(250_000);
   });
 
-  it('hard kit has the same composition as the Normal digger kit (#1874)', () => {
-    expect(slotKeys('hard').sort()).toEqual(slotKeys('normal').sort());
+  it('digger kit includes a rock digger and a driver holding driving.excavator (#1874)', () => {
+    expect(siteOf('digger')!.vehicles.some(v => v.role === 'rock_digger' && v.tier === 1)).toBe(true);
+    expect(skillsOf('digger').has('driving.excavator')).toBe(true);
+    expect(skillsOf('digger').has('driving.rock_fragmenter')).toBe(false);
   });
 
-  it('hard cash is 195k, below normal and above the old 170k (#1874)', () => {
-    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBe(195_000);
-    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBeLessThan(SANDBOX_DIFFICULTIES.normal.startingCash);
-    expect(SANDBOX_DIFFICULTIES.hard.startingCash).toBeGreaterThan(170_000);
+  it('full kit adds a rock fragmenter and a driving.rock_fragmenter driver (#1891)', () => {
+    expect(siteOf('full')!.vehicles.some(v => v.role === 'rock_fragmenter')).toBe(true);
+    expect(skillsOf('full').has('driving.rock_fragmenter')).toBe(true);
+    expect(skillsOf('full').has('driving.excavator')).toBe(true);
   });
 
   it('hard no longer shares the Dusty Hollow site, and Dusty Hollow keeps its own start (#1874)', () => {
-    expect(siteOf('hard')).not.toEqual(DUSTY_HOLLOW_STARTING_SITE);
+    expect(siteOf('digger')).not.toEqual(DUSTY_HOLLOW_STARTING_SITE);
     expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.some(v => v.role === 'rock_digger')).toBe(false);
     expect(DUSTY_HOLLOW_STARTING_SITE.employees.some(e => e.qualifications.some(q => q.category === 'driving.excavator'))).toBe(false);
     const level = getLevel('dusty_hollow')!;
@@ -424,23 +459,24 @@ describe('sandbox starting site per difficulty (#1671)', () => {
     expect(level.startingCash).toBe(50_000);
   });
 
-  it('a hostile difficulty falls back to the default difficulty kit', () => {
-    const level = sandboxLevelDef({ biome: 'not_a_biome', difficulty: 'legendary' as SandboxDifficultyId, seed: -5 });
-    expect(level.startingSite).toEqual(SANDBOX_DIFFICULTIES[SANDBOX_DEFAULTS.difficulty].startingSite);
+  it('a hostile kit falls back to the default digger kit', () => {
+    const level = sandboxLevelDef({ biome: 'not_a_biome', kit: 'legendary' as SandboxKitId, seed: -5 });
+    expect(level.startingSite).toEqual(SANDBOX_KITS[SANDBOX_DEFAULTS.kit].startingSite);
     expect(level.startingSite!.vehicles.length).toBeGreaterThan(0);
   });
 });
 
-// ─── #1686: biome traits and difficulty details ─────────────────────────────
+// ─── #1686: biome traits and kit details ─────────────────────────────
 
 import {
   sandboxBiomeTraits,
-  sandboxDifficultyDetails,
+  sandboxKitDetails,
 } from '../../../src/core/campaign/Sandbox.js';
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
 import {
   SANDBOX_STARTING_SITES,
+  SANDBOX_STARTING_CASH,
   SANDBOX_RUGGEDNESS_ROLLING_PV,
   SANDBOX_RUGGEDNESS_STEEP_PV,
 } from '../../../src/core/config/balance.js';
@@ -519,53 +555,53 @@ describe('sandboxBiomeTraits (#1686)', () => {
   });
 });
 
-describe('sandboxDifficultyDetails (#1686)', () => {
+describe('sandboxKitDetails (#1686)', () => {
   const count = <T>(items: readonly T[], keyOf: (x: T) => string): Map<string, number> => {
     const m = new Map<string, number>();
     for (const i of items) m.set(keyOf(i), (m.get(keyOf(i)) ?? 0) + 1);
     return m;
   };
 
-  it('carries id, labelKey and the difficulty starting cash', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
-      const d = sandboxDifficultyDetails(id);
+  it('carries id, labelKey and the kit starting cash', () => {
+    for (const id of SANDBOX_KIT_ORDER) {
+      const d = sandboxKitDetails(id);
       expect(d.id).toBe(id);
-      expect(d.labelKey).toBe(SANDBOX_DIFFICULTIES[id].labelKey);
-      expect(d.startingCash).toBe(SANDBOX_DIFFICULTIES[id].startingCash);
+      expect(d.labelKey).toBe(SANDBOX_KITS[id].labelKey);
+      expect(d.startingCash).toBe(SANDBOX_KITS[id].startingCash);
     }
   });
 
   it('crew counts per role match the starting site employees', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+    for (const id of SANDBOX_KIT_ORDER) {
       const site = SANDBOX_STARTING_SITES[id];
       const expected = count(site.employees, e => e.role);
-      const got = sandboxDifficultyDetails(id).crew;
+      const got = sandboxKitDetails(id).crew;
       expect(got.length, id).toBe(expected.size);
       for (const g of got) expect(g.count, `${id}/${g.role}`).toBe(expected.get(g.role));
     }
   });
 
   it('vehicle counts per role and tier match the starting site vehicles', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+    for (const id of SANDBOX_KIT_ORDER) {
       const expected = count(SANDBOX_STARTING_SITES[id].vehicles, v => `${v.role}|${v.tier}`);
-      const got = sandboxDifficultyDetails(id).vehicles;
+      const got = sandboxKitDetails(id).vehicles;
       expect(got.length, id).toBe(expected.size);
       for (const g of got) expect(g.count).toBe(expected.get(`${g.role}|${g.tier}`));
     }
   });
 
   it('building counts per type and tier match the starting site buildings', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
+    for (const id of SANDBOX_KIT_ORDER) {
       const expected = count(SANDBOX_STARTING_SITES[id].buildings, b => `${b.type}|${b.tier}`);
-      const got = sandboxDifficultyDetails(id).buildings;
+      const got = sandboxKitDetails(id).buildings;
       expect(got.length, id).toBe(expected.size);
       for (const g of got) expect(g.count).toBe(expected.get(`${g.type}|${g.tier}`));
     }
   });
 
   it('every grouped count is a positive integer and totals match the site', () => {
-    for (const id of SANDBOX_DIFFICULTY_ORDER) {
-      const d = sandboxDifficultyDetails(id);
+    for (const id of SANDBOX_KIT_ORDER) {
+      const d = sandboxKitDetails(id);
       const site = SANDBOX_STARTING_SITES[id];
       expect(d.crew.reduce((s, c) => s + c.count, 0)).toBe(site.employees.length);
       expect(d.vehicles.reduce((s, c) => s + c.count, 0)).toBe(site.vehicles.length);
@@ -576,9 +612,9 @@ describe('sandboxDifficultyDetails (#1686)', () => {
     }
   });
 
-  it('easy opens with at least everything normal does', () => {
-    const easy = sandboxDifficultyDetails('easy');
-    const normal = sandboxDifficultyDetails('normal');
+  it('full opens with at least everything digger does', () => {
+    const easy = sandboxKitDetails('full'); // the richer kit
+    const normal = sandboxKitDetails('digger'); // the baseline kit
     const covers = <T extends { count: number }>(big: readonly T[], small: readonly T[], k: (x: T) => string) =>
       small.every(s => (big.find(b => k(b) === k(s))?.count ?? 0) >= s.count);
     expect(covers(easy.crew, normal.crew, c => (c as { role: string }).role)).toBe(true);
@@ -665,12 +701,12 @@ describe('sandbox pit mask (#1680)', () => {
 
 
 describe('sandbox market (#1681)', () => {
-  it('every biome and difficulty runs on the production market', async () => {
+  it('every biome and kit runs on the production market', async () => {
     const { getAllBiomes } = await import('../../../src/core/world/BiomeCatalog.js');
     for (const biome of getAllBiomes()) {
-      for (const difficulty of SANDBOX_DIFFICULTY_ORDER) {
-        const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id, difficulty }));
-        expect(level.market, `${biome.id}/${difficulty}`).toBe('production');
+      for (const kit of SANDBOX_KIT_ORDER) {
+        const level = sandboxLevelDef(clampSandboxConfig({ biome: biome.id, kit }));
+        expect(level.market, `${biome.id}/${kit}`).toBe('production');
       }
     }
   });

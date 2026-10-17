@@ -33,9 +33,9 @@ const DESERT = 'desert_badlands';
 const ABSORB_DAYS = 5;
 const BOARD_SEEDS = 20;
 
-function startSandbox(biome: string, seed: number, difficulty = 'normal', extra = ''): { run: Run; ctx: GameContext } {
+function startSandbox(biome: string, seed: number, kit = 'digger', extra = ''): { run: Run; ctx: GameContext } {
   const { runner, ctx } = createRunner();
-  const res = runner.run(`sandbox start biome:${biome} difficulty:${difficulty} seed:${seed} ${extra}`.trim());
+  const res = runner.run(`sandbox start biome:${biome} kit:${kit} seed:${seed} ${extra}`.trim());
   expect(res.success, res.output).toBe(true);
   return { run: (c) => runner.run(c), ctx };
 }
@@ -218,8 +218,8 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
  * log, an elapsed-tick clock, and `playUntil` stepping contracts and ticks up to `horizon`.
  * `afterTick` runs once per played step (for per-step bookkeeping).
  */
-function startPlayLoop(difficulty: string, horizon: number, afterTick: (elapsed: number) => void = () => {}) {
-  const { run, ctx } = startSandbox(DESERT, 42, difficulty);
+function startPlayLoop(kit: string, horizon: number, afterTick: (elapsed: number) => void = () => {}) {
+  const { run, ctx } = startSandbox(DESERT, 42, kit);
   run('time resume');
   const state = ctx.state!;
   const commands: string[] = [];
@@ -260,7 +260,7 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
 
   it('Normal, opening kit only, fires two blasts and grows cash from tick 1000 to tick 2000', () => {
     let cashAtMid: number | null = null;
-    const { state, commands, logged, over, playUntil } = startPlayLoop('normal', HORIZON, (elapsed) => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('digger', HORIZON, (elapsed) => {
       if (cashAtMid === null && elapsed >= MIDPOINT) cashAtMid = state.cash;
     });
     const filled = () => state.contracts.completedHistory.filter(c => c.completed).length;
@@ -300,14 +300,14 @@ describe('sandbox economy: a competent desert sandbox stays solvent', () => {
   }, 600_000);
 });
 
-describe('sandbox economy: the standard opening on every difficulty', () => {
+describe('sandbox economy: the standard opening on every starting kit (#1891)', () => {
   const HORIZON = 2000;
   const BUILD = 'living_quarters at:30,48 tier:1';
   const SHOT_START = '36,32';
-  /** The ramp Hard's kit digger carves into the first crater (#1874); same line as the solvent-sandbox test. */
-  const HARD_RAMP = 'start:12,34 end:34,34 depth:6';
+  /** The ramp the digger kit's rock digger carves into the first crater (#1874); same line as the solvent-sandbox test. */
+  const DIGGER_RAMP = 'start:12,34 end:34,34 depth:6';
   /**
-   * Easy's cash at tick 2000 on the scripted opening: today's run, #1747.
+   * The full kit's cash at tick 2000 on the scripted opening: today's run, #1747.
    * Measured on current main behaviour (seed 42, desert_badlands).
    */
   const EASY_CASH_AT_HORIZON_FLOOR = 681_127;
@@ -326,14 +326,14 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
   }
 
   /** The scripted standard opening: living quarters (tier 1), one 3x3 shot on the deposit, then sell to the horizon. */
-  function playOpening(difficulty: string, ramp?: string): OpeningTrace {
+  function playOpening(kit: string, ramp?: string): OpeningTrace {
     let rampOk: boolean | null = null;
     const trace: OpeningTrace = {
       endedAtTick: null, endReason: '', cashAtFirstBlast: null, cashAtHorizon: 0,
       brokeBeforeSaleAtTick: null, commands: [], buildOk: false, rampOk: null,
     };
     const saleDone = () => state.contracts.completedHistory.some(c => c.type === 'ore_sale' && c.completed);
-    const { state, commands, logged, over, playUntil } = startPlayLoop(difficulty, HORIZON, (elapsed) => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop(kit, HORIZON, (elapsed) => {
       if (trace.brokeBeforeSaleAtTick === null && !saleDone() && state.cash <= 0) trace.brokeBeforeSaleAtTick = elapsed;
       if (trace.endedAtTick === null && state.levelEnded) {
         trace.endedAtTick = elapsed;
@@ -360,13 +360,14 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     return trace;
   }
 
-  it('starting cash is strictly richer on easier difficulties', () => {
-    expect(SANDBOX_STARTING_CASH.easy).toBeGreaterThan(SANDBOX_STARTING_CASH.normal);
-    expect(SANDBOX_STARTING_CASH.normal).toBeGreaterThan(SANDBOX_STARTING_CASH.hard);
+  it('the full kit starts with strictly more cash than the digger kit', () => {
+    expect(SANDBOX_STARTING_CASH.full).toBeGreaterThan(SANDBOX_STARTING_CASH.digger);
+    expect(SANDBOX_STARTING_CASH.digger).toBe(210_000);
+    expect(SANDBOX_STARTING_CASH.full).toBe(250_000);
   });
 
-  it.each(['normal', 'hard'] as const)('%s: survives to tick 2000 solvent, and ends richer than at the first blast', (difficulty) => {
-    const t = playOpening(difficulty);
+  it.each(['digger', 'full'] as const)('%s kit: survives to tick 2000 solvent, and ends richer than at the first blast', (kit) => {
+    const t = playOpening(kit);
     expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
     expect(t.brokeBeforeSaleAtTick, 'cash hit zero before the first ore sale completed').toBeNull();
     expect(t.cashAtFirstBlast, 'a blast was fired').not.toBeNull();
@@ -374,8 +375,8 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 
-  it('hard: the kit digger carves the ramp, and the opening stays solvent and ends richer than at the first blast (#1874)', () => {
-    const t = playOpening('hard', HARD_RAMP);
+  it('digger: the kit digger carves the ramp, and the opening stays solvent and ends richer than at the first blast (#1874)', () => {
+    const t = playOpening('digger', DIGGER_RAMP);
     expect(t.rampOk, 'build_ramp accepted with the kit digger').toBe(true);
     expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
     expect(t.brokeBeforeSaleAtTick, 'cash hit zero before the first ore sale completed').toBeNull();
@@ -384,8 +385,8 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 600_000);
 
-  it('hard: the opening kit holds a rock digger and an excavator-licensed driver at game start (#1874)', () => {
-    const { ctx } = startSandbox(DESERT, 42, 'hard');
+  it('digger: the opening kit holds a rock digger and an excavator-licensed driver at game start (#1874)', () => {
+    const { ctx } = startSandbox(DESERT, 42, 'digger');
     const state = ctx.state!;
     const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger');
     expect(digger, 'a rock digger in the kit').toBeDefined();
@@ -393,8 +394,8 @@ describe('sandbox economy: the standard opening on every difficulty', () => {
     expect(driver, 'an excavator-licensed employee').toBeDefined();
   });
 
-  it('easy: the same opening ends at least at the pinned cash (today\'s run, #1747)', () => {
-    const t = playOpening('easy');
+  it('full: the same opening ends at least at the pinned cash (today\'s run, #1747)', () => {
+    const t = playOpening('full');
     expect(t.endedAtTick, `level ended at tick ${t.endedAtTick}: ${t.endReason}`).toBeNull();
     expect(t.cashAtHorizon).toBeGreaterThanOrEqual(EASY_CASH_AT_HORIZON_FLOOR);
     expect(t.commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
@@ -406,8 +407,8 @@ describe('sandbox economy: a supply contract can be filled (#1789)', () => {
   const BUILD = 'living_quarters at:30,48 tier:1';
   const SHOT_START = '36,32';
 
-  it('easy: the first dirtite supply offer is accepted, completes without penalty, and sales go on', () => {
-    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON);
+  it('full: the first dirtite supply offer is accepted, completes without penalty, and sales go on', () => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON);
     const supplyId = { current: null as number | null };
     const settled = () => supplyId.current !== null && state.contracts.completedHistory.some((c) => c.id === supplyId.current);
     /** Like a player: accept the first dirtite supply offer the moment it is on the board. */
@@ -451,7 +452,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
   const WAREHOUSE_FILLED_KG = 20_000;
   const RUSTITE_STOCK_FLOOR_KG = 2_000;
 
-  it('easy: rustite reaches stock and sells by t3500 (whether or not the warehouse fills), dirtite keeps selling', () => {
+  it('full: rustite reaches stock and sells by t3500 (whether or not the warehouse fills), dirtite keeps selling', () => {
     let filledAt: number | null = null;
     let rustitePeakAfterFill = 0;
     let rustitePeak = 0;
@@ -459,7 +460,7 @@ describe('sandbox economy: the second ore reaches the warehouse (#1817)', () => 
     const stockKg = (ore?: string) => ore === undefined
       ? Object.values(state.collectedOre).reduce((a, b) => a + b, 0)
       : state.collectedOre[ore] ?? 0;
-    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON, (elapsed) => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON, (elapsed) => {
       totalPeak = Math.max(totalPeak, stockKg());
       rustitePeak = Math.max(rustitePeak, stockKg('rustite'));
       if (filledAt === null && stockKg() >= WAREHOUSE_FILLED_KG) filledAt = elapsed;
@@ -506,7 +507,7 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
    */
   const HIGH_GRADE_GROUND_CEILING_KG = 10_000;
 
-  it('easy: accepted rustite contracts mostly complete, rustite and dirtite sell, high-grade rustite leaves the ground', () => {
+  it('full: accepted rustite contracts mostly complete, rustite and dirtite sell, high-grade rustite leaves the ground', () => {
     const acceptedRustite = new Set<number>();
     const rustiteActive = () => state.contracts.active.some((c) => c.type === 'ore_sale' && c.materialId === 'rustite');
     let armed = false; // offers are taken only once the shot is fired: rock must exist before a deadline runs against it
@@ -518,7 +519,7 @@ describe('sandbox economy: grade-weighted ore demand hauls high-grade rustite (#
     // Last tick rustite sat in the warehouse: once the reachable rustite is all hauled and sold nothing can fill a later offer,
     // so contracts accepted after it expire for want of ore, whatever the haul ranking does.
     let lastRustiteStockTick = 0;
-    const { state, commands, logged, over, playUntil } = startPlayLoop('easy', HORIZON, () => {
+    const { state, commands, logged, over, playUntil } = startPlayLoop('full', HORIZON, () => {
       if ((state.collectedOre['rustite'] ?? 0) > 1) lastRustiteStockTick = state.tickCount;
       acceptSmallRustite(logged);
     });

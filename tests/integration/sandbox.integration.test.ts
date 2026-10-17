@@ -1,15 +1,15 @@
 // Sandbox mode — through the real console runner and game loop
 //
-// #504: `sandbox start` collapsed to biome/difficulty/seed. Grid extents are
+// #504: `sandbox start` collapsed to biome/kit/seed (#1891: kit replaced difficulty). Grid extents are
 // fixed (64x64, datum SANDBOX_DATUM) and starting cash comes from the named
-// difficulty.
+// starting kit.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
-import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES } from '../../src/core/campaign/Sandbox.js';
+import { SANDBOX_DEFAULTS, SANDBOX_KITS } from '../../src/core/campaign/Sandbox.js';
 import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import { addIncome } from '../../src/core/economy/Finance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
@@ -56,7 +56,7 @@ describe('sandbox mode', () => {
   });
 
   it('starts a site from nothing — no new_game needed first', () => {
-    const result = runner.run('sandbox start biome:alpine_granite difficulty:hard seed:777');
+    const result = runner.run('sandbox start biome:alpine_granite kit:digger seed:777');
     expect(result.success).toBe(true);
     expect(ctx.state).toBeTruthy();
     expect(ctx.grid).toBeTruthy();
@@ -65,28 +65,71 @@ describe('sandbox mode', () => {
     });
   });
 
-  it.each(['easy', 'normal', 'hard'] as const)(
-    'difficulty:%s produces the documented starting cash',
-    (difficulty) => {
-      runner.run(`sandbox start biome:desert_badlands difficulty:${difficulty} seed:1`);
-      expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES[difficulty].startingCash);
+  it.each(['digger', 'full'] as const)(
+    'kit:%s produces the documented starting cash',
+    (kit) => {
+      runner.run(`sandbox start biome:desert_badlands kit:${kit} seed:1`);
+      expect(ctx.state!.cash).toBe(SANDBOX_KITS[kit].startingCash);
     },
   );
 
-  it('rejects an unknown difficulty, naming the valid ids', () => {
-    const result = runner.run('sandbox start difficulty:legendary');
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('easy');
-    expect(result.output).toContain('normal');
-    expect(result.output).toContain('hard');
+  it('defaults to the digger kit when no kit is given', () => {
+    runner.run('sandbox start biome:desert_badlands seed:1');
+    expect(ctx.state!.cash).toBe(SANDBOX_KITS.digger.startingCash);
+    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(false);
   });
 
-  it('rejects difficulty:constructor rather than resolving it to Object.prototype.constructor (#504 prototype pollution)', () => {
-    const result = runner.run('sandbox start biome:desert_badlands difficulty:constructor seed:1');
+  it.each([
+    ['easy', 'full'],
+    ['normal', 'digger'],
+    ['hard', 'digger'],
+  ] as const)('legacy difficulty:%s still works as an alias for kit:%s (#1891)', (difficulty, kit) => {
+    const result = runner.run(`sandbox start biome:desert_badlands difficulty:${difficulty} seed:1`);
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(SANDBOX_KITS[kit].startingCash);
+    expect(ctx.state!.vehicles.vehicles.length).toBe(SANDBOX_KITS[kit].startingSite.vehicles.length);
+    expect(result.output).not.toMatch(/difficult/i);
+  });
+
+  it('kit wins over the difficulty alias when both are given (#1891)', () => {
+    const result = runner.run('sandbox start biome:desert_badlands kit:digger difficulty:easy seed:1');
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(SANDBOX_KITS.digger.startingCash);
+  });
+
+  it('kit:full opens with a rock fragmenter and a fragmenter-licensed driver (#1891)', () => {
+    runner.run('sandbox start biome:desert_badlands kit:full seed:1');
+    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(true);
+    expect(ctx.state!.employees.employees.some(e => e.qualifications.some(q => q.category === 'driving.rock_fragmenter'))).toBe(true);
+    expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'rock_digger')).toBe(true);
+  });
+
+  it('rejects an unknown kit, naming the raw value and the valid ids', () => {
+    const result = runner.run('sandbox start kit:legendary');
     expect(result.success).toBe(false);
-    expect(result.output).toContain('easy');
-    expect(result.output).toContain('normal');
-    expect(result.output).toContain('hard');
+    expect(result.output).toContain('legendary');
+    expect(result.output).toContain('digger, full');
+    expect(result.output).not.toMatch(/difficult/i);
+  });
+
+  it('rejects an unknown difficulty alias value the same way (#1891)', () => {
+    const result = runner.run('sandbox start difficulty:legendary');
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('legendary');
+    expect(result.output).toContain('digger, full');
+  });
+
+  it('rejects kit:constructor rather than resolving it to Object.prototype.constructor (#504 prototype pollution)', () => {
+    const result = runner.run('sandbox start biome:desert_badlands kit:constructor seed:1');
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('constructor');
+    expect(result.output).toContain('digger, full');
+  });
+
+  it('the start message names no difficulty (#1891)', () => {
+    const result = runner.run('sandbox start biome:desert_badlands kit:full seed:1');
+    expect(result.success).toBe(true);
+    expect(result.output).not.toMatch(/difficult/i);
   });
 
   it('rejects an unknown biome instead of silently substituting one', () => {
@@ -96,14 +139,14 @@ describe('sandbox mode', () => {
   });
 
   it('seed:random produces a playable site', () => {
-    const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:random');
+    const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:random');
     expect(result.success).toBe(true);
     expect(ctx.grid).toBeTruthy();
     expect(solidCount(ctx.grid!)).toBeGreaterThan(0);
   });
 
   it('rebuilds an identical map from the same seed and biome', () => {
-    const args = 'sandbox start biome:green_foothills difficulty:normal seed:2024';
+    const args = 'sandbox start biome:green_foothills kit:digger seed:2024';
     runner.run(args);
     const first = solidCount(ctx.grid!);
 
@@ -114,25 +157,25 @@ describe('sandbox mode', () => {
   });
 
   it('produces a different map for a different seed', () => {
-    runner.run('sandbox start biome:green_foothills difficulty:normal seed:1');
+    runner.run('sandbox start biome:green_foothills kit:digger seed:1');
     const a = solidCount(ctx.grid!);
 
     const other = createRunner();
-    other.runner.run('sandbox start biome:green_foothills difficulty:normal seed:99999');
+    other.runner.run('sandbox start biome:green_foothills kit:digger seed:99999');
     expect(solidCount(other.ctx.grid!)).not.toBe(a);
   });
 
-  it('starts a playable alpine_granite hard-difficulty site', () => {
-    const result = runner.run('sandbox start biome:alpine_granite difficulty:hard seed:777');
+  it('starts a playable alpine_granite digger-kit site', () => {
+    const result = runner.run('sandbox start biome:alpine_granite kit:digger seed:777');
     expect(result.success).toBe(true);
-    expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
+    expect(ctx.state!.cash).toBe(SANDBOX_KITS.digger.startingCash);
     expect(ctx.state!.world).toMatchObject({
       sizeX: DEFAULT_GRID_SIZE, datum: SANDBOX_DATUM, sizeZ: DEFAULT_GRID_SIZE,
     });
   });
 
   it('grid extent stays fixed at 64x64 (datum SANDBOX_DATUM) regardless of a removed arg like size:', () => {
-    const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5 size:48');
+    const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:5 size:48');
     expect(result.success).toBe(true);
     expect(ctx.state!.world).toMatchObject({
       sizeX: DEFAULT_GRID_SIZE, datum: SANDBOX_DATUM, sizeZ: DEFAULT_GRID_SIZE,
@@ -146,7 +189,7 @@ describe('sandbox mode', () => {
     // any hole to actually land, same composition drill-plan-queueing.test.ts
     // uses for `new_game ... staffed:true`.
     // Staffed explicitly: this test pins the global composition, not the level kit.
-    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true');
+    runner.run('sandbox start biome:desert_badlands kit:full seed:42 staffed:true');
     const before = solidCount(ctx.grid!);
 
     runner.run('drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20');
@@ -175,7 +218,7 @@ describe('sandbox mode', () => {
   });
 
   it('generates contracts so the economy is live from the first tick', () => {
-    runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5');
+    runner.run('sandbox start biome:desert_badlands kit:digger seed:5');
     expect(ctx.state!.contracts.available.length).toBeGreaterThan(0);
   });
 
@@ -209,12 +252,12 @@ describe('sandbox mode', () => {
       }
     }
 
-    it.each(['easy', 'normal', 'hard'] as const)(
+    it.each(['digger', 'full'] as const)(
       'defaults to the %s level kit: crew, fleet and buildings placed, cash untouched (#1671)',
-      (difficulty) => {
-        const result = runner.run(`sandbox start biome:desert_badlands difficulty:${difficulty} seed:42`);
+      (kit) => {
+        const result = runner.run(`sandbox start biome:desert_badlands kit:${kit} seed:42`);
         expect(result.success).toBe(true);
-        const site = SANDBOX_DIFFICULTIES[difficulty].startingSite;
+        const site = SANDBOX_KITS[kit].startingSite;
         const st = ctx.state!;
         expect(site.employees.length).toBeGreaterThan(0);
         expect(st.employees.employees.length).toBe(site.employees.length);
@@ -226,28 +269,28 @@ describe('sandbox mode', () => {
         for (const slot of site.vehicles) {
           expect(st.vehicles.vehicles.some(v => v.type === slot.role && v.tier === slot.tier), `${slot.role} owned`).toBe(true);
         }
-        expect(st.cash).toBe(SANDBOX_DIFFICULTIES[difficulty].startingCash);
+        expect(st.cash).toBe(SANDBOX_KITS[kit].startingCash);
       },
     );
 
     it('default start places a freight warehouse and a spoil heap on the grid', () => {
-      runner.run('sandbox start biome:desert_badlands difficulty:hard seed:42');
+      runner.run('sandbox start biome:desert_badlands kit:digger seed:42');
       const types = ctx.state!.buildings.buildings.map(b => b.type);
       expect(types).toContain('freight_warehouse');
       expect(types).toContain('spoil_heap');
     });
 
     it('staffed:false opens a bare site: no crew, fleet or buildings (#1671)', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:false');
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:false');
       expect(result.success).toBe(true);
       expect(ctx.state!.employees.employees.length).toBe(0);
       expect(ctx.state!.vehicles.vehicles.length).toBe(0);
       expect(ctx.state!.buildings.buildings.length).toBe(0);
-      expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES.normal.startingCash);
+      expect(ctx.state!.cash).toBe(SANDBOX_KITS.digger.startingCash);
     });
 
-    it('staffed:true places the global composition and no buildings, whatever the difficulty (#1671)', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:hard seed:42 staffed:true');
+    it('staffed:true places the global composition and no buildings, whatever the kit (#1671)', () => {
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:true');
       expect(result.success).toBe(true);
       assertEmployeesMatchComposition(ctx.state!.employees.employees);
       assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
@@ -255,14 +298,14 @@ describe('sandbox mode', () => {
     });
 
     it('staffed:true hires and equips the STARTING_SITE_STAFFED_COMPOSITION roster and fleet', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:true');
       expect(result.success).toBe(true);
       assertEmployeesMatchComposition(ctx.state!.employees.employees);
       assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
     });
 
     it('staffed:true opens with a tier-1 charging truck and an employee holding blasting and driving.truck (#1648)', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:true');
       expect(result.success).toBe(true);
       const st = ctx.state!;
       expect(st.vehicles.vehicles.filter(v => v.type === 'charging_truck' && v.tier === 1)).toHaveLength(1);
@@ -273,23 +316,23 @@ describe('sandbox mode', () => {
     });
 
     it('staffed:false has no charging truck and no crew (#1648)', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:false');
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:false');
       expect(result.success).toBe(true);
       expect(ctx.state!.vehicles.vehicles.some(v => v.type === 'charging_truck')).toBe(false);
       expect(ctx.state!.employees.employees.length).toBe(0);
     });
 
     it('staffed:true leaves starting cash unaffected — same as an unstaffed run with identical params', () => {
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:true');
       expect(result.success).toBe(true);
-      expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES.normal.startingCash);
+      expect(ctx.state!.cash).toBe(SANDBOX_KITS.digger.startingCash);
     });
 
     it('rejects staffed:banana, leaving any existing game state untouched', () => {
-      runner.run('sandbox start biome:desert_badlands difficulty:normal seed:7');
+      runner.run('sandbox start biome:desert_badlands kit:digger seed:7');
       const before = ctx.state;
 
-      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:banana');
+      const result = runner.run('sandbox start biome:desert_badlands kit:digger seed:42 staffed:banana');
 
       expect(result.success).toBe(false);
       expect(result.output).toContain('Invalid staffed value');
@@ -298,7 +341,7 @@ describe('sandbox mode', () => {
   });
 });
 
-// #1671: each difficulty reaches its first sale from the free kit alone.
+// #1671: each kit reaches its first sale from the free kit alone.
 const CYCLE_TICK_CAP = 4000;
 const CYCLE_BUY_OR_HIRE = /^(employee hire|vehicle buy|vehicle purchase|build |hire |purchase )/;
 
@@ -332,13 +375,13 @@ function richDrillStarts(grid: VoxelGrid, count: number): Array<[number, number]
   return picked;
 }
 
-describe.each(['easy', 'normal', 'hard'] as const)('sandbox first blast to first sale on %s (#1671)', (difficulty) => {
+describe.each(['digger', 'full'] as const)('sandbox first blast to first sale on the %s kit (#1671)', (kit) => {
   it('drills, charges, fires, hauls and fills an ore contract with no buying or hiring, and stays solvent', () => {
     const { runner, ctx } = createRunner();
     const commands: string[] = [];
     const run: Run = (cmd) => { commands.push(cmd); return runner.run(cmd); };
 
-    expect(run(`sandbox start biome:desert_badlands seed:42 difficulty:${difficulty}`).success).toBe(true);
+    expect(run(`sandbox start biome:desert_badlands seed:42 kit:${kit}`).success).toBe(true);
     run('time resume');
     const state = ctx.state!;
     expect(state.employees.employees.length, 'the level opens staffed').toBeGreaterThan(0);
@@ -394,9 +437,9 @@ describe('parseSandboxArgs', () => {
     expect(parseSandboxArgs({ seed: 'huge' })).toEqual({});
   });
 
-  it('parses the full biome/difficulty/seed set the UI would emit', () => {
-    const parsed = parseSandboxArgs({ biome: 'volcanic_flats', difficulty: 'hard', seed: '4242' });
-    expect(parsed).toEqual({ biome: 'volcanic_flats', difficulty: 'hard', seed: 4242 });
+  it('parses the full biome/kit/seed set the UI would emit', () => {
+    const parsed = parseSandboxArgs({ biome: 'volcanic_flats', kit: 'full', seed: '4242' });
+    expect(parsed).toEqual({ biome: 'volcanic_flats', kit: 'full', seed: 4242 });
     expect(Object.keys(SANDBOX_DEFAULTS)).toEqual(expect.arrayContaining(Object.keys(parsed)));
   });
 
@@ -415,7 +458,7 @@ describe('sandbox mode vs the campaign profile (#1312)', () => {
     ctx.campaignProfile.bestStars['dusty_hollow'] = 2;
     const before = JSON.parse(JSON.stringify(ctx.campaignProfile));
 
-    expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5').success).toBe(true);
+    expect(runner.run('sandbox start biome:desert_badlands kit:digger seed:5').success).toBe(true);
     runner.run('tick 3');
 
     expect(ctx.campaignProfile).toEqual(before);
@@ -424,20 +467,20 @@ describe('sandbox mode vs the campaign profile (#1312)', () => {
   it('leaves a fresh profile untouched', () => {
     const { runner, ctx } = createRunner();
     const before = JSON.parse(JSON.stringify(ctx.campaignProfile));
-    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
+    runner.run('sandbox start biome:desert_badlands kit:full seed:5');
     expect(ctx.campaignProfile).toEqual(before);
   });
 
   it('gives the sandbox state a throwaway campaign that is not the profile object', () => {
     const { runner, ctx } = createRunner();
-    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
+    runner.run('sandbox start biome:desert_badlands kit:full seed:5');
     expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
     expect(ctx.state!.campaign.activeLevelId).not.toBe('dusty_hollow');
   });
 
   it('mutating the sandbox campaign does not leak into the profile', () => {
     const { runner, ctx } = createRunner();
-    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
+    runner.run('sandbox start biome:desert_badlands kit:full seed:5');
     ctx.state!.campaign.levels['grumpstone_ridge']!.unlocked = true;
     expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
   });
@@ -446,7 +489,7 @@ describe('sandbox mode vs the campaign profile (#1312)', () => {
 describe('sandbox is endless free play (#1321)', () => {
   it('never wins on profit: net profit far above the old $100k target ends nothing', () => {
     const { runner, ctx } = createRunner();
-    runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5');
+    runner.run('sandbox start biome:desert_badlands kit:digger seed:5');
     addIncome(ctx.state!.finances, 500000, 'sales', 'test windfall', ctx.state!.tickCount);
     runner.run('tick 3');
     expect(ctx.state!.levelEndReason).toBeNull();
@@ -455,7 +498,7 @@ describe('sandbox is endless free play (#1321)', () => {
 
   it('bankruptcy still ends a sandbox run', () => {
     const { runner, ctx } = createRunner();
-    runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5');
+    runner.run('sandbox start biome:desert_badlands kit:digger seed:5');
     ctx.state!.cash = 0;
     ctx.state!.bankruptcy.ticksBelowThreshold = BANKRUPTCY_GRACE_TICKS - 1;
     runner.run('tick 1');
@@ -465,7 +508,7 @@ describe('sandbox is endless free play (#1321)', () => {
 
   it('running sandbox start twice with identical args restarts the same configuration', () => {
     const { runner, ctx } = createRunner();
-    const args = 'sandbox start biome:green_foothills difficulty:hard seed:2024';
+    const args = 'sandbox start biome:green_foothills kit:digger seed:2024';
     runner.run(args);
     const first = { seed: ctx.state!.seed, cash: ctx.state!.cash, solid: solidCount(ctx.grid!) };
     runner.run('tick 5');
@@ -516,7 +559,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
   }
 
   it('desert_badlands seed 29 yields only desert rocks', () => {
-    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const { ctx } = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const rocks = rocksIn(ctx.grid!);
     expect(rocks.size).toBeGreaterThan(0);
     for (const volcanic of VOLCANIC_ROCKS) expect(rocks.has(volcanic), `${volcanic} present`).toBe(false);
@@ -525,7 +568,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
   });
 
   it('desert_badlands seed 29 offers only desert ores on the contract board', () => {
-    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const { ctx } = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const allowed = resolveContractOres(ctx.state!);
     for (const ore of WRONG_ORES) expect(allowed).not.toContain(ore);
     for (const ore of allowed) expect(DESERT_ORES).toContain(ore);
@@ -535,14 +578,14 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
   });
 
   it('starting the same site twice rebuilds identical voxels', () => {
-    const a = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
-    const b = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const a = start('sandbox start biome:desert_badlands kit:digger seed:29');
+    const b = start('sandbox start biome:desert_badlands kit:digger seed:29');
     expect(solidCount(b.ctx.grid!)).toBe(solidCount(a.ctx.grid!));
     expect(rockFingerprint(b.ctx.grid!)).toBe(rockFingerprint(a.ctx.grid!));
   });
 
   it('persists the shifted climate bias on the world and embeds the same bias in a save', () => {
-    const { ctx } = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const { ctx } = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const centre = getBiome('desert_badlands')!.climateCenter;
     const bias = ctx.state!.world!.climateBias;
     expect(bias).toBeDefined();
@@ -560,12 +603,12 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
     }
     // Precondition: the centre bias alone already resolves to the picked biome.
     expect(resolveGeneratedBiome(seed, DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE, centre).id).toBe('desert_badlands');
-    const { ctx } = start(`sandbox start biome:desert_badlands difficulty:normal seed:${seed}`);
+    const { ctx } = start(`sandbox start biome:desert_badlands kit:digger seed:${seed}`);
     expect(ctx.state!.world!.climateBias).toBeUndefined();
   });
 
   it('save then load keeps world.climateBias and regenerates the same terrain', () => {
-    const live = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const live = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const bias = live.ctx.state!.world!.climateBias;
     const loaded = createRunner().ctx;
     const state = deserialize(serialize(stateForSave(live.ctx, live.ctx.state!)));
@@ -576,7 +619,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
   });
 
   it('a save with no embedded voxels regenerates through the saved climate bias', () => {
-    const live = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const live = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const loaded = createRunner().ctx;
     const state = deserialize(serialize(live.ctx.state!)); // no world.voxels: the fallback path
     expect(state.world!.voxels).toBeUndefined();
@@ -586,7 +629,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
   });
 
   it('a save without world.climateBias loads using the biome centre', () => {
-    const live = start('sandbox start biome:desert_badlands difficulty:normal seed:29');
+    const live = start('sandbox start biome:desert_badlands kit:digger seed:29');
     const state = deserialize(serialize(live.ctx.state!));
     delete state.world!.climateBias;
     const loaded = createRunner().ctx;
@@ -611,7 +654,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
 describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start survey finds ore (#1677)', (biome) => {
   it.each(['aerial', 'core_sample'] as const)('%s survey at the start reports ore', (method) => {
     const { runner, ctx } = createRunner();
-    expect(runner.run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`).success).toBe(true);
+    expect(runner.run(`sandbox start biome:${biome} kit:digger seed:42 staffed:true`).success).toBe(true);
     runner.run('time resume');
     const state = ctx.state!;
     // The free kit has no surveyor: hire one and grant geology, as a player would via the roster.
@@ -678,7 +721,7 @@ describe('sandbox pit mask persistence and flat ground (#1680)', () => {
   }
 
   it('records the sandbox mask on the world', () => {
-    const { ctx } = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const { ctx } = start('sandbox start biome:alpine_granite kit:digger seed:42');
     expect(ctx.state!.world!.pitMask).toEqual(SANDBOX_PIT_MASK);
   });
 
@@ -688,14 +731,14 @@ describe('sandbox pit mask persistence and flat ground (#1680)', () => {
   });
 
   it('embeds the mask in a save and keeps world.pitMask through serialize/deserialize', () => {
-    const { ctx } = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const { ctx } = start('sandbox start biome:alpine_granite kit:digger seed:42');
     const state = deserialize(serialize(stateForSave(ctx, ctx.state!)));
     expect(state.world!.pitMask).toEqual(SANDBOX_PIT_MASK);
     expect(state.world!.voxels!.gen.pitMask).toEqual(SANDBOX_PIT_MASK);
   });
 
   it('save then load regenerates the same terrain', () => {
-    const live = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const live = start('sandbox start biome:alpine_granite kit:digger seed:42');
     const loaded = createRunner().ctx;
     const state = deserialize(serialize(stateForSave(live.ctx, live.ctx.state!)));
     expect(loadGridForState(loaded, state)).toBeNull();
@@ -705,7 +748,7 @@ describe('sandbox pit mask persistence and flat ground (#1680)', () => {
   });
 
   it('a save with no embedded voxels regenerates the same terrain through world.pitMask', () => {
-    const live = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const live = start('sandbox start biome:alpine_granite kit:digger seed:42');
     const loaded = createRunner().ctx;
     const state = deserialize(serialize(live.ctx.state!));
     expect(state.world!.voxels).toBeUndefined();
@@ -722,7 +765,7 @@ describe('sandbox pit mask persistence and flat ground (#1680)', () => {
   });
 
   it('a save without world.pitMask loads with the default mask (older saves)', () => {
-    const live = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const live = start('sandbox start biome:alpine_granite kit:digger seed:42');
     const state = deserialize(serialize(live.ctx.state!));
     delete state.world!.pitMask;
     const loaded = createRunner().ctx;
@@ -732,7 +775,7 @@ describe('sandbox pit mask persistence and flat ground (#1680)', () => {
   });
 
   it('a 3x3 shatternite shot on the flattest pad of alpine seed 42 is not a catastrophic flyrock event', () => {
-    const { ctx } = start('sandbox start biome:alpine_granite difficulty:normal seed:42');
+    const { ctx } = start('sandbox start biome:alpine_granite kit:digger seed:42');
     const grid = ctx.grid!;
     const size = SANDBOX_FLAT_PAD_SIZE;
 
@@ -757,5 +800,19 @@ describe('sandbox pit mask persistence and flat ground (#1680)', () => {
     const result = executeBlast(assembleBlastPlan(holes, charges), grid, []);
     expect(result, 'blast plan was rejected').not.toBeNull();
     expect(result!.rating).not.toBe('catastrophic');
+  });
+});
+
+describe('sandbox kit save round trip (#1891)', () => {
+  it('a kit:full state keeps crew, fleet and cash through serialize/deserialize', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands kit:full seed:42').success).toBe(true);
+    const live = ctx.state!;
+    const restored = deserialize(serialize(stateForSave(ctx, live)));
+    expect(restored.cash).toBe(SANDBOX_KITS.full.startingCash);
+    expect(restored.employees.employees.length).toBe(SANDBOX_KITS.full.startingSite.employees.length);
+    expect(restored.vehicles.vehicles.length).toBe(SANDBOX_KITS.full.startingSite.vehicles.length);
+    expect(restored.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')).toBe(true);
+    expect(restored.employees.employees.map(e => e.name).sort()).toEqual(live.employees.employees.map(e => e.name).sort());
   });
 });
