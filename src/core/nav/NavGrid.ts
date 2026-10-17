@@ -404,7 +404,12 @@ export class NavGrid {
   /**
    * Patch a rectangular region of the NavGrid in place.
    * The `navGrid` argument is mutated directly — no new NavGrid is created.
-   * Only cells within the clamped region are recomputed; cells outside are untouched.
+   * Cells within the clamped region are fully recomputed. The 1-cell halo
+   * around it is reclassified too (type/moveCost only), because
+   * `classifyCellType` reads cardinal neighbours' surface heights: a halo
+   * cell's ramp/walkable type depends on the patched column beside it. Other
+   * halo fields (benchLevel, occupancy, voxelY) are kept. Afterwards every
+   * cell's type and moveCost equal a fresh `buildNavGrid` of the same terrain.
    */
   static patchNavGrid(
     navGrid: NavGrid,
@@ -457,6 +462,8 @@ export class NavGrid {
       }
     }
 
+    NavGrid.reclassifyHalo(navGrid, voxelGrid, buildings, drillHoles, minX, maxX, minZ, maxZ);
+
     // Rare: only when the patch may have touched the grid's tallest column.
     // Cells outside the patch keep bench levels computed against the old
     // maxSurfaceY until their own next patch or a full rebuild touches them —
@@ -475,6 +482,34 @@ export class NavGrid {
     }
 
     NavGrid.recomputeClearanceRegion(navGrid, minX, maxX, minZ, maxZ);
+  }
+
+  /**
+   * Re-derive type/moveCost of the ring of cells just outside the given
+   * (already patched) box. Void cells and cells whose column is gone are
+   * skipped. Only walkable/ramp can flip here (drill_hole/blocked priority is
+   * unchanged), neither of which feeds clearance, so no clearance rework.
+   */
+  private static reclassifyHalo(
+    navGrid: NavGrid,
+    voxelGrid: VoxelGrid,
+    buildings: ReadonlyArray<FootprintOccupant>,
+    drillHoles: DrillHole[],
+    minX: number, maxX: number, minZ: number, maxZ: number,
+  ): void {
+    for (let z = minZ - 1; z <= maxZ + 1; z++) {
+      for (let x = minX - 1; x <= maxX + 1; x++) {
+        if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) continue;
+        const cell = navGrid.cellAt(x, z);
+        if (!cell || cell.type === 'void' || !navGrid.containsCell(x, z)) continue;
+        if (!voxelGrid.containsColumn(x, z)) continue;
+        const { cellType } = NavGrid.computeColumnData(voxelGrid, x, z, buildings, drillHoles);
+        if (cellType === cell.type) continue;
+        cell.type = cellType;
+        cell.moveCost = NavGrid.makeCell(cellType).moveCost;
+        navGrid.bumpRevision();
+      }
+    }
   }
 
   /**

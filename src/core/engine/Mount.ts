@@ -50,7 +50,7 @@ function admitOccupant(host: OccupancyHost, capacity: number, employee: Employee
  * occupants and, when the employee still exists, stands them on foot at
  * (x, z) with no journey in flight.
  */
-function releaseOccupant(host: OccupancyHost | undefined, employeeId: number, employee: Employee | undefined, x: number, z: number): void {
+function releaseOccupant(state: GameState, host: OccupancyHost | undefined, employeeId: number, employee: Employee | undefined, x: number, z: number): void {
   if (host) host.occupantIds = host.occupantIds.filter(id => id !== employeeId);
   if (!employee) return;
   employee.x = x;
@@ -84,6 +84,10 @@ function releaseOccupant(host: OccupancyHost | undefined, employeeId: number, em
   // isIdleForReposition (VehicleDriverAssignment.ts).
   employee.destinationX = null;
   employee.destinationZ = null;
+  // A mid-tick alight/leave is visible to other movers at once: claim the
+  // ground cell (refused when another agent already holds it; the next
+  // reconcile registers them then).
+  if (employee.alive) state.agentOccupancy?.tryMove({ kind: 'employee', id: employeeId }, Math.round(x), Math.round(z));
 }
 
 /** Records a host transition on the employee's trail at their current position; no-op without a trail. */
@@ -182,7 +186,7 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
   const next = employee?.itinerary?.legs[1];
   const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
   const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
-  releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
+  releaseOccupant(state, vehicle, employeeId, employee, cell.x, cell.z);
   if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
   // A driver who alights mid-route (rest, death) leaves the vehicle parked on a
   // cell its drive leg never marked: without the flag, foot paths route through it
@@ -293,7 +297,7 @@ export function releaseEmployeeFromHosts(state: GameState, employeeId: number, e
     if (employee && isInsideBuilding(employee.locomotion)) {
       leaveBuilding(state, employeeId, emitter);
     } else {
-      releaseOccupant(building, employeeId, undefined, 0, 0);
+      releaseOccupant(state, building, employeeId, undefined, 0, 0);
     }
   }
   if (employee && (isMounted(employee.locomotion) || isInsideBuilding(employee.locomotion))) {
@@ -354,7 +358,7 @@ export function leaveBuilding(state: GameState, employeeId: number, emitter?: Ev
   const cell = building
     ? findBuildingExitCell(state.navGrid, building, getBuildingDef(building.type, building.tier), employee.x, employee.z)
     : { x: employee.x, z: employee.z };
-  releaseOccupant(building, employeeId, employee, cell.x, cell.z);
+  releaseOccupant(state, building, employeeId, employee, cell.x, cell.z);
   markTransition(employee, 'leave', 'building', building?.x ?? cell.x, building?.z ?? cell.z);
 
   if (emitter) emitter.emit('employee:left_building', { employeeId, buildingId });
@@ -448,11 +452,11 @@ export function releaseOccupantsOfRemovedVehicles(state: GameState, emitter?: Ev
     if (isMounted(emp.locomotion)) {
       const vehicleId = emp.locomotion.vehicleId;
       if (liveVehicleIds.has(vehicleId)) continue;
-      releaseOccupant(undefined, emp.id, emp, emp.x, emp.z);
+      releaseOccupant(state, undefined, emp.id, emp, emp.x, emp.z);
       emitter?.emit('employee:alighted', { employeeId: emp.id, vehicleId });
       released.push(emp.id);
     } else if (!isInsideBuilding(emp.locomotion) && staleVehicleOrder(emp, liveVehicleIds)) {
-      releaseOccupant(undefined, emp.id, emp, emp.x, emp.z);
+      releaseOccupant(state, undefined, emp.id, emp, emp.x, emp.z);
       emp.moveConsecutiveFailures = 0;
       emp.vehicleWaitingTicks = 0;
       emp.isMoveStuck = false;
