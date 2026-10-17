@@ -28,7 +28,7 @@ export type PlayerAction =
    * an employee has no static x/z to click, only the id the hire produced,
    * and the driver looks up its current position itself.
    */
-  | { do: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
+  | { do: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole'; id: number; distance?: number }
   /**
    * Scroll the wheel out N ticks (design doc: always available, even while a
    * placement tool is armed). P3's in-scene picker only accepts a click on a

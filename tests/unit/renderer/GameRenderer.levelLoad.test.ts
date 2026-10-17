@@ -14,6 +14,7 @@ import { TerrainMesh } from '../../../src/renderer/TerrainMesh.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../../../src/core/config/balance.js';
 import { playableCut } from '../../../src/renderer/GameRendererTerrain.js';
+import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
@@ -456,5 +457,75 @@ describe('GameRenderer — level load draws the state\'s on-ground fragments (#1
     renderer.buildPlayableMesh(ctx);
 
     expect(drawnFragments(renderer)).toBe(0);
+  });
+});
+
+// ── Holes of a loaded state are drawn (#1877) ──
+//
+// A level load never ran showBlastPlanOverlay: a fresh page showed none of a
+// save's ordered, drilled and charged holes.
+
+describe('GameRenderer — level load draws the state\'s blast plan overlay (#1877)', () => {
+  async function ctxWithPlan(): Promise<MiningContext> {
+    const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
+    const state = ctx.state!;
+    const counter = { nextHoleId: 1 };
+    const g = ctx.grid!;
+    const cx = Math.floor((g.minX + g.maxX) / 2);
+    const cz = Math.floor((g.minZ + g.maxZ) / 2);
+    const h1 = addHole(counter, state.drillHoles, cx, cz, 6, 0.089);
+    const h2 = addHole(counter, state.drillHoles, cx + 3, cz, 6, 0.089);
+    addHole(counter, state.plannedDrillHoles, cx + 6, cz, 6, 0.089, state.drillHoles);
+    state.chargesByHole[h1.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: 2 };
+    state.chargesByHole[h2.id] = { explosiveId: 'boomite', amountKg: 6, stemmingM: 2 };
+    return ctx;
+  }
+
+  function expectPlanDrawn(renderer: GameRenderer): void {
+    for (const id of ['H1', 'H2', 'H3']) {
+      expect(renderer.entityWorldPosition('hole', holeNumericId(id)), id).not.toBeNull();
+    }
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(true);
+  }
+
+  it('draws ordered, drilled and charged holes through the staged load', async () => {
+    const ctx = await ctxWithPlan();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+    renderer.buildLandscapeMesh(ctx);
+    renderer.buildAmbient(ctx);
+    renderer.finishLevelLoad(ctx);
+
+    expectPlanDrawn(renderer);
+  });
+
+  it('draws them already after buildPlayableMesh, next to the fragments', async () => {
+    const ctx = await ctxWithPlan();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+    renderer.finishLevelLoad(ctx);
+
+    expectPlanDrawn(renderer);
+  });
+
+  it('draws them through the one-call syncFromContext load', async () => {
+    const ctx = await ctxWithPlan();
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.syncFromContext(ctx);
+
+    expectPlanDrawn(renderer);
+  });
+
+  it('draws nothing for a loaded state with no holes', async () => {
+    const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(false);
+    expect(renderer.entityWorldPosition('hole', 1)).toBeNull();
   });
 });

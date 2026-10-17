@@ -272,3 +272,44 @@ describe('BlastPlanOverlay', () => {
     overlay.dispose();
   });
 });
+
+describe('BlastPlanOverlay.reset (#1877)', () => {
+  it('hides the overlay and removes every marker', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(0, 4));
+    expect(overlayGroup(scene).children.length).toBeGreaterThan(0);
+
+    overlay.reset();
+
+    expect(overlayGroup(scene).visible).toBe(false);
+    expect(overlayGroup(scene).children).toHaveLength(0);
+    overlay.dispose();
+  });
+
+  it('drops every pick position and leaves pickables empty', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.show(makeOptions(0, 3));
+    expect(overlay.getHolePosition(holeNumericId('H1'))).not.toBeNull();
+
+    overlay.reset();
+
+    for (const id of ['H1', 'H2', 'H3']) expect(overlay.getHolePosition(holeNumericId(id))).toBeNull();
+    expect(overlay.pickables()).toEqual([]);
+    overlay.dispose();
+  });
+
+  it('is safe on a never-shown overlay and the overlay can be shown again afterwards', () => {
+    const scene = new THREE.Scene();
+    const overlay = new BlastPlanOverlay(scene);
+    overlay.reset();
+    overlay.show(makeOptions(0, 2));
+    overlay.reset();
+    overlay.show(makeOptions(0, 2));
+
+    expect(overlayGroup(scene).visible).toBe(true);
+    expect(overlay.getHolePosition(holeNumericId('H2'))).not.toBeNull();
+    overlay.dispose();
+  });
+});
