@@ -9,9 +9,13 @@ import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
 import { makeMockSceneManager } from '../../helpers/rendererFixtures.js';
+import { MAX_RENDERED_FRAGMENTS } from '../../../src/renderer/FragmentMesh.js';
 import { TerrainMesh } from '../../../src/renderer/TerrainMesh.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { FRAGMENT_MIN_RENDER_Y } from '../../../src/core/config/balance.js';
 import { playableCut } from '../../../src/renderer/GameRendererTerrain.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
 describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
@@ -332,5 +336,125 @@ describe('GameRenderer — landscape material follows the terrain material acros
 
     expect(renderer.landscape).toBe(landscape);
     expect(landscape.currentMaterial).toBe(renderer.terrain!.sharedMaterial);
+  });
+});
+
+function frag(id: number, x: number, y: number, z: number): FragmentData {
+  return {
+    id,
+    position: { x, y, z },
+    volume: 0.1, mass: 200, rockId: 'sandite', oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+    halfExtents: { x: 0.2, y: 0.2, z: 0.2 }, shapeSeed: id, origin: { x, y, z },
+  };
+}
+
+/** Fragment instances currently drawn by the renderer's FragmentMesh. */
+function drawnFragments(renderer: GameRenderer): number {
+  return (renderer as any).fragments.count as number;
+}
+
+// ── Fragments of a loaded state are drawn (#1868) ──
+//
+// A level load used to leave the FragmentMesh empty ("until blast runs"), so a
+// saved game's muckpile never appeared after Continue / Load Game.
+
+describe('GameRenderer — level load draws the state\'s on-ground fragments (#1868)', () => {
+  const MAX_RENDERED = MAX_RENDERED_FRAGMENTS;
+
+  async function ctxWith(frags: FragmentData[], states: Array<'on_ground' | 'in_transit' | 'stored'> = []): Promise<MiningContext> {
+    const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
+    addBlastFragments(ctx.state!.logistics, frags);
+    states.forEach((st, i) => { ctx.state!.logistics.fragments[i]!.state = st; });
+    return ctx;
+  }
+
+  function stagedLoad(renderer: GameRenderer, ctx: MiningContext): void {
+    renderer.buildPlayableMesh(ctx);
+    renderer.buildLandscapeMesh(ctx);
+    renderer.buildAmbient(ctx);
+    renderer.finishLevelLoad(ctx);
+  }
+
+  it('draws one instance per on-ground fragment, ignoring in-transit and stored ones', async () => {
+    const frags = [frag(1, 10, 5, 10), frag(2, 12, 5, 10), frag(3, 14, 5, 10), frag(4, 16, 5, 10), frag(5, 18, 5, 10)];
+    const ctx = await ctxWith(frags, ['on_ground', 'in_transit', 'on_ground', 'stored', 'on_ground']);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+
+    expect(drawnFragments(renderer)).toBe(3);
+    expect(renderer.entityWorldPosition('fragment', 1)).not.toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 2)).toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 3)).not.toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 4)).toBeNull();
+    expect(renderer.entityWorldPosition('fragment', 5)).not.toBeNull();
+  });
+
+  it('places each fragment where the state does (y floored like the blast spawn path)', async () => {
+    const ctx = await ctxWith([frag(1, 10, 5, 12), frag(2, 20, 0, 22)]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+
+    const a = renderer.entityWorldPosition('fragment', 1)!;
+    expect([a.x, a.y, a.z]).toEqual([10, 5, 12].map(v => expect.closeTo(v, 4)));
+    const b = renderer.entityWorldPosition('fragment', 2)!;
+    expect(b.x).toBeCloseTo(20, 4);
+    expect(b.y).toBeCloseTo(FRAGMENT_MIN_RENDER_Y, 4);
+    expect(b.z).toBeCloseTo(22, 4);
+  });
+
+  it('also draws them through the one-call syncFromContext load', async () => {
+    const ctx = await ctxWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.syncFromContext(ctx);
+
+    expect(drawnFragments(renderer)).toBe(2);
+  });
+
+  it('survives finishLevelLoad of the staged path', async () => {
+    const ctx = await ctxWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    stagedLoad(renderer, ctx);
+
+    expect(drawnFragments(renderer)).toBe(2);
+    expect(renderer.entityWorldPosition('fragment', 2)).not.toBeNull();
+  });
+
+  it('caps a huge pile at the render cap by sampling evenly across it', async () => {
+    const n = MAX_RENDERED + 1000;
+    const frags = Array.from({ length: n }, (_, i) => frag(i, 5 + (i % 50), 5, 5 + Math.floor(i / 50) % 50));
+    const ctx = await ctxWith(frags);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+
+    expect(drawnFragments(renderer)).toBe(MAX_RENDERED);
+    // Even sampling reaches the tail of the array, a prefix would not.
+    let tail = 0;
+    for (let i = Math.floor(n * 0.9); i < n; i++) if (renderer.entityWorldPosition('fragment', i)) tail++;
+    expect(tail).toBeGreaterThan(0);
+  });
+
+  it('draws nothing when no fragment lies on the ground', async () => {
+    const ctx = await ctxWith([frag(1, 10, 5, 10), frag(2, 12, 5, 10)], ['stored', 'in_transit']);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+
+    expect(drawnFragments(renderer)).toBe(0);
+    expect(renderer.entityWorldPosition('fragment', 1)).toBeNull();
+  });
+
+  it('draws nothing for a state with no fragments at all', async () => {
+    const ctx = await ctxWith([]);
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+
+    renderer.buildPlayableMesh(ctx);
+
+    expect(drawnFragments(renderer)).toBe(0);
   });
 });
