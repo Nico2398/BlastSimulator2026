@@ -4037,6 +4037,7 @@
   "economy.contract.deliver_insufficient": "Not enough {material} in storage to deliver.",
   "economy.contract.deliver_not_found": "Contract #{id} not found or already completed.",
   "logistics.invalid_amount": "Invalid amount requested: {amount}.",
+  "logistics.insufficient_rubble": "Not enough barren rock: {available} kg available, {requested} kg requested.",
   "logistics.insufficient_stock": "Not enough {material} in storage: {available} kg available, {requested} kg requested.",
   "time.duration.hours": "{h}h",
   "time.duration.days": "{d}d",

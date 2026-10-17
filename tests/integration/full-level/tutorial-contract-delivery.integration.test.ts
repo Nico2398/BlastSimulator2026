@@ -366,29 +366,32 @@ describe('Tutorial Level — Contract Delivery', () => {
 
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
 
-    // Accept a live rubble_disposal contract only now (#1574). The level opens
-    // with a spoil heap, and a rubble contract draws on heap stock first and is
-    // delivered from it as soon as the hauler dumps barren rock there, so a
-    // contract accepted before the haul completes (and can end the level on
-    // its payout) before the warehouse even exists. This test is about the
-    // warehouse draw path, so the heap is emptied to make storage the only
-    // stock the delivery can use. Not hardcoded to id 1 (#1166): see
-    // acceptRubbleDisposalContract.
-    const contractId = acceptRubbleDisposalContract();
-    for (const b of ctx.state!.buildings.buildings) {
-      if (b.type === 'spoil_heap') b.storedSpoilKg = 0;
-    }
+    // Accept a live ore_sale contract only now (#1574): one accepted before the
+    // haul completes could expire or end the level before the warehouse even
+    // exists. The hauled piece is ore-bearing and warehouse-bound, and rubble
+    // contracts draw on barren rock alone (#1871), so this test sells that
+    // ore from storage. The contract is injected for the stored ore rather than
+    // waiting for the board to roll a matching one.
+    const [oreId, oreKg] = Object.entries(ctx.state!.collectedOre).sort((x, y) => y[1] - x[1])[0]!;
+    expect(oreKg).toBeGreaterThan(0);
+    const saleKg = Math.min(200, Math.floor(oreKg));
+    const contractId = ctx.state!.contracts.nextId++;
+    ctx.state!.contracts.active.push({
+      id: contractId, type: 'ore_sale', materialId: oreId,
+      description: `[test fixture] deliver ${saleKg} kg ${oreId}`,
+      quantityKg: saleKg, deliveredKg: 0, pricePerKg: 10, deadlineTicks: 5000,
+      acceptedAtTick: ctx.state!.tickCount, penaltyAmount: 0, earlyBonus: 0,
+      completed: false, expired: false,
+    });
     // Both read right before the delivery, with no tick in between: the
     // contract search above ticks forward, and the self-dispatching hauler
     // keeps filling the warehouse meanwhile.
     const storedBefore = ctx.state!.logistics.storedMassKg;
     const cashBefore = ctx.state!.cash;
 
-    // rubble_disposal (materialId '') — deliver an amount well within what
-    // was actually hauled into storage.
-    const deliverAmount = Math.min(200, storedBefore);
+    // Deliver an amount within what was actually hauled into storage.
     const deliverResult = contractCommand(ctx, ['deliver', String(contractId)], {
-      amount: String(deliverAmount),
+      amount: String(saleKg),
     });
 
     expect(deliverResult.success).toBe(true);
