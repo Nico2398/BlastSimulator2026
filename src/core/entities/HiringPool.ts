@@ -39,7 +39,7 @@ export interface HiringPoolState {
 export const HIRING_ROLES: readonly EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 
 /** Fill every role up to HIRING_POOL_SIZE candidates, drawing ids from the pool counter. */
-function topUp(pool: HiringPoolState, rng: Random): void {
+function topUp(pool: HiringPoolState, rng: Random, _rosterNames?: ReadonlySet<string>): void {
   for (const role of HIRING_ROLES) {
     while (candidatesForRole(pool, role).length < HIRING_POOL_SIZE) {
       pool.candidates.push(generateCandidate(role, rng, pool.nextCandidateId++));
@@ -47,7 +47,7 @@ function topUp(pool: HiringPoolState, rng: Random): void {
   }
 }
 
-export function createHiringPool(seed: number, tick: number, script?: readonly ScriptedCandidate[]): HiringPoolState {
+export function createHiringPool(seed: number, tick: number, script?: readonly ScriptedCandidate[], _rosterNames?: ReadonlySet<string>): HiringPoolState {
   const pool: HiringPoolState = { candidates: [], nextCandidateId: 1, lastRefreshTick: tick };
   if (script) {
     applyScript(pool, script);
@@ -68,7 +68,7 @@ function buildCandidate(id: number, role: EmployeeRole, name: string, unionized:
   return { id, role, name, unionized, qualifications, salary: calculateSalary({ role, qualifications, raises: 0, unionized }) };
 }
 
-export function generateCandidate(role: EmployeeRole, rng: Random, id: number): HireCandidate {
+export function generateCandidate(role: EmployeeRole, rng: Random, id: number, _taken?: ReadonlySet<string>): HireCandidate {
   const name = generateName(rng);
   const unionized = rng.chance(CANDIDATE_UNION_CHANCE);
   // The bonus roll only happens for roles that have a primary qualification (draw order matters for seeded pools).
@@ -78,7 +78,7 @@ export function generateCandidate(role: EmployeeRole, rng: Random, id: number): 
 }
 
 /** Replace the whole pool with fresh candidates (new ids). */
-export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number, script?: readonly ScriptedCandidate[]): void {
+export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number, script?: readonly ScriptedCandidate[], _rosterNames?: ReadonlySet<string>): void {
   pool.candidates = [];
   pool.lastRefreshTick = tick;
   if (script) {
@@ -86,6 +86,12 @@ export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: num
     return;
   }
   topUp(pool, new Random(seed + tick + pool.nextCandidateId));
+}
+
+/** Names currently offered by the pool. */
+export function poolNames(_pool: Pick<HiringPoolState, 'candidates'>): Set<string> {
+  // TODO: implement
+  return new Set<string>();
 }
 
 /** Build the fixed candidate a script entry describes (#1600). */

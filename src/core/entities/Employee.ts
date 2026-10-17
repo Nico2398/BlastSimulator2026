@@ -44,8 +44,14 @@ const LAST_NAMES = [
   'Quartzman', 'Slagheap', 'Bedrock', 'Pitman', 'Drillbit',
 ];
 
-export function generateName(rng: Random): string {
+export function generateName(rng: Random, _taken?: ReadonlySet<string>): string {
   return `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
+}
+
+/** Names of the employees still alive (the dead free their name). */
+export function livingNames(_employees: readonly Pick<Employee, 'name' | 'alive'>[]): Set<string> {
+  // TODO: implement
+  return new Set<string>();
 }
 
 // ── Skills & Training ──
@@ -319,6 +325,7 @@ export function hireEmployee(
   z: number = 0,
   tickCount: number = 0,
   candidate?: Pick<HireCandidate, 'name' | 'unionized' | 'qualifications'>,
+  _takenNames?: ReadonlySet<string>,
 ): HireResult {
   const employee: Employee = {
     id: state.nextId++,
