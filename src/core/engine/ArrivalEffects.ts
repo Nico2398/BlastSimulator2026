@@ -29,7 +29,7 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
-import { pickupFragment, deliverToDepot, deliverToSpoilHeap, type TrackedFragment } from '../economy/Logistics.js';
+import { pickupFragment, reserveFragmentIds, deliverToDepot, deliverToSpoilHeap, type TrackedFragment } from '../economy/Logistics.js';
 import { creditSpoilKg, haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
@@ -207,15 +207,6 @@ function breakSeed(fragmentId: number, tickCount: number): number {
   return Math.abs(seed) % 2147483647;
 }
 
-/** Highest fragment id currently tracked in logistics, or -1 if none. Moved from the old BoulderBreaking.ts (#1091). */
-function highestFragmentId(state: GameState): number {
-  let max = -1;
-  for (const f of state.logistics.fragments) {
-    if (f.fragment.id > max) max = f.fragment.id;
-  }
-  return max;
-}
-
 /**
  * Fires when a rock_fragmenter's drive-to-boulder leg arrives: splits the
  * oversized fragment named by the vehicle's active fragment_debris action
@@ -243,10 +234,7 @@ export function applyBoulderSplit(state: GameState, vehicle: Vehicle, emitter?: 
   if (!result.success) return false;
 
   const originalId = tracked.fragment.id;
-  // Computed before the splice below (and against the original fragment's own
-  // id) so a sub-fragment id can never collide with the boulder just removed
-  // or with any other fragment still tracked in logistics.
-  let nextId = Math.max(highestFragmentId(state), originalId) + 1;
+  let nextId = reserveFragmentIds(state.logistics, result.fragments.length);
   const idx = state.logistics.fragments.indexOf(tracked);
   if (idx >= 0) state.logistics.fragments.splice(idx, 1);
   const cellX = Math.round(tracked.fragment.position.x);
