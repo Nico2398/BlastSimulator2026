@@ -423,14 +423,15 @@ export class ShadyPanel extends PanelBase {
       text: t('ui.shady.frame_union_refused'),
       attrs: { 'data-role': 'frame-union-refused', style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-critical-text)' },
     });
-    refusalEl.hidden = true;
     startBtn.disabled = eligible.length === 0 || cash < FRAME_COST;
     // Toggled in place on selection: the refusal shows before the player pays, no rebuild.
     select.addEventListener('change', () => {
       const refused = selectedIsUnion(select);
-      refusalEl.hidden = !refused;
+      // In the DOM only while refused, so the text never reads as present when it is not.
+      if (refused) selectRow.before(refusalEl); else refusalEl.remove();
       startBtn.disabled = refused || eligible.length === 0 || (this.lastState?.cash ?? cash) < FRAME_COST;
     });
+    const selectRow = el('div', { attrs: { style: 'display:flex;gap:6px' }, children: [select, startBtn] });
     startBtn.addEventListener('click', () => {
       const empId = Number(select.value);
       const emp = eligible.find(e => e.id === empId);
@@ -446,7 +447,7 @@ export class ShadyPanel extends PanelBase {
         },
       });
     });
-    children.push(refusalEl, el('div', { attrs: { style: 'display:flex;gap:6px' }, children: [select, startBtn] }));
+    children.push(selectRow);
 
     return card(children);
   }

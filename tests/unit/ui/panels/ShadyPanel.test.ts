@@ -737,8 +737,8 @@ describe('ShadyPanel frame service and union members (#1872)', () => {
     panel.setConfirmHandler((config) => { requests.push(config); });
     const calls: string[] = [];
     panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
-    const select = container.querySelector<HTMLSelectElement>('#bs-shady-panel [data-action="mafia-frame-employee"]')!;
-    const startBtn = () => container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-frame-start"]')!;
+    const select = container.querySelector<HTMLSelectElement>('[data-action="mafia-frame-employee"]')!;
+    const startBtn = () => container.querySelector<HTMLButtonElement>('[data-action="mafia-frame-start"]')!;
     const choose = () => {
       select.value = String(employee.id);
       select.dispatchEvent(new Event('change', { bubbles: true }));
