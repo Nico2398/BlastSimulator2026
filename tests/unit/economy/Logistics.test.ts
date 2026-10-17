@@ -378,31 +378,21 @@ describe('consumeStoredOre', () => {
     expect(getFragmentCounts(state).stored).toBe(1);
   });
 
-  it('rubble (materialId "") reaches into ore-bearing fragments once barren stock runs out, splitting them and decrementing collectedOre for the ore it removes', () => {
+  it('rubble (materialId "") larger than the barren stock fails with no mutation, even when ore-bearing stock would cover it (#1871)', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
-    const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
-    const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
-    putInStorage(state, oreFrag);
-    putInStorage(state, barrenFrag);
+    putInStorage(state, makeStoredFragment(1, 500, 0.04, { oreE: 1.0 })); // 500kg mass, 100kg oreE
+    putInStorage(state, makeStoredFragment(2, 300, 0.02, {})); // 300kg barren
     const collectedOre: Record<string, number> = { oreE: 100 };
+    const fragmentsBefore = state.fragments.map(f => ({ id: f.fragment.id, state: f.state, mass: f.fragment.mass, od: { ...f.fragment.oreDensities } }));
 
-    // Barren stock (300kg) alone can't cover this — the remaining 200kg comes
-    // out of the ore-bearing fragment, split rather than scrapped whole
-    // (#973), and the ore that leaves with it is struck off collectedOre so
-    // the ledger can't overstate what is physically in storage (#959).
     const result = consumeStoredOre(state, collectedOre, '', 500, []);
 
-    expect(result.success).toBe(true);
-    expect(result.consumedKg).toBe(500);
-    // 200kg of the ore fragment's 500kg left storage — 40% of its 100kg oreE.
-    expect(collectedOre.oreE).toBeCloseTo(60, 9);
-    expect(state.storedMassKg).toBe(300);
-    const remainder = state.fragments.find(f => f.fragment.id === 1);
-    expect(remainder).toBeDefined();
-    expect(remainder!.state).toBe('stored');
-    expect(remainder!.fragment.mass).toBe(300);
-    expect(state.fragments.find(f => f.fragment.id === 2)).toBeUndefined();
-    expect(getFragmentCounts(state).stored).toBe(1);
+    expect(result.success).toBe(false);
+    expect(result.consumedKg).toBe(0);
+    expect(result.error).toBeDefined();
+    expect(collectedOre).toEqual({ oreE: 100 });
+    expect(state.storedMassKg).toBe(800);
+    expect(state.fragments.map(f => ({ id: f.fragment.id, state: f.state, mass: f.fragment.mass, od: { ...f.fragment.oreDensities } }))).toEqual(fragmentsBefore);
   });
 
   it('rubble: two sequential small deliveries against a single oversized fragment both succeed via partial splits (issue #973 regression)', () => {
@@ -485,25 +475,99 @@ describe('consumeStoredOre', () => {
     expect(state.storedMassKg).toBe(200);
   });
 
-  it('rubble: a partial split of an ore-bearing fragment decrements collectedOre by the ore that physically left storage', () => {
+  it('rubble: ore-only stock is never consumed; the request fails and collectedOre is untouched (#1871)', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
-    // The only stored fragment carries real ore, so disposal has no barren
-    // stock to prefer and must split this one.
-    const frag = makeStoredFragment(1, 500, 0.04, { oreX: 1.0 }); // 100kg oreX
-    putInStorage(state, frag);
+    putInStorage(state, makeStoredFragment(1, 500, 0.04, { oreX: 1.0 })); // 100kg oreX
     const collectedOre: Record<string, number> = { oreX: 100 };
 
     const result = consumeStoredOre(state, collectedOre, '', 200, []);
 
-    expect(result.success).toBe(true);
-    expect(result.consumedKg).toBe(200);
-    // 200kg of 500kg left storage — with it, 40% of the fragment's oreX.
-    expect(collectedOre.oreX).toBeCloseTo(60, 9);
+    expect(result.success).toBe(false);
+    expect(result.consumedKg).toBe(0);
+    expect(collectedOre.oreX).toBe(100);
     const tracked = state.fragments.find(f => f.fragment.id === 1);
-    expect(tracked).toBeDefined();
-    expect(tracked!.fragment.mass).toBe(300);
-    expect(state.storedMassKg).toBe(300);
+    expect(tracked!.fragment.mass).toBe(500);
+    expect(tracked!.fragment.oreDensities).toEqual({ oreX: 1.0 });
+    expect(state.storedMassKg).toBe(500);
     expect(getFragmentCounts(state).stored).toBe(1);
+  });
+
+  it('rubble: a fragment just above the barren threshold is not rubble stock (#1871)', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 400, 0.16, { oreX: 0.03 }));
+    const collectedOre: Record<string, number> = { oreX: 30 };
+
+    expect(consumeStoredOre(state, collectedOre, '', 100, []).success).toBe(false);
+    expect(collectedOre.oreX).toBe(30);
+    expect(state.storedMassKg).toBe(400);
+  });
+
+  it('rubble: a fragment exactly at the barren threshold is rubble stock (#1871)', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 400, 0.16, { oreX: 0.02 }));
+    const collectedOre: Record<string, number> = { oreX: 8 };
+
+    const result = consumeStoredOre(state, collectedOre, '', 400, []);
+
+    expect(result.success).toBe(true);
+    expect(result.consumedKg).toBe(400);
+    expect(state.storedMassKg).toBe(0);
+  });
+
+  it('rubble draws the spoil heap first, then barren stored fragments (#1871)', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
+    putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
+    const collectedOre: Record<string, number> = { oreE: 100 };
+    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+
+    const heapOnly = consumeStoredOre(state, collectedOre, '', 150, [heap]);
+    expect(heapOnly.success).toBe(true);
+    expect(heap.storedSpoilKg).toBe(50);
+    expect(state.storedMassKg).toBe(800);
+
+    const spill = consumeStoredOre(state, collectedOre, '', 100, [heap]);
+    expect(spill.success).toBe(true);
+    expect(spill.consumedKg).toBe(100);
+    expect(heap.storedSpoilKg).toBe(0);
+    expect(state.fragments.find(f => f.fragment.id === 1)!.fragment.mass).toBe(250);
+    expect(state.storedMassKg).toBe(750);
+    expect(collectedOre.oreE).toBe(100);
+  });
+
+  it('rubble with a mixed stock takes exactly heap + barren and leaves ore whole (#1871)', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
+    putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
+    const collectedOre: Record<string, number> = { oreE: 100 };
+    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+
+    const result = consumeStoredOre(state, collectedOre, '', 500, [heap]);
+
+    expect(result.success).toBe(true);
+    expect(result.consumedKg).toBe(500);
+    expect(heap.storedSpoilKg).toBe(0);
+    expect(state.fragments.find(f => f.fragment.id === 1)).toBeUndefined();
+    const ore = state.fragments.find(f => f.fragment.id === 2);
+    expect(ore!.fragment.mass).toBe(500);
+    expect(state.storedMassKg).toBe(500);
+    expect(collectedOre.oreE).toBe(100);
+  });
+
+  it('rubble with a mixed stock refuses one kg more than heap + barren, mutating nothing (#1871)', () => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 300, 0.12, {}));
+    putInStorage(state, makeStoredFragment(2, 500, 0.04, { oreE: 1.0 }));
+    const collectedOre: Record<string, number> = { oreE: 100 };
+    const heap = { type: 'spoil_heap' as const, storedSpoilKg: 200 };
+
+    const result = consumeStoredOre(state, collectedOre, '', 501, [heap]);
+
+    expect(result.success).toBe(false);
+    expect(result.consumedKg).toBe(0);
+    expect(heap.storedSpoilKg).toBe(200);
+    expect(state.storedMassKg).toBe(800);
+    expect(collectedOre.oreE).toBe(100);
   });
 
   it('rubble boundary: requesting exactly the stored mass succeeds and empties storage', () => {
