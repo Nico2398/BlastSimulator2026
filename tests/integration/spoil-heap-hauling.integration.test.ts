@@ -28,6 +28,9 @@ import { makeGameContext } from '../helpers/gameContext.js';
 import { drillChargeAndBlast, tickUntilFresh } from '../helpers/blastFixtures.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { tickUntil } from './helpers.js';
+import { playContracts, playTick, clearBlastZone, FORBIDDEN_COMMAND, type Run } from '../helpers/playthrough.js';
+import { resolveActionCost } from '../../src/core/engine/ActionSelection.js';
+import { octileHeuristic } from '../../src/core/nav/Pathfinding.js';
 
 const HEAP_COST = 2000;
 
@@ -45,10 +48,10 @@ const heaps = (state: GameState) => state.buildings.buildings.filter(b => b.type
 const stateOf = (state: GameState, id: number) => state.logistics.fragments.find(t => t.fragment.id === id);
 
 /** Staffed 32x32 site with an active freight warehouse, a spoil heap and a crewed hauler. */
-function haulSite(withHeap = true) {
+function haulSite(withHeap = true, size = 32) {
   const { runner, ctx } = createRunner();
   const run = (cmd: string) => runner.run(cmd);
-  expect(run('new_game seed:42 size:32 staffed:true')).toMatchObject({ success: true });
+  expect(run(`new_game seed:42 size:${size} staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
   expect(run('build freight_warehouse at:4,18')).toMatchObject({ success: true });
   tickUntil(run, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 300);
@@ -472,4 +475,186 @@ describe('rock left after an ore sale leaves the warehouse as spoil (#1690)', ()
     expect(state.logistics.storedMassKg).toBeCloseTo(0, 3);
     expect(state.cash - cashBefore).toBeGreaterThanOrEqual(2000);
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Barren rock waits while an ore haul can be taken (#1870)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('barren rock yields to ore hauls (#1870): small site', () => {
+  const warehouseOf = (state: GameState) => state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+
+  /** Parks a stored filler in the warehouse so only `freeKg` of room is left (what a stocked warehouse is). */
+  function leaveRoom(state: GameState, freeKg: number): void {
+    refreshLogisticsCapacity(state);
+    const filler = rich(7001, 0, 0, state.logistics.storageCapacityKg - freeKg);
+    state.logistics.fragments.push({ fragment: filler, state: 'stored', vehicleId: null, warehouseId: warehouseOf(state).id });
+    state.logistics.storedMassKg += filler.mass;
+  }
+
+  it('barren rock beside far ore: the ore reaches the warehouse before any barren rock reaches the heap', () => {
+    const { run, state } = haulSite(true, 64);
+    // Barren piles near the hauler and the depot; one ore piece far out, past what the ore bonus can bridge.
+    const near = Array.from({ length: 6 }, (_, i) => barren(9801 + i, 6 + i, 6, 400));
+    addBlastFragments(state.logistics, [...near, rich(9810, 56, 56, 400)], state.navGrid);
+    syncHaulDispatch(state);
+
+    tickUntil(run, () => stateOf(state, 9810)?.state === 'stored', 4000);
+
+    expect(stateOf(state, 9810)?.state).toBe('stored');
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(0);
+    expect(near.every(f => stateOf(state, f.id)?.state === 'on_ground')).toBe(true);
+  });
+
+  it('with the ore delivered the barren rock follows to the heap (no ore left to wait for)', () => {
+    const { run, state } = haulSite(true, 64);
+    const near = Array.from({ length: 3 }, (_, i) => barren(9821 + i, 6 + i, 6, 400));
+    addBlastFragments(state.logistics, [...near, rich(9830, 56, 56, 400)], state.navGrid);
+    syncHaulDispatch(state);
+
+    tickUntil(run, () => near.every(f => stateOf(state, f.id) === undefined) && stateOf(state, 9830)?.state === 'stored', 8000);
+
+    expect(stateOf(state, 9830)?.state).toBe('stored');
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(1200);
+  });
+
+  it('control: barren rock alone is still cleared to the heap by the driver', () => {
+    const { run, state } = haulSite();
+    const frags = [barren(9841, 5, 6, 500), barren(9842, 6, 6, 500)];
+    addBlastFragments(state.logistics, frags, state.navGrid);
+    syncHaulDispatch(state);
+
+    tickUntil(run, () => frags.every(f => stateOf(state, f.id) === undefined), 3000);
+
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(1000);
+  });
+
+  it('control: with the warehouse full the barren rock still goes to the heap while the ore waits', () => {
+    const { run, state } = haulSite(true, 64);
+    leaveRoom(state, 100); // fragments weigh 400 kg: no ore fits
+    const near = Array.from({ length: 3 }, (_, i) => barren(9851 + i, 6 + i, 6, 400));
+    addBlastFragments(state.logistics, [...near, rich(9860, 56, 56, 400)], state.navGrid);
+    syncHaulDispatch(state);
+    refreshLogisticsCapacity(state);
+
+    tickUntil(run, () => near.every(f => stateOf(state, f.id) === undefined), 6000);
+
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(1200);
+    expect(stateOf(state, 9860)?.state).toBe('on_ground');
+    expect(state.pendingActions.find(a => a.payload['fragmentId'] === 9860)?.blockedReason).toBe('storage_full');
+  });
+});
+
+describe('barren rock yields to ore hauls (#1870): second shot beside the first', () => {
+  const BUILD = 'living_quarters at:30,48 tier:1';
+  const FIRST_SHOT = '36,32';
+  const SECOND_SHOT = '48,32';
+  /** The repro fires the second shot at t1866 of the standard opening (#1747, easy, desert_badlands seed 42). */
+  const SECOND_SHOT_FIRED_AT = 1866;
+  /** Drilling and charging it (~500 ticks beside the hauling) is ordered early enough to be ready by then. */
+  const SECOND_SHOT_ORDERED_AT = 1100;
+  const WINDOW_TICKS = 1000;
+  /** The repro's first-shot-only share was 12%; with the second shot it was 36%. */
+  const MAX_BARREN_SHARE = 0.15;
+  const ORE_PROBES = 8;
+
+  it('no barren trip starts while a reachable ore haul with warehouse room is open, and barren stays a small share of the tonnage', () => {
+    const { runner, ctx } = createRunner();
+    const run: Run = (c) => runner.run(c);
+    expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42')).toMatchObject({ success: true });
+    run('time resume');
+    const state = ctx.state!;
+    const commands: string[] = [];
+    const logged: Run = (c) => { commands.push(c); return run(c); };
+    const startTick = state.tickCount;
+    const elapsed = () => state.tickCount - startTick;
+
+    const tracking = { on: false };
+    const claimedSeen = new Set<number>();
+    const carried = new Map<number, { kg: number; barren: boolean }>();
+    const violations: string[] = [];
+    let barrenStarts = 0;
+    let oreStored = 0;
+    const storedSeen = new Set<number>();
+
+    const openOreHauls = () => {
+      const byId = new Map(state.logistics.fragments.map(t => [t.fragment.id, t]));
+      return state.pendingActions.filter(a => {
+        if (a.type !== 'haul_debris' || a.status !== 'queued' || a.holderId !== null || a.blockedReason != null) return false;
+        const t = byId.get(a.payload['fragmentId'] as number);
+        return t !== undefined && t.state === 'on_ground' && !isBarrenFragment(t.fragment.oreDensities) && haulBlockedReason(state, a) === null;
+      });
+    };
+    /** Idle debris haulers' reachable open ore hauls as of the last tick's end: what each driver's next choice could have been. */
+    const takeableOre = new Map<number, number>();
+    const sampleTakeableOre = () => {
+      takeableOre.clear();
+      if (!tracking.on) return;
+      const ore = openOreHauls();
+      if (ore.length === 0) return;
+      for (const e of state.employees.employees) {
+        if (e.activeActionId !== null || !state.vehicles.vehicles.some(v => v.type === 'debris_hauler' && vehicleDriverId(v) === e.id)) continue;
+        const probe = [...ore]
+          .sort((x, y) => octileHeuristic(e.x, e.z, x.targetX, x.targetZ) - octileHeuristic(e.x, e.z, y.targetX, y.targetZ))
+          .slice(0, ORE_PROBES)
+          .find(o => resolveActionCost(state, e, o) !== null);
+        if (probe !== undefined) takeableOre.set(e.id, probe.id);
+      }
+    };
+    const observe = () => {
+      if (!tracking.on) return;
+      const byId = new Map(state.logistics.fragments.map(t => [t.fragment.id, t]));
+      for (const t of state.logistics.fragments) {
+        if (t.state === 'in_transit' && !carried.has(t.fragment.id)) carried.set(t.fragment.id, { kg: t.fragment.mass, barren: isBarrenFragment(t.fragment.oreDensities) });
+        if (t.state === 'stored' && !storedSeen.has(t.fragment.id) && !isBarrenFragment(t.fragment.oreDensities)) {
+          storedSeen.add(t.fragment.id);
+          oreStored += t.fragment.mass;
+        }
+      }
+      for (const a of state.pendingActions) {
+        if (a.type !== 'haul_debris' || a.holderId === null || claimedSeen.has(a.id)) continue;
+        claimedSeen.add(a.id);
+        const t = byId.get(a.payload['fragmentId'] as number);
+        if (t === undefined || t.state !== 'on_ground' || !isBarrenFragment(t.fragment.oreDensities)) continue;
+        barrenStarts++;
+        const ore = takeableOre.get(a.holderId);
+        if (ore !== undefined) violations.push(`t+${elapsed()}: barren haul ${a.id} claimed by ${a.holderId} while ore haul ${ore} was open and reachable`);
+      }
+    };
+    const step = () => { playContracts(logged, state); sampleTakeableOre(); playTick(logged, state); observe(); };
+    const playUntil = (max: number, done: () => boolean) => { for (let i = 0; i < max && !state.levelEnded && !done(); i++) step(); };
+
+    // The #1747 standard opening: quarters, one 3x3 Krackle 8 kg shot on the deposit.
+    expect(logged(`build ${BUILD}`).success).toBe(true);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${FIRST_SHOT}`).success).toBe(true);
+    playUntil(800, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+
+    // The second 3x3 shot beside the first crater, ordered at t1866 of the opening.
+    playUntil(SECOND_SHOT_ORDERED_AT, () => elapsed() >= SECOND_SHOT_ORDERED_AT);
+    expect(logged(`drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:${SECOND_SHOT}`).success).toBe(true);
+    playUntil(1200, () => state.plannedDrillHoles.length === 0);
+    logged('charge hole:* explosive:krackle amount:8 stemming:2');
+    playUntil(1200, () => Object.keys(state.plannedChargesByHole).length === 0);
+    playUntil(SECOND_SHOT_FIRED_AT, () => elapsed() >= SECOND_SHOT_FIRED_AT);
+    clearBlastZone(logged, state);
+    expect(logged('blast').success).toBe(true);
+    expect(state.levelEnded, `ended ${String(state.levelEndReason)}`).toBe(false);
+
+    tracking.on = true;
+    const windowStart = elapsed();
+    playUntil(WINDOW_TICKS, () => elapsed() - windowStart >= WINDOW_TICKS);
+
+    const kg = (barren: boolean) => [...carried.values()].filter(c => c.barren === barren).reduce((sum, c) => sum + c.kg, 0);
+    const total = kg(true) + kg(false);
+    expect(violations).toEqual([]);
+    expect(oreStored, 'ore keeps arriving at the warehouse in the window').toBeGreaterThan(0);
+    expect(kg(false), 'ore tonnage the hauler carried in the window').toBeGreaterThan(0);
+    expect(kg(true) / total, `barren ${Math.round(kg(true))} kg of ${Math.round(total)} kg carried (${barrenStarts} barren trips)`).toBeLessThanOrEqual(MAX_BARREN_SHARE);
+    expect(commands.filter(c => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+    expectNoWorldInvariantViolations(state);
+  }, 900_000);
 });
