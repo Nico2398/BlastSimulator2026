@@ -14,7 +14,7 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../world/RockCatalog.js';
 import { getOre } from '../world/OreCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxDifficultyId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
+import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxDifficultyId, type SandboxKitId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
@@ -24,7 +24,7 @@ import type { LevelDef } from './Level.js';
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
 export const SANDBOX_LEVEL_ID = 'sandbox';
 
-export type { SandboxDifficultyId };
+export type { SandboxDifficultyId, SandboxKitId };
 
 export interface SandboxDifficultyDef {
   id: SandboxDifficultyId;
@@ -256,4 +256,44 @@ export function sandboxDifficultyDetails(id: SandboxDifficultyId): SandboxDiffic
     vehicles: groupSlots(vehicles.map(v => ({ role: v.role, tier: v.tier })), v => `${v.role}:${v.tier}`),
     buildings: groupSlots(buildings.map(b => ({ type: b.type, tier: b.tier })), b => `${b.type}:${b.tier}`),
   };
+}
+
+// ─── Starting kits (#1891) ─────────────────────────────────────────────────────
+
+export interface SandboxKitDef {
+  id: SandboxKitId;
+  /** i18n key for the kit's label. */
+  labelKey: string;
+  startingCash: number;
+  /** Free opening crew, fleet and buildings. */
+  startingSite: StartingSiteComposition;
+}
+
+/** Named starting kits: digger = today's normal kit, full = today's easy kit. */
+export const SANDBOX_KITS: Record<SandboxKitId, SandboxKitDef> = undefined as unknown as Record<SandboxKitId, SandboxKitDef>; // TODO: implement
+
+export const SANDBOX_KIT_ORDER: SandboxKitId[] = []; // TODO: implement ['digger', 'full']
+
+/** Legacy `difficulty:` names mapped onto kits (easy -> full, normal/hard -> digger). */
+export const SANDBOX_LEGACY_DIFFICULTY_ALIASES: Readonly<Record<string, SandboxKitId>> = {}; // TODO: implement
+
+/** Resolve a kit id or legacy difficulty alias; undefined when unknown. */
+export function resolveSandboxKitId(raw: string): SandboxKitId | undefined {
+  void raw;
+  return undefined; // TODO: implement
+}
+
+/** What a kit hands the player at the start. */
+export interface SandboxKitDetails {
+  id: SandboxKitId;
+  labelKey: string;
+  startingCash: number;
+  crew: readonly { role: EmployeeRole; count: number }[];
+  vehicles: readonly { role: VehicleRole; tier: VehicleTier; count: number }[];
+  buildings: readonly { type: BuildingType; tier: BuildingTier; count: number }[];
+}
+
+export function sandboxKitDetails(id: SandboxKitId): SandboxKitDetails {
+  void id;
+  return undefined as unknown as SandboxKitDetails; // TODO: implement
 }

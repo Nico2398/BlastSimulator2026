@@ -1630,6 +1630,9 @@ export const TUTORIAL_STARTING_BUILDINGS_NEAR = { x: 4, z: 19 } as const;
 /** Sandbox difficulty ids; single source of truth, re-exported by campaign/Sandbox. Starting kits are keyed by it (#1671). */
 export type SandboxDifficultyId = 'easy' | 'normal' | 'hard';
 
+/** Sandbox starting-kit ids (#1891): 'digger' = rock digger and driver, 'full' = richer kit. Replaces difficulty as the player-facing choice. */
+export type SandboxKitId = 'digger' | 'full';
+
 const SANDBOX_KIT_FRAGMENTER_DRIVER: StartingSiteEmployeeSlot = {
   role: 'driver',
   qualifications: [{ category: 'driving.rock_fragmenter', proficiencyLevel: 1 }],
