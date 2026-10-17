@@ -2895,3 +2895,6 @@ export const WB_OVERWORK_DRAG_MAX = 0.15;
 export const WB_CROWDING_DRAG_MAX = 0.8;
 /** Well-being drag per tick per accident of the last 10 ticks (about 1.5 points per accident in total); a blast that kills the crew must dent well-being, not zero it. */
 export const WB_ACCIDENT_DRAG = 0.15;
+
+/** Morale every remaining crew member loses when a colleague is dismissed (not for cause). */
+export const DISMISSAL_CREW_MORALE_DENT = 6;

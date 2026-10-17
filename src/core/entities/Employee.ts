@@ -431,6 +431,12 @@ export function fireEmployee(
   return { success: true };
 }
 
+/** Every alive employee except the dismissed one loses DISMISSAL_CREW_MORALE_DENT morale, clamped at 0. */
+export function applyDismissalMoraleDent(state: EmployeeState, dismissedId: number): void {
+  // TODO: implement
+  void state; void dismissedId;
+}
+
 /**
  * Process pay cycle. Returns total salaries paid.
  * Call each tick; only pays when cycle completes. `salaryFactorOf` scales each role's pay (active event modifiers).

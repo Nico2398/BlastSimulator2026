@@ -593,7 +593,7 @@ export function releaseEmployeeFromWorld(state: GameState, employeeId: number, e
 export function fireEmployeeFromWorld(
   state: GameState,
   employeeId: number,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; forCause?: boolean },
 ): { success: boolean; error?: string } & RefusalKey {
   const guard = canFireEmployee(state.employees, employeeId, opts);
   if (!guard.success) return guard;

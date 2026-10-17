@@ -6,7 +6,7 @@ import type { Random } from '../math/Random.js';
 import { queueFollowUp, type EventSystemState } from './EventSystem.js';
 import type { CorruptionState } from '../economy/Corruption.js';
 import type { GameState } from '../state/GameState.js';
-import type { EmployeeState } from '../entities/Employee.js';
+import type { Employee, EmployeeState } from '../entities/Employee.js';
 import { bookEmployeeDeath } from '../entities/Damage.js';
 import { releaseEmployeeFromWorld, fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import {
@@ -114,6 +114,13 @@ export function arrangeAccident(
     outcomeKey: 'mafia.accident_failed', outcomeParams: { name: emp.name },
     investigationTriggered: true,
   };
+}
+
+/** Refusal outcome key when the framing target cannot be framed (union members), else null. */
+export function frameRefusal(emp: Pick<Employee, 'unionized'>): string | null {
+  // TODO: implement
+  void emp;
+  return null;
 }
 
 /**
