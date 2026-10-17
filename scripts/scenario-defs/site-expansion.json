@@ -420,16 +420,6 @@
       "role": "setup"
     },
     {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
       "command": "blast",
       "description": "A blast spanning both the original site and ground claimed during play. #1648: the evacuation now sends its own walkout crew back in to drive the stranded rig out, so the zone clears and the detonation fires by itself during the ticks above (command mode: this `blast` is then refused, nothing left charged -- commandOutcome either). Should the zone still be waiting, the player presses Fire anyway.",
       "timeout": 150,
@@ -453,6 +443,17 @@
           "chargedCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolves a spontaneous event that fired during the last evacuation chunk. Sits after the blast step, not before it: the detonation can already have fired during the ticks above, and while its blast report is open the event dialog is deferred (UIManager.update), so a resolve placed before the report is closed waits on a dialog that cannot show. The pending event leaves command-mode state unchanged either way (a tick block stops dead on it, and the `blast` refusal advances nothing).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "build management_office at:34,4",
