@@ -29,7 +29,7 @@ import { getRock } from '../world/RockCatalog.js';
 import { buildTickEventContext } from './TickEventContext.js';
 import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues, releaseDeadHoldersActions } from './TaskCancellation.js';
-import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
+import { processPayCycle, computeAverageMorale, livingNames } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags, getStorageCapacity } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
@@ -224,7 +224,7 @@ export function runTick(
 
   // 4b. Rotate the hiring candidate pool on its interval
   if (isHiringPoolDue(state.hiringPool, state.tickCount)) {
-    refreshHiringPool(state.hiringPool, state.seed, state.tickCount, resolveHiringScript(state));
+    refreshHiringPool(state.hiringPool, state.seed, state.tickCount, resolveHiringScript(state), livingNames(state.employees.employees));
   }
 
   // 5. Smuggling income — a chosen fraction of trailing operating income, read before

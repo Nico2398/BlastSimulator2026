@@ -39,21 +39,24 @@ export interface HiringPoolState {
 export const HIRING_ROLES: readonly EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 
 /** Fill every role up to HIRING_POOL_SIZE candidates, drawing ids from the pool counter. */
-function topUp(pool: HiringPoolState, rng: Random, _rosterNames?: ReadonlySet<string>): void {
+function topUp(pool: HiringPoolState, rng: Random, rosterNames?: ReadonlySet<string>): void {
+  const taken = new Set([...(rosterNames ?? []), ...poolNames(pool)]);
   for (const role of HIRING_ROLES) {
     while (candidatesForRole(pool, role).length < HIRING_POOL_SIZE) {
-      pool.candidates.push(generateCandidate(role, rng, pool.nextCandidateId++));
+      const candidate = generateCandidate(role, rng, pool.nextCandidateId++, taken);
+      taken.add(candidate.name);
+      pool.candidates.push(candidate);
     }
   }
 }
 
-export function createHiringPool(seed: number, tick: number, script?: readonly ScriptedCandidate[], _rosterNames?: ReadonlySet<string>): HiringPoolState {
+export function createHiringPool(seed: number, tick: number, script?: readonly ScriptedCandidate[], rosterNames?: ReadonlySet<string>): HiringPoolState {
   const pool: HiringPoolState = { candidates: [], nextCandidateId: 1, lastRefreshTick: tick };
   if (script) {
     applyScript(pool, script);
     return pool;
   }
-  topUp(pool, new Random(seed + tick));
+  topUp(pool, new Random(seed + tick), rosterNames);
   return pool;
 }
 
@@ -68,8 +71,8 @@ function buildCandidate(id: number, role: EmployeeRole, name: string, unionized:
   return { id, role, name, unionized, qualifications, salary: calculateSalary({ role, qualifications, raises: 0, unionized }) };
 }
 
-export function generateCandidate(role: EmployeeRole, rng: Random, id: number, _taken?: ReadonlySet<string>): HireCandidate {
-  const name = generateName(rng);
+export function generateCandidate(role: EmployeeRole, rng: Random, id: number, taken?: ReadonlySet<string>): HireCandidate {
+  const name = generateName(rng, taken);
   const unionized = rng.chance(CANDIDATE_UNION_CHANCE);
   // The bonus roll only happens for roles that have a primary qualification (draw order matters for seeded pools).
   const hasPrimary = ROLE_STARTING_QUALIFICATIONS[role].length > 0;
@@ -78,20 +81,19 @@ export function generateCandidate(role: EmployeeRole, rng: Random, id: number, _
 }
 
 /** Replace the whole pool with fresh candidates (new ids). */
-export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number, script?: readonly ScriptedCandidate[], _rosterNames?: ReadonlySet<string>): void {
+export function refreshHiringPool(pool: HiringPoolState, seed: number, tick: number, script?: readonly ScriptedCandidate[], rosterNames?: ReadonlySet<string>): void {
   pool.candidates = [];
   pool.lastRefreshTick = tick;
   if (script) {
     applyScript(pool, script);
     return;
   }
-  topUp(pool, new Random(seed + tick + pool.nextCandidateId));
+  topUp(pool, new Random(seed + tick + pool.nextCandidateId), rosterNames);
 }
 
 /** Names currently offered by the pool. */
-export function poolNames(_pool: Pick<HiringPoolState, 'candidates'>): Set<string> {
-  // TODO: implement
-  return new Set<string>();
+export function poolNames(pool: Pick<HiringPoolState, 'candidates'>): Set<string> {
+  return new Set(pool.candidates.map(c => c.name));
 }
 
 /** Build the fixed candidate a script entry describes (#1600). */

@@ -6,6 +6,7 @@
 import type { ActionType, PendingAction } from '../state/GameState.js';
 import type { SkillCategory } from '../entities/Employee.js';
 import { createEmployeeState, hireEmployee, isEligibleForWork } from '../entities/Employee.js';
+import { poolNames } from '../entities/HiringPool.js';
 import { availableTrainingOffers, enrolInTraining, planTraining } from '../entities/EmployeeTraining.js';
 import { cancelAction } from '../engine/TaskDispatch.js';
 import { applyTaskCompletion } from '../engine/TaskCompletionEffects.js';
@@ -80,7 +81,7 @@ const hireContractor: UnqualifiedEffectHandler = (ids, world, tick) => {
     if (NEEDS_GRID.has(action.type) && !grid) continue;
     // A one-off visitor: not on the roster, earns no XP, only does the work.
     const { employee: contractor } = hireEmployee(
-      createEmployeeState(), 'manager', new Random(state.seed + tick + action.id), action.targetX, action.targetZ, tick,
+      createEmployeeState(), 'manager', new Random(state.seed + tick + action.id), action.targetX, action.targetZ, tick, undefined, poolNames(state.hiringPool),
     );
     contractor.id = -1;
     contractor.qualifications = action.requiredSkill === null
