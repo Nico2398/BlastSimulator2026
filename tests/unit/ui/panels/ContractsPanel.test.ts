@@ -28,6 +28,15 @@ function makePanel(): { panel: ContractsPanel; container: HTMLElement; gameConso
   return { panel, container, gameConsole };
 }
 
+/** Put one stored fragment of the given mass into warehouse storage; barren when oreDensities is empty. */
+function storeRock(state: GameState, mass: number, oreDensities: Record<string, number> = {}): void {
+  const fragment = {
+    id: state.logistics.fragments.length + 1, mass, volume: mass / 2500, rockId: 'sandite', oreDensities,
+  } as unknown as GameState['logistics']['fragments'][number]['fragment'];
+  state.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: 1 });
+  state.logistics.storedMassKg += mass;
+}
+
 function makeContract(overrides: Partial<Contract> = {}): Contract {
   return {
     id: 1, type: 'ore_sale', materialId: 'dirtite', description: 'Deliver dirtite ore',
@@ -184,16 +193,25 @@ describe('ContractsPanel', () => {
     expect(panel.root.querySelector('[data-contract-id="9"]')!.getAttribute('data-contract-wins')).toBe('true');
   });
 
-  it('marks a rubble offer fillable from raw stored mass, which carries no ore breakdown', () => {
+  it('marks a rubble offer fillable from barren stored fragments, and not from ore-bearing ones (#1871)', () => {
     const { panel } = makePanel();
     const state = makeState();
-    state.logistics.storedMassKg = 500;
+    storeRock(state, 500);
     state.contracts.available.push(makeContract({ id: 8, type: 'rubble_disposal', materialId: '', quantityKg: 400 }));
     panel.show();
     panel.update(state);
 
     expect(panel.root.querySelector('[data-contract-id="8"]')!
       .getAttribute('data-contract-fillable')).toBe('true');
+
+    const ore = makePanel();
+    const oreState = makeState();
+    storeRock(oreState, 500, { dirtite: 0.5 });
+    oreState.contracts.available.push(makeContract({ id: 8, type: 'rubble_disposal', materialId: '', quantityKg: 400 }));
+    ore.panel.show();
+    ore.panel.update(oreState);
+    expect(ore.panel.root.querySelector('[data-contract-id="8"]')!
+      .getAttribute('data-contract-fillable')).toBe('false');
   });
 
   it('Negotiate and Decline dispatch their commands', () => {
@@ -431,10 +449,11 @@ describe('ContractsPanel', () => {
       expect(r).toEqual({ '1': 'true', '2': 'false' });
     });
 
-    it('rubble_disposal is fillable against stored mass, not collected ore', () => {
+    it('rubble_disposal is fillable against barren stored rock, not collected ore or ore-bearing rock (#1871)', () => {
       const rubble = makeContract({ id: 3, type: 'rubble_disposal', materialId: '', quantityKg: 800 });
-      expect(fillableOf([rubble], (s) => { s.logistics.storedMassKg = 800; })['3']).toBe('true');
-      expect(fillableOf([rubble], (s) => { s.logistics.storedMassKg = 799; })['3']).toBe('false');
+      expect(fillableOf([rubble], (s) => { storeRock(s, 800); })['3']).toBe('true');
+      expect(fillableOf([rubble], (s) => { storeRock(s, 799); })['3']).toBe('false');
+      expect(fillableOf([rubble], (s) => { storeRock(s, 800, { dirtite: 0.5 }); })['3']).toBe('false');
     });
   });
 
@@ -737,7 +756,7 @@ describe('ContractsPanel deliver amount (#1368)', () => {
   function setup(stock: number, contract: Partial<Contract> = {}, rubble = false) {
     const ctx = makePanel();
     const state = makeState();
-    if (rubble) state.logistics.storedMassKg = stock;
+    if (rubble) storeRock(state, stock);
     else state.collectedOre['dirtite'] = stock;
     state.contracts.active.push(makeContract({ id: 5, quantityKg: 100, deliveredKg: 0, ...contract }));
     ctx.panel.show();
@@ -785,7 +804,7 @@ describe('ContractsPanel deliver amount (#1368)', () => {
     expect(max().disabled).toBe(true);
   });
 
-  it('rubble contract floors against storedMassKg', () => {
+  it('rubble contract floors against barren stored rock', () => {
     const { input, deliver, gameConsole } = setup(99.6, { type: 'rubble_disposal', materialId: '' }, true);
     expect(Number(input().value)).toBeCloseTo(99.6, 10);
     deliver().click();

@@ -910,25 +910,24 @@ describe('Economy', () => {
     }
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
 
-    // 7. Deliver against an active contract. The blast is a real, RNG-driven
-    // pipeline — unlike the fixture-injected-fragment tests above, there is
-    // no guarantee this particular grid's fragments carry any given ore
-    // (blingite is a probabilistic vein, not a certainty per voxel). A
-    // rubble_disposal contract (materialId: '') is the one contract type
-    // that consumeStoredOre accepts against raw stored mass regardless of
-    // ore content, so it is the deterministic way to round-trip this leg.
-    const contract = insertOreSaleContract(ctx.state!.contracts, 50, 10, {
-      type: 'rubble_disposal',
-      materialId: '',
-      description: '[test fixture] dispose of 50 kg rubble @ $10/kg',
+    // 7. Deliver against an active contract. Only warehouse-bound (ore-bearing)
+    // rock is ever stored — barren rock goes to a spoil heap and rubble
+    // contracts draw on barren rock alone (#1871) — so the stored fragment's own
+    // dominant ore is the deterministic thing to sell, whatever the RNG-driven
+    // blast happened to yield.
+    const [oreId, oreKg] = Object.entries(ctx.state!.collectedOre).sort((x, y) => y[1] - x[1])[0]!;
+    expect(oreKg).toBeGreaterThan(0);
+    const saleKg = Math.min(50, Math.floor(oreKg));
+    const contract = insertOreSaleContract(ctx.state!.contracts, saleKg, 10, {
+      materialId: oreId,
+      description: `[test fixture] deliver ${saleKg} kg ${oreId} @ $10/kg`,
     });
     const acceptResult = contractCommand(ctx, ['accept', String(contract.id)], {});
     expect(acceptResult.success).toBe(true);
 
     const completedBefore = ctx.state!.contracts.completedHistory.length;
-    const deliverAmount = Math.min(50, ctx.state!.logistics.storedMassKg);
     const deliverResult = contractCommand(ctx, ['deliver', String(contract.id)], {
-      amount: String(deliverAmount),
+      amount: String(saleKg),
     });
 
     expect(deliverResult.success).toBe(true);
