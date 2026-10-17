@@ -14,7 +14,7 @@ import type { BlastPlaybackSnapshot } from '../core/mining/BlastPlayback.js';
 import type { BlastReport } from '../core/mining/BlastExecution.js';
 import type { MiningContext } from '../console/commands/mining.js';
 import type { LandscapeHandle } from '../console/commands/world.js';
-import { onGroundFragmentData } from '../core/economy/Logistics.js';
+import { onGroundFragmentData, type LogisticsState } from '../core/economy/Logistics.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
@@ -282,17 +282,20 @@ export class GameRenderer {
 
     // A replaced state (save load over the same seed/grid) keeps the old
     // fragment meshes; loadGame() already seeded its own (#1868).
-    if (stateReplaced && !rebuilt) this.redrawGroundFragments(ctx);
+    if (stateReplaced && !rebuilt) this.redrawGroundFragments(ctx.state.logistics);
 
     this.lastState = ctx.state;
     this.syncEntities(ctx);
   }
 
   /** Drop every fragment mesh and redraw the state's on-ground pile (#1868). */
-  private redrawGroundFragments(ctx: MiningContext): void {
+  private redrawGroundFragments(logistics: LogisticsState): void {
     this.fragmentAnimator?.begin([]);
+    // The previous game's blast report and playback clock are stale too.
+    this.blastPlaybackReport = null;
+    this.blastPlaybackClockS = 0;
     this.fragments?.clearAll();
-    this.fragments?.spawnFragments(onGroundFragmentData(ctx.state!.logistics));
+    this.fragments?.spawnFragments(onGroundFragmentData(logistics));
   }
 
   /**

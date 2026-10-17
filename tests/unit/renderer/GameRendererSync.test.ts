@@ -501,6 +501,8 @@ describe('GameRenderer.syncFromContext — state replacement redraws fragments (
 
     expect(renderer.fragmentPlaybackDuration).toBe(0);
     expect(renderer.blastPlayback.isPlaying).toBe(false);
+    expect(renderer.blastPlayback.report).toBeNull();
+    expect(renderer.blastPlayback.elapsedS).toBe(0);
     expect(renderer.entityWorldPosition('fragment', 100)).toBeNull();
     expect(renderer.entityWorldPosition('fragment', 1)).not.toBeNull();
   });

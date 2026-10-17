@@ -27,7 +27,7 @@ import { buildBaseTransform, composeInstanceMatrix, type FragmentBaseTransform, 
 const MIN_RENDER_EXTENT = 0.25;
 
 // Maximum fragments rendered simultaneously (performance guard)
-const MAX_RENDERED_FRAGMENTS = 2000;
+export const MAX_RENDERED_FRAGMENTS = 2000;
 
 // Number of irregular shape variants
 const SHAPE_VARIANTS = 24;

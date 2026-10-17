@@ -9,6 +9,7 @@ import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
 import { makeMockSceneManager } from '../../helpers/rendererFixtures.js';
+import { MAX_RENDERED_FRAGMENTS } from '../../../src/renderer/FragmentMesh.js';
 import { TerrainMesh } from '../../../src/renderer/TerrainMesh.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { FRAGMENT_MIN_RENDER_Y } from '../../../src/core/config/balance.js';
@@ -359,7 +360,7 @@ function drawnFragments(renderer: GameRenderer): number {
 // saved game's muckpile never appeared after Continue / Load Game.
 
 describe('GameRenderer — level load draws the state\'s on-ground fragments (#1868)', () => {
-  const MAX_RENDERED = 2000;
+  const MAX_RENDERED = MAX_RENDERED_FRAGMENTS;
 
   async function ctxWith(frags: FragmentData[], states: Array<'on_ground' | 'in_transit' | 'stored'> = []): Promise<MiningContext> {
     const ctx = await makeGameContext({ mineType: 'green_foothills', seed: '42', size: '64' });
