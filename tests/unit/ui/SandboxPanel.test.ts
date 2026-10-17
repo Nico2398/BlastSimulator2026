@@ -532,7 +532,7 @@ describe('SandboxPanel', () => {
     changeSelect('biome', 'volcanic_flats');
     expect((control('seed') as HTMLInputElement).value).toBe('4242');
     expect((control('kit') as HTMLSelectElement).value).toBe('digger');
-    expect(panel.getConfig()).toEqual({ biome: 'volcanic_flats', difficulty: 'digger', seed: 4242 });
+    expect(panel.getConfig()).toEqual({ biome: 'volcanic_flats', kit: 'digger', seed: 4242 });
   });
 
   it('biome select option text is the full translated name, never shortened', () => {

@@ -320,7 +320,7 @@ describe('resolveContractOres (#1364)', () => {
   describe('new_game path (state.seed differs from any level terrainSeed)', () => {
     for (const biome of getAllBiomes()) {
       it(`biome ${biome.id}: offered covers the grid and is yieldable by the generated biome`, () => {
-        const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 12345 });
+        const level = sandboxLevelDef({ biome: biome.id, kit: 'digger', seed: 12345 });
         expect(level.terrainSeed).not.toBe(getLevel('tutorial_pit')!.terrainSeed);
         const state = stateFor(level, null);
         state.seed = 12345;
@@ -345,7 +345,7 @@ describe('resolveContractOres (#1364)', () => {
 
     for (const biome of getAllBiomes()) {
       it(`sandbox biome ${biome.id}`, () => {
-        const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 7 });
+        const level = sandboxLevelDef({ biome: biome.id, kit: 'digger', seed: 7 });
         const state = stateFor(level, SANDBOX_LEVEL_ID);
         // sandbox start persists the per-seed bias on the world (regenerateGrid)
         state.world!.climateBias = [level.climateBias[0], level.climateBias[1]];

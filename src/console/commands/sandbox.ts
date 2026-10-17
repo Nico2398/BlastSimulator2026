@@ -36,6 +36,10 @@ export function parseSandboxArgs(named: Record<string, string>): Partial<Sandbox
     const seed = named['seed'] === 'random' ? randomSandboxSeed() : Number(named['seed']);
     if (Number.isFinite(seed)) out.seed = seed;
   }
+  // Unknown kit values are left unset here; sandboxCommand reports them.
+  const rawKit = rawKitArg(named);
+  const kit = rawKit === undefined ? undefined : resolveSandboxKitId(rawKit);
+  if (kit) out.kit = kit;
   return out;
 }
 
