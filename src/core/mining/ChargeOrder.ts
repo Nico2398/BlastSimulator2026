@@ -8,7 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, type OrderStockDraw } from './ExplosiveStock.js';
+import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, orderDeliveryTicks, readOrderDeliveryTick, type OrderStockDraw } from './ExplosiveStock.js';
 import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
@@ -31,9 +31,21 @@ export interface ChargeHoleActionPayload {
 }
 
 /** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */
-export function earliestChargeDeliveryTick(_state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
-  // TODO: implement
-  return null;
+export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
+  let earliest: number | null = null;
+  for (const a of state.pendingActions) {
+    if (a.type !== 'charge_hole') continue;
+    const arrival = readOrderDeliveryTick(a);
+    if (arrival !== undefined && arrival > state.tickCount && (earliest === null || arrival < earliest)) earliest = arrival;
+  }
+  return earliest;
+}
+
+/** True while a charge order's cash-bought explosives have not arrived yet (#1895). */
+export function isChargeDeliveryPending(action: Pick<PendingAction, 'type' | 'payload'>, tickCount: number): boolean {
+  if (action.type !== 'charge_hole') return false;
+  const arrival = readOrderDeliveryTick(action);
+  return arrival !== undefined && tickCount < arrival;
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */
@@ -95,6 +107,7 @@ export function dispatchChargeAction(
     payload: {
       holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
       ...(orderStock && { orderStock }),
+      ...(fromCashKg > 0 && { deliveryArrivalTick: state.tickCount + orderDeliveryTicks(fromCashKg) }),
     } satisfies ChargeHoleActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });

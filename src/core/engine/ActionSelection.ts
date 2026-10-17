@@ -21,6 +21,7 @@ import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehic
 import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
+import { isChargeDeliveryPending } from '../mining/ChargeOrder.js';
 import { employeeClimbReach } from './OrderReachability.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks
@@ -428,12 +429,13 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 
 /**
  * True unless `action` is a charge_hole order whose hole is still only
- * planned (its drill order has not landed yet).
+ * planned (its drill order has not landed yet), or whose explosives are still in transit (#1895).
  */
 export function isChargeHoleClaimable(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'charge_hole') return true;
   const holeId = action.payload['holeId'];
   if (typeof holeId !== 'string') return true;
+  if (isChargeDeliveryPending(action, state.tickCount)) return false;
   return !state.plannedDrillHoles.some(h => h.id === holeId);
 }
 

@@ -595,7 +595,13 @@ export const EXPLOSIVE_ENERGY_SCALE = 10.0;
 /** Bulk purchase price relative to the per-order price of an explosive (#1678). */
 export const EXPLOSIVE_BULK_PRICE_FACTOR = 0.7;
 
-/** Ticks a charge order's cash-bought explosives take to be delivered (#1895). */
+/**
+ * Ticks a charge order's cash-bought explosives take to be delivered (#1895). Flat per order.
+ * Stock drawn from a warehouse loads at once, so a site firing ~1 pattern per 500 ticks
+ * waits ~400 ticks per unstocked pattern: the warehouse gains about that many ticks of
+ * extra pattern time per pattern, which at the pattern value pays its $20k build and
+ * $12/tick upkeep back within ~3,000 ticks.
+ */
 export const EXPLOSIVE_DELIVERY_TICKS = 400;
 
 /** Kg added or removed per click of the stock purchase stepper (#1685). */

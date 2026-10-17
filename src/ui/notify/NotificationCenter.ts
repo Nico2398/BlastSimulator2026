@@ -21,7 +21,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
-import { buildBlockedOrderMessage, isFailureBlock } from './blockedOrders.js';
+import { buildBlockedOrderMessage, isFailureBlock, isInTransitBlock } from './blockedOrders.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 import type { UiCues } from '../../audio/ui/UiCues.js';
@@ -98,6 +98,7 @@ export class NotificationCenter {
   private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
   /** True while a charge-awaiting-funds episode has already been toasted (#1345). */
   private chargeFundsWarned = false;
+  private transitWarned = false;
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
 
@@ -223,7 +224,8 @@ export class NotificationCenter {
     const queuedBlocked = state.pendingActions.filter(
       a => a.status === 'queued' && a.blockedReason != null,
     );
-    const strandedCount = queuedBlocked.filter(a => !isFailureBlock(a)).length;
+    const inTransit = queuedBlocked.filter(isInTransitBlock);
+    const strandedCount = queuedBlocked.filter(a => !isFailureBlock(a) && !isInTransitBlock(a)).length;
     const blockedActions = queuedBlocked.filter(isFailureBlock);
     // Hundreds of haul actions share one cause: toast once per reason, not per action.
     const haulActions = new Map<BlockedOrderReason, PendingAction>();
@@ -238,6 +240,14 @@ export class NotificationCenter {
     }
     for (const reason of this.warnedHaulReasons) {
       if (!haulActions.has(reason)) this.warnedHaulReasons.delete(reason);
+    }
+    // Explosives in transit (#1895): one grouped toast per waiting episode, no pip.
+    const [firstInTransit] = inTransit;
+    if (firstInTransit === undefined) {
+      this.transitWarned = false;
+    } else if (!this.transitWarned) {
+      this.transitWarned = true;
+      this.notify({ severity: 'info', icon: 'clock', title: t('notification.title.order_blocked'), body: buildBlockedOrderMessage(firstInTransit) });
     }
     // A ramp's layers are judged together (#1306), so one unreachable ramp
     // would otherwise toast once per layer: warn once per ramp instead.

@@ -3,12 +3,18 @@
 // Shared by the notification center, the Operations panel and the vehicle inspector.
 
 import type { PendingAction } from '../../core/state/GameState.js';
+import { readOrderDeliveryTick } from '../../core/mining/ExplosiveStock.js';
 import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 /** True when the block is a failure the player must fix (vs. a stranded-debris wait) (#1810). */
 export function isFailureBlock(action: Pick<PendingAction, 'blockedReason'>): boolean {
-  return action.blockedReason != null && action.blockedReason !== 'debris_out_of_reach';
+  return action.blockedReason != null && action.blockedReason !== 'debris_out_of_reach' && !isInTransitBlock(action);
+}
+
+/** True while a charge order waits for its explosives to arrive (#1895): a neutral wait, not a failure. */
+export function isInTransitBlock(action: Pick<PendingAction, 'blockedReason'>): boolean {
+  return action.blockedReason === 'explosives_in_transit';
 }
 
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
@@ -51,6 +57,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_spoil_heap_full', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
+    case 'explosives_in_transit':
+      return t('notification.order_blocked_in_transit', { order, tick: readOrderDeliveryTick(action) ?? 0 });
     case 'debris_out_of_reach':
       // Not toasted from update() (one summary pip instead); the Operations panel shows it per order.
       return t('notification.order_stranded_debris', { order });

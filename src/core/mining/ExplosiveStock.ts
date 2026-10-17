@@ -2,7 +2,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { factorFor } from '../events/ActiveModifiers.js';
-import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../config/balance.js';
+import { EXPLOSIVE_BULK_PRICE_FACTOR, EXPLOSIVE_DELIVERY_TICKS } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 import { addExpense, addIncome } from '../economy/Finance.js';
@@ -111,13 +111,12 @@ export function returnOrderStock(
 }
 
 /** Delivery wait in ticks for the part of an order bought with cash (#1895); 0 when nothing is bought. */
-export function orderDeliveryTicks(_fromCashKg: number): number {
-  // TODO: implement
-  return 0;
+export function orderDeliveryTicks(fromCashKg: number): number {
+  return fromCashKg > 0 ? EXPLOSIVE_DELIVERY_TICKS : 0;
 }
 
 /** Delivery arrival tick recorded on a charge action's payload, if any (#1895). */
-export function readOrderDeliveryTick(_action: Pick<PendingAction, 'payload'>): number | undefined {
-  // TODO: implement
-  return undefined;
+export function readOrderDeliveryTick(action: Pick<PendingAction, 'payload'>): number | undefined {
+  const tick = action.payload['deliveryArrivalTick'];
+  return typeof tick === 'number' ? tick : undefined;
 }

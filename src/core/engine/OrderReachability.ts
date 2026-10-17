@@ -29,6 +29,7 @@ import {
   type ClimbComponents,
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
+import { isChargeDeliveryPending } from '../mining/ChargeOrder.js';
 import { withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
@@ -343,7 +344,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     ) {
       unqualifiedIds.add(action.id);
     }
-    action.blockedReason = reason ?? haulBlockedReason(state, action, fragmentOf, fits);
+    action.blockedReason = reason
+      ?? (isChargeDeliveryPending(action, state.tickCount) ? 'explosives_in_transit' : null)
+      ?? haulBlockedReason(state, action, fragmentOf, fits);
     action.blockedLicenceLevel = action.requiredVehicleRole === null ? null
       : reason === 'licence_level_too_low' ? neededTierOf(action.requiredVehicleRole, orderTierFloor(action))
       : reason === 'no_reaching_vehicle' ? orderTierFloor(action)
