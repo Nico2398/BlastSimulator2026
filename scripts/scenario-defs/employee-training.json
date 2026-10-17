@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:200000",
-      "description": "#553: cash bumped from the default $50,000 to cover the drill_rig ($35,000) on top of the original curriculum's driving_center/geology_lab/training costs, with headroom for the ~250-tick runway's payroll/vehicle upkeep (no income anywhere in this file) and one lawsuit event (observed: Aesthetic Pollution, $15,000, seed 42).",
+      "description": "#553: cash bumped from the default $50,000 to cover the drill_rig ($35,000) on top of the original curriculum's driving_center/geology_lab/training costs, with headroom for the ~250-tick runway's payroll/vehicle upkeep (no income anywhere in this file) and one lawsuit event (observed: Aesthetic Pollution, $15,000, seed 42). #1873: cash raised from $150,000 to $200,000 because union membership (stretched union event cadence, member salary discount) shifted payroll and event timing.",
       "interaction": [
         {
           "type": "command",

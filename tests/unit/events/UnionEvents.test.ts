@@ -9,7 +9,7 @@ import { UNION_EVENTS_2 } from '../../../src/core/events/UnionEvents2.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
 import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { createEventSystemState, selectEvent, tickEventSystem } from '../../../src/core/events/EventSystem.js';
-import { MIN_EVENT_INTERVAL_ACTIONS } from '../../../src/core/config/balance.js';
+import { MIN_EVENT_INTERVAL_ACTIONS, MIN_EVENT_INTERVAL_TICKS } from '../../../src/core/config/balance.js';
 import { resolveEvent } from '../../../src/core/events/EventResolver.js';
 
 function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
@@ -175,6 +175,25 @@ describe('union events scale with membership (#1873)', () => {
     }
     return fired;
   }
+
+  it('the cooldown stretch alone refuses a zero-member crew where an all-member crew fires', () => {
+    const attempt = (unionMemberCount: number) => {
+      const state = createEventSystemState();
+      state.timers = state.timers.filter(t => t.category === 'union');
+      state.timers[0]!.remaining = 1; // expires on the next tick
+      state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS; // cached draw held fixed
+      state.lastEventTick = 0;
+      state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+      // Exactly the unstretched interval has elapsed.
+      const ctx = makeCtx({ tickCount: MIN_EVENT_INTERVAL_TICKS, employeeCount: 10, unionMemberCount, scores: lowWellBeing() });
+      return { state, fired: tickEventSystem(state, ctx, new Random(7)) };
+    };
+    const all = attempt(10);
+    expect(all.fired).not.toBeNull();
+    const none = attempt(0);
+    expect(none.fired).toBeNull();
+    expect(none.state.timers[0]!.remaining).toBe(5); // cooldown retry delay
+  });
 
   it('an all-member crew gets at least twice the union events of a zero-member crew', () => {
     const none = countUnionFires(0);

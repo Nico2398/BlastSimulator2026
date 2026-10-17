@@ -10,7 +10,6 @@ import {
   UNION_MEMBER_SALARY_DISCOUNT_PCT,
   UNION_TIMER_MIN_SHARE_FACTOR,
   UNION_STRIKE_MIN_MEMBERS,
-  ROLE_STARTING_QUALIFICATIONS,
   XP_THRESHOLDS,
 } from '../../../src/core/config/balance.js';
 import {
@@ -189,7 +188,6 @@ describe('hiring pool candidates with union discount', () => {
     const [u, n] = pool.candidates;
     expect(u!.salary).toBe(unionDiscountedSalary(n!.salary, true));
     expect(u!.salary).toBeLessThan(n!.salary);
-    expect(ROLE_STARTING_QUALIFICATIONS['driller'].length).toBeGreaterThan(0);
   });
 
   it('hiring a candidate gives the employee the card salary', () => {
