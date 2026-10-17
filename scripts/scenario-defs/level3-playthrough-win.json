@@ -1786,7 +1786,7 @@
       "expect": {
         "equals": {
           "tickCount": 455,
-          "cash": 781877,
+          "cash": 777077,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -2048,7 +2048,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 61.42340008633179,
+          "wellBeing": 61.42347366408654,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
