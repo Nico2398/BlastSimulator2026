@@ -3,18 +3,18 @@
   "description": "Visual check of morale effects from need gauges: after 200+ ticks without rest, morale should decrease as gauges drain below thresholds; needs command and scores output verify need penalty calculation and well-rested bonus when all gauges above 80",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:200000",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:200000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 200000,
           "employeeCount": 0
         }
       }
@@ -149,10 +149,9 @@
       "expect": {
         "decreased": [
           "cash",
-          "minFatigue",
-          "wellBeing"
+          "minFatigue"
         ],
-        "note": "gauges have now drained below thresholds — morale and wellBeing both fall from their tick-100 peak, confirming the penalty side of the file's claim"
+        "note": "gauges have now drained below thresholds — morale and wellBeing both fall from their tick-100 peak, confirming the penalty side of the file's claim #1907: wellBeing is no longer asserted here -- union events run on their own cooldown clock, Food Trucks now halts this batch at tick 120 and wellBeing is still pinned at its ~100 cap; the penalty is asserted below, where the gauges actually drain it."
       }
     },
     {
@@ -207,10 +206,9 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "minFatigue",
-          "wellBeing"
+          "minFatigue"
         ],
-        "note": "a real event (verified via direct trace) fires only ~5 ticks into this batch and blocks the rest, so cash doesn't move yet within that short a window (no payroll cycle hit) — minFatigue/wellBeing still confirm the continuing drain"
+        "note": "a real event (verified via direct trace) fires only ~5 ticks into this batch and blocks the rest, so cash doesn't move yet within that short a window (no payroll cycle hit) — minFatigue/wellBeing still confirm the continuing drain #1907: wellBeing is asserted in the long-drain steps at the end instead (still capped near 100 at this point)."
       }
     },
     {
@@ -221,12 +219,6 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "expect": {
-        "increased": [
-          "wellBeing"
-        ],
-        "note": "verified via direct trace: the pending event here is union_miner_month (the driller is hired from the union candidate, #1873: union events only fire at full cadence with union members on the roster), and choosing option 0 genuinely boosts wellBeing back up rather than leaving it at its drained low — a real, surprising effect worth locking in, not assumed"
-      },
       "role": "player",
       "commandOutcome": "either"
     },
@@ -259,6 +251,71 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "tick 300",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 300"
+        }
+      ],
+      "role": "setup",
+      "description": "#1907: drain phase. With union events on their own cooldown clock the early events no longer drain the crew, so the file runs on until the gauges do. Union_unlucky_days lands at tick 242 and halts this batch."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolve the tick-242 event so the drain can continue."
+    },
+    {
+      "command": "tick 300",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 300"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash",
+          "wellBeing"
+        ],
+        "note": "gauges have now drained below thresholds -- wellBeing falls from its ~100 cap to 0 by the time the tick-404 event halts this batch (minFatigue is not asserted: the crew rests mid-batch), confirming the penalty side of the file's claim"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either",
+      "expect": {
+        "increased": [
+          "wellBeing"
+        ],
+        "note": "verified via direct trace: the pending event here is union_suggestion_box (the driller is hired from the union candidate, #1873: union events only fire at full cadence with union members on the roster), and choosing option 0 genuinely boosts wellBeing back up from its drained 0 -- a real, surprising effect worth locking in, not assumed"
+      }
+    },
+    {
+      "command": "scores",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ]
     },
     {
       "command": "state full",

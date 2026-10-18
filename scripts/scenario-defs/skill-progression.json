@@ -731,13 +731,14 @@
       "description": "A single `tick 700` step silently under-runs: a random event can fire mid-batch and the tick command stops advancing right there (`Advanced N of 700 requested ticks`) rather than queuing the remainder, and `tick` itself refuses to advance at all while an event is pending. Chunked into 14× (tick 50, event choose 0) instead, the same pattern already used everywhere else in this file's sibling scenarios, so no requested ticks are silently dropped waiting on an unresolved dialog."
     },
     {
-      "command": "event choose 0",
+      "command": "event choose 1",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "resolveEventIfPending",
+          "option": 1
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "#1907: this is the Mining Human Right event (tick 181 since union events own their cooldown clock); option 1 ignores it, because option 0 hires a second employee and would inflate proficiencyTotal. Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player",
       "commandOutcome": "either"
     },

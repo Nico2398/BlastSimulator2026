@@ -306,6 +306,29 @@
       ]
     },
     {
+      "command": "tick 10",
+      "timeout": 130,
+      "description": "#1907: union events run on their own cooldown clock, so the Drills Realistic event now lands at tick 310, three ticks into this batch, and halts it. Advance to it here so the next step resolves it and the hauling window below runs in full.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons; decides whether an event is pending from authoritative game state, not from whether the modal has rendered.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "tick 60",
       "timeout": 130,
       "description": "Let the haulers carry the first ore into the warehouse.",

@@ -8,7 +8,7 @@ import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
 import { isEventShielded, markShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS, UNION_STRIKE_WEIGHT_BOOST } from '../config/balance.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS, UNION_STRIKE_MIN_MEMBERS, UNION_STRIKE_WEIGHT_BOOST, UNION_EVENT_MIN_INTERVAL_TICKS, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE } from '../config/balance.js';
 import { unionEventStretch } from '../entities/UnionMembership.js';
 import { STRIKE_EVENT_TAG, strikeDue } from './UnionGrievance.js';
 
@@ -70,6 +70,10 @@ export interface EventSystemState {
    * its own threshold fresh.
    */
   cooldownMinIntervalTicks: number | null;
+  /** Tick of the most recent union event fire — union events' own cooldown clock (#1907). */
+  lastUnionEventTick: number;
+  /** Union cooldown threshold for the current window, drawn once like cooldownMinIntervalTicks (#1907). Null between windows. */
+  unionCooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
   raisedUnqualifiedActionIds?: number[];
   /** Live timed modifiers raised by event effects (#1414). */
@@ -131,8 +135,29 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     actionCountSinceEvent: 0,
     eventFreqMultiplier,
     cooldownMinIntervalTicks: null,
+    lastUnionEventTick: 0,
+    unionCooldownMinIntervalTicks: null,
     unionGrievance: 0,
   };
+}
+
+/**
+ * Whether the union-event cooldown window is open at `tick` (#1907). Union events run on their
+ * own clock: the threshold is drawn once per window and cached (#597), then stretched by
+ * membership at the check, so no rng is consumed per retry.
+ */
+export function unionCooldownOpen(
+  state: EventSystemState,
+  tick: number,
+  unionMemberCount: number | undefined,
+  livingEmployeeCount: number,
+  rng: Random,
+): boolean {
+  if (state.unionCooldownMinIntervalTicks === null) {
+    state.unionCooldownMinIntervalTicks = UNION_EVENT_MIN_INTERVAL_TICKS + rng.nextInt(0, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE);
+  }
+  return tick - state.lastUnionEventTick
+    >= state.unionCooldownMinIntervalTicks * unionEventStretch(unionMemberCount, livingEmployeeCount);
 }
 
 // ── Tick processing ──
@@ -191,14 +216,19 @@ export function tickEventSystem(
       // Cooldown check — prevent events from firing too rapidly. The random
       // component is drawn once per cooldown window and cached (#597) rather
       // than redrawn on every retry below — see cooldownMinIntervalTicks's
-      // doc comment for why that matters.
-      if (state.cooldownMinIntervalTicks === null) {
-        state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
+      // doc comment for why that matters. Union events own a separate clock (#1907).
+      const isUnion = timer.category === 'union';
+      let blocked: boolean;
+      if (isUnion) {
+        blocked = !unionCooldownOpen(state, ctx.tickCount, ctx.unionMemberCount, ctx.employeeCount, rng);
+      } else {
+        if (state.cooldownMinIntervalTicks === null) {
+          state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
+        }
+        blocked = ctx.tickCount - state.lastEventTick < state.cooldownMinIntervalTicks
+          || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS;
       }
-      // The cached draw stays unscaled; the membership stretch applies to every category at the check (no extra rng draws).
-      const minInterval = state.cooldownMinIntervalTicks * unionEventStretch(ctx.unionMemberCount, ctx.employeeCount);
-      const ticksSinceLastEvent = ctx.tickCount - state.lastEventTick;
-      if (ticksSinceLastEvent < minInterval || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS) {
+      if (blocked) {
         // Short retry delay (5 ticks) before re-checking cooldown — avoids tight loop
         timer.remaining = 5;
         continue;
@@ -214,9 +244,14 @@ export function tickEventSystem(
           return null;
         }
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
-        state.lastEventTick = ctx.tickCount;
-        state.actionCountSinceEvent = 0;
-        state.cooldownMinIntervalTicks = null;
+        if (isUnion) {
+          state.lastUnionEventTick = ctx.tickCount;
+          state.unionCooldownMinIntervalTicks = null;
+        } else {
+          state.lastEventTick = ctx.tickCount;
+          state.actionCountSinceEvent = 0;
+          state.cooldownMinIntervalTicks = null;
+        }
         return state.pendingEvent;
       }
     }
@@ -248,7 +283,7 @@ export function incrementActionCount(state: EventSystemState): void {
 
 // ── Selection ──
 
-/** Union timers reset longer for a crew with few members (#1873); other categories' timers are unaffected (the shared cooldown is stretched separately, #1890). */
+/** Union timers reset longer for a crew with few members (#1873); other categories' timers are unaffected; the union cooldown is stretched at its own check (#1907). */
 function categoryStretch(category: EventCategory, ctx: EventContext): number {
   return category === 'union' ? unionEventStretch(ctx.unionMemberCount, ctx.employeeCount) : 1;
 }

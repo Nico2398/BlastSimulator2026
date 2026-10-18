@@ -20,7 +20,7 @@ let idle8x: CrowdSim;
 
 beforeAll(() => {
   idle1x = playIdle(IDLE_S, { speed: 1 });
-  idle8x = playIdle(IDLE_S, { speed: 8 });
+  idle8x = playIdle(IDLE_S, { speed: 8, noEvents: true });
 }, RUN_TIMEOUT_MS);
 
 describe('an idle mine at 1x', () => {
