@@ -163,7 +163,7 @@ export class PreflightModal {
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
-    const { value: estValue, coverage } = estimate;
+    const { value: estValue, coverage, brokenVoxels, charged, holeCoverage } = estimate;
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
@@ -185,7 +185,7 @@ export class PreflightModal {
     const permit = permitPreview(state.grade, plan, state.tickCount);
 
     const signature = JSON.stringify({
-      permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage,
+      permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage, brokenVoxels, charged, holeCoverage,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
       phase, protectedCount: protectedHoles.length, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });

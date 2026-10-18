@@ -15,6 +15,9 @@ export function oreEstimateView(
   e: Pick<BlastOreEstimate, 'coverage' | 'brokenVoxels' | 'charged' | 'holeCoverage'>,
 ): OreEstimateView {
   const coverage = e.coverage;
+  if (!(e.brokenVoxels > 0)) {
+    return e.charged || e.holeCoverage > 0 ? { kind: 'neutral' } : { kind: 'unknown' };
+  }
   if (!(coverage > 0)) return { kind: 'unknown' };
   if (coverage >= 1) return { kind: 'full' };
   return { kind: 'partial', sharePct: Math.min(99, Math.max(1, Math.round(coverage * 100))) };
@@ -25,9 +28,10 @@ export function oreValueColor(view: OreEstimateView): string {
   return view.kind === 'unknown' || view.kind === 'neutral' ? 'var(--bsx-text-micro)' : 'var(--bsx-positive)';
 }
 
-/** EST. ORE VALUE text for a coverage state: "No survey", "$X (N% surveyed)" or "$X". */
+/** EST. ORE VALUE text for a coverage state: "No survey", "—" (nothing to value), "$X (N% surveyed)" or "$X". */
 export function oreValueText(view: OreEstimateView, value: number): string {
-  if (view.kind === 'unknown' || view.kind === 'neutral') return t('ui.blast_workshop.footer.est_ore_unknown');
+  if (view.kind === 'neutral') return '—';
+  if (view.kind === 'unknown') return t('ui.blast_workshop.footer.est_ore_unknown');
   const money = `$${formatMoney(value)}`;
   return view.kind === 'partial'
     ? `${money} ${t('ui.blast_workshop.footer.coverage_share', { percent: view.sharePct })}`

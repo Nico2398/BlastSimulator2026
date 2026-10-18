@@ -7,7 +7,7 @@
 import { oreValuePerKg, type MarketId } from '../economy/Market.js';
 import type { BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
-import { freshSurveys } from './SurveyStaleness.js';
+import { freshSurveys, isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { findSurveyForColumn, oresSurveyedAt } from './SurveyColumn.js';
 import { buildPlanEnergyField } from './BlastExecution.js';
 import { identifyFragmentedVoxels } from './VoxelFragmentation.js';
@@ -59,8 +59,11 @@ export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, cover
  * (`oresSurveyedAt`): ore a survey did not locate at that depth counts for
  * nothing, so an aerial reading values its top 2 m only. Value =
  * density x ORE_DENSITY_KG_M3 x oreValuePerKg(ore, marketId) x survey confidence.
- * Coverage counts a voxel as covered whenever its column has a fresh survey,
- * whatever the depth that survey reached.
+ * Coverage counts a voxel as covered whenever its column lies inside any fresh
+ * survey's disc (barren or not), whatever the depth that survey reached; a
+ * covered barren column adds $0. `brokenVoxels` is 0 when nothing breaks,
+ * `charged` is false without charges/an energy field, and `holeCoverage` is the
+ * share of drilled holes inside a fresh disc (also set on the early returns).
  */
 export function estimateBlastOre(
   plan: BlastPlan,
@@ -69,23 +72,25 @@ export function estimateBlastOre(
   wetHoleIds: ReadonlySet<string> = new Set(),
   marketId: MarketId = 'legacy',
 ): BlastOreEstimate {
-  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
-  if (!field) return NO_ORE_ESTIMATE;
   const surveys = freshSurveys(surveyResults);
-  if (surveys.length === 0) return NO_ORE_ESTIMATE;
+  const inDisc = (x: number, z: number): boolean => surveys.some(sv => isColumnInSurveyDisc(sv, x, z));
+  const holeCoverage = plan.holes.length === 0
+    ? 0
+    : plan.holes.filter(h => inDisc(h.x, h.z)).length / plan.holes.length;
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
+  if (!field) return { ...NO_ORE_ESTIMATE, holeCoverage };
   const { fragmented } = identifyFragmentedVoxels(field, grid, false);
-  if (fragmented.length === 0) return NO_ORE_ESTIMATE;
+  if (fragmented.length === 0) return { ...NO_ORE_ESTIMATE, charged: true, holeCoverage };
   let value = 0;
   let covered = 0;
   for (const { x, y, z } of fragmented) {
+    if (inDisc(x, z)) covered++;
     const survey = findSurveyForColumn(surveys, x, z);
     if (!survey) continue;
-    covered++;
     const densities = oresSurveyedAt(survey, x, z, y);
     if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
   }
-  // TODO: implement brokenVoxels / charged / holeCoverage (#1967)
-  return { value, coverage: covered / fragmented.length, brokenVoxels: 0, charged: false, holeCoverage: 0 };
+  return { value, coverage: covered / fragmented.length, brokenVoxels: fragmented.length, charged: true, holeCoverage };
 }
 
 /** Estimated ore value (game dollars) of a blast plan; see `estimateBlastOre` (#1703). */

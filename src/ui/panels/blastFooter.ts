@@ -108,7 +108,7 @@ export class BlastFooter {
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
     const estValue = estimate.value;
-    const coverage = estimate.coverage;
+    const { coverage, brokenVoxels, charged, holeCoverage } = estimate;
     const margin = estValue - planCost;
 
     // Undrilled (ordered, not yet landed) holes are a PreflightModal warning
@@ -126,7 +126,7 @@ export class BlastFooter {
         : null;
 
     const permit = permitPreview(state.grade, plan, state.tickCount);
-    const signature = JSON.stringify({ planCost, estValue, coverage, margin, fireOk, reason, permit });
+    const signature = JSON.stringify({ planCost, estValue, coverage, brokenVoxels, charged, holeCoverage, margin, fireOk, reason, permit });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -134,11 +134,15 @@ export class BlastFooter {
     const view = oreEstimateView(estimate);
     this.valueEl.textContent = oreValueText(view, estValue);
     this.valueEl.style.color = oreValueColor(view);
-    if (view.kind === 'unknown') {
+    if (view.kind === 'unknown' || view.kind === 'neutral') {
       this.marginEl.textContent = t('ui.blast_workshop.footer.margin_unknown');
       this.marginEl.style.color = 'var(--bsx-text-micro)';
-      this.hintEl.textContent = t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
-      this.hintEl.style.display = hasHoles ? '' : 'none';
+      if (view.kind === 'unknown') {
+        this.hintEl.textContent = t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
+        this.hintEl.style.display = hasHoles ? '' : 'none';
+      } else {
+        this.hintEl.style.display = 'none';
+      }
     } else {
       this.marginEl.textContent = `${margin < 0 ? '-' : ''}$${formatMoney(Math.abs(margin))}`;
       this.marginEl.style.color = 'var(--bsx-positive)';
