@@ -2,6 +2,7 @@
 // Tubing records must follow the hole: a blast, `drill_plan clear` and
 // `drill_plan remove` drop them; unknown/bare install_tubing is refused.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -15,7 +16,7 @@ function drive(runner: ConsoleRunner, ctx: GameContext, done: () => boolean, max
   for (let i = 0; i < maxTicks && !done(); i++) {
     fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
     for (const emp of ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 

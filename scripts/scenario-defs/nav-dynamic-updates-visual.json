@@ -280,6 +280,17 @@
       "description": "Employee #3 spawns near the staffed fleet's cluster (~0,2); hauler #5 spawns at (35,35), ~48 tiles away -- confirmed live: 60 ticks is enough for #3 to walk over and board (`vehicle list` shows driver:#3 afterward)."
     },
     {
+      "command": "event choose 0",
+      "description": "#1895: the explosives delivery wait moves the event clock, so an event can be pending after the tick above and its dialog would cover the Fleet panel; resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "vehicle reposition 6 15 15",
       "timeout": 120,
       "interaction": [

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { tickResolvingEvents } from './helpers.js';
 import * as THREE from 'three';
 import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
 import { ensureLandscape, terrainConfigOf } from '../../src/console/commands/world.js';
@@ -192,14 +193,14 @@ describe('Landscape/playable seam on a real level (#907)', () => {
 
     const state = engine.ctx.state!;
     expect(run('drill_plan grid rows:2 cols:2 spacing:3 depth:8 start:2,2').success).toBe(true);
-    for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) tickResolvingEvents(run);
     expect(state.drillHoles.length, 'no hole was ever drilled').toBeGreaterThan(0);
     fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     // Wait for every hole to finish loading, not just for the order queue to
     // empty: a claimed charge leaves the queue while it is still being loaded.
     const unloaded = (): boolean => state.drillHoles.some(h => state.chargesByHole[h.id] === undefined);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 2000 && (Object.keys(state.plannedChargesByHole).length > 0 || unloaded()); i++) run('tick 1');
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 2000 && (Object.keys(state.plannedChargesByHole).length > 0 || unloaded()); i++) tickResolvingEvents(run);
     expect(run('blast').success).toBe(true);
 
     assertSeamClosed(engine, 'after a blast at the site edge');

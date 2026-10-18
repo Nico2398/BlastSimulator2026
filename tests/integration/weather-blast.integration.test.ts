@@ -3,6 +3,7 @@
 // actually reaches executeBlast's wetHoleIds (BlastExecution.ts), not just
 // that the `weather` command reports a state.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -36,7 +37,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
       emp.fatigue = 100;
     }
     keepFunded(ctx);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 
@@ -50,7 +51,7 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
       emp.fatigue = 100;
     }
     keepFunded(ctx);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 
@@ -67,7 +68,7 @@ function applyWeather(runner: ConsoleRunner, ctx: GameContext, weather: string):
   if (RAINY.has(weather)) {
     for (let i = 0; i < 4; i++) {
       runner.run(`weather set ${weather}`);
-      runner.run('tick 1');
+      tickResolvingEvents(cmd => runner.run(cmd));
     }
   }
   runner.run(`weather set ${weather}`);
@@ -94,7 +95,7 @@ function clearPatternOfCrew(runner: ConsoleRunner, ctx: GameContext, maxTicks = 
       emp.fatigue = 100;
     }
     keepFunded(ctx);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(isClear(), runner.run('zone status').output).toBe(true);
 }

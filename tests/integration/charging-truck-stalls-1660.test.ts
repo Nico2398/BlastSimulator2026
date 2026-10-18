@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { tickResolvingEvents } from './helpers.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { killEmployee } from '../../src/core/entities/Employee.js';
 import { destroyVehicle } from '../../src/core/entities/Vehicle.js';
@@ -11,10 +12,10 @@ function drilledGame(cols: number, spacing: number) {
   expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
   expect(run(`drill_plan grid rows:1 cols:${cols} spacing:${spacing} depth:8 start:14,14`).success).toBe(true);
   const state = ctx.state!;
-  for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+  for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) tickResolvingEvents(run);
   state.cash = 1e6;
   expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
-  const tick = () => { state.cash = Math.max(state.cash, 1e6); run('tick 1'); };
+  const tick = () => { state.cash = Math.max(state.cash, 1e6); tickResolvingEvents(run); };
   return { state, tick };
 }
 

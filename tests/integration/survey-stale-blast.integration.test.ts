@@ -5,6 +5,7 @@
 // post-blast ore report is computed against the PRE-blast freshness, and only
 // afterwards are overlapping surveys marked stale.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -30,7 +31,7 @@ function drain(runner: ConsoleRunner, ctx: MiningContext, done: () => boolean): 
     // more payroll ticks than the starting cash covers; keep the run from going bankrupt.
     ctx.state!.cash = Math.max(ctx.state!.cash, 100000);
     for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(done()).toBe(true);
 }

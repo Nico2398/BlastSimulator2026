@@ -16,7 +16,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
-import { tickUntil } from './helpers.js';
+import { tickUntil, tickResolvingEvents } from './helpers.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 import { buyChargingTruck } from '../helpers/blastFixtures.js';
 import { refreshHiringPool } from '../../src/core/entities/HiringPool.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
@@ -421,7 +422,8 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
 
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 1500 && (state.plannedDrillHoles.length > 0 || Object.keys(state.plannedChargesByHole).length > 0); i++) {
       for (const emp of state.employees.employees) emp.fatigue = 100;
-      run('tick 1');
+      fundForDeliveryWait(state); // payroll runs through the explosive delivery wait (#1895)
+      tickResolvingEvents(run);
       for (const id of Object.keys(state.chargesByHole)) {
         expect(state.drillHoles.some(h => h.id === id)).toBe(true);
       }

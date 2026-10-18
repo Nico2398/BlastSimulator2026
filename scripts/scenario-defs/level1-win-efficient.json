@@ -298,6 +298,17 @@
       ]
     },
     {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "#1895: the explosives delivery wait shifts the event clock, so an event can fire during the tick above; resolved through the event dialog before the contracts panel is opened.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
       "command": "contract accept type:ore_sale fillable:true",
       "role": "player",
       "commandOutcome": "either",

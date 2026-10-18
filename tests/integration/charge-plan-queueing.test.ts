@@ -29,7 +29,12 @@ import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 /** tickUntil with the payroll covered: the explosives delivery wait (#1895) idles the crew for hundreds of ticks. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
-  tickUntil(run, () => { fundForDeliveryWait(state); return predicate(); }, maxTicks);
+  tickUntil(run, () => {
+    fundForDeliveryWait(state);
+    // A random event fired during the long wait halts the clock until resolved.
+    if (state.events.pendingEvent) run('event choose 0');
+    return predicate();
+  }, maxTicks);
 }
 
 /** Drills a grid and waits for every hole to land in state.drillHoles. */

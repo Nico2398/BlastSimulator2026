@@ -565,6 +565,21 @@
       "role": "observe"
     },
     {
+      "command": "wait_until field:supplyOffered equals:true max_ticks:200",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "supplyOffered",
+          "equals": true,
+          "maxTicks": 200,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "description": "#1895: the board re-rolls which contract types it holds every refresh and the explosives delivery wait moved that phase; wait for a supply offer instead of padding ticks. Costs no ticks when one is already on the board."
+    },
+    {
       "command": "contract accept type:supply",
       "interaction": [
         {

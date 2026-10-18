@@ -21,6 +21,7 @@
 // than instantiating the full renderer, matching the established pattern in
 // tests/integration/tutorial-pause.integration.test.ts.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
@@ -48,7 +49,7 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(ctx.state!.plannedDrillHoles.length).toBe(0);
 
@@ -63,7 +64,7 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(Object.keys(ctx.state!.plannedChargesByHole).length).toBe(0);
 

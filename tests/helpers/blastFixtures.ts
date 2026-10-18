@@ -7,6 +7,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
+import { tickResolvingEvents } from '../integration/helpers.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Keeps every living employee's fatigue topped up so a long drill/haul run is never derailed by a needs collapse mid-drive (mirrors blast-report-modal-save-load.integration.test.ts's fireBlast helper). */
@@ -18,7 +19,7 @@ function refreshFatigue(state: GameState): void {
 export function tickUntilFresh(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
   for (let i = 0; i < maxTicks && !predicate(); i++) {
     refreshFatigue(state);
-    run('tick 1');
+    tickResolvingEvents(run);
   }
 }
 

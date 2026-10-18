@@ -4,6 +4,7 @@
 // fixed (64x64, datum SANDBOX_DATUM) and starting cash comes from the named
 // starting kit.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -200,7 +201,7 @@ describe('sandbox mode', () => {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;
       }
-      runner.run('tick 1');
+      tickResolvingEvents(cmd => runner.run(cmd));
     }
     runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
     // #554: charging is real work too — drain the ordered charges the same
@@ -209,7 +210,7 @@ describe('sandbox mode', () => {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;
       }
-      runner.run('tick 1');
+      tickResolvingEvents(cmd => runner.run(cmd));
     }
     const blast = runner.run('blast');
 
@@ -501,7 +502,7 @@ describe('sandbox is endless free play (#1321)', () => {
     runner.run('sandbox start biome:desert_badlands kit:digger seed:5');
     ctx.state!.cash = 0;
     ctx.state!.bankruptcy.ticksBelowThreshold = BANKRUPTCY_GRACE_TICKS - 1;
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
     expect(ctx.state!.levelEndReason).toBe('bankruptcy');
     expect(ctx.state!.levelEnded).toBe(true);
   });
@@ -696,7 +697,7 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
     expect(result.success, result.output).toBe(true);
 
-    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) runner.run('tick 1');
+    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) tickResolvingEvents(cmd => runner.run(cmd));
     expect(state.surveyResults.length).toBeGreaterThan(0);
 
     const survey = state.surveyResults[0]!;

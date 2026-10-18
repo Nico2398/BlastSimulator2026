@@ -95,7 +95,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'vehicleLoaded', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue', 'insideBuildingCount',
-  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'winningRustiteSaleOffered', 'rubbleDisposalOffered', 'blastBanned', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
+  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'winningRustiteSaleOffered', 'rubbleDisposalOffered', 'supplyOffered', 'blastBanned', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel', 'chargeOrderBlockedReason',
@@ -480,6 +480,25 @@ describe('console-api', () => {
       s.contracts.available = [makeOreSaleOffer('gloomium', 100), rubble];
 
       expect(serializeGameState(runner.ctx as MiningContext)!.rubbleDisposalOffered).toBe(true);
+    });
+
+    it('reports supplyOffered false on an empty pool and when the pool holds only other contract types (#1895)', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.contracts.available = [];
+      expect(serializeGameState(runner.ctx as MiningContext)!.supplyOffered).toBe(false);
+
+      s.contracts.available = [makeOreSaleOffer('dirtite', 100)];
+      expect(serializeGameState(runner.ctx as MiningContext)!.supplyOffered).toBe(false);
+    });
+
+    it('reports supplyOffered true once a supply offer is in the pool (#1895)', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      const supply = { ...makeOreSaleOffer('dirtite', 400), type: 'supply' as const };
+      s.contracts.available = [makeOreSaleOffer('gloomium', 100), supply];
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.supplyOffered).toBe(true);
     });
 
     it('reports zero deathCount for a fresh game with no employees', () => {

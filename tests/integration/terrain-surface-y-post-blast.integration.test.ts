@@ -10,6 +10,7 @@
 // the console (rather than hand-building a grid) proves the fix against the
 // actual mutation path buildings/vehicles/employees see in play.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -25,7 +26,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 
@@ -37,7 +38,7 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
     }
     // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
     fundForDeliveryWait(ctx.state!);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 

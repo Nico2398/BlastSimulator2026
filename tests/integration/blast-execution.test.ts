@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { tickResolvingEvents } from './helpers.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
@@ -234,7 +235,7 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
     expect(run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:14,14').success).toBe(true);
     const state = ctx.state!;
 
-    for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) tickResolvingEvents(run);
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(state.drillHoles.length).toBeGreaterThan(0);
 
@@ -267,7 +268,7 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
     const state = ctx.state!;
 
-    for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) tickResolvingEvents(run);
     expect(state.drillHoles.length).toBeGreaterThan(0);
 
     // Order charges for every drilled hole but do NOT wait for them to land —
@@ -333,7 +334,7 @@ describe('Blast execution — #1346', () => {
     const { run, state } = setupPartiallyDrilled();
     expect(run('blast').success).toBe(true);
     const drilledAfterBlast = state.drillHoles.length;
-    for (let i = 0; i < 600; i++) run('tick 1');
+    for (let i = 0; i < 600; i++) tickResolvingEvents(run);
     expect(state.drillHoles).toHaveLength(drilledAfterBlast);
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
@@ -345,7 +346,7 @@ describe('Blast execution — #1346', () => {
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
     expect(run('drill_plan grid rows:4 cols:6 spacing:3 depth:8 start:12,12').success).toBe(true);
     const state = ctx.state!;
-    for (let i = 0; i < 2000 && state.drillHoles.length < 2; i++) run('tick 1');
+    for (let i = 0; i < 2000 && state.drillHoles.length < 2; i++) tickResolvingEvents(run);
     expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
     const id = state.drillHoles[0]!.id;
     expect(run(`charge hole:${id} explosive:boomite amount:8 stemming:2`).success).toBe(true);
@@ -365,7 +366,7 @@ describe('Blast execution — #1346', () => {
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
     expect(run('drill_plan grid rows:4 cols:6 spacing:3 depth:8 start:12,12').success).toBe(true);
     const state = ctx.state!;
-    for (let i = 0; i < 2000 && state.drillHoles.length < 1; i++) run('tick 1');
+    for (let i = 0; i < 2000 && state.drillHoles.length < 1; i++) tickResolvingEvents(run);
     expect(state.drillHoles.length).toBeGreaterThan(0);
     const planned = state.plannedDrillHoles.length;
     expect(planned).toBeGreaterThan(0);
@@ -411,9 +412,9 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(run('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
     const state = () => ctx.state!;
     const topUp = () => { state().cash = Math.max(state().cash, 100000); for (const e of state().employees.employees) e.fatigue = 100; };
-    for (let i = 0; i < 600 && state().plannedDrillHoles.length > 0; i++) { topUp(); run('tick 1'); }
+    for (let i = 0; i < 600 && state().plannedDrillHoles.length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 2000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 2000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(state().drillHoles.length).toBeGreaterThan(0);
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
     return { run, ctx, state, topUp, engine };
@@ -436,7 +437,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
   /** Tick one at a time until a blast has been recorded (or the cap hits). */
   function tickUntilBlast(s: Setup, cap = 400): number {
     let n = 0;
-    while (n < cap && s.state().damage.blastCount === 0) { s.topUp(); s.run('tick 1'); n++; }
+    while (n < cap && s.state().damage.blastCount === 0) { s.topUp(); tickResolvingEvents(cmd => s.run(cmd)); n++; }
     return n;
   }
 
@@ -482,7 +483,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
 
   /** Tick until the armed shot fires (sync) or starts resolving (sliced). */
   function tickUntilFired(s: Setup, cap = 400): void {
-    for (let n = 0; n < cap && s.state().damage.blastCount === 0 && !s.ctx.blastJob; n++) { s.topUp(); s.run('tick 1'); }
+    for (let n = 0; n < cap && s.state().damage.blastCount === 0 && !s.ctx.blastJob; n++) { s.topUp(); tickResolvingEvents(cmd => s.run(cmd)); }
   }
 
   /** Everything a blast decides, for comparing two runs of the same shot. */
@@ -566,7 +567,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
 
     expect(res.success, res.output).toBe(true);
     expect(s.state().pendingDetonation).toBeNull();
-    for (let i = 0; i < 120; i++) { s.topUp(); s.run('tick 1'); }
+    for (let i = 0; i < 120; i++) { s.topUp(); tickResolvingEvents(cmd => s.run(cmd)); }
     expect(s.state().damage.blastCount).toBe(0);
     expect(s.state().drillHoles.length).toBeGreaterThan(0);
   });
@@ -608,7 +609,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     crewAt(s, 16, 16);
     s.run('blast detonate');
     s.run('blast');
-    for (let i = 0; i < 100; i++) s.run('tick 1');
+    for (let i = 0; i < 100; i++) tickResolvingEvents(cmd => s.run(cmd));
     expect(s.state().damage.blastCount).toBe(1);
   });
 
@@ -654,7 +655,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(res.success, res.output).toBe(true);
     expect(s.state().damage.blastCount).toBe(0);
 
-    for (let i = 0; i < 200; i++) { s.topUp(); s.run('tick 1'); }
+    for (let i = 0; i < 200; i++) { s.topUp(); tickResolvingEvents(cmd => s.run(cmd)); }
     expect(s.state().damage.blastCount).toBe(0);
     expect(s.state().pendingDetonation).not.toBeNull();
 
@@ -676,7 +677,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     unlicenceCrew(s, 'driving.excavator');
     s.run('blast detonate');
     expect(s.run('blast cancel').success).toBe(true);
-    for (let i = 0; i < 50; i++) s.run('tick 1');
+    for (let i = 0; i < 50; i++) tickResolvingEvents(cmd => s.run(cmd));
     expect(s.state().damage.blastCount).toBe(0);
     expect(s.state().pendingDetonation).toBeNull();
   });
@@ -700,7 +701,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     const s = setupCharged();
     crewAt(s, 16, 16);
     expect(s.run('blast detonate').success).toBe(true);
-    for (let i = 0; i < 2; i++) { s.topUp(); s.run('tick 1'); }
+    for (let i = 0; i < 2; i++) { s.topUp(); tickResolvingEvents(cmd => s.run(cmd)); }
     expect(s.state().damage.blastCount).toBe(0);
     const armedTick = s.state().pendingDetonation!.armedTick;
     expect(s.run('save slot:detonate-1362').success).toBe(true);
@@ -798,7 +799,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
     for (let i = 0; i < 600 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const e of ctx.state!.employees.employees) e.fatigue = 100;
-      run('tick 1');
+      tickResolvingEvents(run);
     }
 
     const res = run('blast detonate');
@@ -825,10 +826,10 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     topUp();
     if (quarters !== null) expect(run(`build living_quarters at:${quarters}`).success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
-    for (let i = 0; i < 2500 && !(state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9); i++) { topUp(); run('tick 1'); }
+    for (let i = 0; i < 2500 && !(state().plannedDrillHoles.length === 0 && state().drillHoles.length >= 9); i++) { topUp(); tickResolvingEvents(run); }
     expect(state().drillHoles.length).toBeGreaterThanOrEqual(9);
     expect(run('charge hole:* explosive:krackle amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 3000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); run('tick 1'); }
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 3000 && Object.keys(state().plannedChargesByHole).length > 0; i++) { topUp(); tickResolvingEvents(run); }
     expect(Object.keys(state().plannedChargesByHole)).toHaveLength(0);
     return { run, state, topUp };
   }
@@ -841,7 +842,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     let ticks = 0;
     while (ticks < cap && s.state().damage.blastCount === 0) {
       s.topUp();
-      s.run('tick 1');
+      tickResolvingEvents(cmd => s.run(cmd));
       ticks++;
       if (s.state().pendingDetonation !== null && detonationPhase(s.state()).kind === 'stranded') everStranded = true;
     }
@@ -916,7 +917,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     let stranded = false;
     for (let i = 0; i < 250; i++) {
       s.topUp();
-      s.run('tick 1');
+      tickResolvingEvents(cmd => s.run(cmd));
       if (detonationPhase(s.state()).kind === 'stranded') stranded = true;
     }
 
@@ -1047,7 +1048,7 @@ describe('Blast execution — haulers keep hauling reachable debris past a crate
     for (let i = 0; i < WINDOW; i++) {
       state().cash = Math.max(state().cash, 100000);
       for (const e of state().employees.employees) e.fatigue = 100;
-      run('tick 1');
+      tickResolvingEvents(run);
       // Orders are unblocked as the crew reaches them, so the queue rises before it drains: measure from its peak, not a fixed tick (the peak moves with where the rock rests).
       peakQueued = Math.max(peakQueued, reachableQueued());
       if (reachableQueued() === 0) continue;
@@ -1174,7 +1175,7 @@ describe('Blast execution — the tutorial plan opens the box cut (#1724)', () =
     const tickWhile = (pending: () => boolean, cap: number): void => {
       for (let i = 0; i < cap && pending(); i++) {
         topUp();
-        run('tick 1');
+        tickResolvingEvents(run);
         if (ctx.state!.events.pendingEvent) run('event choose 0');
       }
     };

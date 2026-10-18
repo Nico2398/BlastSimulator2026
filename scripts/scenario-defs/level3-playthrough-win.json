@@ -2076,7 +2076,7 @@
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect. #1873: event timing shift from union cadence; wellBeing 58.8579115411053 -> 58.85780020486362. No behaviour defect. #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect. #1873: event timing shift from union cadence; wellBeing 58.8579115411053 -> 58.85780020486362. No behaviour defect. #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
     },
@@ -2316,7 +2316,7 @@
           "surveyCount": 3,
           "safety": 0
         },
-        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline."
+        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
       },
       "description": "#1186: safety re-measured, 50 -> 0. Not a new incident -- deathCount stays 12, unchanged from pattern 1's own blast, and the blast's own fragmentedCount/detachedCount/liftedCount/projectionCount are byte-identical to origin/main (direct-verified). The cause is entirely upstream, at the 'tick 6' step: main's own PRNG stream happened to queue a pending event on the very first sub-tick after the blast, freezing tickCount there (0 of 6 ticks actually ran) before TickPipeline's own recentAccidents penalty (ScoreManager.ts: `sfDelta -= recentAccidents * 5`, a 10-tick lookback window) ever got a chance to see the 12 fresh death accidents from that same blast. This branch's SurveyCalc.ts fix (see the 'tick 6' step's own description) shifts the PRNG stream enough that no event happens to be pending there any more, so all 6 real ticks run for the first time -- and recentAccidents=12 (or more, counting destroyed vehicles) applied every one of those ticks crashes safety to its floor almost immediately, exactly as the formula says it should for a blast that just killed 12 of 15 employees. Re-measured, not loosened: the old 'safety: 50' value was only ever a byproduct of main's own tick call freezing at 0 ticks by coincidence, not of the blast being any less catastrophic."
     },
@@ -2334,8 +2334,7 @@
           "levelEnded": true,
           "levelEndReason": "completed",
           "bankrupt": false,
-          "revolted": false,
-          "profit": 800000.0000000002
+          "revolted": false
         },
         "increased": [
           "cash"
@@ -2361,10 +2360,9 @@
           "safety": 0,
           "bankrupt": false,
           "levelEnded": true,
-          "levelEndReason": "completed",
-          "profit": 800000.0000000002
+          "levelEndReason": "completed"
         },
-        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline."
+        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
       },
       "description": "Final checkpoint: the level has ended as a real win -- 'completed', not bankrupt, not revolted, profit at the $800,000 threshold; the mine is frozen (#1313) so nothing moves after the force-win."
     }

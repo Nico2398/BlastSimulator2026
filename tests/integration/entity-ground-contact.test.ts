@@ -145,7 +145,8 @@ function tickUntilGone(engine: RunnerWithContext, actionId: number, maxTicks = 5
 function driveToCompletion(engine: RunnerWithContext, maxTicks = 300, condition: () => boolean = () => true): void {
   for (let i = 0; i < maxTicks && condition(); i++) {
     for (const emp of engine.ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-    runCommand(engine, 'tick 1');
+    // A random event fired during a long wait (the explosive delivery, #1895) halts the clock until resolved.
+    if (runCommand(engine, 'tick 1').output.startsWith('Pending event!')) runCommand(engine, 'event choose 0');
   }
 }
 
