@@ -7,18 +7,19 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { getDefSize, getBuildingDef } from '../../src/core/entities/Building.js';
 import { t, setLocale } from '../../src/core/i18n/I18n.js';
 import { equipDemolition } from '../helpers/demolition.js';
 import { warehouseStoredKg } from '../../src/core/economy/FreightWarehouses.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const SEED = 42;
 const MAX_RESEARCH_TICKS = 3000;
 const MAX_REBUILD_TICKS = 3000;
 
 function refresh(state: GameState): void {
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
   for (const e of state.employees.employees) e.fatigue = 100;
 }
 
@@ -33,7 +34,7 @@ function fireOpeningShot(run: (c: string) => unknown, state: GameState): void {
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${SHOT_START}`)).toMatchObject({ success: true });
   tickUntil(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(run('charge hole:* explosive:krackle amount:6 stemming:2')).toMatchObject({ success: true });
-  tickUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
+  tickUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickUntil(run, state, () => state.lastBlastReport !== null, 600);
   expect(state.lastBlastReport).not.toBeNull();

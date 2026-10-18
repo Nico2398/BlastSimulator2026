@@ -13,7 +13,7 @@ import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { getProfitShortfall } from './core/campaign/LevelObjective.js';
-import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer, hasSupplyOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { isActive } from './core/events/ActiveModifiers.js';
@@ -127,6 +127,8 @@ export interface SerializableGameState {
    * stock against, so mere presence in the pool is the whole condition.
    */
   rubbleDisposalOffered: boolean;
+  /** A `supply` offer is on the board (`hasSupplyOffer`, #1895): the wait before a scenario accepts it, since the pool re-rolls which types it holds every refresh. */
+  supplyOffered: boolean;
   /** An event's blasting ban is in force (#1414): `blast` is refused until it lapses, so a scenario waits for `false` before firing instead of padding ticks. */
   blastBanned: boolean;
   /** An `ore_sale` for blingite is on the board at any quantity (`hasOreSaleOffer`, #1586): the wait before accepting a sale storage cannot fill yet. */
@@ -239,6 +241,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     fillableRustiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite'),
     winningRustiteSaleOffered: hasWinningOreSaleOffer(s.contracts.available, s.collectedOre, 'rustite', getProfitShortfall(s.campaign.activeLevelId, s.finances)),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    supplyOffered: hasSupplyOffer(s.contracts.available),
     blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount),
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),

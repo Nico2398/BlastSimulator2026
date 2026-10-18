@@ -156,7 +156,12 @@ const LEVELS: readonly LevelDef[] = [
     // #1550: bumped $340,000 -> $400,000 for ~200 more ticks of payroll
     // headroom (~$300/tick) before the first sale, same precedent as #959.
     // Win condition is operating-profit based, so unaffected.
-    startingCash: 400000,
+    // #1895: bumped $400,000 -> $500,000. A cash-bought charge order now waits
+    // EXPLOSIVE_DELIVERY_TICKS (400) for its delivery with the crew idle on payroll
+    // (~$200-300/tick, ~$80k+), and a player clicking between steps spends more
+    // ticks than the scripted run: at $400,000 the tutorial could no longer pay for
+    // the freight_warehouse its build-storage stage requires. Same precedent as #1550.
+    startingCash: 500000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,
     eventFreqMultiplier: 0,

@@ -3,19 +3,19 @@
   "description": "Visual verification of post-blast report: crater visibility, report metrics, rating display",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true cash:150000",
+      "command": "new_game seed:42 staffed:true cash:250000",
       "timeout": 30,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true cash:150000"
+          "command": "new_game seed:42 staffed:true cash:250000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
+          "cash": 250000,
           "holeCount": 0
         }
       }
@@ -119,8 +119,8 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -135,8 +135,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",

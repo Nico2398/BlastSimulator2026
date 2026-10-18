@@ -9,6 +9,7 @@ import { BLAST_SUB_CONFIG } from '../../../../src/core/config/audio/synth.js';
 import { CrowdRecorder, CrowdSim, soundDurationS } from '../../../helpers/audioCrowding.js';
 import { formatStats, isBlastSound, maxInWindow, maxOverlap, peakIn, summarize } from '../../../helpers/audioCrowdingStats.js';
 import { listenerAt } from '../director/helpers.js';
+import { fundForDeliveryWait } from '../../../helpers/playthrough.js';
 
 describe('soundDurationS', () => {
   it('reads a sample from its MP3 header and a synthesized sound from its recipe config', () => {
@@ -215,6 +216,7 @@ describe('CrowdSim blast', () => {
     sim.command('time resume');
     sim.command('drill_plan grid rows:1 cols:2 spacing:3 depth:6 start:15,15');
     sim.waitUntil(() => sim.state!.plannedDrillHoles.length === 0, 900);
+    fundForDeliveryWait(sim.state!); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
     sim.command('charge hole:* explosive:boomite amount:5 stemming:2');
     sim.waitUntil(() => Object.keys(sim.state!.plannedChargesByHole).length === 0, 3000);
     sim.command('weather set sunny');

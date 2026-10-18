@@ -36,11 +36,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow staffed:false cash:200000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:300000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false cash:200000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:300000"
         }
       ],
       "role": "setup",
@@ -792,6 +792,17 @@
       "commandOutcome": "either"
     },
     {
+      "command": "set_policy mode:shift_8h fatigue:60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h fatigue:60"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
@@ -817,16 +828,16 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "command": "wait_until field:chargedCount equals:4 max_ticks:700",
       "description": "#1261: collapsed the 4-chunk fixed `tick 15` charging pad into a single wait_until on chargedCount, same reasoning as the drilling wait above.",
-      "timeout": 90,
+      "timeout": 170,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 4,
-          "maxTicks": 300,
-          "timeoutMs": 90000
+          "maxTicks": 700,
+          "timeoutMs": 170000
         }
       ],
       "role": "setup",
@@ -836,6 +847,17 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Back to the continuous, no-rest policy this file runs under (#1379) now the shipment has arrived and the crew has loaded it."
     },
     {
       "command": "event choose 0",

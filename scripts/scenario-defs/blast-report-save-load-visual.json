@@ -3,19 +3,19 @@
   "description": "Regression coverage for #571: a Blast Report modal, dismissed by a real click, must stay closed after a save+load round trip -- even past the playback-gated open (BLAST_REPORT_MIN_PLAYBACK_S, BlastReportModal.ts) that would otherwise re-arm it. Before the fix, `load` replaced ctx.state wholesale with a *new* state.lastBlastReport object (deep-cloned from the save), and the modal's identity check (report !== lastShownReport) treated that new reference as a fresh, never-shown report -- reopening it ~3s later over whatever panel the player had moved on to. The fix stamps lastShownReport from the swapped-in state inside reset() (closeStaleLevelOverlays), so a report identical in content to one already dismissed does not re-arm. Sanity checks bracket the regression check: the modal must still genuinely open for a real new report (step 'blast'), and must still genuinely close on a real click (step 'dismiss report').",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 staffed:true cash:150000",
       "timeout": 15,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 staffed:true cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 150000,
           "holeCount": 0
         }
       }
@@ -115,8 +115,8 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -131,8 +131,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",

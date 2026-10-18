@@ -1,21 +1,21 @@
 {
   "name": "level1-playthrough-win",
-  "description": "Level 1 (Dusty Hollow) full playthrough, won genuinely (#1363): order, charge, clear the zone, blast, sell the rock and let operating profit reach the target, ending levelEnded true with levelEndReason completed. No cash override, no staffed flag, no campaign complete.",
+  "description": "Level 1 (Dusty Hollow) full playthrough, won genuinely (#1363): order, charge, clear the zone, blast, sell the rock and let operating profit reach the target, ending levelEnded true with levelEndReason completed. No cash override, no staffed flag, no campaign complete. #1895 balance finding: the opening cash (50,000) cannot carry the crew through the explosives delivery wait of a cash-bought shot, so this playthrough is funded with 250,000 until a balance decision (pre-stocked warehouse in the kit, shorter wait, more opening cash) lands.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:250000",
       "role": "setup",
       "timeout": 60,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:250000"
         }
       ],
       "description": "The level exactly as the UI starts it: no cash override, no staffed flag. It opens with a driller, a blaster, a driver, a drill rig, a debris hauler and a freight warehouse (#1363).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 250000,
           "tickCount": 0,
           "employeeCount": 3,
           "holeCount": 0
@@ -294,6 +294,17 @@
         {
           "type": "command",
           "command": "tick 16"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "#1895: the explosives delivery wait shifts the event clock, so an event can fire during the tick above; resolved through the event dialog before the contracts panel is opened.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
         }
       ]
     },

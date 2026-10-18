@@ -36,11 +36,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow staffed:false cash:200000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:300000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false cash:200000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:300000"
         }
       ],
       "role": "setup",
@@ -1041,16 +1041,16 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "command": "wait_until field:chargedCount equals:4 max_ticks:700",
       "description": "#1261: collapsed the 4-chunk fixed `tick 15` charging pad into a single wait_until on chargedCount, same reasoning as the drilling wait above.",
-      "timeout": 90,
+      "timeout": 170,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 4,
-          "maxTicks": 300,
-          "timeoutMs": 90000
+          "maxTicks": 700,
+          "timeoutMs": 170000
         }
       ],
       "role": "setup",

@@ -30,6 +30,7 @@ import { recordProfit } from '../../src/core/campaign/Campaign.js';
 import { tickCommand } from '../../src/console/commands/tick.js';
 import { blastCommand, blastPreviewCommand } from '../../src/console/commands/mining.js';
 import type { GameContext } from '../../src/console/commands/world.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -389,7 +390,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     expect(state.drillHoles.length).toBe(4);
 
     expect(run(`charge hole:* explosive:${opts.explosive ?? 'boomite'} amount:${opts.amountKg ?? 3} stemming:2`).success).toBe(true);
-    tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
+    tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 800);
     expect(Object.keys(state.chargesByHole).length).toBe(4);
     return ctx;
   }

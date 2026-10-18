@@ -3,17 +3,17 @@
   "description": "Issue #1092 phase 6: the Fleet panel's new Reposition control drives a vehicle somewhere with no work attached (Itinerary's `reposition` Goal), the player-facing replacement for console-only `vehicle move`. Reuses blast-unevacuated-casualties.json's exact seed-42 drill/charge/fire pattern at (15,15)-(21,21) -- that file, with every staffed vehicle left exactly where it spawned, reports `vehicleCount` decreasing (the drill_rig it drove out on, plus a second vehicle the reckless 8m-hole/0.5m-stemming overcharge's flyrock reaches from spawn). This file moves the staffed debris_hauler (#2, spawned at (3,2) by STARTING_SITE_STAFFED_COMPOSITION) well clear of both the drilled footprint and that flyrock radius BEFORE the same pattern fires, entirely by clicking: open the Fleet panel, click vehicle #2's Reposition button, pick a far tile, confirm. No console command anywhere in that step. The final `vehicle list`/`state full` observe steps are this scenario's actual proof for the visual channel -- state-schema-definitions.ts has no per-vehicle position/survival field for `expect` to check programmatically (same gap vehicle-driver-assignment-visual.json's own observe steps document), so a human (or an automated screenshot/state-dump read) confirms vehicle #2 is listed, parked at the safe tile, undamaged, after the blast that damages/destroys vehicles left in place.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:100000 staffed:true",
+      "command": "new_game seed:42 cash:200000 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:100000 staffed:true"
+          "command": "new_game seed:42 cash:200000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000,
+          "cash": 200000,
           "employeeCount": 5,
           "vehicleCount": 5,
           "deathCount": 0
@@ -200,16 +200,16 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:800",
       "description": "Drains the charge order(s). #1709: 400-tick bound, was 200 -- the 20-tick shift lets the one blaster work longer between rests, but the nine holes still take ~206 ticks here (the lone blaster rests in place between trips).",
-      "timeout": 90,
+      "timeout": 170,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 90000
+          "maxTicks": 800,
+          "timeoutMs": 170000
         }
       ],
       "role": "setup",

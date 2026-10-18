@@ -18,6 +18,8 @@ import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 // #795: mining.ts's own static, non-per-item strings (its local requireGame,
 // formatBlastPlanErrors' two headers, every "Usage:" string, the three "==="
@@ -47,11 +49,13 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
 }
 
 /** Mirrors mining-commands.test.ts's own helper — ticks until every ordered charge lands. */
-function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 200): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
 }
