@@ -2716,7 +2716,7 @@
   "ui.fleet.scrap_confirm_title": "Détruire ce véhicule ?",
   "ui.fleet.scrap_confirm_body": "{name} sera vendu pour pièces pour {amount} $. Cette action est irréversible.",
   "ui.fleet.dealership": "CONCESSION",
-  "ui.card.per_hour": "{cost} $/h",
+  "ui.card.per_hour": "{cost}\u00a0$/h",
   "ui.card.line": "{desc} · {cost}",
   "ui.fleet.tip.speed": "Vitesse : {value} cases/h",
   "ui.fleet.tip.capacity_kg": "Capacité : {value} kg",

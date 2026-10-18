@@ -22,7 +22,6 @@ import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { assembleBlastPlan } from '../../../core/mining/BlastPlan.js';
 import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
@@ -76,7 +75,7 @@ export class FireStep {
     const wet = wetHoles(state);
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
-    const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, assembleBlastPlan(state.drillHoles, state.chargesByHole), state.tickCount);
+    const permit = state.drillHoles.length === 0 ? null : permitPreview(state.grade, { holes: state.drillHoles, charges: state.chargesByHole }, state.tickCount);
     const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, permit });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;

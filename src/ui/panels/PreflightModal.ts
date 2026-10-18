@@ -202,6 +202,12 @@ export class PreflightModal {
       { key: t('ui.blast_workshop.preflight.stat_cost'), value: `$${formatMoney(planCost)}`, color: 'var(--bsx-critical-text)', info: 'preflight-cost' },
       { key: t('ui.blast_workshop.preflight.stat_value'), value: oreValueText(oreView, estValue), color: oreValueColor(oreView) },
     ], 4));
+    if (permit) {
+      // Cost line under the stats grid, beside the charges cost it adds to.
+      const fee = el('div', { text: permit.feeText, attrs: { style: 'margin-top:8px;font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } });
+      fee.dataset['role'] = 'preflight-permit-fee';
+      this.statsEl.appendChild(fee);
+    }
 
     this.renderPredicted(state);
 
@@ -234,17 +240,8 @@ export class PreflightModal {
     ];
     const rows = warnings.map(w => this.makeWarningRow(w));
     if (permit) {
-      const note = (role: string, text: string): HTMLElement => {
-        const row = this.makeWarningRow({ ok: true, text });
-        row.dataset['role'] = role;
-        return row;
-      };
-      rows.push(note('preflight-permit-fee', permit.feeText), note('preflight-permit-strikes', permit.strikesText));
-      if (permit.over) {
-        const warn = this.makeWarningRow({ ok: false, text: permit.warningText });
-        warn.dataset['role'] = 'preflight-permit-warning';
-        rows.push(warn);
-      }
+      rows.push(this.makeRoleRow('preflight-permit-strikes', true, permit.strikesText));
+      if (permit.over) rows.push(this.makeRoleRow('preflight-permit-warning', false, permit.warningText));
     }
     this.warningsEl.replaceChildren(...rows);
   }
@@ -275,6 +272,12 @@ export class PreflightModal {
     if (!preview.fragments) line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_fragments'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
     if (!preview.projections) line.appendChild(el('span', { text: t('ui.blast_workshop.preflight.predicted_locked_projections'), attrs: { style: 'color:var(--bsx-text-micro)' } }));
     this.predictedEl.replaceChildren(label, line);
+  }
+
+  private makeRoleRow(role: string, ok: boolean, text: string): HTMLElement {
+    const row = this.makeWarningRow({ ok, text });
+    row.dataset['role'] = role;
+    return row;
   }
 
   private makeWarningRow(w: Warning): HTMLElement {

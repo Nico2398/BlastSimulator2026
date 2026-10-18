@@ -4,6 +4,7 @@ import type { GradeState } from '../../core/economy/MineGrade.js';
 import { preFireCheck, liveStrikes } from '../../core/economy/PermitLimits.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
+import { permitStrikesText } from '../../core/economy/permitLimitText.js';
 
 /** Display-ready comparison of a blast plan with the current permit. */
 export interface PermitPreview {
@@ -35,7 +36,8 @@ export function permitPreview(
 ): PermitPreview | null {
   if (!grade) return null;
   const check = preFireCheck(grade.grade, plan.charges, plan.holes.length);
-  const strikes = liveStrikes(grade.strikeTicks ?? [], tick).length;
+  const strikeTicks = grade.strikeTicks ?? [];
+  const strikes = liveStrikes(strikeTicks, tick).length;
   const kg = Math.round(check.planKg * 10) / 10;
   return {
     over: check.over,
@@ -46,7 +48,7 @@ export function permitPreview(
     fee: check.fee,
     feeText: t('permit.preview.fee', { fee: formatMoney(check.fee) }),
     strikes,
-    strikesText: t('permit.status.strikes', { count: strikes }),
+    strikesText: permitStrikesText(strikeTicks, tick),
     warningText: check.over ? t('permit.preview.warning') : '',
   };
 }
