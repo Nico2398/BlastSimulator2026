@@ -53,6 +53,6 @@ export function leaverLabel(
 ): LeaverLabel | undefined {
   const draw = pending?.leavers?.find(d => d.optionIndex === optionIndex);
   if (!draw) return undefined;
-  const who = draw.employeeId === null ? undefined : staff.find(e => e.id === draw.employeeId);
+  const who = draw.employeeId === null ? undefined : staff.find(e => e.id === draw.employeeId && e.alive);
   return who ? { name: who.name, role: who.role } : 'nobody';
 }

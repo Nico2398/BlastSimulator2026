@@ -12,7 +12,6 @@ import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.
 import { TRAFFIC_JAM_EFFECTS, type EventWorld, type EffectOutcome } from './TrafficJamEffects.js';
 import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
-import { getLivingEmployees } from '../entities/Employee.js';
 import { applyEventEffects } from './EventEffectCatalog.js';
 import { applyUnionDecision } from './UnionGrievance.js';
 import { leaverLabel } from './EventLeavers.js';
@@ -101,9 +100,10 @@ export function resolveEvent(
 
   // Declarative effects (#1414): modifiers, hires, bans, ... the sentence promised.
   if (world && resolved.effects?.length) {
+    // Label before the effects run: the leaver is off the roster afterwards.
+    const label = leaverLabel(pendingBefore, optionIndex, world.state.employees.employees);
     mergeOutcome(result, applyEventEffects(resolved.effects, world, tick, rng, leaverId));
-    const living = getLivingEmployees(world.state.employees.employees);
-    result.effectChips = effectChips(resolved.effects, leaverLabel(pendingBefore, optionIndex, living));
+    result.effectChips = effectChips(resolved.effects, label);
   }
 
   if (world && resolved.exposureDelta) {

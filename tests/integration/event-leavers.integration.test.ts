@@ -60,9 +60,10 @@ describe('event leavers', () => {
     const pending = s.events.pendingEvent;
     expect(pending?.eventId).toBe('leaver_followup');
     expect(pending!.leavers).toHaveLength(2);
-    for (const l of pending!.leavers!) {
-      expect(s.employees.employees.find(e => e.id === l.employeeId)?.alive).toBe(true);
-    }
+    // The staffed roster has no manager, so the role option draws nobody (null).
+    const [random, byRole] = pending!.leavers!;
+    expect(s.employees.employees.find(e => e.id === random!.employeeId)?.alive).toBe(true);
+    expect(byRole!.employeeId).toBeNull();
   });
 
   it('choosing the option removes exactly the shown employee and the outcome names them', () => {
