@@ -2716,7 +2716,7 @@
   "ui.fleet.scrap_confirm_title": "Détruire ce véhicule ?",
   "ui.fleet.scrap_confirm_body": "{name} sera vendu pour pièces pour {amount} $. Cette action est irréversible.",
   "ui.fleet.dealership": "CONCESSION",
-  "ui.card.per_hour": "{cost}\u00a0$/h",
+  "ui.card.per_hour": "{cost} $/h",
   "ui.card.line": "{desc} · {cost}",
   "ui.fleet.tip.speed": "Vitesse : {value} cases/h",
   "ui.fleet.tip.capacity_kg": "Capacité : {value} kg",
@@ -4304,5 +4304,12 @@
   "inspector.vehicle.work_rate": "Cadence de travail",
   "inspector.vehicle.cost": "Coût d'exploitation",
   "inspector.vehicle.maintenance": "Entretien",
-  "inspector.vehicle.fuel": "Carburant"
+  "inspector.vehicle.fuel": "Carburant",
+  "permit.preview.kg": "{used} / {limit} kg de charge",
+  "permit.preview.holes": "{used} / {limit} trous",
+  "permit.preview.fee": "Taxe de notification : {fee} $",
+  "permit.preview.warning": "Au-dessus de votre permis. L'inspecteur est peut-être à la cantine.",
+  "permit.preview.grid_warning": "{holes} trous, c'est plus que ce que votre permis autorise ({limit}). Le Ministère sait compter les trous.",
+  "ui.blast_workshop.fire.check_permit_ok": "Dans les clous du permis : {kg}, {holes}",
+  "ui.blast_workshop.fire.check_permit_over": "Dans les clous du permis : {kg}, {holes}. Pas vraiment. Tirer reste permis ; le Ministère regarde, c'est tout."
 }

@@ -22,6 +22,8 @@ import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
+import { assembleBlastPlan } from '../../../core/mining/BlastPlan.js';
+import { permitPreview, type PermitPreview } from '../permitPreview.js';
 
 
 interface Occupant {
@@ -74,7 +76,8 @@ export class FireStep {
     const wet = wetHoles(state);
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
-    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length });
+    const permit = permitPreview(state.grade, assembleBlastPlan(state.drillHoles, state.chargesByHole), state.tickCount);
+    const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length, permit });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -83,7 +86,7 @@ export class FireStep {
 
     const occupants = zone ? this.occupants(state, zone) : [];
     this.renderZoneList(occupants, zone !== null);
-    this.renderChecklist(state.drillHoles.length, wet.length, occupants);
+    this.renderChecklist(state.drillHoles.length, wet.length, occupants, permit);
   }
 
   refreshLocale(): void {
@@ -158,7 +161,7 @@ export class FireStep {
     return row;
   }
 
-  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[]): void {
+  private renderChecklist(holeCount: number, wetCount: number, occupants: Occupant[], permit: PermitPreview | null): void {
     const dryOk = wetCount === 0;
     const occupantCount = occupants.length;
     const strandedCount = occupants.filter(o => o.strandedNoDriver).length;
@@ -170,7 +173,19 @@ export class FireStep {
         : strandedCount > 0
           ? t('ui.blast_workshop.fire.check_zone_occupied_stranded', { count: occupantCount, strandedCount })
           : t('ui.blast_workshop.fire.check_zone_occupied', { count: occupantCount })),
+      ...(permit ? [this.makePermitRow(permit)] : []),
     );
+  }
+
+  /** Warns, never blocks: FIRE stays enabled when the plan is over the permit. */
+  private makePermitRow(permit: PermitPreview): HTMLElement {
+    const ok = !permit.over;
+    const row = this.makeCheckRow(ok, t(ok ? 'ui.blast_workshop.fire.check_permit_ok' : 'ui.blast_workshop.fire.check_permit_over', {
+      kg: permit.kgText, holes: permit.holesText,
+    }));
+    row.dataset['role'] = 'permit-check';
+    row.dataset['ok'] = String(ok);
+    return row;
   }
 
   private makeCheckRow(ok: boolean, text: string): HTMLElement {

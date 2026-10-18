@@ -29,6 +29,7 @@ import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
+import { permitPreview } from './permitPreview.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -180,8 +181,10 @@ export class PreflightModal {
     // Warning only, never a detonate gate: firing cancels these drill orders (#1346).
     const undrilledCount = state.plannedDrillHoles.length;
 
+    const permit = permitPreview(state.grade, plan, state.tickCount);
+
     const signature = JSON.stringify({
-      undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage,
+      permit, undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
       phase, protectedCount: protectedHoles.length, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });
@@ -229,7 +232,21 @@ export class PreflightModal {
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_zone', { count: occupantCount }) }
         : { ok: true, text: t('ui.blast_workshop.preflight.ok_zone') },
     ];
-    this.warningsEl.replaceChildren(...warnings.map(w => this.makeWarningRow(w)));
+    const rows = warnings.map(w => this.makeWarningRow(w));
+    if (permit) {
+      const note = (role: string, text: string): HTMLElement => {
+        const row = this.makeWarningRow({ ok: true, text });
+        row.dataset['role'] = role;
+        return row;
+      };
+      rows.push(note('preflight-permit-fee', permit.feeText), note('preflight-permit-strikes', permit.strikesText));
+      if (permit.over) {
+        const warn = this.makeWarningRow({ ok: false, text: permit.warningText });
+        warn.dataset['role'] = 'preflight-permit-warning';
+        rows.push(warn);
+      }
+    }
+    this.warningsEl.replaceChildren(...rows);
   }
 
   refreshLocale(): void {
