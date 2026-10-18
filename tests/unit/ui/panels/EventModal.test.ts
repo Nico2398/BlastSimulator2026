@@ -7,6 +7,8 @@ import { setupEvents } from '../../../../src/core/events/index.js';
 import { registerEvents, clearEvents, getEventById, type EventDef } from '../../../../src/core/events/EventPool.js';
 import type { EventEffect } from '../../../../src/core/events/EventSystem.js';
 import { effectChips, effectChipText } from '../../../../src/core/events/EventEffectText.js';
+import { hireEmployee } from '../../../../src/core/entities/Employee.js';
+import { Random } from '../../../../src/core/math/Random.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
 
@@ -88,6 +90,52 @@ describe('EventModal', () => {
     const firstChoice = container.querySelectorAll('#bs-event-dialog .bs-event-choice')[0]!;
     const hintChips = firstChoice.querySelectorAll('.bsx-chip');
     expect(hintChips.length).toBe(2);
+    modal.dispose();
+    container.remove();
+  });
+
+  it('shows the leaver\'s name on an employee_leaves option before the choice (#1908)', () => {
+    const { container, modal } = mount();
+    const state = createGame({ seed: 42, mineType: 'desert' });
+    clearEvents();
+    setupEvents();
+    const hired = hireEmployee(state.employees, 'manager', new Random(1), 5, 5, 0);
+    const doomed = state.employees.employees.find(e => e.id === (hired as { id?: number }).id) ?? state.employees.employees[state.employees.employees.length - 1]!;
+    state.events.pendingEvent = { eventId: 'mafia_informant', firedAtTick: 3, leavers: [{ optionIndex: 1, employeeId: doomed.id }] };
+    modal.update(state);
+
+    const choices = container.querySelectorAll('#bs-event-dialog .bs-event-choice');
+    expect(choices[1]!.textContent).toContain(doomed.name);
+    expect(choices[1]!.textContent).toContain('quits the crew');
+    expect(choices[0]!.textContent).not.toContain(doomed.name);
+    modal.dispose();
+    container.remove();
+  });
+
+  it("says nobody quits when the option's stored leaver is null (#1908)", () => {
+    const { container, modal } = mount();
+    const state = createGame({ seed: 42, mineType: 'desert' });
+    clearEvents();
+    setupEvents();
+    state.events.pendingEvent = { eventId: 'mafia_informant', firedAtTick: 3, leavers: [{ optionIndex: 1, employeeId: null }] };
+    modal.update(state);
+
+    const choices = container.querySelectorAll('#bs-event-dialog .bs-event-choice');
+    expect(choices[1]!.textContent).toContain('Nobody is left to quit.');
+    modal.dispose();
+    container.remove();
+  });
+
+  it('keeps the generic chip on a pending event without stored leavers (#1908)', () => {
+    const { container, modal } = mount();
+    const state = createGame({ seed: 42, mineType: 'desert' });
+    clearEvents();
+    setupEvents();
+    state.events.pendingEvent = { eventId: 'mafia_informant', firedAtTick: 3 };
+    modal.update(state);
+
+    const choices = container.querySelectorAll('#bs-event-dialog .bs-event-choice');
+    expect(choices[1]!.textContent).toContain('An employee leaves the crew');
     modal.dispose();
     container.remove();
   });

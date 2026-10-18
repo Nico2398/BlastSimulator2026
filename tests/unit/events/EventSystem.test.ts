@@ -175,6 +175,24 @@ describe('Event system engine', () => {
     expect(restored.firedEventIds).toEqual(['persist_test']);
   });
 
+  it('a pending event keeps its stored leavers through a JSON round trip (#1908)', () => {
+    const state = createEventSystemState();
+    state.pendingEvent = { eventId: 'x', firedAtTick: 4, leavers: [{ optionIndex: 1, employeeId: 3 }, { optionIndex: 2, employeeId: null }] };
+    const restored = JSON.parse(JSON.stringify(state)) as typeof state;
+    expect(restored.pendingEvent!.leavers).toEqual([{ optionIndex: 1, employeeId: 3 }, { optionIndex: 2, employeeId: null }]);
+  });
+
+  it('tickEventSystem itself leaves leavers unset; the tick pipeline stores them (#1908)', () => {
+    registerEvents([{ ...makeEvent('leave_ev', 'union'), followUpOnly: true,
+      consequences: [{ cashDelta: 0, effects: [{ type: 'employee_leaves', pick: 'random' }] }, { cashDelta: 0 }] }]);
+    const state = createEventSystemState();
+    queueFollowUp(state, 'leave_ev');
+    state.followUpDelayTicks = 1;
+    const fired = tickEventSystem(state, makeCtx({ tickCount: 5 }), new Random(1));
+    expect(fired?.eventId).toBe('leave_ev');
+    expect(fired!.leavers).toBeUndefined();
+  });
+
   it('follow-up events are also deduplicated', () => {
     registerEvents([{ ...makeEvent('followup_ev', 'union'), followUpOnly: true }]);
     const state = createEventSystemState();

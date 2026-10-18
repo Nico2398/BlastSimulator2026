@@ -2756,6 +2756,8 @@
   "ui.event.effect.morale_shift": "Morale shifts by {perHour} per hour for {hours}h.",
   "ui.event.effect.fatigue_relief": "Everyone is rested.",
   "ui.event.effect.employee_leaves": "An employee leaves the crew ({pick}).",
+  "ui.event.effect.employee_leaves_named": "{name} ({role}) quits the crew.",
+  "ui.event.effect.employee_leaves_nobody": "Nobody is left to quit.",
   "ui.event.effect.employee_joins": "A new {role} joins the crew for free.",
   "ui.event.effect.employee_injured": "An employee is injured.",
   "ui.event.effect.salary": "Salaries change by {pct}% for {days} days ({scope}).",

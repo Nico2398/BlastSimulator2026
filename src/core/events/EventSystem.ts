@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Event system engine
 // Manages category timers, weighted selection, and event firing.
 
+import type { LeaverDraw } from './EventLeavers.js';
 import type { TrafficJam } from './TrafficJams.js';
 import { eventWeightFactor, type ActiveModifier } from './ActiveModifiers.js';
 import type { Random } from '../math/Random.js';
@@ -91,6 +92,8 @@ export interface FiredEvent {
   jam?: TrafficJam;
   /** The pending actions an unqualified_task event concerns (#1380). */
   unqualifiedActionIds?: number[];
+  /** The employee each employee_leaves option takes, drawn at fire time (#1908). */
+  leavers?: LeaverDraw[];
 }
 
 /** What kind of value an EventEffect carries — decides which chip color/format the UI uses. */

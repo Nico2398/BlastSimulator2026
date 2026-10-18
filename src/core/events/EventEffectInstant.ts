@@ -1,12 +1,13 @@
 // BlastSimulator2026 — Instant (non-timed) event effect handlers (#1414)
 
 import type { Random } from '../math/Random.js';
-import type { Employee, EmployeeRole } from '../entities/Employee.js';
+import type { EmployeeRole } from '../entities/Employee.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
 import type { EffectOutcome, EventWorld } from './TrafficJamEffects.js';
 import { getLivingEmployees, hireEmployee, injureEmployee } from '../entities/Employee.js';
 import { poolNames } from '../entities/HiringPool.js';
 import { hireSpawnPoint } from '../entities/HireSpawn.js';
+import { pickLeaver } from './EventLeavers.js';
 import { fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import { offerSpecialContract, outstandingPenalty } from '../economy/Contract.js';
 import { chargeFine, deductExpense } from '../economy/Finance.js';
@@ -21,28 +22,16 @@ const outcome = (over: Partial<EffectOutcome> = {}): EffectOutcome => ({
 });
 const alt = (): EffectOutcome => outcome({ resultKeySuffix: '_alt' });
 
-type SpecOf<T extends EventEffectSpec['type']> = Extract<EventEffectSpec, { type: T }>;
-
-/** The employee an employee_leaves spec picks, or undefined when nobody matches. */
-function pickLeaver(spec: SpecOf<'employee_leaves'>, staff: Employee[], rng: Random): Employee | undefined {
-  const pool = spec.pick === 'role' ? staff.filter(e => e.role === spec.role) : staff;
-  if (pool.length === 0) return undefined;
-  if (spec.pick === 'junior') {
-    // Most recently hired; ids only grow, so the highest id breaks a same-tick tie.
-    return pool.reduce((a, b) => ((b.hiredAtTick ?? 0) > (a.hiredAtTick ?? 0) || ((b.hiredAtTick ?? 0) === (a.hiredAtTick ?? 0) && b.id > a.id) ? b : a));
-  }
-  return pool[rng.nextInt(0, pool.length - 1)];
-}
-
 /** Applies one instant spec (hire, leave, injury, bonus, contract change, ...). */
 export function applyInstantEffect(
-  spec: EventEffectSpec, world: EventWorld, tick: number, rng: Random,
+  spec: EventEffectSpec, world: EventWorld, tick: number, rng: Random, leaverId?: number | null,
 ): EffectOutcome {
   const { state } = world;
   const staff = getLivingEmployees(state.employees.employees);
   switch (spec.type) {
     case 'employee_leaves': {
-      const leaver = pickLeaver(spec, staff, rng);
+      // A stored draw (#1908) wins: null or a departed employee means nobody leaves, with no fresh draw.
+      const leaver = leaverId === undefined ? pickLeaver(spec, staff, rng) : staff.find(e => e.id === leaverId);
       // Unionised staff are protected from the fire command; events may still take them. Not a dismissal: no crew morale dent.
       if (!leaver || !fireEmployeeFromWorld(state, leaver.id, { force: true, skipCrewMoraleDent: true }).success) return alt();
       return outcome();
