@@ -7,6 +7,8 @@ import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { readFileSync } from 'node:fs';
+import { t } from '../../../../src/core/i18n/I18n.js';
+import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import { Random } from '../../../../src/core/math/Random.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -190,5 +192,123 @@ describe('BlastFooter cost net of stock (#1685)', () => {
     footer.update(state);
     expect(footer.root.textContent).toContain('$0');
     expect(footer.root.textContent).not.toContain('$60');
+  });
+});
+
+describe('BlastFooter ore estimate coverage (#1960)', () => {
+  /** The value span sitting under the stat label with the given key. */
+  function statValue(root: HTMLElement, labelKey: string): HTMLElement {
+    const label = [...root.querySelectorAll('span')].find(s => s.textContent === t(labelKey));
+    if (!label) throw new Error(`no stat label ${labelKey}`);
+    return label.nextElementSibling as HTMLElement;
+  }
+  const value = (root: HTMLElement) => statValue(root, 'ui.blast_workshop.footer.est_ore_value');
+  const margin = (root: HTMLElement) => statValue(root, 'ui.blast_workshop.footer.margin');
+
+  function setup(survey: 'none' | 'half' | 'full' | 'stale') {
+    const { footer } = makeFooter();
+    footer.setGridProvider(() => grid);
+    const grid = makeOreGrid();
+    const state = makeState();
+    addChargedPattern(state, holeCounter);
+    if (survey === 'half') state.surveyResults.push(makeCoverageSurvey(0, 20));
+    if (survey === 'full') state.surveyResults.push(makeCoverageSurvey(0, 39));
+    if (survey === 'stale') state.surveyResults.push({ ...makeCoverageSurvey(0, 39), stale: true });
+    footer.update(state);
+    return { footer, state };
+  }
+
+  it('without a survey the est. ore value reads "No survey", not $0', () => {
+    const { footer } = setup('none');
+    expect(value(footer.root).textContent).toBe(t('ui.blast_workshop.footer.est_ore_unknown'));
+    expect(value(footer.root).textContent).toBe('No survey');
+    expect(value(footer.root).textContent).not.toContain('$');
+  });
+
+  it('without a survey the margin shows no dollar figure and is not red', () => {
+    const { footer } = setup('none');
+    expect(margin(footer.root).textContent).toBe(t('ui.blast_workshop.footer.margin_unknown'));
+    expect(margin(footer.root).textContent).not.toContain('$');
+    expect(margin(footer.root).style.color).not.toContain('critical');
+    expect(margin(footer.root).style.color).not.toContain('red');
+  });
+
+  it('without a survey a hint points at the Survey panel', () => {
+    const { footer } = setup('none');
+    const hint = t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
+    expect(hint).toContain('Survey');
+    expect(footer.root.textContent).toContain(hint);
+  });
+
+  it('a stale-only survey reads as no survey', () => {
+    const { footer } = setup('stale');
+    expect(value(footer.root).textContent).toBe('No survey');
+    expect(footer.root.textContent).toContain(t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') }));
+  });
+
+  it('a plan with no grid available reads "No survey"', () => {
+    const { footer } = makeFooter();
+    const state = makeState();
+    addChargedPattern(state, holeCounter);
+    footer.update(state);
+    expect(value(footer.root).textContent).toBe('No survey');
+  });
+
+  it('partial coverage shows the dollar value and the surveyed share', () => {
+    const { footer } = setup('half');
+    const text = value(footer.root).textContent ?? '';
+    expect(text).toMatch(/\$/);
+    expect(text).not.toBe('No survey');
+    expect(footer.root.textContent).toMatch(/\b\d{1,2}% surveyed/);
+    expect(footer.root.textContent).not.toContain(t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') }));
+  });
+
+  it('partial coverage share matches the i18n template', () => {
+    const { footer } = setup('half');
+    const m = /(\d{1,2})% surveyed/.exec(footer.root.textContent ?? '');
+    expect(m).not.toBeNull();
+    const pct = Number(m![1]);
+    expect(pct).toBeGreaterThanOrEqual(1);
+    expect(pct).toBeLessThanOrEqual(99);
+    expect(footer.root.textContent).toContain(t('ui.blast_workshop.footer.coverage_share', { percent: pct }));
+  });
+
+  it('partial coverage shows a margin figure', () => {
+    const { footer } = setup('half');
+    expect(margin(footer.root).textContent).toMatch(/\$/);
+  });
+
+  it('full coverage shows the dollar value with no share suffix and no hint', () => {
+    const { footer } = setup('full');
+    expect(value(footer.root).textContent).toMatch(/^\$[\d,.]+/);
+    expect(footer.root.textContent).not.toContain('surveyed');
+    expect(footer.root.textContent).not.toContain('No survey');
+    expect(footer.root.textContent).not.toContain(t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') }));
+    expect(margin(footer.root).textContent).toMatch(/\$/);
+  });
+
+  it('plan cost and FIRE enablement do not depend on survey coverage', () => {
+    const none = setup('none');
+    const full = setup('full');
+    const costOf = (f: BlastFooter) => statValue(f.root, 'ui.blast_workshop.footer.plan_cost').textContent;
+    expect(costOf(none.footer)).toBe(costOf(full.footer));
+    const fire = (f: BlastFooter) => (f.root.querySelector('[data-action="execute"]') as HTMLButtonElement).disabled;
+    expect(fire(none.footer)).toBe(false);
+    expect(fire(full.footer)).toBe(false);
+  });
+
+  it('moves from "No survey" to a value when a survey lands', () => {
+    const { footer, state } = setup('none');
+    expect(value(footer.root).textContent).toBe('No survey');
+    state.surveyResults.push(makeCoverageSurvey(0, 39));
+    footer.update(state);
+    expect(value(footer.root).textContent).toMatch(/^\$/);
+  });
+
+  it('reads "No survey" in French as the fr key, not English', () => {
+    setLocale('fr');
+    const { footer } = setup('none');
+    expect(value(footer.root).textContent).toBe(t('ui.blast_workshop.footer.est_ore_unknown'));
+    expect(value(footer.root).textContent).not.toBe('No survey');
   });
 });
