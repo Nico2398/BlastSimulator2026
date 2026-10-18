@@ -45,6 +45,7 @@ import {
 } from './commands/entities.js';
 import { researchCommand } from './commands/research.js';
 import { setPolicyCommand } from './commands/policy.js';
+import { permitCommand } from './commands/permit.js';
 import { vehicleCommand } from './commands/vehicle.js';
 import {
   tickCommand,
@@ -243,6 +244,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('contract', 'Contracts (list|accept|status|deliver|negotiate)', (args, named) =>
     contractCommand(ctx, args, named),
+  );
+  runner.register('permit', 'Mine permit ladder (status|apply)', (args, named) =>
+    permitCommand(ctx, args, named),
   );
   runner.register('fragments', 'Fragment logistics (status)', (args, named) =>
     fragmentsCommand(ctx, args, named),

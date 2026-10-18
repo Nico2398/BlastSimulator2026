@@ -288,6 +288,16 @@ Sound is feedback and atmosphere: alive, never crowded, and it sounds like a wor
 
 Sound is positional (pan, distance, zoom). Everything is rate-limited in real time, so 8x speed never multiplies the noise. Implementation, licensing, tools and tuning: `dev-audio`.
 
+## Mine grades (progression v1)
+
+The Ministry of Holes (Ministere des Trous) issues the open pit a **grade**: a permit earned by reaching targets. v1 only holds the grade itself (`src/core/economy/MineGrade.ts`); later tasks make it gate blasts, buyers and the dealer.
+
+- **Progression sites only.** `LevelDef.progression: true` (the sandbox) makes the sandbox start create `GameState.grade`. Campaign levels and `new_game` have none, so every grade function is a no-op or empty there. The optional field needs no `SAVE_VERSION` bump; load drops a malformed one (`sanitizeGradeState`).
+- **Table** (`MINE_GRADES` in `balance.ts`): grade 0 Backyard Dig Permit (start); 1 Hobby Quarry Licence (5 t ore, 2 blasts, $20,000, 48 ticks); 2 Licensed Quarry (30 t, pit 10 m, safety 40, $75,000, 72); 3 Industrial Pit (150 t, 20 m, neighbours 35, no death in 1,000 ticks, $250,000, 96); 4 Strategic National Excavation (600 t, 30 m, safety 50, ecology 30, $800,000, 120); 5 Mega-Pit of Public Interest (2,500 t, 40 m, neighbours 40, no death in 2,000 ticks, $2,500,000, 144). Above 5, endless **Planetary Crater, Class n**: ore 2,500 t x 2.5^n, rock broken >= 60,000 m3 x 2^(n-1), fee $2,500,000 x 2^n, 144 ticks. Every value is a v1 default for the calibration tasks to re-tune.
+- **Trackers**: ore delivered kg (`ore_sale` and `supply` deliveries, never `rubble_disposal`), deepest pit m (generator surface minus current surface over the columns a blast cleared; also feeds `levelStats.maxDepthReached`), rock broken m3, blasts fired. Deaths come from `damage.accidents`: a death at tick d blocks `no_death` while now - d < window. Neighbour relations is the `nuisance` score.
+- **Lifecycle**: `permit apply` is refused (in order) with no ladder, a pending application, unmet targets (names them) or cash below the fee. Success books the fee as a `permits` operating expense and starts processing; the tick pipeline counts it down, raises the grade and emits `progression:grade_approved`. Targets are checked only at application; there is no demotion.
+- **Console**: `permit status` (grade, next targets with progress, pending countdown), `permit apply`. The state dump exposes `mineGrade: {grade, pendingTicksLeft} | null`.
+
 ## Localization (i18n)
 
 English (en) + French (fr) from day one. All text externalized. Interpolation support. All fictional names localized.
