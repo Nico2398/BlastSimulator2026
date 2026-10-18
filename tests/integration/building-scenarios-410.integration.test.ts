@@ -378,7 +378,7 @@ describe('building-research-progression-visual — scenario-runner (#410)', () =
     expect(statusSteps.length).toBeGreaterThanOrEqual(3);
 
     // First status check happens right after queuing — task still pending.
-    expect(statusSteps[0]!.commandOutput).toContain('research_center');
+    expect(statusSteps[0]!.commandOutput).toContain('Research Center');
 
     // Last status check happens after the tick-pad — queue should be empty.
     const lastStatus = statusSteps[statusSteps.length - 1]!;

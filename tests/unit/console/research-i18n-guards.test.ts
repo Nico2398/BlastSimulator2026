@@ -173,3 +173,44 @@ describe('research queue usage, funds and success messages — translated (#1808
     expect(fr).not.toBe(en);
   });
 });
+
+describe('research status keys — translated (#1936)', () => {
+  const KEYS = [
+    'research.status_header',
+    'research.status_idle',
+    'research.status_no_center',
+    'research.status_task_active',
+    'research.status_task_pending',
+  ];
+  for (const key of KEYS) {
+    it(`${key} exists in en.json and fr.json and the two differ`, () => {
+      expect(EN[key], `en.json lacks ${key}`).toBeDefined();
+      expect(FR[key], `fr.json lacks ${key}`).toBeDefined();
+      expect(FR[key]).not.toBe(EN[key]);
+    });
+  }
+
+  it('status_header carries speed, active and slots placeholders', () => {
+    for (const l of [EN, FR]) {
+      expect(l['research.status_header']).toContain('{speed}');
+      expect(l['research.status_header']).toContain('{active}');
+      expect(l['research.status_header']).toContain('{slots}');
+    }
+  });
+
+  for (const locale of ['en', 'fr'] as const) {
+    it(`status header (${locale}) prints t(research.status_header)`, () => {
+      const ctx = makeCtx();
+      placeResearchCenter(ctx);
+      setLocale(locale);
+      const out = researchCommand(ctx, ['status'], {}).output;
+      expect(out).toContain(t('research.status_header', { speed: 1, active: 0, slots: 1 }));
+    });
+
+    it(`status with no center (${locale}) prints t(research.status_no_center)`, () => {
+      const ctx = makeCtx();
+      setLocale(locale);
+      expect(researchCommand(ctx, ['status'], {}).output).toContain(t('research.status_no_center'));
+    });
+  }
+});
