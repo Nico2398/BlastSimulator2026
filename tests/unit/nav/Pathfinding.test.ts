@@ -2152,3 +2152,127 @@ describe('#1851 start/goal cell mapping matches NavGrid rounding', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Per-agent climb limit: PathRequest.maxSlopeRatio (#1938)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('findPath — maxSlopeRatio per-agent climb limit (#1938)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+  const TIER3 = tanDeg(18);
+
+  /** Single-row corridor with one step of `rise` between x=1 and x=2: only cardinal moves exist. */
+  function stepCorridor(rise: number, length = 4): NavGrid {
+    const grid = makeFlatGrid(length, 1, 'walkable');
+    for (let x = 0; x < length; x++) setCell(grid, x, 0, 'walkable', { surfaceY: x >= 2 ? rise : 0 });
+    return grid;
+  }
+  const req = (toX: number, extra: { maxSlopeRatio?: number } = {}) =>
+    ({ agentId: 1, fromX: 0, fromZ: 0, toX, toZ: 0, avoidVehicles: false, ...extra });
+
+  it('an 18 degree limit refuses a 30 degree step', () => {
+    const grid = stepCorridor(tanDeg(30));
+    expect(findPath(grid, req(3, { maxSlopeRatio: TIER3 })).found).toBe(false);
+  });
+
+  it('an 18 degree limit accepts a 15 degree step', () => {
+    const grid = stepCorridor(tanDeg(15));
+    const result = findPath(grid, req(3, { maxSlopeRatio: TIER3 }));
+    expect(result.found).toBe(true);
+    expect(result.waypoints[result.waypoints.length - 1]).toEqual({ x: 3, z: 0 });
+  });
+
+  it('the default limit still accepts the 30 degree step, so only the limit differs', () => {
+    const grid = stepCorridor(tanDeg(30));
+    expect(findPath(grid, req(3)).found).toBe(true);
+    expect(findPath(grid, req(3, { maxSlopeRatio: NAV_MAX_SLOPE_RATIO })).found).toBe(true);
+  });
+
+  it('a limit looser than the default lets a 35 degree step through', () => {
+    const grid = stepCorridor(tanDeg(35));
+    expect(findPath(grid, req(3)).found).toBe(false);
+    expect(findPath(grid, req(3, { maxSlopeRatio: tanDeg(36) })).found).toBe(true);
+  });
+
+  it('refuses a downhill 30 degree step too', () => {
+    const grid = stepCorridor(tanDeg(30));
+    const down = findPath(grid, { agentId: 1, fromX: 3, fromZ: 0, toX: 0, toZ: 0, avoidVehicles: false, maxSlopeRatio: TIER3 });
+    expect(down.found).toBe(false);
+  });
+
+  it('refuses a diagonal-only 30 degree step under the limit, like a cardinal one', () => {
+    const grid = makeFlatGrid(2, 2, 'walkable');
+    setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
+    // Corners are walkable but cliff-high, so the diagonal is the only climbable route (blocked corners would forbid it outright, #1197).
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 10 });
+    setCell(grid, 0, 1, 'walkable', { surfaceY: 10 });
+    setCell(grid, 1, 1, 'walkable', { surfaceY: tanDeg(25) * Math.SQRT2 }); // 25 degrees over the sqrt2 run
+    expect(findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false }).found).toBe(true);
+    expect(findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false, maxSlopeRatio: TIER3 }).found).toBe(false);
+  });
+
+  it('routes around a steep gap through a gentler one when the limit forbids the short way', () => {
+    // 5x3: a wall column at x=2 with two gaps — z=0 a 30 degree step, z=2 a 15 degree step.
+    const grid = makeFlatGrid(5, 3, 'walkable');
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 5; x++) setCell(grid, x, z, 'walkable', { surfaceY: 0 });
+      setCell(grid, 2, z, 'blocked');
+    }
+    setCell(grid, 2, 0, 'walkable', { surfaceY: 0 });
+    for (let x = 3; x < 5; x++) setCell(grid, x, 0, 'walkable', { surfaceY: tanDeg(30) });
+    setCell(grid, 2, 2, 'walkable', { surfaceY: 0 });
+    for (let x = 3; x < 5; x++) setCell(grid, x, 2, 'walkable', { surfaceY: tanDeg(15) });
+    setCell(grid, 3, 1, 'walkable', { surfaceY: tanDeg(15) });
+    setCell(grid, 4, 1, 'walkable', { surfaceY: tanDeg(15) });
+    const steepOnly = { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 0, avoidVehicles: false };
+    // Unlimited, the short way through the steep gap wins.
+    expect(findPath(grid, steepOnly).waypoints.some(w => w.x === 2 && w.z === 0)).toBe(true);
+    const strict = findPath(grid, { ...steepOnly, maxSlopeRatio: TIER3 });
+    expect(strict.found).toBe(true);
+    // The strict route never crosses the wall through the steep gap at z=0 ...
+    expect(strict.waypoints.some(w => w.x === 2 && w.z === 0)).toBe(false);
+    // ... and does cross through the gentle one.
+    expect(strict.waypoints.some(w => w.x === 2 && w.z === 2)).toBe(true);
+  });
+
+  it('findExactPath honours the limit as well', () => {
+    const grid = stepCorridor(tanDeg(30));
+    const exact = findExactPath(grid, req(3, { maxSlopeRatio: TIER3 }));
+    expect(exact.found).toBe(false);
+    expect(findExactPath(grid, req(3)).found).toBe(true);
+  });
+
+  it('the budget-fallback direct-line walk refuses a step over the limit', () => {
+    // 600x1 corridor is past the A* node budget, so the direct-line walk answers (see the #1356 cases above).
+    const length = 600;
+    const grid = makeFlatGrid(length, 1, 'walkable');
+    for (let x = 0; x < length; x++) setCell(grid, x, 0, 'walkable', { surfaceY: x >= 300 ? tanDeg(30) : 0 });
+    const long = { agentId: 1, fromX: 0, fromZ: 0, toX: length - 1, toZ: 0, avoidVehicles: false };
+    expect(findPath(grid, long).found).toBe(true);
+    expect(findPath(grid, { ...long, maxSlopeRatio: TIER3 }).found).toBe(false);
+  });
+
+  it('the budget-fallback direct-line walk accepts a 15 degree step under the limit', () => {
+    const length = 600;
+    const grid = makeFlatGrid(length, 1, 'walkable');
+    for (let x = 0; x < length; x++) setCell(grid, x, 0, 'walkable', { surfaceY: x >= 300 ? tanDeg(15) : 0 });
+    const long = { agentId: 1, fromX: 0, fromZ: 0, toX: length - 1, toZ: 0, avoidVehicles: false, maxSlopeRatio: TIER3 };
+    expect(findPath(grid, long).found).toBe(true);
+  });
+
+  it('a flat grid gives an identical route and cost whatever the limit', () => {
+    const grid = makeFlatGrid(12, 12, 'walkable', 0);
+    const base = { agentId: 1, fromX: 0, fromZ: 0, toX: 11, toZ: 9, avoidVehicles: false };
+    const a = findPath(grid, base);
+    const b = findPath(grid, { ...base, maxSlopeRatio: TIER3 });
+    expect(b.found).toBe(a.found);
+    expect(b.waypoints).toEqual(a.waypoints);
+    expect(b.totalCost).toBe(a.totalCost);
+  });
+
+  it('an omitted limit equals an explicit NAV_MAX_SLOPE_RATIO on rolling ground', () => {
+    const grid = makePlateauWithPit(15, 15, { minX: 5, maxX: 9, minZ: 5, maxZ: 9 }, 20, 5);
+    const base = { agentId: 1, fromX: 0, fromZ: 0, toX: 14, toZ: 14, avoidVehicles: false };
+    expect(findPath(grid, { ...base, maxSlopeRatio: NAV_MAX_SLOPE_RATIO })).toEqual(findPath(grid, base));
+  });
+});

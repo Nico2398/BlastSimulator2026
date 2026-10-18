@@ -8,7 +8,9 @@ import {
   VEHICLE_TIER_MULTIPLIERS,
   VEHICLE_SCRAP_RESIDUAL_FRACTION,
   NAV_CLEARANCE_VEHICLE_CELLS,
+  NAV_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
+import { tierSlopeRatio, VEHICLE_TIER_LIST } from '../nav/ClimbLimit.js';
 import type { Employee } from './Employee.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
@@ -73,9 +75,8 @@ interface BaseStats {
 
 /** Generate all three tier VehicleDefs from a role's base (tier-1) stats. */
 function makeTiers(role: VehicleRole, base: BaseStats): Record<VehicleTier, VehicleDef> {
-  const tiers: VehicleTier[] = [1, 2, 3];
   const result = {} as Record<VehicleTier, VehicleDef>;
-  for (const tier of tiers) {
+  for (const tier of VEHICLE_TIER_LIST) {
     const m = VEHICLE_TIER_MULTIPLIERS[tier];
     result[tier] = {
       type: role,
@@ -361,3 +362,8 @@ export function canReleaseDriver(
 
 // ── Licence mapping / driver assignment / loading rate ──
 // Moved to VehicleDriverAssignment.ts (#484), re-exported above.
+
+/** Steepest rise/run this vehicle climbs; progression sites use its tier's limit (#1938). */
+export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression: boolean): number {
+  return progression ? tierSlopeRatio(vehicle.tier) : NAV_MAX_SLOPE_RATIO;
+}

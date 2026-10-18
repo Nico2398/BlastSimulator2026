@@ -130,3 +130,18 @@ A mover mid-hop paths from its committed hop origin (`inFlightHopOrigin`), not t
 **Idle blockers yield off the route (#1696).** When the occupant in a mover's way is an idle employee or an idle parked vehicle (nothing queued, not working/resting/driving) and the nearest free cell would be another cell of the mover's remaining route, `pickYieldCell` (`nav/IdleYield.ts`) picks the nearest free cell within `IDLE_YIELD_SEARCH_RADIUS_CELLS` that is off that route (route recomputed each ladder step). The blocker is relocated there with no return trip, so it cannot walk back into a 1-wide corridor. With no such cell the older nearest-free-cell behaviour applies. Working, resting, driven and evacuating agents are never relocated. Ladder steps are counted per leg destination in `Employee.blockEpisode` (survives sidestep/reroute resets, cleared on arrival); at `BLOCK_EPISODE_ABANDON_LIMIT` the movement is abandoned so a sidestep-return loop ends.
 
 A world position maps to a cell by `Math.round` through `NavGrid.clampX`/`clampZ`; pathfinding, planner and runtime share it, so a mover stopped mid-hop at a fractional position finds routes from the same cell the runtime sees (#1851).
+
+## Per-agent slope limit (#1938)
+
+`isStepClimbable(fromY, toY, run, maxSlopeRatio = NAV_MAX_SLOPE_RATIO)` is the one climb predicate. `PathRequest.maxSlopeRatio` (default 30°) is threaded to every climb check: A* neighbour expansion, the direct-line walk, exact paths, ramp connections (`findRampConnections`) and the multi-level fallback. A* cost and heuristic are unchanged. The inclusive `<=` boundary (with epsilon) holds, so a slope exactly at the limit is climbable.
+
+| Agent | Max slope |
+|-------|-----------|
+| Walking, any site | 30° |
+| Vehicle tier 1 | 30° |
+| Vehicle tier 2, progression site | 24° |
+| Vehicle tier 3, progression site | 18° |
+
+Progression site = `state.grade !== undefined` (`isProgressionSite`). Off such sites every vehicle keeps 30°. Limits live in `VEHICLE_TIER_MAX_SLOPE_DEGREES` (`balance.ts`); `nav/ClimbLimit.ts` converts degrees, tiers and ratios. Ramp cell typing stays at 30°. Reachability labellings (`computeClimbComponents`, `computeClimbReachableSet*`) take the same ratio; `OrderReachability` keys its component cache by `${clearance}|${ratio}`. The planner estimate and the executor (`Locomotion`, `AgentAdvance` recovery checks) share `vehicleMaxSlopeRatio(vehicle, progression)`, so the estimate equals the executed route length.
+
+**Decision (#1938): the limit applies per step, diagonals included.** `isStepClimbable` is evaluated with the step's own run (`hypot(dx, dz)`), so a diagonal step over an x-graded ramp has grade `atan(tan g / sqrt(2))`. A ramp at least 2 cells wide is therefore climbable by a diagonal zigzag up to about `tan(limit) * sqrt(2)` (a 24 degree limit passes roughly a 32 degree cardinal grade). The inspector grade is the steepest cardinal step and its tiers line is conservative (it can say a tier cannot climb a ramp that a wide-ramp zigzag does). Recorded, not a bug.

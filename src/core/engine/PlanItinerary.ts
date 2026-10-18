@@ -5,7 +5,7 @@
 // executor). Nothing consumes this yet (phase 3a, see gameplay-vehicle-fleet).
 // Read-only: never mutates state, never reserves/boards a vehicle.
 
-import { isFootprintAction, isHoleAction, type GameState, type PendingAction } from '../state/GameState.js';
+import { isFootprintAction, isHoleAction, isProgressionSite, type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
@@ -13,7 +13,7 @@ import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUN
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { canReleaseDriver, getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
+import { canReleaseDriver, getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, vehicleMaxSlopeRatio, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -147,12 +147,13 @@ export function estimateLegDistance(
   toZ: number,
   avoidVehicles: boolean,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  maxSlopeRatio?: number,
 ): number | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     return octileHeuristic(fromX, fromZ, toX, toZ);
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance, ...(maxSlopeRatio !== undefined && { maxSlopeRatio }) });
   return path.found ? path.totalCost : null;
 }
 
@@ -433,7 +434,10 @@ function buildDriveLeg(
   // function's own doc comment above `dist`.
   allowUnreachable: boolean,
 ): Leg | null {
-  const dist = estimateLegDistance(state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false, vehicleRequiredClearanceCells(vehicle));
+  const dist = estimateLegDistance(
+    state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false,
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+  );
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
   if (effectiveDist === null) return null;
 
@@ -685,6 +689,7 @@ function resolveRideAlightPoint(
   targetX: number,
   targetZ: number,
   requiredClearance: number,
+  maxSlopeRatio: number,
 ): { x: number; z: number } | null {
   if (fidelity === 'estimate' || state.navGrid === null) {
     const dx = targetX - fromX;
@@ -695,7 +700,7 @@ function resolveRideAlightPoint(
     return { x: fromX + dx * rideFraction, z: fromZ + dz * rideFraction };
   }
 
-  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance });
+  const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX: targetX, toZ: targetZ, avoidVehicles: false, requiredClearance, maxSlopeRatio });
   if (!path.found || path.waypoints.length <= TRANSPORT_ALIGHT_FINISH_WALK_CELLS + 1) return null;
 
   const wp = path.waypoints[path.waypoints.length - 1 - TRANSPORT_ALIGHT_FINISH_WALK_CELLS]!;
@@ -747,7 +752,7 @@ export function buildTransportRideItinerary(
 
   const alight = resolveRideAlightPoint(
     state, fidelity, employee.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ,
-    vehicleRequiredClearanceCells(vehicle),
+    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
   );
   if (alight === null) return null;
 
