@@ -19,6 +19,8 @@ export interface PathRequest {
   avoidVehicles: boolean;
   /** Minimum required cell clearance; defaults to NAV_CLEARANCE_EMPLOYEE_CELLS inside findPath (#1154). */
   requiredClearance?: number;
+  /** Steepest climbable rise/run for this agent; defaults to NAV_MAX_SLOPE_RATIO (#1938). */
+  maxSlopeRatio?: number;
 }
 
 /**

@@ -294,6 +294,8 @@ export interface PendingAction {
   blockedReason?: BlockedOrderReason | null;
   /** Licence level the blocking vehicle tier needs when `blockedReason` is 'licence_level_too_low' (#1524); for 'no_reaching_vehicle' it carries the required vehicle tier. Optional like `blockedReason`. */
   blockedLicenceLevel?: LicenceLevel | null;
+  /** Extra i18n key and params explaining a block (e.g. slope too steep for the vehicle tier) (#1938). */
+  blockedDetail?: { key: string; params: Record<string, string | number> };
   /**
    * Tick after which this action becomes claimable again, stamped when a
    * vehicle abandons it as stuck. Null/absent = no backoff active.
@@ -851,4 +853,10 @@ export function syncWorldBounds(state: GameState, voxelGrid: VoxelGrid): void {
   state.world.minZ = voxelGrid.minZ;
   state.world.sizeX = voxelGrid.sizeX;
   state.world.sizeZ = voxelGrid.sizeZ;
+}
+
+/** True when the site runs the mine-grade permit ladder (#1938). */
+export function isProgressionSite(state: Pick<GameState, 'grade'>): boolean {
+  void state;
+  return false; // TODO: implement
 }

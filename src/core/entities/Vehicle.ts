@@ -361,3 +361,9 @@ export function canReleaseDriver(
 
 // ── Licence mapping / driver assignment / loading rate ──
 // Moved to VehicleDriverAssignment.ts (#484), re-exported above.
+
+/** Steepest rise/run this vehicle climbs; progression sites use its tier's limit (#1938). */
+export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression: boolean): number {
+  void vehicle; void progression;
+  return 0; // TODO: implement
+}

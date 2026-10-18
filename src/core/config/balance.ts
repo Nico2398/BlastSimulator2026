@@ -1257,6 +1257,13 @@ export const NAV_MAX_SLOPE_DEGREES = 30;
  */
 export const NAV_MAX_SLOPE_RATIO = Math.tan(NAV_MAX_SLOPE_DEGREES * Math.PI / 180);
 
+/** Steepest slope (degrees) each vehicle tier climbs on a progression site (#1938). Tier 1 keeps the global limit. */
+export const VEHICLE_TIER_MAX_SLOPE_DEGREES: Record<VehicleTier, number> = {
+  1: NAV_MAX_SLOPE_DEGREES,
+  2: 24,
+  3: 18,
+};
+
 /**
  * Anti-noise floor, in metres, below which a graded cardinal-neighbour
  * height delta reads as flat rather than a ramp. Ramp classification uses
