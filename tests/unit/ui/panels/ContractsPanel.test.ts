@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { ContractsPanel, deliverableAmountKg } from '../../../../src/ui/panels/ContractsPanel.js';
+import {
+  ContractsPanel, deliverableAmountKg, orderOffers, CONTRACT_OFFER_CARD_PX, AVAILABLE_VISIBLE_CARDS, SECTION_GAP_PX,
+} from '../../../../src/ui/panels/ContractsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -523,6 +525,13 @@ function getBodyEl(panel: ContractsPanel): HTMLElement {
  * Every direct child of `bodyEl` between the section header whose text
  * contains `label` and the next section header (or the end of bodyEl).
  */
+/** Header label without its count suffix ("Available · 3" -> "Available"). */
+function countLabel(key: 'ui.contracts.available_count' | 'ui.contracts.active_count'): string {
+  return t(key, { count: 0 }).replace(/\s*·\s*0$/, '');
+}
+const AVAILABLE_LABEL = countLabel('ui.contracts.available_count');
+const ACTIVE_LABEL = countLabel('ui.contracts.active_count');
+
 function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
   const children = Array.from(bodyEl.children) as HTMLElement[];
   const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
@@ -552,8 +561,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
     panel.update(state);
 
     const bodyEl = getBodyEl(panel);
-    const activeChildren = sectionChildren(bodyEl, t('ui.contracts.active'));
-    const availableChildren = sectionChildren(bodyEl, t('ui.contracts.available'));
+    const activeChildren = sectionChildren(bodyEl, ACTIVE_LABEL);
+    const availableChildren = sectionChildren(bodyEl, AVAILABLE_LABEL);
     const closedChildren = sectionChildren(bodyEl, t('ui.contracts.closed'));
 
     expect(activeChildren.length).toBe(1);
@@ -587,8 +596,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
 
     const bodyEl = getBodyEl(panel);
     const wrappers = [
-      sectionChildren(bodyEl, t('ui.contracts.active'))[0]!,
-      sectionChildren(bodyEl, t('ui.contracts.available'))[0]!,
+      sectionChildren(bodyEl, ACTIVE_LABEL)[0]!,
+      sectionChildren(bodyEl, AVAILABLE_LABEL)[0]!,
       sectionChildren(bodyEl, t('ui.contracts.closed'))[0]!,
     ];
     for (const wrapper of wrappers) {
@@ -612,8 +621,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
     const headers = (Array.from(bodyEl.children) as HTMLElement[]).filter(c => c.classList.contains('bsx-section'));
     const headerLabels = headers.map(h => h.textContent ?? '');
 
-    expect(headerLabels.some(l => l.includes(t('ui.contracts.active')))).toBe(true);
-    expect(headerLabels.some(l => l.includes(t('ui.contracts.available')))).toBe(true);
+    expect(headerLabels.some(l => l.includes(ACTIVE_LABEL))).toBe(true);
+    expect(headerLabels.some(l => l.includes(AVAILABLE_LABEL))).toBe(true);
     expect(headerLabels.some(l => l.includes(t('ui.contracts.closed')))).toBe(true);
     expect(headers.length).toBe(3);
   });
@@ -625,8 +634,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
 
     const bodyEl = getBodyEl(panel);
     for (const [label, emptyKey] of [
-      [t('ui.contracts.active'), t('ui.contracts.none_active')],
-      [t('ui.contracts.available'), t('ui.contracts.none')],
+      [ACTIVE_LABEL, t('ui.contracts.none_active')],
+      [AVAILABLE_LABEL, t('ui.contracts.none')],
       [t('ui.contracts.closed'), t('ui.contracts.none_closed')],
     ] as const) {
       const children = sectionChildren(bodyEl, label);
@@ -849,10 +858,11 @@ describe('ContractsPanel deliver amount (#1368)', () => {
 // ── Live refresh keeps scroll and typed input across ticks (#1592) ──
 
 describe('ContractsPanel — tick refresh keeps scroll and typed input (#1592)', () => {
-  /** The three bounded sections (active, available, closed), in DOM order. */
+  /** The three bounded sections, always as [active, available, closed] regardless of DOM order (#1970). */
   const sections = (panel: ContractsPanel): HTMLElement[] =>
-    Array.from(panel.root.querySelectorAll<HTMLElement>('div'))
-      .filter(d => d.style.overflowY === 'auto' && d.style.maxHeight === '200px');
+    ['active', 'available', 'closed']
+      .map(k => panel.root.querySelector<HTMLElement>(`[data-scroll-key="${k}"]`))
+      .filter((d): d is HTMLElement => d !== null);
 
   function busyState(): GameState {
     const state = makeState();
@@ -1058,5 +1068,172 @@ describe('ContractsPanel — rubble cards (#1892)', () => {
     const text = panel.root.textContent ?? '';
     expect(text).toContain(t('ui.contracts.delivered_line', { delivered: '101', total: '1,000' }));
     expect(text).toContain(t('ui.contracts.delivered_line', { delivered: '250', total: '1,000' }));
+  });
+});
+
+
+// ── Layout: Available above Active, fillable first, counts, taller Available (#1970) ──
+
+describe('orderOffers (#1970)', () => {
+  const o = (id: number, over: Partial<Contract> = {}) => makeContract({ id, quantityKg: 100, ...over });
+  const ids = (cs: Contract[]) => cs.map(c => c.id);
+
+  it('keeps board order when every offer is fillable', () => {
+    const list = [o(3), o(1), o(2)];
+    expect(ids(orderOffers(list, { dirtite: 500 }, 0))).toEqual([3, 1, 2]);
+  });
+
+  it('keeps board order when no offer is fillable', () => {
+    const list = [o(3), o(1), o(2)];
+    expect(ids(orderOffers(list, { dirtite: 5 }, 0))).toEqual([3, 1, 2]);
+  });
+
+  it('returns an empty list for no offers', () => {
+    expect(orderOffers([], { dirtite: 500 }, 100)).toEqual([]);
+  });
+
+  it('puts fillable offers first and keeps board order inside each group', () => {
+    const list = [o(1, { quantityKg: 900 }), o(2), o(3, { quantityKg: 800 }), o(4), o(5, { quantityKg: 700 })];
+    expect(ids(orderOffers(list, { dirtite: 100 }, 0))).toEqual([2, 4, 1, 3, 5]);
+  });
+
+  it('does not mutate its input', () => {
+    const list = [o(1, { quantityKg: 900 }), o(2)];
+    const copy = [...list];
+    const out = orderOffers(list, { dirtite: 100 }, 0);
+    expect(list).toEqual(copy);
+    expect(out).not.toBe(list);
+  });
+
+  it('judges rubble offers against the rubble stock argument, not collected ore', () => {
+    const rubble = o(2, { type: 'rubble_disposal', materialId: '', quantityKg: 400 });
+    const ore = o(1, { quantityKg: 900 });
+    expect(ids(orderOffers([ore, rubble], {}, 400))).toEqual([2, 1]);
+    expect(ids(orderOffers([ore, rubble], { dirtite: 5000 }, 399))).toEqual([1, 2]);
+    expect(ids(orderOffers([rubble, ore], { dirtite: 5000 }, 399))).toEqual([1, 2]);
+  });
+});
+
+describe('ContractsPanel layout (#1970)', () => {
+  const headerTexts = (panel: ContractsPanel): string[] =>
+    (Array.from(getBodyEl(panel).children) as HTMLElement[])
+      .filter(c => c.classList.contains('bsx-section')).map(c => c.textContent ?? '');
+  const offerIds = (panel: ContractsPanel): string[] =>
+    Array.from(panel.root.querySelectorAll<HTMLElement>('[data-scroll-key="available"] [data-contract-id]'))
+      .map(n => n.dataset['contractId']!);
+
+  /** Offers 1..n; odd-numbered ones are fillable (100 kg), even ones need 900 kg. */
+  function mixedState(n: number): GameState {
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100;
+    for (let i = 1; i <= n; i++) state.contracts.available.push(makeContract({ id: i, quantityKg: i % 2 ? 100 : 900 }));
+    return state;
+  }
+
+  it('orders sections Storage, Available, Active, Closed', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+    const kids = Array.from(getBodyEl(panel).children) as HTMLElement[];
+    const pos = (key: string) => kids.findIndex(k => k.dataset['scrollKey'] === key);
+    const strip = kids.findIndex(k => k.querySelector('[data-action="goto-ops"]') !== null);
+    expect(strip).toBeGreaterThanOrEqual(0);
+    expect(strip).toBeLessThan(pos('available'));
+    expect(pos('available')).toBeLessThan(pos('active'));
+    expect(pos('active')).toBeLessThan(pos('closed'));
+    const labels = headerTexts(panel);
+    expect(labels[0]).toContain(AVAILABLE_LABEL);
+    expect(labels[1]).toContain(ACTIVE_LABEL);
+    expect(labels[2]).toContain(t('ui.contracts.closed'));
+  });
+
+  it('shows the offer count in the Available header', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(mixedState(8));
+    expect(headerTexts(panel)[0]).toContain(t('ui.contracts.available_count', { count: 8 }));
+  });
+
+  it('shows count 0 in the Available header with no offers', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+    expect(headerTexts(panel)[0]).toContain(t('ui.contracts.available_count', { count: 0 }));
+  });
+
+  it('shows the active count in the Active header', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(...makeManyContracts(3, 50));
+    panel.show();
+    panel.update(state);
+    const active = headerTexts(panel).find(h => h.includes(t('ui.contracts.active_count', { count: 3 })));
+    expect(active).toBeDefined();
+  });
+
+  it('updates the counts when offers are added', () => {
+    const { panel } = makePanel();
+    const state = mixedState(2);
+    panel.show();
+    panel.update(state);
+    state.contracts.available.push(makeContract({ id: 30 }));
+    panel.update(state);
+    expect(headerTexts(panel)[0]).toContain(t('ui.contracts.available_count', { count: 3 }));
+  });
+
+  it('renders fillable offers before unfillable ones, board order inside each group', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(mixedState(8));
+    expect(offerIds(panel)).toEqual(['1', '3', '5', '7', '2', '4', '6', '8']);
+  });
+
+  it('keeps the order identical across two renders and after a forced refresh', () => {
+    const { panel } = makePanel();
+    const state = mixedState(8);
+    panel.show();
+    panel.update(state);
+    const first = offerIds(panel);
+    panel.update(state);
+    expect(offerIds(panel)).toEqual(first);
+    panel.refreshLocale();
+    panel.update(state);
+    expect(offerIds(panel)).toEqual(first);
+    expect(first).toEqual(['1', '3', '5', '7', '2', '4', '6', '8']);
+  });
+
+  it('puts a rubble offer first when the rubble stock covers it', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    storeRock(state, 500);
+    state.contracts.available.push(
+      makeContract({ id: 1, quantityKg: 900 }),
+      makeContract({ id: 2, type: 'rubble_disposal', materialId: '', quantityKg: 400 }),
+    );
+    panel.show();
+    panel.update(state);
+    expect(offerIds(panel)).toEqual(['2', '1']);
+  });
+
+  it('sizes the Available wrapper for three offer cards, still scrolling', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(mixedState(8));
+    const wrapper = panel.root.querySelector<HTMLElement>('[data-scroll-key="available"]')!;
+    expect(AVAILABLE_VISIBLE_CARDS).toBe(3);
+    expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
+    expect(parseInt(wrapper.style.maxHeight, 10)).toBeGreaterThanOrEqual(3 * CONTRACT_OFFER_CARD_PX + 2 * SECTION_GAP_PX);
+    expect(wrapper.style.overflowY).toBe('auto');
+  });
+
+  it('leaves the Active and Closed wrappers at their own bounded height', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+    for (const key of ['active', 'closed']) {
+      const w = panel.root.querySelector<HTMLElement>(`[data-scroll-key="${key}"]`)!;
+      expect(w.style.overflowY).toBe('auto');
+      expect(w.style.maxHeight).toMatch(/^\d+px$/);
+    }
   });
 });
