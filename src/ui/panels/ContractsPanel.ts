@@ -297,12 +297,12 @@ export class ContractsPanel extends PanelBase {
     strip.append(el('span', {
       text: t('ui.contracts.active_summary', { count: summary.count, hours: summary.nextDeadlineHours }),
       className: 'bs-contract-active-summary-deadline',
-      attrs: { style: `color:${this.urgencyColor(soonest, state.tickCount)}` },
+      attrs: { style: `min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${this.urgencyColor(soonest, state.tickCount)}` },
     }));
     if (summary.penaltyTotal > 0) {
       strip.append(el('span', {
         text: t('ui.contracts.penalty_line', { amount: formatMoney(summary.penaltyTotal) }),
-        attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' },
+        attrs: { style: 'margin-left:auto;flex-shrink:0;white-space:nowrap;color:var(--bsx-critical-text)' },
       }));
     }
     strip.addEventListener('click', () => activeHeader.scrollIntoView?.({ block: 'start' }));
