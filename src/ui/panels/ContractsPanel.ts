@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Contracts panel (redesign P5)
-// Section order: storage strip, AVAILABLE offers (fillable first, sized to
-// three cards before scrolling; Accept/Negotiate/Decline, negotiate result
-// inline), ACTIVE contracts (progress + MAX-capped deliver), CLOSED history.
+// Section order: storage strip, running-contracts summary strip (only with
+// active contracts; click jumps to ACTIVE), AVAILABLE offers (fillable first,
+// sized to three cards before scrolling; Accept/Negotiate/Decline, negotiate
+// result inline), ACTIVE contracts (progress + MAX-capped deliver), CLOSED history.
 // Replaces ContractUI.ts's role (deleted in the P5 cleanup task).
 //
 // Root id and the accept/deliver/amount classes are preserved from the old
@@ -85,10 +86,18 @@ export interface ActiveSummary {
 
 /** Summarize active contracts; null when there are none. */
 export function summarizeActive(active: readonly Contract[], tickCount: number): ActiveSummary | null {
-  void active;
-  void tickCount;
-  // TODO: implement
-  return null;
+  if (active.length === 0) return null;
+  let nextDeadlineHours = Infinity;
+  let penaltyTotal = 0;
+  for (const c of active) {
+    nextDeadlineHours = Math.min(nextDeadlineHours, remainingTicksOf(c, tickCount));
+    if (c.type !== 'rubble_disposal') penaltyTotal += c.penaltyAmount;
+  }
+  return { count: active.length, nextDeadlineHours, penaltyTotal };
+}
+
+function remainingTicksOf(c: Contract, tickCount: number): number {
+  return Math.max(0, c.acceptedAtTick + c.deadlineTicks - tickCount);
 }
 
 /** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
@@ -161,8 +170,10 @@ export class ContractsPanel extends PanelBase {
   private render(state: GameState): void {
     const managerLevel = bestAvailableManagerLevel(state.employees.employees);
     const siteOres = resolveContractOres(state);
-    const sections: HTMLElement[] = [
+    const activeHeader = sectionHeader(t('ui.contracts.active_count', { count: state.contracts.active.length }));
+    const sections: (HTMLElement | null)[] = [
       this.makeStorageStrip(state),
+      this.makeActiveSummaryStrip(state, activeHeader),
       sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
       scrollBoundedSection(
         state.contracts.available.length > 0
@@ -171,7 +182,7 @@ export class ContractsPanel extends PanelBase {
         AVAILABLE_SECTION_MAX_PX,
         { gap: SECTION_GAP_PX, scrollKey: 'available' },
       ),
-      sectionHeader(t('ui.contracts.active_count', { count: state.contracts.active.length })),
+      activeHeader,
       scrollBoundedSection(
         state.contracts.active.length > 0
           ? state.contracts.active.map(c => this.makeActiveCard(c, state))
@@ -193,6 +204,7 @@ export class ContractsPanel extends PanelBase {
 
   /** Time-left text and urgency colour tick every hour; patch them in place so scroll and typed input survive. */
   private refreshDynamic(state: GameState): void {
+    this.refreshActiveSummary(state);
     for (const c of state.contracts.active) {
       const cardEl = this.bodyEl.querySelector<HTMLElement>(`[data-contract-id="${c.id}"]`);
       if (!cardEl) continue;
@@ -208,7 +220,7 @@ export class ContractsPanel extends PanelBase {
   }
 
   private remainingTicks(c: Contract, tickCount: number): number {
-    return Math.max(0, c.acceptedAtTick + c.deadlineTicks - tickCount);
+    return remainingTicksOf(c, tickCount);
   }
 
   /** Kilograms of `materialId` available to deliver — collected ore by type, or barren rock (heaps plus barren stored fragments) for rubble ('' materialId). */
@@ -261,6 +273,49 @@ export class ContractsPanel extends PanelBase {
     linkBtn.style.cssText = 'height:26px;align-self:flex-start;font-size:10px;padding:0 9px';
 
     return card([headRow, progressBar(pct, 'var(--bsx-amber)'), oreEntries.length > 0 ? chipsRow : null, linkBtn]);
+  }
+
+  // ── Active summary strip ──
+
+  /** The active contract with the soonest deadline: its urgency colours the strip. */
+  private soonestActive(state: GameState): Contract | undefined {
+    return state.contracts.active.reduce<Contract | undefined>(
+      (best, c) => (!best || remainingTicksOf(c, state.tickCount) < remainingTicksOf(best, state.tickCount) ? c : best),
+      undefined,
+    );
+  }
+
+  private makeActiveSummaryStrip(state: GameState, activeHeader: HTMLElement): HTMLElement | null {
+    const summary = summarizeActive(state.contracts.active, state.tickCount);
+    const soonest = this.soonestActive(state);
+    if (!summary || !soonest) return null;
+    const strip = el('button', {
+      className: 'bs-contract-active-summary',
+      attrs: { type: 'button', style: 'display:flex;align-items:center;gap:8px;flex-shrink:0;width:100%;padding:6px 10px;border-radius:4px;border:1px solid var(--bsx-border,rgba(255,255,255,.1));background:rgba(255,255,255,.05);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 11px/1.2 var(--bsx-font-ui)' },
+    });
+    strip.dataset['action'] = 'goto-active';
+    strip.append(el('span', {
+      text: t('ui.contracts.active_summary', { count: summary.count, hours: summary.nextDeadlineHours }),
+      className: 'bs-contract-active-summary-deadline',
+      attrs: { style: `color:${this.urgencyColor(soonest, state.tickCount)}` },
+    }));
+    if (summary.penaltyTotal > 0) {
+      strip.append(el('span', {
+        text: t('ui.contracts.penalty_line', { amount: formatMoney(summary.penaltyTotal) }),
+        attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' },
+      }));
+    }
+    strip.addEventListener('click', () => activeHeader.scrollIntoView?.({ block: 'start' }));
+    return strip;
+  }
+
+  private refreshActiveSummary(state: GameState): void {
+    const deadline = this.bodyEl.querySelector<HTMLElement>('.bs-contract-active-summary-deadline');
+    const summary = summarizeActive(state.contracts.active, state.tickCount);
+    const soonest = this.soonestActive(state);
+    if (!deadline || !summary || !soonest) return;
+    deadline.textContent = t('ui.contracts.active_summary', { count: summary.count, hours: summary.nextDeadlineHours });
+    deadline.style.color = this.urgencyColor(soonest, state.tickCount);
   }
 
   // ── Active ──
