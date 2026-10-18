@@ -26,6 +26,7 @@
     },
     {
       "command": "wait_until field:holeCount equals:1 max_ticks:300",
+      "timeout": 130,
       "role": "setup",
       "interaction": [
         {
