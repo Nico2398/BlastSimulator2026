@@ -131,7 +131,7 @@ export class BlastFooter {
     this.lastSignature = signature;
 
     this.costEl.textContent = `$${formatMoney(planCost)}`;
-    const view = oreEstimateView(coverage);
+    const view = oreEstimateView(estimate);
     this.valueEl.textContent = oreValueText(view, estValue);
     this.valueEl.style.color = oreValueColor(view);
     if (view.kind === 'unknown') {

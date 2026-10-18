@@ -37,10 +37,16 @@ export interface BlastOreEstimate {
   value: number;
   /** Share of broken voxels covered by a fresh survey, 0..1. */
   coverage: number;
+  /** Voxels the blast breaks; 0 = nothing broken. */
+  brokenVoxels: number;
+  /** True when the plan has charges / an energy field. */
+  charged: boolean;
+  /** Share 0..1 of drilled holes whose column lies in a fresh survey disc; 0 with no holes. */
+  holeCoverage: number;
 }
 
 /** Estimate for a blast with nothing to value: no field, no fresh survey, or nothing broken. */
-export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, coverage: 0 });
+export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, coverage: 0, brokenVoxels: 0, charged: false, holeCoverage: 0 });
 
 /**
  * Estimate the total ore value (game dollars) a blast plan will yield (#1703),
@@ -78,7 +84,8 @@ export function estimateBlastOre(
     const densities = oresSurveyedAt(survey, x, z, y);
     if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
   }
-  return { value, coverage: covered / fragmented.length };
+  // TODO: implement brokenVoxels / charged / holeCoverage (#1967)
+  return { value, coverage: covered / fragmented.length, brokenVoxels: 0, charged: false, holeCoverage: 0 };
 }
 
 /** Estimated ore value (game dollars) of a blast plan; see `estimateBlastOre` (#1703). */
