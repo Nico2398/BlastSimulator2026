@@ -13,7 +13,7 @@ function labelValue(m: ActiveModifier): string {
     case 'recurring_charge': return formatMoney(m.magnitude);
     case 'forced_weather': return t(`hud.weather.${ALL_WEATHER_STATES[m.magnitude] ?? 'sunny'}`);
     case 'event_weight': return `${t(`ui.event.category.${m.category ?? 'union'}`)} ×${m.magnitude.toFixed(2)}`;
-    case 'work_stoppage': case 'blast_ban': case 'haul_pause': case 'drill_ban': case 'out_of_service': return '';
+    case 'work_stoppage': case 'blast_ban': case 'haul_pause': case 'drill_ban': case 'out_of_service': case 'permit_delay': return '';
     default: return `×${m.magnitude.toFixed(2)}`;
   }
 }

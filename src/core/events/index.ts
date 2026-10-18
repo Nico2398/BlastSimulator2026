@@ -19,6 +19,7 @@ import { TRAFFIC_JAM_EVENTS } from './TrafficJamEvents.js';
 import { UNQUALIFIED_TASK_EVENTS } from './UnqualifiedTaskEvents.js';
 import { ORE_REPORT_EVENTS } from './OreReportEvents.js';
 import { TUTORIAL_EVENTS } from './TutorialEvents.js';
+import { PERMIT_EVENTS_1 } from './PermitEvents1.js';
 
 export { clearEvents } from './EventPool.js';
 
@@ -42,6 +43,7 @@ export const EVENT_FILES: Readonly<Record<string, EventDef[]>> = {
   'UnqualifiedTaskEvents.ts': UNQUALIFIED_TASK_EVENTS,
   'OreReportEvents.ts': ORE_REPORT_EVENTS,
   'TutorialEvents.ts': TUTORIAL_EVENTS,
+  'PermitEvents1.ts': PERMIT_EVENTS_1,
 };
 
 /**

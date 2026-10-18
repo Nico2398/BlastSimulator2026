@@ -44,6 +44,8 @@ export interface GradeState {
   strikeTicks?: number[];
   /** Count of inspection rolls made, salting each roll's seed. */
   inspectionRolls?: number;
+  /** Share of the blast charge cap the last blast used (#1927). */
+  lastBlastChargeShare?: number;
 }
 
 export interface GradeTargetStatus {
@@ -213,4 +215,21 @@ export function advanceGradeApplication(state: GameState, emitter: EventEmitter)
   g.grade = g.pending.toGrade;
   g.pending = null;
   emitter.emit('progression:grade_approved', { grade: g.grade });
+}
+
+/** Shifts a pending application's remaining processing ticks (negative = faster, floored at 1); false without one (#1927). */
+export function shiftPendingApplication(g: GradeState, ticks: number): boolean {
+  void g; void ticks; // TODO: implement
+  return undefined as unknown as boolean;
+}
+
+/** Approves a pending application at once, granting the grade; false without one (#1927). */
+export function approvePendingApplication(g: GradeState, emitter: EventEmitter): boolean {
+  void g; void emitter; // TODO: implement
+  return undefined as unknown as boolean;
+}
+
+/** Records the last blast's charge as a share of the grade's charge cap (#1927). */
+export function recordBlastChargeShare(g: GradeState | undefined, planKg: number, maxChargeKg: number): void {
+  void g; void planKg; void maxChargeKg; // TODO: implement
 }

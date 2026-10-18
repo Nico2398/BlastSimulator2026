@@ -123,6 +123,12 @@ export interface EventContext {
   unionMemberCount?: number;
   /** Current union grievance, 0..UNION_GRIEVANCE_MAX (#1890). */
   unionGrievance?: number;
+  /** True on a progression site (one with a mine grade ladder) (#1927). */
+  hasProgression?: boolean;
+  /** True while a permit application is being processed (#1927). */
+  applicationPending?: boolean;
+  /** Share of the blast charge cap the last blast used, 0..1+ (#1927). */
+  lastBlastChargeShare?: number;
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */
@@ -208,6 +214,7 @@ const EFFECT_DIRECTION: Record<EventEffectSpec['type'], EventOptionEffectHint['d
   building_closed: 'negative',
   forced_weather: 'neutral',
   event_weight: 'neutral',
+  permit_processing: 'neutral',
 };
 
 function deriveEffectHints(c: EventConsequence): EventOptionEffectHint[] {

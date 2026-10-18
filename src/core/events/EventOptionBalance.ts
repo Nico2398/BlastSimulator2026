@@ -45,6 +45,7 @@ function specDims(spec: EventEffectSpec): DimEntry[] | null {
     case 'building_closed': return [['outOfService', -spec.hours]];
     case 'forced_weather': return null;
     case 'event_weight': return null;
+    case 'permit_processing': return null;
     default: return spec satisfies never;
   }
 }
