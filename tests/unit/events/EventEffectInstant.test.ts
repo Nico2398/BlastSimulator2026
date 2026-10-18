@@ -3,6 +3,12 @@ import { applyEventEffects } from '../../../src/core/events/EventEffectCatalog.j
 import { applyInstantEffect } from '../../../src/core/events/EventEffectInstant.js';
 import { generateName } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { setupEvents } from '../../../src/core/events/index.js';
+import { getAllEvents } from '../../../src/core/events/EventPool.js';
+import { isOutOfService } from '../../../src/core/events/ActiveModifiers.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { makeEffectWorld } from '../../helpers/eventEffectWorld.js';
 
 const alive = (fx: ReturnType<typeof makeEffectWorld>) => fx.state.employees.employees.filter(e => e.alive);
@@ -185,5 +191,56 @@ describe('employee_joins — unique names (#1886)', () => {
     applyInstantEffect({ type: 'employee_joins', role: 'driver' }, fx.world, 5, new Random(7));
     const joined = fx.state.employees.employees[fx.state.employees.employees.length - 1]!;
     expect(joined.name).not.toBe(drawn);
+  });
+});
+
+describe('authored breakdown and closure (#1958)', () => {
+  it('an authored vehicle_breakdown takes a vehicle out of service, not claimable', () => {
+    const fx = makeEffectWorld();
+    const v = fx.state.vehicles.vehicles[0]!;
+    const out = applyEventEffects([{ type: 'vehicle_breakdown', hpLoss: 25, hours: 24 }], fx.world, 10, fx.rng);
+    expect(out.resultKeySuffix).toBe('');
+    expect(isOutOfService(fx.state.events.activeModifiers, 'vehicle', v.id, 10)).toBe(true);
+    expect(isOutOfService(fx.state.events.activeModifiers, 'vehicle', v.id, 10 + 24)).toBe(false);
+  });
+
+  it('vehicle_breakdown with an empty fleet reports _alt and registers nothing', () => {
+    const fx = makeEffectWorld({ empty: true });
+    const out = applyEventEffects([{ type: 'vehicle_breakdown', hpLoss: 25, hours: 24 }], fx.world, 0, fx.rng);
+    expect(out.resultKeySuffix).toBe('_alt');
+    expect(fx.state.events.activeModifiers.filter(m => m.kind === 'out_of_service')).toHaveLength(0);
+  });
+
+  it('building_closed closes a building via a live out_of_service modifier', () => {
+    const fx = makeEffectWorld();
+    const placed = placeBuilding(fx.state.buildings, 'management_office', 10, 10, 64, 64);
+    expect(placed.success).toBe(true);
+    const out = applyEventEffects([{ type: 'building_closed', hours: 24 }], fx.world, 5, fx.rng);
+    expect(out.resultKeySuffix).toBe('');
+    const mods = fx.state.events.activeModifiers.filter(m => m.kind === 'out_of_service' && m.targetKind === 'building');
+    expect(mods).toHaveLength(1);
+    expect(isOutOfService(fx.state.events.activeModifiers, 'building', mods[0]!.targetId!, 5)).toBe(true);
+  });
+
+  it('building_closed with no building reports _alt', () => {
+    const fx = makeEffectWorld();
+    fx.state.buildings.buildings = [];
+    const out = applyEventEffects([{ type: 'building_closed', hours: 24 }], fx.world, 0, fx.rng);
+    expect(out.resultKeySuffix).toBe('_alt');
+  });
+
+  it('every authored vehicle_breakdown / building_closed option has res<i>_alt in en and fr', () => {
+    setupEvents();
+    const dir = join(import.meta.dirname, '../../../src/core/i18n/locales');
+    const en = JSON.parse(readFileSync(join(dir, 'en.json'), 'utf8')) as Record<string, string>;
+    const fr = JSON.parse(readFileSync(join(dir, 'fr.json'), 'utf8')) as Record<string, string>;
+    const authored = getAllEvents().flatMap(e => e.consequences.map((c, i) => ({ e, i, c }))
+      .filter(({ c }) => [c, c.altConsequence].some(b => b?.effects?.some(s => s.type === 'vehicle_breakdown' || s.type === 'building_closed'))));
+    expect(authored.length).toBeGreaterThanOrEqual(3);
+    const bad = authored.flatMap(({ e, i }) => [['en', en], ['fr', fr]].flatMap(([loc, d]) => {
+      const v = (d as Record<string, string>)[`event.${e.id}.res${i}_alt`];
+      return v === undefined || v === '' ? [`${e.id} res${i}_alt [${loc as string}] missing`] : [];
+    }));
+    expect(bad).toEqual([]);
   });
 });

@@ -40,9 +40,9 @@ const LASTING_KINDS: ReadonlySet<string> = new Set([
   'work_stoppage', 'work_rate', 'morale_shift', 'salary', 'recurring_charge', 'ban', 'cost_factor',
   'contract_price', 'forced_weather', 'event_weight', 'employee_leaves', 'employee_joins', 'cancel_contract',
 ]);
-const HOUR_KINDS: ReadonlySet<string> = new Set(['work_stoppage', 'work_rate', 'morale_shift', 'ban', 'forced_weather']);
+const HOUR_KINDS: ReadonlySet<string> = new Set(['work_stoppage', 'work_rate', 'morale_shift', 'ban', 'forced_weather', 'building_closed', 'vehicle_breakdown']);
 const DAY_KINDS: ReadonlySet<string> = new Set(['salary', 'recurring_charge', 'cost_factor', 'contract_price', 'event_weight']);
-const ALT_KINDS: ReadonlySet<string> = new Set(['employee_leaves', 'employee_injured', 'cancel_contract']);
+const ALT_KINDS: ReadonlySet<string> = new Set(['employee_leaves', 'employee_injured', 'cancel_contract', 'vehicle_breakdown', 'building_closed']);
 
 const EVENT_SOURCE_FILES = [
   'UnionEvents1', 'UnionEvents2', 'PoliticsEvents1', 'PoliticsEvents2', 'WeatherEvents1', 'WeatherEvents2',
@@ -56,12 +56,6 @@ const CATALOG_KINDS = new Set(
     .map(k => /^ui\.event\.effect\.([a-z_]+)$/.exec(k)?.[1])
     .filter((k): k is string => k !== undefined && k !== 'scope_all' && !k.endsWith('_permanent')),
 );
-
-/** TODO(#1568): effects the engine cannot wire yet are kept out of the pool until #1568 lands. */
-function isUnwired(s: EventEffectSpec): boolean {
-  return s.type === 'vehicle_breakdown' || s.type === 'building_closed'
-    || (s.type === 'cost_factor' && (s.what === 'survey' || s.what === 'research'));
-}
 
 const followUpIds = new Set(FOLLOWUP_EVENTS.map(e => e.id));
 
@@ -101,9 +95,14 @@ describe('event effect spread (#1538)', () => {
     expect(bad).toEqual([]);
   });
 
-  it('unwired specs (TODO(#1568)) are not used', () => {
-    const bad = events.flatMap(e => specsOf(e).filter(isUnwired).map(s => `${e.id}: ${s.type}`));
-    expect(bad, `unwired effects:\n${bad.join('\n')}`).toEqual([]);
+  it('every catalog kind, and cost_factor survey and research, is used by at least one event (#1958)', () => {
+    const specs = events.flatMap(specsOf);
+    const used = new Set(specs.map(s => s.type));
+    const unused = [...CATALOG_KINDS].filter(k => !used.has(k));
+    expect(unused, `catalog kinds no event uses: ${unused.join(', ')}`).toEqual([]);
+    for (const what of ['survey', 'research']) {
+      expect(specs.some(s => s.type === 'cost_factor' && s.what === what), `cost_factor ${what}`).toBe(true);
+    }
   });
 
   describe.each(SPREAD_CATEGORIES)('category %s', cat => {
