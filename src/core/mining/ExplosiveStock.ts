@@ -140,7 +140,14 @@ export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingAction
 }
 
 /** Maps each hole with a still-in-transit charge order to its delivery arrival tick (#1966). */
-export function chargeDeliveryArrivalByHole(_state: Pick<GameState, 'pendingActions' | 'tickCount'>): Map<string, number> {
-  // TODO: implement
-  return new Map();
+export function chargeDeliveryArrivalByHole(state: Pick<GameState, 'pendingActions' | 'tickCount'>): Map<string, number> {
+  const byHole = new Map<string, number>();
+  for (const a of state.pendingActions) {
+    if (!isChargeDeliveryPending(a, state.tickCount)) continue;
+    const holeId = a.payload['holeId'];
+    const arrival = readOrderDeliveryTick(a);
+    if (typeof holeId !== 'string' || arrival === undefined) continue;
+    byHole.set(holeId, arrival);
+  }
+  return byHole;
 }

@@ -26,7 +26,7 @@ import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } 
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature, drainReasonText, type HoleDrainView } from './ChargeHoleList.js';
-import { ChargeStockBlock, buildStockView } from './ChargeStock.js';
+import { ChargeStockBlock, buildStockView, deliveryTransitText } from './ChargeStock.js';
 import { chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
 import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
@@ -62,6 +62,7 @@ export class ChargeStep {
   private readonly tubingCardEl: HTMLElement;
   private readonly drainEl: HTMLElement;
   private readonly stockBlock: ChargeStockBlock;
+  private readonly transitBannerEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
   private holeRockSampler?: (hole: DrillHole) => ColumnRock | null;
@@ -133,6 +134,8 @@ export class ChargeStep {
       () => { this.lastSignature = ''; },
       kg => this.runAndNotify(`buy explosive:${this.selectedExplosiveId} kg:${kg}`),
     );
+    this.transitBannerEl = el('div', { attrs: { style: 'display:none;font:500 11px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' } });
+    this.transitBannerEl.dataset['info'] = 'delivery-transit';
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId), holeId => this.runAndNotify(`drain_hole hole:${holeId}`));
 
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
@@ -141,7 +144,7 @@ export class ChargeStep {
 
     // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.stockBlock.root, this.weakLineEl,
+      this.transitBannerEl, productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.stockBlock.root, this.weakLineEl,
       this.holeList.root, this.drainEl, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -211,6 +214,9 @@ export class ChargeStep {
     this.lastSignature = signature;
 
     this.renderProductList(wet.length > 0);
+    const transitText = deliveryTransitText(stockView);
+    this.transitBannerEl.textContent = transitText ?? '';
+    this.transitBannerEl.style.display = transitText === null ? 'none' : '';
     this.stockBlock.render(stockView);
     this.updateChargeLine(holes.length, stockView.paidCash);
     this.updateFitLine(shallowest, holes.length + state.plannedDrillHoles.length === 0);

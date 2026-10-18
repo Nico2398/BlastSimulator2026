@@ -79,7 +79,7 @@ export function buildJobSection(v: Vehicle, state: GameState, links: InspectorLi
   if (job.etaTicks !== null) rows.push(liveRow(t('inspector.vehicle.eta'), 'eta', t('inspector.vehicle.eta_value', { n: Math.ceil(job.etaTicks) })));
   if (job.blockedReason !== null) {
     const order = state.pendingActions.find(a => a.id === job.blockedOrderId);
-    rows.push(valueRow(t('inspector.vehicle.waiting'), order ? buildBlockedOrderMessage(order) : t('inspector.vehicle.job_none')));
+    rows.push(valueRow(t('inspector.vehicle.waiting'), order ? buildBlockedOrderMessage(order, state.tickCount) : t('inspector.vehicle.job_none')));
   }
   const wrap = sectionOf(t('inspector.vehicle.job'), rows);
   return wrap;

@@ -10,6 +10,7 @@ import type { MiningContext } from './types.js';
 import type { GameContext } from '../world.js';
 import { villagePositions } from '../../../core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../../core/mining/BlastExecution.js';
+import { chargeDeliveryArrivalByHole } from '../../../core/mining/ExplosiveStock.js';
 import { clearTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
@@ -74,7 +75,9 @@ export function assembleCurrentBlastPlan(state: GameState): BlastPlan {
  * identically (#790).
  */
 export function validateCurrentBlastPlan(state: GameState, plan: BlastPlan): ValidationError[] {
-  return validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
+  return validateBlastPlan(
+    plan, new Set(Object.keys(state.plannedChargesByHole)), chargeDeliveryArrivalByHole(state),
+  );
 }
 
 /**
