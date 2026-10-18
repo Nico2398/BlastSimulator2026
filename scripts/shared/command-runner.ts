@@ -20,6 +20,18 @@ import { checkGoalAgainstState, checkCommandOutcome, type GoalMismatch } from '.
 export type { GoalMismatch } from './scenario-goal.js';
 
 /**
+ * Resolve a pending event with its first option (`event choose 0`), as command
+ * mode has no player to read it; a no-op when none is pending. `tick` refuses
+ * to advance while an event is pending, so every headless tick loop (waitUntil,
+ * the progression probe) answers it first. Rationale in `runWaitUntil`.
+ */
+export function resolvePendingEvent(engine: RunnerWithContext): void {
+  if (engine.ctx.state?.events.pendingEvent) {
+    runCommand(engine, 'event choose 0');
+  }
+}
+
+/**
  * Command-mode side of the `waitUntil` action (issue #590): loop the
  * console's own `tick 1` — reusing `tickCommand` exactly as it stands via
  * `runCommand`, never duplicating its body — checking the state dump after
@@ -65,9 +77,7 @@ function runWaitUntil(
         gameState: lastState,
       };
     }
-    if (ctx.state?.events.pendingEvent) {
-      runCommand(engine, 'event choose 0');
-    }
+    resolvePendingEvent(engine);
   }
   throw new Error(
     `waitUntil: "${action.field}" never reached ${JSON.stringify(action.equals)}`

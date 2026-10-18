@@ -1,4 +1,10 @@
 import type { GameState } from '../../src/core/state/GameState.js';
+import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
+import { isOversized } from '../../src/core/mining/BlastCalc.js';
+import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
+import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
+import { getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
+import { HIRING_COSTS } from '../../src/core/config/balance.js';
 import type { ProbeRunConfig } from './probe-config.js';
 
 export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000] as const;
@@ -28,12 +34,160 @@ export interface RunResult {
   endReason: string | null;
 }
 
+/** Ticks between boulder re-scans: the only O(fragments) work the observer does outside a blast. */
+const BOULDER_SCAN_INTERVAL_TICKS = 50;
+/** Tick by which the first blast's sold share is read. */
+const FIRST_BLAST_SOLD_TICK = 6000;
+
+const sumValues = (rec: Record<string, number>): number => Object.values(rec).reduce((a, b) => a + b, 0);
+
+/**
+ * Reads the game once per tick and condenses the run into ProbeMetrics. Pure
+ * reader: never writes state. Per-tick work walks the pending-action list only;
+ * fragment scans happen on a blast and every BOULDER_SCAN_INTERVAL_TICKS.
+ *
+ * Definitions where the issue leaves room:
+ * - first blast sold share: ore kg delivered through ore_sale/supply contracts
+ *   (grade tracker) up to t6000 or the second blast, over the ore in the first
+ *   blast's fragments. Null off the progression ladder (no grade state).
+ * - boulder sold share: boulder ore (oversized fragments at blast time) that is
+ *   no longer lying as a boulder (broken, hauled or sold). Broken pieces are new
+ *   fragments, so "sold" cannot be told from "broken" without lineage; this is
+ *   an upper bound on the sold share. Null without a fragmenter or boulder ore.
+ * - affordable ticks: first tick cash covers the catalog cost (in-place upgrade
+ *   cost for the warehouse; vehicle price plus a driver's hiring fee for the hauler).
+ */
 export class MetricsObserver {
-  onTick(_state: GameState): void {
-    throw new Error('not implemented');
+  private readonly cashAt: Record<number, number | null> = {};
+  private lowPointCash = Infinity;
+  private lowPointTick = 0;
+  private bankruptTick: number | null = null;
+  private blastsFired = 0;
+  private lastReport: BlastReport | null = null;
+  private firstBlastOreKg: number | null = null;
+  private soldAtSecondBlastKg: number | null = null;
+  private soldAt6000Kg: number | null = null;
+  private warehouseFullTick: number | null = null;
+  private haulWaitTicks = 0;
+  /** Ore kg of each boulder still lying on the ground, by fragment id. */
+  private readonly boulderOreKg = new Map<number, number>();
+  private boulderTotalKg = 0;
+  private lastState: GameState | null = null;
+  private readonly gradeReachedTick: Record<number, number> = {};
+  private grade = 0;
+  private readonly affordableTick: ProbeMetrics['affordableTick'] = {
+    warehouseT2: null, researchCenter: null, secondHauler: null,
+  };
+  private readonly costs = {
+    warehouseT2: getUpgradeCost('freight_warehouse', 2),
+    researchCenter: getBuildingDef('research_center', 1).constructionCost,
+    secondHauler: getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver,
+  };
+
+  constructor() {
+    for (const t of CASH_SAMPLE_TICKS) this.cashAt[t] = null;
+  }
+
+  onTick(state: GameState): void {
+    this.lastState = state;
+    const t = state.tickCount;
+    for (const sample of CASH_SAMPLE_TICKS) {
+      if (this.cashAt[sample] === null && t >= sample) this.cashAt[sample] = state.cash;
+    }
+    if (state.cash < this.lowPointCash) { this.lowPointCash = state.cash; this.lowPointTick = t; }
+    if (this.bankruptTick === null && (state.bankruptcy.bankrupt || state.levelEndReason === 'bankruptcy')) {
+      this.bankruptTick = t;
+    }
+    this.observeBlast(state);
+    this.observeStorage(state);
+    this.observeProgress(state);
+    if (t === FIRST_BLAST_SOLD_TICK || (this.soldAt6000Kg === null && t > FIRST_BLAST_SOLD_TICK)) {
+      this.soldAt6000Kg = this.soldAtSecondBlastKg ?? state.grade?.oreDeliveredKg ?? null;
+    }
+    if (t > 0 && t % BOULDER_SCAN_INTERVAL_TICKS === 0) this.pruneBoulders(state);
+  }
+
+  private observeBlast(state: GameState): void {
+    const report = state.lastBlastReport;
+    if (!report || report === this.lastReport) return;
+    this.lastReport = report;
+    this.blastsFired++;
+    if (this.blastsFired === 1) {
+      const ore: Record<string, number> = {};
+      for (const f of state.logistics.fragments) accumulateOreMass(ore, f.fragment.volume, f.fragment.oreDensities);
+      this.firstBlastOreKg = sumValues(ore);
+    } else if (this.blastsFired === 2) {
+      this.soldAtSecondBlastKg = state.grade?.oreDeliveredKg ?? null;
+    }
+    for (const f of state.logistics.fragments) {
+      if (f.state !== 'on_ground' || !isOversized(f.fragment.volume) || this.boulderOreKg.has(f.fragment.id)) continue;
+      const ore: Record<string, number> = {};
+      accumulateOreMass(ore, f.fragment.volume, f.fragment.oreDensities);
+      const kg = sumValues(ore);
+      if (kg <= 0) continue;
+      this.boulderOreKg.set(f.fragment.id, kg);
+      this.boulderTotalKg += kg;
+    }
+  }
+
+  private observeStorage(state: GameState): void {
+    const t = state.tickCount;
+    let waiting = false;
+    for (const a of state.pendingActions) {
+      if (a.blockedReason === 'storage_full') { waiting = true; break; }
+    }
+    if (waiting) this.haulWaitTicks++;
+    const full = state.logistics.storageCapacityKg > 0 && state.logistics.storedMassKg >= state.logistics.storageCapacityKg;
+    if (this.warehouseFullTick === null && (waiting || full)) this.warehouseFullTick = t;
+  }
+
+  private observeProgress(state: GameState): void {
+    const t = state.tickCount;
+    const grade = state.grade?.grade ?? 0;
+    for (; this.grade < grade; this.grade++) this.gradeReachedTick[this.grade + 1] = t;
+    for (const key of Object.keys(this.costs) as Array<keyof typeof this.costs>) {
+      if (this.affordableTick[key] === null && state.cash >= this.costs[key]) this.affordableTick[key] = t;
+    }
+  }
+
+  /** Drop tracked boulders that no longer lie on the ground as boulders. */
+  private pruneBoulders(state: GameState): void {
+    if (this.boulderOreKg.size === 0) return;
+    const standing = new Set<number>();
+    for (const f of state.logistics.fragments) {
+      if (f.state === 'on_ground') standing.add(f.fragment.id);
+    }
+    for (const id of [...this.boulderOreKg.keys()]) {
+      if (!standing.has(id)) this.boulderOreKg.delete(id);
+    }
   }
 
   finalize(): ProbeMetrics {
-    throw new Error('not implemented');
+    return {
+      cashAt: { ...this.cashAt },
+      lowPointCash: Number.isFinite(this.lowPointCash) ? this.lowPointCash : 0,
+      lowPointTick: this.lowPointTick,
+      bankruptTick: this.bankruptTick,
+      firstBlastSoldShareAt6000: this.soldShare(),
+      blastsFired: this.blastsFired,
+      warehouseFullTick: this.warehouseFullTick,
+      ticksHaulWaitedOnFullStorage: this.haulWaitTicks,
+      boulderSoldShare: this.boulderShare(),
+      gradeReachedTick: { ...this.gradeReachedTick },
+      affordableTick: { ...this.affordableTick },
+    };
+  }
+
+  private soldShare(): number | null {
+    if (this.soldAt6000Kg === null || !this.firstBlastOreKg) return null;
+    return Math.min(1, this.soldAt6000Kg / this.firstBlastOreKg);
+  }
+
+  private boulderShare(): number | null {
+    const state = this.lastState;
+    if (!state || this.boulderTotalKg <= 0) return null;
+    if (!state.vehicles.vehicles.some(v => v.type === 'rock_fragmenter')) return null;
+    this.pruneBoulders(state);
+    return 1 - [...this.boulderOreKg.values()].reduce((a, b) => a + b, 0) / this.boulderTotalKg;
   }
 }
