@@ -13,6 +13,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import { oreEstimateView, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
@@ -23,6 +24,7 @@ export class BlastFooter {
   private readonly marginEl: HTMLElement;
   private readonly fireBtn: HTMLButtonElement;
   private readonly reasonEl: HTMLElement;
+  private readonly hintEl: HTMLElement;
   private onFireRequested?: () => void;
   private gridProvider: () => VoxelGrid | null = () => null;
   private readonly estimateMemo = new OreEstimateMemo();
@@ -76,7 +78,9 @@ export class BlastFooter {
     this.reasonEl = el('div');
     this.reasonEl.style.cssText = 'display:none;gap:6px;align-items:flex-start';
 
-    this.el.append(row, this.fireBtn, this.reasonEl);
+    this.hintEl = el('div', { attrs: { style: 'display:none;font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } });
+
+    this.el.append(row, this.hintEl, this.fireBtn, this.reasonEl);
     container.appendChild(this.el);
   }
 
@@ -94,7 +98,9 @@ export class BlastFooter {
     const fireOk = hasHoles && errors.length === 0;
 
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
-    const estValue = this.estimateMemo.get(state, plan, this.gridProvider()).value;
+    const estimate = this.estimateMemo.get(state, plan, this.gridProvider());
+    const estValue = estimate.value;
+    const coverage = estimate.coverage;
     const margin = estValue - planCost;
 
     // Undrilled (ordered, not yet landed) holes are a PreflightModal warning
@@ -107,13 +113,23 @@ export class BlastFooter {
         ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
         : null;
 
-    const signature = JSON.stringify({ planCost, estValue, margin, fireOk, reason });
+    const signature = JSON.stringify({ planCost, estValue, coverage, margin, fireOk, reason });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
     this.costEl.textContent = `$${formatMoney(planCost)}`;
-    this.valueEl.textContent = `$${formatMoney(estValue)}`;
-    this.marginEl.textContent = `${margin < 0 ? '-' : ''}$${formatMoney(Math.abs(margin))}`;
+    const view = oreEstimateView(coverage);
+    this.valueEl.textContent = oreValueText(view, estValue);
+    if (view.kind === 'unknown') {
+      this.marginEl.textContent = t('ui.blast_workshop.footer.margin_unknown');
+      this.marginEl.style.color = 'var(--bsx-text-micro)';
+      this.hintEl.textContent = t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
+      this.hintEl.style.display = hasHoles ? '' : 'none';
+    } else {
+      this.marginEl.textContent = `${margin < 0 ? '-' : ''}$${formatMoney(Math.abs(margin))}`;
+      this.marginEl.style.color = 'var(--bsx-positive)';
+      this.hintEl.style.display = 'none';
+    }
 
     this.fireBtn.disabled = !fireOk;
     this.fireBtn.style.cursor = fireOk ? 'pointer' : 'not-allowed';

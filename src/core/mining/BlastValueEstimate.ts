@@ -31,38 +31,6 @@ export function columnOreValuePerM3(densities: Readonly<Record<string, number>>,
   return value;
 }
 
-/**
- * Estimate the total ore value (game dollars) a blast plan will yield (#1703).
- *
- * The broken volume comes from the blast's own propagation (the same energy
- * field the preview and `executeBlast` use; wet holes in `wetHoleIds` are
- * treated as the blast would). Each broken 1 m voxel is valued from the newest
- * fresh survey covering its column, read at the voxel's own depth
- * (`oresSurveyedAt`): ore a survey did not locate at that depth counts for
- * nothing, so an aerial reading values its top 2 m only. Value =
- * density x ORE_DENSITY_KG_M3 x oreValuePerKg(ore, marketId) x survey confidence.
- */
-export function estimateBlastOreValue(
-  plan: BlastPlan,
-  surveyResults: readonly SurveyResult[],
-  grid: VoxelGrid,
-  wetHoleIds: ReadonlySet<string> = new Set(),
-  marketId: MarketId = 'legacy',
-): number {
-  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
-  if (!field) return 0;
-  const surveys = freshSurveys(surveyResults);
-  if (surveys.length === 0) return 0;
-  let value = 0;
-  for (const { x, y, z } of identifyFragmentedVoxels(field, grid, false).fragmented) {
-    const survey = findSurveyForColumn(surveys, x, z);
-    if (!survey) continue;
-    const densities = oresSurveyedAt(survey, x, z, y);
-    if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
-  }
-  return value;
-}
-
 /** Ore value of a blast plus how much of the broken volume surveys cover (#1960). */
 export interface BlastOreEstimate {
   /** Estimated ore value, game dollars. */
@@ -71,7 +39,20 @@ export interface BlastOreEstimate {
   coverage: number;
 }
 
-/** Like `estimateBlastOreValue`, but also reports survey coverage of the broken volume (#1960). */
+/**
+ * Estimate the total ore value (game dollars) a blast plan will yield (#1703),
+ * and how much of the broken volume a fresh survey covers (#1960).
+ *
+ * The broken volume comes from the blast's own propagation (the same energy
+ * field the preview and `executeBlast` use; wet holes in `wetHoleIds` are
+ * treated as the blast would). Each broken 1 m voxel is valued from the newest
+ * fresh survey covering its column, read at the voxel's own depth
+ * (`oresSurveyedAt`): ore a survey did not locate at that depth counts for
+ * nothing, so an aerial reading values its top 2 m only. Value =
+ * density x ORE_DENSITY_KG_M3 x oreValuePerKg(ore, marketId) x survey confidence.
+ * Coverage counts a voxel as covered whenever its column has a fresh survey,
+ * whatever the depth that survey reached.
+ */
 export function estimateBlastOre(
   plan: BlastPlan,
   surveyResults: readonly SurveyResult[],
@@ -79,7 +60,31 @@ export function estimateBlastOre(
   wetHoleIds: ReadonlySet<string> = new Set(),
   marketId: MarketId = 'legacy',
 ): BlastOreEstimate {
-  void plan; void surveyResults; void grid; void wetHoleIds; void marketId;
-  // TODO: implement
-  return { value: 0, coverage: 0 };
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
+  if (!field) return { value: 0, coverage: 0 };
+  const surveys = freshSurveys(surveyResults);
+  if (surveys.length === 0) return { value: 0, coverage: 0 };
+  const { fragmented } = identifyFragmentedVoxels(field, grid, false);
+  if (fragmented.length === 0) return { value: 0, coverage: 0 };
+  let value = 0;
+  let covered = 0;
+  for (const { x, y, z } of fragmented) {
+    const survey = findSurveyForColumn(surveys, x, z);
+    if (!survey) continue;
+    covered++;
+    const densities = oresSurveyedAt(survey, x, z, y);
+    if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
+  }
+  return { value, coverage: covered / fragmented.length };
+}
+
+/** Estimated ore value (game dollars) of a blast plan; see `estimateBlastOre` (#1703). */
+export function estimateBlastOreValue(
+  plan: BlastPlan,
+  surveyResults: readonly SurveyResult[],
+  grid: VoxelGrid,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+  marketId: MarketId = 'legacy',
+): number {
+  return estimateBlastOre(plan, surveyResults, grid, wetHoleIds, marketId).value;
 }

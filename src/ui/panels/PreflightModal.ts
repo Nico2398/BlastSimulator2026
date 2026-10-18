@@ -19,6 +19,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
+import { oreEstimateView, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
@@ -157,7 +158,7 @@ export class PreflightModal {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
-    const estValue = this.estimateMemo.get(state, plan, this.gridProvider()).value;
+    const { value: estValue, coverage } = this.estimateMemo.get(state, plan, this.gridProvider());
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
@@ -171,7 +172,7 @@ export class PreflightModal {
     const undrilledCount = state.plannedDrillHoles.length;
 
     const signature = JSON.stringify({
-      undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue,
+      undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
       phase, protectedCount: protectedHoles.length, loadingCount, errorCount: validationErrors.length,
     });
@@ -186,7 +187,7 @@ export class PreflightModal {
       { key: t('ui.blast_workshop.preflight.stat_holes'), value: `${state.drillHoles.length}` },
       { key: t('ui.blast_workshop.preflight.stat_charge'), value: `${chargeKg.toFixed(1)} kg` },
       { key: t('ui.blast_workshop.preflight.stat_cost'), value: `$${formatMoney(planCost)}`, color: 'var(--bsx-critical-text)', info: 'preflight-cost' },
-      { key: t('ui.blast_workshop.preflight.stat_value'), value: `$${formatMoney(estValue)}`, color: 'var(--bsx-positive)' },
+      { key: t('ui.blast_workshop.preflight.stat_value'), value: oreValueText(oreEstimateView(coverage), estValue), color: oreEstimateView(coverage).kind === 'unknown' ? 'var(--bsx-text-micro)' : 'var(--bsx-positive)' },
     ], 4));
 
     this.renderPredicted(state);
