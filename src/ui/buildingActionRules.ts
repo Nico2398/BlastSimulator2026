@@ -1,7 +1,7 @@
 // Which building actions the inspector offers, and why one is not (#1758).
 
 import {
-  getBuildingDef, getDefSize, getDemolishCost, getMoveCost, getResearchProgress, getUpgradeCost,
+  getBuildingDef, getDefSize, getDemolishCost, getMoveCost, getResearchProgress, getResearchTicksRemaining, getUpgradeCost,
   isSingleTierType, isTierUnlocked,
   type Building, type BuildingTier, type BuildingType,
 } from '../core/entities/Building.js';
@@ -123,7 +123,7 @@ function upgradeRules(
         cost: researchCostFor(def.cost, state.events.activeModifiers, state.tickCount),
         duration: def.ticks,
         blocked: task ? null : researchBlock(state, b.type, nextTier),
-        queued: task ? { fraction: getResearchProgress(task).fraction, remaining: task.ticksRemaining } : null,
+        queued: task ? { fraction: getResearchProgress(task).fraction, remaining: getResearchTicksRemaining(task) } : null,
       },
     };
   }
