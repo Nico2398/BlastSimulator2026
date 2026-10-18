@@ -79,11 +79,11 @@ describe('probe-config expandMatrix', () => {
     expect(runs[0]).toEqual({
       biome: 'desert_badlands', kit: 'digger', seed: 42, strategy: 'opening', horizon: 10000,
     });
-    expect(runs[1].strategy).toBe('reinvest');
-    expect(runs[1].seed).toBe(42);
-    expect(runs[2].seed).toBe(7);
-    expect(runs[6].kit).toBe('full');
-    expect(runs[12].biome).toBe('green_foothills');
+    expect(runs[1]!.strategy).toBe('reinvest');
+    expect(runs[1]!.seed).toBe(42);
+    expect(runs[2]!.seed).toBe(7);
+    expect(runs[6]!.kit).toBe('full');
+    expect(runs[12]!.biome).toBe('green_foothills');
     expect(runs[23]).toEqual({
       biome: 'green_foothills', kit: 'full', seed: 13, strategy: 'reinvest', horizon: 10000,
     });

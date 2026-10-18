@@ -46,7 +46,7 @@ describe('progression probe integration', () => {
     const results = runMatrix(opts, r => seen.push(r));
     expect(results).toHaveLength(1);
     expect(seen).toHaveLength(1);
-    const r = results[0];
+    const r = results[0]!;
     for (const k of METRIC_KEYS) expect(r.metrics, k).toHaveProperty(k);
     expectFiniteOrAllowedNull(r, 1200);
     expect(r.metrics.blastsFired).toBeGreaterThanOrEqual(1);

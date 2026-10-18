@@ -34,14 +34,14 @@ describe('probe-report formatTable', () => {
     // both runs share biome/kit/strategy, so one median row follows them
     expect(lines).toHaveLength(2 + results.length + 1);
     expect(lines[2 + results.length]).toContain('median(2)');
-    expect(lines[0].startsWith('|')).toBe(true);
+    expect(lines[0]!.startsWith('|')).toBe(true);
     expect(lines[1]).toMatch(/^\|[\s:|-]+\|$/);
     expect(lines[1]).toContain('---');
   });
 
   it('rows have the same column count as the header', () => {
     const cols = (l: string) => l.split('|').length;
-    for (const l of lines) expect(cols(l)).toBe(cols(lines[0]));
+    for (const l of lines) expect(cols(l)).toBe(cols(lines[0]!));
   });
 
   it('renders null as "-"', () => {
@@ -49,7 +49,7 @@ describe('probe-report formatTable', () => {
   });
 
   it('includes every metric column', () => {
-    const header = lines[0].toLowerCase();
+    const header = lines[0]!.toLowerCase();
     for (const col of [
       'seed', 'biome', 'kit', 'strategy', 'low cash', 'low tick', 'bankrupt', 'blasts',
       'warehousefull', 'boulder', 'grade', 'warehouset2', 'researchcenter', 'secondhauler',
