@@ -20,12 +20,13 @@ export interface EventOption {
    * Hand-authored consequence-chip hints for the choose-phase row. Leave unset —
    * getOptionEffectHints derives the same information from the parallel
    * EventConsequence, so hand-authoring here is only for the rare case where
-   * that derivation doesn't fit.
+   * that derivation doesn't fit. A hand-authored hint without an `amount` gets
+   * it filled from the consequence when certain; an explicit `amount` wins.
    */
   effects?: EventOptionEffectHint[];
 }
 
-/** One consequence-chip hint shown before the player chooses an option. No delta magnitude — the real outcome may be probabilistic, so only kind/direction are promised ahead of the choice. */
+/** One consequence-chip hint shown before the player chooses an option. The real outcome may be probabilistic, so a risky hint promises only kind/direction; a certain one also carries its exact amount and lasting spec. */
 export interface EventOptionEffectHint {
   kind: 'cash' | 'score' | 'other';
   /** 'cash' for the cash hint; a ScoreState key for a score hint; a free-form tag (e.g. 'corruption', 'followUp') for 'other'. */
@@ -51,7 +52,8 @@ export function consequenceAmount(
   return amount || undefined;
 }
 
-function isRisky(c: EventConsequence): boolean {
+/** True when the consequence is probabilistic (may not happen as written). */
+export function isRisky(c: EventConsequence): boolean {
   return c.probability !== undefined && c.probability < 1;
 }
 

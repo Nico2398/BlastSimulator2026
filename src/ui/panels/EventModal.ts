@@ -83,6 +83,12 @@ export function amountLabel(kind: 'cash' | 'score' | 'other', key: string, delta
   return `${sign}${magnitude} ${kindLabel(kind, key)}`;
 }
 
+/** Name shown on an amount-less hint chip; an unnamed 'other' key is a lasting effect, so it reads as "lasting". */
+function hintName(hint: EventOptionEffectHint): string {
+  const name = kindLabel(hint.kind, hint.key);
+  return hint.kind === 'other' && name === hint.key ? t('ui.event.effect_lasting') : name;
+}
+
 /** Choose-phase hint chip: the exact amount or lasting effect when certain, direction only (with "?") when risky. */
 function hintChip(hint: EventOptionEffectHint): HTMLElement {
   const tone: ChipTone = hint.risky
@@ -92,9 +98,7 @@ function hintChip(hint: EventOptionEffectHint): HTMLElement {
   if (hint.amount !== undefined && !hint.risky) return chip(amountLabel(hint.kind, hint.key, hint.amount), tone);
   const sign = hint.direction === 'positive' ? '+' : hint.direction === 'negative' ? '-' : '';
   // An unnamed 'other' key is a lasting effect whose spec is hidden because the outcome is risky.
-  const name = kindLabel(hint.kind, hint.key) === hint.key && hint.kind === 'other'
-    ? t('ui.event.effect_lasting') : kindLabel(hint.kind, hint.key);
-  return chip(`${sign}${name}${hint.risky ? '?' : ''}`, tone);
+  return chip(`${sign}${hintName(hint)}${hint.risky ? '?' : ''}`, tone);
 }
 
 /** Outcome-phase effect chip: the real, resolved magnitude. */
