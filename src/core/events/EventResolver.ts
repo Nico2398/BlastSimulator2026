@@ -7,7 +7,7 @@ import type { FinanceState } from '../economy/Finance.js';
 import { addIncome, addExpense } from '../economy/Finance.js';
 import { applyExposure } from './MafiaActions.js';
 import type { EventConsequence } from './EventPool.js';
-import { getEventById } from './EventPool.js';
+import { getEventById, isRisky } from './EventPool.js';
 import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
 import { TRAFFIC_JAM_EFFECTS, type EventWorld, type EffectOutcome } from './TrafficJamEffects.js';
 import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
@@ -161,8 +161,8 @@ function resolveConsequence(
   c: EventConsequence,
   rng: Random,
 ): { consequence: EventConsequence; isAlt: boolean } {
-  if (c.probability !== undefined && c.probability < 1.0) {
-    if (rng.chance(c.probability)) {
+  if (isRisky(c)) {
+    if (rng.chance(c.probability!)) {
       return { consequence: c, isAlt: false }; // Success path
     }
     return { consequence: c.altConsequence ?? {}, isAlt: c.altConsequence !== undefined }; // Failure path
