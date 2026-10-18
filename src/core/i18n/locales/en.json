@@ -3856,7 +3856,7 @@
   "mining.blast.permit_fee": "Blast Notification Form B-52 filed: {fee}.",
   "mining.blast.permit_over_unchecked": "This blast exceeded the permit limits. Nobody from the Ministry showed up. This time.",
   "mining.blast.permit_caught": "A Ministry inspector was waiting with a clipboard: fine {fine}, neighbour relations suffer. Strikes on record: {strikes}.",
-  "mining.blast.permit_suspended": "Three strikes. Your permit is suspended and blasting is banned for a while.",
+  "mining.blast.permit_suspended": "{count} strikes. Your permit is suspended and blasting is banned for a while.",
   "mining.blast.unknown_subcommand": "Unknown blast subcommand \"{arg}\". Use \"blast\", \"blast detonate\", \"blast cancel\" or \"blast status\".",
   "mining.blast.detonation_armed": "Detonation armed: {remaining} left in the blast zone. Firing once it is clear.",
   "mining.blast.detonation_cancelled": "Detonation cancelled.",

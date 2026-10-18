@@ -305,7 +305,7 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "description": "Blast 1: fire the 90 kg shot; the notification fee is booked and the seeded inspection roll decides the fine.",
+      "description": "Blast 1: arm the 90 kg shot; it fires once the danger zone is clear.",
       "timeout": 90,
       "role": "player"
     },
@@ -323,7 +323,7 @@
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "role": "setup",
-      "description": "Blast 1: the sequence evacuates the pattern and fires; the holes are consumed.",
+      "description": "Blast 1: the sequence evacuates the pattern and fires; the holes are consumed, the notification fee is booked and a seeded inspection roll decides the fine.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -335,6 +335,9 @@
       ],
       "timeout": 330,
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "holeCount": 0,
           "blastBanned": false
@@ -580,7 +583,7 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "description": "Blast 2: the same 90 kg overshoot, now with a bribed inspector: never inspected.",
+      "description": "Blast 2: arm the shot with ten holes (over the nine-hole limit) and a bribed inspector: never inspected.",
       "timeout": 90,
       "role": "player"
     },
@@ -598,7 +601,7 @@
     {
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "role": "setup",
-      "description": "Blast 1: the sequence evacuates the pattern and fires; the holes are consumed.",
+      "description": "Blast 2: the sequence fires; the holes are consumed and the bribed inspector never turns up (no strike, no ban).",
       "interaction": [
         {
           "type": "waitUntil",

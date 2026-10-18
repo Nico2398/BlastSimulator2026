@@ -33,7 +33,7 @@ import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
 import { isActive } from '../../../core/events/ActiveModifiers.js';
 import { armDetonation, cancelDetonation, hasChargedHole, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
-import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
+import { PERMIT_STRIKES_TO_SUSPEND, BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
 /** Report line for one warehouse whose stock a blast destroyed with it. */
 function stockLossLine(loss: WarehouseLoss): string {
@@ -45,7 +45,7 @@ function verdictLines(v: InspectionVerdict): string[] {
   if (!v.caught) return [t('mining.blast.permit_over_unchecked')];
   return [
     t('mining.blast.permit_caught', { fine: formatMoney(v.fine), strikes: v.strikes }),
-    ...(v.suspended ? [t('mining.blast.permit_suspended')] : []),
+    ...(v.suspended ? [t('mining.blast.permit_suspended', { count: PERMIT_STRIKES_TO_SUSPEND })] : []),
   ];
 }
 

@@ -2,28 +2,22 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import type { GradeState } from './MineGrade.js';
+import { LAST_NAMED_GRADE, type GradeState } from './MineGrade.js';
 import { Random, rollSeed } from '../math/Random.js';
 import { chargeFine } from './Finance.js';
 import { isEventShielded, markShielded } from './BribeProtection.js';
-import { addModifier } from '../events/ActiveModifiers.js';
+import { pushModifier } from '../events/ActiveModifiers.js';
 import { clampScore } from '../scores/ScoreManager.js';
 import {
   PERMIT_LIMITS, PERMIT_CLASS_CHARGE_FACTOR, PERMIT_CLASS_HOLES_FACTOR, PERMIT_CLASS_FEE_FACTOR,
   PERMIT_INSPECTION_BASE_CHANCE, PERMIT_FINE_FEE_MULTIPLIER, PERMIT_CAUGHT_NEIGHBOUR_PENALTY,
-  PERMIT_STRIKES_TO_SUSPEND, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS,
+  PERMIT_STRIKES_TO_SUSPEND, type PermitLimitConfig, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS,
   MAX_DRILL_GRID_HOLES, INSPECTION_EVENT_TAG,
 } from '../config/balance.js';
 
 
-interface PermitLimits {
-  maxChargeKg: number;
-  maxHoles: number;
-  fee: number;
-}
-
 interface PreFireCheck {
-  limits: PermitLimits;
+  limits: PermitLimitConfig;
   planKg: number;
   planHoles: number;
   over: boolean;
@@ -41,11 +35,8 @@ export interface InspectionVerdict {
   suspended: boolean;
 }
 
-/** Last grade with a named table entry; classes start above it. */
-const LAST_NAMED_GRADE = 5;
-
 /** Limits of a grade; endless classes above grade 5 scale by the class factors. */
-export function permitLimitsFor(grade: number): PermitLimits {
+export function permitLimitsFor(grade: number): PermitLimitConfig {
   const named = PERMIT_LIMITS[Math.max(0, grade)];
   if (named) return { ...named };
   const top = PERMIT_LIMITS[LAST_NAMED_GRADE]!;
@@ -121,16 +112,14 @@ export function resolveOvershoot(
     state.scores.nuisance = clampScore(state.scores.nuisance - PERMIT_CAUGHT_NEIGHBOUR_PENALTY);
     strikes.push(tick);
     if (strikes.length >= PERMIT_STRIKES_TO_SUSPEND) {
-      const ev = state.events;
-      const id = addModifier(ev.activeModifiers, {
+      pushModifier(state.events, {
         kind: 'blast_ban', sourceEventId: '', role: null, targetId: null, category: null,
         magnitude: 1, startTick: tick, endTick: tick + PERMIT_SUSPENSION_TICKS,
-      }, ev.nextModifierId);
-      if (id === ev.nextModifierId) ev.nextModifierId++;
+      });
       g.strikeTicks = [];
       verdict.suspended = true;
     }
-    verdict.strikes = verdict.suspended ? 0 : strikes.length;
+    verdict.strikes = strikes.length;
   }
 
   emitter.emit('progression:blast_inspected', {

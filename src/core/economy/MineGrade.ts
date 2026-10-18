@@ -60,7 +60,7 @@ type GradeApplyResult =
   | { ok: false; refusal: GradeApplyRefusal; unmet?: GradeTargetKind[] };
 
 /** Last grade with a named table entry; classes start above it. */
-const LAST_NAMED_GRADE = 5;
+export const LAST_NAMED_GRADE = 5;
 
 /** Fresh grade state of a progression site: grade 0, nothing tracked. */
 export function createGradeState(): GradeState {

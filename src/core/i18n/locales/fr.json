@@ -3856,7 +3856,7 @@
   "mining.blast.permit_fee": "Formulaire de notification de tir B-52 déposé : {fee}.",
   "mining.blast.permit_over_unchecked": "Ce tir dépassait les limites du permis. Personne du Ministère ne s'est présenté. Cette fois.",
   "mining.blast.permit_caught": "Un inspecteur du Ministère attendait, presse-papiers en main : amende {fine}, les relations de voisinage en pâtissent. Avertissements au dossier : {strikes}.",
-  "mining.blast.permit_suspended": "Trois avertissements. Votre permis est suspendu et le tir est interdit pour un moment.",
+  "mining.blast.permit_suspended": "{count} avertissements. Votre permis est suspendu et le tir est interdit pour un moment.",
   "mining.blast.unknown_subcommand": "Sous-commande de tir inconnue « {arg} ». Utilisez \"blast\", \"blast detonate\", \"blast cancel\" ou \"blast status\".",
   "mining.blast.detonation_armed": "Déclenchement armé : {remaining} encore dans la zone de tir. Tir dès qu'elle est dégagée.",
   "mining.blast.detonation_cancelled": "Déclenchement annulé.",
