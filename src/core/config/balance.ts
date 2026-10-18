@@ -1888,6 +1888,12 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
   },
 };
 
+/** Research ticks consumed per game tick by a Research Center of each tier (#1936). */
+export const RESEARCH_CENTER_SPEED_BY_TIER: Record<1 | 2 | 3, number> = { 1: 1, 2: 1.5, 3: 2 };
+
+/** Research tasks a Research Center of each tier works on in parallel (#1936). */
+export const RESEARCH_CENTER_SLOTS_BY_TIER: Record<1 | 2 | 3, number> = { 1: 1, 2: 2, 3: 3 };
+
 /** Look up the research task definition for a building type and tier. */
 export function getResearchTaskDef(type: BuildingType, tier: 2 | 3): ResearchTaskDef {
   return RESEARCH_TASK_DEFS[type][tier];
@@ -2664,6 +2670,27 @@ export const EVENT_CALM_DAYS = 7;
 
 /** Hours a lingering weather front holds the sky. */
 export const EVENT_FRONT_HOURS = 36;
+
+/** Hit points a breakdown event takes off the affected vehicle (hp). */
+export const EVENT_BREAKDOWN_HP_LOSS = 25;
+
+/** Hours a broken-down vehicle stays out of service. */
+export const EVENT_BREAKDOWN_HOURS = 24;
+
+/** Hours an event-closed building stays shut. */
+export const EVENT_CLOSURE_HOURS = 24;
+
+/** Percent change applied to survey costs by an event discount (negative = cheaper). */
+export const EVENT_SURVEY_DISCOUNT_PCT = -25;
+
+/** Days a survey cost discount lasts. */
+export const EVENT_SURVEY_DISCOUNT_DAYS = 7;
+
+/** Percent change applied to research costs by an event discount (negative = cheaper). */
+export const EVENT_RESEARCH_DISCOUNT_PCT = -25;
+
+/** Days a research cost discount lasts. */
+export const EVENT_RESEARCH_DISCOUNT_DAYS = 7;
 
 // ── Smuggling vs tax audit (#1409) ──
 

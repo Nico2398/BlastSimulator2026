@@ -7,6 +7,9 @@ import type { GameContext } from './world.js';
 import {
   queueResearchTask,
   getQueueBlockCode,
+  getResearchCenterProfile,
+  getActiveResearchTasks,
+  getResearchTicksRemaining,
   getAllBuildingTypes,
   type BuildingType,
   type QueueBlockCode,
@@ -111,13 +114,22 @@ export function researchCommand(
       };
     }
     case 'status': {
-      if (state.buildings.researchQueue.length === 0) {
-        return { success: true, output: 'No research queued.' };
-      }
-      const lines = ['Research queue:'];
-      state.buildings.researchQueue.forEach((task, i) => {
-        const status = i === 0 ? 'in progress' : 'pending';
-        lines.push(`  [${i}] ${task.targetType} tier ${task.targetTier} — ${status}, ${task.ticksRemaining} ticks remaining, $${task.cost}`);
+      const queue = state.buildings.researchQueue;
+      const profile = getResearchCenterProfile(state.buildings);
+      const activeCount = getActiveResearchTasks(state.buildings, profile).length;
+      const lines = [profile
+        ? t('research.status_header', { speed: profile.speed, active: activeCount, slots: profile.slots })
+        : t('research.status_no_center')];
+      if (queue.length === 0 && profile) lines.push(t('research.status_idle'));
+      queue.forEach((task, i) => {
+        const key = i < activeCount ? 'research.status_task_active' : 'research.status_task_pending';
+        lines.push(t(key, {
+          index: i,
+          name: buildingTypeName(task.targetType),
+          tier: task.targetTier,
+          remaining: getResearchTicksRemaining(task),
+          cost: task.cost,
+        }));
       });
       return { success: true, output: lines.join('\n') };
     }
