@@ -49,9 +49,9 @@ export interface GradeTargetStatus {
   needed: number;
 }
 
-type GradeApplyRefusal = 'no_ladder' | 'pending' | 'unmet_targets' | 'insufficient_funds';
+export type GradeApplyRefusal = 'no_ladder' | 'pending' | 'unmet_targets' | 'insufficient_funds';
 
-type GradeApplyResult =
+export type GradeApplyResult =
   | { ok: true; fee: number; toGrade: number }
   | { ok: false; refusal: GradeApplyRefusal; unmet?: GradeTargetKind[] };
 

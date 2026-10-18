@@ -43,7 +43,7 @@ import type { ListSelection } from './selectionRoute.js';
 import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 
 
-export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'shady' | 'settings';
+export type PanelName = 'blast' | 'contracts' | 'finances' | 'ops' | 'build' | 'vehicles' | 'employees' | 'survey' | 'shady' | 'permits' | 'settings';
 
 export class UIManager {
   private readonly topBar: TopBar;
