@@ -31,6 +31,7 @@ import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { pickupFragment, reserveFragmentIds, deliverToDepot, deliverToSpoilHeap, type TrackedFragment } from '../economy/Logistics.js';
 import { creditSpoilKg, haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
@@ -111,7 +112,7 @@ export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: Even
 /** Picks `tracked` up onto `vehicle.cargo`; false when logistics refuses (storage room). */
 function loadFragment(state: GameState, vehicle: Vehicle, tracked: TrackedFragment, emitter?: EventEmitter): boolean {
   const fragmentId = tracked.fragment.id;
-  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id), freightWarehouseSites(state.buildings), vehicle.x, vehicle.z, spoilHeapSites(state.buildings))) return false;
+  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id), freightWarehouseSites(state.buildings), vehicle.x, vehicle.z, spoilHeapSites(state.buildings), oreGradeScaleOf(state.world))) return false;
 
   state.navGrid?.removeFragmentOccupant(
     Math.round(tracked.fragment.position.x),
@@ -148,8 +149,8 @@ function deliverCargoItem(
   atZ: number,
 ): boolean {
   const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
-  if (tracked && haulDestinationOf(tracked.fragment) === 'spoil_heap') {
-    const dumped = deliverToSpoilHeap(state.logistics, fragmentId, heaps, atX, atZ);
+  if (tracked && haulDestinationOf(tracked.fragment, oreGradeScaleOf(state.world)) === 'spoil_heap') {
+    const dumped = deliverToSpoilHeap(state.logistics, fragmentId, heaps, atX, atZ, oreGradeScaleOf(state.world));
     if (!dumped) return false;
     const heap = state.buildings.buildings.find(b => b.id === dumped.heapId);
     if (heap) creditSpoilKg(heap, dumped.massKg);

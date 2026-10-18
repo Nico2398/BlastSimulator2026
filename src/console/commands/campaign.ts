@@ -192,6 +192,7 @@ export function campaignStartCommand(
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
     ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
+    ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
     startingCrew: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
     ...(level.rallyPoint ? { rallyPoint: level.rallyPoint } : {}),

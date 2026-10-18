@@ -4,24 +4,25 @@
 import type { Building } from '../entities/Building.js';
 import { spoilHeapRoomKg } from '../entities/Building.js';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
+import { oreGradeScaleOf, scaledGradeThreshold } from './OreGrade.js';
 
 /** Where a hauled fragment is delivered. */
 export type HaulDestination = 'warehouse' | 'spoil_heap';
 
 /**
  * Whether a fragment's ore densities make it barren: summed density at or below
- * SPOIL_BARREN_ORE_FRACTION_THRESHOLD (empty = barren). Decides haul destination
+ * SPOIL_BARREN_ORE_FRACTION_THRESHOLD x `gradeScale` (empty = barren). Decides haul destination
  * and which rock rubble may take (a filter: only barren fragments qualify).
  */
-export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>, _gradeScale = 1): boolean {
+export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>, gradeScale = 1): boolean {
   let total = 0;
   for (const d of Object.values(oreDensities)) total += d;
-  return total <= SPOIL_BARREN_ORE_FRACTION_THRESHOLD;
+  return total <= scaledGradeThreshold(SPOIL_BARREN_ORE_FRACTION_THRESHOLD, gradeScale);
 }
 
 /** Destination for a fragment, by its ore densities. */
-export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<string, number>> }): HaulDestination {
-  return isBarrenFragment(fragment.oreDensities) ? 'spoil_heap' : 'warehouse';
+export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<string, number>> }, gradeScale = 1): HaulDestination {
+  return isBarrenFragment(fragment.oreDensities, gradeScale) ? 'spoil_heap' : 'warehouse';
 }
 
 /** Re-exported: the room helper lives with the building (entities layer) so BuildingWarehouse needs no economy import. */
@@ -50,29 +51,29 @@ export interface StoredFragmentLike {
 }
 
 /** True for a fragment held in storage whose ore densities make it barren. */
-export function isStoredBarren(f: StoredFragmentLike): boolean {
-  return f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities);
+export function isStoredBarren(f: StoredFragmentLike, gradeScale = 1): boolean {
+  return f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities, gradeScale);
 }
 
 /** Mass (kg) of stored fragments that are barren (isStoredBarren). */
-export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[]): number {
+export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[], gradeScale = 1): number {
   let total = 0;
   for (const f of fragments) {
-    if (isStoredBarren(f)) total += f.fragment.mass;
+    if (isStoredBarren(f, gradeScale)) total += f.fragment.mass;
   }
   return total;
 }
 
 /** Barren rock a rubble_disposal contract can draw on: stored barren fragments plus every heap's rock. Ore-bearing stock is never rubble (#1871). */
-export function rubbleStockKg(fragments: readonly StoredFragmentLike[], buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[]): number {
-  return barrenStoredMassKg(fragments) + totalSpoilKg(buildings);
+export function rubbleStockKg(fragments: readonly StoredFragmentLike[], buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], gradeScale = 1): number {
+  return barrenStoredMassKg(fragments, gradeScale) + totalSpoilKg(buildings);
 }
 
 /** rubbleStockKg for any state slice carrying logistics and buildings (GameState fits). */
 export function stateRubbleStockKg(
-  state: { logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
+  state: { logistics: { fragments: readonly StoredFragmentLike[] }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] }; world?: { oreGradeScale?: number } | null },
 ): number {
-  return rubbleStockKg(state.logistics.fragments, state.buildings.buildings);
+  return rubbleStockKg(state.logistics.fragments, state.buildings.buildings, oreGradeScaleOf(state.world));
 }
 
 /** Remove up to `amountKg` of barren rock from the heaps, in building order; returns the kg removed. */

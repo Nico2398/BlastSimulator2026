@@ -34,6 +34,7 @@ import { minDrillRigTier } from '../mining/DrillPlan.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import type { HaulDestination } from '../economy/SpoilHeaps.js';
 import { alight } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -154,9 +155,10 @@ export function hasBlockedQueuedActionForVehicleRole(state: GameState, role: Veh
  */
 function createDepotCheck(state: GameState): (action: PendingAction) => boolean {
   let byId: Map<number, HaulDestination> | null = null;
+  const gradeScale = oreGradeScaleOf(state.world);
   const exists = new Map<string, boolean>();
   return (action) => {
-    byId ??= new Map(state.logistics.fragments.map(f => [f.fragment.id, haulDestinationOf(f.fragment)]));
+    byId ??= new Map(state.logistics.fragments.map(f => [f.fragment.id, haulDestinationOf(f.fragment, gradeScale)]));
     const fragmentId = action.payload['fragmentId'];
     const depotType = typeof fragmentId === 'number' && byId.get(fragmentId) === 'spoil_heap' ? 'spoil_heap' : 'freight_warehouse';
     let found = exists.get(depotType);

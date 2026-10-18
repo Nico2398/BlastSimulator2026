@@ -86,6 +86,7 @@ export function pickupFragment(
   vehicleX: number,
   vehicleZ: number,
   heapSites: readonly WarehouseSite[] = [],
+  gradeScale = 1,
 ): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
@@ -94,7 +95,7 @@ export function pickupFragment(
 
   const site = pickWarehouse(
     state,
-    haulDestinationOf(tracked.fragment) === 'spoil_heap' ? heapSites : sites,
+    haulDestinationOf(tracked.fragment, gradeScale) === 'spoil_heap' ? heapSites : sites,
     vehicleX, vehicleZ, tracked.fragment.mass,
   );
   if (!site) return false;
@@ -155,9 +156,10 @@ export function deliverToSpoilHeap(
   heapSites: readonly WarehouseSite[],
   atX: number,
   atZ: number,
+  gradeScale = 1,
 ): { heapId: number; massKg: number } | null {
   const tracked = findInTransitFragment(state, fragmentId);
-  if (!tracked || haulDestinationOf(tracked.fragment) !== 'spoil_heap') return null;
+  if (!tracked || haulDestinationOf(tracked.fragment, gradeScale) !== 'spoil_heap') return null;
 
   // The fragment's own reservation is already counted in warehouseFreeKg.
   const reserved = heapSites.find(s => s.id === tracked.warehouseId);
@@ -336,6 +338,7 @@ export function consumeStoredOre(
   materialId: string,
   amountKg: number,
   buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
+  gradeScale = 1,
 ): { success: boolean; consumedKg: number; error?: string } {
   if (!Number.isFinite(amountKg) || amountKg <= 0) {
     return {
@@ -347,7 +350,7 @@ export function consumeStoredOre(
 
   if (materialId !== '') {
     // Legacy leftovers and heaps built after the rock was stored (#1690).
-    releaseBarrenStoredFragments(state, collectedOre, buildings);
+    releaseBarrenStoredFragments(state, collectedOre, buildings, gradeScale);
     const available = collectedOre[materialId] ?? 0;
     if (amountKg > available) {
       return {
@@ -381,14 +384,14 @@ export function consumeStoredOre(
     }
 
     // The rock left after the sale is spoil: it leaves storage for the heap (#1690).
-    releaseBarrenStoredFragments(state, collectedOre, buildings);
+    releaseBarrenStoredFragments(state, collectedOre, buildings, gradeScale);
     return { success: true, consumedKg: Math.min(tally, amountKg) };
   }
 
   // Rubble: barren rock only (ore below the spoil-heap threshold) — heaps, then
   // barren stored fragments oldest-first. Ore-bearing rock is never scrapped as
   // cheap rubble (#1871).
-  const available = rubbleStockKg(state.fragments, buildings);
+  const available = rubbleStockKg(state.fragments, buildings, gradeScale);
   if (amountKg > available) {
     return {
       success: false,
@@ -401,7 +404,7 @@ export function consumeStoredOre(
   const storageKg = amountKg - fromHeaps;
 
   const storedIds = state.fragments
-    .filter(isStoredBarren)
+    .filter(f => isStoredBarren(f, gradeScale))
     .map(f => f.fragment.id);
 
   let removedMass = 0;
@@ -558,12 +561,13 @@ export function releaseBarrenStoredFragments(
   state: LogisticsState,
   collectedOre: Record<string, number>,
   buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
+  gradeScale = 1,
 ): number {
   if (totalSpoilRoomKg(buildings) <= 0) return 0; // no heap, or every heap full: the rock stays stored
   const reservedKg = warehouseUsedKgMap(state); // in-flight hauls hold room on a heap too
   const released = new Set<TrackedFragment>();
   let releasedKg = 0;
-  for (const tracked of state.fragments.filter(isStoredBarren)) {
+  for (const tracked of state.fragments.filter(f => isStoredBarren(f, gradeScale))) {
     if (!creditSpoilHeaps(buildings, tracked.fragment.mass, reservedKg)) continue;
     decrementCollectedOre(collectedOre, tracked.fragment);
     releasedKg += tracked.fragment.mass;

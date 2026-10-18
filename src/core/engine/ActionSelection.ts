@@ -20,6 +20,7 @@ import type { VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { employeeClimbReach } from './OrderReachability.js';
@@ -264,7 +265,7 @@ function demandBonusOf(
   // A loaded (in_transit) haul gets the full bonus so no urgent ground fragment can outbid it (#1709).
   if (haulActionIsLoaded(state, action, fragmentOf)) return ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS;
   const densities = haulActionOreDensities(state, action, fragmentOf);
-  return densities === null ? 0 : ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS * fragmentHaulUrgency(densities, urgency);
+  return densities === null ? 0 : ORE_DEMAND_HAUL_PRIORITY_BONUS_TICKS * fragmentHaulUrgency(densities, urgency, oreGradeScaleOf(state.world));
 }
 
 /**
