@@ -228,7 +228,7 @@ describe('getOptionEffectHints amounts (#1893)', () => {
 
   it('a forced_weather effect is not hinted', () => {
     const hints = getOptionEffectHints(OPTION, {
-      effects: [{ type: 'forced_weather', weather: 'rain', hours: 3 }],
+      effects: [{ type: 'forced_weather', weather: 'storm', hours: 3 }],
     });
     expect(hints).toEqual([]);
   });
