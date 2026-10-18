@@ -2203,8 +2203,9 @@ describe('findPath — maxSlopeRatio per-agent climb limit (#1938)', () => {
   it('refuses a diagonal-only 30 degree step under the limit, like a cardinal one', () => {
     const grid = makeFlatGrid(2, 2, 'walkable');
     setCell(grid, 0, 0, 'walkable', { surfaceY: 0 });
-    setCell(grid, 1, 0, 'blocked');
-    setCell(grid, 0, 1, 'blocked');
+    // Corners are walkable but cliff-high, so the diagonal is the only climbable route (blocked corners would forbid it outright, #1197).
+    setCell(grid, 1, 0, 'walkable', { surfaceY: 10 });
+    setCell(grid, 0, 1, 'walkable', { surfaceY: 10 });
     setCell(grid, 1, 1, 'walkable', { surfaceY: tanDeg(25) * Math.SQRT2 }); // 25 degrees over the sqrt2 run
     expect(findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false }).found).toBe(true);
     expect(findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 1, toZ: 1, avoidVehicles: false, maxSlopeRatio: TIER3 }).found).toBe(false);

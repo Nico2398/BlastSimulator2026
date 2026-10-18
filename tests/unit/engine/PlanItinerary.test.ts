@@ -781,10 +781,11 @@ describe('planItinerary — vehicle tier climb limit (#1938)', () => {
     expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p), 5);
   });
 
-  it('a tier-3 hauler with only a 30 degree ramp has no itinerary, in exact and estimate fidelity', () => {
+  it('a tier-3 hauler with only a 30 degree ramp has no itinerary at exact fidelity; estimate stays the never-failing octile ranking heuristic', () => {
     const p = pit([30], 3, true);
     expect(driveTicks(p, 'exact')).toBeNull();
-    expect(driveTicks(p, 'estimate')).toBeNull();
+    // 'estimate' never checks reachability (estimateLegDistance); the exact plan at dispatch is the gate.
+    expect(driveTicks(p, 'estimate')).not.toBeNull();
   });
 
   it('the same single steep ramp is fine for tier 1, and for tier 3 off a progression site', () => {

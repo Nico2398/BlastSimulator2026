@@ -23,7 +23,7 @@ function tiersLine(tiers: readonly VehicleTier[], progression: boolean): string 
 export function describeRamp(ramp: BuiltRamp, opts?: RampClimbText): { title: string; sub: string } {
   const base = t('shell.selection.ramp_sub', { id: ramp.id, width: ramp.width, length: ramp.def.length });
   const climb = opts === undefined ? [] : [
-    t('shell.selection.ramp_grade', { grade: Math.round(opts.gradeDeg * 10) / 10 }),
+    t('shell.selection.ramp_grade', { grade: Math.round(opts.gradeDeg) }),
     tiersLine(opts.tiers, opts.progression),
   ];
   return {

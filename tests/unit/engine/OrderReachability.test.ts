@@ -1437,11 +1437,12 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
   });
 
   it('names the tier and limit of the best vehicle available: a tier-2 rig reads 24 degrees', () => {
-    const state = pit([30]);
+    // 34 degrees, not 30: a diagonal step over the 3-wide corridor climbs at tan(34)/sqrt2 = 25.5 degrees, which tier 2 would still manage on a 30 degree ramp (22 degrees).
+    const state = pit([34]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 2);
     const id = orderOn(state);
     classifyQueuedOrders(state);
-    expect(actionOf(state, id).blockedDetail?.params).toMatchObject({ id: 1, grade: 30, tier: 2, max: 24 });
+    expect(actionOf(state, id).blockedDetail?.params).toMatchObject({ id: 1, grade: 34, tier: 2, max: 24 });
   });
 
   it('names the steepest of several blocking ramps', () => {
