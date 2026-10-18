@@ -35,6 +35,8 @@ function started(speed: GameSpeed, audioSeed: number): CrowdSim {
   // A rich mine: the game must not end in bankruptcy while the weather is being measured.
   sim.state!.cash = 1e9;
   sim.state!.finances.cash = 1e9;
+  // An afk player never answers an event dialog, and a pending event halts the tick clock mid-measurement (#1907).
+  sim.state!.events.eventFreqMultiplier = 0;
   return sim;
 }
 

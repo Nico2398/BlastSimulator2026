@@ -81,12 +81,14 @@ export function playScenario(name: string, options: ScenarioPlayOptions): CrowdS
 }
 
 /** A started campaign level that nobody touches: the game runs at 1x for `seconds` real seconds. */
-export function playIdle(seconds: number, options: CrowdSimOptions & { readonly levelId?: string }): CrowdSim {
+export function playIdle(seconds: number, options: CrowdSimOptions & { readonly levelId?: string; readonly noEvents?: boolean }): CrowdSim {
   const sim = new CrowdSim({ ...options, afk: options.afk ?? true });
   resetCampaignProfile(sim.engine.ctx.campaignProfile);
   sim.command(`campaign start level:${options.levelId ?? 'dusty_hollow'}`);
   sim.chooseSpeed();
   sim.command('time resume');
+  // An afk player never answers an event dialog, and a pending event halts the clock before the mine can go bankrupt.
+  if (options.noEvents) sim.state!.events.eventFreqMultiplier = 0;
   sim.seconds(seconds);
   return sim;
 }
