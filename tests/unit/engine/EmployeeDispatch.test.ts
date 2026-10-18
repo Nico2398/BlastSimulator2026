@@ -38,6 +38,7 @@ import {
   NEED_HARD_THRESHOLDS,
   NAV_CLEARANCE_EMPLOYEE_CELLS,
 } from '../../../src/core/config/balance.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 
 /**
  * Rest/task timers are arrival-gated (#437): tickEmployees only queues
@@ -2582,6 +2583,7 @@ describe('charge_hole is vehicle-gated work: a mounted blaster is not alighted b
     const hole: DrillHole = { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 };
     state.drillHoles.push(hole);
     dispatchChargeAction(state, hole, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    state.tickCount += EXPLOSIVE_DELIVERY_TICKS; // explosives have arrived (#1895)
     return { state, employee, vehicle };
   }
 

@@ -3,12 +3,12 @@
   "description": "#1342: after Clear Plan empties the site (a real blast leaves a crater the rig cannot reach, so a reload there is unreachable by design), loading a saved blast plan re-orders its holes and charges as real work. Load must not write finished holes: it queues drill_hole and charge_hole orders (orderedHoleCount / orderedChargeCount rise, holeCount stays 0, cash drops for the explosives), and the crew then drills the holes and loads the charges.",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true cash:200000",
+      "command": "new_game seed:42 staffed:true cash:300000",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true cash:200000"
+          "command": "new_game seed:42 staffed:true cash:300000"
         }
       ],
       "role": "setup",
@@ -123,15 +123,15 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",

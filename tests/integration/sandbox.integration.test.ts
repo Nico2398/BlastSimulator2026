@@ -4,13 +4,14 @@
 // fixed (64x64, datum SANDBOX_DATUM) and starting cash comes from the named
 // starting kit.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
 import { SANDBOX_DEFAULTS, SANDBOX_KITS } from '../../src/core/campaign/Sandbox.js';
-import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { addIncome } from '../../src/core/economy/Finance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
@@ -200,16 +201,16 @@ describe('sandbox mode', () => {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;
       }
-      runner.run('tick 1');
+      tickResolvingEvents(cmd => runner.run(cmd));
     }
     runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;
       }
-      runner.run('tick 1');
+      tickResolvingEvents(cmd => runner.run(cmd));
     }
     const blast = runner.run('blast');
 
@@ -400,7 +401,7 @@ describe.each(['digger', 'full'] as const)('sandbox first blast to first sale on
       if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
       tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
       run('charge hole:* explosive:boomite amount:5 stemming:2');
-      tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
+      tickUntil(run, state, EXPLOSIVE_DELIVERY_TICKS + 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
       clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);
@@ -501,7 +502,7 @@ describe('sandbox is endless free play (#1321)', () => {
     runner.run('sandbox start biome:desert_badlands kit:digger seed:5');
     ctx.state!.cash = 0;
     ctx.state!.bankruptcy.ticksBelowThreshold = BANKRUPTCY_GRACE_TICKS - 1;
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
     expect(ctx.state!.levelEndReason).toBe('bankruptcy');
     expect(ctx.state!.levelEnded).toBe(true);
   });
@@ -696,7 +697,7 @@ describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start s
     const result = runner.run(`survey ${method} x:${cx} z:${cz}`);
     expect(result.success, result.output).toBe(true);
 
-    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) runner.run('tick 1');
+    for (let i = 0; i < 400 && state.surveyResults.length === 0; i++) tickResolvingEvents(cmd => runner.run(cmd));
     expect(state.surveyResults.length).toBeGreaterThan(0);
 
     const survey = state.surveyResults[0]!;

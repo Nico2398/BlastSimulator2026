@@ -3,19 +3,19 @@
   "description": "#1362: DETONATE arms the sequence with the crew still on the pattern; the waiting state always offers Fire anyway and Cancel. The player overrides the wait and fires immediately, accepting casualties.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:150000",
       "role": "setup",
       "timeout": 60,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:150000"
         }
       ],
       "description": "The level exactly as the UI starts it: no cash override, no staffed flag. It opens with a driller, a blaster, a driver, a drill rig, a debris hauler and a freight warehouse (#1363).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 150000,
           "tickCount": 0,
           "employeeCount": 3,
           "holeCount": 0
@@ -148,18 +148,18 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "description": "Cycle 1: the blaster loads every charge.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 300000
+          "maxTicks": 3400,
+          "timeoutMs": 380000
         }
       ],
-      "timeout": 330,
+      "timeout": 410,
       "role": "setup",
       "expect": {
         "equals": {

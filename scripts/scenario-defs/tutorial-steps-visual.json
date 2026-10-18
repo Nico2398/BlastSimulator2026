@@ -816,15 +816,15 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:9 max_ticks:250",
-      "timeout": 90,
+      "command": "wait_until field:chargedCount equals:9 max_ticks:650",
+      "timeout": 170,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 9,
-          "maxTicks": 250,
-          "timeoutMs": 90000
+          "maxTicks": 650,
+          "timeoutMs": 170000
         },
         {
           "type": "wait",

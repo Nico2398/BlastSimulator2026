@@ -17,7 +17,8 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
 import { rebuildAgentOccupancy, type AgentOccupancy } from '../../src/core/nav/AgentOccupancy.js';
-import { clearBlastZone, playContracts, playTick, type Run } from '../helpers/playthrough.js';
+import { clearBlastZone, playContracts, playTick, type Run, stockWarehouse } from '../helpers/playthrough.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Ticks of the standard opening before the save (#1747's opening at the issue's repro point). */
 const SAVE_AT_TICK = 1304;
@@ -39,8 +40,9 @@ function playStandardOpening(run: Run, ctx: GameContext, untilElapsed: number): 
   expect(run('build living_quarters at:30,48').success).toBe(true);
   expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
   playUntil(800, () => state.plannedDrillHoles.length === 0);
+  expect(stockWarehouse(run, state, 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
   run('charge hole:* explosive:krackle amount:8 stemming:2.5');
-  playUntil(800, () => Object.keys(state.plannedChargesByHole).length === 0);
+  playUntil(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
   clearBlastZone(run, state);
   expect(run('blast detonate').success).toBe(true);
   // The ramp into the crater (x=39..41): digging it lowers columns beside cells whose type depends on them.

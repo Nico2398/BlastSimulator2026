@@ -196,6 +196,8 @@ Each has: energy yield, cost, water sensitivity, charge limits, minimum rock tie
 Examples: Pop-Rock (starter), Big Bada Boom (mid), Dynatomics (endgame).
 Cost: costPerKg x kg is charged when the charge order is placed (finance category `explosives`) and refunded in full if the order is cancelled; firing the blast charges nothing.
 
+**Delivery wait (#1895, owner decision 2026-10-17):** explosives drawn from Explosive Warehouse stock load at once; the cash-bought part of a charge order is delivered `EXPLOSIVE_DELIVERY_TICKS` (400, flat per order, not per kg) after ordering, and nobody can claim that hole's charge order until then (blocked reason `explosives_in_transit`, a neutral wait, not a failure). An order fully covered by stock carries no wait. Rationale: a site firing about one pattern per 500 ticks saves ~400 ticks per stocked pattern, which is what pays the warehouse's build cost and upkeep back (price discount alone never did). Charge step shows `[data-info="delivery-hint"]` and `[data-info="delivery-transit"]`. Lever: the constant in `balance.ts`.
+
 Level explosive lists (`availableExplosives`) are enforced in the Charge step and console `charge` (single, `hole:*`, saved-plan queue); sandbox/new_game (no known level) use the full catalog.
 
 ### Ores

@@ -450,6 +450,11 @@ export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean 
   return available.some(c => c.type === 'rubble_disposal');
 }
 
+/** True when `available` holds a `supply` (bulk) offer, whatever material or quantity: the wait before a scenario opens the Contracts panel for its Accept button (#1895). */
+export function hasSupplyOffer(available: readonly Contract[]): boolean {
+  return available.some(c => c.type === 'supply');
+}
+
 /**
  * True when `available` holds an `ore_sale` offer for `materialId`, whatever
  * quantity it asks for — the wait before a scenario clicks that offer's

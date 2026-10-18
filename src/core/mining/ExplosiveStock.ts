@@ -2,7 +2,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { factorFor } from '../events/ActiveModifiers.js';
-import { EXPLOSIVE_BULK_PRICE_FACTOR } from '../config/balance.js';
+import { EXPLOSIVE_BULK_PRICE_FACTOR, EXPLOSIVE_DELIVERY_TICKS } from '../config/balance.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 import { addExpense, addIncome } from '../economy/Finance.js';
@@ -108,4 +108,33 @@ export function returnOrderStock(
     addIncome(state.finances, cashRefund, 'refund', `Unstorable ${explosiveId} ${lost}kg`, state.tickCount);
   }
   return { restockedKg, cashRefund };
+}
+
+/** Delivery wait in ticks for the part of an order bought with cash (#1895); 0 when nothing is bought. */
+export function orderDeliveryTicks(fromCashKg: number): number {
+  return fromCashKg > 0 ? EXPLOSIVE_DELIVERY_TICKS : 0;
+}
+
+/** Delivery arrival tick recorded on a charge action's payload, if any (#1895). */
+export function readOrderDeliveryTick(action: Pick<PendingAction, 'payload'>): number | undefined {
+  const tick = action.payload['deliveryArrivalTick'];
+  return typeof tick === 'number' ? tick : undefined;
+}
+
+/** True while a charge order's cash-bought explosives have not arrived yet (#1895). */
+export function isChargeDeliveryPending(action: Pick<PendingAction, 'type' | 'payload'>, tickCount: number): boolean {
+  if (action.type !== 'charge_hole') return false;
+  const arrival = readOrderDeliveryTick(action);
+  return arrival !== undefined && tickCount < arrival;
+}
+
+/** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */
+export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
+  let earliest: number | null = null;
+  for (const a of state.pendingActions) {
+    if (!isChargeDeliveryPending(a, state.tickCount)) continue;
+    const arrival = readOrderDeliveryTick(a) as number;
+    if (earliest === null || arrival < earliest) earliest = arrival;
+  }
+  return earliest;
 }

@@ -57,7 +57,7 @@ import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { getProfitShortfall } from './core/campaign/LevelObjective.js';
-import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { hasWinningOreSaleOffer, hasFillableOreSaleOffer, hasFillableSaleOffer, hasOreSaleOffer, hasRubbleDisposalOffer, hasSupplyOffer } from './core/economy/Contract.js';
 import { isActive } from './core/events/ActiveModifiers.js';
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
@@ -869,6 +869,7 @@ window.__gameState = () => {
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors
     // console-api.ts's own field so both modes read the same thing.
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    supplyOffered: hasSupplyOffer(s.contracts.available),
     blastBanned: isActive(s.events.activeModifiers, 'blast_ban', s.tickCount), // mirrors serializeGameState
     blingiteSaleOffered: hasOreSaleOffer(s.contracts.available, 'blingite'),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),

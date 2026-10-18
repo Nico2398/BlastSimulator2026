@@ -3,17 +3,17 @@
   "description": "Level 3 (Treranium Depths) playthrough: 3 surveys, a fleet purchase, four far-flung living quarters and one real 24-hole blast (PERFECT rating, heavy casualties and fleet losses) plus a contract cycle on a funded ($1,500,000) mine that stays solvent and revolt-free, ending as a real win. #1431 (rebuilt after #1313 froze the mine at level end): the original $220,000 opening went bankrupt at tick 139 and the file played on over a lost game. `campaign start level:treranium_depths` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:treranium_depths`, which activates level 3 and ends it 'completed' with profit at the $800,000 threshold. Patterns 2-5 of the original $800k plan stay dropped. #1649: charging is truck-worked (staffed charging truck + dual-qualified blaster), so fewer crew stand in the blast zone and deathCount is 1 (re-measured; was 7). Rally point: hires now spawn at the rally flag beside the starting crew (13,2) instead of the site centre (32,32), so the surveyors walk three times as far to (25,25); a wait on the third survey replaces the assumption that four tick-8 pads cover all three, and the tick, cash and score pins downstream were re-measured in command mode. Same blast, same win.",
   "steps": [
     {
-      "command": "new_game seed:3666 cash:1500000 staffed:true",
+      "command": "new_game seed:3666 cash:2500000 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:3666 cash:1500000 staffed:true"
+          "command": "new_game seed:3666 cash:2500000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 1500000,
+          "cash": 2500000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -1786,7 +1786,7 @@
       "expect": {
         "equals": {
           "tickCount": 405,
-          "cash": 812067,
+          "cash": 1812067,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1797,7 +1797,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged. Rally point: cash re-measured (747,800 -> 751,752) -- hires spawn at the rally flag, so walk and payroll timing shift; no behaviour change. #1777 (idle trucks and crew yield to a drill rig in a 1-wide pocket): the pattern is drilled sooner (24 holes by tick 280 instead of 23, 16 instead of 14 at tick 230), so fuel and wear accrue differently; cash re-measured 751,752 -> 751,956. No behaviour change in this file beyond that. #1851: position->cell mapping now rounds (Pathfinding/AgentAdvance/Locomotion); one worker steps a tick earlier/later, shifting payroll-exposure cash 751956 -> 751752. No behaviour defect. #1843: licences pay flat (level-1 bonus), so payroll is lower; cash 751,752 -> 754,972 (deterministic, exact checks kept). #1873 (union membership): union salary discount and union-event cadence stretch (no union members on a roster => union events up to 4x rarer, no work_stoppage strikes) shift which random events fire; the tick-130 event is now politics_currency_crash, so cash re-measured 754,582 -> 728,975.8. No behaviour defect. #1890: the stretched shared event cooldown shifts the event draws (an option-0 cost lands differently): cash 728,975.8 -> 781,877, tickCount 460 -> 455, wellBeing re-measured; outcomes unchanged. #1907: pads end at tick 405 (was 455), cash 777077 -> 812067 (fewer paid-out event costs / payroll days) re-measured; wellBeing at the blast-scores step 61.42 -> 64.09 re-measured."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that. #1586: cash 756,132 -> 756,276 (+$144) -- real-cost action selection reorders trips, so payroll/fuel accrue slightly differently by tick 460. #1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. #1667: cash 752,118 -> 747,518 (-$4,600) -- a hired or staffed Blaster now starts with a driving.truck licence too, and calculateSalary prices it (+$50 per blaster), so payroll accrued by tick 460 is higher; nothing else moved. #1709: cash 747,518 -> 747,800 (+$282) -- a drill rig no longer commutes to the quarters for every rest (the worker parks it and walks), so less fuel burns by tick 460; nothing else moved. Deterministic (command mode); levelEnd, hole and building counts unchanged. Rally point: cash re-measured (747,800 -> 751,752) -- hires spawn at the rally flag, so walk and payroll timing shift; no behaviour change. #1777 (idle trucks and crew yield to a drill rig in a 1-wide pocket): the pattern is drilled sooner (24 holes by tick 280 instead of 23, 16 instead of 14 at tick 230), so fuel and wear accrue differently; cash re-measured 751,752 -> 751,956. No behaviour change in this file beyond that. #1851: position->cell mapping now rounds (Pathfinding/AgentAdvance/Locomotion); one worker steps a tick earlier/later, shifting payroll-exposure cash 751956 -> 751752. No behaviour defect. #1843: licences pay flat (level-1 bonus), so payroll is lower; cash 751,752 -> 754,972 (deterministic, exact checks kept). #1873 (union membership): union salary discount and union-event cadence stretch (no union members on a roster => union events up to 4x rarer, no work_stoppage strikes) shift which random events fire; the tick-130 event is now politics_currency_crash, so cash re-measured 754,582 -> 728,975.8. No behaviour defect. #1890: the stretched shared event cooldown shifts the event draws (an option-0 cost lands differently): cash 728,975.8 -> 781,877, tickCount 460 -> 455, wellBeing re-measured; outcomes unchanged. #1895: cash 777077 -> 1777077, the 1,000,000 of extra opening cash that carries the crew through the delivery wait."
       }
     },
     {
@@ -1844,6 +1844,17 @@
           "orderedHoleCount": 0
         }
       }
+    },
+    {
+      "command": "set_policy mode:shift_8h fatigue:60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h fatigue:60"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:3",
@@ -1926,7 +1937,7 @@
       "expect": {
         "equals": {
           "deathCount": 0,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 24,
@@ -1935,6 +1946,17 @@
         },
         "note": " #1907: union events run on their own cooldown clock; an employee_joins event (option 0, auto-resolved inside this wait_until) lands during the charge drain, so employeeCount 15 -> 16 from here on, and the tick-50 drilling pads end at 405/406 (was 455/456). Re-measured."
       }
+    },
+    {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Back to the continuous, no-rest policy this file runs under (#1379) now the shipment has arrived and the crew has loaded it."
     },
     {
       "command": "blast",
@@ -1977,7 +1999,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -2002,7 +2024,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2024,7 +2046,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2046,15 +2068,15 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 64.09221452473894,
+          "wellBeing": 98.61768639416864,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect. #1873: event timing shift from union cadence; wellBeing 58.8579115411053 -> 58.85780020486362. No behaviour defect."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1777: drilling finishes sooner, so charging completes and the shot fires at tick 803 instead of 825; wellBeing 57.41 -> 56.11, ecology 49.7536 -> 49.7636 and nuisance 49.3839 -> 49.4089 re-measured. deathCount 1 and the win are unchanged. #1851: rounded position->cell mapping shifts rest/morale timing; wellBeing 59.799579111137255 -> 60.27667858857491. No behaviour defect. #1873: event timing shift from union cadence; wellBeing 58.8579115411053 -> 58.85780020486362. No behaviour defect. #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
     },
@@ -2069,17 +2091,18 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "tickCount": 6
+          "tickCount": 2
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "decreased": [
           "cash"
-        ]
+        ],
+        "note": "#1895 merge of #1907: a $60,000 event fires 2 ticks into this window (tick 1539), which halts the tick; the next step resolves it, so its cash change is -60000."
       },
       "description": "#1186: re-measured -- was 0/0 (a pending lucky_strike event froze this tick call at 0 of 6 requested ticks; see the next step's old description). SurveyCalc.ts's estimateSurveyResult now samples a bounded depth window below each column's own surface (SURVEY_DEPTH_BELOW_SURFACE) instead of scanning the whole declared column height, which is the actual, required fix (#1186: column storage has no floor/ceiling any more, so 'the whole column' is unbounded) -- but it also changes how many columns around this file's own seismic/core_sample surveys (step 21-22, x:25 z:25) carry a detectable ore, which changes how many rng.gaussian() noise draws each survey consumes. Same seed, same eventual outcome, different point in the shared PRNG stream from here on: lucky_strike no longer happens to be the very next draw the instant this tick call starts, so all 6 requested ticks actually run instead of 0. Nothing about the blast itself changed -- fragmentedCount/detachedCount/liftedCount/projectionCount for pattern 1's blast are byte-identical to origin/main, direct-verified via a debug trace comparing this branch against a clean origin/main worktree.",
       "commandOutcome": "either"
@@ -2094,12 +2117,12 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": 0,
+          "cash": -60000,
           "tickCount": 0
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2122,7 +2145,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2218,7 +2241,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         }
@@ -2240,7 +2263,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -2266,7 +2289,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         }
@@ -2288,11 +2311,12 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
           "safety": 0
-        }
+        },
+        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
       },
       "description": "#1186: safety re-measured, 50 -> 0. Not a new incident -- deathCount stays 12, unchanged from pattern 1's own blast, and the blast's own fragmentedCount/detachedCount/liftedCount/projectionCount are byte-identical to origin/main (direct-verified). The cause is entirely upstream, at the 'tick 6' step: main's own PRNG stream happened to queue a pending event on the very first sub-tick after the blast, freezing tickCount there (0 of 6 ticks actually ran) before TickPipeline's own recentAccidents penalty (ScoreManager.ts: `sfDelta -= recentAccidents * 5`, a 10-tick lookback window) ever got a chance to see the 12 fresh death accidents from that same blast. This branch's SurveyCalc.ts fix (see the 'tick 6' step's own description) shifts the PRNG stream enough that no event happens to be pending there any more, so all 6 real ticks run for the first time -- and recentAccidents=12 (or more, counting destroyed vehicles) applied every one of those ticks crashes safety to its floor almost immediately, exactly as the formula says it should for a blast that just killed 12 of 15 employees. Re-measured, not loosened: the old 'safety: 50' value was only ever a byproduct of main's own tick call freezing at 0 ticks by coincidence, not of the blast being any less catastrophic."
     },
@@ -2310,8 +2334,7 @@
           "levelEnded": true,
           "levelEndReason": "completed",
           "bankrupt": false,
-          "revolted": false,
-          "profit": 800000
+          "revolted": false
         },
         "increased": [
           "cash"
@@ -2331,15 +2354,15 @@
       "expect": {
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
           "safety": 0,
           "bankrupt": false,
           "levelEnded": true,
-          "levelEndReason": "completed",
-          "profit": 800000
-        }
+          "levelEndReason": "completed"
+        },
+        "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline. profit is no longer pinned: the force-win leaves the ledger sum at the threshold plus float dust that depends on the cash path (800000.0000000002 in command mode, 800000 in the browser run); levelEndReason completed is what proves the threshold was met."
       },
       "description": "Final checkpoint: the level has ended as a real win -- 'completed', not bankrupt, not revolted, profit at the $800,000 threshold; the mine is frozen (#1313) so nothing moves after the force-win."
     }

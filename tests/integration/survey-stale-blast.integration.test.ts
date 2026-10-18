@@ -5,6 +5,7 @@
 // post-blast ore report is computed against the PRE-blast freshness, and only
 // afterwards are overlapping surveys marked stale.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -12,6 +13,7 @@ import type { MiningContext } from '../../src/console/commands/mining.js';
 import type { SurveyResult } from '../../src/core/mining/SurveyCalc.js';
 import { isSurveyStale } from '../../src/core/mining/SurveyCalc.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /** Survey whose estimates cover every column in [0, 40]². */
 function wideSurvey(id: number, over: Partial<SurveyResult> = {}): SurveyResult {
@@ -24,12 +26,12 @@ function wideSurvey(id: number, over: Partial<SurveyResult> = {}): SurveyResult 
 }
 
 function drain(runner: ConsoleRunner, ctx: MiningContext, done: () => boolean): void {
-  for (let i = 0; i < 800 && !done(); i++) {
+  for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 800 && !done(); i++) {
     // Charging is worked from a truck by one crew member (#1649), so a pass spans
     // more payroll ticks than the starting cash covers; keep the run from going bankrupt.
     ctx.state!.cash = Math.max(ctx.state!.cash, 100000);
     for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(done()).toBe(true);
 }

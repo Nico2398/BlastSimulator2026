@@ -16,13 +16,15 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
-import { tickUntil } from './helpers.js';
+import { tickUntil, tickResolvingEvents } from './helpers.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 import { buyChargingTruck } from '../helpers/blastFixtures.js';
 import { refreshHiringPool } from '../../src/core/entities/HiringPool.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { checkProtectedPositions } from '../../src/core/mining/BlastPlan.js';
 import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 describe('drill_plan grid — queues drill_hole actions instead of writing holes instantly (#553)', () => {
   afterEach(() => {
@@ -330,7 +332,7 @@ function setupSavedPlan() {
   state.cash = 500_000;
   state.finances.cash = 500_000;
   expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
-  tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
+  tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 800);
   expect(Object.keys(state.chargesByHole)).toHaveLength(4);
   expect(run('blast_plan save').success).toBe(true);
   return { run, state };
@@ -418,9 +420,10 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(run('blast_plan load').success).toBe(true);
     const newIds = state.plannedDrillHoles.map(h => h.id);
 
-    for (let i = 0; i < 1500 && (state.plannedDrillHoles.length > 0 || Object.keys(state.plannedChargesByHole).length > 0); i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 1500 && (state.plannedDrillHoles.length > 0 || Object.keys(state.plannedChargesByHole).length > 0); i++) {
       for (const emp of state.employees.employees) emp.fatigue = 100;
-      run('tick 1');
+      fundForDeliveryWait(state); // payroll runs through the explosive delivery wait (#1895)
+      tickResolvingEvents(run);
       for (const id of Object.keys(state.chargesByHole)) {
         expect(state.drillHoles.some(h => h.id === id)).toBe(true);
       }

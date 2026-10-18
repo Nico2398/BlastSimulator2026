@@ -172,6 +172,27 @@
       ]
     },
     {
+      "command": "wait_until field:chargedCount equals:1 max_ticks:380",
+      "description": "Stock-covered order (#1895): no delivery wait, the loaded charge lands well inside the 400-tick delivery window.",
+      "timeout": 130,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      },
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 380,
+          "timeoutMs": 130000
+        }
+      ]
+    },
+    {
       "command": "state full",
       "role": "observe",
       "interaction": [

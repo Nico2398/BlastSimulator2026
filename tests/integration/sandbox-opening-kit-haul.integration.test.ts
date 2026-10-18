@@ -12,8 +12,9 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const SEED = 42;
 // Ore on the desert seed 42 site sits in discrete deposits (#1682); (30,-4) is
@@ -32,7 +33,7 @@ const MIN_STORAGE_FILL_SHARE = 0.8;
 const OLD_STUCK_BASELINE_KG = 12_000;
 
 function refresh(state: GameState): void {
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
   for (const e of state.employees.employees) e.fatigue = 100;
 }
 
@@ -57,7 +58,7 @@ function openingKitHaul(side: 'west' | 'east') {
   expect(run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${SHOT_START}`)).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 1500);
   expect(run('charge hole:* explosive:krackle amount:6 stemming:2')).toMatchObject({ success: true });
-  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
+  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.lastBlastReport !== null, 600);
   expect(state.lastBlastReport).not.toBeNull();
