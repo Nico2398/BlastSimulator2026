@@ -4165,7 +4165,7 @@
   "inspector.reason.demolition_ordered": "Une démolition est déjà ordonnée",
   "inspector.reason.upgrade_ordered": "Une amélioration est déjà ordonnée",
   "inspector.reason.under_construction": "Encore en chantier",
-  "inspector.tip.upgrade": "Monte le bâtiment au niveau suivant sur place, pour le coût de construction de ce niveau. Il continue de fonctionner pendant le chantier. Exige la recherche du niveau et la place pour l'emprise plus grande.",
+  "inspector.tip.upgrade": "Monte le bâtiment au niveau suivant sur place, pour le coût de construction du niveau suivant moins la moitié de celui du niveau actuel. Il continue de fonctionner pendant le chantier. Exige la recherche du niveau et la place pour l'emprise plus grande.",
   "ui.build.demolish_confirm_loses_ore": "Le minerai stocké ({kg} kg) est perdu.",
   "inspector.section.contents": "Contenu",
   "inspector.stock_capacity": "{stored} sur {capacity} kg",

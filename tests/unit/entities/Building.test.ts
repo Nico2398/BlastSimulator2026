@@ -23,7 +23,7 @@ import {
   findOverlappingOccupant,
   BUILDING_DEFS,
 } from '../../../src/core/entities/Building.js';
-import type { Building, FootprintOccupant } from '../../../src/core/entities/Building.js';
+import type { Building, BuildingType, FootprintOccupant } from '../../../src/core/entities/Building.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import type { TerrainReservation } from '../../../src/core/entities/PlacementReservations.js';
 
@@ -343,22 +343,57 @@ describe('getDemolishCost()', () => {
 });
 
 describe('getUpgradeCost()', () => {
-  it('is the next tier construction cost alone: nothing is demolished (#1875)', () => {
-    const nextConstruction = getBuildingDef('living_quarters', 2).constructionCost;
-    const currentDemolish = getBuildingDef('living_quarters', 1).demolishCost;
+  // #1905: next tier's construction cost minus 50% of the current tier's.
+  const PRICES: ReadonlyArray<readonly [BuildingType, number, number]> = [
+    ['freight_warehouse', 28_500, 54_000],
+    ['living_quarters', 20_000, 37_500],
+    ['explosive_warehouse', 38_000, 71_000],
+    ['research_center', 47_500, 90_000],
+    ['blasting_academy', 28_500, 54_000],
+    ['driving_center', 24_000, 45_000],
+    ['management_office', 16_000, 30_000],
+    ['geology_lab', 22_000, 41_000],
+  ];
 
-    expect(getUpgradeCost('living_quarters', 2)).toBe(nextConstruction);
-    expect(getUpgradeCost('living_quarters', 2)).not.toBe(currentDemolish + nextConstruction);
+  it.each(PRICES)('%s costs the literal discounted price for T1->T2 and T2->T3', (type, t2, t3) => {
+    expect(getUpgradeCost(type, 2)).toBe(t2);
+    expect(getUpgradeCost(type, 3)).toBe(t3);
   });
 
-  it('is the tier-3 construction cost for a tier-2 to tier-3 upgrade', () => {
-    expect(getUpgradeCost('geology_lab', 3)).toBe(getBuildingDef('geology_lab', 3).constructionCost);
-  });
-
-  it('is positive for every upgradable type and tier', () => {
-    for (const type of ['living_quarters', 'geology_lab', 'freight_warehouse', 'management_office'] as const) {
-      for (const tier of [2, 3] as const) expect(getUpgradeCost(type, tier)).toBeGreaterThan(0);
+  it('is next tier construction cost minus half the current tier construction cost', () => {
+    for (const [type] of PRICES) {
+      for (const tier of [2, 3] as const) {
+        const next = getBuildingDef(type, tier).constructionCost;
+        const cur = getBuildingDef(type, (tier - 1) as 1 | 2).constructionCost;
+        expect(getUpgradeCost(type, tier)).toBe(next - Math.round(cur * 0.5));
+      }
     }
+  });
+
+  it('is strictly below the next tier construction cost and still positive', () => {
+    for (const [type] of PRICES) {
+      for (const tier of [2, 3] as const) {
+        const cost = getUpgradeCost(type, tier);
+        expect(cost).toBeLessThan(getBuildingDef(type, tier).constructionCost);
+        expect(cost).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('is not the demolish-plus-build price of the old model (#1875)', () => {
+    const currentDemolish = getBuildingDef('living_quarters', 1).demolishCost;
+    expect(getUpgradeCost('living_quarters', 2)).not.toBe(currentDemolish + getBuildingDef('living_quarters', 2).constructionCost);
+  });
+
+  it('leaves the price of a new build at any tier unchanged', () => {
+    expect(getBuildingDef('living_quarters', 2).constructionCost).toBe(25_000);
+    expect(getBuildingDef('management_office', 3).constructionCost).toBe(40_000);
+    expect(getBuildingDef('geology_lab', 1).constructionCost).toBe(12_000);
+  });
+
+  it('charges the full construction cost for nextTier 1 (nothing to credit)', () => {
+    expect(getUpgradeCost('living_quarters', 1)).toBe(10_000);
+    expect(getUpgradeCost('management_office', 1)).toBe(getBuildingDef('management_office', 1).constructionCost);
   });
 });
 

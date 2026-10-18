@@ -304,7 +304,8 @@ describe('build upgrade as in-place construction (#1875)', () => {
       expect(res.success, res.output).toBe(true);
     });
     expect(spent).toBe(getUpgradeCost(old.type, 2));
-    expect(spent).toBe(getBuildingDef(old.type, 2).constructionCost);
+    expect(spent).toBe(20_000); // #1905: T2 25,000 minus half of T1 10,000
+    expect(spent).toBeLessThan(getBuildingDef(old.type, 2).constructionCost);
     expect(ctx.state!.buildings.buildings.find(b => b.id === id)!.tier).toBe(1);
   });
 
@@ -325,6 +326,8 @@ describe('build upgrade as in-place construction (#1875)', () => {
       tick(ctx);
       const b = ctx.state!.buildings.buildings.find(x => x.id === id);
       expect(b, `building ${id} vanished at tick ${i}`).toBeDefined();
+      expect(b!.active, `building ${id} deactivated at tick ${i}`).toBe(true);
+      expect(b!.outOfService, `building ${id} out of service at tick ${i}`).toBeFalsy();
     }
     expect(ctx.state!.plannedBuildings).toHaveLength(0);
   });
@@ -431,6 +434,9 @@ describe('build upgrade as in-place construction (#1875)', () => {
     const { ctx, id } = upgradeSetup();
     const before = ctx.state!.cash;
     buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(before - ctx.state!.cash).toBe(20_000); // #1905: discounted charge, refunded in full below
+    expect(placeActionFor(ctx, id)!.payload).toMatchObject({ cost: 20_000 });
+    expect(ctx.state!.plannedBuildings.find(pb => pb.buildingId === id)!.cost).toBe(20_000);
     expect(ctx.state!.plannedBuildings.some(pb => pb.buildingId === id)).toBe(true);
 
     const actionId = placeActionFor(ctx, id)!.id;
@@ -447,6 +453,7 @@ describe('build upgrade as in-place construction (#1875)', () => {
   it('refunds and leaves no site when the building is demolished by other means before the work lands', () => {
     const { ctx, id } = upgradeSetup();
     const spent = cashSpentBy(ctx, () => { buildCommand(ctx, ['upgrade', String(id)], {}); });
+    expect(spent).toBe(20_000); // #1905
     expect(spent).toBeGreaterThan(0);
     ctx.state!.buildings.buildings = ctx.state!.buildings.buildings.filter(b => b.id !== id);
     for (let i = 0; i < 1500 && ctx.state!.plannedBuildings.length > 0; i++) tick(ctx);

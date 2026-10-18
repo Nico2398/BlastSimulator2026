@@ -337,7 +337,7 @@
         "equals": {
           "buildingCount": 3
         },
-        "note": "An upgrade is ordinary construction (#1875): charged the next tier's construction cost now, no demolition, no vehicle. The building keeps standing, so buildingCount stays 3."
+        "note": "An upgrade is ordinary construction (#1875): charged the discounted upgrade price now (next tier's construction cost minus half the current tier's), no demolition, no vehicle. The building keeps standing, so buildingCount stays 3."
       }
     },
     {

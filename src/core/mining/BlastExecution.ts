@@ -301,8 +301,10 @@ export function executeBlast(
   /** Hole ids currently holding water (stored hole water past the wet threshold — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
   marketId?: MarketId,
+  /** First fragment id of this blast's block (see reserveFragmentIds). */
+  firstFragmentId: number = 0,
 ): BlastResult | null {
-  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds, marketId));
+  return drain(executeBlastSteps(plan, grid, villages, groundFactor, buildingState, emitter, wetHoleIds, marketId, firstFragmentId));
 }
 
 /**
@@ -321,6 +323,8 @@ export function* executeBlastSteps(
   emitter?: EventEmitter,
   wetHoleIds: ReadonlySet<string> = new Set(),
   marketId?: MarketId,
+  /** First fragment id of this blast's block (see reserveFragmentIds). */
+  firstFragmentId: number = 0,
 ): Steps<BlastResult | null> {
   // 1. Validate
   const errors = validateBlastPlan(plan);
@@ -345,7 +349,7 @@ export function* executeBlastSteps(
   const fragmentation = field ? yield* identifyFragmentedVoxelsSteps(field, grid) : null;
 
   const fragments: FragmentData[] = [];
-  let fragmentIdCounter = 0;
+  let nextId = firstFragmentId;
   let totalRockVolume = 0;
   let totalOreValue = 0;
   let oversizedFragments = 0;
@@ -372,7 +376,7 @@ export function* executeBlastSteps(
       const velocity = computeFragmentVelocity(gen.origin, gen.sources, gen.massKg, field, throwFraction);
 
       fragments.push({
-        id: fragmentIdCounter++,
+        id: nextId++,
         position: gen.origin,
         volume: gen.volumeM3,
         mass: gen.massKg,

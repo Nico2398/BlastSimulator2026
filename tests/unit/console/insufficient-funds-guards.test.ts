@@ -314,7 +314,7 @@ describe('build destroy — insufficient funds guard', () => {
 // ── build upgrade — issue #511 ──
 
 describe('build upgrade — insufficient funds guard', () => {
-  const UPGRADE_COST = getBuildingDef('management_office', 2).constructionCost;
+  const UPGRADE_COST = 16_000; // #1905: T2 20,000 minus half of T1 8,000
 
   function unlockTier2(ctx: MiningContext): void {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;

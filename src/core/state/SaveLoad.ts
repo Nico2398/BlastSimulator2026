@@ -755,6 +755,20 @@ export function deserialize(json: string): GameState {
     }
   }
 
+  // #1903: fragment ids are unique for the life of a game; a save from before the counter
+  // resumes above every id still on the ground.
+  if (logisticsRaw) {
+    const tracked = Array.isArray(logisticsRaw['fragments'])
+      ? logisticsRaw['fragments'] as Array<{ fragment?: { id?: number } }>
+      : [];
+    let maxId = -1;
+    for (const t of tracked) {
+      const id = t.fragment?.id;
+      if (typeof id === 'number' && id > maxId) maxId = id;
+    }
+    ensureField(logisticsRaw, 'nextFragmentId', v => typeof v === 'number', maxId + 1);
+  }
+
   // ghostPreviewsRevision added alongside the renderer's dirty-check gate
   // (#761) — no dedicated save-version bump, so this can't be gated behind
   // a `version < N` check: every save that predates the PR, including the
