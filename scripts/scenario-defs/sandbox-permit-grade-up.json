@@ -145,6 +145,10 @@
           "panel": "blast"
         },
         {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
           "type": "clickIfPresent",
           "selector": "#bs-inspector [data-panel-close]",
           "timeoutMs": 0
@@ -208,6 +212,10 @@
         {
           "type": "ensurePanel",
           "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
         },
         {
           "type": "setStepper",
@@ -274,22 +282,9 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "[data-action=\"preflight-fire-anyway\"]",
-          "timeoutMs": 3000
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Blast 1: fire.",
+      "description": "Blast 1: arm the sequence; the crew evacuates the pattern before it fires, so nobody is lost.",
       "timeout": 90,
       "role": "player"
     },
@@ -312,6 +307,22 @@
           "holeCount": 0
         }
       }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 60,
+      "description": "Dismiss the blast report once the sequence has fired.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ]
     },
     {
       "command": "build_ramp start:12,34 end:34,34 depth:6",
@@ -361,11 +372,35 @@
       "role": "player"
     },
     {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "role": "setup",
+      "description": "The digger finishes the ramp before blast 2's pattern is ordered: holes ordered while the ramp is open are unreachable ghosts for the driller.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:36,42",
       "interaction": [
         {
           "type": "ensurePanel",
           "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
         },
         {
           "type": "clickIfPresent",
@@ -389,6 +424,13 @@
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
           "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 38,
+          "z": 44,
+          "distance": 30,
+          "pitch": 75
         },
         {
           "type": "dragTiles",
@@ -431,6 +473,10 @@
         {
           "type": "ensurePanel",
           "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
         },
         {
           "type": "setStepper",
@@ -497,22 +543,9 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "[data-action=\"preflight-fire-anyway\"]",
-          "timeoutMs": 3000
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Blast 2: fire.",
+      "description": "Blast 2: arm the sequence; the crew evacuates the pattern before it fires, so nobody is lost.",
       "timeout": 90,
       "role": "player"
     },
@@ -537,16 +570,20 @@
       }
     },
     {
-      "command": "tick 100",
-      "role": "setup",
+      "command": "state",
+      "role": "player",
+      "timeout": 60,
+      "description": "Dismiss the blast report once the sequence has fired.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 100"
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ],
-      "description": "Haul window part 1/4: no observable condition marks 'enough ore stored' (waitUntil is strict equality), so a bounded tick pad lets the haulers fill the warehouse.",
-      "commandOutcome": "either"
+      ]
     },
     {
       "command": "event choose 0",
@@ -558,260 +595,6 @@
       "description": "Clear an event if one is pending (nondeterministic beat).",
       "commandOutcome": "either",
       "role": "player"
-    },
-    {
-      "command": "tick 100",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 100"
-        }
-      ],
-      "description": "Haul window part 2/4: no observable condition marks 'enough ore stored' (waitUntil is strict equality), so a bounded tick pad lets the haulers fill the warehouse.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Clear an event if one is pending (nondeterministic beat).",
-      "commandOutcome": "either",
-      "role": "player"
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        }
-      ],
-      "description": "Accept an ore sale contract to deliver the stored ore against.",
-      "expect": {
-        "equals": {
-          "activeContractCount": 1
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract deliver type:ore_sale fillable:true amount:5000",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel .bs-contract-amount"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-contract-panel .bs-contract-amount",
-          "value": "5000"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-deliver"
-        }
-      ],
-      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        }
-      ],
-      "description": "Accept an ore sale contract to deliver the stored ore against.",
-      "expect": {
-        "equals": {
-          "activeContractCount": 1
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract deliver type:ore_sale fillable:true amount:5000",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel .bs-contract-amount"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-contract-panel .bs-contract-amount",
-          "value": "5000"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-deliver"
-        }
-      ],
-      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        }
-      ],
-      "description": "Accept an ore sale contract to deliver the stored ore against.",
-      "expect": {
-        "equals": {
-          "activeContractCount": 1
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract deliver type:ore_sale fillable:true amount:5000",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel .bs-contract-amount"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-contract-panel .bs-contract-amount",
-          "value": "5000"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-deliver"
-        }
-      ],
-      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        }
-      ],
-      "description": "Accept an ore sale contract to deliver the stored ore against.",
-      "expect": {
-        "equals": {
-          "activeContractCount": 1
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "contract deliver type:ore_sale fillable:true amount:5000",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel .bs-contract-amount"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-contract-panel .bs-contract-amount",
-          "value": "5000"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-deliver"
-        }
-      ],
-      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
-      "expect": {
-        "increased": [
-          "cash"
-        ]
-      },
-      "role": "player"
-    },
-    {
-      "command": "tick 100",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 100"
-        }
-      ],
-      "description": "Haul window part 3/4: the offers filled so far drained the warehouse; a bounded tick pad lets the haulers refill it.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Clear an event if one is pending (nondeterministic beat).",
-      "commandOutcome": "either",
-      "role": "player"
-    },
-    {
-      "command": "tick 100",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 100"
-        }
-      ],
-      "description": "Haul window part 4/4: a second bounded pad; a pending event cuts a tick pad short, so each pad is followed by an event clear.",
-      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -833,11 +616,11 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "description": "Accept an ore sale contract to deliver the stored ore against.",
@@ -882,11 +665,109 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "description": "Accept an ore sale contract to deliver the stored ore against.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract deliver type:ore_sale fillable:true amount:5000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "5000"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "description": "Accept an ore sale contract to deliver the stored ore against.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract deliver type:ore_sale fillable:true amount:5000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "5000"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        }
+      ],
+      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "description": "Accept an ore sale contract to deliver the stored ore against.",
@@ -956,7 +837,7 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Clear an event if one is pending (nondeterministic beat).",
+      "description": "Clear an event if one is pending (nondeterministic beat); an event cuts a tick pad short.",
       "commandOutcome": "either",
       "role": "player"
     },
@@ -969,15 +850,8 @@
           "command": "tick 47"
         }
       ],
-      "description": "One tick before approval: still grade 0.",
-      "expect": {
-        "equals": {
-          "mineGrade": {
-            "grade": 0,
-            "pendingTicksLeft": 1
-          }
-        }
-      }
+      "description": "Paperwork window: 47 ticks, possibly cut short by an event, so the pad is repeated with an event clear after each.",
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -986,20 +860,66 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Clear an event if one is pending (nondeterministic beat).",
+      "description": "Clear an event if one is pending (nondeterministic beat); an event cuts a tick pad short.",
       "commandOutcome": "either",
       "role": "player"
     },
     {
-      "command": "tick 1",
+      "command": "tick 47",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "tick 47"
         }
       ],
-      "description": "Processing ends on the 48th tick: the Ministry stamps the application.",
+      "description": "Paperwork window: 47 ticks, possibly cut short by an event, so the pad is repeated with an event clear after each.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); an event cuts a tick pad short.",
+      "commandOutcome": "either",
+      "role": "player"
+    },
+    {
+      "command": "tick 47",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 47"
+        }
+      ],
+      "description": "Paperwork window: 47 ticks, possibly cut short by an event, so the pad is repeated with an event clear after each.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); an event cuts a tick pad short.",
+      "commandOutcome": "either",
+      "role": "player"
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Processing ended: the Ministry stamped the application and the site is a Hobby Quarry (grade 1).",
       "expect": {
         "equals": {
           "mineGrade": {
