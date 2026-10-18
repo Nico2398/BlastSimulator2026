@@ -249,6 +249,13 @@
           "value": 6
         },
         {
+          "type": "focusTile",
+          "x": 19,
+          "z": 9,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
           "type": "dragTiles",
           "x1": 19,
           "z1": 9,
