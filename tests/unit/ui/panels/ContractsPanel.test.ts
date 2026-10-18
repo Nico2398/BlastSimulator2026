@@ -1391,14 +1391,15 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.show();
     panel.update(runningState());
     const original = Element.prototype.scrollIntoView;
-    const spy = vi.fn();
+    const receivers: unknown[] = [];
+    const spy = vi.fn(function (this: unknown) { receivers.push(this); });
     Element.prototype.scrollIntoView = spy;
     try {
       const target = stripOf(panel)!;
       const button = target.matches('button') ? target : target.querySelector<HTMLElement>('button[data-action="goto-active"]')!;
       expect(() => button.click()).not.toThrow();
       expect(spy).toHaveBeenCalledTimes(1);
-      const scrolled = spy.mock.contexts[0] as HTMLElement;
+      const scrolled = receivers[0] as HTMLElement;
       const activeWrapper = panel.root.querySelector<HTMLElement>('[data-scroll-key="active"]')!;
       const kids = Array.from(getBodyEl(panel).children) as HTMLElement[];
       const activeHeader = kids[kids.indexOf(activeWrapper) - 1]!;

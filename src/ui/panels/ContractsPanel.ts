@@ -75,7 +75,7 @@ export function orderOffers(
 }
 
 /** One-line roll-up of the player's active contracts. */
-export interface ActiveSummary {
+interface ActiveSummary {
   /** Number of active contracts. */
   count: number;
   /** Hours left on the soonest deadline (same conversion as the card's time-left, floored at 0). */
