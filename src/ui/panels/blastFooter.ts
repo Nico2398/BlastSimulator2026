@@ -17,6 +17,7 @@ import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDispl
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { chargeDeliveryArrivalByHole } from '../../core/mining/ExplosiveStock.js';
 import { formatGameClock } from '../formatGameClock.js';
+import { permitPreview, type PermitPreview } from './permitPreview.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
 export class BlastFooter {
@@ -27,6 +28,7 @@ export class BlastFooter {
   private readonly fireBtn: HTMLButtonElement;
   private readonly reasonEl: HTMLElement;
   private readonly hintEl: HTMLElement;
+  private readonly permitEl: HTMLElement;
   private onFireRequested?: () => void;
   private gridProvider: () => VoxelGrid | null = () => null;
   private readonly estimateMemo = new OreEstimateMemo();
@@ -82,7 +84,9 @@ export class BlastFooter {
 
     this.hintEl = el('div', { attrs: { style: 'display:none;font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } });
 
-    this.el.append(row, this.hintEl, this.fireBtn, this.reasonEl);
+    this.permitEl = el('div', { attrs: { 'data-role': 'permit-usage', style: 'display:none;flex-direction:column;gap:4px' } });
+
+    this.el.append(row, this.hintEl, this.permitEl, this.fireBtn, this.reasonEl);
     container.appendChild(this.el);
   }
 
@@ -121,7 +125,8 @@ export class BlastFooter {
           : t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
         : null;
 
-    const signature = JSON.stringify({ planCost, estValue, coverage, margin, fireOk, reason });
+    const permit = permitPreview(state.grade, plan, state.tickCount);
+    const signature = JSON.stringify({ planCost, estValue, coverage, margin, fireOk, reason, permit });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
@@ -140,6 +145,8 @@ export class BlastFooter {
       this.hintEl.style.display = 'none';
     }
 
+    this.renderPermit(permit);
+
     this.fireBtn.disabled = !fireOk;
     this.fireBtn.style.cursor = fireOk ? 'pointer' : 'not-allowed';
 
@@ -151,6 +158,26 @@ export class BlastFooter {
       );
     } else {
       this.reasonEl.style.display = 'none';
+    }
+  }
+
+  /** Usage row of the permit; absent on sites without a grade. FIRE is never gated by it. */
+  private renderPermit(permit: PermitPreview | null): void {
+    this.permitEl.style.display = permit ? 'flex' : 'none';
+    if (!permit) { this.permitEl.replaceChildren(); delete this.permitEl.dataset['over']; return; }
+    if (permit.over) this.permitEl.dataset['over'] = 'true'; else delete this.permitEl.dataset['over'];
+    const value = (role: string, text: string, over: boolean): HTMLElement => el('span', {
+      text,
+      attrs: { 'data-role': role, style: `font:600 11px/1 var(--bsx-font-mono);color:${over ? 'var(--bsx-amber)' : 'var(--bsx-text-secondary)'}` },
+    });
+    const usage = el('div', { attrs: { style: 'display:flex;gap:14px' } });
+    usage.append(value('permit-kg', permit.kgText, permit.kgOver), value('permit-holes', permit.holesText, permit.holesOver));
+    this.permitEl.replaceChildren(usage);
+    if (permit.over) {
+      this.permitEl.append(el('span', {
+        text: permit.warningText,
+        attrs: { 'data-role': 'permit-warning', style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)' },
+      }));
     }
   }
 

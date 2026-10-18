@@ -9,7 +9,7 @@
 import type { NavGrid, NavCell } from './NavGrid.js';
 import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
-import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isDiagonalCornerClear } from './Pathfinding.js';
 import type { Rect } from '../world/WorldGen.js';
 
@@ -263,6 +263,7 @@ export function computeClimbReachableSet(
   anchorX: number,
   anchorZ: number,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): ReachableSet {
   // Clamped, unlike computeReachableSet's raw anchor: callers pass a live
   // agent position, and an agent standing on the site's outer border rounds
@@ -270,7 +271,7 @@ export function computeClimbReachableSet(
   // "anchor not traversable" and returns the empty set — which, for the one
   // caller this exists for, silently filters out every candidate action and
   // leaves the agent idle for the rest of the game.
-  return reachableSetFrom(navGrid, navGrid.clampX(anchorX), navGrid.clampZ(anchorZ), true, requiredClearance);
+  return reachableSetFrom(navGrid, navGrid.clampX(anchorX), navGrid.clampZ(anchorZ), true, requiredClearance, maxSlopeRatio);
 }
 
 function reachableSetFrom(
@@ -279,11 +280,12 @@ function reachableSetFrom(
   anchorZ: number,
   climbAware: boolean,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): ReachableSet {
   const ax = Math.round(anchorX);
   const az = Math.round(anchorZ);
   if (!navGrid.cellAt(ax, az)) return EMPTY_REACHABLE_SET;
-  return snapshotFill(navGrid, [{ x: ax, z: az }], climbAware, requiredClearance);
+  return snapshotFill(navGrid, [{ x: ax, z: az }], climbAware, requiredClearance, undefined, maxSlopeRatio);
 }
 
 function snapshotFill(
@@ -292,8 +294,9 @@ function snapshotFill(
   climbAware: boolean,
   requiredClearance: number,
   overrides?: FillOverrides,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): ReachableSet {
-  const { width, height, count } = floodFillFromSources(navGrid, sources, climbAware, false, requiredClearance, overrides);
+  const { width, height, count } = floodFillFromSources(navGrid, sources, climbAware, false, requiredClearance, overrides, maxSlopeRatio);
   const { originX, originZ } = navGrid;
   // Independent snapshot: floodFillReachable's next call reuses the shared
   // scratch buffer, so a wrapper aliasing it directly would go stale (or
@@ -597,11 +600,12 @@ function isLegalStep(
   to: NavCell,
   climbAware: boolean,
   requiredClearance: number,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): boolean {
   const dx = nx - x;
   const dz = nz - z;
   if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(navGrid, x, z, nx, nz)) return false;
-  if (climbAware && !isStepClimbable(from?.surfaceY, to.surfaceY, Math.hypot(dx, dz))) return false;
+  if (climbAware && !isStepClimbable(from?.surfaceY, to.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) return false;
   return hasClearance(to, requiredClearance);
 }
 
@@ -647,6 +651,7 @@ function floodFillFromSources(
   avoidOccupancy: boolean,
   requiredClearance: number,
   overrides?: FillOverrides,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): { width: number; height: number; count: number } {
   const width = navGrid.width;
   const height = navGrid.height;
@@ -682,7 +687,7 @@ function floodFillFromSources(
       if (overrides && inRect(overrides.block, nx, nz)) continue;
       if (neighbourCell.type === 'blocked' && !(overrides && inRect(overrides.free, nx, nz))) continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
-      if (!isLegalStep(navGrid, x, z, cell, nx, nz, neighbourCell, climbAware, requiredClearance)) continue;
+      if (!isLegalStep(navGrid, x, z, cell, nx, nz, neighbourCell, climbAware, requiredClearance, maxSlopeRatio)) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }
@@ -720,13 +725,14 @@ export function computeClimbReachableSetFromSources(
   sources: ReadonlyArray<{ x: number; z: number }>,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
   overrides?: FillOverrides,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): ReachableSet {
   if (sources.length === 0) return EMPTY_REACHABLE_SET;
   const cells = sources.map(s => ({
     x: reachSourceCellX(navGrid, s.x),
     z: reachSourceCellZ(navGrid, s.z),
   }));
-  return snapshotFill(navGrid, cells, true, requiredClearance, overrides);
+  return snapshotFill(navGrid, cells, true, requiredClearance, overrides, maxSlopeRatio);
 }
 
 /** Climb-aware connected components of a nav grid for one clearance. */
@@ -757,6 +763,7 @@ export interface ClimbComponents {
 export function computeClimbComponents(
   navGrid: NavGrid,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): ClimbComponents {
   const { width, height, originX, originZ } = navGrid;
   const label = new Int32Array(width * height);
@@ -786,7 +793,7 @@ export function computeClimbComponents(
         const nIdx = (nz - originZ) * width + (nx - originX);
         if (label[nIdx] !== 0) continue;
         const to = navGrid.cellAt(nx, nz);
-        if (!isGood(to) || !isLegalStep(navGrid, x, z, cell, nx, nz, to, true, requiredClearance)) continue;
+        if (!isGood(to) || !isLegalStep(navGrid, x, z, cell, nx, nz, to, true, requiredClearance, maxSlopeRatio)) continue;
         label[nIdx] = next;
         stack[top++] = nIdx;
       }
@@ -818,7 +825,7 @@ export function computeClimbComponents(
       const neighbour = labelAt(nx, nz);
       if (neighbour === 0) continue;
       const to = navGrid.cellAt(nx, nz);
-      if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, from, nx, nz, to, true, requiredClearance)) visit(neighbour);
+      if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, from, nx, nz, to, true, requiredClearance, maxSlopeRatio)) visit(neighbour);
     }
     return { x: fromX, z: fromZ };
   };

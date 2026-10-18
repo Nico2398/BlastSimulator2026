@@ -784,6 +784,43 @@ describe('isStepClimbable — slope-based traversability (#1151)', () => {
   });
 });
 
+describe('isStepClimbable — explicit per-agent limit (#1938)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+
+  it('an 18 degree limit refuses a 30 degree step the default accepts', () => {
+    expect(isStepClimbable(10, 10 + tanDeg(30), 1)).toBe(true);
+    expect(isStepClimbable(10, 10 + tanDeg(30), 1, tanDeg(18))).toBe(false);
+  });
+
+  it('an 18 degree limit accepts a 15 degree step', () => {
+    expect(isStepClimbable(10, 10 + tanDeg(15), 1, tanDeg(18))).toBe(true);
+  });
+
+  it('boundary: the exact limit is climbable, a hair over is not', () => {
+    expect(isStepClimbable(10, 10 + tanDeg(24), 1, tanDeg(24))).toBe(true);
+    expect(isStepClimbable(10, 10 + tanDeg(24) + 0.01, 1, tanDeg(24))).toBe(false);
+  });
+
+  it('the limit scales with the run, diagonals included', () => {
+    expect(isStepClimbable(10, 10 + tanDeg(18) * Math.SQRT2, Math.SQRT2, tanDeg(18))).toBe(true);
+    expect(isStepClimbable(10, 10 + tanDeg(18) * Math.SQRT2 + 0.01, Math.SQRT2, tanDeg(18))).toBe(false);
+  });
+
+  it('gates a drop like a rise', () => {
+    expect(isStepClimbable(10 + tanDeg(30), 10, 1, tanDeg(18))).toBe(false);
+    expect(isStepClimbable(10 + tanDeg(15), 10, 1, tanDeg(18))).toBe(true);
+  });
+
+  it('an undefined side stays unconstrained whatever the limit', () => {
+    expect(isStepClimbable(undefined, 99, 1, tanDeg(18))).toBe(true);
+  });
+
+  it('a limit of 0 only admits a flat step', () => {
+    expect(isStepClimbable(5, 5, 1, 0)).toBe(true);
+    expect(isStepClimbable(5, 5.01, 1, 0)).toBe(false);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Group 2c: buildNavGrid — ramp detection after a real Ramp.buildRamp() carve on
 // realistic (elevated) terrain. Regression coverage for issue #407: buildRamp

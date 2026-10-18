@@ -3453,6 +3453,7 @@
   "notification.order_blocked_no_reaching_vehicle": "{order} needs a tier-{tier} {role} and a driver licensed for it.",
   "notification.order_blocked_licence_level": "{order} needs {licence} licence level {level}.",
   "notification.order_blocked_target_unreachable": "{order} can't reach its target — no route connects it to the rest of the site.",
+  "order.blocked.ramp_too_steep": "Ramp #{id} is {grade}°: too steep for a tier-{tier} {role} (max {max}°).",
   "notification.order_blocked_in_transit": "{order}: explosives are on their way, arriving {when} (in {duration}).",
   "notification.order_blocked_in_transit_no_eta": "{order}: explosives are on their way, arriving {when}.",
   "notification.order_blocked_no_warehouse": "{order} needs a Freight Warehouse — build one to store hauled rock.",
@@ -3557,6 +3558,10 @@
   "inspector.ramp.widen_short_funds": "Not enough cash: widening costs ${cost}",
   "shell.selection.ramp_title": "Ramp ({width}m wide)",
   "shell.selection.ramp_sub": "#{id} · {length}m long · {width}m wide",
+  "shell.selection.ramp_grade": "{grade}° grade",
+  "shell.selection.ramp_tiers": "Climbed by tier {tiers} vehicles",
+  "shell.selection.ramp_tiers_all": "Climbed by every vehicle tier",
+  "shell.selection.ramp_tiers_none": "Too steep for any vehicle",
   "role.driller": "Driller",
   "role.blaster": "Blaster",
   "role.driver": "Driver",
@@ -4304,5 +4309,12 @@
   "inspector.vehicle.work_rate": "Work rate",
   "inspector.vehicle.cost": "Running cost",
   "inspector.vehicle.maintenance": "Maintenance",
-  "inspector.vehicle.fuel": "Fuel"
+  "inspector.vehicle.fuel": "Fuel",
+  "permit.preview.kg": "{used} / {limit} kg",
+  "permit.preview.holes": "{used} / {limit} holes",
+  "permit.preview.fee": "Notification fee: ${fee}",
+  "permit.preview.warning": "Over your permit. Maybe the inspector is at lunch.",
+  "permit.preview.grid_warning": "{holes} holes is more than your permit allows ({limit}). The Ministry counts holes too.",
+  "ui.blast_workshop.fire.check_permit_ok": "Within permit: {kg}, {holes}",
+  "ui.blast_workshop.fire.check_permit_over": "Within permit: {kg}, {holes}. Not quite. Firing is still allowed; the Ministry is merely watching."
 }
