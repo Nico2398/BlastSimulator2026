@@ -16,7 +16,7 @@ import {
 } from '../config/balance.js';
 
 
-interface PreFireCheck {
+export interface PreFireCheck {
   limits: PermitLimitConfig;
   planKg: number;
   planHoles: number;
