@@ -6,11 +6,11 @@
 // held to the same honesty rule: no layoff, scrap, demolish or sell hack.
 
 import type { GameState } from '../../src/core/state/GameState.js';
+import { playTick, playContracts, clearBlastZone, stockWarehouse, type Run } from '../../scripts/shared/player-actions.js';
+
+export { playTick, playContracts, clearBlastZone, stockWarehouse, type Run };
 
 const DELIVERY_WAIT_FLOAT = 1_000_000;
-
-/** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
-export type Run = (cmd: string) => { success: boolean; output: string };
 
 /** Commands a player-honest playthrough must never issue (budget-balancing hacks). */
 export const FORBIDDEN_COMMAND = /^(employee fire|vehicle scrap|build destroy|vehicle sell)\b/;
@@ -23,81 +23,13 @@ export function fundForDeliveryWait(state: Pick<GameState, 'cash'>): void {
   state.cash = Math.max(state.cash, DELIVERY_WAIT_FLOAT);
 }
 
-/** One ordinary player tick: resolve a pending event, then let time pass. */
-export function playTick(run: Run, state: GameState): void {
-  if (state.events.pendingEvent) run('event choose 0');
-  run('tick 1');
-}
-
 /** Advance ticks until `done()` reads true or `maxTicks` pass. */
 export function tickUntil(run: Run, state: GameState, maxTicks: number, done: () => boolean): void {
   for (let i = 0; i < maxTicks && !done(); i++) playTick(run, state);
 }
 
-/**
- * Ordinary contract play, the same actions the Contracts panel offers:
- * deliver stock against accepted ore_sale/rubble_disposal contracts, and
- * accept an offer only when current stock covers it in full (an
- * unfulfilled contract costs a penalty). ore_sale is preferred.
- */
-export function playContracts(run: Run, state: GameState): void {
-  const stockOf = (materialId: string) => (
-    materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
-  );
-  for (const active of [...state.contracts.active]) {
-    if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
-    const amount = Math.min(active.quantityKg - active.deliveredKg, stockOf(active.materialId));
-    if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
-  }
-  for (let guard = 0; guard < 8; guard++) {
-    const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
-    const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
-      ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
-    if (!offer) return;
-    if (!run(`contract accept ${offer.id}`).success) return;
-    const active = state.contracts.active.find((c) => c.id === offer.id);
-    if (!active) return;
-    const amount = Math.min(active.quantityKg, stockOf(active.materialId));
-    if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
-  }
-}
-
 /** Every command verb a first-blast playthrough may use: what a player can do with controls enabled. */
 export const PLAYER_BLAST_VERB = /^(campaign start|time resume|tick|drill_plan|charge|sequence|blast|zone clear|zone status|contract accept|contract deliver|event choose)\b/;
-
-/** Tiles a careful player clears around a charged pattern before firing. */
-const BLAST_ZONE_CLEAR_MARGIN = 16;
-
-/** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
-export function clearBlastZone(run: Run, state: GameState): void {
-  const xs = state.drillHoles.map((h) => h.x);
-  const zs = state.drillHoles.map((h) => h.z);
-  if (xs.length === 0) return;
-  const m = BLAST_ZONE_CLEAR_MARGIN;
-  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
-  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
-  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
-}
-
-/**
- * Stock `kg` of `explosiveId` in an explosive warehouse before ordering a pattern, as a competent player does:
- * a stock-covered order skips the cash-bought delivery wait (#1895), which would idle the crew on payroll.
- * Builds a warehouse on the first free cell when the site has none (the kits carry none) and waits for the
- * crew to raise it, then buys. Returns the buy command's result so a caller can assert it.
- */
-export function stockWarehouse(run: Run, state: GameState, explosiveId: string, kg: number): { success: boolean; output: string } {
-  if (!state.buildings.buildings.some((b) => b.type === 'explosive_warehouse')) {
-    const grid = state.navGrid!;
-    let ordered = false;
-    for (let z = 1; z < grid.height - 6 && !ordered; z += 2) {
-      for (let x = 1; x < grid.width - 6 && !ordered; x += 2) {
-        ordered = run(`build explosive_warehouse at:${x},${z} tier:1`).success;
-      }
-    }
-    for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state);
-  }
-  return run(`buy explosive:${explosiveId} kg:${kg}`);
-}
 
 /**
  * Land every outstanding charge order's explosives now, as if the order had been stock-covered (#1895).

@@ -54,6 +54,8 @@ npm run sounds:check      # audio: every asset decodes in headless Chromium, off
 npm run audio:smoke       # audio: wiring in a real engine, intended cues of a scripted game (needs a browser)
 ```
 
+Progression probe (`npm run probe:progression`, #1922): plays the `opening` and `reinvest` strategies headlessly through console commands and prints a markdown economy table (cash curve, low point, first-blast sold share, blasts, storage waits, grades, affordability). `-- --quick` is one site to 3000 ticks; flags `--seed --biome --kit --strategy --horizon --json <path>`. Not a verification channel and not in `validate`. The full 24-run matrix outlives one foreground call: `npm run long -- start probe -- npm run probe:progression -- --json out.json`, then `npm run long -- wait probe` with explicit timeout 600000 until it prints FINISHED.
+
 The two audio commands prove assets, levels and wiring, never how anything sounds; what each does and does not prove: `dev-audio`. They are not among the four channels and run on request, not in `npm run validate`.
 
 `npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.

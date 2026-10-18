@@ -27,6 +27,7 @@
     "qualimetry:diff": "tsx scripts/qualimetry-diff.ts",
     "scenario": "tsx scripts/scenario-test.ts",
     "scenarios": "tsx scripts/run-all-scenarios.ts",
+    "probe:progression": "tsx scripts/progression-probe.ts",
     "scenarios:interaction": "tsx scripts/run-all-scenarios.ts --mode interaction",
     "screenshot": "tsx scripts/screenshot.ts",
     "a11y": "tsx scripts/a11y-check.ts",
