@@ -37,7 +37,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   panel = new PermitPanel(container);
   gameConsole = vi.fn().mockReturnValue({ success: true, output: '' });
-  panel.setGameConsole(gameConsole);
+  panel.setGameConsole(gameConsole as never);
   panel.show();
 });
 

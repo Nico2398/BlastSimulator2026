@@ -882,8 +882,7 @@
             "grade": 0,
             "pendingTicksLeft": 48
           }
-        },
-        "blocked": "#bs-permit-panel [data-action=\"permit-apply\"]"
+        }
       }
     },
     {

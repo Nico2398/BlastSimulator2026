@@ -182,11 +182,11 @@ export class TopBar {
     this.gradeWrap = document.createElement('button');
     this.gradeWrap.dataset['action'] = 'open-permits';
     this.gradeWrap.dataset['panel'] = 'permits';
-    this.gradeWrap.style.cssText = 'display:none;flex:0 0 auto;align-items:center;gap:8px;padding:0 16px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;cursor:pointer;font:inherit;text-align:left';
+    this.gradeWrap.style.cssText = 'display:none;flex:0 1 auto;min-width:0;align-items:center;gap:8px;padding:0 12px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;cursor:pointer;font:inherit;text-align:left';
     this.gradeWrap.addEventListener('click', () => this.onNavigate?.('permits'));
     this.locale.bindTitle(this.gradeWrap, 'shell.topbar.grade_tip');
     this.gradeText = el('span', { className: 'bsx-mono' });
-    this.gradeText.style.cssText = 'font-size:11px;white-space:nowrap';
+    this.gradeText.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px';
     this.gradeWrap.append(iconEl('contract', 14), this.gradeText);
 
     // ── Day / clock ──

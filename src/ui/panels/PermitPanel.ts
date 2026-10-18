@@ -17,7 +17,7 @@ import type { GameConsoleFn } from '../gameConsole.js';
 
 const MICRO_STYLE = 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)';
 const LABEL_STYLE = 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)';
-const STAMP_STYLE = 'margin-left:auto;transform:rotate(-8deg);padding:4px 9px;border:2px solid var(--bsx-critical-text);border-radius:4px;'
+const STAMP_STYLE = 'margin:0 auto;transform:rotate(-4deg);white-space:nowrap;padding:4px 9px;border:2px solid var(--bsx-critical-text);border-radius:4px;'
   + 'color:var(--bsx-critical-text);font:800 11px/1 var(--bsx-font-ui);letter-spacing:.2em;opacity:.85';
 
 export class PermitPanel extends PanelBase {
@@ -99,7 +99,7 @@ export class PermitPanel extends PanelBase {
 
     const currentCard = card([
       el('span', { text: t('ui.permit.current_label'), attrs: { style: LABEL_STYLE } }),
-      el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [
+      el('div', { attrs: { style: 'display:flex;align-items:center;justify-content:center;padding:10px 0 6px' }, children: [
         el('span', {
           text: `${t('ui.permit.stamp')} - ${t(current.nameKey, current.nameParams)}`,
           attrs: { 'data-role': 'permit-stamp', style: STAMP_STYLE },
