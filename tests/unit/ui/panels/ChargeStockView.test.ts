@@ -44,14 +44,6 @@ describe('buildStockView delivery fields (#1895)', () => {
     expect(view.deliveryTicks).toBe(EXPLOSIVE_DELIVERY_TICKS);
   });
 
-  it('reports hasWarehouse', () => {
-    const none = buildStockView(makeState(), ['boomite'], 'boomite', 10, 1, 5);
-    expect(none.hasWarehouse).toBe(false);
-    const state = makeState();
-    withWarehouse(state, 10);
-    expect(buildStockView(state, ['boomite'], 'boomite', 10, 1, 5).hasWarehouse).toBe(true);
-  });
-
   it('inTransitUntilTick is null with no order in transit', () => {
     expect(buildStockView(makeState(), ['boomite'], 'boomite', 10, 1, 5).inTransitUntilTick).toBeNull();
   });

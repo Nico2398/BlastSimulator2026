@@ -31,6 +31,7 @@ import {
   type MiningContext,
 } from '../../src/console/commands/mining.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { driveChargePlanToCompletion } from './full-level/helpers.js';
 
 // ── Helpers (mirror tests/unit/console/navgrid-patching.test.ts) ───────────
 
@@ -51,17 +52,6 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
-    tickCommand(ctx, ['1'], {});
-  }
-}
-
-function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 200): void {
-  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
-    for (const emp of ctx.state!.employees.employees) {
-      emp.fatigue = 100;
-    }
-    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     tickCommand(ctx, ['1'], {});
   }
 }
@@ -117,7 +107,7 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '12' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
-    driveChargePlanToCompletion(ctx);
+    driveChargePlanToCompletion(ctx, EXPLOSIVE_DELIVERY_TICKS + 200);
 
     const callsBeforeBlast = spy.mock.calls.length;
 

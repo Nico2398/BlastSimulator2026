@@ -43,6 +43,7 @@ import {
   hireDriver,
 } from '../helpers/blastFixtures.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 /**
  * Crews a rock_fragmenter and a debris_hauler (mirrors economy-full-loop.json's
@@ -467,7 +468,7 @@ function blastSandboxPattern(biome: string, startX: number, startZ: number): San
   const state = ctx.state!;
   const grid = ctx.grid!;
   const refresh = (): void => {
-    state.cash = Math.max(state.cash, 1_000_000);
+    fundForDeliveryWait(state);
     for (const e of state.employees.employees) e.fatigue = 100;
   };
   const tickWhile = (until: () => boolean, max: number): void => {
@@ -563,13 +564,13 @@ function blastRampScenario(rampFirst: boolean): RampShot {
     for (let i = 0; i < max && !until(); i++) {
       // Money, rest and ecology are not what this probes: wages must not freeze the mine, a crew asleep never clears the rubble,
       // and a long dig under a blast's rubble must not end in an ecological shutdown that stops every tick.
-      state.cash = Math.max(state.cash, 1_000_000);
+      fundForDeliveryWait(state);
       state.scores.ecology = Math.max(state.scores.ecology, 50);
       for (const e of state.employees.employees) e.fatigue = 100;
       run('tick 1');
     }
   };
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
 
   expect(run('build living_quarters at:12,44')).toMatchObject({ success: true });
   expect(run('set_policy mode:shift_8h fatigue:75')).toMatchObject({ success: true });
@@ -674,7 +675,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
-      state.cash = Math.max(state.cash, 1_000_000);
+      fundForDeliveryWait(state);
       state.scores.ecology = Math.max(state.scores.ecology, 50);
       for (const e of state.employees.employees) e.fatigue = 100;
       run('tick 1');
@@ -801,13 +802,13 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   const state = ctx.state!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
-      state.cash = Math.max(state.cash, 1_000_000);
+      fundForDeliveryWait(state);
       state.scores.ecology = Math.max(state.scores.ecology, 50);
       for (const e of state.employees.employees) e.fatigue = 100;
       run('tick 1');
     }
   };
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
 
   expect(run('build living_quarters at:30,48')).toMatchObject({ success: true });
   expect(run('set_policy mode:shift_8h fatigue:75')).toMatchObject({ success: true });

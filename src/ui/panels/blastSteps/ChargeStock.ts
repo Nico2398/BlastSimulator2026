@@ -8,10 +8,9 @@ import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { stockAwareChargesCost } from '../../../core/mining/ChargePlan.js';
 import {
-  buyStockBlockReason, bulkPricePerKg, explosivePriceFactor, orderDeliveryTicks, type BuyStockFailure,
+  buyStockBlockReason, bulkPricePerKg, explosivePriceFactor, orderDeliveryTicks, earliestChargeDeliveryTick, type BuyStockFailure,
 } from '../../../core/mining/ExplosiveStock.js';
-import { earliestChargeDeliveryTick } from '../../../core/mining/ChargeOrder.js';
-import { getExplosivesCapacity, getExplosivesFreeCapacity, getExplosivesStockByType } from '../../../core/entities/Building.js';
+import { getExplosivesFreeCapacity, getExplosivesStockByType } from '../../../core/entities/Building.js';
 import { STOCK_BUY_STEP_KG } from '../../../core/config/balance.js';
 import type { GameState } from '../../../core/state/GameState.js';
 
@@ -32,7 +31,6 @@ interface StockView {
   uncoveredKg: number;
   /** Delivery wait in ticks for the cash-bought part (#1895). */
   deliveryTicks: number;
-  hasWarehouse: boolean;
   /** Tick an in-transit delivery arrives, or null (#1895). */
   inTransitUntilTick: number | null;
   /** Current tick while a delivery is in transit (0 otherwise), so the countdown repaints (#1895). */
@@ -62,7 +60,6 @@ export function buildStockView(
     paidCash: split.cashCost,
     uncoveredKg,
     deliveryTicks: orderDeliveryTicks(uncoveredKg),
-    hasWarehouse: getExplosivesCapacity(state.buildings) > 0,
     inTransitUntilTick,
     // Only while a delivery is in transit: the remaining ticks repaint per tick, otherwise the view stays still.
     nowTick: inTransitUntilTick === null ? 0 : state.tickCount,

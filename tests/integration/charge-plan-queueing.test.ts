@@ -25,10 +25,11 @@ import { t } from '../../src/core/i18n/I18n.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { readFileSync } from 'node:fs';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 /** tickUntil with the payroll covered: the explosives delivery wait (#1895) idles the crew for hundreds of ticks. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
-  tickUntil(run, () => { state.cash = Math.max(state.cash, 1_000_000); return predicate(); }, maxTicks);
+  tickUntil(run, () => { fundForDeliveryWait(state); return predicate(); }, maxTicks);
 }
 
 /** Drills a grid and waits for every hole to land in state.drillHoles. */

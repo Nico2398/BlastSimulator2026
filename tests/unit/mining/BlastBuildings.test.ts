@@ -47,6 +47,7 @@ import {
   recordBuildingDestruction,
 } from '../../../src/core/scores/ScoreManager.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -523,7 +524,7 @@ function makeBlastContextWithWarehouse(kg: number) {
   chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
   for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 200 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
     for (const e of state.employees.employees) e.fatigue = 100;
-    state.cash = Math.max(state.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+    fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
     tickCommand(ctx, ['1'], {});
   }
   const hole = state.drillHoles[0]!;

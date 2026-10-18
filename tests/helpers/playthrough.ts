@@ -7,11 +7,21 @@
 
 import type { GameState } from '../../src/core/state/GameState.js';
 
+const DELIVERY_WAIT_FLOAT = 1_000_000;
+
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
 
 /** Commands a player-honest playthrough must never issue (budget-balancing hacks). */
 export const FORBIDDEN_COMMAND = /^(employee fire|vehicle scrap|build destroy|vehicle sell)\b/;
+
+/**
+ * Top cash up so payroll cannot bankrupt a test while the crew idles through the explosive
+ * delivery wait (#1895); funding is not the subject of those tests.
+ */
+export function fundForDeliveryWait(state: Pick<GameState, 'cash'>): void {
+  state.cash = Math.max(state.cash, DELIVERY_WAIT_FLOAT);
+}
 
 /** One ordinary player tick: resolve a pending event, then let time pass. */
 export function playTick(run: Run, state: GameState): void {

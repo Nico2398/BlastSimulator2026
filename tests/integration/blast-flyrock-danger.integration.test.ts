@@ -22,6 +22,7 @@ import { BLAST_DANGER_MARGIN_M, STARTING_SITE_STAFFED_COMPOSITION, EXPLOSIVE_DEL
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { addFreightWarehouseToState } from '../helpers/freightWarehouse.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 function makeCtx(): MiningContext {
   // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
@@ -58,7 +59,7 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
     }
     // The crew rests at the shift length between jobs (#1673), so a long drive
     // pays wages for longer than the starting cash covers; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
   const driller = ctx.state!.employees.employees.find(e => e.id === 1);
@@ -98,7 +99,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DE
     }
     // The crew rests at the shift length between jobs (#1673), so a long drive
     // pays wages for longer than the starting cash covers; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
   // Weather ticks with the game (#1403); rain fizzles boomite. These tests are
@@ -120,7 +121,7 @@ function blastAt(ctx: MiningContext, stemming: string): string {
   driveDrillPlanToCompletion(ctx);
   // Charging bills explosives at order time (#1341); these tests are about
   // flyrock, not budget, so fund the order explicitly.
-  ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+  fundForDeliveryWait(ctx.state!);
   const ordered = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
   expect(ordered.success, ordered.output).toBe(true);
   driveChargePlanToCompletion(ctx);
@@ -283,7 +284,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const farVehicle = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', safeX, safeZ + 1).vehicle;
 
     // Truck-worked charging spans many payroll ticks (#1649); fund it like blastAt does.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     driveChargePlanToCompletion(ctx);
     const result = blastCommand(ctx, [], {});

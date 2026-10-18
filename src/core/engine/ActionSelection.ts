@@ -21,7 +21,7 @@ import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehic
 import { createFragmentLookup, haulActionCarriesOre, haulActionIsLoaded, haulActionOreDensities, isAutoDebrisAction, type FragmentLookup } from '../economy/HaulDispatch.js';
 import { fragmentHaulUrgency, oreHaulUrgency } from '../economy/OreDemand.js';
 import { thinDebrisCandidates } from './DebrisCandidateBins.js';
-import { isChargeDeliveryPending } from '../mining/ChargeOrder.js';
+import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { employeeClimbReach } from './OrderReachability.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 // #1090: planItinerary (PlanItinerary.ts) itself imports computeActionWorkTicks

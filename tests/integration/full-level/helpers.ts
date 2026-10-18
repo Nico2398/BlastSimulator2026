@@ -12,6 +12,7 @@ import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { VEHICLE_BASE_STATS, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 /**
  * Create a fresh GameContext with a new game of the default mine preset.
@@ -105,7 +106,7 @@ function runTickLoop(
     }
     if (topUpCash) {
       // The explosive delivery wait (#1895) idles the crew on payroll; funding is not the point here.
-      ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+      fundForDeliveryWait(ctx.state!);
     }
     tickCommand(ctx, ['1'], {});
     if (ctx.state!.events.pendingEvent) {

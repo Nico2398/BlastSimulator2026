@@ -9,8 +9,9 @@ import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   dispatchChargeAction, cancelOutstandingChargeAction,
   chargeFundsFailureAmount, isHoleChargeCovered, autoChargeHole, settleAwaitingFundsCharges,
-  chargePatternHoles, outstandingChargeBlockedReason, earliestChargeDeliveryTick,
+  chargePatternHoles, outstandingChargeBlockedReason,
 } from '../../../src/core/mining/ChargeOrder.js';
+import { earliestChargeDeliveryTick } from '../../../src/core/mining/ExplosiveStock.js';
 
 const BOOMITE_5KG = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
 const COST_5KG = 60; // boomite $12/kg x 5 kg

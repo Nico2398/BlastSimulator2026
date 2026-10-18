@@ -11,7 +11,7 @@ import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { createGameEngine } from '../../scripts/shared/command-runner.js';
 import { runCommand, createRunner } from '../../src/console/createRunner.js';
-import { playContracts, playTick, clearBlastZone, type Run } from '../helpers/playthrough.js';
+import { playContracts, playTick, clearBlastZone, type Run, fundForDeliveryWait } from '../helpers/playthrough.js';
 
 import {
   tickNeedGauges,
@@ -1796,7 +1796,7 @@ describe('#1801 — the debris-hauler driver on long hauls recovers morale under
     expect(run('build living_quarters at:30,48 tier:1').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32').success).toBe(true);
     until(800, () => state.plannedDrillHoles.length === 0);
-    state.cash = Math.max(state.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
+    fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
     run('charge hole:* explosive:krackle amount:8 stemming:2');
     until(EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state.plannedChargesByHole).length === 0);
     // The delivery wait (#1895) now outlasts the harsh control's patience: it revolts before the shot is loaded.

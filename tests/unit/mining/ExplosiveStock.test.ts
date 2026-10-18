@@ -8,7 +8,7 @@ import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { EXPLOSIVE_BULK_PRICE_FACTOR, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import {
   bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor, buyStockBlockReason,
-  orderDeliveryTicks, readOrderDeliveryTick,
+  orderDeliveryTicks, readOrderDeliveryTick, isChargeDeliveryPending,
 } from '../../../src/core/mining/ExplosiveStock.js';
 
 function makeState(cash = 100_000, warehouses = 1, tier: 1 | 2 | 3 = 1): GameState {
@@ -314,5 +314,19 @@ describe('readOrderDeliveryTick (#1895)', () => {
 
   it('is undefined for a non-numeric payload value', () => {
     expect(readOrderDeliveryTick({ payload: { deliveryArrivalTick: 'soon' } })).toBeUndefined();
+  });
+});
+
+describe('isChargeDeliveryPending (#1895)', () => {
+  const charge = { type: 'charge_hole', payload: { deliveryArrivalTick: 450 } } as const;
+
+  it('is true before the arrival tick, false from it on', () => {
+    expect(isChargeDeliveryPending(charge, 449)).toBe(true);
+    expect(isChargeDeliveryPending(charge, 450)).toBe(false);
+  });
+
+  it('is false without an arrival tick or for other action types', () => {
+    expect(isChargeDeliveryPending({ type: 'charge_hole', payload: {} }, 0)).toBe(false);
+    expect(isChargeDeliveryPending({ type: 'drill_hole', payload: { deliveryArrivalTick: 450 } }, 0)).toBe(false);
   });
 });

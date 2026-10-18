@@ -34,6 +34,7 @@ import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
@@ -85,7 +86,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DE
       emp.fatigue = 100;
     }
     // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
 }

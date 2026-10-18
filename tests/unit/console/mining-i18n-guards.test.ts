@@ -19,6 +19,7 @@ import { makeGameContext } from '../../helpers/gameContext.js';
 import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 // #795: mining.ts's own static, non-per-item strings (its local requireGame,
 // formatBlastPlanErrors' two headers, every "Usage:" string, the three "==="
@@ -54,7 +55,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DE
       emp.fatigue = 100;
     }
     // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
 }

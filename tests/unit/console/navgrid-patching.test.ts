@@ -22,6 +22,7 @@ import { isOnBuildingRing } from '../../../src/core/nav/BuildingApproach.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DE
       emp.fatigue = 100;
     }
     // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
 }

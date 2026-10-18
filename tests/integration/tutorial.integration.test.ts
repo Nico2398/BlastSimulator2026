@@ -38,7 +38,7 @@ import {
   TUTORIAL_HIRING_SCRIPT,
   TUTORIAL_ORE_SALE_OFFER, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, deliverExplosivesNow, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, deliverExplosivesNow, type Run, fundForDeliveryWait } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
-      ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+      fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
@@ -261,7 +261,7 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
     }
     expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
-      ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+      fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
@@ -520,7 +520,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     let sawPartialCharge = false;
 
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
-      ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+      fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
@@ -601,7 +601,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     const chargeStep = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
     expect(run(chargeStep.commands![0]!).success).toBe(true);
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
-      state.cash = Math.max(state.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+      fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of state.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
@@ -704,7 +704,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     );
     expect(charge.success, charge.output).toBe(true);
     for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
-      state.cash = Math.max(state.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+      fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
       run('tick 1');
     }

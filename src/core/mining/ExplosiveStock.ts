@@ -120,3 +120,21 @@ export function readOrderDeliveryTick(action: Pick<PendingAction, 'payload'>): n
   const tick = action.payload['deliveryArrivalTick'];
   return typeof tick === 'number' ? tick : undefined;
 }
+
+/** True while a charge order's cash-bought explosives have not arrived yet (#1895). */
+export function isChargeDeliveryPending(action: Pick<PendingAction, 'type' | 'payload'>, tickCount: number): boolean {
+  if (action.type !== 'charge_hole') return false;
+  const arrival = readOrderDeliveryTick(action);
+  return arrival !== undefined && tickCount < arrival;
+}
+
+/** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */
+export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
+  let earliest: number | null = null;
+  for (const a of state.pendingActions) {
+    if (!isChargeDeliveryPending(a, state.tickCount)) continue;
+    const arrival = readOrderDeliveryTick(a) as number;
+    if (earliest === null || arrival < earliest) earliest = arrival;
+  }
+  return earliest;
+}

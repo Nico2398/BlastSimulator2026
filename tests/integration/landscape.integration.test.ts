@@ -10,6 +10,7 @@ import { LandscapeMesh, uniformNeighbourSteps, type PlayableCut } from '../../sr
 import { meshClaimsCell, haloSurfaceHeight, nodeTouchesMeshedCell } from '../../src/renderer/terrain/PlayableCoverage.js';
 import { measureSeam } from '../helpers/landscapeSeam.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 describe('Console — landscape_info / lazy landscape build (#458 T2.1)', () => {
   let engine: RunnerWithContext;
@@ -193,7 +194,7 @@ describe('Landscape/playable seam on a real level (#907)', () => {
     expect(run('drill_plan grid rows:2 cols:2 spacing:3 depth:8 start:2,2').success).toBe(true);
     for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
     expect(state.drillHoles.length, 'no hole was ever drilled').toBeGreaterThan(0);
-    state.cash = Math.max(state.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
+    fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     // Wait for every hole to finish loading, not just for the order queue to
     // empty: a claimed charge leaves the queue while it is still being loaded.

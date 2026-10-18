@@ -12,13 +12,14 @@ import { getDefSize, getBuildingDef } from '../../src/core/entities/Building.js'
 import { t, setLocale } from '../../src/core/i18n/I18n.js';
 import { equipDemolition } from '../helpers/demolition.js';
 import { warehouseStoredKg } from '../../src/core/economy/FreightWarehouses.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const SEED = 42;
 const MAX_RESEARCH_TICKS = 3000;
 const MAX_REBUILD_TICKS = 3000;
 
 function refresh(state: GameState): void {
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
   for (const e of state.employees.employees) e.fatigue = 100;
 }
 

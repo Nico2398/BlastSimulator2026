@@ -15,11 +15,12 @@ import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const RAMP_LANDING = { x: 32, z: 27 };
 
 function refresh(state: GameState): void {
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
   for (const e of state.employees.employees) e.fatigue = 100;
 }
 

@@ -14,6 +14,7 @@ import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
 import { FREIGHT_WAREHOUSE_CAPACITY_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const SEED = 42;
 // Ore on the desert seed 42 site sits in discrete deposits (#1682); (30,-4) is
@@ -32,7 +33,7 @@ const MIN_STORAGE_FILL_SHARE = 0.8;
 const OLD_STUCK_BASELINE_KG = 12_000;
 
 function refresh(state: GameState): void {
-  state.cash = Math.max(state.cash, 1_000_000);
+  fundForDeliveryWait(state);
   for (const e of state.employees.employees) e.fatigue = 100;
 }
 

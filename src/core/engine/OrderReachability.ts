@@ -29,7 +29,7 @@ import {
   type ClimbComponents,
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
-import { isChargeDeliveryPending } from '../mining/ChargeOrder.js';
+import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 

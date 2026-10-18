@@ -8,7 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, orderDeliveryTicks, readOrderDeliveryTick, type OrderStockDraw } from './ExplosiveStock.js';
+import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, orderDeliveryTicks, type OrderStockDraw } from './ExplosiveStock.js';
 import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
@@ -28,24 +28,6 @@ export interface ChargeHoleActionPayload {
   orderStock?: OrderStockDraw;
   /** Tick the cash-bought part of the order is delivered (#1895); absent when fully drawn from stock. */
   deliveryArrivalTick?: number;
-}
-
-/** Earliest delivery tick of a still-waiting charge order, or null when none is in transit (#1895). */
-export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingActions' | 'tickCount'>): number | null {
-  let earliest: number | null = null;
-  for (const a of state.pendingActions) {
-    if (a.type !== 'charge_hole') continue;
-    const arrival = readOrderDeliveryTick(a);
-    if (arrival !== undefined && arrival > state.tickCount && (earliest === null || arrival < earliest)) earliest = arrival;
-  }
-  return earliest;
-}
-
-/** True while a charge order's cash-bought explosives have not arrived yet (#1895). */
-export function isChargeDeliveryPending(action: Pick<PendingAction, 'type' | 'payload'>, tickCount: number): boolean {
-  if (action.type !== 'charge_hole') return false;
-  const arrival = readOrderDeliveryTick(action);
-  return arrival !== undefined && tickCount < arrival;
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */

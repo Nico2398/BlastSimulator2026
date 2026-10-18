@@ -29,7 +29,7 @@ import { isBarrenFragment } from '../../src/core/economy/SpoilHeaps.js';
 import { haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
+import { tickUntil, clearBlastZone, type Run, fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const cap = (tier: 1 | 2 | 3) => getBuildingDef('freight_warehouse', tier).capacity;
 
@@ -92,7 +92,7 @@ function fireReferenceShot(cols: number, chargeKg: number): Shot {
   const z = Math.round(rig.z) + 13;
   expect(run(`drill_plan grid rows:1 cols:${cols} spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
   tickUntil(run, state, 600, () => state.plannedDrillHoles.length === 0);
-  state.cash = Math.max(state.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
+  fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
   run(`charge hole:* explosive:boomite amount:${chargeKg} stemming:2`);
   tickUntil(run, state, EXPLOSIVE_DELIVERY_TICKS + 600, () => Object.keys(state.plannedChargesByHole).length === 0);
   run('sequence auto');

@@ -34,6 +34,7 @@ import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 // ── Harness: drives the real production sync entry point ───────────────────
 
@@ -135,7 +136,7 @@ function tickUntilGone(engine: RunnerWithContext, actionId: number, maxTicks = 5
   for (let i = 0; i < maxTicks; i++) {
     if (!engine.ctx.state!.pendingActions.some(a => a.id === actionId)) return true;
     for (const emp of engine.ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-    engine.ctx.state!.cash = Math.max(engine.ctx.state!.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
+    fundForDeliveryWait(engine.ctx.state!); // the delivery wait (#1895) idles the crew on payroll
     runCommand(engine, 'tick 1');
   }
   return !engine.ctx.state!.pendingActions.some(a => a.id === actionId);

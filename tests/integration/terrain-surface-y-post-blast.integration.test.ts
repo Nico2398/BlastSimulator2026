@@ -17,6 +17,7 @@ import type { GameContext } from '../../src/console/commands/world.js';
 import { getTerrainSurfaceY } from '../../src/renderer/GameRendererTerrain.js';
 import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 /** Mirrors weather-blast.integration.test.ts's drill-to-completion helper. */
 function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
@@ -35,7 +36,7 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
     // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
-    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+    fundForDeliveryWait(ctx.state!);
     runner.run('tick 1');
   }
 }

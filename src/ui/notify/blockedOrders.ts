@@ -7,7 +7,7 @@ import { readOrderDeliveryTick } from '../../core/mining/ExplosiveStock.js';
 import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
-/** True when the block is a failure the player must fix (vs. a stranded-debris wait) (#1810). */
+/** True when the block is a failure the player must fix (vs. a stranded-debris or explosives-in-transit wait) (#1810, #1895). */
 export function isFailureBlock(action: Pick<PendingAction, 'blockedReason'>): boolean {
   return action.blockedReason != null && action.blockedReason !== 'debris_out_of_reach' && !isInTransitBlock(action);
 }
