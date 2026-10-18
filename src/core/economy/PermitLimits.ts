@@ -16,13 +16,13 @@ import {
 } from '../config/balance.js';
 
 
-export interface PermitLimits {
+interface PermitLimits {
   maxChargeKg: number;
   maxHoles: number;
   fee: number;
 }
 
-export interface PreFireCheck {
+interface PreFireCheck {
   limits: PermitLimits;
   planKg: number;
   planHoles: number;

@@ -81,7 +81,7 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   const r = raw as Record<string, unknown>;
   const { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending } = r;
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
-  const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isCount) ? [...r['strikeTicks'] as number[]] : [];
+  const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isWholeCount) ? [...r['strikeTicks'] as number[]] : [];
   const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
   if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
