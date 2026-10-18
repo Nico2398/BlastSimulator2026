@@ -6,6 +6,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { applyForGrade, gradeDef, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
 import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
+import { permitLimitsFor, liveStrikes } from '../../core/economy/PermitLimits.js';
 import { requireGame } from './commandUtils.js';
 
 function targetLine(s: GradeTargetStatus): string {
@@ -20,9 +21,12 @@ function permitStatus(ctx: GameContext): CommandResult {
 
   const current = gradeDef(g.grade);
   const next = gradeDef(g.grade + 1);
+  const limits = permitLimitsFor(g.grade);
   const lines = [
     t('permit.status.grade', { grade: g.grade, name: t(current.nameKey, current.nameParams) }),
     t('permit.status.next', { name: t(next.nameKey, next.nameParams), fee: formatMoney(next.fee), ticks: next.processingTicks }),
+    t('permit.status.limits', { kg: limits.maxChargeKg, holes: limits.maxHoles, fee: formatMoney(limits.fee) }),
+    t('permit.status.strikes', { count: liveStrikes(g.strikeTicks ?? [], state.tickCount).length }),
     ...nextGradeTargets(state).map(targetLine),
   ];
   if (g.pending) {

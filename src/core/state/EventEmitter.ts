@@ -19,6 +19,7 @@ export interface GameEventMap {
   'time:tick': { dt: number };
   /** A mine-grade application finished processing (#1921). */
   'progression:grade_approved': { grade: number };
+  'progression:blast_inspected': { overshoot: number; caught: boolean; fine: number; strikes: number; suspended: boolean };
 
   // Phase 7 — Campaign events
   'level:complete': { levelId: string; totalProfit: number; blastsPerformed: number; casualties: number; finalWellBeing: number; finalEcology: number; finalSafety: number; stars: number };
