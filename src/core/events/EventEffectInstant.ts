@@ -36,8 +36,9 @@ function pickLeaver(spec: SpecOf<'employee_leaves'>, staff: Employee[], rng: Ran
 
 /** Applies one instant spec (hire, leave, injury, bonus, contract change, ...). */
 export function applyInstantEffect(
-  spec: EventEffectSpec, world: EventWorld, tick: number, rng: Random,
+  spec: EventEffectSpec, world: EventWorld, tick: number, rng: Random, leaverId?: number | null,
 ): EffectOutcome {
+  void leaverId;
   const { state } = world;
   const staff = getLivingEmployees(state.employees.employees);
   switch (spec.type) {

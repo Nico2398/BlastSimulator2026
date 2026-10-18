@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Outcome chips describing declarative event effects (#1414)
 
 import type { EventEffect } from './EventSystem.js';
+import type { LeaverLabel } from './EventLeavers.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import { t } from '../i18n/I18n.js';
@@ -41,7 +42,8 @@ function chipOf(spec: EventEffectSpec): EventEffectChip {
   };
 }
 
-export function effectChips(specs: readonly EventEffectSpec[] | undefined): EventEffectChip[] {
+export function effectChips(specs: readonly EventEffectSpec[] | undefined, leaver?: LeaverLabel): EventEffectChip[] {
+  void leaver;
   return (specs ?? []).map(chipOf);
 }
 

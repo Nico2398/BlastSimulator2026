@@ -81,8 +81,9 @@ function assetModifier(spec: EventEffectSpec, world: EventWorld, tick: number, r
 
 /** Applies every spec of a chosen option; undefined specs yield an empty outcome. Timed specs are registered on state.events. */
 export function applyEventEffects(
-  specs: readonly EventEffectSpec[] | undefined, world: EventWorld, tick: number, rng: Random,
+  specs: readonly EventEffectSpec[] | undefined, world: EventWorld, tick: number, rng: Random, leaverId?: number | null,
 ): EffectOutcome {
+  void leaverId; // TODO: implement (#1908)
   const total: EffectOutcome = { effects: [], cashChange: 0, cashSettled: 0, scoreChanges: {}, resultKeySuffix: '' };
   const events = world.state.events;
   const base = { sourceEventId: events.pendingEvent?.eventId ?? '' };
