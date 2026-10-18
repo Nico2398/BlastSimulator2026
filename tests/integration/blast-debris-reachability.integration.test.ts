@@ -279,6 +279,7 @@ describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
       const run = (cmd: string) => runner.run(cmd);
       expect(run(`sandbox start biome:desert_badlands difficulty:normal seed:${SEALED_SEED} staffed:true`)).toMatchObject({ success: true });
       const state = ctx.state!;
+      state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
       const grid = ctx.grid!;
       topUp(state);
 
@@ -464,6 +465,7 @@ function blastSandboxPattern(biome: string, startX: number, startZ: number): San
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:${biome} difficulty:normal seed:42 staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   const grid = ctx.grid!;
   const refresh = (): void => {
     state.cash = Math.max(state.cash, 1_000_000);
@@ -557,6 +559,7 @@ function blastRampScenario(rampFirst: boolean): RampShot {
   const run = (c: string) => runner.run(c);
   expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true')).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
@@ -670,6 +673,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:${biome} difficulty:normal seed:${seed} staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   const grid = ctx.grid!;
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
@@ -798,6 +802,7 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:${biome} difficulty:easy seed:42 staffed:true`)).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   const tickWhile = (until: () => boolean, max: number): void => {
     for (let i = 0; i < max && !until(); i++) {
       state.cash = Math.max(state.cash, 1_000_000);

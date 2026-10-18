@@ -32,6 +32,7 @@ function blastAndRamp() {
   const run = (c: string) => runner.run(c);
   expect(run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true')).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; the haul loop is under test
   const grid = ctx.grid!;
   refresh(state);
 
