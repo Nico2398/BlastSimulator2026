@@ -1,6 +1,8 @@
 import { isRisky, type EventConsequence, type EventDef } from './EventPool.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
-import { EVENT_BALANCE_PERMANENT_DAYS, EVENT_BALANCE_REFERENCE_CREW } from '../config/balance.js';
+import {
+  EVENT_BALANCE_PERMANENT_DAYS, EVENT_BALANCE_REFERENCE_CREW, EVENT_BALANCE_PERMIT_APPROVE_TICKS, EVENT_BALANCE_REFERENCE_PERMIT_FEE,
+} from '../config/balance.js';
 
 /** Signed expected-value dimensions of one option; higher is always better for the player. */
 type OptionDims = Readonly<Record<string, number>>;
@@ -45,6 +47,10 @@ function specDims(spec: EventEffectSpec): DimEntry[] | null {
     case 'building_closed': return [['outOfService', -spec.hours]];
     case 'forced_weather': return null;
     case 'event_weight': return null;
+    case 'permit_processing':
+      return spec.action === 'shift'
+        ? [['permit', -Math.max(spec.ticks, spec.ticksBelow ?? spec.ticks)]]
+        : [['permit', EVENT_BALANCE_PERMIT_APPROVE_TICKS], ['cash', -(spec.feePct / 100) * EVENT_BALANCE_REFERENCE_PERMIT_FEE]];
     default: return spec satisfies never;
   }
 }

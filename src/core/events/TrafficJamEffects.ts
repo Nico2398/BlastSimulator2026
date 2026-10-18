@@ -35,6 +35,13 @@ export interface EffectOutcome {
   resultKeySuffix: '' | '_alt';
 }
 
+/** An outcome with nothing applied; `over` sets what a handler did. */
+export const outcome = (over: Partial<EffectOutcome> = {}): EffectOutcome => ({
+  effects: [], cashChange: 0, cashSettled: 0, scoreChanges: {}, resultKeySuffix: '', ...over,
+});
+/** The fallback outcome: the handler could not do what was asked. */
+export const alt = (): EffectOutcome => outcome({ resultKeySuffix: '_alt' });
+
 type JamEffectHandler = (jam: TrafficJam, world: EventWorld, tick: number) => EffectOutcome;
 
 const UNCHANGED = { cashChange: 0, cashSettled: 0, scoreChanges: {} } as const;
