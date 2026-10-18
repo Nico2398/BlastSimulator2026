@@ -100,8 +100,10 @@ export class PermitPanel extends PanelBase {
     const currentCard = card([
       el('span', { text: t('ui.permit.current_label'), attrs: { style: LABEL_STYLE } }),
       el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [
-        el('span', { text: t(current.nameKey, current.nameParams), attrs: { 'data-role': 'permit-grade', style: 'font:700 13px/1.2 var(--bsx-font-ui)' } }),
-        el('span', { text: t('ui.permit.stamp'), attrs: { 'data-role': 'permit-stamp', style: STAMP_STYLE } }),
+        el('span', {
+          text: `${t('ui.permit.stamp')} - ${t(current.nameKey, current.nameParams)}`,
+          attrs: { 'data-role': 'permit-stamp', style: STAMP_STYLE },
+        }),
       ] }),
     ]);
 
@@ -130,8 +132,8 @@ export class PermitPanel extends PanelBase {
   }
 
   private pendingBlock(): HTMLElement {
-    return el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px' }, children: [
-      el('span', { attrs: { 'data-role': 'permit-pending', style: 'font:600 12px/1 var(--bsx-font-mono);color:var(--bsx-info)' } }),
+    return el('div', { attrs: { 'data-role': 'permit-pending', style: 'display:flex;flex-direction:column;gap:5px' }, children: [
+      el('span', { attrs: { 'data-role': 'permit-countdown', style: 'font:600 12px/1 var(--bsx-font-mono);color:var(--bsx-info)' } }),
       el('span', { text: t('ui.permit.pending_status'), attrs: { style: MICRO_STYLE + ';font-style:italic' } }),
     ] });
   }
@@ -143,10 +145,10 @@ export class PermitPanel extends PanelBase {
       const result = this.gameConsole?.('permit apply');
       flashStatus(this.statusEl, result?.output ?? '');
     });
-    const reason = el('span', { attrs: { 'data-role': 'permit-apply-reason', style: MICRO_STYLE } });
-    const allMet = el('span', { text: t('ui.permit.all_met'), attrs: { 'data-role': 'permit-all-met', style: MICRO_STYLE } });
-    allMet.style.display = 'none';
-    return el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' }, children: [applyBtn, reason, allMet] });
+    const note = blocked
+      ? el('span', { attrs: { 'data-role': 'permit-apply-reason', style: MICRO_STYLE } })
+      : el('span', { text: t('ui.permit.all_met'), attrs: { 'data-role': 'permit-all-met', style: MICRO_STYLE } });
+    return el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:6px' }, children: [applyBtn, note] });
   }
 
   /** Per-tick numbers, bar widths, countdown and the cash-bearing refusal text. */
@@ -164,7 +166,7 @@ export class PermitPanel extends PanelBase {
       row.querySelector<HTMLElement>('[data-role="target-bar"]')!.style.width = `${pct}%`;
     }
 
-    const pendingEl = this.contentEl.querySelector<HTMLElement>('[data-role="permit-pending"]');
+    const pendingEl = this.contentEl.querySelector<HTMLElement>('[data-role="permit-countdown"]');
     if (pendingEl && g.pending) {
       pendingEl.textContent = t('ui.permit.pending_countdown', { time: formatGameDuration(g.pending.ticksLeft) });
     }
@@ -175,8 +177,6 @@ export class PermitPanel extends PanelBase {
       reasonEl.textContent = blocker
         ? permitRefusalText(blocker.refusal, blocker.unmet, gradeDef(g.grade + 1).fee, state.cash)
         : '';
-      const allMet = this.contentEl.querySelector<HTMLElement>('[data-role="permit-all-met"]');
-      if (allMet) allMet.style.display = blocker ? 'none' : '';
     }
   }
 }
