@@ -50,6 +50,19 @@ const DECISION_INTERVAL_TICKS = 10;
 const REINVEST_CASH_RESERVE = 50_000;
 /** Haulable ore (kg) left on the ground under which reinvest fires the next blast. */
 const RELOAD_THRESHOLD_KG = 40_000;
+/** Fraction of the last blast's haulable yield under which reinvest fires the next blast. */
+export const RELOAD_FRACTION = 0.5;
+
+/**
+ * Reload gate: true when a prior yield exists (`lastYieldKg > 0`) and the haulable ore left on
+ * the ground has fallen under `RELOAD_FRACTION` of it.
+ */
+export function shouldReload(haulableKg: number, lastYieldKg: number): boolean {
+  // TODO: implement
+  void haulableKg;
+  void lastYieldKg;
+  return false;
+}
 
 /** Ticks one opening step may take before the run is reported as `opening_failed:<step>`. */
 const OPENING_STEP_MAX_TICKS = 3000;
