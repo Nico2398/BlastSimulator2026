@@ -73,6 +73,24 @@ export function orderOffers(
   return [...available.filter(fillable), ...available.filter(c => !fillable(c))];
 }
 
+/** One-line roll-up of the player's active contracts. */
+export interface ActiveSummary {
+  /** Number of active contracts. */
+  count: number;
+  /** Hours left on the soonest deadline (same conversion as the card's time-left, floored at 0). */
+  nextDeadlineHours: number;
+  /** Sum of penaltyAmount over active contracts, excluding rubble_disposal contracts. */
+  penaltyTotal: number;
+}
+
+/** Summarize active contracts; null when there are none. */
+export function summarizeActive(active: readonly Contract[], tickCount: number): ActiveSummary | null {
+  void active;
+  void tickCount;
+  // TODO: implement
+  return null;
+}
+
 /** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
 export function deliverableAmountKg(maxDeliverableKg: number): number {
   if (!(maxDeliverableKg > 0)) return 0;
