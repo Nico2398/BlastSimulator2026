@@ -3,6 +3,8 @@
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
 import {
+  EVENT_BREAKDOWN_HOURS,
+  EVENT_BREAKDOWN_HP_LOSS,
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CHEER_HOURS,
   EVENT_CHEER_MORALE_PER_HOUR,
@@ -232,7 +234,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -22000, scoreDelta: { safety: 10 }, effectTag: 'repair_vehicles' },
       { cashDelta: 0, scoreDelta: { safety: -8, wellBeing: -5 }, effectTag: 'dented_fleet',
-        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
+        effects: [
+          { type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS },
+          { type: 'vehicle_breakdown', hpLoss: EVENT_BREAKDOWN_HP_LOSS, hours: EVENT_BREAKDOWN_HOURS },
+        ] },
       { cashDelta: -10000, scoreDelta: { safety: 6 }, effectTag: 'vehicle_shelters',
         effects: [
           { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS },

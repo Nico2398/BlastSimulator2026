@@ -16,6 +16,8 @@ import {
   EVENT_PAYCUT_SALARY_PCT,
   EVENT_RAISE_DAYS,
   EVENT_RAISE_SALARY_PCT,
+  EVENT_RESEARCH_DISCOUNT_DAYS,
+  EVENT_RESEARCH_DISCOUNT_PCT,
   EVENT_RETAINER_DAYS,
   EVENT_RETAINER_PER_DAY,
   EVENT_SCRUTINY_DAYS,
@@ -24,6 +26,8 @@ import {
   EVENT_SETTLEMENT_PER_DAY,
   EVENT_SULK_HOURS,
   EVENT_SULK_MORALE_PER_HOUR,
+  EVENT_SURVEY_DISCOUNT_DAYS,
+  EVENT_SURVEY_DISCOUNT_PCT,
   EVENT_TARIFF_DAYS,
   EVENT_TARIFF_PRICE_PCT,
   EVENT_UPKEEP_DISCOUNT_DAYS,
@@ -161,7 +165,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
         effects: [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },
-      { cashDelta: 20000, scoreDelta: { ecology: 5 }, effectTag: 'subsidy_green_strings' },
+      { cashDelta: 20000, scoreDelta: { ecology: 5 }, effectTag: 'subsidy_green_strings',
+        effects: [
+          { type: 'cost_factor', what: 'survey', pct: EVENT_SURVEY_DISCOUNT_PCT, days: EVENT_SURVEY_DISCOUNT_DAYS },
+        ] },
       { cashDelta: 0, scoreDelta: { ecology: 3 },
         effects: [{ type: 'event_weight', category: 'lawsuit', factor: EVENT_CALM_WEIGHT_FACTOR, days: EVENT_CALM_DAYS }] },
     ],
@@ -313,7 +320,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.1 + 0.5 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 90,
     options: [
-      { cashDelta: -40000, scoreDelta: { ecology: 10 }, effectTag: 'comply_reform' },
+      { cashDelta: -40000, scoreDelta: { ecology: 10 }, effectTag: 'comply_reform',
+        effects: [
+          { type: 'cost_factor', what: 'research', pct: EVENT_RESEARCH_DISCOUNT_PCT, days: EVENT_RESEARCH_DISCOUNT_DAYS },
+        ] },
       { cashDelta: -15000, corruptionDelta: 20, effectTag: 'offshore_shell' },
       { cashDelta: -25000, effectTag: 'lobby_against_reform',
         effects: [{ type: 'recurring_charge', perDay: EVENT_RETAINER_PER_DAY, days: EVENT_RETAINER_DAYS }] },
