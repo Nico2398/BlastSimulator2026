@@ -21,7 +21,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { getEventById, getOptionEffectHints, type EventCategory, type EventDef, type EventOptionEffectHint } from '../../core/events/EventPool.js';
 import type { EventEffect } from '../../core/events/EventSystem.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { effectChipText } from '../../core/events/EventEffectText.js';
+import { effectChipText, effectChips } from '../../core/events/EventEffectText.js';
 import { createModifierChips } from '../shell/ModifierChips.js';
 
 
@@ -76,23 +76,35 @@ function kindLabel(kind: 'cash' | 'score' | 'other', key: string): string {
   return key;
 }
 
-/** Choose-phase hint chip: kind + direction only, no magnitude — the real outcome may be probabilistic. */
+/** Signed, formatted magnitude for a chip (cash with $, others plain), e.g. "-$8,000 Cash". */
+export function amountLabel(kind: 'cash' | 'score' | 'other', key: string, delta: number): string {
+  const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
+  const magnitude = kind === 'cash' ? `$${formatMoney(Math.abs(delta))}` : `${Math.abs(delta)}`;
+  return `${sign}${magnitude} ${kindLabel(kind, key)}`;
+}
+
+/** Name shown on an amount-less hint chip; an unnamed 'other' key is a lasting effect, so it reads as "lasting". */
+function hintName(hint: EventOptionEffectHint): string {
+  const name = kindLabel(hint.kind, hint.key);
+  return hint.kind === 'other' && name === hint.key ? t('ui.event.effect_lasting') : name;
+}
+
+/** Choose-phase hint chip: the exact amount or lasting effect when certain, direction only (with "?") when risky. */
 function hintChip(hint: EventOptionEffectHint): HTMLElement {
-  const sign = hint.direction === 'positive' ? '+' : hint.direction === 'negative' ? '-' : '';
-  const label = `${sign}${kindLabel(hint.kind, hint.key)}${hint.risky ? '?' : ''}`;
   const tone: ChipTone = hint.risky
     ? 'warn'
     : hint.direction === 'positive' ? 'positive' : hint.direction === 'negative' ? 'critical' : 'neutral';
-  return chip(label, tone);
+  if (hint.spec) return chip(effectChipText(effectChips([hint.spec])[0]!) ?? hint.key, tone);
+  if (hint.amount !== undefined && !hint.risky) return chip(amountLabel(hint.kind, hint.key, hint.amount), tone);
+  const sign = hint.direction === 'positive' ? '+' : hint.direction === 'negative' ? '-' : '';
+  // An unnamed 'other' key is a lasting effect whose spec is hidden because the outcome is risky.
+  return chip(`${sign}${hintName(hint)}${hint.risky ? '?' : ''}`, tone);
 }
 
 /** Outcome-phase effect chip: the real, resolved magnitude. */
 function effectChip(effect: EventEffect): HTMLElement {
-  const sign = effect.delta > 0 ? '+' : effect.delta < 0 ? '-' : '';
-  const magnitude = effect.kind === 'cash' ? `$${formatMoney(Math.abs(effect.delta))}` : `${Math.abs(effect.delta)}`;
-  const label = `${sign}${magnitude} ${kindLabel(effect.kind, effect.key)}`;
   const tone: ChipTone = effect.delta > 0 ? 'positive' : effect.delta < 0 ? 'critical' : 'neutral';
-  return chip(label, tone);
+  return chip(amountLabel(effect.kind, effect.key, effect.delta), tone);
 }
 
 export class EventModal {
@@ -262,10 +274,10 @@ export class EventModal {
       const consequence = def.consequences[i];
       const btn = el('button', { className: 'bsx-btn bs-btn bs-event-choice' });
       btn.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;height:auto;min-height:36px;padding:9px 12px;white-space:normal';
-      btn.appendChild(el('span', { text: t(option.labelKey), attrs: { style: 'flex:1' } }));
+      btn.appendChild(el('span', { text: t(option.labelKey), attrs: { style: 'flex:1 1 40%;min-width:0' } }));
       const hints = getOptionEffectHints(option, consequence);
       if (hints.length > 0) {
-        const hintRow = el('div', { attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
+        const hintRow = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex:0 1 auto;min-width:0;max-width:60%' } });
         hintRow.append(...hints.map(hintChip));
         btn.appendChild(hintRow);
       }

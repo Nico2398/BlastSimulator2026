@@ -1,4 +1,4 @@
-import type { EventConsequence, EventDef } from './EventPool.js';
+import { isRisky, type EventConsequence, type EventDef } from './EventPool.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
 import { EVENT_BALANCE_PERMANENT_DAYS, EVENT_BALANCE_REFERENCE_CREW } from '../config/balance.js';
 
@@ -72,7 +72,7 @@ function addBranch(c: EventConsequence, w: number, dims: Record<string, number>,
 export function optionValue(c: EventConsequence): OptionValue {
   const dims: Record<string, number> = {};
   const opaque: string[] = [];
-  const p = c.probability !== undefined && c.probability < 1 ? c.probability : 1;
+  const p = isRisky(c) ? c.probability! : 1;
   addBranch(c, p, dims, opaque);
   if (p < 1 && c.altConsequence) addBranch(c.altConsequence, 1 - p, dims, opaque);
   return { dims, opaque: opaque.sort().join('|') };

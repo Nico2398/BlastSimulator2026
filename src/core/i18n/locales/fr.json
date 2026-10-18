@@ -2719,6 +2719,7 @@
   "ui.event.choose": "Choisissez votre réponse :",
   "ui.event.dismiss": "Ignorer",
   "ui.event.outcome": "Résultat :",
+  "ui.event.effect_lasting": "Effet durable",
   "ui.event.effect_exposure": "% d'exposition",
   "ui.event.follow_up_developing": "Une nouvelle situation se prépare en coulisses…",
   "ui.event.category.union": "Syndicat",
