@@ -2,7 +2,7 @@
 //
 // Contract (key params): research.status_header {speed, active, slots};
 // research.status_no_center {}; research.status_task_active / _pending
-// {index, name, remaining, cost} where remaining = Math.ceil(ticksRemaining).
+// {index, name, tier, remaining, cost} where remaining = Math.ceil(ticksRemaining).
 
 import { describe, it, expect, afterEach } from 'vitest';
 import type { GameContext } from '../../../src/console/commands/world.js';
@@ -25,7 +25,7 @@ function makeCtx(centerTier: 1 | 2 | 3 | null, tasks = 0, ticks = 50): GameConte
 
 const status = (ctx: GameContext) => researchCommand(ctx, ['status'], {}).output;
 const line = (key: string, i: number, name: string, remaining: number) =>
-  t(key, { index: i, name, remaining, cost: 12000 });
+  t(key, { index: i, name, tier: 3, remaining, cost: 12000 });
 
 describe('research status (#1936)', () => {
   it.each([[1, 1, 1], [2, 1.5, 2], [3, 2, 3]] as const)('tier %i header shows speed %f and %i slots', (tier, speed, slots) => {

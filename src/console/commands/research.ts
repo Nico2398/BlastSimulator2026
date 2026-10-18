@@ -118,8 +118,9 @@ export function researchCommand(
       if (queue.length === 0 && !profile) {
         return { success: true, output: t('research.status_no_center') };
       }
-      if (queue.length === 0) {
-        return { success: true, output: 'No research queued.' };
+      if (queue.length === 0 && profile) {
+        const header = t('research.status_header', { speed: profile.speed, active: 0, slots: profile.slots });
+        return { success: true, output: `${header}\nNo research queued.` };
       }
       const activeCount = getActiveResearchTasks(state.buildings).length;
       const lines = profile
