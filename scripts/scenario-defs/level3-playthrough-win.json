@@ -1785,8 +1785,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 455,
-          "cash": 1777077,
+          "tickCount": 405,
+          "cash": 1812067,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1937,7 +1937,7 @@
       "expect": {
         "equals": {
           "deathCount": 0,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 24,
@@ -1999,7 +1999,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -2024,7 +2024,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2046,7 +2046,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2068,10 +2068,10 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.61109333258743,
+          "wellBeing": 98.61768639416864,
           "safety": 50,
           "ecology": 49.7635685061019,
           "nuisance": 49.40892126525473
@@ -2091,17 +2091,18 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "tickCount": 6
+          "tickCount": 2
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "decreased": [
           "cash"
-        ]
+        ],
+        "note": "#1895 merge of #1907: a $60,000 event fires 2 ticks into this window (tick 1539), which halts the tick; the next step resolves it, so its cash change is -60000."
       },
       "description": "#1186: re-measured -- was 0/0 (a pending lucky_strike event froze this tick call at 0 of 6 requested ticks; see the next step's old description). SurveyCalc.ts's estimateSurveyResult now samples a bounded depth window below each column's own surface (SURVEY_DEPTH_BELOW_SURFACE) instead of scanning the whole declared column height, which is the actual, required fix (#1186: column storage has no floor/ceiling any more, so 'the whole column' is unbounded) -- but it also changes how many columns around this file's own seismic/core_sample surveys (step 21-22, x:25 z:25) carry a detectable ore, which changes how many rng.gaussian() noise draws each survey consumes. Same seed, same eventual outcome, different point in the shared PRNG stream from here on: lucky_strike no longer happens to be the very next draw the instant this tick call starts, so all 6 requested ticks actually run instead of 0. Nothing about the blast itself changed -- fragmentedCount/detachedCount/liftedCount/projectionCount for pattern 1's blast are byte-identical to origin/main, direct-verified via a debug trace comparing this branch against a clean origin/main worktree.",
       "commandOutcome": "either"
@@ -2116,12 +2117,12 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": 0,
+          "cash": -60000,
           "tickCount": 0
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2144,7 +2145,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -2240,7 +2241,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         }
@@ -2262,7 +2263,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -2288,7 +2289,7 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         }
@@ -2310,10 +2311,10 @@
         },
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "safety": 8.800000000000011
+          "safety": 0
         },
         "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline."
       },
@@ -2334,7 +2335,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 800000
+          "profit": 800000.0000000002
         },
         "increased": [
           "cash"
@@ -2354,14 +2355,14 @@
       "expect": {
         "equals": {
           "deathCount": 1,
-          "employeeCount": 16,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "safety": 8.800000000000011,
+          "safety": 0,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "completed",
-          "profit": 800000
+          "profit": 800000.0000000002
         },
         "note": " #1895: re-measured after the explosives delivery wait (and the rest-policy swap around it) moved the crew's morale and the casualty timeline."
       },

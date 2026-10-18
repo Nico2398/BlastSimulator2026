@@ -3,18 +3,18 @@
   "description": "Full blast pipeline: create game, drill holes, charge, blast",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true cash:150000",
+      "command": "new_game seed:42 staffed:true cash:200000",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true cash:150000"
+          "command": "new_game seed:42 staffed:true cash:200000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
+          "cash": 200000,
           "holeCount": 0
         }
       }

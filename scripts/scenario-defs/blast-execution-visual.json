@@ -1377,11 +1377,16 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "timeout": 95,
+      "description": "#554/#1895: was a flat `tick 50`, which the two spontaneous events at ticks 1537 and 1539 (union event clock, #1907, with the delivery waits above shifting the clock) cut to 1 + 2 + 50 ticks, leaving 3 holes undrilled. wait_until drives to actual completion instead of a hand-measured pad, matching the other drill cycles in this file.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",

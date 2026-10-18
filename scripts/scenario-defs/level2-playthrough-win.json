@@ -3,11 +3,11 @@
   "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four living quarters clear of every blast pattern, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig. #1649: charging is worked from a charging truck by a blasting + driving.truck employee. Each blast destroys the truck, so patterns 2-4 each buy a fresh charging truck; no licence step is needed because a hired Blaster arrives with blasting + driving.truck level 1 (#1667), so the former per-pattern `employee assign_skill ... driving.truck` bootstrap steps are gone; death counts and ecology/nuisance figures were re-measured, and the closing profit reads 250000 (#1660 shifted charging timing by a few ticks, so a random employee_joins event now lands earlier and the figures here were re-measured; the old 250000 float residue is gone). Rally point: every hire and vehicle purchase now spawns at the site's rally flag, on flat ground beside the starting crew at (7,2), instead of the old mid-site hire spawn near (27,48); the quarters moved from the (48..52, 48..52) block to (32..36, 0..4), the same clearance from the blast patterns (blast 1 is 14 cells away) but beside the base rather than 60 cells from it, so their construction no longer stalls the clock for 200 ticks and shifts every seeded event draw. Survey, tick, death (1, 2, 3, 5 after #1773) and score pins re-measured in command mode; the run still completes as a win with no refused command.",
   "steps": [
     {
-      "command": "new_game seed:2277 cash:5000000 staffed:true",
+      "command": "new_game seed:2277 cash:5500000 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:2277 cash:5000000 staffed:true"
+          "command": "new_game seed:2277 cash:5500000 staffed:true"
         }
       ],
       "role": "setup",
@@ -18,10 +18,10 @@
           "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 5000000
+          "cash": 5500000
         }
       },
-      "description": "#553: staffed:true added -- cash:150000 sits on this new_game, not on the campaign start below, because that command fails outright (grumpstone_ridge is tier-2, locked on a fresh campaign, Finding #59), so it never replaces this state and a cash: on it would be discarded with the rest of the command. staffed:true hires and equips its own free crew before any assertion here: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster, #3-5 drivers, vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter -- free, not deducted from cash, which is why employeeCount is already 5 here instead of 0. All four vehicles come unmanned (driverId: null); vehicle driver 1 1 immediately below crews the free rig with the free driller, since drill_hole is now a queued, vehicle-gated action and nothing drills without a driver aboard. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs, same as before -- but see the pattern-1 drill-wait step further down for what that budget can no longer survive once drilling takes hundreds of ticks instead of zero."
+      "description": "#553: staffed:true added -- cash:150000 sits on this new_game, not on the campaign start below, because that command fails outright (grumpstone_ridge is tier-2, locked on a fresh campaign, Finding #59), so it never replaces this state and a cash: on it would be discarded with the rest of the command. staffed:true hires and equips its own free crew before any assertion here: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster, #3-5 drivers, vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter -- free, not deducted from cash, which is why employeeCount is already 5 here instead of 0. All four vehicles come unmanned (driverId: null); vehicle driver 1 1 immediately below crews the free rig with the free driller, since drill_hole is now a queued, vehicle-gated action and nothing drills without a driver aboard. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs, same as before -- but see the pattern-1 drill-wait step further down for what that budget can no longer survive once drilling takes hundreds of ticks instead of zero. #1895 merge of #1907: cash raised from $5,000,000 to $5,500,000 -- the last 49-hole charge order now waits out the explosives delivery with the crew on payroll and at $5,000,000 the site was $1,200 overdrawn after the blast, so the rubble-disposal contract could not be accepted. wellBeing/safety/ecology/nuisance and deathCount (4 -> 5 at the last blast) re-measured from deterministic command-mode runs; the level still completes."
     },
     {
       "command": "set_policy mode:continuous fatigue:0",
@@ -1889,8 +1889,8 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 97.91723234009739,
-          "safety": 50,
+          "wellBeing": 97.92134090985321,
+          "safety": 59.650000000000134,
           "ecology": 98.55524933152729,
           "nuisance": 46.513123328818224
         },
@@ -2690,8 +2690,8 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.17190268289134,
-          "safety": 0,
+          "wellBeing": 98.10719026220619,
+          "safety": 50,
           "ecology": 99.55611269906477,
           "nuisance": 49.0152817476619
         },
@@ -3691,10 +3691,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 94.84905242577177,
+          "wellBeing": 93.58584900842459,
           "safety": 0,
-          "ecology": 86.78323830466212,
-          "nuisance": 21.535199932527885
+          "ecology": 99.95,
+          "nuisance": 61.657826013617495
         },
         "changedBy": {
           "tickCount": 0
@@ -4205,7 +4205,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4230,7 +4230,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4252,7 +4252,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4274,7 +4274,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4295,7 +4295,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4318,7 +4318,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4339,7 +4339,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4367,7 +4367,7 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -4386,7 +4386,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4409,7 +4409,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4439,7 +4439,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -4481,7 +4481,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -4505,14 +4505,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 89.4212447179275,
+          "wellBeing": 90.88167514540403,
           "safety": 0,
-          "ecology": 98.07372591302335,
-          "nuisance": 41.477359924800574
+          "ecology": 99.95,
+          "nuisance": 46.12735992480058
         },
         "changedBy": {
           "tickCount": 0
@@ -4531,14 +4531,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 89.4212447179275,
+          "wellBeing": 90.88167514540403,
           "safety": 0,
-          "ecology": 98.07372591302335,
-          "nuisance": 41.477359924800574
+          "ecology": 99.95,
+          "nuisance": 46.12735992480058
         },
         "changedBy": {
           "tickCount": 0

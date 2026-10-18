@@ -3,19 +3,19 @@
   "description": "Visual check of building destruction via blast: drill, charge, and detonate near warehouses. #553: drill_plan no longer writes holes instantly — a staffed driller/drill_rig must physically reach and drill each hole, so the two holes are ordered ON OPEN GROUND (via drill_plan add, one per building origin) and landed BEFORE either warehouse is built. Building a warehouse first would leave its footprint permanently un-navigable to the not-yet-drilled hole underneath it (buildings occupy blocked NavGrid cells; only an already-drilled hole's cell reclassifies to the walkable 'drill_hole' type) — a driller/drill_rig sent to drill under a standing building can never physically arrive there, so drill-then-build is not just tidier ordering here but the only sequence that can complete at all.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:200000 staffed:true",
+      "command": "new_game seed:42 cash:250000 staffed:true",
       "timeout": 70,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — exactly what #553's automatic drill dispatch needs.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:200000 staffed:true"
+          "command": "new_game seed:42 cash:250000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 200000,
+          "cash": 250000,
           "holeCount": 0,
           "orderedHoleCount": 0,
           "buildingCount": 0
@@ -362,6 +362,30 @@
       ],
       "description": "Pin dry weather right before the blast: rain would leave standing water in the holes (#1350) and weaken the water-sensitive boomite charges.",
       "role": "bootstrap"
+    },
+    {
+      "command": "tick 10",
+      "timeout": 130,
+      "description": "#1895/#1907: the delivery wait puts the pre-blast window at tick ~536, where politics_heritage_listing fires (union events now run on their own clock, #1907). Auto-resolving it with option 0 bans blasting for 48h and the blast below is refused, so advance to the event here (tick halts when it fires) and answer it deliberately in the next step.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ]
+    },
+    {
+      "command": "event choose 1",
+      "description": "#1895/#1907: option 1 (delist heritage, $5,000 and corruption) is the one that does not ban blasting; option 0 bans it for 48h and option 2 costs $25,000. Idempotent: no-op when no event is pending.",
+      "role": "player",
+      "commandOutcome": "either",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending",
+          "option": 1
+        }
+      ]
     },
     {
       "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",

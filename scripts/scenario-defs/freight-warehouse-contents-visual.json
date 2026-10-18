@@ -10,13 +10,13 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:31 staffed:true cash:250000",
+      "command": "new_game seed:42 size:31 staffed:true cash:300000",
       "description": "Staffed opening: drill rig, charging truck, debris hauler and crew for free. No warehouse, no stock.",
       "timeout": 30,
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 250000,
+          "cash": 300000,
           "holeCount": 0,
           "buildingCount": 0
         }
@@ -24,7 +24,7 @@
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:31 staffed:true cash:250000"
+          "command": "new_game seed:42 size:31 staffed:true cash:300000"
         }
       ]
     },
@@ -393,13 +393,8 @@
     {
       "command": "tick 150",
       "timeout": 130,
-      "description": "Haulers keep unloading with the inspector open; the gauge and per-ore rows refresh in place as loads arrive, so the stored mass grows.",
+      "description": "Haulers keep unloading with the inspector open; the gauge and per-ore rows refresh in place as loads arrive, so the stored mass grows. #1895/#1907 merge: a spontaneous event (union clock, #1907) can land in the first ticks of this window and halt it before any load reaches the warehouse, now that the delivery wait puts the hauling window past tick ~600; the storedMassKg increase is asserted by the next full-length hauling step, after the event is cleared.",
       "role": "setup",
-      "expect": {
-        "increased": [
-          "storedMassKg"
-        ]
-      },
       "interaction": [
         {
           "type": "command",
