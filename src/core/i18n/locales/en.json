@@ -3225,6 +3225,7 @@
   "research.queue_failed": "Could not queue research: {code}.",
   "research.queue_queued": "Queued research: {type} tier {tier} — {ticks} ticks, ${cost}.",
   "research.queue_queued_instant": "Queued research: {type} tier {tier} — ${cost}.",
+  "research.status_idle": "No research queued.",
   "research.status_header": "Research speed x{speed}, {active}/{slots} slots",
   "research.status_no_center": "No operating Research Center: research is paused.",
   "research.status_task_active": "  [{index}] {name} tier {tier} — in progress, {remaining} ticks remaining, ${cost}",

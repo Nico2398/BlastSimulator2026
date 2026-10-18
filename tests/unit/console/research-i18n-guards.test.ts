@@ -177,6 +177,7 @@ describe('research queue usage, funds and success messages — translated (#1808
 describe('research status keys — translated (#1936)', () => {
   const KEYS = [
     'research.status_header',
+    'research.status_idle',
     'research.status_no_center',
     'research.status_task_active',
     'research.status_task_pending',

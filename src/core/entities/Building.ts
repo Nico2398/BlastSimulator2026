@@ -672,7 +672,7 @@ export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoil
 
 export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
 export {
-  queueResearchTask, tickResearch, getResearchProgress, isTierUnlocked,
+  queueResearchTask, tickResearch, getResearchProgress, getResearchTicksRemaining, isTierUnlocked,
   hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,
   getResearchCenterProfile, getActiveResearchTasks,
   type QueueBlockCode, type CancelledResearch,

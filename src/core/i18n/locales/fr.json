@@ -3225,6 +3225,7 @@
   "research.queue_failed": "Impossible de mettre la recherche en file : {code}.",
   "research.queue_queued": "Recherche mise en file : {type} niveau {tier} — {ticks} ticks, {cost} $.",
   "research.queue_queued_instant": "Recherche mise en file : {type} niveau {tier} — {cost} $.",
+  "research.status_idle": "Aucune recherche en file.",
   "research.status_header": "Vitesse de recherche x{speed}, {active}/{slots} emplacements",
   "research.status_no_center": "Aucun centre de recherche en service : la recherche est à l'arrêt.",
   "research.status_task_active": "  [{index}] {name} niveau {tier} — en cours, {remaining} ticks restants, {cost} $",

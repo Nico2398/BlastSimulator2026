@@ -2,7 +2,7 @@
 import { t } from '../../../core/i18n/I18n.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { isOperating, type Building, type ResearchTask } from '../../../core/entities/Building.js';
-import { getActiveResearchTasks, getResearchCenterProfile, getResearchProgress } from '../../../core/entities/BuildingResearch.js';
+import { getActiveResearchTasks, getResearchCenterProfile, getResearchProgress, getResearchTicksRemaining } from '../../../core/entities/BuildingResearch.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { liveLine, sectionOf, setLive, type InspectorSection } from './inspectorWidgets.js';
 
@@ -12,7 +12,7 @@ const runningText = (task: ResearchTask): string =>
   t('inspector.research_running', {
     name: targetName(task),
     percent: Math.round(getResearchProgress(task).fraction * 100),
-    remaining: Math.ceil(task.ticksRemaining),
+    remaining: getResearchTicksRemaining(task),
   });
 
 const pendingText = (task: ResearchTask): string =>

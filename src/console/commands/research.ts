@@ -9,6 +9,7 @@ import {
   getQueueBlockCode,
   getResearchCenterProfile,
   getActiveResearchTasks,
+  getResearchTicksRemaining,
   getAllBuildingTypes,
   type BuildingType,
   type QueueBlockCode,
@@ -115,24 +116,18 @@ export function researchCommand(
     case 'status': {
       const queue = state.buildings.researchQueue;
       const profile = getResearchCenterProfile(state.buildings);
-      if (queue.length === 0 && !profile) {
-        return { success: true, output: t('research.status_no_center') };
-      }
-      if (queue.length === 0 && profile) {
-        const header = t('research.status_header', { speed: profile.speed, active: 0, slots: profile.slots });
-        return { success: true, output: `${header}\nNo research queued.` };
-      }
-      const activeCount = getActiveResearchTasks(state.buildings).length;
-      const lines = profile
-        ? [t('research.status_header', { speed: profile.speed, active: activeCount, slots: profile.slots })]
-        : [t('research.status_no_center')];
+      const activeCount = getActiveResearchTasks(state.buildings, profile).length;
+      const lines = [profile
+        ? t('research.status_header', { speed: profile.speed, active: activeCount, slots: profile.slots })
+        : t('research.status_no_center')];
+      if (queue.length === 0 && profile) lines.push(t('research.status_idle'));
       queue.forEach((task, i) => {
         const key = i < activeCount ? 'research.status_task_active' : 'research.status_task_pending';
         lines.push(t(key, {
           index: i,
           name: buildingTypeName(task.targetType),
           tier: task.targetTier,
-          remaining: Math.ceil(task.ticksRemaining),
+          remaining: getResearchTicksRemaining(task),
           cost: task.cost,
         }));
       });
