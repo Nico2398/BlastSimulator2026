@@ -16,6 +16,7 @@ import {
   resolveRepeatCount,
   type ReportableStep,
 } from './scenario-utils.js';
+import { resolvePendingEvent } from './player-actions.js';
 import { checkGoalAgainstState, checkCommandOutcome, type GoalMismatch } from './scenario-goal.js';
 export type { GoalMismatch } from './scenario-goal.js';
 
@@ -65,9 +66,7 @@ function runWaitUntil(
         gameState: lastState,
       };
     }
-    if (ctx.state?.events.pendingEvent) {
-      runCommand(engine, 'event choose 0');
-    }
+    resolvePendingEvent((cmd) => runCommand(engine, cmd), ctx.state);
   }
   throw new Error(
     `waitUntil: "${action.field}" never reached ${JSON.stringify(action.equals)}`

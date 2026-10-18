@@ -32,20 +32,22 @@ const RAIL_ENTRIES: readonly RailEntry[] = [
   { panel: 'employees', icon: 'crew', labelKey: 'shell.rail.employees' },
   // No label, no tooltip: the player notices it only once it's there.
   { panel: 'shady', icon: 'shady', revealWhen: (s) => s.corruption.level > 0 || s.corruption.mafiaUnlocked },
+  // Progression sites only (state.grade exists): the Ministry of Holes permit ladder.
+  { panel: 'permits', icon: 'contract', labelKey: 'shell.rail.permits', revealWhen: (s) => s.grade !== undefined },
   { panel: 'settings', icon: 'settings', labelKey: 'shell.rail.settings' },
 ];
 
 /** Right-edge offset of the rail, matching its `right:` inline style below. */
 const RAIL_RIGHT_OFFSET_PX = 12;
 /**
- * Per-entry button height, matching its inline style below. 46, not the 52 it
+ * Per-entry button height, matching its inline style below. 42, not the 52 it
  * was: at the smallest supported viewport (1280x720) the band between the top
- * bar and the MiniMap is 488px, and a fully revealed rail — all 9 entries,
- * `shady` included, and a revealed entry never re-hides — was 506px tall, so
- * it painted over the map (#983). The button still holds an 18px icon, a 5px
- * gap and a 9px label with room to spare.
+ * bar and the MiniMap is 471px, and a fully revealed rail — every entry,
+ * `shady` and `permits` included, and a revealed entry never re-hides — must
+ * fit it (#983): 10 x 42 + 9 x 3 + 14 = 461px. The button still holds an 18px
+ * icon, a 5px gap and a 9px label.
  */
-const RAIL_BUTTON_HEIGHT_PX = 46;
+const RAIL_BUTTON_HEIGHT_PX = 42;
 /** Per-entry button width, matching its inline style below. */
 const RAIL_BUTTON_WIDTH_PX = 58;
 /** Rail container padding, matching its inline style below. */
@@ -64,7 +66,7 @@ const RAIL_MINIMAP_GAP_PX = 8;
  */
 const RAIL_BOTTOM_RESERVED_PX = MINIMAP_EDGE_OFFSET_PX + MINIMAP_HEIGHT_PX + RAIL_MINIMAP_GAP_PX;
 
-/** Height at full reveal — RAIL_ENTRIES.length, since a revealed gated entry ('shady') never re-hides. */
+/** Height at full reveal — RAIL_ENTRIES.length, since a revealed gated entry ('shady', 'permits') never re-hides. */
 function toolRailHeight(): number {
   const entryCount = RAIL_ENTRIES.length;
   return RAIL_BORDER_PX * 2 + RAIL_PADDING_PX * 2 + entryCount * RAIL_BUTTON_HEIGHT_PX + (entryCount - 1) * RAIL_GAP_PX;
@@ -151,7 +153,7 @@ export class ToolRail {
     shellLayoutRegistry.register({ id: 'tool-rail', layer: 'hud', bounds: toolRailBounds });
   }
 
-  /** Reveal any gated rail entry (currently just 'shady') once its condition is met. Never re-hides. */
+  /** Reveal any gated rail entry ('shady', 'permits') once its condition is met. Never re-hides. */
   update(state: GameState): void {
     for (const entry of RAIL_ENTRIES) {
       if (!entry.revealWhen || !entry.revealWhen(state)) continue;
