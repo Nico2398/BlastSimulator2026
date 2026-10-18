@@ -70,6 +70,10 @@ export interface EventSystemState {
    * its own threshold fresh.
    */
   cooldownMinIntervalTicks: number | null;
+  /** Tick of the most recent union event fire — union events' own cooldown clock (#1907). */
+  lastUnionEventTick: number;
+  /** Union cooldown threshold for the current window, drawn once like cooldownMinIntervalTicks (#1907). Null between windows. */
+  unionCooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
   raisedUnqualifiedActionIds?: number[];
   /** Live timed modifiers raised by event effects (#1414). */
@@ -131,8 +135,22 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     actionCountSinceEvent: 0,
     eventFreqMultiplier,
     cooldownMinIntervalTicks: null,
+    lastUnionEventTick: 0,
+    unionCooldownMinIntervalTicks: null,
     unionGrievance: 0,
   };
+}
+
+/** Whether the union-event cooldown window is open at `tick` (#1907). */
+export function unionCooldownOpen(
+  _state: EventSystemState,
+  _tick: number,
+  _unionMemberCount: number,
+  _livingEmployeeCount: number,
+  _rng: Random,
+): boolean {
+  // TODO: implement
+  return true;
 }
 
 // ── Tick processing ──
