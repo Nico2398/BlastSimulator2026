@@ -667,6 +667,23 @@ function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * Drops a `pendingActions[].blockedDetail` that is not `{ key: string, params: object }`.
+ * It is derived display data, recomputed on the next reachability pass, so a malformed one is discarded (#1938).
+ */
+function dropMalformedBlockedDetails(obj: Record<string, unknown>): void {
+  const pendingActions = obj['pendingActions'];
+  if (!Array.isArray(pendingActions)) return;
+  for (const action of pendingActions as Array<Record<string, unknown>>) {
+    if (typeof action !== 'object' || action === null || !('blockedDetail' in action)) continue;
+    const detail = action['blockedDetail'] as Record<string, unknown> | null;
+    const params = detail?.['params'];
+    const valid = typeof detail === 'object' && detail !== null && typeof detail['key'] === 'string'
+      && typeof params === 'object' && params !== null && !Array.isArray(params);
+    if (!valid) delete action['blockedDetail'];
+  }
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -690,6 +707,8 @@ export function deserialize(json: string): GameState {
       `Please update the game.`
     );
   }
+
+  dropMalformedBlockedDetails(obj);
 
   // v2 → v3: waitingTicks added to Vehicle interface.
   // Older saves may have vehicles without this field — default to 0.

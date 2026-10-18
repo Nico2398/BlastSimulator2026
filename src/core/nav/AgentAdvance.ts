@@ -6,6 +6,7 @@
 
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
+import { NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { isImpassable, directLineWalk } from './Pathfinding.js';
 import type { Occupant, AgentOccupancy } from './AgentOccupancy.js';
 
@@ -18,6 +19,8 @@ export interface AgentPath {
 }
 
 export interface AdvanceAlongPathInput {
+  /** Steepest climbable rise/run of the mover; defaults to NAV_MAX_SLOPE_RATIO (#1938). */
+  maxSlopeRatio?: number;
   x: number;
   z: number;
   walkSpeed: number;
@@ -290,7 +293,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   // it from an interior hop's post-move position can hand back the very same
   // index the agent just departed, stalling the loop in place instead of
   // progressing through the fresh path's later waypoints.
-  let pathIndex = firstUnwalkedWaypoint(input.x, input.z, input.path.waypoints, input.navGrid ?? null);
+  let pathIndex = firstUnwalkedWaypoint(input.x, input.z, input.path.waypoints, input.navGrid ?? null, input.maxSlopeRatio);
 
   // Bounded by one iteration per waypoint the fresh path holds (+1 for the
   // synthetic single-hop case) — cannot loop unboundedly since each iteration
@@ -314,6 +317,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       committed,
       input.navGrid ?? null,
       input.avoidVehicles ?? false,
+      input.maxSlopeRatio,
     );
 
     // Only a hop that actually consumes the fresh path's own next waypoint
@@ -546,6 +550,7 @@ function resolveTargetWaypoint(
   committed: RouteCommitment,
   navGrid: NavGrid | null,
   avoidVehicles: boolean,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): { target: { x: number; z: number }; committed: RouteCommitment } {
   const adoptFresh = (): { target: { x: number; z: number }; committed: RouteCommitment } => ({
     target: freshTarget,
@@ -621,7 +626,7 @@ function resolveTargetWaypoint(
     // neighbour-expansion call, which measures the same way from consecutive
     // integer cell coordinates.
     const climbLegal = !!standingCell && !!targetCell
-      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, Math.hypot(targetCellX - standingCellX, targetCellZ - standingCellZ));
+      && isStepClimbable(standingCell.surfaceY, targetCell.surfaceY, Math.hypot(targetCellX - standingCellX, targetCellZ - standingCellZ), maxSlopeRatio);
     if (blocked || !climbLegal) return adoptFresh();
   }
 
@@ -682,7 +687,7 @@ function resolveTargetWaypoint(
       // #1129 guard this branch exists for depends on it (no-navGrid callers
       // have no other way to break the oscillation adoptFresh() would cause).
       const lineIsUnsafe = navGrid !== null
-        && directLineWalk(navGrid, x, z, destinationX, destinationZ, avoidVehicles, 0, null, null) === null;
+        && directLineWalk(navGrid, x, z, destinationX, destinationZ, avoidVehicles, 0, null, null, maxSlopeRatio) === null;
       if (!lineIsUnsafe) {
         return {
           target: { x: destinationX, z: destinationZ },
@@ -747,6 +752,7 @@ function firstUnwalkedWaypoint(
   z: number,
   waypoints: Array<{ x: number; z: number }>,
   navGrid: NavGrid | null,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): number {
   if (waypoints.length <= 1) return 0;
   if (waypoints.length === 2 || !navGrid) return 1;
@@ -766,7 +772,7 @@ function firstUnwalkedWaypoint(
   // and afterNext (1.0 cardinal, sqrt(2) diagonal), not the agent's raw
   // continuous distance to afterNext — same fix as resolveTargetWaypoint's
   // climb check above (#1166).
-  return isStepClimbable(standing?.surfaceY, target.surfaceY, Math.hypot(afterNext.x - standingX, afterNext.z - standingZ)) ? 2 : 1;
+  return isStepClimbable(standing?.surfaceY, target.surfaceY, Math.hypot(afterNext.x - standingX, afterNext.z - standingZ), maxSlopeRatio) ? 2 : 1;
 }
 
 /**
