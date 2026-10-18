@@ -431,6 +431,86 @@ describe('resolveEvent — spread declarative effects (#1538)', () => {
     expectLasting(def!.id, 'forced_weather');
   });
 
+  describe('stored leavers (#1908)', () => {
+    const LEAVE_DEF: EventDef = {
+      id: 'leaver_resolve', category: 'mafia', titleKey: 't', descKey: 'd',
+      options: [
+        { labelKey: 'l0', resultKey: 'event.leaver_resolve.res0' },
+        { labelKey: 'l1', resultKey: 'event.leaver_resolve.res1' },
+      ],
+      consequences: [
+        { cashDelta: 0 },
+        { cashDelta: 0, effects: [{ type: 'employee_leaves', pick: 'random' }, { type: 'employee_injured' }] },
+      ],
+      weightCoeff: () => 1, canFire: () => true,
+    };
+    const resolveWith = (leavers: { optionIndex: number; employeeId: number | null }[] | undefined, mutate?: (fx: ReturnType<typeof makeEffectWorld>) => void) => {
+      clearEvents();
+      registerEvents([LEAVE_DEF]);
+      const fx = makeEffectWorld();
+      mutate?.(fx);
+      fx.state.events.pendingEvent = { eventId: 'leaver_resolve', firedAtTick: 10, ...(leavers ? { leavers } : {}) };
+      const result = resolveEvent(fx.state.events, fx.state.finances, fx.state.scores, 1, 10, new Random(7), fx.world)!;
+      return { fx, result };
+    };
+    const leaveChip = (fx: ReturnType<typeof makeEffectWorld>) =>
+      fx.state.events.lastOutcome!.effects.find(e => e.textKey?.startsWith('ui.event.effect.employee_leaves')) as unknown as
+        { textKey: string; params: Record<string, string> } | undefined;
+
+    it('removes the stored leaver, not a fresh random pick', () => {
+      const probe = makeEffectWorld();
+      const target = probe.state.employees.employees[5]!;
+      const { fx } = resolveWith([{ optionIndex: 1, employeeId: target.id }]);
+      expect(fx.state.employees.employees.some(e => e.id === target.id)).toBe(false);
+      expect(fx.state.employees.employees).toHaveLength(5);
+    });
+
+    it('the outcome chip names the leaver and role', () => {
+      const probe = makeEffectWorld();
+      const target = probe.state.employees.employees[5]!;
+      const { fx } = resolveWith([{ optionIndex: 1, employeeId: target.id }]);
+      const chip = leaveChip(fx)!;
+      expect(chip.textKey).toBe('ui.event.effect.employee_leaves_named');
+      expect(chip.params).toMatchObject({ name: target.name, role: target.role });
+    });
+
+    it('a null stored leaver: nobody leaves, _alt result, nobody chip', () => {
+      const { fx, result } = resolveWith([{ optionIndex: 1, employeeId: null }]);
+      expect(fx.state.employees.employees).toHaveLength(6);
+      expect(result.resultKey).toBe('event.leaver_resolve.res1_alt');
+      expect(leaveChip(fx)!.textKey).toBe('ui.event.effect.employee_leaves_nobody');
+    });
+
+    it('a stored leaver gone by choice time: nobody leaves and no fresh draw', () => {
+      const probe = makeEffectWorld();
+      const target = probe.state.employees.employees[0]!;
+      const { fx, result } = resolveWith([{ optionIndex: 1, employeeId: target.id }],
+        w => { w.state.employees.employees = w.state.employees.employees.filter(e => e.id !== target.id); });
+      expect(fx.state.employees.employees).toHaveLength(5);
+      expect(result.resultKey).toBe('event.leaver_resolve.res1_alt');
+      expect(leaveChip(fx)!.textKey).toBe('ui.event.effect.employee_leaves_nobody');
+    });
+
+    it('a stored draw for another option does not apply', () => {
+      const { fx } = resolveWith([{ optionIndex: 0, employeeId: null }]);
+      expect(fx.state.employees.employees).toHaveLength(5);
+      expect(leaveChip(fx)!.textKey).toBe('ui.event.effect.employee_leaves');
+    });
+
+    it('without stored leavers it draws at choice time and keeps the generic chip', () => {
+      const { fx, result } = resolveWith(undefined);
+      expect(fx.state.employees.employees).toHaveLength(5);
+      expect(result.resultKey).toBe('event.leaver_resolve.res1');
+      expect(leaveChip(fx)!.textKey).toBe('ui.event.effect.employee_leaves');
+    });
+
+    it('employee_injured in the same option still draws at choice time', () => {
+      const probe = makeEffectWorld();
+      const { fx } = resolveWith([{ optionIndex: 1, employeeId: probe.state.employees.employees[2]!.id }]);
+      expect(fx.state.employees.employees.filter(e => e.injured)).toHaveLength(1);
+    });
+  });
+
   it('an _alt result text is used when the effect has no target (empty roster)', () => {
     const def = getAllEvents().find(e => e.consequences.some(c => (c.effects ?? []).some(s => s.type === 'employee_leaves')));
     expect(def, 'no event carries employee_leaves').toBeDefined();

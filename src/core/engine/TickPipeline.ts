@@ -11,6 +11,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { Random } from '../math/Random.js';
+import { drawPendingLeavers } from '../events/EventLeavers.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import type { TaskProgressLevelUp } from './TaskProgress.js';
@@ -192,6 +193,7 @@ export function runTick(
   // 1. Event system
   const evCtx = buildTickEventContext(state);
   let fired = tickEventSystem(state.events, evCtx, rng);
+  if (fired) drawPendingLeavers(state.events, state.employees.employees, rng);
 
   // 2. Payroll — processPayCycle increments ticksSincePayday internally
   const paySalary = processPayCycle(state.employees, role => salaryFactor(state.events.activeModifiers, role));
