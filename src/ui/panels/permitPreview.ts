@@ -47,7 +47,7 @@ export function permitPreview(
     feeText: t('permit.preview.fee', { fee: formatMoney(check.fee) }),
     strikes,
     strikesText: t('permit.status.strikes', { count: strikes }),
-    warningText: t('permit.preview.warning'),
+    warningText: check.over ? t('permit.preview.warning') : '',
   };
 }
 
