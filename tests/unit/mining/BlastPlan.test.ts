@@ -77,3 +77,62 @@ describe('coveredByFootprint', () => {
     expect([...covered]).toEqual(['a']);
   });
 });
+
+describe('validateBlastPlan delivery wait (#1966)', () => {
+  const AWAIT = 'blast.validation.charge_awaiting_delivery';
+
+  it('a hole whose explosives are in transit gets the awaiting key with its arrival tick', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
+    const id = holes[0]!.id;
+    const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set([id]), new Map([[id, 680]]));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.holeId).toBe(id);
+    expect(errors[0]!.issue).toBe(AWAIT);
+    expect(errors[0]!.arrivalTick).toBe(680);
+  });
+
+  it('the delivery wait wins over charge_loading when a hole is in both sets', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
+    const id = holes[0]!.id;
+    const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set([id]), new Map([[id, 10]]));
+    expect(errors[0]!.issue).toBe(AWAIT);
+  });
+
+  it('a delivery-map hole outside the loading set is still awaiting delivery', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
+    const id = holes[0]!.id;
+    const errors = validateBlastPlan(assembleBlastPlan(holes, {}), undefined, new Map([[id, 10]]));
+    expect(errors[0]!.issue).toBe(AWAIT);
+  });
+
+  it('a really loading hole (not in the delivery map) keeps charge_loading and has no arrivalTick', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 1, 3, 8, 0.15);
+    const [a, b] = [holes[0]!.id, holes[1]!.id];
+    const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set([a, b]), new Map([[b, 99]]));
+    const ea = errors.find(e => e.holeId === a)!;
+    const eb = errors.find(e => e.holeId === b)!;
+    expect(ea.issue).toBe('blast.validation.charge_loading');
+    expect(ea.arrivalTick).toBeUndefined();
+    expect(eb.issue).toBe(AWAIT);
+  });
+
+  it('a hole in neither set stays missing_charge', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 1, 3, 8, 0.15);
+    const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set(), new Map([[holes[0]!.id, 5]]));
+    expect(errors.find(e => e.holeId === holes[1]!.id)!.issue).toBe('blast.validation.missing_charge');
+  });
+
+  it('a charged hole is never flagged, even if the delivery map names it', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
+    const depths = Object.fromEntries(holes.map(h => [h.id, h.depth]));
+    const { charges } = batchCharge(holes.map(h => h.id), depths, 'pop_rock', 2, 1.5);
+    const plan = assembleBlastPlan(holes, charges);
+    expect(validateBlastPlan(plan, new Set(), new Map(holes.map(h => [h.id, 700] as [string, number])))).toEqual([]);
+  });
+
+  it('two-argument calls behave as before', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
+    const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set([holes[0]!.id]));
+    expect(errors[0]!.issue).toBe('blast.validation.charge_loading');
+  });
+});

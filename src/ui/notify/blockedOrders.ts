@@ -4,6 +4,8 @@
 
 import type { PendingAction } from '../../core/state/GameState.js';
 import { readOrderDeliveryTick } from '../../core/mining/ExplosiveStock.js';
+import { formatGameClock } from '../formatGameClock.js';
+import { formatGameDuration } from '../formatGameDuration.js';
 import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
@@ -18,7 +20,7 @@ export function isInTransitBlock(action: Pick<PendingAction, 'blockedReason'>): 
 }
 
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
-export function buildBlockedOrderMessage(action: PendingAction): string {
+export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number): string {
   const order = t(ACTION_LABEL_KEY[action.type]);
   switch (action.blockedReason) {
     case 'no_vehicle_in_fleet':
@@ -57,8 +59,15 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_spoil_heap_full', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
-    case 'explosives_in_transit':
-      return t('notification.order_blocked_in_transit', { order, tick: readOrderDeliveryTick(action) ?? 0 });
+    case 'explosives_in_transit': {
+      const arrivalTick = readOrderDeliveryTick(action) ?? 0;
+      const when = formatGameClock(arrivalTick);
+      return nowTick === undefined
+        ? t('notification.order_blocked_in_transit_no_eta', { order, when })
+        : t('notification.order_blocked_in_transit', {
+          order, when, duration: formatGameDuration(Math.max(0, arrivalTick - nowTick)),
+        });
+    }
     case 'debris_out_of_reach':
       // Not toasted from update() (one summary pip instead); the Operations panel shows it per order.
       return t('notification.order_stranded_debris', { order });

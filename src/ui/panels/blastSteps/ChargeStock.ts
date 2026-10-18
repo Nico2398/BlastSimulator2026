@@ -2,6 +2,8 @@
 // Stock per offered explosive, buy-into-stock control and the paid-from line.
 // A pure view builder (core numbers in, plain data out) plus a small renderer.
 
+import { formatGameClock } from '../../formatGameClock.js';
+import { formatGameDuration } from '../../formatGameDuration.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { el, stepper, sectionHeader, button } from '../../dom.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -66,6 +68,15 @@ export function buildStockView(
   };
 }
 
+/** Banner text for an in-transit delivery (shown atop the Charge step), or null when nothing is in transit (#1966). */
+export function deliveryTransitText(view: Pick<StockView, 'inTransitUntilTick' | 'nowTick'>): string | null {
+  if (view.inTransitUntilTick === null) return null;
+  return t('ui.blast_workshop.charge.delivery_transit', {
+    when: formatGameClock(view.inTransitUntilTick),
+    duration: formatGameDuration(Math.max(0, view.inTransitUntilTick - view.nowTick)),
+  });
+}
+
 export class ChargeStockBlock {
   private readonly el: HTMLElement;
   private readonly rowsEl: HTMLElement;
@@ -123,11 +134,7 @@ export class ChargeStockBlock {
     const notes: HTMLElement[] = [paid];
     // No hint for a fully stock-covered pattern; a stocked warehouse is what makes that so.
     if (view.uncoveredKg > 0) {
-      notes.push(this.noteEl('delivery-hint', t('ui.blast_workshop.charge.delivery_hint', { ticks: view.deliveryTicks })));
-    }
-    if (view.inTransitUntilTick !== null) {
-      const remaining = Math.max(0, view.inTransitUntilTick - view.nowTick);
-      notes.push(this.noteEl('delivery-transit', t('ui.blast_workshop.charge.delivery_transit', { tick: view.inTransitUntilTick, remaining })));
+      notes.push(this.noteEl('delivery-hint', t('ui.blast_workshop.charge.delivery_hint', { duration: formatGameDuration(view.deliveryTicks) })));
     }
     this.paidEl.replaceChildren(...notes);
   }

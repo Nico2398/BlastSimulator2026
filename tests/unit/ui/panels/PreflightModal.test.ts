@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
+import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
+import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -559,5 +561,56 @@ describe('PreflightModal ore estimate coverage (#1960)', () => {
     });
     expect(costs[0]).toMatch(/^\$/);
     expect(new Set(costs).size).toBe(1);
+  });
+});
+
+describe('PreflightModal delivery wait (#1966)', () => {
+  function inTransitState(): GameState {
+    const state = makeState();
+    state.tickCount = 280;
+    state.cash = 100_000;
+    state.finances.cash = 100_000;
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    dispatchChargeAction(state, { id: hole.id, x: 10, z: 10 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    return state;
+  }
+
+  afterEach(() => setLocale('en'));
+
+  it('warns that explosives are on the way, with day, hour and duration and no tick', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(inTransitState(), 'sunny');
+
+    const text = modal.root.textContent ?? '';
+    expect(text).toContain('Day 29, 08:00');
+    expect(text).toContain(formatGameDuration(400));
+    expect(text).not.toContain('tick');
+  });
+
+  it('does not show the loading warning for a hole that is only waiting for delivery', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(inTransitState(), 'sunny');
+    expect(modal.root.textContent).not.toContain(t('ui.blast_workshop.preflight.warn_charge_loading', { count: 1 }));
+    expect(modal.root.textContent).not.toContain('still being charged');
+  });
+
+  it('keeps the loading warning for a hole that is really loading', () => {
+    const { modal } = makeModal();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.plannedChargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    modal.show();
+    modal.update(state, 'sunny');
+    expect(modal.root.textContent).toContain(t('ui.blast_workshop.preflight.warn_charge_loading', { count: 1 }));
+  });
+
+  it('shows the French clock in French', () => {
+    setLocale('fr');
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(inTransitState(), 'sunny');
+    expect(modal.root.textContent).toContain('Jour 29, 08h00');
   });
 });
