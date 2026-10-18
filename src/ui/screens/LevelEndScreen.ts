@@ -34,6 +34,7 @@ const DEFEAT_ICON: Record<DefeatReason, IconName> = {
   arrest: 'gavel',
   ecological_shutdown: 'water',
   worker_revolt: 'union',
+  fired: 'gavel',
 };
 
 export class LevelEndScreen {
@@ -417,6 +418,8 @@ export class LevelEndScreen {
     const days = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
 
     switch (reason) {
+      case 'fired':
+        return []; // TODO: implement board-fired stats (#1946)
       case 'bankruptcy':
         return [
           { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash), color: 'var(--bsx-critical-text)' },

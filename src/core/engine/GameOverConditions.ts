@@ -30,6 +30,7 @@ export function checkGameOverConditions(state: GameState, emitter: EventEmitter)
       ecoShutdown: false,
       arrested: false,
       revolted: false,
+      fired: false,
       levelEndReason: state.levelEndReason,
     };
   }
@@ -74,6 +75,7 @@ export function checkGameOverConditions(state: GameState, emitter: EventEmitter)
     ecoShutdown,
     arrested,
     revolted,
+    fired: false,
     levelEndReason: state.levelEndReason,
   };
 }

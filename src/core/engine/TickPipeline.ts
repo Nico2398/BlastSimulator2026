@@ -73,6 +73,7 @@ import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
 import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles, flushUnannouncedLeaves } from './Mount.js';
+import type { BoardReview } from '../economy/Board.js';
 
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
@@ -100,12 +101,15 @@ export interface GameOverReport {
   ecoShutdown: boolean;
   arrested: boolean;
   revolted: boolean;
+  fired: boolean;
   levelEndReason: GameState['levelEndReason'];
 }
 
 /** Structured result of advancing the simulation by one tick. */
 export interface TickReport {
   tick: number;
+  /** Quarterly board review result, when one ran this tick (#1946). */
+  boardReview?: BoardReview | null;
   contractsExpired: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }>;
   /** Stored ore automatically delivered to active contracts this tick. */
   contractsDelivered: Array<{ contractId: number; kg: number; payment: number; bonus: number; completed: boolean }>;
