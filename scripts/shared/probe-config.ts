@@ -1,13 +1,14 @@
+// BlastSimulator2026 — Progression probe options: defaults, CLI parsing and matrix expansion (#1922)
+
 import type { SandboxKitId } from '../../src/core/config/balance.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 
 export type StrategyId = 'opening' | 'reinvest';
-type KitId = SandboxKitId;
 
 export interface ProbeRunConfig {
   seed: number;
   biome: string;
-  kit: KitId;
+  kit: SandboxKitId;
   strategy: StrategyId;
   horizon: number;
 }
@@ -15,7 +16,7 @@ export interface ProbeRunConfig {
 export interface ProbeOptions {
   seeds: number[];
   biomes: string[];
-  kits: KitId[];
+  kits: SandboxKitId[];
   strategies: StrategyId[];
   horizon: number;
   quick: boolean;
@@ -36,9 +37,9 @@ export const PROBE_DEFAULTS: ProbeOptions = {
 
 const QUICK_SEED = 42;
 const QUICK_BIOME = 'desert_badlands';
-const QUICK_KIT: KitId = 'digger';
+const QUICK_KIT: SandboxKitId = 'digger';
 
-const KIT_IDS: readonly KitId[] = ['digger', 'full'];
+const KIT_IDS: readonly SandboxKitId[] = ['digger', 'full'];
 const STRATEGY_IDS: readonly StrategyId[] = ['opening', 'reinvest'];
 
 function parseList(flag: string, raw: string | undefined): string[] {

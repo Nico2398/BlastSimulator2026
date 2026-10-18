@@ -5,7 +5,8 @@
 //
 // Plays the reference strategies headlessly through the console core and prints
 // a markdown table (stdout, deterministic) of the economy curve; timing goes to
-// stderr. `--quick` is one site (desert_badlands, digger, seed 42) to 3000 ticks.
+// stderr. `--quick` is one site (desert_badlands, digger, seed 42) to 3000 ticks;
+// it still runs both strategies (2 rows) unless `--strategy` is given.
 //
 // The full default matrix (24 runs to 10000 ticks) outlives one foreground Bash
 // call, so run it detached and wait inside the same turn, always with an

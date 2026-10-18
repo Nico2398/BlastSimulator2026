@@ -74,11 +74,11 @@ describe('progression probe integration', () => {
     expectFiniteOrAllowedNull(r, 600);
   }, 60000);
 
-  it('never crashes on failure: endReason is null or names the failed opening step', () => {
+  it('never crashes on failure: endReason is null or a reason the run loop produces', () => {
     const r = runProbe({
       seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'opening', horizon: 300,
     });
-    if (r.endReason !== null) expect(r.endReason).toMatch(/^opening_failed:.+|.+/);
+    if (r.endReason !== null) expect(r.endReason).toMatch(/^(opening_failed:\w+|stalled|game_over:.+)$/);
     expectFiniteOrAllowedNull(r, 300);
   }, 60000);
 });

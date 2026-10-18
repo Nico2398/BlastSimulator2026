@@ -25,21 +25,22 @@
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
 //            Calibration tasks extend this list; keep each rule one short block.
+//            The blast rule is gated (threshold, nothing queued), so reinvest rarely
+//            re-fires a blast; deposits are ranked on ground-truth ore, not a survey.
 
-import { createGameEngine, resolvePendingEvent } from './command-runner.js';
+import { createGameEngine } from './command-runner.js';
 import { runCommand } from '../../src/console/createRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { computeVoxelColumnSurfaceY, getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
-import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
 import { nextGradeTargets } from '../../src/core/economy/MineGrade.js';
 import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
 import { getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
-import { playContracts, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
-import { MetricsObserver, type RunResult } from './probe-metrics.js';
+import { playContracts, playTick, clearBlastZone, stockWarehouse, type Run } from './player-actions.js';
+import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
 import { expandMatrix } from './probe-config.js';
 
@@ -139,13 +140,11 @@ function rallyOf(s: ProbeSession): Pattern {
 
 /** Haulable (not oversized) ore on the ground, kg. */
 function haulableOreOnGroundKg(state: GameState): number {
-  const ore: Record<string, number> = {};
-  for (const f of state.logistics.fragments) {
-    if (f.state === 'on_ground' && !isOversized(f.fragment.volume)) {
-      accumulateOreMass(ore, f.fragment.volume, f.fragment.oreDensities);
-    }
-  }
-  return Object.values(ore).reduce((a, b) => a + b, 0);
+  return fragmentOreKg(
+    state.logistics.fragments
+      .filter(f => f.state === 'on_ground' && !isOversized(f.fragment.volume))
+      .map(f => f.fragment),
+  );
 }
 
 // ── Building placement ──
@@ -293,13 +292,20 @@ function tryOnce(s: ProbeSession, m: ReinvestMemory, key: string, attempt: () =>
   return ok;
 }
 
+/** Order the next shot unless a recent attempt failed; null when none was ordered. */
+function orderShotOnce(s: ProbeSession, m: ReinvestMemory): Shot | null {
+  let ordered: Shot | null = null;
+  tryOnce(s, m, 'shot', () => (ordered = orderShot(s)) !== null);
+  return ordered as Shot | null; // assigned inside the closure, which TS narrowing cannot see
+}
+
 function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
   const shot = m.shot;
   if (!shot) {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
     if (idle && haulableOreOnGroundKg(s.state) < RELOAD_THRESHOLD_KG) {
-      m.shot = tryOnce(s, m, 'shot', () => (m.shot = orderShot(s)) !== null) ? m.shot : null;
+      m.shot = orderShotOnce(s, m);
     }
     return;
   }
@@ -376,10 +382,7 @@ function createSession(config: ProbeRunConfig, observer: MetricsObserver): Probe
       if (/^tick\b/.test(cmd)) afterTick();
       return result;
     },
-    tick: () => {
-      resolvePendingEvent(engine);
-      session.run('tick 1');
-    },
+    tick: () => playTick(session.run, session.state),
     waitFor: (step, done) => {
       const started = session.state.tickCount;
       while (!done()) {
@@ -421,6 +424,7 @@ export function runProbe(config: ProbeRunConfig): RunResult {
   return { config, metrics: observer.finalize(), endTick, endReason };
 }
 
+/** Every run of the option matrix, in order; `onResult` sees each as it finishes. */
 export function runMatrix(
   opts: ProbeOptions,
   onResult?: (result: RunResult) => void,

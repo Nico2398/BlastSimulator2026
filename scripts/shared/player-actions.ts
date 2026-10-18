@@ -10,9 +10,18 @@ import type { GameState } from '../../src/core/state/GameState.js';
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
 
+/**
+ * Resolve a pending event with its first option (`event choose 0`); a no-op when none is pending.
+ * `tick` refuses to advance while an event is pending, so every headless tick loop answers it first.
+ * The one home of that rule: playTick, the probe and command-mode `waitUntil` all go through it.
+ */
+export function resolvePendingEvent(run: Run, state: Pick<GameState, 'events'> | null | undefined): void {
+  if (state?.events.pendingEvent) run('event choose 0');
+}
+
 /** One ordinary player tick: resolve a pending event, then let time pass. */
 export function playTick(run: Run, state: GameState): void {
-  if (state.events.pendingEvent) run('event choose 0');
+  resolvePendingEvent(run, state);
   run('tick 1');
 }
 

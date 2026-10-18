@@ -84,3 +84,14 @@ No constant was changed.
 - `reinvest` rarely re-fires blasts: 2 of 12 runs got a second blast. A grade was reached only in those 2 runs (`g1@9293` desert, `g1@4425` green_foothills; both digger/seed 42/reinvest), and no run reached a second grade. Grade progression is barely exercised by this baseline.
 - Median rows mix survivors and bankrupt runs per column; read `bankrupt` and `end` before trusting a median.
 - Runs that go bankrupt early leave `-` in later cash columns.
+
+## Known deviations
+
+Where the probe's numbers differ from what their column names suggest. None changes the baseline above; each is documented in the code.
+
+- `low cash` / `low tick` is the global minimum of cash over the whole run, not strictly the opening's dip. A later dip below the opening's low point replaces it.
+- `boulderSold` is an upper-bound proxy: boulder ore that no longer lies as a boulder (broken, hauled or sold). Broken pieces are new fragments and the probe keeps no lineage, so broken counts as sold. 100% therefore carries little information.
+- Median rows are taken over the non-null runs of each column only. A column's median can rest on fewer than 3 runs (bankrupt runs leave `-`), and the `-` cells in a median row mean no run had a value.
+- `reinvest` rarely re-fires blasts: the next blast is ordered only when haulable ore on the ground is under the reload threshold and no drill or charge work is queued (the idle gate). Calibration tasks extend the policy.
+- `--quick` runs both strategies (2 rows) on the single quick site unless `--strategy` is given.
+- Deposit ranking reads ground-truth ore densities from the voxel grid, not a survey estimate. The probe does not model surveying.

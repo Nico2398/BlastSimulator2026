@@ -1,5 +1,7 @@
+// BlastSimulator2026 — Progression probe metrics: the per-tick observer and run result (#1922)
+
 import type { GameState } from '../../src/core/state/GameState.js';
-import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
+import type { BlastReport, FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
 import { getBuildingDef, getUpgradeCost } from '../../src/core/entities/Building.js';
@@ -7,6 +9,7 @@ import { getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
 import type { ProbeRunConfig } from './probe-config.js';
 
+/** Ticks at which cash is sampled for the report. */
 export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000] as const;
 
 interface ProbeMetrics {
@@ -39,7 +42,12 @@ const BOULDER_SCAN_INTERVAL_TICKS = 50;
 /** Tick by which the first blast's sold share is read. */
 const FIRST_BLAST_SOLD_TICK = 6000;
 
-const sumValues = (rec: Record<string, number>): number => Object.values(rec).reduce((a, b) => a + b, 0);
+/** Ore kg (all ore types) inside `fragments`, summed per ore type first and then across types. */
+export function fragmentOreKg(fragments: Iterable<Pick<FragmentData, 'volume' | 'oreDensities'>>): number {
+  const ore: Record<string, number> = {};
+  for (const f of fragments) accumulateOreMass(ore, f.volume, f.oreDensities);
+  return Object.values(ore).reduce((a, b) => a + b, 0);
+}
 
 /**
  * Reads the game once per tick and condenses the run into ProbeMetrics. Pure
@@ -53,7 +61,9 @@ const sumValues = (rec: Record<string, number>): number => Object.values(rec).re
  * - boulder sold share: boulder ore (oversized fragments at blast time) that is
  *   no longer lying as a boulder (broken, hauled or sold). Broken pieces are new
  *   fragments, so "sold" cannot be told from "broken" without lineage; this is
- *   an upper bound on the sold share. Null without a fragmenter or boulder ore.
+ *   an upper-bound proxy (100% carries little information). Null without a
+ *   fragmenter or boulder ore.
+ * - low point: the global run minimum of cash, not strictly the opening's dip.
  * - affordable ticks: first tick cash covers the catalog cost (in-place upgrade
  *   cost for the warehouse; vehicle price plus a driver's hiring fee for the hauler).
  */
@@ -113,17 +123,13 @@ export class MetricsObserver {
     this.lastReport = report;
     this.blastsFired++;
     if (this.blastsFired === 1) {
-      const ore: Record<string, number> = {};
-      for (const f of state.logistics.fragments) accumulateOreMass(ore, f.fragment.volume, f.fragment.oreDensities);
-      this.firstBlastOreKg = sumValues(ore);
+      this.firstBlastOreKg = fragmentOreKg(state.logistics.fragments.map(f => f.fragment));
     } else if (this.blastsFired === 2) {
       this.soldAtSecondBlastKg = state.grade?.oreDeliveredKg ?? null;
     }
     for (const f of state.logistics.fragments) {
       if (f.state !== 'on_ground' || !isOversized(f.fragment.volume) || this.boulderOreKg.has(f.fragment.id)) continue;
-      const ore: Record<string, number> = {};
-      accumulateOreMass(ore, f.fragment.volume, f.fragment.oreDensities);
-      const kg = sumValues(ore);
+      const kg = fragmentOreKg([f.fragment]);
       if (kg <= 0) continue;
       this.boulderOreKg.set(f.fragment.id, kg);
       this.boulderTotalKg += kg;
