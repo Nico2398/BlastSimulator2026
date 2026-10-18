@@ -30,8 +30,10 @@ describe('probe-report formatTable', () => {
   const table = formatTable(results);
   const lines = table.split('\n').filter(l => l.trim().length > 0);
 
-  it('emits a markdown table: header, separator, one row per run', () => {
-    expect(lines).toHaveLength(2 + results.length);
+  it('emits a markdown table: header, separator, one row per run, a median row per multi-run group', () => {
+    // both runs share biome/kit/strategy, so one median row follows them
+    expect(lines).toHaveLength(2 + results.length + 1);
+    expect(lines[2 + results.length]).toContain('median(2)');
     expect(lines[0].startsWith('|')).toBe(true);
     expect(lines[1]).toMatch(/^\|[\s:|-]+\|$/);
     expect(lines[1]).toContain('---');
@@ -49,7 +51,7 @@ describe('probe-report formatTable', () => {
   it('includes every metric column', () => {
     const header = lines[0].toLowerCase();
     for (const col of [
-      'seed', 'biome', 'kit', 'strategy', 'lowpoint', 'bankrupt', 'blasts',
+      'seed', 'biome', 'kit', 'strategy', 'low cash', 'low tick', 'bankrupt', 'blasts',
       'warehousefull', 'boulder', 'grade', 'warehouset2', 'researchcenter', 'secondhauler',
     ]) {
       expect(header).toContain(col);

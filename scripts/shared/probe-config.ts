@@ -2,7 +2,7 @@ import type { SandboxKitId } from '../../src/core/config/balance.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
 
 export type StrategyId = 'opening' | 'reinvest';
-export type KitId = SandboxKitId;
+type KitId = SandboxKitId;
 
 export interface ProbeRunConfig {
   seed: number;

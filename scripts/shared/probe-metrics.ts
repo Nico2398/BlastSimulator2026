@@ -9,7 +9,7 @@ import type { ProbeRunConfig } from './probe-config.js';
 
 export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000] as const;
 
-export interface ProbeMetrics {
+interface ProbeMetrics {
   cashAt: Record<number, number | null>;
   lowPointCash: number;
   lowPointTick: number;
