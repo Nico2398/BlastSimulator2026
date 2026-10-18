@@ -172,7 +172,7 @@ export class PreflightModal {
     const validationErrors = validateBlastPlan(plan, loadingHoleIds, deliveryArrivals);
     const awaitingArrivals = validationErrors
       .filter(e => e.issue === 'blast.validation.charge_awaiting_delivery')
-      .map(e => e.arrivalTick as number);
+      .flatMap(e => (e.arrivalTick === undefined ? [] : [e.arrivalTick]));
     const awaitingCount = awaitingArrivals.length;
     const earliestArrival = awaitingCount > 0 ? Math.min(...awaitingArrivals) : null;
     const loadingCount = validationErrors.filter(e => e.issue === 'blast.validation.charge_loading').length;

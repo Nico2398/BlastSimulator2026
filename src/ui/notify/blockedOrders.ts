@@ -59,13 +59,13 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
       return t('notification.order_blocked_spoil_heap_full', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
-    case 'explosives_in_transit':
-    {
-      const when = formatGameClock(readOrderDeliveryTick(action) ?? 0);
+    case 'explosives_in_transit': {
+      const arrivalTick = readOrderDeliveryTick(action) ?? 0;
+      const when = formatGameClock(arrivalTick);
       return nowTick === undefined
         ? t('notification.order_blocked_in_transit_no_eta', { order, when })
         : t('notification.order_blocked_in_transit', {
-          order, when, duration: formatGameDuration(Math.max(0, (readOrderDeliveryTick(action) ?? 0) - nowTick)),
+          order, when, duration: formatGameDuration(Math.max(0, arrivalTick - nowTick)),
         });
     }
     case 'debris_out_of_reach':
