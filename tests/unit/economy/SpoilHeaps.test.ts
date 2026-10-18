@@ -35,6 +35,25 @@ describe('isBarrenFragment', () => {
     expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD })).toBe(true);
   });
 
+  it('a scaled fragment is barren only at or below threshold * scale (#1932)', () => {
+    const scale = 0.2;
+    const edge = SPOIL_BARREN_ORE_FRACTION_THRESHOLD * scale;
+    expect(isBarrenFragment({ blingite: edge }, scale)).toBe(true);
+    expect(isBarrenFragment({ blingite: edge * 1.5 }, scale)).toBe(false);
+  });
+
+  it('a fragment scaled by s at gradeScale s classifies like the unscaled one at scale 1 (#1932)', () => {
+    const scale = 0.2;
+    for (const d of [0.005, 0.02, 0.03, 0.5]) {
+      expect(isBarrenFragment({ blingite: d * scale }, scale)).toBe(isBarrenFragment({ blingite: d }, 1));
+    }
+  });
+
+  it('scale 1 behaves as today (#1932)', () => {
+    expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD }, 1)).toBe(true);
+    expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD + 0.001 }, 1)).toBe(false);
+  });
+
   it('just above the threshold is not barren', () => {
     expect(isBarrenFragment({ blingite: SPOIL_BARREN_ORE_FRACTION_THRESHOLD + 0.001 })).toBe(false);
   });

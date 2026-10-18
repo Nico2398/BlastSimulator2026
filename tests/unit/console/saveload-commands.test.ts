@@ -12,6 +12,7 @@ import { requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION } from '../../../sr
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 import { stateForSave, loadGridForState } from '../../../src/console/commands/world.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 import type { SerializedVoxels } from '../../../src/core/state/VoxelGridCodec.js';
 
 function makeCtx(): MiningContext {
@@ -225,6 +226,30 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     });
   });
 
+  it.each([
+    ['zero', 0],
+    ['negative', -0.5],
+    ['above 1', 1.5],
+  ])('refuses a voxels-path save whose world.oreGradeScale is invalid (%s), leaving ctx unchanged (#1932)', (_l, scale) => {
+    const ctx = makeCtx();
+    const refusal = expectRefusedUnchanged(ctx, () => {
+      const source = makeCtx();
+      const saved = JSON.parse(serialize(stateForSave(source, source.state!))) as { world: { oreGradeScale?: unknown } };
+      saved.world.oreGradeScale = scale;
+      return loadGridForState(ctx, deserialize(JSON.stringify(saved)));
+    });
+    expect(refusal).toBe(t('world.terrain_save_corrupt'));
+  });
+
+  it('a valid world.oreGradeScale survives save then load (#1932)', () => {
+    const source = makeCtx();
+    source.state!.world!.oreGradeScale = 0.2;
+    expect(saveCommand(source, [], { slot: 'ore-grade-scale' }).success).toBe(true);
+    const ctx = makeCtx();
+    expect(loadCommand(ctx, [], { slot: 'ore-grade-scale' }).success).toBe(true);
+    expect(ctx.state!.world!.oreGradeScale).toBe(0.2);
+  });
+
   it('refuses to load a save whose voxels payload has a malformed "added" edit segment (no composition), leaving ctx unchanged', () => {
     const ctx = makeCtx();
     expectRefusedUnchanged(ctx, () => loadTampered(ctx, v => {
@@ -385,5 +410,38 @@ describe("loadGridForState — no-voxels fallback rejects a corrupted world size
   // at its exact ceiling.
   it('accepts a value exactly at MAX_TERRAIN_GEN_DIMENSION (regression guard against over-rejection)', () => {
     expect(requireValidGenDimension(MAX_TERRAIN_GEN_DIMENSION, 'world.baseSizeX')).toBe(MAX_TERRAIN_GEN_DIMENSION);
+  });
+});
+
+describe('loadCommand — no-voxels fallback rejects an invalid world.oreGradeScale (#1932)', () => {
+  it.each([
+    ['zero', 0],
+    ['negative', -1],
+    ['above 1', 2],
+  ])('refuses a no-voxels save with oreGradeScale %s, leaving ctx unchanged', (_l, scale) => {
+    const buildCtx = makeCtx();
+    buildCtx.state!.world!.oreGradeScale = scale;
+    buildCtx.grid = null;
+    expect(saveCommand(buildCtx, [], { slot: `bad-grade-${_l}` }).success).toBe(true);
+
+    const ctx = makeCtx();
+    const stateBefore = ctx.state;
+    const gridBefore = ctx.grid;
+    const result = loadCommand(ctx, [], { slot: `bad-grade-${_l}` });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain(t('world.terrain_save_corrupt'));
+    expect(ctx.state).toBe(stateBefore);
+    expect(ctx.grid).toBe(gridBefore);
+  });
+
+  it('a valid scale on a no-voxels save loads and is kept', () => {
+    const buildCtx = makeCtx();
+    buildCtx.state!.world!.oreGradeScale = 0.5;
+    buildCtx.grid = null;
+    expect(saveCommand(buildCtx, [], { slot: 'ok-grade' }).success).toBe(true);
+    const ctx = makeCtx();
+    expect(loadCommand(ctx, [], { slot: 'ok-grade' }).success).toBe(true);
+    expect(ctx.state!.world!.oreGradeScale).toBe(0.5);
   });
 });

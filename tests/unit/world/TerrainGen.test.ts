@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
-  requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION,
+  requireValidGenDimension, requireValidGenDatum, requireValidPitMask, requireValidOreGradeScale, MAX_TERRAIN_GEN_DIMENSION,
   climateBiasLandingOn, resolveGeneratedBiome,
   isInBorderZone, TERRAIN_GENERATOR_VERSION,
   type TerrainConfig,
@@ -816,5 +816,15 @@ describe('requireValidPitMask — envelope fields (#1734)', () => {
     ['negative cornerRadius', { cornerRadius: -3 }],
   ])('rejects %s with the corrupt-save error', (_label, extra) => {
     expect(() => requireValidPitMask({ ...full, ...extra }, 'world.pitMask')).toThrow(/corrupt save: world\.pitMask is not a valid pit mask/);
+  });
+});
+
+describe('requireValidOreGradeScale (#1932)', () => {
+  it.each([[0.2], [1], [0.0001], [0.5]])('accepts %s', (v) => {
+    expect(requireValidOreGradeScale(v, 'world.oreGradeScale')).toBe(v);
+  });
+
+  it.each([[0], [-0.1], [1.0001], [2], [NaN], [Infinity], [-Infinity]])('rejects %s with the corrupt-save error', (v) => {
+    expect(() => requireValidOreGradeScale(v, 'world.oreGradeScale')).toThrow(/corrupt save: world\.oreGradeScale is not a valid ore grade scale/);
   });
 });
