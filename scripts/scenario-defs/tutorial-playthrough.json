@@ -10,18 +10,18 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:400000",
+      "command": "campaign start level:tutorial_pit cash:700000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:400000"
+          "command": "campaign start level:tutorial_pit cash:700000"
         }
       ],
-      "description": "#553: cash bumped from $80,000 to $188,648 -- drill_hole is now a queued, vehicle-gated action, so this file needs a drill_rig (tier-1 purchaseCost $35,000, VEHICLE_STATS in balance.ts) it never used to, and it needs a second one -- plus a second driller -- after the first blast kills its crew and destroys the rig standing among the holes it just drilled, plus the 190 ticks the two drillers spend sinking the two patterns ($37,648 of payroll, fuel and maintenance). The bump is exactly those four, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #555: bumped again to $260,000 -- dig_ramp_segment is now gated the same way, so this file also needs a rock_digger (tier-1 purchaseCost $50,000) it never used to, plus the extra payroll/fuel/maintenance drain of the real ticks the ramp order now spends actually digging instead of completing in the same tick it was ordered.",
+      "description": "#553: cash bumped from $80,000 to $188,648 -- drill_hole is now a queued, vehicle-gated action, so this file needs a drill_rig (tier-1 purchaseCost $35,000, VEHICLE_STATS in balance.ts) it never used to, and it needs a second one -- plus a second driller -- after the first blast kills its crew and destroys the rig standing among the holes it just drilled, plus the 190 ticks the two drillers spend sinking the two patterns ($37,648 of payroll, fuel and maintenance). The bump is exactly those four, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #555: bumped again to $260,000 -- dig_ramp_segment is now gated the same way, so this file also needs a rock_digger (tier-1 purchaseCost $50,000) it never used to, plus the extra payroll/fuel/maintenance drain of the real ticks the ramp order now spends actually digging instead of completing in the same tick it was ordered. #1895: opening cash 400000 -> 700000 so the crew is paid through the two explosives delivery waits.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 400000
+          "cash": 700000
         }
       }
     },
@@ -370,6 +370,17 @@
       }
     },
     {
+      "command": "set_policy mode:shift_8h fatigue:60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h fatigue:60"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:1.8",
       "description": "#1774: 5 kg, not 4 -- a 4 kg shot in a 6 m hole leaves the rubble sealed under the cap (BURDEN_BREAKOUT_MAX), sealed rock gets no haul order, and the crater stays stepped so the later build_ramp click at (15,15) cannot resolve its tile. 5 kg breaks out, the rubble is hauled as before. #1724: the panel's Charge All default is now 7 kg, so the click path sets the amount stepper explicitly and runs the same shot as the command (this file keeps its own 4 kg geometry; at 7 kg the first blast buries the site and the warehouse is never built). #949: retuned from amount:5 stemming:2 -- the tutorial's own catastrophic-rated shot got its overload/under-stemming fixed at tutorialSteps.ts's own (different) geometry, and this file's first blast (fired before any box-cut free face exists) gets the same directional tuning applied to its own 3x3/spacing:3/depth:6 pattern: stemming raised to >= 0.3x depth (1.8m at depth 6) and amount dropped from 5kg to 4kg. Exact safe values for this specific geometry were verified to run clean via the command-mode scenario run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough` -- 59/59 steps OK).",
       "interaction": [
@@ -407,8 +418,8 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -423,8 +434,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -434,6 +445,17 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Back to the continuous, no-rest policy this file runs under now the shipment has arrived and the crew has loaded it."
     },
     {
       "command": "blast",
@@ -1009,8 +1031,8 @@
       "role": "observe"
     },
     {
-      "command": "set_policy mode:shift_8h",
-      "description": "Rally point (#1772 CI): the click now selects the shift_8h mode button before Apply. It used to press Apply alone, which re-applied the panel's current selection -- the continuous mode the bootstrap step at the top of this file set -- so the browser ran the rest of the file under continuous while command mode switched to shift_8h. Every figure after this step drifted apart from there (the second drill pattern landed 8 ticks apart), and with the crew now gathered around the rally flag the drift reached blast 2's casualty count: 5 in the browser, 4 in command mode. The fatigue input is left as the panel shows it (0), matching the command, which sets no threshold.",
+      "command": "set_policy mode:shift_8h fatigue:60",
+      "description": "Rally point (#1772 CI): the click now selects the shift_8h mode button before Apply. It used to press Apply alone, which re-applied the panel's current selection -- the continuous mode the bootstrap step at the top of this file set -- so the browser ran the rest of the file under continuous while command mode switched to shift_8h. Every figure after this step drifted apart from there (the second drill pattern landed 8 ticks apart), and with the crew now gathered around the rally flag the drift reached blast 2's casualty count: 5 in the browser, 4 in command mode. The fatigue input is left as the panel shows it (0), matching the command, which sets no threshold. #1895: fatigue:60 restores the default rest threshold the file's earlier fatigue:0 had zeroed, so the idle crew rests through the second explosives delivery wait instead of sliding into a revolt.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1399,8 +1421,8 @@
       "role": "player"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -1415,8 +1437,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",

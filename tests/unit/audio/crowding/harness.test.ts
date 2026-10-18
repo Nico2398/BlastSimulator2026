@@ -215,6 +215,7 @@ describe('CrowdSim blast', () => {
     sim.command('time resume');
     sim.command('drill_plan grid rows:1 cols:2 spacing:3 depth:6 start:15,15');
     sim.waitUntil(() => sim.state!.plannedDrillHoles.length === 0, 900);
+    sim.state!.cash = Math.max(sim.state!.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll; funding is not the subject
     sim.command('charge hole:* explosive:boomite amount:5 stemming:2');
     sim.waitUntil(() => Object.keys(sim.state!.plannedChargesByHole).length === 0, 3000);
     sim.command('weather set sunny');

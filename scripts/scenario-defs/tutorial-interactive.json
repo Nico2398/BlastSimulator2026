@@ -838,15 +838,15 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:9 max_ticks:500",
+      "command": "wait_until field:chargedCount equals:9 max_ticks:900",
       "description": "#554-followup round 6 (issue #586 CI): earlier rounds waited only for the FIRST charge to land (tutorialStep flips to 'sequence' the instant chargedCount first increases -- createComparisonStep's isComplete, same premature-advance behaviour as drill-plan above) and moved on with 8 of 9 holes still uncharged. That left 'Auto Sequence' unreachable further down the file: the sequence panel's own auto-sequence control only ever became reachable once every ordered charge had actually landed, so a scenario that stopped at chargedCount:1 could never proceed no matter how the following steps were reshuffled. Waiting for full completion here (chargedCount:9) is the real fix -- the drill-plan step above now also waits for all 9 holes before charging is ordered (round 6), so this order only ever targets the full 9 in the first place, unlike the partial orders earlier rounds were chasing. A 16-hole grid at this same lone-employee, no-living-quarters stage drove a full WORKER REVOLT at cumulative tick 318 (WorkerRevolt.ts's REVOLT_TICKS=120 sticky-zero window); REGION.drill (tutorialStages.ts) was fixed at the source to restore the tutorial's originally-intended 3x3/9-hole workload, which comfortably finishes charging well short of that threshold.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 9,
-          "maxTicks": 500,
-          "timeoutMs": 180000
+          "maxTicks": 900,
+          "timeoutMs": 260000
         }
       ],
       "role": "player",
@@ -861,7 +861,7 @@
           "orderedChargeCount": 0
         }
       },
-      "timeout": 180
+      "timeout": 260
     },
     {
       "command": "event choose 0",

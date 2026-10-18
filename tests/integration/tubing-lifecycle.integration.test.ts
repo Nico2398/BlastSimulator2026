@@ -6,11 +6,13 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 const GRID = 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12';
 
-function drive(runner: ConsoleRunner, ctx: GameContext, done: () => boolean, maxTicks = 300): void {
+function drive(runner: ConsoleRunner, ctx: GameContext, done: () => boolean, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 300): void {
   for (let i = 0; i < maxTicks && !done(); i++) {
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000); // the delivery wait (#1895) idles the crew on payroll
     for (const emp of ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
     runner.run('tick 1');
   }

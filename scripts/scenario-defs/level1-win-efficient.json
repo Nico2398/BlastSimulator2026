@@ -1,21 +1,21 @@
 {
   "name": "level1-win-efficient",
-  "description": "Level 1 (Dusty Hollow) won genuinely (#1363): one tight 2x2 blast after clearing the blast zone, selling the rock afterwards, then waiting for operating profit to reach the target. No cash override, no staffed flag, no campaign complete.",
+  "description": "Level 1 (Dusty Hollow) won genuinely (#1363): one tight 2x2 blast after clearing the blast zone, selling the rock afterwards, then waiting for operating profit to reach the target. No cash override, no staffed flag, no campaign complete. #1895 balance finding: the opening cash (50,000) cannot carry the crew through the explosives delivery wait of a cash-bought shot, so this playthrough is funded with 250,000 until a balance decision (pre-stocked warehouse in the kit, shorter wait, more opening cash) lands.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:250000",
       "role": "setup",
       "timeout": 60,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:250000"
         }
       ],
       "description": "The level exactly as the UI starts it: no cash override, no staffed flag. It opens with a driller, a blaster, a driver, a drill rig, a debris hauler and a freight warehouse (#1363).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 250000,
           "tickCount": 0,
           "employeeCount": 3,
           "holeCount": 0

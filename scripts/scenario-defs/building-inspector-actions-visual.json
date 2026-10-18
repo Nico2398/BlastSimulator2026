@@ -10,18 +10,18 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 cash:500000 staffed:true",
+      "command": "new_game seed:42 cash:600000 staffed:true",
       "description": "Staffed opening (#551) with a generous cushion: the hauling prefix below, three placed buildings, a Wrecking Rascal, research and an upgrade all draw on one balance. The prefix up to the tick 60 step is hauling-gate's own, so the freight warehouse (building #1) ends up holding hauled ore before the inspector steps start.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:500000 staffed:true"
+          "command": "new_game seed:42 cash:600000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 500000,
+          "cash": 600000,
           "buildingCount": 0
         }
       }
@@ -218,8 +218,8 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -234,8 +234,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -357,8 +357,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "vehicleCount": 4
+        "changedBy": {
+          "vehicleCount": 1
         }
       }
     },
@@ -460,12 +460,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 20",
-      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: ore is delivered to the warehouse (storedMassKg), barren rock to the spoil heap (storedSpoilKg). Rally point (#1772 CI): now that both modes arm and evacuate before the shot (see the `blast detonate` step), the haulers' first loads are ore -- the first warehouse delivery lands inside this block (tick ~230) and the heap receives nothing until the warehouse is full (see the tick 80 block below). This step asserts the first delivery happened, not which kind of rock was nearest.",
+      "command": "tick 70",
+      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: ore is delivered to the warehouse (storedMassKg), barren rock to the spoil heap (storedSpoilKg). Rally point (#1772 CI): now that both modes arm and evacuate before the shot (see the `blast detonate` step), the haulers' first loads are ore -- the first warehouse delivery lands inside this block (tick ~270 once the explosives delivery wait of #1895 has passed) and the heap receives nothing until the warehouse is full (see the tick 80 block below). This step asserts the first delivery happened, not which kind of rock was nearest.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 70"
         }
       ],
       "role": "setup",

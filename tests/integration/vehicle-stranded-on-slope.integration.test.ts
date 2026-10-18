@@ -26,7 +26,8 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { estimateLegDistance } from '../../src/core/engine/PlanItinerary.js';
-import { playContracts, playTick, tickUntil, clearBlastZone, type Run } from '../helpers/playthrough.js';
+import { playContracts, playTick, tickUntil, clearBlastZone, type Run, stockWarehouse } from '../helpers/playthrough.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 const MAX_TICKS = 600;
 
@@ -147,8 +148,9 @@ function playRedCanyonOpening(): { run: Run; ctx: GameContext } {
   ok('build living_quarters at:30,48');
   ok('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:36,32');
   tickUntil(run, state(), 800, () => state().plannedDrillHoles.length === 0);
+  expect(stockWarehouse(run, state(), 'krackle', 72).success).toBe(true); // stock-covered: no delivery wait (#1895)
   ok('charge hole:* explosive:krackle amount:8 stemming:2.5');
-  tickUntil(run, state(), 800, () => Object.keys(state().plannedChargesByHole).length === 0);
+  tickUntil(run, state(), EXPLOSIVE_DELIVERY_TICKS + 800, () => Object.keys(state().plannedChargesByHole).length === 0);
   clearBlastZone(run, state());
   ok('blast detonate');
   ok('build_ramp start:40,12 end:40,31 depth:8');

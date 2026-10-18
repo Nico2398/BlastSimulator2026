@@ -50,6 +50,12 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // trigger but keeps the fatigue threshold (default 60), which is how the
   // crew behaved before the rest applied there. Exact-string, same reasoning.
   'set_policy mode:continuous',
+  // #1895: a cash-bought charge order waits out the explosives delivery (hundreds of idle ticks).
+  // A crew on the no-rest continuous policy sinks into a worker revolt before the shipment lands, so
+  // a scenario hands that wait to the default shift policy (rest at fatigue 60) and, where it keeps
+  // the continuous policy elsewhere, restores it afterwards. Exact strings, same reasoning as above.
+  'set_policy mode:shift_8h',
+  'set_policy mode:shift_8h fatigue:60',
   'weather set',
   'weather',
   'event fire',

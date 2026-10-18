@@ -42,8 +42,9 @@ import { completeDemolition } from '../../src/core/engine/BuildingDemolition.js'
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
 import { destroyBuilding } from '../../src/core/entities/Building.js';
 import { t } from '../../src/core/i18n/I18n.js';
+import { deliverExplosivesNow } from '../helpers/playthrough.js';
 import { addFreightWarehouse, ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
-import { ORE_PRICES as ALL_ORE_PRICES, FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
+import { ORE_PRICES as ALL_ORE_PRICES, FREIGHT_WAREHOUSE_CAPACITY_KG, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
@@ -155,11 +156,13 @@ function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
  * Ticks until every charge ordered by the last `charge hole:*` has landed in
  * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
  */
-function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+function driveChargePlanToCompletion(ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 400): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     tickCommand(ctx, ['1'], {});
   }
 }
@@ -802,6 +805,7 @@ describe('Economy', () => {
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
+    deliverExplosivesNow(ctx.state!); // timing downstream of the charge is the subject, not the delivery wait (#1895)
     driveChargePlanToCompletion(ctx);
 
     const blastResult = blastCommand(ctx as any, [], {});

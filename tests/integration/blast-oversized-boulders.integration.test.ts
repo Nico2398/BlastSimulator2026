@@ -25,6 +25,8 @@ import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { releaseVehicleReservation } from '../../src/core/engine/VehicleReservation.js';
 import { getVehicleReservation } from '../../src/core/entities/Vehicle.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { deliverExplosivesNow } from '../helpers/playthrough.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /**
  * `cash:` is raised above the $50,000 default because `vehicle buy` now
@@ -83,11 +85,13 @@ function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
  * Ticks until every charge ordered by the last `charge hole:*` has landed in
  * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
  */
-function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+function driveChargePlanToCompletion(ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 400): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     tickCommand(ctx, ['1'], {});
   }
 }
@@ -135,6 +139,7 @@ function blastUndercharged(ctx: GameContext): void {
     stemming: '2m',
   });
   expect(chargeResult.success).toBe(true);
+  deliverExplosivesNow(ctx.state!); // timing downstream of the charge is the subject, not the delivery wait (#1895)
   driveChargePlanToCompletion(ctx);
 
   const blastResult = blastCommand(ctx as any, [], {});

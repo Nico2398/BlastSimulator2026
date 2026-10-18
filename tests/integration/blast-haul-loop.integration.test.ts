@@ -14,6 +14,7 @@ import { getSmoothTerrainSurfaceY } from '../../src/core/world/VoxelGrid.js';
 import { employeeClimbReach } from '../../src/core/engine/OrderReachability.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { assertWorldInvariants } from '../../src/core/state/WorldInvariants.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 const RAMP_LANDING = { x: 32, z: 27 };
 
@@ -38,7 +39,7 @@ function blastAndRamp() {
   expect(run('drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:28,18')).toMatchObject({ success: true });
   tickWhile(run, state, () => state.plannedDrillHoles.length === 0, 800);
   expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
+  tickWhile(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 800);
 
   const before = new Map<string, number>();
   for (let z = 10; z < 40; z++) for (let x = 18; x < 50; x++) before.set(`${x},${z}`, getSmoothTerrainSurfaceY(grid, x, z));

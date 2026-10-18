@@ -32,6 +32,12 @@ function order(state: GameState, n: number): void {
   dispatchChargeAction(state, { id: `H${n}`, x: 10 + n * 3, z: 10 }, BOOMITE);
 }
 
+/** An order whose explosives have already arrived, so only fleet/crew reasons can block it (#1895). */
+function orderArrived(state: GameState, n: number): void {
+  order(state, n);
+  state.tickCount = Math.max(state.tickCount, EXPLOSIVE_DELIVERY_TICKS);
+}
+
 const chargeActions = (state: GameState) => state.pendingActions.filter(a => a.type === 'charge_hole');
 
 describe('outstandingChargeBlockedReason (#1660)', () => {
@@ -76,7 +82,7 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
     const state = makeState();
     hireDual(state);
     const truckId = purchaseVehicle(state.vehicles, 'charging_truck', 10, 10).vehicle.id;
-    order(state, 1);
+    orderArrived(state, 1);
     classifyQueuedOrders(state);
     expect(outstandingChargeBlockedReason(state)).toBeNull();
 
@@ -95,7 +101,7 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
     const { employee: driver } = hireEmployee(state.employees, 'driver', new Random(8), 10, 10);
     assignSkill(state.employees, driver.id, LICENCE as never, 1);
     purchaseVehicle(state.vehicles, 'charging_truck', 10, 10);
-    order(state, 1);
+    orderArrived(state, 1);
     classifyQueuedOrders(state);
     expect(outstandingChargeBlockedReason(state)).toBeNull();
 
@@ -108,7 +114,7 @@ describe('outstandingChargeBlockedReason (#1660)', () => {
   it('returns to null once a replacement charging truck is bought', () => {
     const state = makeState();
     hireDual(state);
-    order(state, 1);
+    orderArrived(state, 1);
     classifyQueuedOrders(state);
     expect(outstandingChargeBlockedReason(state)).toBe('no_vehicle_in_fleet');
 

@@ -18,7 +18,7 @@ import { Random } from '../../src/core/math/Random.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
-import { BLAST_DANGER_MARGIN_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { BLAST_DANGER_MARGIN_M, STARTING_SITE_STAFFED_COMPOSITION, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 import { addFreightWarehouseToState } from '../helpers/freightWarehouse.js';
@@ -91,7 +91,7 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
  * qualified too (ROLE_STARTING_QUALIFICATIONS) but must stay exactly where
  * each test put them.
  */
-function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 1500): void {
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 1500): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;

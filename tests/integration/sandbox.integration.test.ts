@@ -10,7 +10,7 @@ import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
 import { SANDBOX_DEFAULTS, SANDBOX_KITS } from '../../src/core/campaign/Sandbox.js';
-import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { addIncome } from '../../src/core/economy/Finance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
@@ -205,7 +205,7 @@ describe('sandbox mode', () => {
     runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;
       }
@@ -400,7 +400,7 @@ describe.each(['digger', 'full'] as const)('sandbox first blast to first sale on
       if (!run(`drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:${x},${z}`).success) continue;
       tickUntil(run, state, 800, () => over() || state.plannedDrillHoles.length === 0);
       run('charge hole:* explosive:boomite amount:5 stemming:2');
-      tickUntil(run, state, 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
+      tickUntil(run, state, EXPLOSIVE_DELIVERY_TICKS + 800, () => over() || Object.keys(state.plannedChargesByHole).length === 0);
       run('sequence auto');
       clearBlastZone(run, state);
       expect(run('blast').success).toBe(true);

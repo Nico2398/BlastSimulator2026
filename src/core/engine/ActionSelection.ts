@@ -433,9 +433,9 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
  */
 export function isChargeHoleClaimable(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'charge_hole') return true;
+  if (isChargeDeliveryPending(action, state.tickCount)) return false;
   const holeId = action.payload['holeId'];
   if (typeof holeId !== 'string') return true;
-  if (isChargeDeliveryPending(action, state.tickCount)) return false;
   return !state.plannedDrillHoles.some(h => h.id === holeId);
 }
 

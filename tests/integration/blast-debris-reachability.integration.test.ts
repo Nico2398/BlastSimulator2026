@@ -42,6 +42,7 @@ import {
   crewRockDigger,
   hireDriver,
 } from '../helpers/blastFixtures.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /**
  * Crews a rock_fragmenter and a debris_hauler (mirrors economy-full-loop.json's
@@ -251,7 +252,7 @@ function fireKrackleShot(run: (cmd: string) => unknown, state: GameState, amount
   expect(state.plannedDrillHoles).toHaveLength(0);
   const chargeResult = run(`charge hole:* explosive:krackle amount:${amountKg} stemming:2`);
   expect(chargeResult).toMatchObject({ success: true });
-  tickToppedUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
+  tickToppedUntil(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
   expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickToppedUntil(run, state, () => state.lastBlastReport !== null, 600);
@@ -477,7 +478,7 @@ function blastSandboxPattern(biome: string, startX: number, startZ: number): San
   expect(run(`drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:${startX},${startZ}`)).toMatchObject({ success: true });
   tickWhile(() => state.plannedDrillHoles.length === 0, 800);
   expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 800);
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 800);
 
   const before = new Map<string, number>();
   for (let z = startZ - 8; z < startZ + 22; z++) for (let x = startX - 10; x < startX + 22; x++) before.set(`${x},${z}`, computeVoxelColumnSurfaceY(grid, x, z)!);
@@ -580,7 +581,7 @@ function blastRampScenario(rampFirst: boolean): RampShot {
   expect(state.plannedDrillHoles).toHaveLength(0);
   expect(state.drillHoles).toHaveLength(9);
   expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 3000);
   expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
   if (rampFirst) {
     tickWhile(() => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 3000);
@@ -684,7 +685,7 @@ function startBenchSession(biome: string, seed: number): BenchSession {
     tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-    tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+    tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 3000);
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
     state.lastBlastReport = null;
     expect(run('blast detonate')).toMatchObject({ success: true });
@@ -814,7 +815,7 @@ function rampIntoCrater(endZ: number, biome = 'desert_badlands', depth = 8): Cra
   tickWhile(() => state.plannedDrillHoles.length === 0, 3000);
   expect(state.plannedDrillHoles).toHaveLength(0);
   expect(run('charge hole:* explosive:krackle amount:8 stemming:2.5')).toMatchObject({ success: true });
-  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, 3000);
+  tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 3000);
   state.lastBlastReport = null;
   expect(run('blast detonate')).toMatchObject({ success: true });
   tickWhile(() => state.lastBlastReport !== null, 400);

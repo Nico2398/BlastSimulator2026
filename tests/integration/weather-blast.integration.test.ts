@@ -10,7 +10,7 @@ import { t } from '../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { forecast, createWeatherCycle } from '../../src/core/weather/WeatherCycle.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
-import { TICKS_PER_DAY } from '../../src/core/config/balance.js';
+import { TICKS_PER_DAY, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /**
  * Wages run every tick and the shift policy rests the crew between jobs, so a
@@ -44,7 +44,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
  * Ticks until every charge ordered by the last `charge hole:*` has landed in
  * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
  */
-function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
+function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 300): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;

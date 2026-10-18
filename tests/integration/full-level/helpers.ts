@@ -10,7 +10,7 @@ import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
-import { VEHICLE_BASE_STATS } from '../../../src/core/config/balance.js';
+import { VEHICLE_BASE_STATS, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
 /**
@@ -94,14 +94,18 @@ export function makeCampaignCtxWithUnlock(levelId: string, opts: { levelDefaultS
 function runTickLoop(
   ctx: GameContext,
   maxIterations: number,
-  opts: { topUpNeeds?: boolean; continueCondition?: () => boolean } = {}
+  opts: { topUpNeeds?: boolean; topUpCash?: boolean; continueCondition?: () => boolean } = {}
 ): void {
-  const { topUpNeeds = false, continueCondition } = opts;
+  const { topUpNeeds = false, topUpCash = false, continueCondition } = opts;
   for (let i = 0; i < maxIterations && (continueCondition ? continueCondition() : true); i++) {
     if (topUpNeeds) {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100;
       }
+    }
+    if (topUpCash) {
+      // The explosive delivery wait (#1895) idles the crew on payroll; funding is not the point here.
+      ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     }
     tickCommand(ctx, ['1'], {});
     if (ctx.state!.events.pendingEvent) {
@@ -146,9 +150,10 @@ export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): vo
  * Resolves pending events and tops up employee need gauges each tick, same
  * reasoning as driveDrillPlanToCompletion above.
  */
-export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 400): void {
   runTickLoop(ctx, maxTicks, {
     topUpNeeds: true,
+    topUpCash: true,
     continueCondition: () => Object.keys(ctx.state!.plannedChargesByHole).length > 0,
   });
 }
@@ -243,7 +248,7 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number,
     amount: '5kg',
     stemming: '2m',
   });
-  driveChargePlanToCompletion(ctx, driveTicks);
+  driveChargePlanToCompletion(ctx, driveTicks + EXPLOSIVE_DELIVERY_TICKS);
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }

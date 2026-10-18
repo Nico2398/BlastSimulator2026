@@ -21,6 +21,7 @@ import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { isOnBuildingRing } from '../../../src/core/nav/BuildingApproach.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -69,11 +70,13 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
  * hole:<id>` has landed in state.chargesByHole (#554), mirroring
  * driveDrillPlanToCompletion above.
  */
-function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 200): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
+    ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
     tickCommand(ctx, ['1'], {});
   }
 }

@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow staffed:false cash:200000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:300000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false cash:200000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:300000"
         }
       ],
       "role": "setup",
@@ -35,12 +35,12 @@
       "description": "#1261/#1207: this campaign start used to opt into agent occupancy explicitly; occupancy is unconditional since #1207, so the wait_until conversions below now genuinely exercise it. Latent occupancy-contention risk worth flagging: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278)."
     },
     {
-      "command": "set_policy mode:continuous fatigue:0",
+      "command": "set_policy mode:shift_8h",
       "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
       "interaction": [
         {
           "type": "command",
-          "command": "set_policy mode:continuous fatigue:0"
+          "command": "set_policy mode:shift_8h"
         }
       ],
       "role": "bootstrap"
@@ -517,16 +517,16 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "command": "wait_until field:chargedCount equals:4 max_ticks:700",
       "description": "#1261: collapsed the 4-chunk fixed `tick 15` charging pad into a single wait_until on chargedCount, same reasoning as the drilling wait above.",
-      "timeout": 90,
+      "timeout": 170,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 4,
-          "maxTicks": 300,
-          "timeoutMs": 90000
+          "maxTicks": 700,
+          "timeoutMs": 170000
         }
       ],
       "role": "setup",
@@ -570,12 +570,12 @@
       "role": "setup"
     },
     {
-      "command": "employee cancel 14",
-      "description": "The dispatched walk is open-ended general work; cancel it so the surveyor is free for the later core_sample (same pattern as vibration-budget). Rally-point spawns: action id 16 -> 14; the hires and purchases now start beside the rally flag, and that timeline queues two fewer actions before this dispatch.",
+      "command": "employee cancel 48",
+      "description": "The dispatched walk is open-ended general work; cancel it so the surveyor is free for the later core_sample (same pattern as vibration-budget). Rally-point spawns: action id 16 -> 14; #1895: the shift rests queued during the explosives delivery wait move it to 48; the hires and purchases now start beside the rally flag, and that timeline queues two fewer actions before this dispatch.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee cancel 14"
+          "command": "employee cancel 48"
         }
       ],
       "role": "bootstrap"

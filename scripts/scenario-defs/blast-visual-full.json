@@ -3,18 +3,18 @@
   "description": "Comprehensive visual pipeline test covering all 7 blast system areas: drill plan, charge, software preview tiers, detonation execution, post-blast report, and voxel fragmentation with multi-angle screenshots at every stage",
   "steps": [
     {
-      "command": "new_game seed:42 cash:200000",
+      "command": "new_game seed:42 cash:500000",
       "timeout": 60,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:200000"
+          "command": "new_game seed:42 cash:500000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 200000,
+          "cash": 500000,
           "holeCount": 0
         }
       },
@@ -374,15 +374,15 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "description": "#601-followup: reverted from #554-followup round 3's hand-measured `tick 56` (+ a round-4 chunked-margin chase for whatever an interruption cost) back to a real `waitUntil`. That detour existed only because interaction mode's own `waitUntil` used to drive the page's real rAF clock, whose overshoot on a loaded runner (not this file's own margin) was what caused round 3's premature WORKER REVOLT -- #601 fixed `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time, exactly like command mode's `runWaitUntil` already did) rather than working around it here. A real `waitUntil` now drains in exactly the ticks needed and no more -- no hand-measured count to keep in sync, no margin to guess, no risk of the unconditional resume ticks round 3/4 needed spending extra decay this file's already-thin crew margin can't afford.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -392,7 +392,7 @@
           "orderedChargeCount": 0
         }
       },
-      "timeout": 120
+      "timeout": 200
     },
     {
       "command": "event choose 0",
@@ -445,15 +445,15 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "description": "#601-followup: reverted from #554-followup round 3's hand-measured `tick 12` (+ a resume-tick chase for whatever an interruption cost) back to a real `waitUntil` -- see the file's own first charge-drain step's note for why: #601 fixed interaction mode's `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time) instead of working around its old real-time overshoot here.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -463,7 +463,7 @@
           "orderedChargeCount": 0
         }
       },
-      "timeout": 120
+      "timeout": 200
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
@@ -504,15 +504,15 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "description": "#601-followup: reverted from #554-followup round 2's hand-measured `tick 5` (+ a widened-and-chained resume chase for whatever an interruption cost) back to a real `waitUntil` -- see the file's own first charge-drain step's note for why: #601 fixed interaction mode's `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time) instead of working around its old real-time overshoot here.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -522,7 +522,7 @@
           "orderedChargeCount": 0
         }
       },
-      "timeout": 120
+      "timeout": 200
     },
     {
       "command": "blast_preview",
