@@ -56,6 +56,8 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // the continuous policy elsewhere, restores it afterwards. Exact strings, same reasoning as above.
   'set_policy mode:shift_8h',
   'set_policy mode:shift_8h fatigue:60',
+  // #1921: mine-grade application has no player UI in v1 (the approval ceremony is a later task).
+  'permit apply',
   'weather set',
   'weather',
   'event fire',

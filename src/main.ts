@@ -899,6 +899,7 @@ window.__gameState = () => {
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
+    mineGrade: s.grade ? { grade: s.grade.grade, pendingTicksLeft: s.grade.pending?.ticksLeft ?? null } : null,
     storedMassKg: s.logistics.storedMassKg,
     storedSpoilKg: totalSpoilKg(s.buildings.buildings),
     // Sum across every material key in state.collectedOre (kg) -- mirrors

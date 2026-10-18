@@ -80,4 +80,10 @@ describe('help lists real subcommands (#1402)', () => {
       expect(runner.run('vehicle move').output).toBe(usage);
     });
   });
+
+  it('permit line lists every real subcommand (#1921)', () => {
+    const line = helpLine('permit');
+    for (const sub of ['status', 'apply']) expect(line).toContain(sub);
+    expect(groupTokens(line).sort()).toEqual(['apply', 'status']);
+  });
 });

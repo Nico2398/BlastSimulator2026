@@ -264,7 +264,7 @@ export function statsCommand(
   const lines = [
     'Level Statistics:',
     `  Total wealth:       $${s.totalWealth.toLocaleString('en-US')}`,
-    `  Max depth:          ${s.maxDepthReached} voxels`,
+    `  Max depth:          ${s.maxDepthReached} m`,
     `  Volume blasted:     ${s.totalVolumeBlasted.toFixed(1)} m³`,
     `  Blasts performed:   ${s.blastsPerformed}`,
     `  Casualties:         ${s.casualties}`,

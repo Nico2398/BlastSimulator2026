@@ -2418,3 +2418,31 @@ describe('serialize/deserialize — unionGrievance (#1890)', () => {
     expect(deserialize(JSON.stringify(parsed)).events.unionGrievance).toBe(0);
   });
 });
+
+describe('serialize/deserialize — mine grade state (#1921)', () => {
+  it('round-trips the grade state including a pending countdown', () => {
+    const state = createGame({ seed: 42 });
+    state.grade = {
+      grade: 1, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5,
+      pending: { toGrade: 2, ticksLeft: 31 },
+    };
+    expect(deserialize(serialize(state)).grade).toEqual(state.grade);
+  });
+
+  it('round-trips a grade state with nothing pending', () => {
+    const state = createGame({ seed: 42 });
+    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null };
+    expect(deserialize(serialize(state)).grade).toEqual(state.grade);
+  });
+
+  it('a site without grade state reloads without one and needs no version bump', () => {
+    const loaded = deserialize(serialize(createGame({ seed: 42 })));
+    expect(loaded.grade).toBeUndefined();
+  });
+
+  it('a malformed grade state is dropped on load', () => {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
+    parsed['grade'] = { grade: 'two', oreDeliveredKg: -3, pending: 7 };
+    expect(deserialize(JSON.stringify(parsed)).grade).toBeUndefined();
+  });
+});

@@ -8,6 +8,7 @@ import {
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
 import type { TutorialProgress } from './TutorialProgress.js';
+import type { GradeState } from '../economy/MineGrade.js';
 import type { PendingDetonation } from '../engine/DetonationSequence.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
@@ -393,6 +394,8 @@ export interface GameState {
   isPaused: boolean;
   /** Tutorial position persisted with the save so load can resume it (#1333). Absent when no tutorial is active. */
   tutorialProgress?: TutorialProgress;
+  /** Mine-grade permit state; present only on progression sites (#1921). */
+  grade?: GradeState;
 
   /** Mine type preset ID used for this game. */
   mineType: string;
