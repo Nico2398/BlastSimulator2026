@@ -1,0 +1,480 @@
+{
+  "name": "sandbox-permit-grade-up",
+  "description": "Mine grades (#1921): a sandbox site starts at grade 0, refuses an application before its targets are met, then after 5 t of ore delivered and 2 blasts fired, `permit apply` books the $20,000 fee and 48 ticks later the site is a Hobby Quarry (grade 1). The state dump's `mineGrade` field carries the grade.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+        }
+      ],
+      "description": "Progression site: the sandbox opens with a permit ladder at grade 0.",
+      "expect": {
+        "equals": {
+          "mineGrade": 0
+        }
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Backyard Dig Permit with the grade-1 targets (5 t ore, 2 blasts) unmet."
+    },
+    {
+      "command": "permit apply",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit apply"
+        }
+      ],
+      "description": "Applying before the targets are met is refused.",
+      "expect": {
+        "equals": {
+          "mineGrade": 0
+        }
+      },
+      "commandOutcome": "refused"
+    },
+    {
+      "command": "build explosive_warehouse at:8,8",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build explosive_warehouse at:8,8"
+        }
+      ],
+      "description": "Stock explosives up front: the crew idles on payroll during a 400-tick delivery wait, which the starting cash cannot pay for twice."
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:400",
+      "role": "setup",
+      "description": "The explosive warehouse is built.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "buy explosive:krackle kg:200",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy explosive:krackle kg:200"
+        }
+      ],
+      "description": "Buy enough krackle for both blasts into the warehouse stock.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:36,30",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:36,30"
+        }
+      ],
+      "description": "Blast 1: order the pattern."
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "Blast 1: the driller lands every ordered hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:6 stemming:2",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:6 stemming:2"
+        }
+      ],
+      "description": "Blast 1: order the charges (from stock, no delivery wait).",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "description": "Blast 1: the blaster loads every charge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast detonate"
+        }
+      ],
+      "description": "Blast 1: fire.",
+      "timeout": 90
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "description": "Blast 1: the sequence evacuates the pattern and fires; the holes are consumed.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "build_ramp start:12,34 end:34,34 depth:6",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build_ramp start:12,34 end:34,34 depth:6"
+        }
+      ],
+      "description": "Ramp into the crater right after blast 1 so the digger and hauler move its ore while blast 2 is prepared (payroll runs every tick; the starting cash cannot afford a serial run)."
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:36,42",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:36,42"
+        }
+      ],
+      "description": "Blast 2: order the pattern."
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "Blast 2: the driller lands every ordered hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:6 stemming:2",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:6 stemming:2"
+        }
+      ],
+      "description": "Blast 2: order the charges (from stock, no delivery wait).",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "description": "Blast 2: the blaster loads every charge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast detonate"
+        }
+      ],
+      "description": "Blast 2: fire.",
+      "timeout": 90
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "description": "Blast 2: the sequence evacuates the pattern and fires; the holes are consumed.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 100",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ],
+      "description": "Haul window part 1/4: no observable condition marks 'enough ore stored' (waitUntil is strict equality), so a bounded tick pad lets the haulers fill the warehouse.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat).",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 100",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ],
+      "description": "Haul window part 2/4: no observable condition marks 'enough ore stored' (waitUntil is strict equality), so a bounded tick pad lets the haulers fill the warehouse.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat).",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract accept type:ore_sale fillable:true"
+        }
+      ],
+      "description": "Accept an ore sale contract to deliver the stored ore against.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:ore_sale fillable:true amount:5000",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver type:ore_sale fillable:true amount:5000"
+        }
+      ],
+      "description": "Deliver at least 5 t of ore: the ore-delivered tracker reaches the grade-1 target.",
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Both grade-1 targets met."
+    },
+    {
+      "command": "permit apply",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit apply"
+        }
+      ],
+      "description": "Apply: the fee is booked under permits and processing starts.",
+      "expect": {
+        "changedBy": {
+          "cash": -20000
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat).",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 47",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 47"
+        }
+      ],
+      "description": "One tick before approval: still grade 0.",
+      "expect": {
+        "equals": {
+          "mineGrade": 0
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat).",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 1",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "description": "Processing ends on the 48th tick: the Ministry stamps the application.",
+      "expect": {
+        "equals": {
+          "mineGrade": 1
+        }
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Hobby Quarry Licence with the grade-2 targets."
+    }
+  ]
+}
