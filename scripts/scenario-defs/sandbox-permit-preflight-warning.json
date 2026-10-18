@@ -328,7 +328,7 @@
       "command": "blast detonate",
       "role": "player",
       "timeout": 90,
-      "description": "Open the preflight: the notification fee and strikes lines and the over-limit warning are listed; DETONATE is still usable. Fire anyway.",
+      "description": "Open the preflight: the notification fee and strikes lines and the over-limit warning are listed.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -349,15 +349,28 @@
         {
           "type": "awaitUsable",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
       "expect": {
-        "usable": ".bs-confirm-overlay .bs-btn-danger"
+        "usable": "[data-action=\"preflight-cancel\"], [data-action=\"preflight-cancel-detonation\"]"
       }
+    },
+    {
+      "command": "blast",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"preflight-detonate\"]",
+          "timeoutMs": 3000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        }
+      ],
+      "description": "Fire from the preflight (DETONATE, or Blast anyway when crew is still inside): the limit is soft, the sequence fires."
     },
     {
       "command": "event choose 0",
