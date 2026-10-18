@@ -10,7 +10,7 @@ type BuildingStatusKind =
   | 'operating' | 'out_of_service' | 'demolition_ordered' | 'upgrading' | 'under_construction';
 
 /** Where the builder of a site stands: no one assigned, walking there, or working. */
-export type BuilderPhase = 'unassigned' | 'on_the_way' | 'working';
+type BuilderPhase = 'unassigned' | 'on_the_way' | 'working';
 
 export interface BuildingStatus {
   kind: BuildingStatusKind;
