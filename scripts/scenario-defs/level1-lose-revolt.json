@@ -600,7 +600,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "#1890: the stretched shared event cooldown shifts the draws; wellBeing now reaches its floor (0) one batch earlier (tick 264 instead of 304), so this batch asserts the floor with `equals` instead of a decrease. employee #12/vehicle #6 has reached the pattern and started drilling in command mode; vehicle #1 (see #591 note above) contributes too. #596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 215->255), same as the other non-interrupted batches in this file, but pinning the running total still couples this step to every batch before it. #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above; wellBeing is still falling toward its floor here (see tick 290 below), so `decreased` is the correct direction. holeCount/orderedHoleCount stay dropped entirely here, and at every remaining tick checkpoint through the revolt below -- pre-#591 direct evidence (two consecutive full local interaction-mode runs of this file, `--mode interaction --port 5246`, both showed employee #12/vehicle #5 never actually landing a single hole through the revolt while command mode lands holes) motivated this relaxation, but #591 changes vehicle #1's own behavior in both modes -- this pairing has not been re-verified against a live interaction-mode run since #591 landed, so the relaxation is left in place rather than re-pinned on an unconfirmed number. The level's own outcome (worker_revolt, same deathCount/employeeCount/revolted/levelEnded/levelEndReason) was unaffected by the mode divergence pre-#591 and remains unaffected post-#591 (sandbox-measured, command mode) -- so this stays a checkpoint relaxation, not a production-code fix, per this batch's own remit.",
+        "note": "#1907: union events run on their own cooldown clock, so the event draws shift again and the revolt lands at tick 439 (was 449), re-measured; still worker_revolt, deathCount 0, no blast fired. #1890: the stretched shared event cooldown shifts the draws; wellBeing now reaches its floor (0) one batch earlier (tick 264 instead of 304), so this batch asserts the floor with `equals` instead of a decrease. employee #12/vehicle #6 has reached the pattern and started drilling in command mode; vehicle #1 (see #591 note above) contributes too. #596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 215->255), same as the other non-interrupted batches in this file, but pinning the running total still couples this step to every batch before it. #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above; wellBeing is still falling toward its floor here (see tick 290 below), so `decreased` is the correct direction. holeCount/orderedHoleCount stay dropped entirely here, and at every remaining tick checkpoint through the revolt below -- pre-#591 direct evidence (two consecutive full local interaction-mode runs of this file, `--mode interaction --port 5246`, both showed employee #12/vehicle #5 never actually landing a single hole through the revolt while command mode lands holes) motivated this relaxation, but #591 changes vehicle #1's own behavior in both modes -- this pairing has not been re-verified against a live interaction-mode run since #591 landed, so the relaxation is left in place rather than re-pinned on an unconfirmed number. The level's own outcome (worker_revolt, same deathCount/employeeCount/revolted/levelEnded/levelEndReason) was unaffected by the mode divergence pre-#591 and remains unaffected post-#591 (sandbox-measured, command mode) -- so this stays a checkpoint relaxation, not a production-code fix, per this batch's own remit.",
         "equals": {
           "wellBeing": 0
         }
@@ -760,7 +760,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 449,
+          "tickCount": 439,
           "wellBeing": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -804,7 +804,7 @@
         "equals": {
           "wellBeing": 0,
           "ecology": 50,
-          "tickCount": 449,
+          "tickCount": 439,
           "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

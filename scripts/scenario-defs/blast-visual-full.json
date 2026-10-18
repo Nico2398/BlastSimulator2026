@@ -18,7 +18,7 @@
           "holeCount": 0
         }
       },
-      "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys. Bumped again to $200,000 (#554): charging is now real work too -- three separate charge orders (Charge All plus two per-hole overrides), each drained by its own wait, add several hundred more ticks of the 3-driller roster's payroll/fuel upkeep before the tier:4 software purchase further down this file (observed short by ~10,400 at $150,000)."
+      "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys. Bumped again to $200,000 (#554): charging is now real work too -- three separate charge orders (Charge All plus two per-hole overrides), each drained by its own wait, add several hundred more ticks of the 3-driller roster's payroll/fuel upkeep before the tier:4 software purchase further down this file (observed short by ~10,400 at $150,000). Bumped again to $250,000 (#1907): union events run on their own cooldown clock, so a politics_trade_war event now lands during the hole-drilling wait and its auto-resolved option 0 costs a $30,000 fine, leaving the tier:4 purchase $6,900 short at $200,000."
     },
     {
       "command": "employee hire role:driller",

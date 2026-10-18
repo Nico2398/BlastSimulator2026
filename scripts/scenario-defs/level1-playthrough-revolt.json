@@ -881,10 +881,10 @@
           "deathCount": 4,
           "wellBeing": 0,
           "holeCount": 0,
-          "employeeCount": 12,
+          "employeeCount": 13,
           "vehicleCount": 0
         },
-        "note": "#1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1709: tickCount re-measured 862 -> 717 for the 3x3 pattern. Rally point: tickCount re-measured 717 -> 629 (blast at 403 instead of 486, see the blast step); the end is still worker_revolt, never bankruptcy. #1773 (well-being stays a managed score after the first Living Quarters): wellBeing no longer climbs undamped beside the quarters (23.7 at the blast, was 48.2), so it reaches 0 sooner after the blast; tickCount re-measured 629 -> 560. The blast still fires first (tick 403, deathCount 5) and the end is still worker_revolt. #1890: the stretched shared event cooldown shifts the event draws (and drops a well-being-positive event from the window after the blast): blast at 526, revolt now lands at tick 710 (was 571); re-measured, still worker_revolt with 4 deaths."
+        "note": "#1588: pins re-measured after merging main (#1586 route choice) with alight-cell routing; employees alight on a real neighbour cell, so tick timing and who stands in the blast zone shift. Deterministic (command mode); levelEnd, hole and building counts unchanged. #1709: tickCount re-measured 862 -> 717 for the 3x3 pattern. Rally point: tickCount re-measured 717 -> 629 (blast at 403 instead of 486, see the blast step); the end is still worker_revolt, never bankruptcy. #1773 (well-being stays a managed score after the first Living Quarters): wellBeing no longer climbs undamped beside the quarters (23.7 at the blast, was 48.2), so it reaches 0 sooner after the blast; tickCount re-measured 629 -> 560. The blast still fires first (tick 403, deathCount 5) and the end is still worker_revolt. #1890: the stretched shared event cooldown shifts the event draws (and drops a well-being-positive event from the window after the blast): blast at 526, revolt now lands at tick 710 (was 571); re-measured, still worker_revolt with 4 deaths. #1907: union events run on their own cooldown clock, so the revolt now lands at tick 612 (was 708) and a hire-granting event (option 0, auto-resolved by wait_until) adds one employee: employeeCount 12 -> 13. Re-measured; still worker_revolt, deathCount 4."
       }
     },
     {
@@ -1886,7 +1886,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "employeeCount": 12,
+          "employeeCount": 13,
           "deathCount": 4
         }
       }
@@ -1909,7 +1909,7 @@
           "tickCount": 993,
           "deathCount": 4,
           "wellBeing": 0,
-          "employeeCount": 12
+          "employeeCount": 13
         }
       }
     },
@@ -1963,7 +1963,7 @@
           "tickCount": 993,
           "deathCount": 4,
           "wellBeing": 0,
-          "employeeCount": 12
+          "employeeCount": 13
         },
         "note": "final state: revolt, not bankruptcy; the level is lost but the company is solvent."
       }

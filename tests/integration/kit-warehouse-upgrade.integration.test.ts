@@ -58,6 +58,7 @@ function startWithResearchedTier2(opts: { blast?: boolean } = {}) {
   const run = (c: string) => runner.run(c);
   expect(run(`sandbox start biome:desert_badlands difficulty:easy seed:${SEED}`)).toMatchObject({ success: true });
   const state = ctx.state!;
+  state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   refresh(state);
   if (opts.blast === true) fireOpeningShot(run, state);
   expect(run('build research_center at:20,48')).toMatchObject({ success: true });
@@ -221,6 +222,7 @@ describe('kit warehouse upgrade (#1830)', () => {
       const run = (c: string) => runner.run(c);
       expect(run(`sandbox start biome:desert_badlands difficulty:easy seed:${SEED}`)).toMatchObject({ success: true });
       const state = ctx.state!;
+      state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
       refresh(state);
       equipDemolition(ctx);
       const heap = state.buildings.buildings.find(b => b.id === 2)!;

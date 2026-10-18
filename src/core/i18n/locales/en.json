@@ -4146,6 +4146,8 @@
   "inspector.status.out_of_service": "Out of service: {event} · {time}",
   "inspector.status.upgrading": "Upgrading to tier {tier} · {percent}%",
   "inspector.status.upgrading_waiting": "Upgrading to tier {tier} · waiting for a builder",
+  "inspector.status.upgrading_on_the_way": "Upgrading to tier {tier} · {builder} is on the way",
+  "inspector.status.under_construction_on_the_way": "Under construction (tier {tier}) · {builder} is on the way",
   "inspector.status.under_construction": "Under construction (tier {tier}) · {percent}%",
   "inspector.status.under_construction_waiting": "Under construction (tier {tier}) · waiting for a builder",
   "inspector.builder": "Builder",

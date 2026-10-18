@@ -25,7 +25,7 @@ import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
 function tickFunded(run: (cmd: string) => unknown, state: GameState, predicate: () => boolean, maxTicks: number): void {
-  tickUntilFresh(run, state, () => { state.cash = Math.max(state.cash, 100000); return predicate(); }, maxTicks);
+  tickUntilFresh(run, state, () => { state.cash = Math.max(state.cash, 100000); state.events.eventFreqMultiplier = 0; /* a pending event halts `tick`; blast flow is under test */ return predicate(); }, maxTicks);
 }
 
 const holeCounter = { nextHoleId: 1 };
@@ -820,6 +820,7 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     const run = (cmd: string) => runner.run(cmd);
     const state = () => ctx.state!;
     expect(run('sandbox start biome:desert_badlands difficulty:easy seed:42').success).toBe(true);
+    state().events.eventFreqMultiplier = 0; // a pending event halts `tick`; the rig's pace is under test
     const topUp = () => { state().cash = Math.max(state().cash, 250000); };
     topUp();
     if (quarters !== null) expect(run(`build living_quarters at:${quarters}`).success).toBe(true);

@@ -18,7 +18,7 @@ import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
 /** Lifecycle status line: operating, closed by an event, demolition ordered, upgrading or under construction. */
-function statusText(status: BuildingStatus): string {
+function statusText(status: BuildingStatus, builderName: string | undefined): string {
   const percent = status.progress === null ? null : Math.round(status.progress * 100);
   switch (status.kind) {
     case 'operating': return t('inspector.operating');
@@ -33,9 +33,11 @@ function statusText(status: BuildingStatus): string {
     case 'upgrading':
     case 'under_construction': {
       const key = status.kind === 'upgrading' ? 'inspector.status.upgrading' : 'inspector.status.under_construction';
-      return percent === null
-        ? t(`${key}_waiting`, { tier: status.targetTier ?? 1 })
-        : t(key, { tier: status.targetTier ?? 1, percent });
+      const tier = status.targetTier ?? 1;
+      if (status.builderPhase === 'on_the_way' && builderName !== undefined) return t(`${key}_on_the_way`, { tier, builder: builderName });
+      return percent === null || status.builderPhase !== 'working'
+        ? t(`${key}_waiting`, { tier })
+        : t(key, { tier, percent });
     }
   }
 }
@@ -135,25 +137,38 @@ function hpRow(text: string, fraction: number): HTMLElement {
   return wrap;
 }
 
+/** Employee building the site of `status`, if one is assigned and still on the roster. */
+function builderOf(state: GameState, status: BuildingStatus) {
+  return status.builderId === null ? undefined : state.employees.employees.find(e => e.id === status.builderId);
+}
+
+/** Builder row: name as an entity link to the employee inspector. */
+function builderRow(builder: { id: number; name: string }, links: InspectorLinks): HTMLElement {
+  const row = el('div', { text: `${t('inspector.builder')}: ` });
+  row.style.cssText = 'font-size:11px';
+  row.append(entityLink(builder.name, 'employee', builder.id, links));
+  return row;
+}
+
+/** Signature fragment: rebuilds the panel when the builder or their phase changes. */
+function builderSignature(status: BuildingStatus, builder: { id: number; name: string } | undefined): string {
+  return `${status.builderPhase ?? ''}:${builder?.id ?? ''}:${builder?.name ?? ''}`;
+}
+
 function siteView(state: GameState, id: number, status: BuildingStatus, links: InspectorLinks): InspectorView | null {
   const site = state.plannedBuildings.find(pb => pb.buildingId === id);
   if (!site) return null;
-  const builder = status.builderId === null ? undefined : state.employees.employees.find(e => e.id === status.builderId);
-  const text = statusText(status);
+  const builder = builderOf(state, status);
+  const text = statusText(status, builder?.name);
   return {
     title: t(`building.${site.type}.t${site.tier}.name`),
     sub: `#${site.buildingId} · ${kindLabel('building')} · ${t('inspector.tier', { tier: site.tier })}`,
     icon: 'build',
     status: text,
-    signature: `site:${site.type}:${site.tier}:${status.kind}:${builder?.id ?? ''}:${builder?.name ?? ''}`,
+    signature: `site:${site.type}:${site.tier}:${status.kind}:${builderSignature(status, builder)}`,
     get sections() {
       const rows: HTMLElement[] = [liveRow(t('inspector.status'), 'status', text)];
-      if (builder) {
-        const row = el('div', { text: `${t('inspector.builder')}: ` });
-        row.style.cssText = 'font-size:11px';
-        row.append(entityLink(builder.name, 'employee', builder.id, links));
-        rows.push(row);
-      }
+      if (builder) rows.push(builderRow(builder, links));
       rows.push(liveRow(t('inspector.position'), 'position', `(${site.x}, ${site.z})`));
       return [sectionOf(t('inspector.section.details'), rows)];
     },
@@ -172,7 +187,8 @@ export const buildingContent: KindContent = {
     const def = getBuildingDef(b.type, b.tier);
     const hp = `${Math.round(b.hp)} / ${def.maxHp}`;
     const hpFraction = fractionOf(b.hp, def.maxHp);
-    const text = statusText(status);
+    const builder = status.kind === 'upgrading' ? builderOf(state, status) : undefined;
+    const text = statusText(status, builder?.name);
     const upkeep = upkeepText(state, b);
     const capacity = getBuildingPeopleCapacity(b.type, b.tier);
     const storage = storageContents(b, state, status.kind === 'out_of_service');
@@ -187,10 +203,11 @@ export const buildingContent: KindContent = {
       sub: `#${b.id} · ${kindLabel('building')} · ${t('inspector.tier', { tier: b.tier })}`,
       icon: 'build',
       status: text,
-      signature: `${b.type}:${b.tier}:${status.kind}:${capacity}:${b.occupantIds.join(',')}:${occupantNames.join('|')}:${extras.map(x => x?.rowSignature ?? '').join('|')}`,
+      signature: `${b.type}:${b.tier}:${status.kind}:${builderSignature(status, builder)}:${capacity}:${b.occupantIds.join(',')}:${occupantNames.join('|')}:${extras.map(x => x?.rowSignature ?? '').join('|')}`,
       get sections() {
         const rows: HTMLElement[] = [
           liveRow(t('inspector.status'), 'status', text),
+          ...(builder ? [builderRow(builder, links)] : []),
           hpRow(hp, hpFraction),
           liveRow(t('inspector.upkeep'), 'upkeep', upkeep),
         ];

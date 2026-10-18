@@ -527,12 +527,14 @@
       "role": "setup"
     },
     {
-      "command": "event choose 0",
+      "command": "event choose 1",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "resolveEventIfPending",
+          "option": 1
         }
       ],
+      "description": "#1907: this is the Mining Human Right event. Option 1 ignores it; option 0 hires a surprise employee, which shifts every later employee id this file addresses by number (employee fire / assign_skill).",
       "role": "player",
       "commandOutcome": "either"
     },

@@ -286,6 +286,7 @@ describe('console-api', () => {
       // seal exists on that seed at any reasonable board size/mine type).
       // Seed 77 keeps this exact box flat at the exact same coordinates.
       runner.runner.run('new_game seed:77 cash:500000');
+      runner.ctx.state!.events.eventFreqMultiplier = 0; // a pending event halts `tick`; stuck detection is under test
       // Idle ticking sinks well-being to 0, and 120 such ticks end the level by
       // worker revolt, which freezes the mine (#1313). Not what this test probes.
       const holdWellBeing = (): void => { runner.ctx.state!.scores.wellBeing = 50; };

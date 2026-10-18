@@ -1558,6 +1558,7 @@ describe('#1692 — well-being does not pin at the ceiling for a busy, housed cr
   function runBusyCrew(extraQuartersTier: 2 | null): number[] {
     const ctx = makeCtx();
     const state = ctx.state!;
+    state.events.eventFreqMultiplier = 0; // event choices swing well-being by event pacing; the quarters' rest effect is under test
     state.cash = 1_000_000;
     state.buildings.unlockedTiers.living_quarters = 3;
     const gx = 32; // makeCtx() builds a 32x32 world

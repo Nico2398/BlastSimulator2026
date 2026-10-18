@@ -190,6 +190,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // fleet — exactly the roster/fleet automatic haul dispatch needs, with
     // no vehicle pre-assigned to anyone.
     expect(run('new_game seed:42 size:32 staffed:true cash:500000').success).toBe(true);
+    ctx.state!.events.eventFreqMultiplier = 0; // a pending event halts `tick`; automatic hauling pace is under test
     // #1264: this test's multiple staffed drivers self-organizing an
     // automatic haul is exactly the multi-agent shape agent occupancy
     // governs — unconditional since #1207.

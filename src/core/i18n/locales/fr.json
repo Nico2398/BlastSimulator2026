@@ -4146,6 +4146,8 @@
   "inspector.status.out_of_service": "Hors service : {event} · {time}",
   "inspector.status.upgrading": "Amélioration au niveau {tier} · {percent} %",
   "inspector.status.upgrading_waiting": "Amélioration au niveau {tier} · en attente d'un ouvrier",
+  "inspector.status.upgrading_on_the_way": "Amélioration au niveau {tier} · {builder} est en route",
+  "inspector.status.under_construction_on_the_way": "En construction (niveau {tier}) · {builder} est en route",
   "inspector.status.under_construction": "En construction (niveau {tier}) · {percent} %",
   "inspector.status.under_construction_waiting": "En construction (niveau {tier}) · en attente d'un ouvrier",
   "inspector.builder": "Ouvrier",

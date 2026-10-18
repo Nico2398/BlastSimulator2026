@@ -246,6 +246,11 @@ export const FOLLOWUP_DELAY_TICKS = 30;
 /** Random additional ticks (0 to value-1, i.e. 0–59 for value=60) added to the per-event cooldown. */
 export const MIN_EVENT_INTERVAL_RANDOM_RANGE = 60;
 
+/** Union events run on their own cooldown clock (#1907): base minimum ticks between union events. */
+export const UNION_EVENT_MIN_INTERVAL_TICKS = 120;
+/** Union events' own cooldown clock (#1907): random extra ticks (0 to value-1) added to the union cooldown. */
+export const UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE = 60;
+
 /** Minimum number of user-initiated actions required between events. */
 export const MIN_EVENT_INTERVAL_ACTIONS = 10;
 

@@ -694,9 +694,9 @@ describe('Event system', () => {
       // ── Phase 0: Setup campaign context ──
       const ctx = makeCampaignCtx('dusty_hollow');
 
-      // Disable non-union timers so only union events can fire
+      // Disable every timer but politics so only a shared-clock event can fire (union events own a separate clock, #1907)
       for (const timer of ctx.state!.events.timers) {
-        if (timer.category !== 'union') {
+        if (timer.category !== 'politics') {
           timer.remaining = 99_999;
         }
       }
@@ -704,13 +704,9 @@ describe('Event system', () => {
       // Pre-warm tickCount to skip past the initial no-timer-activity zone
       ctx.state!.tickCount = 110;
 
-      // Union events need at least one employee (#1412). A unionised one keeps the union
-      // timer at its full pace (#1873) — this test measures the cooldown, not the stretch.
-      hireEmployee(ctx.state!.employees, 'driller', new Random(1), 0, 0).employee.unionized = true;
-
-      // Set union timer to expire in 2 ticks
-      const unionTimer = ctx.state!.events.timers.find(t => t.category === 'union')!;
-      unionTimer.remaining = 2;
+      // Set politics timer to expire in 2 ticks
+      const politicsTimer = ctx.state!.events.timers.find(t => t.category === 'politics')!;
+      politicsTimer.remaining = 2;
 
       // Accumulate the required user actions for the cooldown check
       for (let i = 0; i < MIN_EVENT_INTERVAL_ACTIONS; i++) {
