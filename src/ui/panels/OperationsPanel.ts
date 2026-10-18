@@ -28,6 +28,7 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import type { ConfirmModalConfig } from './ConfirmModal.js';
 import { isFailureBlock, isInTransitBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
@@ -71,6 +72,12 @@ export class OperationsPanel extends PanelBase {
   private activeShift: ShiftMode = 'shift_8h';
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
+  protected onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
+
+  /** Routes the cancel-all-debris confirmation to a modal (#1972); unset means no confirmation is shown. */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.onConfirmRequestCb = cb;
+  }
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-operations-panel'));

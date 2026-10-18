@@ -4316,5 +4316,20 @@
   "permit.preview.warning": "Au-dessus de votre permis. L'inspecteur est peut-être à la cantine.",
   "permit.preview.grid_warning": "{holes} trous, c'est plus que ce que votre permis autorise ({limit}). Le Ministère sait compter les trous.",
   "ui.blast_workshop.fire.check_permit_ok": "Dans les clous du permis : {kg}, {holes}",
-  "ui.blast_workshop.fire.check_permit_over": "Dans les clous du permis : {kg}, {holes}. Pas vraiment. Tirer reste permis ; le Ministère regarde, c'est tout."
+  "ui.blast_workshop.fire.check_permit_over": "Dans les clous du permis : {kg}, {holes}. Pas vraiment. Tirer reste permis ; le Ministère regarde, c'est tout.",
+  "ui.operations.work_queue_debris_title": "{label} (×{count})",
+  "ui.operations.work_queue_debris_status_part_in_progress": "{count} en cours",
+  "ui.operations.work_queue_debris_status_part_queued": "{count} en attente",
+  "ui.operations.work_queue_debris_status_part_blocked": "{count} bloqués",
+  "ui.operations.work_queue_debris_status_part_stranded": "{count} hors de portée",
+  "ui.operations.work_queue_debris_status_part_in_transit": "{count} en transit",
+  "ui.operations.work_queue_debris_expand": "Afficher les ordres",
+  "ui.operations.work_queue_debris_collapse": "Masquer les ordres",
+  "ui.operations.work_queue_debris_page": "{from}–{to} sur {total}",
+  "ui.operations.work_queue_debris_prev": "Précédent",
+  "ui.operations.work_queue_debris_next": "Suivant",
+  "ui.operations.work_queue_debris_cancel": "Tout annuler",
+  "ui.operations.work_queue_debris_confirm_title": "Annuler les ordres de débris ?",
+  "ui.operations.work_queue_debris_confirm_body": "Annuler {count} ordres {label} ? La cargaison chargée est reposée au sol.",
+  "ui.operations.work_queue_debris_confirm_label": "Annuler les ordres"
 }

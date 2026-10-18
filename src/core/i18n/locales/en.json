@@ -4316,5 +4316,20 @@
   "permit.preview.warning": "Over your permit. Maybe the inspector is at lunch.",
   "permit.preview.grid_warning": "{holes} holes is more than your permit allows ({limit}). The Ministry counts holes too.",
   "ui.blast_workshop.fire.check_permit_ok": "Within permit: {kg}, {holes}",
-  "ui.blast_workshop.fire.check_permit_over": "Within permit: {kg}, {holes}. Not quite. Firing is still allowed; the Ministry is merely watching."
+  "ui.blast_workshop.fire.check_permit_over": "Within permit: {kg}, {holes}. Not quite. Firing is still allowed; the Ministry is merely watching.",
+  "ui.operations.work_queue_debris_title": "{label} × {count}",
+  "ui.operations.work_queue_debris_status_part_in_progress": "{count} working",
+  "ui.operations.work_queue_debris_status_part_queued": "{count} queued",
+  "ui.operations.work_queue_debris_status_part_blocked": "{count} blocked",
+  "ui.operations.work_queue_debris_status_part_stranded": "{count} out of reach",
+  "ui.operations.work_queue_debris_status_part_in_transit": "{count} in transit",
+  "ui.operations.work_queue_debris_expand": "Show orders",
+  "ui.operations.work_queue_debris_collapse": "Hide orders",
+  "ui.operations.work_queue_debris_page": "{from}–{to} of {total}",
+  "ui.operations.work_queue_debris_prev": "Previous",
+  "ui.operations.work_queue_debris_next": "Next",
+  "ui.operations.work_queue_debris_cancel": "Cancel all",
+  "ui.operations.work_queue_debris_confirm_title": "Cancel debris orders?",
+  "ui.operations.work_queue_debris_confirm_body": "Cancel {count} {label} orders? Loaded cargo is dropped back on the ground.",
+  "ui.operations.work_queue_debris_confirm_label": "Cancel orders"
 }
