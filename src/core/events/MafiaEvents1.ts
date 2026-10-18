@@ -4,6 +4,8 @@ import { ev, r, mafiaTier } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
 import {
   EVENT_BOOM_PRICE_PCT,
+  EVENT_BREAKDOWN_HOURS,
+  EVENT_BREAKDOWN_HP_LOSS,
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CALM_DAYS,
   EVENT_CALM_WEIGHT_FACTOR,
@@ -267,7 +269,8 @@ export const MAFIA_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 0.3 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(1),
     options: [
-      { cashDelta: 12000, corruptionDelta: 8, scoreDelta: { safety: -4 } },
+      { cashDelta: 12000, corruptionDelta: 8, scoreDelta: { safety: -4 },
+        effects: [{ type: 'vehicle_breakdown', hpLoss: EVENT_BREAKDOWN_HP_LOSS, hours: EVENT_BREAKDOWN_HOURS }] },
       { cashDelta: -8000, scoreDelta: { safety: 3 }, effectTag: 'buy_legit',
         effects: [
           { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS },

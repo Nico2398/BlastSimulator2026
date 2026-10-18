@@ -2671,6 +2671,27 @@ export const EVENT_CALM_DAYS = 7;
 /** Hours a lingering weather front holds the sky. */
 export const EVENT_FRONT_HOURS = 36;
 
+/** Hit points a breakdown event takes off the affected vehicle (hp). */
+export const EVENT_BREAKDOWN_HP_LOSS = 25;
+
+/** Hours a broken-down vehicle stays out of service. */
+export const EVENT_BREAKDOWN_HOURS = 24;
+
+/** Hours an event-closed building stays shut. */
+export const EVENT_CLOSURE_HOURS = 24;
+
+/** Percent change applied to survey costs by an event discount (negative = cheaper). */
+export const EVENT_SURVEY_DISCOUNT_PCT = -25;
+
+/** Days a survey cost discount lasts. */
+export const EVENT_SURVEY_DISCOUNT_DAYS = 7;
+
+/** Percent change applied to research costs by an event discount (negative = cheaper). */
+export const EVENT_RESEARCH_DISCOUNT_PCT = -25;
+
+/** Days a research cost discount lasts. */
+export const EVENT_RESEARCH_DISCOUNT_DAYS = 7;
+
 // ── Smuggling vs tax audit (#1409) ──
 
 /** Period the three audit chances refer to (90 days). */
