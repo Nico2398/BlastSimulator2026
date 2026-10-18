@@ -12,8 +12,7 @@ import { clearLastOutcome } from '../../core/events/EventSystem.js';
 import { effectChipText } from '../../core/events/EventEffectText.js';
 import { modifierSummary } from '../../core/events/ModifierText.js';
 import { applyCorruptionDelta } from '../../core/economy/Corruption.js';
-import { storeLeavers } from '../../core/events/EventLeavers.js';
-import { getLivingEmployees } from '../../core/entities/Employee.js';
+import { drawPendingLeavers } from '../../core/events/EventLeavers.js';
 import { requireGame } from './commandUtils.js';
 
 /**
@@ -128,7 +127,7 @@ export function eventCommand(
       }
       state.events.lastEventTick = state.tickCount;
       state.events.actionCountSinceEvent = 0;
-      storeLeavers(state.events.pendingEvent, def, getLivingEmployees(state.employees.employees), new Random(state.seed + state.tickCount));
+      drawPendingLeavers(state.events, state.employees.employees, new Random(state.seed + state.tickCount));
       state.isPaused = true;
       const lines = [
         `EVENT: ${t(def.titleKey)}`,

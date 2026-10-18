@@ -14,7 +14,7 @@ import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
 import { applyEventEffects } from './EventEffectCatalog.js';
 import { applyUnionDecision } from './UnionGrievance.js';
-import { leaverLabel } from './EventLeavers.js';
+import { leaverDraw, leaverLabel } from './EventLeavers.js';
 import { effectChips, type EventEffectChip } from './EventEffectText.js';
 
 // ── Resolution result ──
@@ -70,9 +70,9 @@ export function resolveEvent(
   const pendingBefore = eventSystem.pendingEvent;
   const { consequence: resolved, isAlt } = resolveConsequence(consequence, rng);
 
-  // The leaver drawn at fire time (#1908); read before the pending event is cleared.
-  const storedLeaver = eventSystem.pendingEvent.leavers?.find(d => d.optionIndex === optionIndex);
-  const leaverId = storedLeaver?.employeeId;
+  // The leaver drawn at fire time (#1908) belongs to the primary consequence only;
+  // pendingBefore keeps it readable after the pending event is cleared.
+  const leaverId = isAlt ? undefined : leaverDraw(pendingBefore, optionIndex)?.employeeId;
 
   // Apply effects
   const result = applyConsequence(
@@ -101,7 +101,7 @@ export function resolveEvent(
   // Declarative effects (#1414): modifiers, hires, bans, ... the sentence promised.
   if (world && resolved.effects?.length) {
     // Label before the effects run: the leaver is off the roster afterwards.
-    const label = leaverLabel(pendingBefore, optionIndex, world.state.employees.employees);
+    const label = isAlt ? undefined : leaverLabel(pendingBefore, optionIndex, world.state.employees.employees);
     mergeOutcome(result, applyEventEffects(resolved.effects, world, tick, rng, leaverId));
     result.effectChips = effectChips(resolved.effects, label);
   }

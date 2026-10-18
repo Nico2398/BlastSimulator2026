@@ -282,7 +282,7 @@ export class EventModal {
         const hintRow = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex:0 1 auto;min-width:0;max-width:60%' } });
         const staff = getLivingEmployees(state.employees.employees);
         const leaver = leaverLabel(state.events.pendingEvent, i, staff);
-        hintRow.append(...hints.map(h => hintChip(h, h.spec?.type === 'employee_leaves' ? leaver : undefined)));
+        hintRow.append(...hints.map(h => hintChip(h, leaver)));
         btn.appendChild(hintRow);
       }
       const idx = i;
