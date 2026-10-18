@@ -10,7 +10,7 @@ import { pickWarehouse, warehouseFreeKg, warehouseUsedKgMap } from './FreightWar
 import { creditSpoilHeaps, totalSpoilRoomKg, drawSpoilKg, haulDestinationOf, isStoredBarren, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
-import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -86,7 +86,7 @@ export function pickupFragment(
   vehicleX: number,
   vehicleZ: number,
   heapSites: readonly WarehouseSite[] = [],
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
@@ -156,7 +156,7 @@ export function deliverToSpoilHeap(
   heapSites: readonly WarehouseSite[],
   atX: number,
   atZ: number,
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): { heapId: number; massKg: number } | null {
   const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked || haulDestinationOf(tracked.fragment, gradeScale) !== 'spoil_heap') return null;
@@ -338,7 +338,7 @@ export function consumeStoredOre(
   materialId: string,
   amountKg: number,
   buildings: readonly Pick<Building, 'type' | 'tier' | 'storedSpoilKg'>[],
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): { success: boolean; consumedKg: number; error?: string } {
   if (!Number.isFinite(amountKg) || amountKg <= 0) {
     return {
@@ -561,7 +561,7 @@ export function releaseBarrenStoredFragments(
   state: LogisticsState,
   collectedOre: Record<string, number>,
   buildings: readonly (Pick<Building, 'type' | 'tier' | 'storedSpoilKg'> & { id?: number })[],
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): number {
   if (totalSpoilRoomKg(buildings) <= 0) return 0; // no heap, or every heap full: the rock stays stored
   const reservedKg = warehouseUsedKgMap(state); // in-flight hauls hold room on a heap too

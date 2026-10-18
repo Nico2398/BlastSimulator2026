@@ -3,7 +3,7 @@
 
 import type { Building } from '../entities/Building.js';
 import { spoilHeapRoomKg } from '../entities/Building.js';
-import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
+import { ORE_GRADE_SCALE_DEFAULT, SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
 import { oreGradeScaleOf, scaledGradeThreshold } from './OreGrade.js';
 
 /** Where a hauled fragment is delivered. */
@@ -14,14 +14,14 @@ export type HaulDestination = 'warehouse' | 'spoil_heap';
  * SPOIL_BARREN_ORE_FRACTION_THRESHOLD x `gradeScale` (empty = barren). Decides haul destination
  * and which rock rubble may take (a filter: only barren fragments qualify).
  */
-export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>, gradeScale = 1): boolean {
+export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>, gradeScale = ORE_GRADE_SCALE_DEFAULT): boolean {
   let total = 0;
   for (const d of Object.values(oreDensities)) total += d;
   return total <= scaledGradeThreshold(SPOIL_BARREN_ORE_FRACTION_THRESHOLD, gradeScale);
 }
 
 /** Destination for a fragment, by its ore densities. */
-export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<string, number>> }, gradeScale = 1): HaulDestination {
+export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<string, number>> }, gradeScale = ORE_GRADE_SCALE_DEFAULT): HaulDestination {
   return isBarrenFragment(fragment.oreDensities, gradeScale) ? 'spoil_heap' : 'warehouse';
 }
 
@@ -51,12 +51,12 @@ export interface StoredFragmentLike {
 }
 
 /** True for a fragment held in storage whose ore densities make it barren. */
-export function isStoredBarren(f: StoredFragmentLike, gradeScale = 1): boolean {
+export function isStoredBarren(f: StoredFragmentLike, gradeScale = ORE_GRADE_SCALE_DEFAULT): boolean {
   return f.state === 'stored' && isBarrenFragment(f.fragment.oreDensities, gradeScale);
 }
 
 /** Mass (kg) of stored fragments that are barren (isStoredBarren). */
-export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[], gradeScale = 1): number {
+export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[], gradeScale = ORE_GRADE_SCALE_DEFAULT): number {
   let total = 0;
   for (const f of fragments) {
     if (isStoredBarren(f, gradeScale)) total += f.fragment.mass;
@@ -65,7 +65,7 @@ export function barrenStoredMassKg(fragments: readonly StoredFragmentLike[], gra
 }
 
 /** Barren rock a rubble_disposal contract can draw on: stored barren fragments plus every heap's rock. Ore-bearing stock is never rubble (#1871). */
-export function rubbleStockKg(fragments: readonly StoredFragmentLike[], buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], gradeScale = 1): number {
+export function rubbleStockKg(fragments: readonly StoredFragmentLike[], buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], gradeScale = ORE_GRADE_SCALE_DEFAULT): number {
   return barrenStoredMassKg(fragments, gradeScale) + totalSpoilKg(buildings);
 }
 

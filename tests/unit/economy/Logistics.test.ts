@@ -1640,3 +1640,34 @@ describe('onGroundFragmentData (#1868)', () => {
     expect(onGroundFragmentData(state)).toEqual([]);
   });
 });
+
+describe('storage paths at a scaled grade (#1932)', () => {
+  const SCALE = 0.2;
+  // Densities 0.005 and 0.02 are barren at scale 1; the same fragments scaled by SCALE are barren at SCALE.
+  const fill = (scale: number) => {
+    const state = createLogisticsState(TEST_STORAGE_KG);
+    putInStorage(state, makeStoredFragment(1, 400, 0.16, { oreX: 0.005 * scale }));
+    putInStorage(state, makeStoredFragment(2, 300, 0.12, { oreX: 0.02 * scale }));
+    putInStorage(state, makeStoredFragment(3, 500, 0.2, { oreX: 0.5 * scale }));
+    return state;
+  };
+
+  it('releaseBarrenStoredFragments releases the same fragments at 0.2 as unscaled at 1', () => {
+    const unscaled = fill(1);
+    const scaled = fill(SCALE);
+    const a = releaseBarrenStoredFragments(unscaled, {}, [heapStub()], 1);
+    const b = releaseBarrenStoredFragments(scaled, {}, [heapStub()], SCALE);
+    expect(b).toBe(a);
+    expect(b).toBe(700);
+    expect(scaled.fragments.map(f => f.fragment.id)).toEqual([3]);
+    expect(scaled.storedMassKg).toBe(500);
+  });
+
+  it('consumeStoredOre rubble draws only fragments barren at the scale', () => {
+    const state = fill(SCALE);
+    const result = consumeStoredOre(state, {}, '', 700, [], SCALE);
+    expect(result.success).toBe(true);
+    expect(state.fragments.map(f => f.fragment.id)).toEqual([3]);
+    expect(consumeStoredOre(state, {}, '', 1, [], SCALE).success).toBe(false);
+  });
+});

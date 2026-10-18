@@ -221,6 +221,27 @@ describe('rubbleStockKg / stateRubbleStockKg', () => {
   });
 });
 
+describe('rubble stock at a scaled grade (#1932)', () => {
+  const SCALE = 0.2;
+  // Proportionally scaled densities classify at SCALE exactly as the unscaled ones at 1.
+  const fragments = () => [0.005, 0.02, 0.03, 0.5].map((d, i) => frag(100 * (i + 1), { blingite: d * SCALE }));
+  const unscaled = () => [0.005, 0.02, 0.03, 0.5].map((d, i) => frag(100 * (i + 1), { blingite: d }));
+
+  it('rubbleStockKg matches the unscaled stock at scale 1', () => {
+    expect(rubbleStockKg(fragments(), [heap(30)], SCALE)).toBe(rubbleStockKg(unscaled(), [heap(30)], 1));
+    expect(rubbleStockKg(fragments(), [heap(30)], SCALE)).toBe(330);
+  });
+
+  it('stateRubbleStockKg reads world.oreGradeScale', () => {
+    const slice = (world: { oreGradeScale?: number }) => ({
+      logistics: { fragments: fragments() }, buildings: { buildings: [heap(30)] }, world,
+    });
+    expect(stateRubbleStockKg(slice({ oreGradeScale: SCALE }))).toBe(330);
+    // Unset scale reads at 1, where the scaled densities all fall under the 0.02 cut except the last.
+    expect(stateRubbleStockKg(slice({}))).toBe(630);
+  });
+});
+
 describe('drawSpoilKg', () => {
   it('draws from heaps in building order, emptying the first before the next', () => {
     const a = heap(40);

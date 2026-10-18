@@ -20,7 +20,6 @@ import { createChunkSource, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requ
  * against the same world the first chunk did.
  */
 export interface SerializedTerrainGen {
-  oreGradeScale?: number;
   version: number;
   seed: number;
   climateBias: [number, number];
@@ -30,6 +29,7 @@ export interface SerializedTerrainGen {
   mixedRockHardness?: boolean;
   oreDeposits?: boolean;
   pitMask?: PitMaskShape;
+  oreGradeScale?: number;
 }
 
 export interface SerializedVoxels {

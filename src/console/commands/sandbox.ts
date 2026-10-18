@@ -27,7 +27,7 @@ import { isStaffedComposition, resolveStartingSite } from '../../core/state/Star
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { createGradeState } from '../../core/economy/MineGrade.js';
-import { ORE_GRADE_SCALE_MAX } from '../../core/config/balance.js';
+import { isValidOreGradeScale } from '../../core/economy/OreGrade.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
@@ -58,7 +58,7 @@ function rawKitArg(named: Record<string, string>): string | undefined {
 function parseOreGradeArg(raw: string | undefined): { scale?: number; error?: string } {
   if (raw === undefined) return {};
   const value = Number(raw);
-  if (raw.trim() === '' || !Number.isFinite(value) || value <= 0 || value > ORE_GRADE_SCALE_MAX) {
+  if (raw.trim() === '' || !isValidOreGradeScale(value)) {
     return { error: t('sandbox.invalid_ore_grade', { value: raw }) };
   }
   return { scale: value };

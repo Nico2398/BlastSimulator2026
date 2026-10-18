@@ -2,7 +2,7 @@
  * Ore demand: how urgently the open ore_sale offers need ore the mine has not
  * yet stocked, and how much of that urgency a haul fragment can relieve (#1817).
  */
-import { ORE_DEMAND_FULL_GRADE, ORE_DEMAND_MIN_GRADE } from '../config/balance.js';
+import { ORE_DEMAND_FULL_GRADE, ORE_DEMAND_MIN_GRADE, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 import { scaledGradeThreshold } from './OreGrade.js';
 import { isAutoDeliverable, remainingKg, storedStockKg, type Contract } from './Contract.js';
 
@@ -57,7 +57,7 @@ function gradeWeight(density: number, gradeScale: number): number {
 export function fragmentHaulUrgency(
   oreDensities: Readonly<Record<string, number>>,
   urgency: ReadonlyMap<string, number>,
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): number {
   let max = 0;
   for (const [ore, density] of Object.entries(oreDensities)) {

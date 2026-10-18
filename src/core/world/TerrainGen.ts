@@ -6,7 +6,8 @@
 import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
-import { ORE_GRADE_SCALE_MAX, type PitMaskShape } from '../config/balance.js';
+import type { PitMaskShape } from '../config/balance.js';
+import { isValidOreGradeScale } from '../economy/OreGrade.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
 import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
@@ -89,8 +90,6 @@ export function requireValidGenDatum(value: number, label: string): number {
 }
 
 export interface TerrainConfig {
-  /** Ore grade scale lever (#1932); absent = default. */
-  oreGradeScale?: number;
   sizeX: number;
   /** The voxel Y the site centre's surface lands on. */
   datum: number;
@@ -114,6 +113,8 @@ export interface TerrainConfig {
   oreDeposits?: boolean;
   /** Pit mask shape; defaults to DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
 }
 
 export interface TerrainContext {
@@ -314,7 +315,7 @@ export function climateBiasLandingOn(
 
 /** Validates an ore grade scale (#1932). */
 export function requireValidOreGradeScale(value: number, label: string): number {
-  if (!Number.isFinite(value) || value <= 0 || value > ORE_GRADE_SCALE_MAX) {
+  if (!isValidOreGradeScale(value)) {
     throw new Error(`corrupt save: ${label} is not a valid ore grade scale`);
   }
   return value;

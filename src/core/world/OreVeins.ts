@@ -9,7 +9,7 @@
 
 import { createNoise3D, type NoiseFunction3D } from 'simplex-noise';
 import {
-  ORE_DEPOSIT_CORE_GAIN, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
+  ORE_DEPOSIT_CORE_GAIN, ORE_GRADE_SCALE_DEFAULT, ORE_DEPOSIT_EDGE_WIDTH, ORE_DEPOSIT_FREQ, ORE_DEPOSIT_RARITY_COVERAGE,
 } from '../config/balance.js';
 import { Random } from '../math/Random.js';
 import { subSeed, cellRand } from '../math/Hash.js';
@@ -79,7 +79,7 @@ export class OreVeinSampler {
   private readonly gradeScale: number;
 
   constructor(seed: number, options: OreVeinOptions = {}) {
-    this.gradeScale = options.gradeScale ?? 1;
+    this.gradeScale = options.gradeScale ?? ORE_GRADE_SCALE_DEFAULT;
     for (const ore of getAllOres()) {
       const rng = new Random(subSeed(seed, `ore:${ore.id}`));
       const noise = createNoise3D(() => rng.next());
@@ -119,7 +119,7 @@ export class OreVeinSampler {
         const density = Math.min(1, (n - threshold) * DENSITY_GAIN);
         if (density > MIN_STORED_DENSITY) {
           const stored = Math.round(density * 100) / 100;
-          result[ore.id] = this.gradeScale === 1 ? stored : stored * this.gradeScale;
+          result[ore.id] = this.gradeScale === ORE_GRADE_SCALE_DEFAULT ? stored : stored * this.gradeScale;
         }
       }
     }

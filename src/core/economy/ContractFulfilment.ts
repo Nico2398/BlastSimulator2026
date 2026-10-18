@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Delivery of stored ore to active contracts, by hand or automatically.
 
-import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
@@ -44,7 +44,7 @@ export function deliverStoredOre(
   requestedKg: number,
   tick: number,
   buildings: SpoilBuildings,
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): DeliveryResult<DeliveryOutcome> {
   const contract = contracts.active.find(c => c.id === contractId);
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
@@ -83,7 +83,7 @@ export function autoDeliverContracts(
   collectedOre: Record<string, number>,
   tick: number,
   buildings: SpoilBuildings,
-  gradeScale = 1,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): AutoDelivery[] {
   const deliveries: AutoDelivery[] = [];
   // Sorted copy: completing a contract splices it out of contracts.active.

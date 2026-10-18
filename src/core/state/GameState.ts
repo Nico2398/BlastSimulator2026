@@ -548,8 +548,6 @@ export interface GameState {
 }
 
 export interface WorldState {
-  /** Ore grade scale lever (#1932); absent = default. */
-  oreGradeScale?: number;
   /**
    * Width of the site's live bounding box, NOT an upper bound on x: the site
    * grows as the player claims chunks (#473), so iterate `minX .. minX+sizeX`
@@ -595,6 +593,8 @@ export interface WorldState {
   oreDeposits?: boolean;
   /** Pit mask shape the terrain was generated with; absent means DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
 }
 
 export interface SavedBlastPlan {

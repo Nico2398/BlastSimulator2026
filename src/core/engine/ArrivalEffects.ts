@@ -149,8 +149,9 @@ function deliverCargoItem(
   atZ: number,
 ): boolean {
   const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
-  if (tracked && haulDestinationOf(tracked.fragment, oreGradeScaleOf(state.world)) === 'spoil_heap') {
-    const dumped = deliverToSpoilHeap(state.logistics, fragmentId, heaps, atX, atZ, oreGradeScaleOf(state.world));
+  const gradeScale = oreGradeScaleOf(state.world);
+  if (tracked && haulDestinationOf(tracked.fragment, gradeScale) === 'spoil_heap') {
+    const dumped = deliverToSpoilHeap(state.logistics, fragmentId, heaps, atX, atZ, gradeScale);
     if (!dumped) return false;
     const heap = state.buildings.buildings.find(b => b.id === dumped.heapId);
     if (heap) creditSpoilKg(heap, dumped.massKg);

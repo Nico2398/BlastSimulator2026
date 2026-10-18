@@ -358,7 +358,7 @@ describe('ore grade scale (#1932)', () => {
     });
   });
 
-  it('scaled densities are not re-rounded (a 0.05 cut density scales to 0.01 exactly, below the cut)', () => {
+  it('scaled densities are not re-rounded (the smallest scaled density is the 0.05 cut times 0.2, below the cut)', () => {
     const scaled = scan(new OreVeinSampler(42, { deposits: true, gradeScale: 0.2 }));
     const values = scaled.flatMap(r => Object.values(r));
     expect(values.length).toBeGreaterThan(0);

@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Unit tests: ore grade scale lever (#1932)
 import { describe, it, expect } from 'vitest';
-import { oreGradeScaleOf, scaledGradeThreshold } from '../../../src/core/economy/OreGrade.js';
+import { isValidOreGradeScale, oreGradeScaleOf, scaledGradeThreshold } from '../../../src/core/economy/OreGrade.js';
 import { fragmentHaulUrgency } from '../../../src/core/economy/OreDemand.js';
 import { ORE_DEMAND_FULL_GRADE, ORE_DEMAND_MIN_GRADE } from '../../../src/core/config/balance.js';
 
@@ -67,4 +67,9 @@ describe('fragmentHaulUrgency with a grade scale (#1932)', () => {
   it('scale 1 equals the default argument', () => {
     expect(fragmentHaulUrgency({ rustite: 0.3 }, urgency, 1)).toBe(fragmentHaulUrgency({ rustite: 0.3 }, urgency));
   });
+});
+
+describe('isValidOreGradeScale (#1932)', () => {
+  it.each([0.01, 0.2, 1])('accepts %s', v => expect(isValidOreGradeScale(v)).toBe(true));
+  it.each([0, -0.1, 1.5, NaN, Infinity])('rejects %s', v => expect(isValidOreGradeScale(v)).toBe(false));
 });
