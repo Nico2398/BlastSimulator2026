@@ -211,16 +211,12 @@ export class ContractsPanel extends PanelBase {
       const color = this.urgencyColor(c, state.tickCount);
       const timeLeft = cardEl.querySelector<HTMLElement>('.bs-contract-time-left');
       if (timeLeft) {
-        timeLeft.textContent = t('ui.contracts.time_left', { hours: this.remainingTicks(c, state.tickCount) });
+        timeLeft.textContent = t('ui.contracts.time_left', { hours: remainingTicksOf(c, state.tickCount) });
         timeLeft.style.color = color;
       }
       const fill = cardEl.querySelector<HTMLElement>('.bsx-progress-fill');
       if (fill) fill.style.background = color;
     }
-  }
-
-  private remainingTicks(c: Contract, tickCount: number): number {
-    return remainingTicksOf(c, tickCount);
   }
 
   /** Kilograms of `materialId` available to deliver — collected ore by type, or barren rock (heaps plus barren stored fragments) for rubble ('' materialId). */
@@ -321,7 +317,7 @@ export class ContractsPanel extends PanelBase {
   // ── Active ──
 
   private urgencyColor(c: Contract, tickCount: number): string {
-    const remaining = this.remainingTicks(c, tickCount);
+    const remaining = remainingTicksOf(c, tickCount);
     const fraction = c.deadlineTicks > 0 ? remaining / c.deadlineTicks : 0;
     if (fraction > 0.5) return 'var(--bsx-positive)';
     if (fraction > 0.2) return 'var(--bsx-amber)';
@@ -329,7 +325,7 @@ export class ContractsPanel extends PanelBase {
   }
 
   private makeActiveCard(c: Contract, state: GameState): HTMLElement {
-    const remainingTicks = this.remainingTicks(c, state.tickCount);
+    const remainingTicks = remainingTicksOf(c, state.tickCount);
     const color = this.urgencyColor(c, state.tickCount);
     const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
     const stored = this.storedOf(c.materialId, state);

@@ -1297,7 +1297,7 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.update(runningState());
     const strip = stripOf(panel)!;
     expect(strip).not.toBeNull();
-    expect(strip.matches('button[data-action="goto-active"]') || strip.querySelector('button[data-action="goto-active"]') !== null).toBe(true);
+    expect(strip.matches('button[data-action="goto-active"]')).toBe(true);
     const kids = Array.from(getBodyEl(panel).children) as HTMLElement[];
     const stripIdx = kids.indexOf(strip);
     const availHeader = kids.findIndex(k => k.classList.contains('bsx-section') && (k.textContent ?? '').includes(AVAILABLE_LABEL));
@@ -1322,8 +1322,7 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     panel.show();
     panel.update(runningState());
     const text = stripOf(panel)!.textContent ?? '';
-    expect(text).toContain('2');
-    expect(text).toContain('42');
+    expect(text).toContain(t('ui.contracts.active_summary', { count: 2, hours: 42 }));
     expect(text).toContain(formatMoney(5234));
   });
 
@@ -1368,7 +1367,6 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     const state = runningState();
     panel.show();
     panel.update(state);
-    const strip = stripOf(panel)!;
     const input = panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!;
     input.value = '12.5';
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1383,7 +1381,6 @@ describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
     expect(after.textContent).not.toContain('42');
     expect(panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!.value).toBe('12.5');
     expect(panel.root.querySelector<HTMLElement>('[data-scroll-key="available"]')!.scrollTop).toBe(40);
-    void strip;
   });
 
   it('click scrolls the Active section header into view without throwing', () => {
