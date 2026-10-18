@@ -67,11 +67,11 @@ export function addDrilledPattern(state: GameState, counter: { nextHoleId: numbe
   for (const x of [12, 28]) addHole(counter, state.drillHoles, x, 20, 8, 0.15);
 }
 
-/** The same two holes charged with a load far too small to fragment molite: a field exists, nothing breaks (#1967). */
+/** The same two holes charged with the weakest load (pop_rock, minimum kg) too small to fragment molite: a field exists, nothing breaks (#1967). */
 export function addWeakChargedPattern(state: GameState, counter: { nextHoleId: number }): void {
   for (const x of [12, 28]) {
     const hole = addHole(counter, state.drillHoles, x, 20, 8, 0.15);
-    const res = createCharge('krackle', 0.0001, 2, hole.depth);
+    const res = createCharge('pop_rock', 0.5, 2, hole.depth);
     if ('charge' in res) state.chargesByHole[hole.id] = res.charge;
   }
 }

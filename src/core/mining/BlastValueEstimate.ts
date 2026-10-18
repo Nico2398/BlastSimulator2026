@@ -77,10 +77,11 @@ export function estimateBlastOre(
   const holeCoverage = plan.holes.length === 0
     ? 0
     : plan.holes.filter(h => inDisc(h.x, h.z)).length / plan.holes.length;
-  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
+  const charged = plan.holes.some(h => plan.charges[h.id] !== undefined);
+  const field = charged ? buildPlanEnergyField(plan, grid, wetHoleIds) : null;
   if (!field) return { ...NO_ORE_ESTIMATE, holeCoverage };
   const { fragmented } = identifyFragmentedVoxels(field, grid, false);
-  if (fragmented.length === 0) return { ...NO_ORE_ESTIMATE, charged: true, holeCoverage };
+  if (fragmented.length === 0) return { ...NO_ORE_ESTIMATE, charged, holeCoverage };
   let value = 0;
   let covered = 0;
   for (const { x, y, z } of fragmented) {
@@ -90,7 +91,7 @@ export function estimateBlastOre(
     const densities = oresSurveyedAt(survey, x, z, y);
     if (densities) value += columnOreValuePerM3(densities, marketId) * survey.confidence;
   }
-  return { value, coverage: covered / fragmented.length, brokenVoxels: fragmented.length, charged: true, holeCoverage };
+  return { value, coverage: covered / fragmented.length, brokenVoxels: fragmented.length, charged, holeCoverage };
 }
 
 /** Estimated ore value (game dollars) of a blast plan; see `estimateBlastOre` (#1703). */

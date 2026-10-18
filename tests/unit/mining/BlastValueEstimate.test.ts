@@ -43,10 +43,10 @@ function makeHole(id: string, x: number, z: number, depth = 8): DrillHole {
   return { id, x, z, depth, diameter: 0.15 };
 }
 
-function chargedPlan(holes: DrillHole[], kg = 8): BlastPlan {
+function chargedPlan(holes: DrillHole[], kg = 8, explosive = 'krackle'): BlastPlan {
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
-  const { charges } = batchCharge(holes.map(h => h.id), depths, 'krackle', kg, 2);
+  const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, 2);
   return assembleBlastPlan(holes, charges);
 }
 
@@ -666,7 +666,7 @@ describe('estimateBlastOre — charged, brokenVoxels and holeCoverage (#1967)', 
   });
 
   it('a charge too weak for the rock is charged with nothing broken', () => {
-    const weak = chargedPlan([HOLE], 0.0001);
+    const weak = chargedPlan([HOLE], 0.5, 'pop_rock');
     const field = buildPlanEnergyField(weak, grid, new Set());
     expect(field).not.toBeNull();
     expect(identifyFragmentedVoxels(field!, grid, false).fragmented).toHaveLength(0);
@@ -678,7 +678,7 @@ describe('estimateBlastOre — charged, brokenVoxels and holeCoverage (#1967)', 
   });
 
   it('an unsurveyed weak charge is still charged with nothing broken', () => {
-    const r = estimateBlastOre(chargedPlan([HOLE], 0.0001), [], grid);
+    const r = estimateBlastOre(chargedPlan([HOLE], 0.5, 'pop_rock'), [], grid);
     expect(r.charged).toBe(true);
     expect(r.brokenVoxels).toBe(0);
     expect(r.holeCoverage).toBe(0);
