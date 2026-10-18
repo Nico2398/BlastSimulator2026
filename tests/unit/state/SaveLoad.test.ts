@@ -2423,7 +2423,7 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
   it('round-trips the grade state including a pending countdown', () => {
     const state = createGame({ seed: 42 });
     state.grade = {
-      grade: 1, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5, strikeTicks: [], inspectionRolls: 0,
+      grade: 1, oreDeliveredKg: 31_000, deepestPitM: 12.5, rockBrokenM3: 800, blastsFired: 5, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0,
       pending: { toGrade: 2, ticksLeft: 31 },
     };
     expect(deserialize(serialize(state)).grade).toEqual(state.grade);
@@ -2431,7 +2431,7 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
 
   it('round-trips a grade state with nothing pending', () => {
     const state = createGame({ seed: 42 });
-    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0 };
+    state.grade = { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0 };
     expect(deserialize(serialize(state)).grade).toEqual(state.grade);
   });
 

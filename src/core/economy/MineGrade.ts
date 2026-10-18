@@ -91,7 +91,7 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
   const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isWholeCount) ? [...r['strikeTicks'] as number[]] : [];
   const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
-  const lastBlastChargeShare = typeof r['lastBlastChargeShare'] === 'number' && Number.isFinite(r['lastBlastChargeShare']) ? r['lastBlastChargeShare'] : 0;
+  const lastBlastChargeShare = typeof r['lastBlastChargeShare'] === 'number' && Number.isFinite(r['lastBlastChargeShare']) && r['lastBlastChargeShare'] >= 0 ? r['lastBlastChargeShare'] : 0;
   if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;

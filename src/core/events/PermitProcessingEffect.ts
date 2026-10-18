@@ -23,9 +23,10 @@ export function applyPermitProcessing(spec: PermitProcessingSpec, world: EventWo
     return done(-fee);
   }
 
+  if (!g || (!g.pending && !spec.next)) return { ...ALT };
   const below = spec.safetyMin !== undefined && state.scores.safety < spec.safetyMin;
   const ticks = below ? spec.ticksBelow ?? spec.ticks : spec.ticks;
-  if (g?.pending && !spec.next) {
+  if (g.pending && !spec.next) {
     shiftPendingApplication(g, ticks);
   } else {
     pushModifier(state.events, {

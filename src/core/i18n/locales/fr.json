@@ -1349,7 +1349,7 @@
   "event.permit_neighbours_petition.title": "Fourches et pétitions",
   "event.permit_neighbours_petition.desc": "Le village dépose une pétition contre les tirs : 400 signatures, trois dessins au crayon d'une vache fissurée et une menace très polie.",
   "event.permit_neighbours_petition.opt0": "Barbecue gratuit pour le village",
-  "event.permit_neighbours_petition.opt1": "Construire un merlon antibruit",
+  "event.permit_neighbours_petition.opt1": "Ériger un merlon antibruit",
   "event.permit_neighbours_petition.opt2": "Les ignorer",
   "event.permit_neighbours_petition.res0": "Des saucisses pour tout le monde. Le village vous pardonne jusqu'au prochain tir, ou à la prochaine pénurie de saucisses.",
   "event.permit_neighbours_petition.res1": "Un vrai merlon de terre s'élève le long de la clôture. Les voisins sont plus calmes et même les grenouilles approuvent.",
