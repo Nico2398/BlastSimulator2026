@@ -65,6 +65,17 @@ function depositLayer(seed: number, ore: OreType): NonNullable<OreField['deposit
   return { noise: createNoise3D(() => rng.next()), cutoff: ORE_DEPOSIT_RARITY_COVERAGE[ore.rarity] ?? 0 };
 }
 
+/**
+ * Ore grade multiplier for a depth below the natural surface in metres (#1933).
+ * Bands start at `fromDepth`; a smoothstep ramp of ORE_DEPTH_BLEND_M metres
+ * begins at each band boundary and rises to the next band's multiplier.
+ */
+export function oreDepthMultiplier(depth: number): number {
+  void depth;
+  // TODO: implement
+  return 1;
+}
+
 /** Sampler options (#1682). */
 interface OreVeinOptions {
   /** Ore grade scale (#1932): multiplies every stored density; absent or 1 leaves output untouched. */

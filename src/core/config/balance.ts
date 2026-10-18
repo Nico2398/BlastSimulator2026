@@ -3086,3 +3086,20 @@ export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
 /** Ore grade scale lever (#1932): default and upper bound. */
 export const ORE_GRADE_SCALE_DEFAULT = 1;
 export const ORE_GRADE_SCALE_MAX = 1;
+
+/**
+ * Ore grade rises with depth below the natural surface (#1933). Each band
+ * applies its multiplier from `fromDepth` metres down.
+ */
+export const ORE_DEPTH_MULTIPLIER_BANDS: readonly {
+  readonly fromDepth: number;
+  readonly multiplier: number;
+}[] = [
+  { fromDepth: 0, multiplier: 1.0 },
+  { fromDepth: 10, multiplier: 1.4 },
+  { fromDepth: 20, multiplier: 1.8 },
+  { fromDepth: 35, multiplier: 2.2 },
+];
+
+/** Metres of smoothstep ramp from each band boundary to the next band (#1933). */
+export const ORE_DEPTH_BLEND_M = 3;
