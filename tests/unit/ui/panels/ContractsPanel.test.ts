@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import {
-  ContractsPanel, deliverableAmountKg, orderOffers, CONTRACT_OFFER_CARD_PX, AVAILABLE_VISIBLE_CARDS,
+  ContractsPanel, deliverableAmountKg, orderOffers, CONTRACT_OFFER_CARD_PX, AVAILABLE_VISIBLE_CARDS, SECTION_GAP_PX,
 } from '../../../../src/ui/panels/ContractsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
@@ -525,6 +525,13 @@ function getBodyEl(panel: ContractsPanel): HTMLElement {
  * Every direct child of `bodyEl` between the section header whose text
  * contains `label` and the next section header (or the end of bodyEl).
  */
+/** Header label without its count suffix ("Available · 3" -> "Available"). */
+function countLabel(key: 'ui.contracts.available_count' | 'ui.contracts.active_count'): string {
+  return t(key, { count: 0 }).replace(/\s*·\s*0$/, '');
+}
+const AVAILABLE_LABEL = countLabel('ui.contracts.available_count');
+const ACTIVE_LABEL = countLabel('ui.contracts.active_count');
+
 function sectionChildren(bodyEl: HTMLElement, label: string): HTMLElement[] {
   const children = Array.from(bodyEl.children) as HTMLElement[];
   const idx = children.findIndex(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(label));
@@ -554,8 +561,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
     panel.update(state);
 
     const bodyEl = getBodyEl(panel);
-    const activeChildren = sectionChildren(bodyEl, t('ui.contracts.active'));
-    const availableChildren = sectionChildren(bodyEl, t('ui.contracts.available'));
+    const activeChildren = sectionChildren(bodyEl, ACTIVE_LABEL);
+    const availableChildren = sectionChildren(bodyEl, AVAILABLE_LABEL);
     const closedChildren = sectionChildren(bodyEl, t('ui.contracts.closed'));
 
     expect(activeChildren.length).toBe(1);
@@ -589,8 +596,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
 
     const bodyEl = getBodyEl(panel);
     const wrappers = [
-      sectionChildren(bodyEl, t('ui.contracts.active'))[0]!,
-      sectionChildren(bodyEl, t('ui.contracts.available'))[0]!,
+      sectionChildren(bodyEl, ACTIVE_LABEL)[0]!,
+      sectionChildren(bodyEl, AVAILABLE_LABEL)[0]!,
       sectionChildren(bodyEl, t('ui.contracts.closed'))[0]!,
     ];
     for (const wrapper of wrappers) {
@@ -614,8 +621,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
     const headers = (Array.from(bodyEl.children) as HTMLElement[]).filter(c => c.classList.contains('bsx-section'));
     const headerLabels = headers.map(h => h.textContent ?? '');
 
-    expect(headerLabels.some(l => l.includes(t('ui.contracts.active')))).toBe(true);
-    expect(headerLabels.some(l => l.includes(t('ui.contracts.available')))).toBe(true);
+    expect(headerLabels.some(l => l.includes(ACTIVE_LABEL))).toBe(true);
+    expect(headerLabels.some(l => l.includes(AVAILABLE_LABEL))).toBe(true);
     expect(headerLabels.some(l => l.includes(t('ui.contracts.closed')))).toBe(true);
     expect(headers.length).toBe(3);
   });
@@ -627,8 +634,8 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
 
     const bodyEl = getBodyEl(panel);
     for (const [label, emptyKey] of [
-      [t('ui.contracts.active'), t('ui.contracts.none_active')],
-      [t('ui.contracts.available'), t('ui.contracts.none')],
+      [ACTIVE_LABEL, t('ui.contracts.none_active')],
+      [AVAILABLE_LABEL, t('ui.contracts.none')],
       [t('ui.contracts.closed'), t('ui.contracts.none_closed')],
     ] as const) {
       const children = sectionChildren(bodyEl, label);
@@ -1135,8 +1142,8 @@ describe('ContractsPanel layout (#1970)', () => {
     expect(pos('available')).toBeLessThan(pos('active'));
     expect(pos('active')).toBeLessThan(pos('closed'));
     const labels = headerTexts(panel);
-    expect(labels[0]).toContain(t('ui.contracts.available'));
-    expect(labels[1]).toContain(t('ui.contracts.active'));
+    expect(labels[0]).toContain(AVAILABLE_LABEL);
+    expect(labels[1]).toContain(ACTIVE_LABEL);
     expect(labels[2]).toContain(t('ui.contracts.closed'));
   });
 
@@ -1215,7 +1222,7 @@ describe('ContractsPanel layout (#1970)', () => {
     const wrapper = panel.root.querySelector<HTMLElement>('[data-scroll-key="available"]')!;
     expect(AVAILABLE_VISIBLE_CARDS).toBe(3);
     expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
-    expect(parseInt(wrapper.style.maxHeight, 10)).toBeGreaterThanOrEqual(3 * CONTRACT_OFFER_CARD_PX + 2 * 10);
+    expect(parseInt(wrapper.style.maxHeight, 10)).toBeGreaterThanOrEqual(3 * CONTRACT_OFFER_CARD_PX + 2 * SECTION_GAP_PX);
     expect(wrapper.style.overflowY).toBe('auto');
   });
 

@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Contracts panel (redesign P5)
 // Section order: storage strip, AVAILABLE offers (fillable first, sized to
 // three cards before scrolling; Accept/Negotiate/Decline, negotiate result
-// inline), ACTIVE contracts (progress + MAX-capped deliver), CLOSED history. Replaces ContractUI.ts's role (deleted in the P5 cleanup task).
+// inline), ACTIVE contracts (progress + MAX-capped deliver), CLOSED history.
+// Replaces ContractUI.ts's role (deleted in the P5 cleanup task).
 //
 // Root id and the accept/deliver/amount classes are preserved from the old
 // panel so tutorialStages.ts and the tutorial scenario defs keep
@@ -54,11 +55,12 @@ const NEGOTIATE_KEY: Record<NegotiationField, { improved: string; worsened: stri
   penalty: { improved: 'ui.contracts.negotiate.penalty_improved', worsened: 'ui.contracts.negotiate.penalty_worsened' },
 };
 
-/** Height budget (px) of one available-offer card, sizing the Available section. */
+/** Height budget (px) of one available-offer card, sizing the Available section. Measured card height is ~181px; 190 leaves headroom. */
 export const CONTRACT_OFFER_CARD_PX = 190;
 /** Offer cards the Available section shows before it scrolls. */
 export const AVAILABLE_VISIBLE_CARDS = 3;
-const SECTION_GAP_PX = 10;
+/** Vertical gap (px) between cards inside a section. */
+export const SECTION_GAP_PX = 10;
 const AVAILABLE_SECTION_MAX_PX = AVAILABLE_VISIBLE_CARDS * CONTRACT_OFFER_CARD_PX + (AVAILABLE_VISIBLE_CARDS - 1) * SECTION_GAP_PX;
 
 /** Available offers in display order (fillable first). */

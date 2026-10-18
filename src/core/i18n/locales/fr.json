@@ -2410,8 +2410,6 @@
   "ui.contracts.negotiate_used": "Déjà négocié",
   "ui.contracts.negotiate_no_manager": "Aucun gérant disponible",
   "ui.contracts.title": "Contrats",
-  "ui.contracts.available": "Disponibles",
-  "ui.contracts.active": "Actifs",
   "ui.contracts.available_count": "Disponibles · {count}",
   "ui.contracts.active_count": "Actifs · {count}",
   "ui.contracts.accept": "Accepter",
