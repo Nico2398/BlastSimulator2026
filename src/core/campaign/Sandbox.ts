@@ -181,6 +181,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     difficultyTier: 0,
     pitMask: SANDBOX_PIT_MASK,
     market: SANDBOX_MARKET,
+    progression: true,
   };
 }
 

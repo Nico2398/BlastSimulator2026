@@ -93,6 +93,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   ecology: { type: 'number', description: '0-100 score (ScoreState)' },
   nuisance: { type: 'number', description: '0-100 score (ScoreState)' },
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
+  mineGrade: { type: 'object', optional: true, description: 'Mine-grade permit state {grade, pendingTicksLeft}; null on a site with no permit ladder (#1921)' },
   storedMassKg: { type: 'number', description: 'Mass held in warehouse storage (LogisticsState.storedMassKg)' },
   storedSpoilKg: { type: 'number', description: 'Barren rock dumped on spoil heaps (sum of Building.storedSpoilKg), never counted in storedMassKg' },
   collectedOreTotal: { type: 'number', description: 'Sum across every material key in state.collectedOre (kg, #671)' },

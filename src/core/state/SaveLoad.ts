@@ -15,6 +15,7 @@ import { createWeatherCycle, isWeatherState } from '../weather/WeatherCycle.js';
 import { WEATHER_HISTORY_MAX } from '../config/balance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 import { sanitizeTutorialProgress } from './TutorialProgress.js';
+import { sanitizeGradeState } from '../economy/MineGrade.js';
 
 /**
  * Serialize a GameState to a JSON string.
@@ -993,6 +994,11 @@ export function deserialize(json: string): GameState {
   const tutorialProgress = sanitizeTutorialProgress(obj['tutorialProgress']);
   if (tutorialProgress) obj['tutorialProgress'] = tutorialProgress;
   else delete obj['tutorialProgress'];
+
+  // #1921: mine-grade state is untrusted input too; keep it only when well-formed (absent = no ladder).
+  const grade = sanitizeGradeState(obj['grade']);
+  if (grade) obj['grade'] = grade;
+  else delete obj['grade'];
 
   const restored = obj as unknown as GameState;
   // Capacity is derived from the warehouses, never trusted from the save (#1369).

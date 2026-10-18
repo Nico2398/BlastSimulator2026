@@ -27,7 +27,6 @@
     "src/console/commands/mining/shared.ts:validateCurrentBlastPlan",
     "src/console/commands/sandbox.ts:SANDBOX_DEFAULTS",
     "src/console/commands/siteExpansion.ts:ClaimOutcome",
-    "src/console/createRunner.ts:META_COMMANDS",
     "src/core/campaign/Campaign.ts:LevelProgress",
     "src/core/campaign/LevelTransition.ts:LevelCompleteResult",
     "src/core/campaign/LevelTransition.ts:LevelCompleteSummary",

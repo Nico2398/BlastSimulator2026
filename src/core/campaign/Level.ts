@@ -83,6 +83,8 @@ export interface LevelDef {
   scriptedOreSale?: ScriptedOreSaleOffer;
   /** Market pricing this level; omitted = 'legacy' (#1681). */
   market?: MarketId;
+  /** Turns the mine-grade progression ladder on; omitted = off (#1921). */
+  progression?: boolean;
 }
 
 /** Market of the active level; 'legacy' by default (#1681). */

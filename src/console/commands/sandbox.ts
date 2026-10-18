@@ -26,6 +26,7 @@ import { regenerateGrid } from './world.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import { createGradeState } from '../../core/economy/MineGrade.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
@@ -114,6 +115,7 @@ export function sandboxCommand(
   });
 
   if (level.market) ctx.state.contracts.market = level.market;
+  if (level.progression) ctx.state.grade = createGradeState();
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
   generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state));
 

@@ -21,7 +21,8 @@ import { processProjections, bookEmployeeDeath, type AccidentRecord } from '../.
 import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
-import { recordBlastResult, snapshotStats } from '../../../core/campaign/SuccessTracker.js';
+import { blastPitDepthM, recordGradeBlast } from '../../../core/economy/MineGrade.js';
+import { recordBlastResult, snapshotStats, updateDepth } from '../../../core/campaign/SuccessTracker.js';
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
@@ -277,6 +278,9 @@ export function* fireBlastSteps(
 
   // Track blast in damage state and level stats
   state.damage.blastCount++;
+  const pitDepthM = blastPitDepthM(ctx.grid!, result.clearedColumns);
+  recordGradeBlast(state.grade, pitDepthM, result.totalRockVolume);
+  updateDepth(state.levelStats, -pitDepthM, 0);
   recordBlastResult(state.levelStats, result.fragments);
   snapshotStats(state.levelStats, state);
 

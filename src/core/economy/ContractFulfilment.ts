@@ -6,6 +6,7 @@ import { deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sort
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 import { rubbleStockKg } from './SpoilHeaps.js';
+import type { ContractType } from './Contract.js';
 import type { Building } from '../entities/Building.js';
 
 /** The slice of a building a rubble delivery reads and draws down: its spoil heap stock. */
@@ -16,6 +17,8 @@ type DeliveryResult<T> = { success: true; data: T } | { success: false; error: s
 /** What one delivery to one contract produced. */
 interface DeliveryOutcome {
   kg: number;
+  /** Type of the contract delivered to: mine grades count ore_sale and supply kg only (#1921). */
+  contractType: ContractType;
   payment: number;
   bonus: number;
   completed: boolean;
@@ -64,7 +67,7 @@ export function deliverStoredOre(
 
   const result = deliverMaterials(contracts, contractId, kg, tick);
   contract.paidTotal = (contract.paidTotal ?? 0) + result.payment;
-  return { success: true, data: { kg, ...result, fee: isPaidClearance(contract) } };
+  return { success: true, data: { kg, contractType: contract.type, ...result, fee: isPaidClearance(contract) } };
 }
 
 /**

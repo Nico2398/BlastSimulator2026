@@ -303,3 +303,31 @@ describe('Arranged mafia accident vs the safety star (#1700)', () => {
     expect(rating.stars).toBe(3);
   });
 });
+
+describe('maxDepthReached is fed by blasts (#1921)', () => {
+  it('a fired sandbox blast raises levelStats.maxDepthReached above 0', async () => {
+    const { createRunner } = await import('../../../src/console/createRunner.js');
+    const { EXPLOSIVE_DELIVERY_TICKS } = await import('../../../src/core/config/balance.js');
+    const { fundForDeliveryWait } = await import('../../helpers/playthrough.js');
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42').success).toBe(true);
+    const state = ctx.state!;
+    state.events.eventFreqMultiplier = 0;
+    const tickWhile = (until: () => boolean, max: number): void => {
+      for (let n = 0; n < max && !until(); n++) {
+        fundForDeliveryWait(state);
+        for (const e of state.employees.employees) e.fatigue = 100;
+        runner.run('tick 1');
+      }
+    };
+    expect(state.levelStats.maxDepthReached).toBe(0);
+    expect(runner.run('drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:36,30').success).toBe(true);
+    tickWhile(() => state.plannedDrillHoles.length === 0, 1500);
+    expect(runner.run('charge hole:* explosive:krackle amount:6 stemming:2').success).toBe(true);
+    tickWhile(() => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
+    expect(runner.run('blast detonate').success).toBe(true);
+    tickWhile(() => state.lastBlastReport !== null, 600);
+    expect(state.lastBlastReport).not.toBeNull();
+    expect(state.levelStats.maxDepthReached).toBeGreaterThan(0);
+  }, 120_000);
+});
