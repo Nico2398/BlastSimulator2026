@@ -300,8 +300,8 @@ describe('research command — status (#410)', () => {
     researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '2' });
     const result = researchCommand(ctx, ['status'], {});
     expect(result.success).toBe(true);
-    expect(result.output).toContain('driving_center');
-    expect(result.output).toContain('2');
+    expect(result.output).toContain('Driving Center');
+    expect(result.output).toContain('tier 2');
   });
 });
 
@@ -458,7 +458,7 @@ describe('research → tick → unlock end-to-end (#410, #442)', () => {
     const ctx = makeCtx();
     placeResearchCenter(ctx);
     researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '2' });
-    expect(researchCommand(ctx, ['status'], {}).output).toContain('geology_lab');
+    expect(researchCommand(ctx, ['status'], {}).output).toContain('Geology Lab');
 
     tickCommand(ctx, ['500'], {});
 

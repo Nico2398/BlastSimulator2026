@@ -30,10 +30,12 @@ import {
   getResearchProgress,
   isTierUnlocked,
   isResearchQueued,
+  getResearchCenterProfile,
+  getActiveResearchTasks,
   type ResearchCondition,
   type ResearchTask,
 } from '../../../src/core/entities/BuildingResearch.js';
-import { RESEARCH_TASK_DEFS, getResearchTaskDef } from '../../../src/core/config/balance.js';
+import { RESEARCH_TASK_DEFS, RESEARCH_CENTER_SPEED_BY_TIER, RESEARCH_CENTER_SLOTS_BY_TIER, getResearchTaskDef } from '../../../src/core/config/balance.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -841,5 +843,210 @@ describe('getResearchProgress (#1398)', () => {
   it('clamps fraction to 0..1 for out-of-range ticksRemaining', () => {
     expect(getResearchProgress(task(9999)).fraction).toBe(0);
     expect(getResearchProgress(task(-5)).fraction).toBe(1);
+  });
+});
+
+// ── Research Center tier -> speed + parallel slots (#1936) ───────────────────
+
+describe('research center speed and slots (#1936)', () => {
+  const T3_TYPES: BuildingType[] = ['driving_center', 'blasting_academy', 'management_office', 'geology_lab'];
+  const mk = (type: BuildingType, tier: 2 | 3, ticks: number): ResearchTask =>
+    ({ targetType: type, targetTier: tier, ticksRemaining: ticks, cost: 1, conditions: [] });
+  const centerOf = (tier: 1 | 2 | 3, active = true): BuildingState => {
+    const st = freshState();
+    pushRawBuilding(st, 'research_center', tier, 10, 10, active);
+    return st;
+  };
+
+  it('balance tables hold the spec values', () => {
+    expect(RESEARCH_CENTER_SPEED_BY_TIER).toEqual({ 1: 1, 2: 1.5, 3: 2 });
+    expect(RESEARCH_CENTER_SLOTS_BY_TIER).toEqual({ 1: 1, 2: 2, 3: 3 });
+  });
+
+  describe('getResearchCenterProfile', () => {
+    it.each([[1, 1, 1], [2, 1.5, 2], [3, 2, 3]] as const)('tier %i gives speed %f and %i slots', (tier, speed, slots) => {
+      expect(getResearchCenterProfile(centerOf(tier))).toEqual({ speed, slots });
+    });
+
+    it('is undefined with no research center', () => {
+      expect(getResearchCenterProfile(freshState())).toBeUndefined();
+    });
+
+    it('is undefined when the only center is closed by an event', () => {
+      const st = centerOf(3);
+      st.buildings[0]!.outOfService = true;
+      expect(getResearchCenterProfile(st)).toBeUndefined();
+    });
+
+    it('is undefined when the only center is inactive', () => {
+      expect(getResearchCenterProfile(centerOf(2, false))).toBeUndefined();
+    });
+
+    it('takes the best operating tier, no stacking', () => {
+      const st = centerOf(1);
+      pushRawBuilding(st, 'research_center', 2, 20, 20);
+      expect(getResearchCenterProfile(st)).toEqual({ speed: 1.5, slots: 2 });
+      pushRawBuilding(st, 'research_center', 2, 30, 30);
+      expect(getResearchCenterProfile(st)).toEqual({ speed: 1.5, slots: 2 });
+    });
+
+    it('ignores a closed tier-3 center when a tier-1 center operates', () => {
+      const st = centerOf(1);
+      pushRawBuilding(st, 'research_center', 3, 20, 20);
+      st.buildings[1]!.outOfService = true;
+      expect(getResearchCenterProfile(st)).toEqual({ speed: 1, slots: 1 });
+    });
+
+    it('ignores non-research buildings', () => {
+      const st = freshState();
+      pushRawBuilding(st, 'geology_lab', 3, 5, 5);
+      expect(getResearchCenterProfile(st)).toBeUndefined();
+    });
+  });
+
+  describe('getActiveResearchTasks', () => {
+    const queueOf = (st: BuildingState, n: number): ResearchTask[] => {
+      for (let i = 0; i < n; i++) st.researchQueue.push(mk(T3_TYPES[i % 4]!, 3, 50));
+      return st.researchQueue;
+    };
+
+    it.each([[1, 1], [2, 2], [3, 3]] as const)('tier %i center: first %i queued tasks are active', (tier, slots) => {
+      const st = centerOf(tier);
+      const q = queueOf(st, 5);
+      const active = getActiveResearchTasks(st);
+      expect(active).toHaveLength(slots);
+      active.forEach((t, i) => expect(t).toBe(q[i]));
+    });
+
+    it('returns fewer than slots when the queue is shorter', () => {
+      const st = centerOf(3);
+      queueOf(st, 2);
+      expect(getActiveResearchTasks(st)).toHaveLength(2);
+    });
+
+    it('is empty for an empty queue', () => {
+      expect(getActiveResearchTasks(centerOf(3))).toEqual([]);
+    });
+
+    it('is empty with no operating center', () => {
+      const st = freshState();
+      queueOf(st, 2);
+      expect(getActiveResearchTasks(st)).toEqual([]);
+      const closed = centerOf(3);
+      closed.buildings[0]!.outOfService = true;
+      queueOf(closed, 2);
+      expect(getActiveResearchTasks(closed)).toEqual([]);
+    });
+  });
+
+  describe('tickResearch with speed and slots', () => {
+    it('tier 1: only the head progresses, 1 tick per tick', () => {
+      const st = centerOf(1);
+      st.researchQueue.push(mk('driving_center', 3, 50), mk('geology_lab', 3, 50));
+      tickResearch(st);
+      expect(st.researchQueue[0]!.ticksRemaining).toBe(49);
+      expect(st.researchQueue[1]!.ticksRemaining).toBe(50);
+    });
+
+    it('tier 2: two tasks progress by 1.5 each, the third waits', () => {
+      const st = centerOf(2);
+      st.researchQueue.push(mk('driving_center', 3, 50), mk('geology_lab', 3, 50), mk('management_office', 3, 50));
+      tickResearch(st);
+      expect(st.researchQueue.map((q) => q.ticksRemaining)).toEqual([48.5, 48.5, 50]);
+    });
+
+    it('tier 3: three tasks progress by 2 each, the fourth waits', () => {
+      const st = centerOf(3);
+      for (const ty of T3_TYPES) st.researchQueue.push(mk(ty, 3, 50));
+      tickResearch(st);
+      expect(st.researchQueue.map((q) => q.ticksRemaining)).toEqual([48, 48, 48, 50]);
+    });
+
+    it('tier 3: two 50-tick tasks both finish at tick 25 (not 100 sequential)', () => {
+      const st = centerOf(3);
+      st.researchQueue.push(mk('driving_center', 3, 50), mk('geology_lab', 3, 50));
+      const emitter = { emit: vi.fn() };
+      for (let i = 0; i < 24; i++) tickResearch(st, emitter);
+      expect(st.researchQueue).toHaveLength(2);
+      expect(emitter.emit).not.toHaveBeenCalled();
+      tickResearch(st, emitter);
+      expect(st.researchQueue).toHaveLength(0);
+      expect(st.unlockedTiers['driving_center']).toBe(3);
+      expect(st.unlockedTiers['geology_lab']).toBe(3);
+      expect(emitter.emit).toHaveBeenCalledTimes(2);
+      expect(emitter.emit).toHaveBeenCalledWith('research:completed', { targetType: 'driving_center', targetTier: 3 });
+      expect(emitter.emit).toHaveBeenCalledWith('research:completed', { targetType: 'geology_lab', targetTier: 3 });
+    });
+
+    it('tier 2: a 50-tick task completes in 34 ticks, not 33', () => {
+      const st = centerOf(2);
+      st.researchQueue.push(mk('driving_center', 3, 50));
+      for (let i = 0; i < 33; i++) tickResearch(st);
+      expect(st.researchQueue).toHaveLength(1);
+      tickResearch(st);
+      expect(st.researchQueue).toHaveLength(0);
+      expect(st.unlockedTiers['driving_center']).toBe(3);
+    });
+
+    it('a waiting task starts progressing once an active one completes, queue order of the rest kept', () => {
+      const st = centerOf(2);
+      st.researchQueue.push(mk('driving_center', 3, 1), mk('geology_lab', 3, 10), mk('management_office', 3, 10), mk('blasting_academy', 3, 10));
+      tickResearch(st);
+      expect(st.researchQueue.map((q) => q.targetType)).toEqual(['geology_lab', 'management_office', 'blasting_academy']);
+      expect(st.researchQueue.map((q) => q.ticksRemaining)).toEqual([8.5, 10, 10]);
+      tickResearch(st);
+      expect(st.researchQueue.map((q) => q.ticksRemaining)).toEqual([7, 8.5, 10]);
+    });
+
+    it('completing a non-head active task keeps the head and order', () => {
+      const st = centerOf(3);
+      st.researchQueue.push(mk('driving_center', 3, 50), mk('geology_lab', 3, 2), mk('management_office', 3, 50));
+      tickResearch(st);
+      expect(st.researchQueue.map((q) => q.targetType)).toEqual(['driving_center', 'management_office']);
+      expect(st.unlockedTiers['geology_lab']).toBe(3);
+    });
+
+    it('tier-2 (0-tick) tasks complete on the first tick, several at once', () => {
+      const st = centerOf(3);
+      st.researchQueue.push(mk('driving_center', 2, 0), mk('geology_lab', 2, 0), mk('management_office', 2, 0));
+      const emitter = { emit: vi.fn() };
+      tickResearch(st, emitter);
+      expect(st.researchQueue).toHaveLength(0);
+      expect(emitter.emit).toHaveBeenCalledTimes(3);
+      expect(st.unlockedTiers['management_office']).toBe(2);
+    });
+
+    it('a 0-tick task behind a full tier-1 slot waits its turn', () => {
+      const st = centerOf(1);
+      st.researchQueue.push(mk('driving_center', 3, 5), mk('geology_lab', 2, 0));
+      tickResearch(st);
+      expect(st.researchQueue).toHaveLength(2);
+    });
+
+    it('no operating center: no progress for any queued task', () => {
+      const st = centerOf(3);
+      st.buildings[0]!.outOfService = true;
+      st.researchQueue.push(mk('driving_center', 3, 50), mk('geology_lab', 3, 50));
+      expect(tickResearch(st)).toBeUndefined();
+      expect(st.researchQueue.map((q) => q.ticksRemaining)).toEqual([50, 50]);
+    });
+
+    it('closed tier-3 plus operating tier-1 progresses at tier-1 pace', () => {
+      const st = centerOf(1);
+      pushRawBuilding(st, 'research_center', 3, 20, 20);
+      st.buildings[1]!.outOfService = true;
+      st.researchQueue.push(mk('driving_center', 3, 50), mk('geology_lab', 3, 50));
+      tickResearch(st);
+      expect(st.researchQueue.map((q) => q.ticksRemaining)).toEqual([49, 50]);
+    });
+
+    it('destroyed center still cancels the head and refunds (unchanged)', () => {
+      const st = freshState();
+      st.researchQueue.push(mk('driving_center', 3, 50));
+      st.researchQueue[0]!.cost = 12000;
+      const emitter = { emit: vi.fn() };
+      expect(tickResearch(st, emitter)).toEqual({ targetType: 'driving_center', targetTier: 3, refund: 12000 });
+      expect(st.researchQueue).toHaveLength(0);
+    });
   });
 });

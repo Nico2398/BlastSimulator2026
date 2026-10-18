@@ -44,6 +44,16 @@ Research task shape:
 - **Conditions** (prerequisites already met — e.g. a specific other building already at a given tier, or another research already completed) — every task beyond the first upgrade has these too.
 - **Exception — first upgrade (tier 1 → tier 2) of any building type:** cost only, no duration, no conditions.
 
+**Research Center speed and slots (#1936).** The tier of the best operating Research Center (no stacking across centers; `getResearchCenterProfile`) sets how fast and how many tasks run:
+
+| Tier | Speed (ticks per tick) | Parallel slots |
+|------|------------------------|----------------|
+| 1 | 1 | 1 |
+| 2 | 1.5 | 2 |
+| 3 | 2 | 3 |
+
+(`RESEARCH_CENTER_SPEED_BY_TIER`, `RESEARCH_CENTER_SLOTS_BY_TIER`, `balance.ts`.) The first `slots` queued tasks (`getActiveResearchTasks`) each lose `speed` from `ticksRemaining` per tick; every task reaching 0 completes the same tick. `ticksRemaining` can be fractional, so every display shows `Math.ceil` of it. Cancel (no centre left, head task refunded) and the closed-centre pause (no progress) are unchanged.
+
 `tickResearch` emits `research:completed` (tier unlocked) and `research:cancelled` (with refund); `wireResearchNotifications` raises the toasts. The Build Menu catalog row's research button shows cost and duration (`ui.build.queue_research_cost`); once queued it is replaced by live progress (`getResearchProgress`, `.bs-build-research-progress`). A placed building's research progress and Research action live in the inspector.
 
 Higher tiers: larger capacity, better performance, larger physical footprint.
@@ -99,7 +109,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 Well-being score (#1692): the tier's `wellBeing` effect (+2 / +4 / +6) is a per-tick gain damped as the score nears 100, so a higher tier settles at a higher equilibrium and no tier pins it at the cap. Beds come from `getBedCapacity` (sum of capacity over operating Living Quarters); a crew beyond the beds adds a crowding drag proportional to the unhoused share, on top of the productivity penalty. Overwork and accidents drag it too; see `gameplay-employee-needs`.
 Inspector occupants (#1760): a Living Quarters shows beds used/total, resident rows (name link, rest time left), the site-wide housing multiplier and an overcapacity warning when the crew outnumbers the beds.
 Inspector schools: the four training buildings show seats used/total, trainee rows (skill, level, time left), who is walking in, and the courses taught at the tier; a course whose skill a higher-tier school on site offers instead (`availableTrainingOffers`) is marked superseded.
-Inspector Research Center: shows the running task (target tier name, percent, ticks left), pending tasks with their cost, "paused" while the centre is closed, and an idle line when the queue is empty.
+Inspector Research Center: one live row per active task (`research-running0..N-1`: target tier name, percent, ticks left rounded up), pending tasks with their cost (`research-pending{i}`), a speed/slots line (`inspector.research_speed`), "paused" while the centre is closed, and an idle line when the queue is empty. Console `research status` prints the same speed/slots header and per-task lines.
 
 ## Warehouses
 

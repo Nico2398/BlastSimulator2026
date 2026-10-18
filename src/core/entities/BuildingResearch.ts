@@ -3,7 +3,7 @@
 
 import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './Building.js';
 import { isOperating } from './Building.js';
-import { getResearchTaskDef } from '../config/balance.js';
+import { getResearchTaskDef, RESEARCH_CENTER_SPEED_BY_TIER, RESEARCH_CENTER_SLOTS_BY_TIER } from '../config/balance.js';
 import { scaledCost } from '../events/ActiveModifiers.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 
@@ -131,34 +131,40 @@ export interface CancelledResearch {
 }
 
 /**
- * Tick the research queue. If no active Research Center remains for the head
- * task (the enabling building was destroyed mid-flight, or otherwise
- * deactivated), the head task is cancelled and removed from the queue, and
- * its cost is returned for the caller to refund — this check runs every
- * tick, not just at queue time, so a task loses its enabling building it is
- * cancelled rather than silently completing. Otherwise, decrement the head
- * task's ticksRemaining; when it reaches 0, set
- * unlockedTiers[targetType] = targetTier and remove it from the queue.
+ * Tick the research queue. If no Research Center building remains (destroyed
+ * or deactivated), the head task is cancelled and removed from the queue, and
+ * its cost is returned for the caller to refund — this check runs every tick,
+ * not just at queue time, so a task that loses its enabling building is
+ * cancelled rather than silently completing.
+ *
+ * Otherwise every active task (the first `slots` queued tasks of the best
+ * operating centre) loses `speed` ticks. Tasks reaching 0 are removed and set
+ * unlockedTiers[targetType] = targetTier. While the centre is closed by an
+ * event (not operating) progress pauses.
  */
 export function tickResearch(
   state: BuildingState,
   emitter?: Pick<EventEmitter, 'emit'>,
 ): CancelledResearch | undefined {
-  const task = state.researchQueue[0];
-  if (!task) return undefined;
+  const head = state.researchQueue[0];
+  if (!head) return undefined;
+  // Raw `active` on purpose (not isOperating): an event closure only pauses progress, losing the building cancels.
   const hasResearchCenter = state.buildings.some((b) => b.type === 'research_center' && b.active);
   if (!hasResearchCenter) {
     state.researchQueue.shift();
-    const cancelled = { targetType: task.targetType, targetTier: task.targetTier, refund: task.cost };
+    const cancelled = { targetType: head.targetType, targetTier: head.targetTier, refund: head.cost };
     emitter?.emit('research:cancelled', cancelled);
     return cancelled;
   }
-  // hasResearchCenter ignores event closures: a closed centre pauses progress, only losing it cancels the task.
-  if (!hasActiveResearchCenter(state)) return undefined;
-  task.ticksRemaining -= 1;
-  if (task.ticksRemaining <= 0) {
+  const profile = getResearchCenterProfile(state);
+  if (!profile) return undefined;
+  const active = getActiveResearchTasks(state, profile);
+  for (const task of active) task.ticksRemaining -= profile.speed;
+  const done = active.filter((task) => task.ticksRemaining <= 0);
+  if (done.length === 0) return undefined;
+  state.researchQueue = state.researchQueue.filter((task) => !done.includes(task));
+  for (const task of done) {
     state.unlockedTiers[task.targetType] = task.targetTier;
-    state.researchQueue.shift();
     emitter?.emit('research:completed', { targetType: task.targetType, targetTier: task.targetTier });
   }
   return undefined;
@@ -201,4 +207,30 @@ export function getResearchProgress(task: ResearchTask): { elapsed: number; tota
   const elapsed = Math.max(0, total - task.ticksRemaining);
   const fraction = total <= 0 ? 1 : Math.min(1, Math.max(0, elapsed / total));
   return { elapsed, total, fraction };
+}
+
+/** Whole ticks left on a queued research task (fractional remainders round up). */
+export function getResearchTicksRemaining(task: ResearchTask): number {
+  return Math.ceil(task.ticksRemaining);
+}
+
+/** Speed and parallel slots of the state's active Research Center, or undefined when it has none. */
+export function getResearchCenterProfile(state: BuildingState): { speed: number; slots: number } | undefined {
+  let best: BuildingTier | 0 = 0;
+  for (const b of state.buildings) {
+    if (b.type === 'research_center' && isOperating(b) && b.tier > best) best = b.tier;
+  }
+  if (best === 0) return undefined;
+  return { speed: RESEARCH_CENTER_SPEED_BY_TIER[best], slots: RESEARCH_CENTER_SLOTS_BY_TIER[best] };
+}
+
+/**
+ * Queued research tasks currently being worked on (at most the Research Center's slot count).
+ * Callers that already hold the profile pass it to skip a second building scan.
+ */
+export function getActiveResearchTasks(
+  state: BuildingState,
+  profile = getResearchCenterProfile(state),
+): ResearchTask[] {
+  return profile ? state.researchQueue.slice(0, profile.slots) : [];
 }
