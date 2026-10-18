@@ -120,6 +120,7 @@ export class BlastFooter {
     this.costEl.textContent = `$${formatMoney(planCost)}`;
     const view = oreEstimateView(coverage);
     this.valueEl.textContent = oreValueText(view, estValue);
+    this.valueEl.style.color = view.kind === 'unknown' ? 'var(--bsx-text-micro)' : 'var(--bsx-positive)';
     if (view.kind === 'unknown') {
       this.marginEl.textContent = t('ui.blast_workshop.footer.margin_unknown');
       this.marginEl.style.color = 'var(--bsx-text-micro)';
