@@ -501,11 +501,15 @@ describe('PreflightModal — button names (#1749)', () => {
 });
 
 describe('PreflightModal ore estimate coverage (#1960)', () => {
-  function estValueText(modal: PreflightModal): string {
+  function statText(modal: PreflightModal, labelKey: string): string {
     const label = [...modal.root.querySelectorAll('*')]
-      .find(n => n.children.length === 0 && n.textContent === t('ui.blast_workshop.preflight.stat_value'));
-    if (!label) throw new Error('no est value stat');
+      .find(n => n.children.length === 0 && n.textContent === t(labelKey));
+    if (!label) throw new Error(`no stat ${labelKey}`);
     return label.nextElementSibling?.textContent ?? label.parentElement?.textContent ?? '';
+  }
+
+  function estValueText(modal: PreflightModal): string {
+    return statText(modal, 'ui.blast_workshop.preflight.stat_value');
   }
 
   function open(survey: 'none' | 'half' | 'full' | 'stale'): PreflightModal {
@@ -548,10 +552,12 @@ describe('PreflightModal ore estimate coverage (#1960)', () => {
   });
 
   it('plan cost is unchanged by coverage and Detonate stays enabled', () => {
-    for (const s of ['none', 'half', 'full'] as const) {
+    const costs = (['none', 'half', 'full'] as const).map(s => {
       const modal = open(s);
       expect((modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement).disabled).toBe(false);
-      expect(modal.root.textContent).toContain('$');
-    }
+      return statText(modal, 'ui.blast_workshop.preflight.stat_cost');
+    });
+    expect(costs[0]).toMatch(/^\$/);
+    expect(new Set(costs).size).toBe(1);
   });
 });

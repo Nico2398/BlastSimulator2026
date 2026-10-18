@@ -3,7 +3,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../../src/core/mining/BlastValueEstimate.js', () => ({
+vi.mock('../../../src/core/mining/BlastValueEstimate.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../src/core/mining/BlastValueEstimate.js')>()),
   estimateBlastOre: vi.fn(() => ({ value: 42, coverage: 0.5 })),
 }));
 vi.mock('../../../src/core/mining/WetHoles.js', () => ({

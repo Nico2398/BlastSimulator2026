@@ -19,7 +19,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { totalChargeKg } from '../../core/mining/BlastCalc.js';
-import { oreEstimateView, oreValueText } from './oreEstimateDisplay.js';
+import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
@@ -183,11 +183,12 @@ export class PreflightModal {
     this.detonateBtn.disabled = validationErrors.length > 0;
     this.detonateBtn.style.cursor = validationErrors.length > 0 ? 'not-allowed' : 'pointer';
 
+    const oreView = oreEstimateView(coverage);
     this.statsEl.replaceChildren(statGrid([
       { key: t('ui.blast_workshop.preflight.stat_holes'), value: `${state.drillHoles.length}` },
       { key: t('ui.blast_workshop.preflight.stat_charge'), value: `${chargeKg.toFixed(1)} kg` },
       { key: t('ui.blast_workshop.preflight.stat_cost'), value: `$${formatMoney(planCost)}`, color: 'var(--bsx-critical-text)', info: 'preflight-cost' },
-      { key: t('ui.blast_workshop.preflight.stat_value'), value: oreValueText(oreEstimateView(coverage), estValue), color: oreEstimateView(coverage).kind === 'unknown' ? 'var(--bsx-text-micro)' : 'var(--bsx-positive)' },
+      { key: t('ui.blast_workshop.preflight.stat_value'), value: oreValueText(oreView, estValue), color: oreValueColor(oreView) },
     ], 4));
 
     this.renderPredicted(state);

@@ -39,6 +39,9 @@ export interface BlastOreEstimate {
   coverage: number;
 }
 
+/** Estimate for a blast with nothing to value: no field, no fresh survey, or nothing broken. */
+export const NO_ORE_ESTIMATE: BlastOreEstimate = Object.freeze({ value: 0, coverage: 0 });
+
 /**
  * Estimate the total ore value (game dollars) a blast plan will yield (#1703),
  * and how much of the broken volume a fresh survey covers (#1960).
@@ -61,11 +64,11 @@ export function estimateBlastOre(
   marketId: MarketId = 'legacy',
 ): BlastOreEstimate {
   const field = buildPlanEnergyField(plan, grid, wetHoleIds);
-  if (!field) return { value: 0, coverage: 0 };
+  if (!field) return NO_ORE_ESTIMATE;
   const surveys = freshSurveys(surveyResults);
-  if (surveys.length === 0) return { value: 0, coverage: 0 };
+  if (surveys.length === 0) return NO_ORE_ESTIMATE;
   const { fragmented } = identifyFragmentedVoxels(field, grid, false);
-  if (fragmented.length === 0) return { value: 0, coverage: 0 };
+  if (fragmented.length === 0) return NO_ORE_ESTIMATE;
   let value = 0;
   let covered = 0;
   for (const { x, y, z } of fragmented) {

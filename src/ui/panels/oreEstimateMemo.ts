@@ -5,18 +5,18 @@
 import type { GameState } from '../../core/state/GameState.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { BlastPlan } from '../../core/mining/BlastPlan.js';
-import { estimateBlastOre, type BlastOreEstimate } from '../../core/mining/BlastValueEstimate.js';
+import { estimateBlastOre, NO_ORE_ESTIMATE, type BlastOreEstimate } from '../../core/mining/BlastValueEstimate.js';
 import { wetHoleIdsFor } from '../../core/mining/WetHoles.js';
 import { resolveMarketId } from '../../core/campaign/Level.js';
 
 export class OreEstimateMemo {
   private key = '';
   private grid: VoxelGrid | null = null;
-  private estimate: BlastOreEstimate = { value: 0, coverage: 0 };
+  private estimate: BlastOreEstimate = NO_ORE_ESTIMATE;
 
   /** Estimate for `plan`; recomputed only when holes, charges, wet holes, surveys or terrain changed. */
   get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): BlastOreEstimate {
-    if (!grid) return { value: 0, coverage: 0 };
+    if (!grid) return NO_ORE_ESTIMATE;
     const wet = wetHoleIdsFor(state);
     const marketId = resolveMarketId(state);
     const key = JSON.stringify([

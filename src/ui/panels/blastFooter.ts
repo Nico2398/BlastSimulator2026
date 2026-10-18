@@ -13,7 +13,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
-import { oreEstimateView, oreValueText } from './oreEstimateDisplay.js';
+import { oreEstimateView, oreValueColor, oreValueText } from './oreEstimateDisplay.js';
 import { OreEstimateMemo } from './oreEstimateMemo.js';
 import { recordedChargesCost } from '../../core/mining/ChargePlan.js';
 
@@ -120,7 +120,7 @@ export class BlastFooter {
     this.costEl.textContent = `$${formatMoney(planCost)}`;
     const view = oreEstimateView(coverage);
     this.valueEl.textContent = oreValueText(view, estValue);
-    this.valueEl.style.color = view.kind === 'unknown' ? 'var(--bsx-text-micro)' : 'var(--bsx-positive)';
+    this.valueEl.style.color = oreValueColor(view);
     if (view.kind === 'unknown') {
       this.marginEl.textContent = t('ui.blast_workshop.footer.margin_unknown');
       this.marginEl.style.color = 'var(--bsx-text-micro)';

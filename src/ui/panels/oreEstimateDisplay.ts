@@ -15,6 +15,11 @@ export function oreEstimateView(coverage: number): OreEstimateView {
   return { kind: 'partial', sharePct: Math.min(99, Math.max(1, Math.round(coverage * 100))) };
 }
 
+/** Colour of the EST. ORE VALUE: muted while unsurveyed, positive once any survey covers the blast. */
+export function oreValueColor(view: OreEstimateView): string {
+  return view.kind === 'unknown' ? 'var(--bsx-text-micro)' : 'var(--bsx-positive)';
+}
+
 /** EST. ORE VALUE text for a coverage state: "No survey", "$X (N% surveyed)" or "$X". */
 export function oreValueText(view: OreEstimateView, value: number): string {
   if (view.kind === 'unknown') return t('ui.blast_workshop.footer.est_ore_unknown');
