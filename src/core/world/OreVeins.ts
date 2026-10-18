@@ -67,6 +67,8 @@ function depositLayer(seed: number, ore: OreType): NonNullable<OreField['deposit
 
 /** Sampler options (#1682). */
 interface OreVeinOptions {
+  /** Ore grade scale (#1932); unused until implemented. */
+  readonly gradeScale?: number;
   /** Gate veins to discrete deposits by rarity tier; off keeps the legacy continuous veins. */
   readonly deposits?: boolean;
 }

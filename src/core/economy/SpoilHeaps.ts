@@ -13,7 +13,7 @@ export type HaulDestination = 'warehouse' | 'spoil_heap';
  * SPOIL_BARREN_ORE_FRACTION_THRESHOLD (empty = barren). Decides haul destination
  * and which rock rubble may take (a filter: only barren fragments qualify).
  */
-export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>): boolean {
+export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>, _gradeScale = 1): boolean {
   let total = 0;
   for (const d of Object.values(oreDensities)) total += d;
   return total <= SPOIL_BARREN_ORE_FRACTION_THRESHOLD;

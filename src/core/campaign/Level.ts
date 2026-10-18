@@ -16,6 +16,8 @@ import { oresYieldedByRocks } from '../world/RockCatalog.js';
 // ── Types ──
 
 export interface LevelDef {
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
   /** Unique identifier. */
   id: string;
   /** i18n key for the level name. */

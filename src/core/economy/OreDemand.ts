@@ -56,6 +56,7 @@ function gradeWeight(density: number): number {
 export function fragmentHaulUrgency(
   oreDensities: Readonly<Record<string, number>>,
   urgency: ReadonlyMap<string, number>,
+  _gradeScale = 1,
 ): number {
   let max = 0;
   for (const [ore, density] of Object.entries(oreDensities)) {

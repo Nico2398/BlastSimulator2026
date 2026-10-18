@@ -89,6 +89,8 @@ export function requireValidGenDatum(value: number, label: string): number {
 }
 
 export interface TerrainConfig {
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
   sizeX: number;
   /** The voxel Y the site centre's surface lands on. */
   datum: number;
@@ -308,4 +310,10 @@ export function climateBiasLandingOn(
     target.climateCenter[0] - fields.temperature(sizeX / 2, sizeZ / 2),
     target.climateCenter[1] - fields.humidity(sizeX / 2, sizeZ / 2),
   ];
+}
+
+/** Validates an ore grade scale (#1932). */
+export function requireValidOreGradeScale(value: number, _label: string): number {
+  // TODO: implement
+  return value;
 }

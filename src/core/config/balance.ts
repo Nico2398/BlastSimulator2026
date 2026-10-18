@@ -3080,3 +3080,7 @@ export const EVENT_PETITION_IGNORE_NEIGHBOURS = -8;
 export const EVENT_PETITION_IGNORE_DELAY_TICKS = 48;
 export const EVENT_BALANCE_PERMIT_APPROVE_TICKS = 96;
 export const EVENT_BALANCE_REFERENCE_PERMIT_FEE = 20000;
+
+/** Ore grade scale lever (#1932): default and upper bound. */
+export const ORE_GRADE_SCALE_DEFAULT = 1;
+export const ORE_GRADE_SCALE_MAX = 1;
