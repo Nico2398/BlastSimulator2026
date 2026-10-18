@@ -43,7 +43,7 @@ function siteWork(s: BuildingStatusInput, site: PlannedBuilding): { builderId: n
   if (!holder) return { builderId: null, builderPhase: 'unassigned', progress: null };
   const total = holder.activeTaskTotalTicks;
   const remaining = holder.taskTicksRemaining;
-  if (remaining === null || total === undefined || total <= 0) return { builderId: holder.id, builderPhase: 'working', progress: null }; // TODO: on_the_way
+  if (remaining === null || total === undefined || total <= 0) return { builderId: holder.id, builderPhase: 'on_the_way', progress: null };
   return { builderId: holder.id, builderPhase: 'working', progress: Math.min(1, Math.max(0, 1 - remaining / total)) };
 }
 
