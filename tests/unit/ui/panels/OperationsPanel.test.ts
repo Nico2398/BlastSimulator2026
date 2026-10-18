@@ -797,3 +797,276 @@ describe('countQueuedByBlock (#1810)', () => {
   });
 });
 
+
+// ── Grouped debris work queue (#1972) ──
+
+function debrisOrders(state: GameState, type: 'haul_debris' | 'fragment_debris', count: number, startId: number): void {
+  for (let i = 0; i < count; i++) {
+    state.pendingActions.push(makePendingActionFixture({
+      id: startId + i, type, requiredVehicleRole: type === 'haul_debris' ? 'debris_hauler' : null,
+      targetX: i % 50, targetZ: Math.floor(i / 50), payload: { fragmentId: startId + i },
+    }));
+  }
+}
+
+function playerOrders(state: GameState): void {
+  state.pendingActions.push(
+    makePendingActionFixture({ id: 1, type: 'place_building' }),
+    makePendingActionFixture({ id: 2, type: 'survey', requiredSkill: 'geology' }),
+    makePendingActionFixture({ id: 3, type: 'drill_hole', status: 'queued', blockedReason: 'no_qualified_employee' }),
+  );
+}
+
+function debrisState(haul = 2000, frag = 500): GameState {
+  const state = makeState();
+  // Debris first so "player orders first" is a rendering decision, not an input-order artifact.
+  debrisOrders(state, 'haul_debris', haul, 10000);
+  debrisOrders(state, 'fragment_debris', frag, 20000);
+  playerOrders(state);
+  return state;
+}
+
+function openPanel(state: GameState) {
+  const ctx = makePanel();
+  ctx.panel.show();
+  ctx.panel.update(state);
+  return ctx;
+}
+
+function summary(panel: OperationsPanel, type: string): HTMLElement {
+  const btn = panel.root.querySelector(`[data-cancel-debris-group="${type}"]`) as HTMLElement | null;
+  expect(btn, `cancel button for ${type}`).not.toBeNull();
+  let node: HTMLElement | null = btn;
+  while (node && !node.querySelector(`[data-debris-toggle="${type}"]`)) node = node.parentElement;
+  expect(node, `summary row for ${type}`).not.toBeNull();
+  return node!;
+}
+
+describe('OperationsPanel — grouped debris queue (#1972)', () => {
+  it('renders only the 3 player rows plus one summary per debris type for 2,500 debris orders', () => {
+    const { panel } = openPanel(debrisState());
+    expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
+    expect(panel.root.querySelectorAll('[data-debris-toggle]').length).toBe(2);
+    expect(panel.root.querySelectorAll('[data-cancel-debris-group]').length).toBe(2);
+    expect(panel.root.querySelectorAll('*').length).toBeLessThan(1500);
+  });
+
+  it('titles the summary with label and count and lists status parts', () => {
+    const state = debrisState(10, 0);
+    state.pendingActions.find(a => a.id === 10000)!.status = 'in_progress';
+    state.pendingActions.find(a => a.id === 10000)!.holderId = 3;
+    state.pendingActions.find(a => a.id === 10001)!.blockedReason = 'debris_out_of_reach';
+    state.pendingActions.find(a => a.id === 10002)!.blockedReason = 'debris_out_of_reach';
+    const { panel } = openPanel(state);
+    const text = summary(panel, 'haul_debris').textContent ?? '';
+    expect(text).toContain(t('ui.operations.work_queue_debris_title', { label: t('ui.crew.action_haul_debris'), count: 10 }));
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_in_progress', { count: 1 }));
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_stranded', { count: 2 }));
+  });
+
+  it('counts blocked and in-transit orders in the summary', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 5, 100);
+    state.pendingActions[0]!.blockedReason = 'no_vehicle_in_fleet';
+    state.pendingActions[1]!.blockedReason = 'explosives_in_transit';
+    const { panel } = openPanel(state);
+    const text = summary(panel, 'haul_debris').textContent ?? '';
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_blocked', { count: 1 }));
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_in_transit', { count: 1 }));
+  });
+
+  it('gives each debris type its own correct total', () => {
+    const { panel } = openPanel(debrisState(2000, 500));
+    expect(summary(panel, 'haul_debris').textContent).toContain(
+      t('ui.operations.work_queue_debris_title', { label: t('ui.crew.action_haul_debris'), count: 2000 }));
+    expect(summary(panel, 'fragment_debris').textContent).toContain(
+      t('ui.operations.work_queue_debris_title', { label: t('ui.crew.action_fragment_debris'), count: 500 }));
+  });
+
+  it('lists player orders before the debris summaries', () => {
+    const { panel } = openPanel(debrisState(20, 20));
+    const all = Array.from(panel.root.querySelectorAll('[data-cancel-action], [data-debris-toggle]'));
+    const lastPlayer = Math.max(...all.map((n, i) => (n.hasAttribute('data-cancel-action') ? i : -1)));
+    const firstSummary = all.findIndex(n => n.hasAttribute('data-debris-toggle'));
+    expect(lastPlayer).toBeGreaterThanOrEqual(0);
+    expect(lastPlayer).toBeLessThan(firstSummary);
+  });
+
+  it('keeps the blocked reason on player rows', () => {
+    const { panel } = openPanel(debrisState(5, 0));
+    expect(panel.root.querySelector('[data-blocked-reason="no_qualified_employee"]')).not.toBeNull();
+  });
+
+  it('shows the empty state only when there are no orders at all', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 3, 100);
+    const { panel } = openPanel(state);
+    expect(panel.root.textContent).not.toContain(t('ui.operations.work_queue_empty'));
+  });
+
+  describe('expand', () => {
+    it('shows no individual debris rows until expanded', () => {
+      const { panel } = openPanel(debrisState());
+      expect(panel.root.querySelector('[data-cancel-action="10000"]')).toBeNull();
+    });
+
+    it('expanding shows at most 25 individual rows and paging controls', () => {
+      const { panel } = openPanel(debrisState());
+      (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
+      const rows = panel.root.querySelectorAll('[data-cancel-action]');
+      expect(rows.length).toBe(3 + 25);
+      expect(panel.root.querySelector('[data-cancel-action="10000"]')).not.toBeNull();
+      expect(panel.root.querySelector('[data-cancel-action="10025"]')).toBeNull();
+      expect(panel.root.querySelector('[data-debris-page="next"]')).not.toBeNull();
+    });
+
+    it('next and prev page through the group', () => {
+      const { panel } = openPanel(debrisState());
+      (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
+      (panel.root.querySelector('[data-debris-page="next"]') as HTMLElement).click();
+      expect(panel.root.querySelector('[data-cancel-action="10000"]')).toBeNull();
+      expect(panel.root.querySelector('[data-cancel-action="10025"]')).not.toBeNull();
+      expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3 + 25);
+      (panel.root.querySelector('[data-debris-page="prev"]') as HTMLElement).click();
+      expect(panel.root.querySelector('[data-cancel-action="10000"]')).not.toBeNull();
+    });
+
+    it('collapsing hides the individual rows again', () => {
+      const { panel } = openPanel(debrisState());
+      const toggle = () => panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement;
+      toggle().click();
+      toggle().click();
+      expect(panel.root.querySelectorAll('[data-cancel-action]').length).toBe(3);
+    });
+
+    it('expanded rows still cancel one order through the console', () => {
+      const { panel, gameConsole } = openPanel(debrisState());
+      (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
+      (panel.root.querySelector('[data-cancel-action="10003"]') as HTMLElement).click();
+      expect(gameConsole).toHaveBeenCalledWith('employee cancel 10003');
+    });
+  });
+
+  describe('cancel group', () => {
+    it('requests confirmation and sends nothing until confirmed', () => {
+      const { panel, gameConsole } = openPanel(debrisState(4, 3));
+      const handler = vi.fn();
+      panel.setConfirmHandler(handler);
+      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
+      expect(handler).toHaveBeenCalledTimes(1);
+      const cfg = handler.mock.calls[0]![0];
+      expect(cfg.title).toBe(t('ui.operations.work_queue_debris_confirm_title'));
+      expect(cfg.body).toContain('4');
+      expect(cfg.confirmLabel).toBe(t('ui.operations.work_queue_debris_confirm_label'));
+      expect(typeof cfg.onConfirm).toBe('function');
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('confirming cancels exactly the group members, not player orders or the other type', () => {
+      const { panel, gameConsole } = openPanel(debrisState(4, 3));
+      const handler = vi.fn();
+      panel.setConfirmHandler(handler);
+      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
+      handler.mock.calls[0]![0].onConfirm();
+      const sent = gameConsole.mock.calls.map(c => c[0] as string).sort();
+      expect(sent).toEqual([10000, 10001, 10002, 10003].map(id => `employee cancel ${id}`).sort());
+    });
+
+    it('cancels the fragment group independently', () => {
+      const { panel, gameConsole } = openPanel(debrisState(4, 3));
+      const handler = vi.fn();
+      panel.setConfirmHandler(handler);
+      (panel.root.querySelector('[data-cancel-debris-group="fragment_debris"]') as HTMLElement).click();
+      handler.mock.calls[0]![0].onConfirm();
+      expect(gameConsole).toHaveBeenCalledTimes(3);
+      expect(gameConsole).toHaveBeenCalledWith('employee cancel 20000');
+    });
+
+    it('sends no command when no confirm handler is set', () => {
+      const { panel, gameConsole } = openPanel(debrisState(4, 3));
+      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('incremental refresh', () => {
+    it('updates counts when one debris order changes without replacing player rows', () => {
+      const state = debrisState(50, 0);
+      const { panel } = openPanel(state);
+      const before = panel.root.querySelector('[data-cancel-action="2"]');
+      expect(before).not.toBeNull();
+      const beforeText = summary(panel, 'haul_debris').textContent;
+
+      const a = state.pendingActions.find(x => x.id === 10000)!;
+      a.status = 'in_progress';
+      a.holderId = 4;
+      panel.update(state);
+
+      expect(panel.root.querySelector('[data-cancel-action="2"]')).toBe(before);
+      expect(summary(panel, 'haul_debris').textContent).not.toBe(beforeText);
+      expect(summary(panel, 'haul_debris').textContent).toContain(
+        t('ui.operations.work_queue_debris_status_part_in_progress', { count: 1 }));
+    });
+
+    it('does not rebuild the summary rows when nothing changed', () => {
+      const state = debrisState(50, 10);
+      const { panel } = openPanel(state);
+      const before = panel.root.querySelector('[data-debris-toggle="haul_debris"]');
+      panel.update(state);
+      expect(panel.root.querySelector('[data-debris-toggle="haul_debris"]')).toBe(before);
+    });
+
+    it('reflects a player order status change', () => {
+      const state = debrisState(5, 0);
+      const { panel } = openPanel(state);
+      const o = state.pendingActions.find(x => x.id === 1)!;
+      o.status = 'in_progress';
+      o.holderId = 9;
+      panel.update(state);
+      expect(panel.root.querySelector('[data-cancel-action="1"]')!.closest('div')!.parentElement!.textContent)
+        .toContain(t('ui.operations.work_queue_status_in_progress'));
+    });
+
+    it('updates the expanded page when a debris order is cancelled away', () => {
+      const state = debrisState(30, 0);
+      const { panel } = openPanel(state);
+      (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
+      state.pendingActions = state.pendingActions.filter(a => a.id !== 10000);
+      panel.update(state);
+      expect(panel.root.querySelector('[data-cancel-action="10000"]')).toBeNull();
+      expect(panel.root.querySelector('[data-cancel-action="10001"]')).not.toBeNull();
+    });
+
+    it('drops a summary row once its last order is gone', () => {
+      const state = debrisState(3, 2);
+      const { panel } = openPanel(state);
+      state.pendingActions = state.pendingActions.filter(a => a.type !== 'fragment_debris');
+      panel.update(state);
+      expect(panel.root.querySelector('[data-debris-toggle="fragment_debris"]')).toBeNull();
+      expect(panel.root.querySelector('[data-debris-toggle="haul_debris"]')).not.toBeNull();
+    });
+  });
+
+  describe('cost', () => {
+    it('one update at 2,500 debris orders stays within a generous budget after warm-up', () => {
+      const state = debrisState(2000, 500);
+      const { panel } = openPanel(state);
+      panel.update(state);
+      let id = 10000;
+      const t0 = performance.now();
+      for (let i = 0; i < 5; i++) {
+        const a = state.pendingActions.find(x => x.id === id++)!;
+        a.status = 'in_progress';
+        a.holderId = 4;
+        panel.update(state);
+      }
+      const perUpdate = (performance.now() - t0) / 5;
+      expect(perUpdate).toBeLessThan(100);
+    });
+
+    it('renders far fewer DOM nodes at 2,500 orders than one row per order', () => {
+      const { panel } = openPanel(debrisState(2000, 500));
+      expect(panel.root.querySelectorAll('*').length).toBeLessThan(2500);
+    });
+  });
+});
