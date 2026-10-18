@@ -57,7 +57,7 @@ function withBuilder(s: GameState, actionId: number, remaining: number | null, t
 describe('computeBuildingStatus — standing building', () => {
   it('reports operating with every detail field null', () => {
     expect(computeBuildingStatus(stateWith(), 3)).toEqual({
-      kind: 'operating', closureTicksRemaining: null, closureEventId: null, progress: null, builderId: null, targetTier: null,
+      kind: 'operating', closureTicksRemaining: null, closureEventId: null, progress: null, builderId: null, builderPhase: null, targetTier: null,
     });
   });
 
@@ -280,5 +280,101 @@ describe('computeBuildingStatus — upgrading in place (#1875)', () => {
     const done = computeBuildingStatus(s, id)!;
     expect(done.kind).toBe('operating');
     expect(s.buildings.buildings.find(b => b.id === id)!.tier).toBe(2);
+  });
+});
+
+// Builder phase: unassigned -> on_the_way -> working, for both kinds of site.
+describe('computeBuildingStatus — builder phase', () => {
+  type Setup = (s: GameState) => number;
+  const cases: Array<[string, Setup, 'upgrading' | 'under_construction']> = [
+    ['upgrading standing building', s => {
+      s.plannedBuildings.push({ ...site(3, 21, 2), upgrade: true });
+      s.pendingActions.push(action({ id: 21, type: 'place_building' }));
+      return 3;
+    }, 'upgrading'],
+    ['under_construction site', s => {
+      s.buildings.buildings = [];
+      s.plannedBuildings.push(site(8, 21, 1));
+      s.pendingActions.push(action({ id: 21, type: 'place_building' }));
+      return 8;
+    }, 'under_construction'],
+  ];
+
+  for (const [label, setup, kind] of cases) {
+    describe(label, () => {
+      it('no holder is unassigned with no builder and no progress', () => {
+        const s = stateWith();
+        const id = setup(s);
+        expect(computeBuildingStatus(s, id)).toMatchObject({ kind, builderPhase: 'unassigned', builderId: null, progress: null });
+      });
+
+      it('a holder whose task timer is null is on_the_way with builderId set and no progress', () => {
+        const s = stateWith();
+        const id = setup(s);
+        const builderId = withBuilder(s, 21, null, undefined);
+        expect(computeBuildingStatus(s, id)).toMatchObject({ kind, builderPhase: 'on_the_way', builderId, progress: null });
+      });
+
+      it('a holder with a timer but no task total is on_the_way', () => {
+        const s = stateWith();
+        const id = setup(s);
+        const builderId = withBuilder(s, 21, 30, undefined);
+        expect(computeBuildingStatus(s, id)).toMatchObject({ builderPhase: 'on_the_way', builderId, progress: null });
+      });
+
+      it('a holder with a zero task total is on_the_way', () => {
+        const s = stateWith();
+        const id = setup(s);
+        withBuilder(s, 21, 30, 0);
+        expect(computeBuildingStatus(s, id)).toMatchObject({ builderPhase: 'on_the_way', progress: null });
+      });
+
+      it('a holder with a negative task total is on_the_way', () => {
+        const s = stateWith();
+        const id = setup(s);
+        withBuilder(s, 21, 30, -5);
+        expect(computeBuildingStatus(s, id)).toMatchObject({ builderPhase: 'on_the_way', progress: null });
+      });
+
+      it('a valid timer is working with the right progress', () => {
+        const s = stateWith();
+        const id = setup(s);
+        const builderId = withBuilder(s, 21, 25, 100);
+        const st = computeBuildingStatus(s, id)!;
+        expect(st.builderPhase).toBe('working');
+        expect(st.builderId).toBe(builderId);
+        expect(st.progress).toBeCloseTo(0.75, 5);
+      });
+
+      it('a timer at the very start is working with progress 0', () => {
+        const s = stateWith();
+        const id = setup(s);
+        withBuilder(s, 21, 100, 100);
+        expect(computeBuildingStatus(s, id)).toMatchObject({ builderPhase: 'working', progress: 0 });
+      });
+
+      it('a holder id that matches no employee is unassigned', () => {
+        const s = stateWith();
+        const id = setup(s);
+        s.pendingActions.find(a => a.id === 21)!.holderId = 9999;
+        expect(computeBuildingStatus(s, id)).toMatchObject({ builderPhase: 'unassigned', builderId: null });
+      });
+    });
+  }
+
+  it('operating has no builder phase', () => {
+    expect(computeBuildingStatus(stateWith(), 3)!.builderPhase).toBeNull();
+  });
+
+  it('out_of_service has no builder phase', () => {
+    const s = stateWith();
+    s.events.activeModifiers.push(outOfService(3, 200));
+    expect(computeBuildingStatus(s, 3)!.builderPhase).toBeNull();
+  });
+
+  it('demolition_ordered has no builder phase', () => {
+    const s = stateWith();
+    s.pendingActions.push(action({ id: 11, type: 'demolish_building', payload: { buildingId: 3 } }));
+    expect(computeBuildingStatus(s, 3)!.builderPhase).toBeNull();
   });
 });
