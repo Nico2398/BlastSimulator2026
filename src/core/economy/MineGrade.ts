@@ -81,11 +81,13 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   const r = raw as Record<string, unknown>;
   const { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending } = r;
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
-  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks: [], inspectionRolls: 0 };
+  const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isCount) ? [...r['strikeTicks'] as number[]] : [];
+  const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
+  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
   if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
-  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks: [], inspectionRolls: 0 };
+  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls };
 }
 
 /** Definition of a grade: 0 is the start permit, 1-5 are named, above that endless classes. */

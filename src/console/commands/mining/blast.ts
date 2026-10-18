@@ -22,6 +22,8 @@ import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { blastPitDepthM, recordGradeBlast } from '../../../core/economy/MineGrade.js';
+import { preFireCheck, resolveOvershoot, type InspectionVerdict } from '../../../core/economy/PermitLimits.js';
+import { deductExpense } from '../../../core/economy/Finance.js';
 import { recordBlastResult, snapshotStats, updateDepth } from '../../../core/campaign/SuccessTracker.js';
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
@@ -36,6 +38,15 @@ import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_N
 /** Report line for one warehouse whose stock a blast destroyed with it. */
 function stockLossLine(loss: WarehouseLoss): string {
   return t('mining.blast.warehouse_stock_lost', { id: loss.buildingId, kg: Math.round(loss.massKg) });
+}
+
+/** Report lines of an inspection verdict; a shielded blast reads like a lucky one. */
+function verdictLines(v: InspectionVerdict): string[] {
+  if (!v.caught) return [t('mining.blast.permit_over_unchecked')];
+  return [
+    t('mining.blast.permit_caught', { fine: formatMoney(v.fine), strikes: v.strikes }),
+    ...(v.suspended ? [t('mining.blast.permit_suspended')] : []),
+  ];
 }
 
 /** Dispatch `blast` subcommands: (none) = fire anyway, detonate, cancel, status (#1362). */
@@ -123,6 +134,18 @@ export function* fireBlastSteps(
   const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;
+  // Progression sites file the notification form on every fire and risk an inspection when over limit.
+  const permitLines: string[] = [];
+  const grade = ctx.state!.grade;
+  if (grade) {
+    const check = preFireCheck(grade.grade, plan.charges, plan.holes.length);
+    deductExpense(ctx.state!, check.fee, 'permits', 'Blast Notification Form B-52');
+    permitLines.push(t('mining.blast.permit_fee', { fee: formatMoney(check.fee) }));
+    if (check.over) {
+      const verdict = resolveOvershoot(ctx.state!, grade, check, ctx.emitter);
+      permitLines.push(...verdictLines(verdict));
+    }
+  }
   // Validation passed: this fire consumes any armed detonation. Refusals above leave it armed.
   ctx.state!.pendingDetonation = null;
 
@@ -384,6 +407,7 @@ export function* fireBlastSteps(
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
       ...stockLossLines,
+      ...permitLines,
       ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties })),
     ].join('\n'),
   };
