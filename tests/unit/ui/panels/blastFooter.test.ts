@@ -235,7 +235,7 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
 
   it('without a survey a hint points at the Survey panel', () => {
     const { footer } = setup('none');
-    const hint = t('ui.blast_workshop.footer.survey_hint');
+    const hint = t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') });
     expect(hint).toContain('Survey');
     expect(footer.root.textContent).toContain(hint);
   });
@@ -243,7 +243,7 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
   it('a stale-only survey reads as no survey', () => {
     const { footer } = setup('stale');
     expect(value(footer.root).textContent).toBe('No survey');
-    expect(footer.root.textContent).toContain(t('ui.blast_workshop.footer.survey_hint'));
+    expect(footer.root.textContent).toContain(t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') }));
   });
 
   it('a plan with no grid available reads "No survey"', () => {
@@ -260,7 +260,7 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
     expect(text).toMatch(/\$/);
     expect(text).not.toBe('No survey');
     expect(footer.root.textContent).toMatch(/\b\d{1,2}% surveyed/);
-    expect(footer.root.textContent).not.toContain(t('ui.blast_workshop.footer.survey_hint'));
+    expect(footer.root.textContent).not.toContain(t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') }));
   });
 
   it('partial coverage share matches the i18n template', () => {
@@ -283,7 +283,7 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
     expect(value(footer.root).textContent).toMatch(/^\$[\d,.]+/);
     expect(footer.root.textContent).not.toContain('surveyed');
     expect(footer.root.textContent).not.toContain('No survey');
-    expect(footer.root.textContent).not.toContain(t('ui.blast_workshop.footer.survey_hint'));
+    expect(footer.root.textContent).not.toContain(t('ui.blast_workshop.footer.survey_hint', { survey: t('ui.survey.title') }));
     expect(margin(footer.root).textContent).toMatch(/\$/);
   });
 
@@ -292,7 +292,7 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
     const full = setup('full');
     const costOf = (f: BlastFooter) => statValue(f.root, 'ui.blast_workshop.footer.plan_cost').textContent;
     expect(costOf(none.footer)).toBe(costOf(full.footer));
-    const fire = (f: BlastFooter) => (f.root.querySelector('#bs-blast-fire') as HTMLButtonElement).disabled;
+    const fire = (f: BlastFooter) => (f.root.querySelector('[data-action="execute"]') as HTMLButtonElement).disabled;
     expect(fire(none.footer)).toBe(false);
     expect(fire(full.footer)).toBe(false);
   });
