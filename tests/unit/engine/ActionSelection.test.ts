@@ -2404,7 +2404,7 @@ describe('selectBestActionForEmployee — demand-weighted haul ranking (#1817)',
 
     it('a site-rich fragment (0.1 rustite) earns the full demand bonus only on a scaled world (#1932)', () => {
       const wanted = () => { state.contracts.available.push(offer('rustite')); };
-      const frags = () => addBlastFragments(state.logistics, [fragment(1, 10, {}), fragment(2, 55, { rustite: 0.1 })]);
+      const frags = () => addBlastFragments(state.logistics, [fragment(1, 10, { dirtite: 0.3 }), fragment(2, 55, { rustite: 0.1 })]);
       const pool = () => [haul(1, 10), haul(2, 55)];
 
       wanted(); frags();
