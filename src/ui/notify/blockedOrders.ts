@@ -18,7 +18,7 @@ export function isInTransitBlock(action: Pick<PendingAction, 'blockedReason'>): 
 }
 
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
-export function buildBlockedOrderMessage(action: PendingAction): string {
+export function buildBlockedOrderMessage(action: PendingAction, _nowTick?: number): string {
   const order = t(ACTION_LABEL_KEY[action.type]);
   switch (action.blockedReason) {
     case 'no_vehicle_in_fleet':

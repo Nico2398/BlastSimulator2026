@@ -138,3 +138,9 @@ export function earliestChargeDeliveryTick(state: Pick<GameState, 'pendingAction
   }
   return earliest;
 }
+
+/** Maps each hole with a still-in-transit charge order to its delivery arrival tick (#1966). */
+export function chargeDeliveryArrivalByHole(_state: Pick<GameState, 'pendingActions' | 'tickCount'>): Map<string, number> {
+  // TODO: implement
+  return new Map();
+}

@@ -13,6 +13,8 @@ export interface BlastPlan {
 export interface ValidationError {
   holeId: string;
   issue: string;
+  /** Tick a waiting explosive delivery arrives, when the issue is a delivery wait (#1966). */
+  arrivalTick?: number;
 }
 
 /**
@@ -25,6 +27,7 @@ export interface ValidationError {
 export function validateBlastPlan(
   plan: BlastPlan,
   loadingHoleIds?: ReadonlySet<string>,
+  _deliveryArrivalByHole?: ReadonlyMap<string, number>,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
