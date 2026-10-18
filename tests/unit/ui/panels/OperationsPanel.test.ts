@@ -669,7 +669,7 @@ describe('OperationsPanel — blocked orders (#1810)', () => {
   });
 
   it('debris_out_of_reach is neutral: Out of reach chip, reason line, no Blocked or warn chip', () => {
-    const action = blockedFixture(4, 'debris_out_of_reach', { type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' });
+    const action = blockedFixture(4, 'debris_out_of_reach', { type: 'general_work', requiredSkill: null, requiredVehicleRole: null });
     const { panel } = renderWith([action]);
     expect(chipTexts(panel.root)).not.toContain('Blocked');
     expect(chipTexts(panel.root)).toContain('Out of reach');
@@ -836,8 +836,8 @@ function openPanel(state: GameState) {
 function summary(panel: OperationsPanel, type: string): HTMLElement {
   const btn = panel.root.querySelector(`[data-cancel-debris-group="${type}"]`) as HTMLElement | null;
   expect(btn, `cancel button for ${type}`).not.toBeNull();
-  let node: HTMLElement | null = btn;
-  while (node && !node.querySelector(`[data-debris-toggle="${type}"]`)) node = node.parentElement;
+  // Summary card = parent of the button row that holds toggle and cancel.
+  const node = btn!.parentElement?.parentElement ?? null;
   expect(node, `summary row for ${type}`).not.toBeNull();
   return node!;
 }
@@ -1055,7 +1055,8 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
       let id = 10000;
       const t0 = performance.now();
       for (let i = 0; i < 5; i++) {
-        const a = state.pendingActions.find(x => x.id === id++)!;
+        const target = id++;
+        const a = state.pendingActions.find(x => x.id === target)!;
         a.status = 'in_progress';
         a.holderId = 4;
         panel.update(state);
