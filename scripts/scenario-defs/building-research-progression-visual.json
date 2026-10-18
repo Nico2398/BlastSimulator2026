@@ -409,6 +409,210 @@
       }
     },
     {
+      "command": "research queue type:driving_center tier:2",
+      "description": "Parallel research (#1936), prerequisite: tier-2 Driving Center research ($5,000, instant).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-research-btn"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -5000,
+          "researchQueueLength": 1
+        }
+      }
+    },
+    {
+      "command": "research queue type:geology_lab tier:2",
+      "description": "Parallel research (#1936), prerequisite: tier-2 Geology Lab research ($5,000, instant).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-research-btn"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -5000,
+          "researchQueueLength": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:researchQueueLength equals:0 max_ticks:20",
+      "description": "Tier-2 research takes 0 ticks: both complete on the first tick, whatever the centre tier.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "researchQueueLength",
+          "equals": 0,
+          "maxTicks": 20,
+          "timeoutMs": 20000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "researchQueueLength": 0
+        }
+      }
+    },
+    {
+      "command": "research queue type:driving_center tier:3",
+      "description": "Queue tier-3 Driving Center research ($12,000, 50 ticks).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-research-btn"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -12000,
+          "researchQueueLength": 1
+        }
+      }
+    },
+    {
+      "command": "research queue type:geology_lab tier:3",
+      "description": "Queue tier-3 Geology Lab research ($12,000, 50 ticks). With the tier-3 Research Center standing it runs in parallel with the first.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-research-btn"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -12000,
+          "researchQueueLength": 1
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Select the tier-3 Research Center (#3). Its inspector shows both tier-3 tasks as running rows at once (three slots, speed x2), with no pending rows (#1936).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickEntity",
+          "kind": "building",
+          "id": 3
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-live=\"research-running0\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-live=\"research-running1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "researchQueueLength": 2
+        }
+      }
+    },
+    {
+      "command": "wait_until field:researchQueueLength equals:0 max_ticks:60",
+      "description": "Both 50-tick tasks finish together after 25 ticks (speed x2, parallel), not 100 sequential; 60 ticks is a bound, the wait lands on the condition.",
+      "timeout": 65,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "researchQueueLength",
+          "equals": 0,
+          "maxTicks": 60,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "researchQueueLength": 0
+        }
+      }
+    },
+    {
+      "command": "research status",
+      "description": "Queue drained; status header reports the tier-3 centre's speed and slots.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "research status"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "build list",
       "interaction": [
         {
