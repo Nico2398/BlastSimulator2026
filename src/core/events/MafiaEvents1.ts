@@ -3,9 +3,9 @@
 import { ev, r, mafiaTier } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
 import {
-  EVENT_BREAKDOWN_HP_LOSS,
-  EVENT_BREAKDOWN_HOURS,
   EVENT_BOOM_PRICE_PCT,
+  EVENT_BREAKDOWN_HOURS,
+  EVENT_BREAKDOWN_HP_LOSS,
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CALM_DAYS,
   EVENT_CALM_WEIGHT_FACTOR,

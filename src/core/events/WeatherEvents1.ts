@@ -3,8 +3,8 @@
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
 import {
-  EVENT_BREAKDOWN_HP_LOSS,
   EVENT_BREAKDOWN_HOURS,
+  EVENT_BREAKDOWN_HP_LOSS,
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CHEER_HOURS,
   EVENT_CHEER_MORALE_PER_HOUR,

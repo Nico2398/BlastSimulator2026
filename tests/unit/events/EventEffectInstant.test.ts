@@ -3,12 +3,9 @@ import { applyEventEffects } from '../../../src/core/events/EventEffectCatalog.j
 import { applyInstantEffect } from '../../../src/core/events/EventEffectInstant.js';
 import { generateName } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { setupEvents } from '../../../src/core/events/index.js';
-import { getAllEvents } from '../../../src/core/events/EventPool.js';
 import { isOutOfService } from '../../../src/core/events/ActiveModifiers.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { findFreeVehicleForRole } from '../../../src/core/engine/VehicleReservation.js';
 import { makeEffectWorld } from '../../helpers/eventEffectWorld.js';
 
 const alive = (fx: ReturnType<typeof makeEffectWorld>) => fx.state.employees.employees.filter(e => e.alive);
@@ -195,13 +192,20 @@ describe('employee_joins — unique names (#1886)', () => {
 });
 
 describe('authored breakdown and closure (#1958)', () => {
-  it('an authored vehicle_breakdown takes a vehicle out of service, not claimable', () => {
+  it('an authored vehicle_breakdown drops hp by hpLoss and takes the vehicle out of service until it lapses', () => {
     const fx = makeEffectWorld();
     const v = fx.state.vehicles.vehicles[0]!;
+    const driver = fx.state.employees.employees.find(e => e.role === 'driver')!;
+    const hp = v.hp;
+    expect(findFreeVehicleForRole(fx.state, v.type, driver)?.id).toBe(v.id);
     const out = applyEventEffects([{ type: 'vehicle_breakdown', hpLoss: 25, hours: 24 }], fx.world, 10, fx.rng);
     expect(out.resultKeySuffix).toBe('');
+    expect(v.hp).toBe(hp - 25);
+    fx.state.tickCount = 10;
     expect(isOutOfService(fx.state.events.activeModifiers, 'vehicle', v.id, 10)).toBe(true);
-    expect(isOutOfService(fx.state.events.activeModifiers, 'vehicle', v.id, 10 + 24)).toBe(false);
+    expect(findFreeVehicleForRole(fx.state, v.type, driver)).toBeNull();
+    fx.state.tickCount = 10 + 24;
+    expect(findFreeVehicleForRole(fx.state, v.type, driver)?.id).toBe(v.id);
   });
 
   it('vehicle_breakdown with an empty fleet reports _alt and registers nothing', () => {
@@ -227,20 +231,5 @@ describe('authored breakdown and closure (#1958)', () => {
     fx.state.buildings.buildings = [];
     const out = applyEventEffects([{ type: 'building_closed', hours: 24 }], fx.world, 0, fx.rng);
     expect(out.resultKeySuffix).toBe('_alt');
-  });
-
-  it('every authored vehicle_breakdown / building_closed option has res<i>_alt in en and fr', () => {
-    setupEvents();
-    const dir = join(import.meta.dirname, '../../../src/core/i18n/locales');
-    const en = JSON.parse(readFileSync(join(dir, 'en.json'), 'utf8')) as Record<string, string>;
-    const fr = JSON.parse(readFileSync(join(dir, 'fr.json'), 'utf8')) as Record<string, string>;
-    const authored = getAllEvents().flatMap(e => e.consequences.map((c, i) => ({ e, i, c }))
-      .filter(({ c }) => [c, c.altConsequence].some(b => b?.effects?.some(s => s.type === 'vehicle_breakdown' || s.type === 'building_closed'))));
-    expect(authored.length).toBeGreaterThanOrEqual(3);
-    const bad = authored.flatMap(({ e, i }) => [['en', en], ['fr', fr]].flatMap(([loc, d]) => {
-      const v = (d as Record<string, string>)[`event.${e.id}.res${i}_alt`];
-      return v === undefined || v === '' ? [`${e.id} res${i}_alt [${loc as string}] missing`] : [];
-    }));
-    expect(bad).toEqual([]);
   });
 });

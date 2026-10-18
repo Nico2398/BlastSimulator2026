@@ -100,7 +100,7 @@ describe('event effect spread (#1538)', () => {
     const used = new Set(specs.map(s => s.type));
     const unused = [...CATALOG_KINDS].filter(k => !used.has(k));
     expect(unused, `catalog kinds no event uses: ${unused.join(', ')}`).toEqual([]);
-    for (const what of ['survey', 'research']) {
+    for (const what of ['survey', 'research'] as const) {
       expect(specs.some(s => s.type === 'cost_factor' && s.what === what), `cost_factor ${what}`).toBe(true);
     }
   });

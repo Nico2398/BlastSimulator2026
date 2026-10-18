@@ -2,13 +2,13 @@
 // External pressures, international absurdity, and governmental incompetence.
 import { ev, r } from './EventBuilder.js';
 import {
-  EVENT_CLOSURE_HOURS,
   EVENT_BOOM_PRICE_PCT,
   EVENT_BOYCOTT_DAYS,
   EVENT_BOYCOTT_PRICE_PCT,
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CHEER_HOURS,
   EVENT_CHEER_MORALE_PER_HOUR,
+  EVENT_CLOSURE_HOURS,
   EVENT_CURFEW_BAN_HOURS,
   EVENT_GLOOM_HOURS,
   EVENT_GLOOM_MORALE_PER_HOUR,
