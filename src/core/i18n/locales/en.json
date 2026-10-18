@@ -4331,5 +4331,12 @@
   "inspector.vehicle.work_rate": "Work rate",
   "inspector.vehicle.cost": "Running cost",
   "inspector.vehicle.maintenance": "Maintenance",
-  "inspector.vehicle.fuel": "Fuel"
+  "inspector.vehicle.fuel": "Fuel",
+  "permit.preview.kg": "{used} / {limit} kg",
+  "permit.preview.holes": "{used} / {limit} holes",
+  "permit.preview.fee": "Notification fee: ${fee}",
+  "permit.preview.warning": "Over your permit. Maybe the inspector is at lunch.",
+  "permit.preview.grid_warning": "{holes} holes is more than your permit allows ({limit}). The Ministry counts holes too.",
+  "ui.blast_workshop.fire.check_permit_ok": "Within permit: {kg}, {holes}",
+  "ui.blast_workshop.fire.check_permit_over": "Within permit: {kg}, {holes}. Not quite. Firing is still allowed; the Ministry is merely watching."
 }
