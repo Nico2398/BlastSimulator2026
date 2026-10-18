@@ -3,6 +3,10 @@
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
 import {
+  EVENT_SURVEY_DISCOUNT_PCT,
+  EVENT_SURVEY_DISCOUNT_DAYS,
+  EVENT_RESEARCH_DISCOUNT_PCT,
+  EVENT_RESEARCH_DISCOUNT_DAYS,
   EVENT_BOOM_PRICE_PCT,
   EVENT_BRIEF_STOP_HOURS,
   EVENT_CALM_DAYS,
@@ -161,7 +165,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
         effects: [
           { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
         ] },
-      { cashDelta: 20000, scoreDelta: { ecology: 5 }, effectTag: 'subsidy_green_strings' },
+      { cashDelta: 20000, scoreDelta: { ecology: 5 }, effectTag: 'subsidy_green_strings',
+        effects: [
+          { type: 'cost_factor', what: 'survey', pct: EVENT_SURVEY_DISCOUNT_PCT, days: EVENT_SURVEY_DISCOUNT_DAYS },
+        ] },
       { cashDelta: 0, scoreDelta: { ecology: 3 },
         effects: [{ type: 'event_weight', category: 'lawsuit', factor: EVENT_CALM_WEIGHT_FACTOR, days: EVENT_CALM_DAYS }] },
     ],
@@ -313,7 +320,10 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.1 + 0.5 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 90,
     options: [
-      { cashDelta: -40000, scoreDelta: { ecology: 10 }, effectTag: 'comply_reform' },
+      { cashDelta: -40000, scoreDelta: { ecology: 10 }, effectTag: 'comply_reform',
+        effects: [
+          { type: 'cost_factor', what: 'research', pct: EVENT_RESEARCH_DISCOUNT_PCT, days: EVENT_RESEARCH_DISCOUNT_DAYS },
+        ] },
       { cashDelta: -15000, corruptionDelta: 20, effectTag: 'offshore_shell' },
       { cashDelta: -25000, effectTag: 'lobby_against_reform',
         effects: [{ type: 'recurring_charge', perDay: EVENT_RETAINER_PER_DAY, days: EVENT_RETAINER_DAYS }] },
