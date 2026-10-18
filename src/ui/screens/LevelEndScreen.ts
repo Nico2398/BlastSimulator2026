@@ -419,7 +419,12 @@ export class LevelEndScreen {
 
     switch (reason) {
       case 'fired':
-        return []; // TODO: implement board-fired stats (#1946)
+        return [
+          { key: t('ui.level_end.stat.quarters_survived'), value: `${Math.max(0, (state.board?.quarter ?? 1) - 1)}` },
+          { key: t('ui.level_end.stat.days'), value: `${days}` },
+          { key: t('ui.level_end.stat.profit'), value: formatDollars(state.levelStats.totalWealth), color: 'var(--bsx-positive)' },
+          { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash) },
+        ];
       case 'bankruptcy':
         return [
           { key: t('ui.level_end.stat.final_balance'), value: formatDollars(state.cash), color: 'var(--bsx-critical-text)' },

@@ -12,6 +12,7 @@ import { updateEcology } from '../campaign/EcologicalDisaster.js';
 import { updateArrest } from '../campaign/CriminalArrest.js';
 import { updateRevolt } from '../campaign/WorkerRevolt.js';
 import { checkLevelComplete } from '../campaign/LevelTransition.js';
+import { isBoardFired } from '../economy/Board.js';
 import { snapshotStats } from '../campaign/SuccessTracker.js';
 import type { GameOverReport } from './TickPipeline.js';
 
@@ -53,6 +54,7 @@ export function checkGameOverConditions(state: GameState, emitter: EventEmitter)
   const ecoShutdown = updateEcology(state, state.ecological, emitter);
   const arrested = updateArrest(state, state.arrest, emitter);
   const revolted = updateRevolt(state, state.revolt, emitter);
+  const fired = isBoardFired(state.board); // lowest priority: any other loss, or the win, claims the level first (#1946)
   if (!state.levelEnded) {
     if (bankrupted) {
       state.levelEnded = true;
@@ -66,6 +68,9 @@ export function checkGameOverConditions(state: GameState, emitter: EventEmitter)
     } else if (revolted) {
       state.levelEnded = true;
       state.levelEndReason = 'worker_revolt';
+    } else if (fired) {
+      state.levelEnded = true;
+      state.levelEndReason = 'fired';
     }
   }
 
@@ -75,7 +80,7 @@ export function checkGameOverConditions(state: GameState, emitter: EventEmitter)
     ecoShutdown,
     arrested,
     revolted,
-    fired: false,
+    fired: state.levelEndReason === 'fired',
     levelEndReason: state.levelEndReason,
   };
 }
