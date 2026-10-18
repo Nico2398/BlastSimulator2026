@@ -54,6 +54,23 @@ const NEGOTIATE_KEY: Record<NegotiationField, { improved: string; worsened: stri
   penalty: { improved: 'ui.contracts.negotiate.penalty_improved', worsened: 'ui.contracts.negotiate.penalty_worsened' },
 };
 
+/** Height budget (px) of one available-offer card, sizing the Available section. */
+export const CONTRACT_OFFER_CARD_PX = 190;
+/** Offer cards the Available section shows before it scrolls. */
+export const AVAILABLE_VISIBLE_CARDS = 3;
+
+/** Available offers in display order (fillable first). */
+export function orderOffers(
+  available: readonly Contract[],
+  collectedOre: Readonly<Record<string, number>>,
+  rubbleStockKg: number,
+): Contract[] {
+  // TODO: implement fillable-first partition
+  void collectedOre;
+  void rubbleStockKg;
+  return [...available];
+}
+
 /** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
 export function deliverableAmountKg(maxDeliverableKg: number): number {
   if (!(maxDeliverableKg > 0)) return 0;
