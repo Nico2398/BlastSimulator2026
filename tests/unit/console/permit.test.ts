@@ -3,6 +3,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { gradeDef } from '../../../src/core/economy/MineGrade.js';
+import { permitApplyBlocker, permitRefusalText } from '../../../src/core/economy/permitRefusalText.js';
 
 function sandbox() {
   const { runner, ctx } = createRunner();
@@ -113,5 +115,38 @@ describe('permit command (#1921)', () => {
     const { runner } = sandbox();
     expect(runner.run('permit').success).toBe(false);
     expect(runner.run('permit frobnicate').success).toBe(false);
+  });
+});
+
+describe('permit apply output equals permitRefusalText (#1924)', () => {
+  beforeAll(() => setLocale('en'));
+
+  it('unmet_targets', () => {
+    const { runner, state } = sandbox();
+    state.grade!.oreDeliveredKg = 5_000;
+    const blocker = permitApplyBlocker(state)!;
+    expect(runner.run('permit apply').output).toBe(permitRefusalText(blocker.refusal, blocker.unmet, gradeDef(1).fee, state.cash));
+  });
+
+  it('insufficient_funds', () => {
+    const { runner, state } = sandbox();
+    state.grade!.oreDeliveredKg = 5_000;
+    state.grade!.blastsFired = 2;
+    state.cash = 10;
+    const blocker = permitApplyBlocker(state)!;
+    expect(blocker.refusal).toBe('insufficient_funds');
+    expect(runner.run('permit apply').output).toBe(permitRefusalText('insufficient_funds', [], gradeDef(1).fee, 10));
+  });
+
+  it('pending', () => {
+    const { runner, state } = sandbox();
+    state.grade!.pending = { toGrade: 1, ticksLeft: 5 };
+    expect(runner.run('permit apply').output).toBe(permitRefusalText('pending', [], gradeDef(1).fee, state.cash));
+  });
+
+  it('no_ladder', () => {
+    const { runner } = createRunner();
+    runner.run('new_game seed:1');
+    expect(runner.run('permit apply').output).toBe(permitRefusalText('no_ladder', [], 0, 0));
   });
 });

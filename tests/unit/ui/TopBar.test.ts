@@ -9,6 +9,8 @@ import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { formatDollars } from '../../../src/core/economy/formatMoney.js';
+import * as TopBarModule from '../../../src/ui/shell/TopBar.js';
+import { createGradeState, gradeDef } from '../../../src/core/economy/MineGrade.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
 
@@ -777,5 +779,105 @@ describe('TopBar (redesign P1)', () => {
       expect(hud.dataset['inspectCount']).toBe('1');
       topBar.dispose();
     });
+  });
+});
+
+describe('TopBar grade chip (#1924)', () => {
+  function mountBar() {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    const center = new NotificationCenter();
+    const onNavigate = vi.fn();
+    topBar.setNavigateHandler(onNavigate);
+    const chip = () => container.querySelector<HTMLElement>('[data-action="open-permits"]');
+    return { topBar, center, onNavigate, chip, container };
+  }
+  function gradeState() {
+    const s = makeState();
+    s.grade = createGradeState();
+    return s;
+  }
+  afterEach(() => { vi.useRealTimers(); setLocale('en'); });
+
+  it('is hidden without state.grade', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    topBar.update(makeState(), center);
+    const el = chip();
+    expect(el === null || el.style.display === 'none').toBe(true);
+    topBar.dispose();
+  });
+
+  it('is visible with a grade, showing the grade name', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    topBar.update(gradeState(), center);
+    expect(chip()).not.toBeNull();
+    expect(chip()!.style.display).not.toBe('none');
+    expect(chip()!.textContent).toContain(t(gradeDef(0).nameKey));
+    topBar.dispose();
+  });
+
+  it('click navigates to permits', () => {
+    const { topBar, center, onNavigate, chip } = mountBar();
+    topBar.update(gradeState(), center);
+    chip()!.click();
+    expect(onNavigate).toHaveBeenCalledWith('permits');
+    topBar.dispose();
+  });
+
+  it('exports GRADE_CHIP_PULSE_MS as a positive duration', () => {
+    const ms = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'];
+    expect(typeof ms).toBe('number');
+    expect(ms as number).toBeGreaterThan(0);
+  });
+
+  it('pulses on the not-met to all-met transition, then clears after GRADE_CHIP_PULSE_MS', () => {
+    vi.useFakeTimers();
+    const pulseMs = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'] as number;
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    topBar.update(s, center);
+    expect(chip()!.dataset['pulse']).not.toBe('true');
+    s.grade!.oreDeliveredKg = 5_000;
+    topBar.update(s, center);
+    expect(chip()!.dataset['pulse']).not.toBe('true'); // one target still unmet
+    s.grade!.blastsFired = 2;
+    topBar.update(s, center);
+    expect(chip()!.dataset['pulse']).toBe('true');
+    vi.advanceTimersByTime(pulseMs - 1);
+    expect(chip()!.dataset['pulse']).toBe('true');
+    vi.advanceTimersByTime(1);
+    expect(chip()!.dataset['pulse']).not.toBe('true');
+    topBar.dispose();
+  });
+
+  it('does not pulse again on later updates while targets stay met', () => {
+    vi.useFakeTimers();
+    const pulseMs = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'] as number;
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    topBar.update(s, center);
+    s.grade!.oreDeliveredKg = 5_000;
+    s.grade!.blastsFired = 2;
+    topBar.update(s, center);
+    vi.advanceTimersByTime(pulseMs);
+    topBar.update(s, center);
+    topBar.update(s, center);
+    expect(chip()!.dataset['pulse']).not.toBe('true');
+    topBar.dispose();
+  });
+
+  it('does not pulse when the targets become met while an application is pending', () => {
+    const { topBar, center, chip } = mountBar();
+    const s = gradeState();
+    s.grade!.pending = { toGrade: 1, ticksLeft: 10 };
+    topBar.update(s, center);
+    s.grade!.oreDeliveredKg = 5_000;
+    s.grade!.blastsFired = 2;
+    topBar.update(s, center);
+    expect(chip()!.dataset['pulse']).not.toBe('true');
+    topBar.dispose();
   });
 });
