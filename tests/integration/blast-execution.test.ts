@@ -260,7 +260,7 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
 // validateBlastPlan reads ─────────────────────────────────────────────────
 
 describe('Blast execution — outstanding (not yet landed) charge orders are not blastable (#554)', () => {
-  it('a blast plan with an outstanding charge_hole order for a hole is refused, with a message distinguishing "still loading" from "missing", and chargesByHole for that hole stays empty', () => {
+  it('a blast plan with an outstanding charge_hole order for a hole is refused, with a message distinguishing "still loading / in transit" from "missing", and chargesByHole for that hole stays empty', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
 
@@ -280,7 +280,8 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     const result = run('blast');
 
     expect(result.success).toBe(false);
-    expect(result.output.toLowerCase()).toContain('loading');
+    // #1966: ordered explosives still in delivery read "in transit", not "missing".
+    expect(result.output.toLowerCase()).toContain('in transit');
     expect(result.output.toLowerCase()).not.toContain('missing charge');
     expect(Object.keys(state.chargesByHole)).toHaveLength(0);
   });
