@@ -11,6 +11,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { gradeDef, nextGradeTargets, permitApplyBlocker, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
+import { permitLimitTexts } from '../../core/economy/permitLimitText.js';
 import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -85,7 +86,8 @@ export class PermitPanel extends PanelBase {
     if (!g) return 'none';
     const next = gradeDef(g.grade + 1);
     const targetFlags = targets.map(s => `${s.kind}:${s.met ? 1 : 0}`).join(',');
-    return [g.grade, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0].join('|');
+    const { limits, strikes } = permitLimitTexts(g.grade, g.strikeTicks ?? [], state.tickCount);
+    return [g.grade, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0, limits, strikes].join('|');
   }
 
   private render(state: GameState, targets: readonly GradeTargetStatus[]): void {
@@ -98,6 +100,7 @@ export class PermitPanel extends PanelBase {
     const next = gradeDef(g.grade + 1);
     const nextName = t(next.nameKey, next.nameParams);
 
+    const limitTexts = permitLimitTexts(g.grade, g.strikeTicks ?? [], state.tickCount);
     const currentCard = card([
       el('span', { text: t('ui.permit.current_label'), attrs: { style: LABEL_STYLE } }),
       el('div', { attrs: { style: 'display:flex;align-items:center;justify-content:center;padding:10px 0 6px' }, children: [
@@ -106,6 +109,8 @@ export class PermitPanel extends PanelBase {
           attrs: { 'data-role': 'permit-stamp', style: STAMP_STYLE },
         }),
       ] }),
+      el('span', { text: limitTexts.limits, attrs: { 'data-role': 'permit-limits', style: MICRO_STYLE } }),
+      el('span', { text: limitTexts.strikes, attrs: { 'data-role': 'permit-strikes', style: MICRO_STYLE } }),
     ]);
 
     const nextChildren: (Node | null)[] = [

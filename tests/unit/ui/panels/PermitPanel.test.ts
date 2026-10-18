@@ -7,6 +7,7 @@ import { createGradeState, gradeDef, nextGradeTargets, permitApplyBlocker } from
 import { permitRefusalText } from '../../../../src/core/economy/permitRefusalText.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
+import { permitLimitsFor } from '../../../../src/core/economy/PermitLimits.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 
 const PENDING_LINE = 'Your file is on the pile. The pile is on a desk. The desk is on holiday.';
@@ -48,6 +49,28 @@ afterEach(() => {
 });
 
 describe('PermitPanel (#1924)', () => {
+  it('shows charge, hole and fee limits of the current grade', () => {
+    panel.update(progression());
+    const lim = permitLimitsFor(0);
+    const text = q('[data-role="permit-limits"]')!.textContent!;
+    expect(text).toContain(`${lim.maxChargeKg} kg`);
+    expect(text).toContain(`${lim.maxHoles} holes`);
+    expect(text).toContain(formatMoney(lim.fee));
+    expect(q('[data-role="permit-strikes"]')!.textContent).toBe(t('permit.status.strikes', { count: 0 }));
+  });
+
+  it('shows live strikes and refreshes when they change', () => {
+    const s = progression();
+    panel.update(s);
+    s.tickCount = 100;
+    s.grade!.strikeTicks = [90, 95];
+    panel.update(s);
+    expect(q('[data-role="permit-strikes"]')!.textContent).toBe(t('permit.status.strikes', { count: 2 }));
+    s.tickCount = 100_000;
+    panel.update(s);
+    expect(q('[data-role="permit-strikes"]')!.textContent).toBe(t('permit.status.strikes', { count: 0 }));
+  });
+
   it('root id is bs-permit-panel', () => {
     expect(panel.root.id).toBe('bs-permit-panel');
   });
