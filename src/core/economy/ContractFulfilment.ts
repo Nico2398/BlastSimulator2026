@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Delivery of stored ore to active contracts, by hand or automatically.
 
-import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
@@ -44,17 +44,18 @@ export function deliverStoredOre(
   requestedKg: number,
   tick: number,
   buildings: SpoilBuildings,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): DeliveryResult<DeliveryOutcome> {
   const contract = contracts.active.find(c => c.id === contractId);
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
 
   let request = Math.min(requestedKg, remainingKg(contract));
   // Partial delivery: take what stock holds (rubble: barren rock only, #1871); an empty store falls through to the insufficient-stock error.
-  const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings));
+  const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings, gradeScale));
   if (stock > FRAGMENT_SPLIT_EPSILON_KG) request = Math.min(request, stock);
   if (!(request > 0)) return { success: false, error: t('economy.contract.deliver_fulfilled', { id: contractId }) };
 
-  const consumption = consumeStoredOre(logistics, collectedOre, contract.materialId, request, buildings);
+  const consumption = consumeStoredOre(logistics, collectedOre, contract.materialId, request, buildings, gradeScale);
   if (!consumption.success) {
     return {
       success: false,
@@ -82,14 +83,15 @@ export function autoDeliverContracts(
   collectedOre: Record<string, number>,
   tick: number,
   buildings: SpoilBuildings,
+  gradeScale = ORE_GRADE_SCALE_DEFAULT,
 ): AutoDelivery[] {
   const deliveries: AutoDelivery[] = [];
   // Sorted copy: completing a contract splices it out of contracts.active.
   for (const contract of sortByDeadline(contracts.active)) {
     if (!isAutoDeliverable(contract)) continue;
-    const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings));
+    const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.fragments, buildings, gradeScale));
     if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
-    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick, buildings);
+    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick, buildings, gradeScale);
     if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data });
   }
   return deliveries;

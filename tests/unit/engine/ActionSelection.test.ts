@@ -2389,6 +2389,34 @@ describe('selectBestActionForEmployee — demand-weighted haul ranking (#1817)',
       expect(sel!.totalTicks).toBeCloseTo(40, 10);
     });
 
+    it('at oreGradeScale 0.2, proportionally scaled fragments weigh the same as at scale 1 (#1932)', () => {
+      state.world = { sizeX: 60, datum: 0, sizeZ: 60, minX: 0, minZ: 0, baseSizeX: 60, baseSizeZ: 60, gridReady: true, oreGradeScale: 0.2 };
+      state.collectedOre = { dirtite: 25_000 };
+      state.contracts.available.push(offer('rustite'));
+      // Same layout as the first test, every density x0.2: a far rich-for-this-site rustite beats a near trace one.
+      addBlastFragments(state.logistics, [fragment(1, 5, { dirtite: 0.18, rustite: 0.004 }), fragment(2, 40, { rustite: 0.14, dirtite: 0.06 })]);
+
+      const sel = selectBestActionForEmployee(state, emp, [haul(1, 5), haul(2, 40)]);
+
+      expect(sel!.action.id).toBe(2);
+      expect(sel!.totalTicks).toBeCloseTo(40, 10);
+    });
+
+    it('a site-rich fragment (0.1 rustite) earns the full demand bonus only on a scaled world (#1932)', () => {
+      const wanted = () => { state.contracts.available.push(offer('rustite')); };
+      const frags = () => addBlastFragments(state.logistics, [fragment(1, 10, { dirtite: 0.3 }), fragment(2, 55, { rustite: 0.1 })]);
+      const pool = () => [haul(1, 10), haul(2, 55)];
+
+      wanted(); frags();
+      expect(selectBestActionForEmployee(state, emp, pool())!.action.id).toBe(1);
+
+      state = makeState(60, 60);
+      emp = makeEmployee(state, 0, 0);
+      state.world = { sizeX: 60, datum: 0, sizeZ: 60, minX: 0, minZ: 0, baseSizeX: 60, baseSizeZ: 60, gridReady: true, oreGradeScale: 0.2 };
+      wanted(); frags();
+      expect(selectBestActionForEmployee(state, emp, pool())!.action.id).toBe(2);
+    });
+
     it('a leaner-than-full but real share (10% rustite) still earns less bonus than a rich one at equal distance', () => {
       state.collectedOre = { dirtite: 25_000 };
       state.contracts.available.push(offer('rustite'));

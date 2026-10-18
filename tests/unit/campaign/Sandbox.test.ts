@@ -19,6 +19,7 @@ import {
   type SandboxKitId,
   resolveSandboxKitId,
 } from '../../../src/core/campaign/Sandbox.js';
+import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
@@ -651,6 +652,12 @@ describe('sandbox pit mask (#1680)', () => {
 
   it('every campaign level leaves pitMask undefined (default mask)', () => {
     for (const level of getAllLevels()) expect(level.pitMask, level.id).toBeUndefined();
+  });
+
+  it('every level def leaves oreGradeScale unset or valid (#1932)', () => {
+    for (const level of [...getAllLevels(), sandboxLevelDef(SANDBOX_DEFAULTS)]) {
+      if (level.oreGradeScale !== undefined) expect(isValidOreGradeScale(level.oreGradeScale), level.id).toBe(true);
+    }
   });
 
   it('the sandbox terrain config reaches the generator context', () => {

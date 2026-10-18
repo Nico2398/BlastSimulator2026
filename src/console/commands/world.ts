@@ -9,7 +9,7 @@ import { ensureRallyPoint } from '../../core/state/RallyPoint.js';
 import { placeStartingBuildings } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, requireValidOreGradeScale, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -104,7 +104,7 @@ function defaultDatumForSize(size: number): number {
 }
 
 /** Size, hardness and ore-mode fields terrain generation reads off a world. */
-interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; climateBias?: [number, number] }
+interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; oreGradeScale?: number; climateBias?: [number, number] }
 
 /**
  * The base (level-original) size + hardness fields generation reads off a
@@ -122,6 +122,7 @@ function worldGenerationFields(world: WorldState): GenerationFields {
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
     ...(world.oreDeposits !== undefined ? { oreDeposits: world.oreDeposits } : {}),
     ...(world.pitMask !== undefined ? { pitMask: world.pitMask } : {}),
+    ...(world.oreGradeScale !== undefined ? { oreGradeScale: world.oreGradeScale } : {}),
     ...(world.climateBias ? { climateBias: world.climateBias } : {}),
   };
 }
@@ -157,6 +158,7 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
     ...(config.mixedRockHardness !== undefined ? { mixedRockHardness: config.mixedRockHardness } : {}),
     ...(config.oreDeposits !== undefined ? { oreDeposits: config.oreDeposits } : {}),
     ...(config.pitMask !== undefined ? { pitMask: config.pitMask } : {}),
+    ...(config.oreGradeScale !== undefined ? { oreGradeScale: config.oreGradeScale } : {}),
   };
 }
 
@@ -186,6 +188,7 @@ function regenerateGridParams(state: GameState): GenerationFields {
     datum: requireValidGenDatum(base.datum, 'world.datum'),
     sizeZ: requireValidGenDimension(base.sizeZ, 'world.baseSizeZ'),
     ...(base.pitMask !== undefined ? { pitMask: requireValidPitMask(base.pitMask, 'world.pitMask') } : {}),
+    ...(base.oreGradeScale !== undefined ? { oreGradeScale: requireValidOreGradeScale(base.oreGradeScale, 'world.oreGradeScale') } : {}),
   };
 }
 
@@ -257,13 +260,17 @@ export function regenerateGrid(
   },
 ): void {
   if (!ctx.state) return;
-  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask } = params;
+  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask, oreGradeScale } = params;
   const config: TerrainConfig = {
     sizeX, datum, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
     ...(oreDeposits !== undefined ? { oreDeposits } : {}),
     ...(pitMask !== undefined ? { pitMask } : {}),
+    ...(oreGradeScale !== undefined ? { oreGradeScale } : {}),
   };
+  if (ctx.state.world && oreGradeScale !== undefined) {
+    ctx.state.world.oreGradeScale = oreGradeScale;
+  }
   if (ctx.state.world && pitMask !== undefined) {
     ctx.state.world.pitMask = pitMask;
   }
@@ -431,6 +438,14 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     }
   }
 
+  if (state.world?.oreGradeScale !== undefined) {
+    try {
+      requireValidOreGradeScale(state.world.oreGradeScale, 'world.oreGradeScale');
+    } catch {
+      return t('world.terrain_save_corrupt');
+    }
+  }
+
   if (state.world?.voxels) {
     const mismatch = terrainVersionMismatch(state.world.voxels);
     if (mismatch) return mismatch;
@@ -454,12 +469,13 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     if (decodedGrid) {
       restoreGrid(ctx, decodedGrid);
     } else {
-      const { sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask, climateBias } = regenerateGridParams(state);
+      const { sizeX, datum, sizeZ, mixedRockHardness, oreDeposits, pitMask, oreGradeScale, climateBias } = regenerateGridParams(state);
       regenerateGrid(ctx, {
         seed: state.seed, climateBias: climateBias ?? biome.climateCenter, sizeX, datum, sizeZ,
         ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
         ...(oreDeposits !== undefined ? { oreDeposits } : {}),
         ...(pitMask !== undefined ? { pitMask } : {}),
+        ...(oreGradeScale !== undefined ? { oreGradeScale } : {}),
       });
     }
   } catch {

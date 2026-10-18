@@ -27,6 +27,7 @@ import { isStaffedComposition, resolveStartingSite } from '../../core/state/Star
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { createGradeState } from '../../core/economy/MineGrade.js';
+import { isValidOreGradeScale } from '../../core/economy/OreGrade.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
@@ -53,8 +54,18 @@ function rawKitArg(named: Record<string, string>): string | undefined {
   return named['kit'] ?? named['difficulty'];
 }
 
+/** `ore_grade:<n>`: a site ore grade scale in (0, 1] (#1932); absent leaves the default. */
+function parseOreGradeArg(raw: string | undefined): { scale?: number; error?: string } {
+  if (raw === undefined) return {};
+  const value = Number(raw);
+  if (raw.trim() === '' || !isValidOreGradeScale(value)) {
+    return { error: t('sandbox.invalid_ore_grade', { value: raw }) };
+  }
+  return { scale: value };
+}
+
 /**
- * `sandbox start [biome:… kit:digger|full seed:… …]` (`difficulty:` is a legacy alias for `kit:`)
+ * `sandbox start [biome:… kit:digger|full seed:… ore_grade:0..1 …]` (`difficulty:` is a legacy alias for `kit:`)
  *
  * Unlike `campaign start`, this needs no prior `new_game` and is gated by no
  * unlock: a sandbox site is created from nothing, which is the whole point of
@@ -85,8 +96,13 @@ export function sandboxCommand(
     return { success: false, output: flags.error };
   }
 
+  const oreGrade = parseOreGradeArg(named['ore_grade']);
+  if (oreGrade.error) {
+    return { success: false, output: oreGrade.error };
+  }
+
   const config = clampSandboxConfig(requested);
-  const level = sandboxLevelDef(config);
+  const level = { ...sandboxLevelDef(config), ...(oreGrade.scale !== undefined ? { oreGradeScale: oreGrade.scale } : {}) };
   // Absent: the kit's free site. true: the global staffed roster, no buildings. false: bare.
   const startingSite = resolveStartingSite(level.startingSite, flags.staffed);
 
@@ -109,6 +125,7 @@ export function sandboxCommand(
     mixedRockHardness: level.mixedRockHardness,
     ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
     ...(level.pitMask ? { pitMask: level.pitMask } : {}),
+    ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
     startingCrew: true,
     fleetMustStayMobile: true,
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),

@@ -42,6 +42,7 @@ function genToConfig(gen: SerializedTerrainGen): TerrainConfig {
     ...(gen.mixedRockHardness !== undefined ? { mixedRockHardness: gen.mixedRockHardness } : {}),
     ...(gen.oreDeposits !== undefined ? { oreDeposits: gen.oreDeposits } : {}),
     ...(gen.pitMask !== undefined ? { pitMask: gen.pitMask } : {}),
+    ...(gen.oreGradeScale !== undefined ? { oreGradeScale: gen.oreGradeScale } : {}),
   };
 }
 
@@ -651,5 +652,49 @@ describe('encodeVoxelGrid / decodeVoxelGrid — oreDeposits (#1682)', () => {
   it('the generator version is unchanged by deposits', () => {
     expect(TERRAIN_GENERATOR_VERSION).toBe(1);
     expect(encodeVoxelGrid(generateTerrain(params), makeGen({ ...params, oreDeposits: true })).gen.version).toBe(1);
+  });
+});
+
+describe('encodeVoxelGrid / decodeVoxelGrid — oreGradeScale (#1932)', () => {
+  const scaledGen = (): SerializedTerrainGen => makeGen({ oreDeposits: true, oreGradeScale: 0.2 });
+
+  function totalOre(grid: VoxelGrid): number {
+    let sum = 0;
+    for (let x = 0; x < 32; x++) for (let z = 0; z < 32; z++) for (let y = 0; y < SCAN_Y; y++) {
+      for (const d of Object.values(grid.oresAt(x, y, z) ?? {})) sum += d;
+    }
+    return sum;
+  }
+  const SCAN_Y = 48;
+
+  it('keeps payload.gen.oreGradeScale', () => {
+    const gen = scaledGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    expect(payload.gen.oreGradeScale).toBe(0.2);
+  });
+
+  it('a payload without the scale decodes to full-grade ore and carries none', () => {
+    const gen = makeGen({ oreDeposits: true });
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    expect(payload.gen.oreGradeScale).toBeUndefined();
+    const explicit = generateTerrain(genToConfig({ ...gen, oreGradeScale: 1 }));
+    expect(totalOre(decodeVoxelGrid(payload))).toBeCloseTo(totalOre(explicit), 9);
+  });
+
+  it('decoding regenerates the scaled ore, not full-grade ore', () => {
+    const gen = scaledGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const decoded = decodeVoxelGrid(JSON.parse(JSON.stringify(encodeVoxelGrid(grid, gen))));
+    const full = generateTerrain(genToConfig({ ...gen, oreGradeScale: 1 }));
+    expect(totalOre(decoded)).toBeCloseTo(totalOre(grid), 9);
+    expect(totalOre(full)).toBeGreaterThan(0);
+    expect(totalOre(decoded) / totalOre(full)).toBeCloseTo(0.2, 1);
+  });
+
+  it.each([[0], [-0.2], [1.5], [NaN]])('an invalid scale (%s) is rejected', (scale) => {
+    const gen = scaledGen();
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const tampered: SerializedVoxels = { ...payload, gen: { ...payload.gen, oreGradeScale: scale } };
+    expect(() => decodeVoxelGrid(tampered)).toThrow(/ore grade scale/);
   });
 });

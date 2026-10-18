@@ -1,6 +1,7 @@
 /** Inspector content for fragment selections (#1769). */
 import { t } from '../../../core/i18n/I18n.js';
 import { fragmentOreKg } from '../../../core/economy/FragmentOre.js';
+import { oreGradeScaleOf } from '../../../core/economy/OreGrade.js';
 import { isBarrenFragment } from '../../../core/economy/SpoilHeaps.js';
 import type { TrackedFragment } from '../../../core/economy/Logistics.js';
 import type { GameState } from '../../../core/state/GameState.js';
@@ -18,7 +19,7 @@ function rockName(rockId: string): string {
   return name === key ? rockId : name;
 }
 
-function buildRockSection(tracked: TrackedFragment): HTMLElement {
+function buildRockSection(tracked: TrackedFragment, gradeScale: number): HTMLElement {
   const f = tracked.fragment;
   const { byOre } = fragmentOreKg(f);
   const rows: HTMLElement[] = [
@@ -29,7 +30,7 @@ function buildRockSection(tracked: TrackedFragment): HTMLElement {
   for (const [oreId, kg] of ores) {
     rows.push(tagged(valueRow(t(`ore.${oreId}.name`), kgText(kg)), 'data-fragment-ore', oreId));
   }
-  if (isBarrenFragment(f.oreDensities)) {
+  if (isBarrenFragment(f.oreDensities, gradeScale)) {
     rows.push(tagged(noteLine(t('inspector.fragment.barren')), 'data-fragment-barren'));
   }
   const section = sectionOf(t('inspector.fragment.section.rock'), rows);
@@ -80,7 +81,7 @@ export const fragmentContent: KindContent = {
     const sections = (): Array<[string, () => HTMLElement]> => {
       const current = state.logistics.fragments.find(x => x.fragment.id === entity.id) ?? tracked;
       return [
-        ['bs-fragment-rock', () => buildRockSection(current)],
+        ['bs-fragment-rock', () => buildRockSection(current, oreGradeScaleOf(state.world))],
         ['bs-fragment-location', () => buildLocationSection(current, state, links)],
       ];
     };

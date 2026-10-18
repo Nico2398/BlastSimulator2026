@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
+import { createGame, createWorldState, SAVE_VERSION } from '../../../src/core/state/GameState.js';
 import { createBuildingState, placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { enterBuilding } from '../../../src/core/engine/Mount.js';
 import { serialize, deserialize, backfillRaises } from '../../../src/core/state/SaveLoad.js';
@@ -2474,5 +2474,19 @@ describe('deserialize — malformed PendingAction.blockedDetail is dropped (#193
     ['a null detail', null],
   ])('drops %s', (_name, detail) => {
     expect(loadWithDetail(detail).blockedDetail).toBeUndefined();
+  });
+});
+
+describe('serialize / deserialize — world.oreGradeScale (#1932)', () => {
+  it('round-trips a set scale', () => {
+    const state = createGame({ seed: 42 });
+    state.world = { ...createWorldState(64, 24, 64, true), oreGradeScale: 0.2 };
+    expect(deserialize(serialize(state)).world!.oreGradeScale).toBe(0.2);
+  });
+
+  it('an absent scale stays absent after a round trip', () => {
+    const state = createGame({ seed: 42 });
+    state.world = createWorldState(64, 24, 64, true);
+    expect(deserialize(serialize(state)).world!.oreGradeScale).toBeUndefined();
   });
 });

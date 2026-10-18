@@ -335,3 +335,46 @@ describe('oreSite helper definitions', () => {
     expect(shareBelow([0, 999, 1000, 5000], 1000)).toBe(0.5);
   });
 });
+
+describe('ore grade scale (#1932)', () => {
+  const COMPOSITIONS: VoxelRockComposition[] = [CRUITE_COMPOSITION];
+  const DEPTHS = [1, 5, 9, 12, 20];
+
+  function scan(sampler: OreVeinSampler): Array<Record<string, number>> {
+    const out: Array<Record<string, number>> = [];
+    for (const comp of COMPOSITIONS) for (const depth of DEPTHS) {
+      for (let x = 0; x < 24; x++) for (let z = 0; z < 24; z++) out.push(sampler.densitiesAt(x, 0, z, depth, comp, 1.0));
+    }
+    return out;
+  }
+
+  it('scale 0.2 multiplies every density by 0.2 and keeps the same non-zero voxels', () => {
+    const base = scan(new OreVeinSampler(42, { deposits: true }));
+    const scaled = scan(new OreVeinSampler(42, { deposits: true, gradeScale: 0.2 }));
+    expect(base.some(r => Object.keys(r).length > 0)).toBe(true);
+    base.forEach((row, i) => {
+      expect(Object.keys(scaled[i]!).sort()).toEqual(Object.keys(row).sort());
+      for (const [ore, d] of Object.entries(row)) expect(scaled[i]![ore]!).toBeCloseTo(d * 0.2, 12);
+    });
+  });
+
+  it('scaled densities are not re-rounded (the smallest scaled density is the 0.05 cut times 0.2, below the cut)', () => {
+    const scaled = scan(new OreVeinSampler(42, { deposits: true, gradeScale: 0.2 }));
+    const values = scaled.flatMap(r => Object.values(r));
+    expect(values.length).toBeGreaterThan(0);
+    expect(Math.min(...values)).toBeLessThan(0.05);
+    expect(Math.min(...values)).toBeGreaterThanOrEqual(0.05 * 0.2 - 1e-12);
+  });
+
+  it('scale 1 is identical to no scale option', () => {
+    expect(scan(new OreVeinSampler(42, { deposits: true, gradeScale: 1 }))).toEqual(scan(new OreVeinSampler(42, { deposits: true })));
+  });
+
+  it('works on legacy continuous veins too', () => {
+    const base = scan(new OreVeinSampler(7));
+    const scaled = scan(new OreVeinSampler(7, { gradeScale: 0.5 }));
+    base.forEach((row, i) => {
+      for (const [ore, d] of Object.entries(row)) expect(scaled[i]![ore]!).toBeCloseTo(d * 0.5, 12);
+    });
+  });
+});

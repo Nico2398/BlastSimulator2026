@@ -4019,6 +4019,7 @@
   "sandbox.unknown_subcommand": "Unknown sub-command: \"{sub}\". Use: start",
   "sandbox.unknown_biome": "Unknown biome: \"{biome}\". Valid: {valid}",
   "sandbox.unknown_kit": "Unknown kit: \"{kit}\". Valid: {valid}",
+  "sandbox.invalid_ore_grade": "Invalid ore_grade: \"{value}\". Use a number above 0 and at most 1.",
   "sandbox.start_success": "Sandbox started. {gridX}x{gridZ} {biome}, kit {kit}, seed {seed}, cash ${cash}.{staffedSuffix}",
   "world.unknown_mine_type": "Unknown mine type: \"{mineType}\". Valid: {valid}",
   "world.invalid_size": "Invalid size: {size}. Must be a whole number between 1 and {max}.",

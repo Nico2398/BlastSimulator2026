@@ -19,6 +19,7 @@ import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { isBarrenFragment, type HaulDestination } from './SpoilHeaps.js';
+import { oreGradeScaleOf } from './OreGrade.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
@@ -94,6 +95,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number,
   const sites = freightWarehouseSites(state.buildings);
   const used = warehouseUsedKgMap(state.logistics);
   const heaps = spoilHeapSites(state.buildings);
+  const gradeScale = oreGradeScaleOf(state.world);
 
   return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
     // An oversized fragment can never be hauled until a Rock Fragmenter
@@ -106,7 +108,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number,
     // away every tick from then on. Blasts throw off boulders far heavier than
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
-    const candidates = isBarrenFragment(tracked.fragment.oreDensities) ? heaps : sites;
+    const candidates = isBarrenFragment(tracked.fragment.oreDensities, gradeScale) ? heaps : sites;
     return pickWarehouse(state.logistics, candidates, vehicle.x, vehicle.z, tracked.fragment.mass, used) !== null;
   });
 }
