@@ -30,6 +30,94 @@ describe('applyInstantEffect', () => {
     expect(alive(fx).length).toBe(before - 1);
   });
 
+  describe('employee_leaves with a stored leaver (#1908)', () => {
+    const spec = { type: 'employee_leaves', pick: 'random' } as const;
+
+    it('removes exactly the stored living employee', () => {
+      const fx = makeEffectWorld();
+      const target = fx.state.employees.employees[4]!;
+      const out = applyInstantEffect(spec, fx.world, 0, fx.rng, target.id);
+      expect(out.resultKeySuffix).toBe('');
+      expect(fx.state.employees.employees.find(e => e.id === target.id)).toBeUndefined();
+      expect(alive(fx)).toHaveLength(5);
+    });
+
+    it('ignores the pick rule when a leaver is given', () => {
+      const fx = makeEffectWorld();
+      const mgr = fx.state.employees.employees.find(e => e.role === 'manager')!;
+      applyInstantEffect({ type: 'employee_leaves', pick: 'role', role: 'driller' }, fx.world, 0, fx.rng, mgr.id);
+      expect(fx.state.employees.employees.some(e => e.id === mgr.id)).toBe(false);
+      expect(alive(fx).filter(e => e.role === 'driller')).toHaveLength(2);
+    });
+
+    it('removes a union member', () => {
+      const fx = makeEffectWorld();
+      const target = fx.state.employees.employees[1]!;
+      target.unionized = true;
+      const out = applyInstantEffect(spec, fx.world, 0, fx.rng, target.id);
+      expect(out.resultKeySuffix).toBe('');
+      expect(fx.state.employees.employees.some(e => e.id === target.id)).toBe(false);
+    });
+
+    it('null leaver takes the alt branch and removes nobody', () => {
+      const fx = makeEffectWorld();
+      const out = applyInstantEffect(spec, fx.world, 0, fx.rng, null);
+      expect(out.resultKeySuffix).toBe('_alt');
+      expect(alive(fx)).toHaveLength(6);
+    });
+
+    it('a gone leaver takes the alt branch with no fresh draw', () => {
+      const fx = makeEffectWorld();
+      const target = fx.state.employees.employees[0]!;
+      fx.state.employees.employees = fx.state.employees.employees.filter(e => e.id !== target.id);
+      const out = applyInstantEffect(spec, fx.world, 0, fx.rng, target.id);
+      expect(out.resultKeySuffix).toBe('_alt');
+      expect(fx.state.employees.employees).toHaveLength(5);
+    });
+
+    it('a dead leaver takes the alt branch with no fresh draw', () => {
+      const fx = makeEffectWorld();
+      const target = fx.state.employees.employees[0]!;
+      target.alive = false;
+      const out = applyInstantEffect(spec, fx.world, 0, fx.rng, target.id);
+      expect(out.resultKeySuffix).toBe('_alt');
+      expect(alive(fx)).toHaveLength(5);
+    });
+
+    it('does not consume rng when a leaver is given', () => {
+      const fx = makeEffectWorld();
+      const rng = new Random(77);
+      applyInstantEffect(spec, fx.world, 0, rng, fx.state.employees.employees[3]!.id);
+      expect(rng.nextInt(0, 1000)).toBe(new Random(77).nextInt(0, 1000));
+    });
+
+    it('undefined leaver still draws at choice time', () => {
+      const fx = makeEffectWorld();
+      const out = applyInstantEffect(spec, fx.world, 0, fx.rng, undefined);
+      expect(out.resultKeySuffix).toBe('');
+      expect(alive(fx)).toHaveLength(5);
+    });
+
+    it('applyEventEffects threads the stored leaver to the spec', () => {
+      const fx = makeEffectWorld();
+      const target = fx.state.employees.employees[5]!;
+      applyEventEffects([spec], fx.world, 0, fx.rng, target.id);
+      expect(fx.state.employees.employees.some(e => e.id === target.id)).toBe(false);
+    });
+
+    it('applyEventEffects with a null leaver reports _alt', () => {
+      const fx = makeEffectWorld();
+      expect(applyEventEffects([spec], fx.world, 0, fx.rng, null).resultKeySuffix).toBe('_alt');
+      expect(alive(fx)).toHaveLength(6);
+    });
+
+    it('employee_injured ignores the leaver and still draws at choice time', () => {
+      const fx = makeEffectWorld();
+      applyEventEffects([{ type: 'employee_injured' }], fx.world, 0, fx.rng, null);
+      expect(alive(fx).filter(e => e.injured)).toHaveLength(1);
+    });
+  });
+
   it('employee_joins adds one employee of the role', () => {
     const fx = makeEffectWorld();
     const before = alive(fx).filter(e => e.role === 'driver').length;
