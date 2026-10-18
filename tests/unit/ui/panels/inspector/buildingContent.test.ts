@@ -543,3 +543,181 @@ describe('building inspector — upgrade ordered (#1875)', () => {
     expect(status).toBe(t('inspector.status.upgrading_waiting', { tier: 2 }));
   });
 });
+
+describe('building inspector — builder phase (#1897)', () => {
+  /** Hire a builder holding action 60; timer null = still walking. */
+  function assignBuilder(s: GameState, remaining: number | null, total: number | undefined): number {
+    const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(7), 0, 0);
+    employee.name = 'Zed Builder';
+    employee.activeActionId = 60;
+    employee.taskTicksRemaining = remaining;
+    if (total !== undefined) employee.activeTaskTotalTicks = total;
+    s.employees.employees.push(employee);
+    const a = s.pendingActions.find(p => p.id === 60)!;
+    a.holderId = employee.id;
+    a.status = 'in_progress';
+    return employee.id;
+  }
+
+  function upgrading(): GameState {
+    const s = stateWith(makeBuilding());
+    s.buildings.unlockedTiers['management_office'] = 2;
+    addSite(s, 3, null, 100);
+    s.plannedBuildings[0]!.tier = 2;
+    s.plannedBuildings[0]!.upgrade = true;
+    return s;
+  }
+
+  function site(): { s: GameState; id: number } {
+    const s = stateWith(null);
+    addSite(s, 8, null, 100);
+    return { s, id: 8 };
+  }
+
+  function builderLink(view: InspectorView, builderId: number): HTMLElement | null {
+    const root = document.createElement('div');
+    root.append(...view.sections);
+    return root.querySelector<HTMLElement>(`[data-select-kind="employee"][data-select-id="${builderId}"]`);
+  }
+
+  function hasEmployeeLink(view: InspectorView): boolean {
+    const root = document.createElement('div');
+    root.append(...view.sections);
+    return root.querySelector('[data-select-kind="employee"]') !== null;
+  }
+
+  describe('Builder row on an upgrading standing building', () => {
+    it('shows a Builder row with an employee link when a builder is assigned', () => {
+      const s = upgrading();
+      const builderId = assignBuilder(s, 60, 100);
+      const view = viewOf(s);
+      const link = builderLink(view, builderId);
+      expect(link).not.toBeNull();
+      expect(link!.textContent).toBe('Zed Builder');
+      expect(textOf(view)).toContain(t('inspector.builder'));
+    });
+
+    it('shows the Builder row while the builder is still on the way', () => {
+      const s = upgrading();
+      const builderId = assignBuilder(s, null, undefined);
+      const view = viewOf(s);
+      expect(builderLink(view, builderId)).not.toBeNull();
+      expect(textOf(view)).toContain(t('inspector.builder'));
+    });
+
+    it('shows no Builder row and no employee link when unassigned', () => {
+      const view = viewOf(upgrading());
+      expect(hasEmployeeLink(view)).toBe(false);
+      expect(textOf(view)).not.toContain(t('inspector.builder'));
+    });
+
+    it('shows no Builder row on a non-upgrading building', () => {
+      const view = viewOf(stateWith(makeBuilding()));
+      expect(hasEmployeeLink(view)).toBe(false);
+      expect(textOf(view)).not.toContain(t('inspector.builder'));
+    });
+
+    it('shows no Builder row when the builder employee is missing', () => {
+      const s = upgrading();
+      s.pendingActions.find(p => p.id === 60)!.holderId = 9999;
+      const view = viewOf(s);
+      expect(hasEmployeeLink(view)).toBe(false);
+      expect(textOf(view)).not.toContain(t('inspector.builder'));
+    });
+  });
+
+  describe('status text per phase', () => {
+    it('upgrade, unassigned: waiting for a builder', () => {
+      expect(viewOf(upgrading()).status).toBe(t('inspector.status.upgrading_waiting', { tier: 2 }));
+    });
+
+    it('upgrade, on the way: names the builder', () => {
+      const s = upgrading();
+      assignBuilder(s, null, undefined);
+      const status = viewOf(s).status;
+      expect(status).toBe('Upgrading to tier 2 · Zed Builder is on the way');
+      expect(status).toBe(t('inspector.status.upgrading_on_the_way', { tier: 2, builder: 'Zed Builder' }));
+      expect(status).not.toMatch(/^inspector\./);
+    });
+
+    it('upgrade, working: shows the percentage', () => {
+      const s = upgrading();
+      assignBuilder(s, 60, 100);
+      expect(viewOf(s).status).toBe(t('inspector.status.upgrading', { tier: 2, percent: 40 }));
+    });
+
+    it('construction site, unassigned: waiting for a builder', () => {
+      const { s, id } = site();
+      expect(viewOf(s, id).status).toBe(t('inspector.status.under_construction_waiting', { tier: 1 }));
+    });
+
+    it('construction site, on the way: names the builder', () => {
+      const { s, id } = site();
+      assignBuilder(s, null, undefined);
+      const status = viewOf(s, id).status;
+      expect(status).toBe('Under construction (tier 1) · Zed Builder is on the way');
+      expect(status).toBe(t('inspector.status.under_construction_on_the_way', { tier: 1, builder: 'Zed Builder' }));
+    });
+
+    it('construction site, working: shows the percentage', () => {
+      const { s, id } = site();
+      assignBuilder(s, 60, 100);
+      expect(viewOf(s, id).status).toBe(t('inspector.status.under_construction', { tier: 1, percent: 40 }));
+    });
+
+    it('on the way with a zero task total still reads on the way', () => {
+      const s = upgrading();
+      assignBuilder(s, 30, 0);
+      expect(viewOf(s).status).toContain('is on the way');
+    });
+
+    it('a missing builder employee falls back to the waiting text without crashing', () => {
+      const up = upgrading();
+      up.pendingActions.find(p => p.id === 60)!.holderId = 9999;
+      expect(viewOf(up).status).toBe(t('inspector.status.upgrading_waiting', { tier: 2 }));
+
+      const { s, id } = site();
+      s.pendingActions.find(p => p.id === 60)!.holderId = 9999;
+      expect(viewOf(s, id).status).toBe(t('inspector.status.under_construction_waiting', { tier: 1 }));
+    });
+  });
+
+  describe('view signature', () => {
+    it('changes when a builder is assigned to an upgrade', () => {
+      const s = upgrading();
+      const before = viewOf(s).signature;
+      assignBuilder(s, null, undefined);
+      expect(viewOf(s).signature).not.toBe(before);
+    });
+
+    it('changes when the builder goes from on the way to working', () => {
+      const s = upgrading();
+      assignBuilder(s, null, undefined);
+      const before = viewOf(s).signature;
+      const e = s.employees.employees[s.employees.employees.length - 1]!;
+      e.taskTicksRemaining = 50;
+      e.activeTaskTotalTicks = 100;
+      expect(viewOf(s).signature).not.toBe(before);
+    });
+
+    it('changes when the builder is renamed', () => {
+      const s = upgrading();
+      assignBuilder(s, 60, 100);
+      const before = viewOf(s).signature;
+      s.employees.employees[s.employees.employees.length - 1]!.name = 'Other Name';
+      expect(viewOf(s).signature).not.toBe(before);
+    });
+
+    it('construction site signature changes when the builder arrives', () => {
+      const { s, id } = site();
+      const before = viewOf(s, id).signature;
+      assignBuilder(s, null, undefined);
+      expect(viewOf(s, id).signature).not.toBe(before);
+      const onTheWay = viewOf(s, id).signature;
+      const e = s.employees.employees[s.employees.employees.length - 1]!;
+      e.taskTicksRemaining = 50;
+      e.activeTaskTotalTicks = 100;
+      expect(viewOf(s, id).signature).not.toBe(onTheWay);
+    });
+  });
+});
