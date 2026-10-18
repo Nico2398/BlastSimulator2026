@@ -50,6 +50,11 @@ export function buildBlockedOrderMessage(action: PendingAction, nowTick?: number
         skill: t(`skill.${action.requiredSkill}`),
       });
     case 'target_unreachable':
+      const detail = action.blockedDetail;
+      if (detail !== undefined && typeof detail.key === 'string' && typeof detail.params === 'object' && detail.params !== null) {
+        const { key, params } = detail;
+        return t(key, typeof params['role'] === 'string' ? { ...params, role: t(`vehicle_type.${params['role']}`) } : params);
+      }
       return t('notification.order_blocked_target_unreachable', { order });
     case 'no_freight_warehouse':
       return t('notification.order_blocked_no_warehouse', { order });

@@ -2446,3 +2446,33 @@ describe('serialize/deserialize — mine grade state (#1921)', () => {
     expect(deserialize(JSON.stringify(parsed)).grade).toBeUndefined();
   });
 });
+
+describe('deserialize — malformed PendingAction.blockedDetail is dropped (#1938)', () => {
+  function loadWithDetail(detail: unknown) {
+    const state = createGame({ seed: 42 });
+    state.pendingActions.push({
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 3, targetZ: 4, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    });
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    (parsed['pendingActions'] as Array<Record<string, unknown>>)[0]!['blockedDetail'] = detail;
+    return deserialize(JSON.stringify(parsed)).pendingActions[0]!;
+  }
+
+  it('keeps a well-formed detail', () => {
+    const detail = { key: 'order.blocked.ramp_too_steep', params: { id: 1, role: 'debris_hauler' } };
+    expect(loadWithDetail(detail).blockedDetail).toEqual(detail);
+  });
+
+  it.each([
+    ['a non-string key', { key: 5, params: {} }],
+    ['a missing params', { key: 'a.b' }],
+    ['a null params', { key: 'a.b', params: null }],
+    ['an array params', { key: 'a.b', params: [] }],
+    ['a string detail', 'oops'],
+    ['a null detail', null],
+  ])('drops %s', (_name, detail) => {
+    expect(loadWithDetail(detail).blockedDetail).toBeUndefined();
+  });
+});

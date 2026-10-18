@@ -14,10 +14,10 @@
 // an actor: alive and on the roster is enough.
 
 import type { NavGrid } from '../nav/NavGrid.js';
-import type { GameState, PendingAction, BlockedOrderReason, GhostPreview } from '../state/GameState.js';
+import { isProgressionSite, type GameState, type PendingAction, type BlockedOrderReason, type GhostPreview } from '../state/GameState.js';
 import { findById } from '../state/IdIndex.js';
 import type { Employee } from '../entities/Employee.js';
-import { vehicleDriverId } from '../entities/Vehicle.js';
+import { vehicleDriverId, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
 import { retargetRampLayers } from './RampLayerRetarget.js';
 import { lowestFleetTier, minVehicleTierFor } from './VehicleReservation.js';
@@ -31,7 +31,9 @@ import {
 } from '../nav/NavGridReachability.js';
 import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { withDockingCells } from '../nav/DockingReach.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
+import { slopeDegreesForTier, tierSlopeRatio } from '../nav/ClimbLimit.js';
+import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
 type OrderActorKey = string;
@@ -82,12 +84,12 @@ function candidateEmployees(state: GameState, req: ActorRequirements): Employee[
 /**
  * Derived reachability per game state, never serialized. Valid for one nav grid
  * at one `revision`: labellings ignore occupancy, so only a cell write
- * invalidates. One labelling per clearance, built the first time a pool needs it.
+ * invalidates. One labelling per clearance and climb limit, built the first time a pool needs it.
  */
 interface ReachCache {
   navGrid: NavGrid;
   revision: number;
-  components: Map<number, ClimbComponents>;
+  components: Map<string, ClimbComponents>;
 }
 
 const reachCaches = new WeakMap<GameState, ReachCache>();
@@ -106,11 +108,12 @@ function cacheFor(state: GameState): ReachCache | null {
   return cache;
 }
 
-function componentsOf(cache: ReachCache, clearance: number): ClimbComponents {
-  let components = cache.components.get(clearance);
+function componentsOf(cache: ReachCache, clearance: number, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): ClimbComponents {
+  const key = `${clearance}|${maxSlopeRatio}`;
+  let components = cache.components.get(key);
   if (components === undefined) {
-    components = computeClimbComponents(cache.navGrid, clearance);
-    cache.components.set(clearance, components);
+    components = computeClimbComponents(cache.navGrid, clearance, maxSlopeRatio);
+    cache.components.set(key, components);
   }
   return components;
 }
@@ -120,6 +123,7 @@ function fillPool(
   cache: ReachCache,
   req: ActorRequirements,
   employees: ReadonlyArray<Employee>,
+  uniformRatio?: number,
 ): ActorPool {
   const onFoot = componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS).reachableFrom(employees);
   const role = req.requiredVehicleRole;
@@ -136,13 +140,26 @@ function fillPool(
     const driverId = vehicleDriverId(v);
     return (driverId !== null && candidateIds.has(driverId)) || onFoot.has(Math.round(v.x), Math.round(v.z));
   });
-  const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS).reachableFrom(usable);
+  // Vehicles climb at their tier's limit: one labelling per distinct limit, and the best climber decides (#1938).
+  const progression = isProgressionSite(state);
+  const byRatio = new Map<number, Vehicle[]>();
+  for (const v of usable) {
+    const ratio = uniformRatio ?? vehicleMaxSlopeRatio(v, progression);
+    const group = byRatio.get(ratio);
+    if (group === undefined) byRatio.set(ratio, [v]);
+    else group.push(v);
+  }
+  const perRatio = [...byRatio].map(([ratio, group]) =>
+    componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(group));
+  const vehicleReach: Pick<ReachableSet, 'has'> = perRatio.length === 1
+    ? perRatio[0]!
+    : { has: (x, z) => perRatio.some(reach => reach.has(x, z)) };
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).
   // Role-agnostic: applies to every vehicle-gated order, not only demolition.
   return { hasActor: true, reachable: withDockingCells(cache.navGrid, vehicleReach, NAV_CLEARANCE_VEHICLE_CELLS) };
 }
 
-function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCache | null): ActorPool {
+function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCache | null, uniformRatio?: number): ActorPool {
   if (cache === null) return NO_ACTORS;
   const employees = candidateEmployees(state, req);
   if (employees.length === 0) return NO_ACTORS;
@@ -153,7 +170,7 @@ function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCa
     return { hasActor: true, reachable: { has: (x, z) => components.canReach(only.x, only.z, x, z) } };
   }
 
-  return fillPool(state, cache, req, employees);
+  return fillPool(state, cache, req, employees, uniformRatio);
 }
 
 /**
@@ -177,18 +194,22 @@ export function warmOrderReachability(state: GameState): void {
   const cache = cacheFor(state);
   if (cache === null) return;
   componentsOf(cache, NAV_CLEARANCE_EMPLOYEE_CELLS);
-  componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS);
+  const progression = isProgressionSite(state);
+  for (const ratio of new Set(state.vehicles.vehicles.map(v => vehicleMaxSlopeRatio(v, progression)))) {
+    componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio);
+  }
 }
 
 export function buildOrderReachability(
   state: GameState,
   actions: ReadonlyArray<PendingAction>,
+  uniformRatio?: number,
 ): OrderReachability {
   const pools = new Map<OrderActorKey, ActorPool>();
   const cache = cacheFor(state);
   for (const action of actions) {
     const key = orderActorKey(action);
-    if (!pools.has(key)) pools.set(key, buildActorPool(state, action, cache));
+    if (!pools.has(key)) pools.set(key, buildActorPool(state, action, cache, uniformRatio));
   }
   return {
     canReach: (key, x, z) => pools.get(key)?.reachable?.has(x, z) ?? false,
@@ -296,6 +317,32 @@ function availabilityReason(
   return holdsSkill(eligible) ? null : 'no_qualified_employee';
 }
 
+/**
+ * Why a vehicle order is unreachable on a progression site, when a tier-1 climb limit would reach it:
+ * names the steepest built ramp too steep for the best-climbing vehicle that could serve it (#1938).
+ */
+function rampTooSteepDetail(
+  state: GameState,
+  action: PendingAction,
+  tier: VehicleTier,
+  reachAtFlatLimit: OrderReachability,
+): PendingAction['blockedDetail'] | undefined {
+  const role = action.requiredVehicleRole;
+  if (role === null || !reachAtFlatLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
+  const blocking = steepestBlockingRamp(state, tierSlopeRatio(tier));
+  if (blocking === null) return undefined;
+  return {
+    key: 'order.blocked.ramp_too_steep',
+    params: {
+      id: blocking.ramp.id,
+      grade: Math.round(blocking.gradeDeg * 10) / 10,
+      tier,
+      role,
+      max: slopeDegreesForTier(tier),
+    },
+  };
+}
+
 const actionIdOf = (action: PendingAction): number => action.id;
 const ghostIdOf = (ghost: GhostPreview): number => ghost.id;
 
@@ -310,6 +357,8 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
   };
   const eligible = state.employees.employees.filter(isEligibleForWork);
   const judgements = judgeActions(state, targets);
+  const progression = isProgressionSite(state);
+  let reachAtFlatLimit: OrderReachability | null = null; // built on the first red vehicle order of a progression site
   const fragmentOf = createFragmentLookup(state);
   const fits = createStorageFit(state);
   let flipped = false;
@@ -330,8 +379,17 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       // player-owned state (#1302), not a failed order: it waits silently.
       action.blockedReason = isAutoDebrisAction(action.type) ? 'debris_out_of_reach' : 'target_unreachable';
       action.blockedLicenceLevel = null;
+      delete action.blockedDetail;
+      const role = action.requiredVehicleRole;
+      const tier = role !== null && progression ? neededTierOf(role, orderTierFloor(action)) : null;
+      if (tier !== null) {
+        reachAtFlatLimit ??= buildOrderReachability(state, targets, NAV_MAX_SLOPE_RATIO);
+        const detail = rampTooSteepDetail(state, action, tier, reachAtFlatLimit);
+        if (detail !== undefined) action.blockedDetail = detail;
+      }
       continue;
     }
+    delete action.blockedDetail;
     const reason = availabilityReason(eligible, action, neededTierOf, state.vehicles.vehicles);
     // Only a skill nobody alive holds raises the modal: a trainee or injured
     // holder is temporarily unavailable, not absent (gameplay-employee-skills rule 5).

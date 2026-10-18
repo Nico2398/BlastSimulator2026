@@ -1,0 +1,433 @@
+{
+  "name": "sandbox-tier3-hauler-gentle-ramp",
+  "description": "Per-vehicle-tier climb limit on a progression site (#1938): tier 1 / 2 / 3 vehicles climb 30 / 24 / 18 degrees. On a sandbox site a pit served only by a steep (about 27 degree) ramp cannot be reached by a tier-3 vehicle: an order at the foot of the ramp reads unreachable and says which ramp is too steep. Once a gentle (about 16 degree) ramp is dug the order clears and the tier-3 rig drills the hole. The player selects the gentle ramp and the inspector opens on it. Stands in for the hauler of the issue with a drill rig, whose reachability is judged by the same per-tier rule.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "role": "setup",
+      "description": "Progression site (#1921): the sandbox opens at grade 0, so vehicle tiers carry slope limits (tier 1 / 2 / 3 climb 30 / 24 / 18 degrees). Kit:full brings five tier-1 vehicles (drill rig #1, debris hauler #2, charging truck #3, rock digger #4, rock fragmenter #5) and drivers #3-#5.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 0,
+            "pendingTicksLeft": null
+          },
+          "vehicleCount": 5
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.excavator level:5",
+      "role": "bootstrap",
+      "description": "Excavator licence for driver #3.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.excavator level:5"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 4 3",
+      "role": "bootstrap",
+      "description": "Crew the kit's rock digger (vehicle #4) with driver #3.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 3"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "build_ramp start:27,9 end:17,9 depth:5",
+      "role": "player",
+      "description": "Steep ramp A: 10 m long for a 5 m depth is the shortest, steepest ramp the game allows (about 27 degrees here). Until a second way in exists, the pit floor at its foot is served by this ramp alone.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
+        },
+        {
+          "type": "focusTile",
+          "x": 22,
+          "z": 9,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 27,
+          "z1": 9,
+          "x2": 17,
+          "z2": 9
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:builtRampCount equals:1 max_ticks:800",
+      "role": "setup",
+      "description": "Wait for the digger to finish ramp A.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "builtRampCount",
+          "equals": 1,
+          "maxTicks": 800,
+          "timeoutMs": 180000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "builtRampCount": 1,
+          "orderedRampSegmentCount": 0
+        }
+      },
+      "timeout": 185
+    },
+    {
+      "command": "vehicle scrap 1",
+      "role": "player",
+      "description": "Scrap the tier-1 drill rig (#1) so the fleet's only rig is the tier-3 one bought next: the slope limit is judged by the best climber in the pool, and a tier-1 rig would take ramp A as it always did.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]:first-child > :first-child"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"] [data-action=\"scrap_vehicle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector[data-kind=\"vehicle\"] [data-action=\"scrap_vehicle\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 4
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig tier:3",
+      "role": "player",
+      "description": "Buy a tier-3 drill rig (#6): it climbs at most 18 degrees on a progression site.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 5
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1 licence:3",
+      "role": "bootstrap",
+      "description": "Licence driller #1 for tier-3 rigs (licence level 3, #1938 bootstrap: the player-facing path is a tier-3 driving school). Without it the order would read licence_level_too_low instead of naming a ramp.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1 licence:3"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:19,9",
+      "role": "player",
+      "description": "Order a hole on the pit floor at the foot of ramp A. The tier-3 rig is on the surface and ramp A is about 27 degrees (tier-3 limit 18), so no vehicle able to do this order can reach it: the ghost reads red, and the order names Ramp #1 as too steep for a tier-3 rig (max 18 degrees). Wording and parameters are asserted in OrderReachability.test.ts.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 19,
+          "z": 9,
+          "distance": 18,
+          "pitch": 85
+        },
+        {
+          "type": "dragTiles",
+          "x1": 19,
+          "z1": 9,
+          "x2": 19,
+          "z2": 9
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "role": "setup",
+      "description": "Let the order settle: the tier-3 rig stays put and the hole is not drilled. unreachableGhostCount counts the red ghost the slope limit produced.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 0,
+          "unreachableGhostCount": 1
+        }
+      }
+    },
+    {
+      "command": "build_ramp start:35,12 end:18,12 depth:5",
+      "role": "player",
+      "description": "Gentle ramp B: 17 m long for the same 5 m depth, about 16 degrees (inside the 18 degree tier-3 limit). It is cut beside ramp A and opens into the same pit, giving it a second way in.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
+        },
+        {
+          "type": "focusTile",
+          "x": 27,
+          "z": 12,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 35,
+          "z1": 12,
+          "x2": 18,
+          "z2": 12
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:builtRampCount equals:2 max_ticks:1200",
+      "role": "setup",
+      "description": "Wait for the digger to finish ramp B.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "builtRampCount",
+          "equals": 2,
+          "maxTicks": 1200,
+          "timeoutMs": 180000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "builtRampCount": 2,
+          "orderedRampSegmentCount": 0
+        }
+      },
+      "timeout": 185
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "With the gentle ramp dug the red ghost clears and the tier-3 rig drives down it and drills the hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 180000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 1,
+          "unreachableGhostCount": 0
+        }
+      },
+      "timeout": 185
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "description": "Player clicks the gentle ramp in the scene: the inspector opens on it and offers Widen. Its detail line also carries the ramp grade and the vehicle tiers that can climb it (text asserted in describeRamp.test.ts).",
+      "interaction": [
+        {
+          "type": "focusTile",
+          "x": 27,
+          "z": 12,
+          "distance": 16,
+          "pitch": 80
+        },
+        {
+          "type": "click",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-inspector [data-action=\"widen\"]",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "usable": "#bs-inspector [data-action=\"widen\"]"
+      },
+      "timeout": 90
+    },
+    {
+      "command": "state full",
+      "role": "observe",
+      "description": "Final state dump.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ]
+    }
+  ]
+}
