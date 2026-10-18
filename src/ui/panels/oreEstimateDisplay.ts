@@ -4,7 +4,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { BlastOreEstimate } from '../../core/mining/BlastValueEstimate.js';
 
-export type OreEstimateView =
+type OreEstimateView =
   | { kind: 'unknown' }
   | { kind: 'neutral' }
   | { kind: 'partial'; sharePct: number }
