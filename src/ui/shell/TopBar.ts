@@ -534,7 +534,7 @@ export class TopBar {
     }
     this.gradeTracked = g ? { grade: g.grade, allMet } : null;
 
-    const sig = grade ? `${g!.grade}` : '';
+    const sig = g ? `${g.grade}` : '';
     if (sig === this.lastGradeSig) return;
     this.lastGradeSig = sig;
     if (!grade) { this.gradeWrap.style.display = 'none'; return; }

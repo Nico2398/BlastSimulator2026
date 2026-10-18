@@ -3,8 +3,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
-import { applyForGrade, createGradeState, gradeDef, nextGradeTargets } from '../../../src/core/economy/MineGrade.js';
-import { permitApplyBlocker, permitRefusalText } from '../../../src/core/economy/permitRefusalText.js';
+import { applyForGrade, createGradeState, gradeDef, nextGradeTargets, permitApplyBlocker } from '../../../src/core/economy/MineGrade.js';
+import { permitRefusalText } from '../../../src/core/economy/permitRefusalText.js';
 
 function progression(): GameState {
   const s = createGame({ seed: 42, mineType: 'desert' });

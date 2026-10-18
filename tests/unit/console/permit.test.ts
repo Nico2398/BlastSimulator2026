@@ -3,8 +3,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
-import { gradeDef } from '../../../src/core/economy/MineGrade.js';
-import { permitApplyBlocker, permitRefusalText } from '../../../src/core/economy/permitRefusalText.js';
+import { gradeDef, permitApplyBlocker } from '../../../src/core/economy/MineGrade.js';
+import { permitRefusalText } from '../../../src/core/economy/permitRefusalText.js';
 
 function sandbox() {
   const { runner, ctx } = createRunner();

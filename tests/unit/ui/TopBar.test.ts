@@ -827,12 +827,6 @@ describe('TopBar grade chip (#1924)', () => {
     topBar.dispose();
   });
 
-  it('exports GRADE_CHIP_PULSE_MS as a positive duration', () => {
-    const ms = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'];
-    expect(typeof ms).toBe('number');
-    expect(ms as number).toBeGreaterThan(0);
-  });
-
   it('pulses on the not-met to all-met transition, then clears after GRADE_CHIP_PULSE_MS', () => {
     vi.useFakeTimers();
     const pulseMs = (TopBarModule as Record<string, unknown>)['GRADE_CHIP_PULSE_MS'] as number;

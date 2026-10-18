@@ -3,8 +3,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PermitPanel } from '../../../../src/ui/panels/PermitPanel.js';
 import { createGame, type GameState } from '../../../../src/core/state/GameState.js';
-import { createGradeState, gradeDef, nextGradeTargets } from '../../../../src/core/economy/MineGrade.js';
-import { permitApplyBlocker, permitRefusalText } from '../../../../src/core/economy/permitRefusalText.js';
+import { createGradeState, gradeDef, nextGradeTargets, permitApplyBlocker } from '../../../../src/core/economy/MineGrade.js';
+import { permitRefusalText } from '../../../../src/core/economy/permitRefusalText.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
@@ -56,7 +56,7 @@ describe('PermitPanel (#1924)', () => {
     panel.update(progression());
     const stamp = q('[data-role="permit-stamp"]');
     expect(stamp).not.toBeNull();
-    expect(panel.root.textContent).toContain(t(gradeDef(0).nameKey));
+    expect(stamp!.textContent).toContain(t(gradeDef(0).nameKey));
   });
 
   it('renders one row per next-grade target', () => {
@@ -199,8 +199,11 @@ describe('PermitPanel (#1924)', () => {
     expect(panel.root.textContent).toContain(t(gradeDef(0).nameKey));
   });
 
-  it('a state without grade does not throw', () => {
+  it('a state without grade shows the no-ladder text and no apply button or stamp', () => {
     const s = createGame({ seed: 1, mineType: 'desert' });
     expect(() => panel.update(s)).not.toThrow();
+    expect(panel.root.textContent).toContain(t('permit.no_ladder'));
+    expect(applyBtn()).toBeNull();
+    expect(q('[data-role="permit-stamp"]')).toBeNull();
   });
 });

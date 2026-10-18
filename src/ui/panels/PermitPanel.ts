@@ -10,8 +10,8 @@ import { el, card, button, sectionHeader, progressBar, panelRoot, panelHeader, p
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { gradeDef, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
-import { permitApplyBlocker, permitRefusalText } from '../../core/economy/permitRefusalText.js';
+import { gradeDef, nextGradeTargets, permitApplyBlocker, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
+import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -64,12 +64,13 @@ export class PermitPanel extends PanelBase {
 
   update(state: GameState): void {
     this.lastState = state;
-    const signature = this.computeSignature(state);
+    const targets = nextGradeTargets(state);
+    const signature = this.computeSignature(state, targets);
     if (signature !== this.lastSignature) {
       this.lastSignature = signature;
-      this.render(state);
+      this.render(state, targets);
     }
-    this.refreshDynamic(state);
+    this.refreshDynamic(state, targets);
   }
 
   refreshLocale(): void {
@@ -79,15 +80,15 @@ export class PermitPanel extends PanelBase {
   }
 
   /** What changes the layout; per-tick numbers go through refreshDynamic. Affordability, not raw cash, so the Apply button is not rebuilt each tick. */
-  private computeSignature(state: GameState): string {
+  private computeSignature(state: GameState, targets: readonly GradeTargetStatus[]): string {
     const g = state.grade;
     if (!g) return 'none';
     const next = gradeDef(g.grade + 1);
-    const targets = nextGradeTargets(state).map(s => `${s.kind}:${s.met ? 1 : 0}`).join(',');
-    return [g.grade, g.pending ? g.pending.toGrade : '-', targets, state.cash >= next.fee ? 1 : 0].join('|');
+    const targetFlags = targets.map(s => `${s.kind}:${s.met ? 1 : 0}`).join(',');
+    return [g.grade, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0].join('|');
   }
 
-  private render(state: GameState): void {
+  private render(state: GameState, targets: readonly GradeTargetStatus[]): void {
     const g = state.grade;
     if (!g) {
       this.contentEl.replaceChildren(card([el('span', { text: t('permit.no_ladder'), attrs: { style: MICRO_STYLE } })]));
@@ -109,7 +110,7 @@ export class PermitPanel extends PanelBase {
 
     const nextChildren: (Node | null)[] = [
       sectionHeader(t('ui.permit.next_label', { name: nextName })),
-      ...nextGradeTargets(state).map(s => this.targetRow(s)),
+      ...targets.map(s => this.targetRow(s)),
       el('span', {
         text: t('ui.permit.fee_line', { fee: formatMoney(next.fee), time: formatGameDuration(next.processingTicks) }),
         attrs: { 'data-role': 'permit-fee', style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-amber)' },
@@ -152,17 +153,16 @@ export class PermitPanel extends PanelBase {
   }
 
   /** Per-tick numbers, bar widths, countdown and the cash-bearing refusal text. */
-  private refreshDynamic(state: GameState): void {
+  private refreshDynamic(state: GameState, targets: readonly GradeTargetStatus[]): void {
     const g = state.grade;
     if (!g) return;
-    const targets = nextGradeTargets(state);
     for (const s of targets) {
       const row = this.contentEl.querySelector<HTMLElement>(`[data-target="${s.kind}"]`);
       if (!row) continue;
       row.dataset['met'] = String(s.met);
       row.querySelector<HTMLElement>('[data-role="target-text"]')!.textContent =
         t(`permit.target.${s.kind}`, { current: formatGradeAmount(s.current), needed: formatGradeAmount(s.needed) });
-      const pct = Math.min(100, (s.current / s.needed) * 100);
+      const pct = s.needed > 0 ? Math.min(100, (s.current / s.needed) * 100) : 100;
       row.querySelector<HTMLElement>('[data-role="target-bar"]')!.style.width = `${pct}%`;
     }
 

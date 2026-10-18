@@ -169,16 +169,30 @@ export function blastPitDepthM(grid: VoxelGrid, clearedColumns: readonly string[
   return deepest;
 }
 
+/** Pure dry-run of the application checks: why one would be refused now, or null when it would be accepted. */
+export function permitApplyBlocker(
+  state: GameState,
+): { refusal: GradeApplyRefusal; unmet: GradeTargetKind[] } | null {
+  const g = state.grade;
+  if (!g) return { refusal: 'no_ladder', unmet: [] };
+  if (g.pending) return { refusal: 'pending', unmet: [] };
+  const unmet = nextGradeTargets(state).filter(s => !s.met).map(s => s.kind);
+  if (unmet.length > 0) return { refusal: 'unmet_targets', unmet };
+  if (state.cash < gradeDef(g.grade + 1).fee) return { refusal: 'insufficient_funds', unmet: [] };
+  return null;
+}
+
 /** Apply for the next grade: checks, books the fee, starts processing. */
 export function applyForGrade(state: GameState): GradeApplyResult {
-  const g = state.grade;
-  if (!g) return { ok: false, refusal: 'no_ladder' };
-  if (g.pending) return { ok: false, refusal: 'pending' };
-  const unmet = nextGradeTargets(state).filter(s => !s.met).map(s => s.kind);
-  if (unmet.length > 0) return { ok: false, refusal: 'unmet_targets', unmet };
+  const blocker = permitApplyBlocker(state);
+  if (blocker) {
+    return blocker.unmet.length > 0
+      ? { ok: false, refusal: blocker.refusal, unmet: blocker.unmet }
+      : { ok: false, refusal: blocker.refusal };
+  }
+  const g = state.grade!;
   const toGrade = g.grade + 1;
   const def = gradeDef(toGrade);
-  if (state.cash < def.fee) return { ok: false, refusal: 'insufficient_funds' };
   deductExpense(state, def.fee, 'permits', `Permit fee: grade ${toGrade}`);
   g.pending = { toGrade, ticksLeft: def.processingTicks };
   return { ok: true, fee: def.fee, toGrade };
