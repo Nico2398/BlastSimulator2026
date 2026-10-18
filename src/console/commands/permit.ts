@@ -4,16 +4,12 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { applyForGrade, gradeDef, nextGradeTargets, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
+import { applyForGrade, gradeDef, nextGradeTargets, formatGradeAmount, type GradeTargetStatus } from '../../core/economy/MineGrade.js';
+import { permitRefusalText } from '../../core/economy/permitRefusalText.js';
 import { requireGame } from './commandUtils.js';
 
-/** Whole numbers as-is, fractions to one decimal. */
-function fmt(n: number): string {
-  return Number.isInteger(n) ? String(n) : (Math.floor(n * 10) / 10).toFixed(1);
-}
-
 function targetLine(s: GradeTargetStatus): string {
-  const text = t(`permit.target.${s.kind}`, { current: fmt(s.current), needed: fmt(s.needed) });
+  const text = t(`permit.target.${s.kind}`, { current: formatGradeAmount(s.current), needed: formatGradeAmount(s.needed) });
   return `  [${s.met ? 'x' : ' '}] ${text}`;
 }
 
@@ -47,18 +43,8 @@ function permitApply(ctx: GameContext): CommandResult {
       output: t('permit.apply.success', { name: t(to.nameKey, to.nameParams), fee: formatMoney(result.fee), ticks: to.processingTicks }),
     };
   }
-  switch (result.refusal) {
-    case 'no_ladder': return { success: false, output: t('permit.no_ladder') };
-    case 'pending': return { success: false, output: t('permit.refusal.pending') };
-    case 'unmet_targets': {
-      const targets = (result.unmet ?? []).map(kind => t(`permit.kind.${kind}`)).join(', ');
-      return { success: false, output: t('permit.refusal.unmet_targets', { targets }) };
-    }
-    case 'insufficient_funds': {
-      const fee = gradeDef(state.grade.grade + 1).fee;
-      return { success: false, output: t('permit.refusal.insufficient_funds', { fee: formatMoney(fee), cash: formatMoney(state.cash) }) };
-    }
-  }
+  const nextFee = gradeDef(state.grade.grade + 1).fee;
+  return { success: false, output: permitRefusalText(result.refusal, result.unmet ?? [], nextFee, state.cash) };
 }
 
 export function permitCommand(

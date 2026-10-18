@@ -21,6 +21,7 @@ import type { EmployeeRole } from '../core/entities/Employee.js';
 import { EventModal } from './panels/EventModal.js';
 import { SurveyPanel } from './panels/SurveyPanel.js';
 import { ShadyPanel } from './panels/ShadyPanel.js';
+import { PermitPanel } from './panels/PermitPanel.js';
 import { SettingsPanel } from './panels/SettingsPanel.js';
 import { MiniMap } from './MiniMap.js';
 import { TopBar } from './shell/TopBar.js';
@@ -65,6 +66,7 @@ export class UIManager {
   private readonly eventModal: EventModal;
   private readonly surveyPanel: SurveyPanel;
   private readonly shadyPanel: ShadyPanel;
+  private readonly permitPanel: PermitPanel;
   private readonly settingsPanel: SettingsPanel;
   private readonly miniMap: MiniMap;
   private readonly leftColumn: LeftColumn;
@@ -145,6 +147,8 @@ export class UIManager {
     this.shadyPanel = new ShadyPanel(leftCol);
     this.shadyPanel.setCloseHandler(() => this.hideAllPanels());
     this.shadyPanel.setConfirmHandler(config => this.confirmModal.show(config));
+    this.permitPanel = new PermitPanel(leftCol);
+    this.permitPanel.setCloseHandler(() => this.hideAllPanels());
     // Settings appended to root container so its z-index:10000 beats the main menu (z-index:9999).
     // Inside leftCol's fixed stacking context it would be capped at z:100 relative to root.
     this.settingsPanel = new SettingsPanel(container);
@@ -226,6 +230,7 @@ export class UIManager {
     this.eventModal.setGameConsole(fn);
     this.surveyPanel.setGameConsole(fn);
     this.shadyPanel.setGameConsole(fn);
+    this.permitPanel.setGameConsole(fn);
   }
 
   /** Hands the shared in-scene placement tool (P3) to every panel that arms it. Only one arms it at a time. */
@@ -451,6 +456,7 @@ export class UIManager {
     this.crewPanel.refreshLocale();
     this.surveyPanel.refreshLocale();
     this.shadyPanel.refreshLocale();
+    this.permitPanel.refreshLocale();
     this.settingsPanel.refreshLocale();
     this.miniMap.refreshLocale();
     this.eventModal.refreshLocale();
@@ -510,6 +516,7 @@ export class UIManager {
     if (this.crewPanel.visible) this.crewPanel.update(state);
     if (this.surveyPanel.visible) this.surveyPanel.update(state);
     if (this.shadyPanel.visible) this.shadyPanel.update(state);
+    if (this.permitPanel.visible) this.permitPanel.update(state);
     // Cheap (one display toggle) and not tied to visibility — the session
     // section has to be fresh the instant the player opens the panel, not
     // one tick later, and this panel doesn't rebuild anything else per tick.
@@ -560,6 +567,7 @@ export class UIManager {
         break;
       case 'survey': this.surveyPanel.show(); break;
       case 'shady': this.shadyPanel.show(); break;
+      case 'permits': this.permitPanel.show(); break;
       case 'settings': this.settingsPanel.show(); break;
     }
     this.toolRail.setActive(this.activePanel);
@@ -606,6 +614,7 @@ export class UIManager {
     this.eventModal.dispose();
     this.surveyPanel.dispose();
     this.shadyPanel.dispose();
+    this.permitPanel.dispose();
     this.settingsPanel.dispose();
     this.miniMap.dispose();
   }
@@ -628,6 +637,7 @@ export class UIManager {
     this.crewPanel.hide();
     this.surveyPanel.hide();
     this.shadyPanel.hide();
+    this.permitPanel.hide();
     this.settingsPanel.hide();
     this.toolRail.setActive(null);
   }

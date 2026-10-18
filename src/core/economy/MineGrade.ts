@@ -51,12 +51,17 @@ export interface GradeTargetStatus {
 
 export type GradeApplyRefusal = 'no_ladder' | 'pending' | 'unmet_targets' | 'insufficient_funds';
 
-export type GradeApplyResult =
+type GradeApplyResult =
   | { ok: true; fee: number; toGrade: number }
   | { ok: false; refusal: GradeApplyRefusal; unmet?: GradeTargetKind[] };
 
 /** Last grade with a named table entry; classes start above it. */
 const LAST_NAMED_GRADE = 5;
+
+/** Target amount for display: whole numbers as-is, fractions floored to one decimal. */
+export function formatGradeAmount(n: number): string {
+  return Number.isInteger(n) ? String(n) : (Math.floor(n * 10) / 10).toFixed(1);
+}
 
 /** Fresh grade state of a progression site: grade 0, nothing tracked. */
 export function createGradeState(): GradeState {

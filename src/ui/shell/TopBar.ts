@@ -14,6 +14,7 @@ import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
+import { gradeDef, nextGradeTargets } from '../../core/economy/MineGrade.js';
 import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
@@ -21,6 +22,9 @@ import { mountModifierChips } from './ModifierChips.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../tokens.js';
 import { activeTimeSegment } from '../timeControlSegments.js';
+
+/** How long the grade chip pulses after every permit target becomes met (#1924). */
+export const GRADE_CHIP_PULSE_MS = 3000;
 
 const FORECAST_DAYS = 14;
 /** Forecast reliability tiers — color-coded, never opacity-encoded (a11y). */
@@ -86,6 +90,12 @@ export class TopBar {
   private readonly objectiveText: HTMLElement;
   private readonly objectiveFill: HTMLElement;
   private lastObjectiveSig: string | null = null;
+  private readonly gradeWrap: HTMLButtonElement;
+  private readonly gradeText: HTMLElement;
+  private lastGradeSig: string | null = null;
+  /** Grade and all-targets-met flag seen last update; null until the first sighting, and reset when the grade changes. */
+  private gradeTracked: { grade: number; allMet: boolean } | null = null;
+  private gradePulseTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly trendValue: HTMLElement;
   private readonly trendRow: HTMLElement;
   private readonly trendIcon: HTMLElement;
@@ -167,6 +177,17 @@ export class TopBar {
     const bar = progressBar(0, OBJECTIVE_BAR_COLOR);
     this.objectiveFill = bar.firstElementChild as HTMLElement;
     this.objectiveWrap.append(this.objectiveText, bar);
+
+    // ── Permit grade chip ── progression sites only; click opens the Permits panel (#1924).
+    this.gradeWrap = document.createElement('button');
+    this.gradeWrap.dataset['action'] = 'open-permits';
+    this.gradeWrap.dataset['panel'] = 'permits';
+    this.gradeWrap.style.cssText = 'display:none;flex:0 0 auto;align-items:center;gap:8px;padding:0 16px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;cursor:pointer;font:inherit;text-align:left';
+    this.gradeWrap.addEventListener('click', () => this.onNavigate?.('permits'));
+    this.locale.bindTitle(this.gradeWrap, 'shell.topbar.grade_tip');
+    this.gradeText = el('span', { className: 'bsx-mono' });
+    this.gradeText.style.cssText = 'font-size:11px;white-space:nowrap';
+    this.gradeWrap.append(iconEl('contract', 14), this.gradeText);
 
     // ── Day / clock ──
     const dayWrap = el('div');
@@ -270,7 +291,7 @@ export class TopBar {
 
     rightWrap.append(this.logBtn, savesBtn, mapBtn);
 
-    this.root.append(this.balanceWrap, this.objectiveWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
+    this.root.append(this.balanceWrap, this.objectiveWrap, this.gradeWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
     container.appendChild(this.root);
 
     shellLayoutRegistry.register({ id: 'topbar', layer: 'hud', bounds: topBarBounds });
@@ -299,6 +320,7 @@ export class TopBar {
     this.trendIcon.style.color = positive ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
 
     this.updateObjective(state);
+    this.updateGradeChip(state);
 
     // Day / clock
     const day = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
@@ -500,6 +522,36 @@ export class TopBar {
     this.objectiveFill.style.background = objective.fraction >= 1 ? OBJECTIVE_BAR_DONE_COLOR : OBJECTIVE_BAR_COLOR;
   }
 
+  /** Show the grade chip on progression sites; pulse it when the last open target of an unapplied grade gets met. */
+  private updateGradeChip(state: GameState): void {
+    const g = state.grade;
+    const grade = g ? gradeDef(g.grade) : undefined;
+    const targets = g ? nextGradeTargets(state) : [];
+    const allMet = !!g && !g.pending && targets.length > 0 && targets.every(s => s.met);
+
+    if (g && this.gradeTracked?.grade === g.grade) {
+      if (allMet && !this.gradeTracked.allMet) this.startGradePulse();
+    }
+    this.gradeTracked = g ? { grade: g.grade, allMet } : null;
+
+    const sig = grade ? `${g!.grade}` : '';
+    if (sig === this.lastGradeSig) return;
+    this.lastGradeSig = sig;
+    if (!grade) { this.gradeWrap.style.display = 'none'; return; }
+    this.gradeWrap.style.display = 'flex';
+    this.gradeText.textContent = t('shell.topbar.grade', { name: t(grade.nameKey, grade.nameParams) });
+  }
+
+  private startGradePulse(): void {
+    clearTimeout(this.gradePulseTimer);
+    this.gradeWrap.dataset['pulse'] = 'true';
+    this.gradeWrap.style.animation = 'bs-pulse 1.2s ease infinite';
+    this.gradePulseTimer = setTimeout(() => {
+      delete this.gradeWrap.dataset['pulse'];
+      this.gradeWrap.style.animation = '';
+    }, GRADE_CHIP_PULSE_MS);
+  }
+
   private lastScoreSig = '';
   private lastScoreState: GameState | undefined;
   private updateScores(state: GameState): void {
@@ -541,6 +593,8 @@ export class TopBar {
     this.weatherBtn.title = t(`hud.weather.${this.lastWeather}`);
     this.lastScoreSig = '';
     this.lastObjectiveSig = '';
+    this.lastGradeSig = null;
+    if (this.lastState) this.updateGradeChip(this.lastState);
     if (this.lastScoreState) this.updateScores(this.lastScoreState);
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }
@@ -552,6 +606,7 @@ export class TopBar {
 
   dispose(): void {
     document.removeEventListener('click', this.onDocumentClick);
+    clearTimeout(this.gradePulseTimer);
     this.root.remove();
     shellLayoutRegistry.unregister('topbar');
     this.modifierChips.dispose();
