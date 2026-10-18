@@ -3,7 +3,7 @@
 import type { Random } from '../math/Random.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
-import type { EffectOutcome, EventWorld } from './TrafficJamEffects.js';
+import { alt, outcome, type EffectOutcome, type EventWorld } from './TrafficJamEffects.js';
 import { getLivingEmployees, hireEmployee, injureEmployee } from '../entities/Employee.js';
 import { poolNames } from '../entities/HiringPool.js';
 import { hireSpawnPoint } from '../entities/HireSpawn.js';
@@ -17,11 +17,6 @@ import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign
 import {
   EVENT_EFFECT_FATIGUE_RELIEF_LEVEL, EVENT_EFFECT_JOIN_DEFAULT_ROLE, EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS,
 } from '../config/balance.js';
-
-const outcome = (over: Partial<EffectOutcome> = {}): EffectOutcome => ({
-  effects: [], cashChange: 0, cashSettled: 0, scoreChanges: {}, resultKeySuffix: '', ...over,
-});
-const alt = (): EffectOutcome => outcome({ resultKeySuffix: '_alt' });
 
 /** Applies one instant spec (hire, leave, injury, bonus, contract change, ...). */
 export function applyInstantEffect(

@@ -28,9 +28,10 @@ const MONEY_PARAMS: ReadonlySet<string> = new Set(['amount', 'perDay']);
 /** Specs whose role field narrows who they hit; absent means everyone. */
 const SCOPED_TYPES: ReadonlySet<EventEffectSpec['type']> = new Set(['work_stoppage', 'work_rate', 'salary']);
 
-/** Permit-processing chip: a shift reads as plain, next-application or safety-gated; an approve as its own sentence. */
-function permitChip(spec: PermitProcessingSpec, params: Record<string, string | number>): EventEffectChip {
+/** Permit-processing chip (spec params copied, not mutated): a shift reads as plain, next-application or safety-gated; an approve as its own sentence. */
+function permitChip(spec: PermitProcessingSpec, specParams: Record<string, string | number>): EventEffectChip {
   let suffix = '_approve';
+  const params = { ...specParams };
   if (spec.action === 'shift') {
     params['ticks'] = signedTicks(spec.ticks);
     if (spec.ticksBelow !== undefined) params['ticksBelow'] = signedTicks(spec.ticksBelow);

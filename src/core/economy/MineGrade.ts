@@ -204,7 +204,7 @@ export function applyForGrade(state: GameState): GradeApplyResult {
   const toGrade = g.grade + 1;
   const def = gradeDef(toGrade);
   deductExpense(state, def.fee, 'permits', `Permit fee: grade ${toGrade}`);
-  g.pending = { toGrade, ticksLeft: Math.max(1, def.processingTicks + takePermitDelay(state.events.activeModifiers)) };
+  g.pending = { toGrade, ticksLeft: flooredTicks(def.processingTicks + takePermitDelay(state.events.activeModifiers)) };
   return { ok: true, fee: def.fee, toGrade };
 }
 
@@ -217,19 +217,24 @@ export function advanceGradeApplication(state: GameState, emitter: EventEmitter)
   approvePendingApplication(g, emitter);
 }
 
+/** Remaining processing ticks after a delay, never below one tick. */
+function flooredTicks(ticks: number): number {
+  return Math.max(1, ticks);
+}
+
 /** Shifts a pending application's remaining processing ticks (negative = faster, floored at 1); false without one (#1927). */
 export function shiftPendingApplication(g: GradeState, ticks: number): boolean {
   if (!g.pending) return false;
-  g.pending.ticksLeft = Math.max(1, g.pending.ticksLeft + ticks);
+  g.pending.ticksLeft = flooredTicks(g.pending.ticksLeft + ticks);
   return true;
 }
 
-/** Approves a pending application at once, granting the grade; false without one (#1927). */
-export function approvePendingApplication(g: GradeState, emitter: EventEmitter): boolean {
+/** Approves a pending application at once, granting the grade (emits only when an emitter is given); false without one (#1927). */
+export function approvePendingApplication(g: GradeState, emitter?: EventEmitter): boolean {
   if (!g.pending) return false;
   g.grade = g.pending.toGrade;
   g.pending = null;
-  emitter.emit('progression:grade_approved', { grade: g.grade });
+  emitter?.emit('progression:grade_approved', { grade: g.grade });
   return true;
 }
 
