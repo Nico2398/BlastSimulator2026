@@ -4018,6 +4018,7 @@
   "sandbox.unknown_subcommand": "Sous-commande inconnue : \"{sub}\". Utilisez : start",
   "sandbox.unknown_biome": "Biome inconnu : \"{biome}\". Valides : {valid}",
   "sandbox.unknown_kit": "Kit inconnu : \"{kit}\". Valides : {valid}",
+  "sandbox.invalid_ore_grade": "ore_grade invalide : \"{value}\". Utilisez un nombre supérieur à 0 et au plus 1.",
   "sandbox.start_success": "Bac à sable démarré. {gridX}x{gridZ} {biome}, kit {kit}, graine {seed}, trésorerie {cash} $.{staffedSuffix}",
   "world.unknown_mine_type": "Type de mine inconnu : \"{mineType}\". Valides : {valid}",
   "world.invalid_size": "Taille invalide : {size}. Doit être un nombre entier entre 1 et {max}.",

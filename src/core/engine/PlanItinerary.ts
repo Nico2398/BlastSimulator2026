@@ -29,6 +29,7 @@ import { selectHaulBatch } from '../economy/HaulBatch.js';
 import { largestWarehouseFreeKg } from '../economy/FreightWarehouses.js';
 import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../economy/OreGrade.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -540,7 +541,7 @@ function planFragmentTaskItinerary(
     // The carried fragment's mass is already reserved in its warehouse, so ask
     // for any warehouse not overbooked (0 kg) rather than counting it twice.
     const carried = state.logistics.fragments.find(f => f.fragment.id === fragmentId);
-    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ, 0, carried ? haulDestinationOf(carried.fragment) : 'warehouse');
+    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ, 0, carried ? haulDestinationOf(carried.fragment, oreGradeScaleOf(state.world)) : 'warehouse');
     if (depotApproach === null) return null;
 
     const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
@@ -582,7 +583,7 @@ function planFragmentTaskItinerary(
   // the primary leg alone also keeps extra legs from inflating a dense
   // cluster's cost, which would invert nearest-first.
   // A batch unloads at one depot; findNearbyHaulableFragments keeps it to the primary's destination (#1530).
-  const destination = haulDestinationOf(tracked.fragment);
+  const destination = haulDestinationOf(tracked.fragment, oreGradeScaleOf(state.world));
   const candidates = fidelity === 'exact'
     ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS)
     : [];

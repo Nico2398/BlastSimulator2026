@@ -75,6 +75,8 @@ export interface LevelDef {
   oreDeposits?: boolean;
   /** Pit mask shape; absent means DEFAULT_PIT_MASK (#1680). */
   pitMask?: PitMaskShape;
+  /** Ore grade scale lever (#1932); absent = default. */
+  oreGradeScale?: number;
   /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
   /** Fixed hiring pool; omitted = seeded random candidates (#1600). */

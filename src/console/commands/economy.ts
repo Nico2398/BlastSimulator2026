@@ -25,6 +25,7 @@ import { recordOreDelivery } from '../../core/economy/MineGrade.js';
 import { deliverStoredOre, bookDeliveryCashflow } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { stateRubbleStockKg, type StoredFragmentLike } from '../../core/economy/SpoilHeaps.js';
+import { oreGradeScaleOf } from '../../core/economy/OreGrade.js';
 import type { Building } from '../../core/entities/Building.js';
 import { formatDollars, insufficientFundsText } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
@@ -219,7 +220,7 @@ export function contractCommand(
       if (Math.min(amount, remainingKg(contract)) > stock + FRAGMENT_SPLIT_EPSILON_KG) {
         return { success: false, output: t('economy.contract.deliver_insufficient', { material: contract.materialId || t('ui.contracts.material_rubble') }) };
       }
-      const delivery = deliverStoredOre(state.contracts, state.logistics, state.collectedOre, id, amount, state.tickCount, state.buildings.buildings);
+      const delivery = deliverStoredOre(state.contracts, state.logistics, state.collectedOre, id, amount, state.tickCount, state.buildings.buildings, oreGradeScaleOf(state.world));
       if (!delivery.success) return { success: false, output: delivery.error };
       const result = delivery.data;
       bookDeliveryCashflow(state, id, result, state.tickCount);
