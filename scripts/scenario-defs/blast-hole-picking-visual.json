@@ -15,31 +15,31 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:32 staffed:true",
+      "command": "new_game seed:42 size:32 staffed:true cash:150000",
       "timeout": 30,
       "description": "Setup: a fresh, staffed site with open ground around the origin — a driller with blasting + drill_rig licence, plus an unmanned drill_rig, hired/purchased for free (#551), exactly what #553's automatic drill dispatch needs.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:32 staffed:true"
+          "command": "new_game seed:42 size:32 staffed:true cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 150000,
           "holeCount": 0,
           "orderedHoleCount": 0
         }
       }
     },
     {
-      "command": "set_policy mode:continuous fatigue:0",
+      "command": "set_policy mode:shift_8h",
       "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so the driller must stay seated in the drill_rig on the hole (as the click-picking steps below assume) rather than being force-rested away. Continuous mode with threshold 0 never forces rest.",
       "interaction": [
         {
           "type": "command",
-          "command": "set_policy mode:continuous fatigue:0"
+          "command": "set_policy mode:shift_8h"
         }
       ],
       "role": "bootstrap"
@@ -167,13 +167,8 @@
     {
       "command": "charge hole:* explosive:boomite amount:6 stemming:2",
       "timeout": 60,
-      "description": "Charge the hole through the Blast Workshop (the inspector only reads it): step tab Charge, amount and stemming steppers, charge-all.",
+      "description": "Charge the hole through the Blast Workshop (the inspector only reads it): step tab Charge, amount and stemming steppers, charge-all. The hole inspector from the previous step is deliberately left open (#1895).",
       "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -205,16 +200,16 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:1000",
+      "timeout": 205,
       "description": "Drain the queued charge order before re-reading the hole.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 120000
+          "maxTicks": 1000,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -228,27 +223,11 @@
     {
       "command": "state",
       "timeout": 60,
-      "description": "Re-click the hole — the inspector now reads it as charged, with the explosive, kg and stemming.",
+      "description": "The still-open hole inspector now reads the hole as charged, with the explosive, kg and stemming — it follows the live game state. Not a re-click (#1895): once the delivery wait has passed, the charging crew and drill rig stand on the hole, so a click on it selects the employee or rig instead.",
       "interaction": [
         {
           "type": "command",
           "command": "state"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-blast-panel [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "cameraFocus",
-          "x": 10,
-          "z": 10,
-          "distance": 8
-        },
-        {
-          "type": "click",
-          "x": 640,
-          "y": 360
         },
         {
           "type": "awaitUsable",

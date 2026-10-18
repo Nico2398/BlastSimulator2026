@@ -7,11 +7,21 @@
 
 import type { GameState } from '../../src/core/state/GameState.js';
 
+const DELIVERY_WAIT_FLOAT = 1_000_000;
+
 /** A console command runner, as `createRunner().runner.run` or a recording wrapper of it. */
 export type Run = (cmd: string) => { success: boolean; output: string };
 
 /** Commands a player-honest playthrough must never issue (budget-balancing hacks). */
 export const FORBIDDEN_COMMAND = /^(employee fire|vehicle scrap|build destroy|vehicle sell)\b/;
+
+/**
+ * Top cash up so payroll cannot bankrupt a test while the crew idles through the explosive
+ * delivery wait (#1895); funding is not the subject of those tests.
+ */
+export function fundForDeliveryWait(state: Pick<GameState, 'cash'>): void {
+  state.cash = Math.max(state.cash, DELIVERY_WAIT_FLOAT);
+}
 
 /** One ordinary player tick: resolve a pending event, then let time pass. */
 export function playTick(run: Run, state: GameState): void {
@@ -67,4 +77,37 @@ export function clearBlastZone(run: Run, state: GameState): void {
   run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
   const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
   for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
+}
+
+/**
+ * Stock `kg` of `explosiveId` in an explosive warehouse before ordering a pattern, as a competent player does:
+ * a stock-covered order skips the cash-bought delivery wait (#1895), which would idle the crew on payroll.
+ * Builds a warehouse on the first free cell when the site has none (the kits carry none) and waits for the
+ * crew to raise it, then buys. Returns the buy command's result so a caller can assert it.
+ */
+export function stockWarehouse(run: Run, state: GameState, explosiveId: string, kg: number): { success: boolean; output: string } {
+  if (!state.buildings.buildings.some((b) => b.type === 'explosive_warehouse')) {
+    const grid = state.navGrid!;
+    let ordered = false;
+    for (let z = 1; z < grid.height - 6 && !ordered; z += 2) {
+      for (let x = 1; x < grid.width - 6 && !ordered; x += 2) {
+        ordered = run(`build explosive_warehouse at:${x},${z} tier:1`).success;
+      }
+    }
+    for (let i = 0; i < 600 && state.plannedBuildings.length > 0; i++) playTick(run, state);
+  }
+  return run(`buy explosive:${explosiveId} kg:${kg}`);
+}
+
+/**
+ * Land every outstanding charge order's explosives now, as if the order had been stock-covered (#1895).
+ * For tests whose subject is timing-sensitive downstream of the charge (weather, hauling, positions) and
+ * must not shift by the cash-bought delivery wait.
+ */
+export function deliverExplosivesNow(state: GameState): void {
+  for (const a of state.pendingActions) {
+    if (a.type === 'charge_hole' && typeof a.payload['deliveryArrivalTick'] === 'number') {
+      a.payload['deliveryArrivalTick'] = state.tickCount;
+    }
+  }
 }

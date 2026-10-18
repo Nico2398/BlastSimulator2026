@@ -3,20 +3,20 @@
   "description": "Visual verification of the save/load UI: multiple save slots, auto-save indicator, save/load buttons, export/import options, slot metadata display (date, level, cash, playtime), and IndexedDB backend for web persistence.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:120000",
+      "command": "new_game seed:42 cash:180000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:120000"
+          "command": "new_game seed:42 cash:180000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 120000
+          "cash": 180000
         }
       },
-      "description": "#553: was `campaign start level:dusty_hollow` -- a manually-bought vehicle spawns at grid centre (FleetPanel/vehicle.ts), and dusty_hollow's 96x40x96 campaign grid put that centre dozens of tiles from this file's own drill site (15,15), the same terrain-reachability trap found and worked around in scores-display-visual.json. Switched to new_game's flat 64x64x64 default (no obstruction) and bumped cash from $50,000 to $120,000 -- this file now needs a driller/drill_rig it never used to, on top of the original save/load-only shopping list."
+      "description": "#553: was `campaign start level:dusty_hollow` -- a manually-bought vehicle spawns at grid centre (FleetPanel/vehicle.ts), and dusty_hollow's 96x40x96 campaign grid put that centre dozens of tiles from this file's own drill site (15,15), the same terrain-reachability trap found and worked around in scores-display-visual.json. Switched to new_game's flat 64x64x64 default (no obstruction) and bumped cash from $50,000 to $120,000 -- this file now needs a driller/drill_rig it never used to, on top of the original save/load-only shopping list. #1895: raised from $120,000 to $180,000 -- the charge order now waits EXPLOSIVE_DELIVERY_TICKS (400) for delivery with the crew on payroll, and at $120,000 the site went bankrupt (tick ~464) before the blast step."
     },
     {
       "command": "time resume",

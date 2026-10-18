@@ -3,17 +3,17 @@
   "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `blast` step ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values. #1649 (supersedes the pattern-1 figures above): charging is worked from the one staffed charging truck by the staffed blaster, about 20 ticks per hole, while payroll and fuel burn the $70k budget. Pattern 1 is therefore a 2x3 grid (6 holes, not 20), the fixed tick-20 pads are one wait_until, and the 7 hand-hires land right before the blast; 4 of 12 die, ecology falls 50 -> ~44.8 and nuisance to ~36. All pinned figures below were re-measured from the real run. Rally point: the starting crew now gathers around the rally flag at (13,2) and the seven hand-hires spawn beside it, instead of the crew lining the north edge and the hires appearing at the site centre (32,32). The flag is 8 cells from pattern 1 (10..16, 10..13) and the shot still fires with no evacuation, so 11 of 12 die (was 4; only the driller who relocated the rig to (35,35) survives). Drilling also finishes 5 ticks sooner. Tick, death and score pins re-measured in command mode; the ecology drop (50 -> ~45, then ~40.8 after the tick-20 cycle) and the levelEnded false/null outcome are unchanged.",
   "steps": [
     {
-      "command": "new_game seed:3666 staffed:true cash:70000",
+      "command": "new_game seed:3666 staffed:true cash:1400000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:3666 staffed:true cash:70000"
+          "command": "new_game seed:3666 staffed:true cash:1400000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 70000,
+          "cash": 1400000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -469,6 +469,17 @@
       }
     },
     {
+      "command": "set_policy mode:shift_8h fatigue:60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h fatigue:60"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
+    },
+    {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
@@ -567,6 +578,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Back to the continuous, no-rest policy this file runs under (#1379) now the shipment has arrived and the crew has loaded it."
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {
@@ -586,7 +608,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -597,7 +619,7 @@
         "changedBy": {
           "cash": -1000
         },
-        "note": "#1890: the stretched shared event cooldown shifts the event draws and charge timing (tick 184 -> 173); every downstream tickCount/score pin re-measured, outcomes (deaths, level state) unchanged."
+        "note": "#1890: the stretched shared event cooldown shifts the event draws and charge timing (tick 184 -> 173); every downstream tickCount/score pin re-measured, outcomes (deaths, level state) unchanged. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -615,7 +637,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -625,7 +647,8 @@
         },
         "changedBy": {
           "cash": -1000
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -643,7 +666,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -653,7 +676,8 @@
         },
         "changedBy": {
           "cash": -1000
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -671,7 +695,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -681,7 +705,8 @@
         },
         "changedBy": {
           "cash": -1500
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -699,7 +724,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -709,7 +734,8 @@
         },
         "changedBy": {
           "cash": -1500
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -727,7 +753,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -737,7 +763,8 @@
         },
         "changedBy": {
           "cash": -1500
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -755,7 +782,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -765,7 +792,8 @@
         },
         "changedBy": {
           "cash": -800
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -779,7 +807,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -789,7 +817,8 @@
         },
         "changedBy": {
           "cash": 0
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -803,7 +832,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 173,
+          "tickCount": 553,
           "holeCount": 6,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -813,7 +842,8 @@
         },
         "changedBy": {
           "cash": 0
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -906,8 +936,8 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 73.6428700000002,
-          "safety": 50,
+          "wellBeing": 99.95,
+          "safety": 51.350000000000094,
           "ecology": 44.83863403876688,
           "nuisance": 37.096585096917195,
           "levelEnded": false,
@@ -917,7 +947,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect. #1793 (free-face pull bounded): the blast breaks slightly different rock, so ecology and nuisance re-measured by +0.05 / +0.125. Deterministic (command mode)."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1586: wellBeing 44.70133 -> 44.40917 (and 25.70133 -> 25.40917 after the event below) -- real-cost action selection reorders the crew's trips, shifting a few ticks of work-driven morale; the mechanic under test (ecology collapse ending the level) is unchanged. #1723 merged with #1691/#1722: ecology 44.59 -> 44.73 (36.78 -> 36.92 at step 34) and nuisance 36.47 -> 36.82 (35.86 -> 36.21) re-measured from the merged run: blasts now break the crater floor down to grade, so the rubble left lying (which #1691 charges against ecology) and the earthmoving differ slightly. Command mode, deterministic; no balance defect. #1793 (free-face pull bounded): the blast breaks slightly different rock, so ecology and nuisance re-measured by +0.05 / +0.125. Deterministic (command mode). #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -976,6 +1006,17 @@
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "set_policy mode:shift_8h fatigue:60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:shift_8h fatigue:60"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -1068,8 +1109,8 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 73.6428700000002,
-          "safety": 50,
+          "wellBeing": 99.95,
+          "safety": 51.350000000000094,
           "ecology": 44.83863403876688,
           "nuisance": 37.096585096917195,
           "levelEnded": false,
@@ -1079,7 +1120,7 @@
           "cash": 0,
           "tickCount": 0
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3)."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3). #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -1094,14 +1135,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 556,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895 merge of #1907: the event lands at tick 556 instead of 573 (union event clock); tickCount re-measured."
       }
     },
     {
@@ -1120,19 +1162,19 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 556,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 34.73787000000018,
+          "wellBeing": 97.40000000000002,
           "safety": 0,
-          "ecology": 40.782214298843314,
-          "nuisance": 36.482925484585905,
+          "ecology": 44.08436960195578,
+          "nuisance": 36.76248721321782,
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1778: re-measured for comfort-band morale recovery. #1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (fresh rubble costs ECOLOGY_DUST_PER_TONNE_PER_TICK, settled rubble the lower ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged. #1733 (settling dust model, re-measured in command mode): rubble dust now settles instead of sitting at a cap, so ecology reads 36.78 -> 40.68 here; the level still reaches the same ecological_shutdown end. #1723 merged with #1691/#1722/#1733: blasts now break the crater floor down to grade, so the rubble left lying differs slightly; ecology 40.68 -> 40.54 and nuisance 35.86 -> 36.21 re-measured from the merged run (command mode, deterministic). The ecological_shutdown end is unchanged."
+        "note": "#1778: re-measured for comfort-band morale recovery. #1691: ecology 44.78 -> 36.78 is the dust term: loose rubble lying on the ground now costs ecology every tick (fresh rubble costs ECOLOGY_DUST_PER_TONNE_PER_TICK, settled rubble the lower ECOLOGY_DUST_SETTLED_PER_TONNE_PER_TICK), and this scenario deliberately mitigates nothing (no spoil heap, no hauling). The new number is exact and reproducible; the ecological_shutdown end it drives is unchanged. #1733 (settling dust model, re-measured in command mode): rubble dust now settles instead of sitting at a cap, so ecology reads 36.78 -> 40.68 here; the level still reaches the same ecological_shutdown end. #1723 merged with #1691/#1722/#1733: blasts now break the crater floor down to grade, so the rubble left lying differs slightly; ecology 40.68 -> 40.54 and nuisance 35.86 -> 36.21 re-measured from the merged run (command mode, deterministic). The ecological_shutdown end is unchanged. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895 merge of #1907: the event that lands at tick 556 is a different draw than the one at 573; wellBeing/ecology/nuisance re-measured (command mode, deterministic)."
       },
       "commandOutcome": "either"
     },
@@ -1148,12 +1190,13 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 193,
+          "tickCount": 556,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
-        }
+        },
+        "note": "#1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone."
       }
     },
     {
@@ -1167,15 +1210,15 @@
       "role": "observe",
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
-        "note": "#1778: pins re-measured for comfort-band morale recovery.",
+        "note": "#1778: pins re-measured for comfort-band morale recovery. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone.",
         "equals": {
-          "tickCount": 193,
+          "tickCount": 556,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 34.73787000000018,
+          "wellBeing": 97.40000000000002,
           "safety": 0,
-          "ecology": 40.782214298843314,
-          "nuisance": 36.482925484585905,
+          "ecology": 44.08436960195578,
+          "nuisance": 36.76248721321782,
           "levelEnded": false,
           "levelEndReason": null
         }
@@ -1192,15 +1235,15 @@
       "role": "setup",
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
-        "note": "#1778: pins re-measured for comfort-band morale recovery.",
+        "note": "#1778: pins re-measured for comfort-band morale recovery. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone. #1895: re-measured after the explosives delivery wait moved the crew relative to the blast zone.",
         "equals": {
-          "tickCount": 193,
+          "tickCount": 556,
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 34.73787000000018,
+          "wellBeing": 97.40000000000002,
           "safety": 0,
-          "ecology": 40.782214298843314,
-          "nuisance": 36.482925484585905,
+          "ecology": 44.08436960195578,
+          "nuisance": 36.76248721321782,
           "levelEnded": false,
           "levelEndReason": null,
           "bankrupt": false

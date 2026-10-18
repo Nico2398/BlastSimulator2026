@@ -3,18 +3,18 @@
   "description": "Set heavy rain weather, drill holes that flood, and verify water-sensitive explosive fails to detonate",
   "steps": [
     {
-      "command": "new_game seed:42 cash:100000",
+      "command": "new_game seed:42 cash:200000",
       "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid puts a manually-bought vehicle's grid-centre spawn (FleetPanel/vehicle.ts) far enough from the drill site that the single driller/drill_rig this file needs (see below) risked a worker revolt from nonstop travel before landing the plan; new_game's 64x64x64 default roughly halves the trip. Cash bumped to $100,000 (from dusty_hollow's $50,000) to cover the drill_rig ($35,000) this file now needs that it never did pre-#553.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:100000"
+          "command": "new_game seed:42 cash:200000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000
+          "cash": 200000
         }
       }
     },
@@ -385,19 +385,19 @@
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
       "description": "#1649: charging is worked by the truck crew; wait on the queue draining rather than a hand-measured tick pad.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
-      "timeout": 180,
+      "timeout": 260,
       "expect": {
         "equals": {
           "chargedCount": 4,

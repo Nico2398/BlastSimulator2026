@@ -13,6 +13,7 @@
 // Verifies the console commands invoked by the Tutorial button in main.ts
 // produce the expected game state: new_game seed:42 size:24 + campaign start level:tutorial_pit.
 
+import { tickResolvingEvents } from './helpers.js';
 import { HIRING_ROLES } from '../../src/core/entities/HiringPool.js';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
@@ -36,10 +37,9 @@ import {
   CHARGE_DEFAULT_STEMMING_M,
   ORE_PRICES,
   TUTORIAL_HIRING_SCRIPT,
-  TUTORIAL_ORE_SALE_OFFER,
-} from '../../src/core/config/balance.js';
+  TUTORIAL_ORE_SALE_OFFER, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
-import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, deliverExplosivesNow, type Run, fundForDeliveryWait } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -206,16 +206,18 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    deliverExplosivesNow(ctx.state!); // the subject is automatic hauling after the blast, not the delivery wait (#1895)
     // #554: charging is real work too — drain the ordered charges the same
     // way the drill plan above was drained before blasting.
-    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     const blastResult = run('blast');
     expect(blastResult.success).toBe(true);
@@ -231,7 +233,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // assigns a driver by hand — the roster/fleet from staffed:true has to
     // self-organize.
     for (let i = 0; i < 400 && !step.isComplete(state, snapshot); i++) {
-      run('tick 1');
+      tickResolvingEvents(run);
     }
 
     expect(step.isComplete(state, snapshot)).toBe(true);
@@ -257,14 +259,15 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      runCmd('tick 1');
+      tickResolvingEvents(runCmd);
     }
     expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      runCmd('tick 1');
+      tickResolvingEvents(runCmd);
     }
     return { ctx, runCmd };
   }
@@ -416,7 +419,7 @@ describe('tutorial training steps (#1339)', () => {
       expect(run('build driving_center at:6,7').success).toBe(true);
       for (let i = 0; i < 400 && countBuildingsOfType(ctx.state!, 'driving_center') === 0; i++) {
         for (const emp of ctx.state!.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-        run('tick 1');
+        tickResolvingEvents(run);
       }
       expect(countBuildingsOfType(ctx.state!, 'driving_center')).toBeGreaterThan(0);
 
@@ -475,7 +478,7 @@ function tickIfUnpaused(
   state.employees.employees.forEach((emp) => {
     emp.fatigue = 100; emp.ticksWorked = 0;
   });
-  run('tick 1');
+  tickResolvingEvents(run);
   return true;
 }
 
@@ -508,7 +511,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     const holeCount = ctx.state!.drillHoles.length;
     expect(holeCount).toBeGreaterThan(1);
@@ -518,11 +521,12 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     const step = TUTORIAL_STEPS.find(s => s.id === 'charge')!;
     let sawPartialCharge = false;
 
-    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      fundForDeliveryWait(ctx.state!); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of ctx.state!.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
 
       const chargedCount = Object.keys(ctx.state!.chargesByHole).length;
       if (chargedCount > 0 && chargedCount < holeCount) {
@@ -579,7 +583,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
       for (const emp of state.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(state.plannedRamps.length).toBe(0);
 
@@ -590,7 +594,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
       for (const emp of state.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(state.plannedDrillHoles.length).toBe(0);
     expect(state.drillHoles.length).toBeGreaterThan(0);
@@ -598,11 +602,12 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     // 4. charge
     const chargeStep = TUTORIAL_STEPS.find((s) => s.id === 'charge')!;
     expect(run(chargeStep.commands![0]!).success).toBe(true);
-    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+      fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of state.employees.employees) {
         emp.fatigue = 100; emp.ticksWorked = 0;
       }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
@@ -676,7 +681,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     expect(run(boxCutStep.commands![0]!).success).toBe(true);
     for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
       for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(state.plannedRamps.length).toBe(0);
 
@@ -691,7 +696,7 @@ describe('panel default parameters on the tutorial square rate good or better (#
     expect(drill.success, drill.output).toBe(true);
     for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
       for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(state.plannedDrillHoles.length).toBe(0);
     expect(state.drillHoles.length).toBe(9);
@@ -700,9 +705,10 @@ describe('panel default parameters on the tutorial square rate good or better (#
       `charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`,
     );
     expect(charge.success, charge.output).toBe(true);
-    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+    for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+      fundForDeliveryWait(state); // the delivery wait (#1895) idles the crew on payroll
       for (const emp of state.employees.employees) { emp.fatigue = 100; emp.ticksWorked = 0; }
-      run('tick 1');
+      tickResolvingEvents(run);
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
@@ -753,7 +759,8 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     for (const step of TUTORIAL_STEPS) {
       if (step.id === 'free-play') return;
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
-      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25);
+      // The charge card waits out the explosives delivery too (#1895).
+      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25) + (step.id === 'charge' ? EXPLOSIVE_DELIVERY_TICKS : 0);
       const complete = () => step.isComplete(state, snapshot);
 
       // Charge only once the drill queue has drained, as a patient player

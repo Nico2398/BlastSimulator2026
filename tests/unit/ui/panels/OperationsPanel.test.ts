@@ -783,4 +783,17 @@ describe('countQueuedByBlock (#1810)', () => {
     expect(countQueuedByBlock([q(null, 'assigned'), q('no_vehicle_in_fleet', 'in_progress')]))
       .toEqual({ open: 0, blocked: 0, stranded: 0 });
   });
+
+  it('does not count an in-transit charge order as blocked or stranded (#1895)', () => {
+    const counts = countQueuedByBlock([q('explosives_in_transit'), q('explosives_in_transit')]);
+    expect(counts.blocked).toBe(0);
+    expect(counts.stranded).toBe(0);
+  });
+
+  it('in-transit does not disturb the counts of real blocks (#1895)', () => {
+    const counts = countQueuedByBlock([q('explosives_in_transit'), q('no_vehicle_in_fleet'), q('debris_out_of_reach')]);
+    expect(counts.blocked).toBe(1);
+    expect(counts.stranded).toBe(1);
+  });
 });
+

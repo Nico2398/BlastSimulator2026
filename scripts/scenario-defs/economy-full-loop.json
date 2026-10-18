@@ -3,18 +3,18 @@
   "description": "Full economy pipeline: blast spawns fragments without instant payout, a debris_hauler hauls them into a freight_warehouse, and contract delivery pays out only from that stored inventory (issue #456).",
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:250000",
+      "command": "campaign start level:tutorial_pit cash:350000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:250000"
+          "command": "campaign start level:tutorial_pit cash:350000"
         }
       ],
       "description": "#553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, and (see below) a rock_fragmenter/second driver to clear the oversized fragments this same charge always produced, on top of the original driver/debris_hauler/freight_warehouse shopping list.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 250000
+          "cash": 350000
         }
       }
     },
@@ -428,8 +428,8 @@
       "role": "player"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -444,8 +444,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",
@@ -1140,9 +1140,10 @@
           "employeeCount": 4,
           "buildingCount": 2,
           "vehicleCount": 2,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 1
-        }
+        },
+        "note": "#1895: activeContractCount is 0, not 1: the delivery wait gives the haulers a longer run before the sale, so the 200 kg delivery fills the fillable ore_sale offer in full and completes it."
       }
     }
   ]

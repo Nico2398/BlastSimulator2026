@@ -28,7 +28,7 @@ import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
-import { isFailureBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
+import { isFailureBlock, isInTransitBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 
@@ -51,6 +51,7 @@ export function countQueuedByBlock(
   for (const a of actions) {
     if (a.status !== 'queued') continue;
     if (a.blockedReason == null) counts.open++;
+    else if (isInTransitBlock(a)) continue;
     else if (isFailureBlock(a)) counts.blocked++;
     else counts.stranded++;
   }
@@ -257,9 +258,11 @@ export class OperationsPanel extends PanelBase {
     const blockedReason = action.status === 'queued' ? (action.blockedReason ?? null) : null;
     const queuedBlocked = blockedReason !== null;
     const statusChip = queuedBlocked
-      ? (isFailureBlock(action)
-        ? chip(t('ui.operations.work_queue_status_blocked'), 'warn')
-        : chip(t('ui.operations.work_queue_status_stranded'), 'neutral'))
+      ? (isInTransitBlock(action)
+        ? chip(t('ui.operations.work_queue_status_in_transit'), 'neutral')
+        : isFailureBlock(action)
+          ? chip(t('ui.operations.work_queue_status_blocked'), 'warn')
+          : chip(t('ui.operations.work_queue_status_stranded'), 'neutral'))
       : chip(t(WORK_QUEUE_STATUS_KEY[action.status]), action.status === 'in_progress' ? 'info' : 'neutral');
 
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });

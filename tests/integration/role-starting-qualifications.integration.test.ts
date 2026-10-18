@@ -12,6 +12,7 @@ import { tickUntil } from './helpers.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import { outstandingChargeBlockedReason } from '../../src/core/mining/ChargeOrder.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 function newSite() {
   const { runner, ctx } = createRunner();
@@ -72,13 +73,14 @@ describe('role starting qualifications — gameplay flows (#1339)', () => {
     expect(charge.success, charge.output).toBe(true);
     expect(state.pendingActions.some(a => a.type === 'charge_hole')).toBe(true);
 
+    state.tickCount += EXPLOSIVE_DELIVERY_TICKS; // the explosives have arrived (#1895): only crew and fleet can block
     run('tick 1');
     expect(outstandingChargeBlockedReason(state)).toBeNull();
     for (const a of state.pendingActions.filter(x => x.type === 'charge_hole')) {
       expect(a.blockedReason).toBeNull();
     }
 
-    tickUntil(run, () => Object.keys(state.chargesByHole).length === 1, 1500);
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === 1, EXPLOSIVE_DELIVERY_TICKS + 1500);
     expect(Object.keys(state.chargesByHole)).toHaveLength(1);
     expect(outstandingChargeBlockedReason(state)).toBeNull();
   });

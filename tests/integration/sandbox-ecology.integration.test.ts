@@ -16,7 +16,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
-import { ECOLOGICAL_SHUTDOWN_TICKS, ECOLOGICAL_WARNING_TICKS } from '../../src/core/config/balance.js';
+import { ECOLOGICAL_SHUTDOWN_TICKS, ECOLOGICAL_WARNING_TICKS, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import { playTick, type Run } from '../helpers/playthrough.js';
 import { makeRubbleFragment } from '../helpers/blastFixtures.js';
 
@@ -110,7 +110,7 @@ function fireOrdinaryPattern(site: Site, notBefore: number): number {
   alive('drilling');
   const charged = run('charge hole:* explosive:krackle amount:8 stemming:2');
   expect(charged.success, charged.output).toBe(true);
-  ticks(site, 1500, () => Object.keys(state.plannedChargesByHole).length === 0);
+  ticks(site, EXPLOSIVE_DELIVERY_TICKS + 1500, () => Object.keys(state.plannedChargesByHole).length === 0);
   alive('charging');
   ticks(site, Math.max(0, notBefore - state.tickCount - 40));
   alive('waiting for the next shot');

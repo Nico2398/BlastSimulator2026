@@ -33,7 +33,8 @@ import { board } from '../../../src/core/engine/Mount.js';
 import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
-import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+import { RAMP_DEFAULT_WIDTH, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
+import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
@@ -79,11 +80,13 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
  * hole:*`/`charge hole:<id>` has landed in `state.chargesByHole` (#554),
  * mirroring driveDrillPlanToCompletion above.
  */
-function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 200): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
+    // The explosive delivery wait (#1895) idles the crew for EXPLOSIVE_DELIVERY_TICKS on payroll; funding is not the point here.
+    fundForDeliveryWait(ctx.state!);
     tickCommand(ctx, ['1'], {});
   }
 }

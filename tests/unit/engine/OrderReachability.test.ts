@@ -49,6 +49,7 @@ import {
   refreshOrderReachability,
   roleShortfall,
 } from '../../../src/core/engine/OrderReachability.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 
 const WIDTH = 24;
 const HEIGHT = 12;
@@ -433,10 +434,13 @@ describe('classifyQueuedOrders (#1306)', () => {
   describe('availability reasons for a charge_hole order (#1649)', () => {
     const licence = ROLE_LICENCE_REQUIRED.charging_truck;
     const reasonOf = (state: GameState) => state.pendingActions.find(a => a.type === 'charge_hole')!.blockedReason;
-    const order = (state: GameState) => dispatchChargeAction(
-      state, { id: 'H1', x: IN_A_TARGET.x, z: IN_A_TARGET.z },
-      { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
-    );
+    const order = (state: GameState) => {
+      dispatchChargeAction(
+        state, { id: 'H1', x: IN_A_TARGET.x, z: IN_A_TARGET.z },
+        { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
+      );
+      state.tickCount += EXPLOSIVE_DELIVERY_TICKS; // explosives have arrived (#1895)
+    };
 
     it('requires the charging truck role', () => {
       const state = makeState();

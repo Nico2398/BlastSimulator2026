@@ -3,17 +3,17 @@
   "description": "The punishment path for issue #557: drill, charge a pattern, then fire WITHOUT ever running `zone clear` — the staffed driller/blaster crew and the drill_rig they drove out on are left standing exactly where their own work left them. Deterministic on seed 42: the crew dies, one vehicle is destroyed, and the incident record shows it. This is the cost the tutorial's evacuate-zone step (and blastCommand's tutorial-mode refusal) exist to prevent.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:100000 staffed:true",
+      "command": "new_game seed:42 cash:200000 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:100000 staffed:true"
+          "command": "new_game seed:42 cash:200000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000,
+          "cash": 200000,
           "employeeCount": 5,
           "deathCount": 0
         }
@@ -118,16 +118,16 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:1000",
       "description": "#554/#1649: drain the charge orders. A charging truck loads one hole at a time, so the budget is generous relative to the old on-foot pace.",
-      "timeout": 125,
+      "timeout": 205,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 120000
+          "maxTicks": 1000,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",

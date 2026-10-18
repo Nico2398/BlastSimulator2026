@@ -8,7 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
-import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, type OrderStockDraw } from './ExplosiveStock.js';
+import { explosivePriceFactor, drawStockForOrder, drawFromStockPool, readOrderStock, orderDeliveryTicks, type OrderStockDraw } from './ExplosiveStock.js';
 import { consumeExplosives, getExplosivesStockByType } from '../entities/Building.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
@@ -26,6 +26,8 @@ export interface ChargeHoleActionPayload {
   orderCost: number;
   /** Kg of the order drawn from warehouse stock at order time (#1678); returned on cancel. */
   orderStock?: OrderStockDraw;
+  /** Tick the cash-bought part of the order is delivered (#1895); absent when fully drawn from stock. */
+  deliveryArrivalTick?: number;
 }
 
 /** Outstanding (queued or claimed) `charge_hole` action for a hole. */
@@ -87,6 +89,7 @@ export function dispatchChargeAction(
     payload: {
       holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
       ...(orderStock && { orderStock }),
+      ...(fromCashKg > 0 && { deliveryArrivalTick: state.tickCount + orderDeliveryTicks(fromCashKg) }),
     } satisfies ChargeHoleActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });

@@ -11,6 +11,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { placeBuilding, getExplosivesStockByType } from '../../src/core/entities/Building.js';
 import { recordedChargesCost } from '../../src/core/mining/ChargePlan.js';
 import { tickUntilFresh } from '../helpers/blastFixtures.js';
+import { EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 type Run = (cmd: string) => { success: boolean; output: string };
 
@@ -34,7 +35,7 @@ function drillGrid(run: Run, state: GameState, rows: number, cols: number): void
 function chargeAll(run: Run, state: GameState, explosive: string, kg: number): void {
   const holes = state.drillHoles.length;
   expect(run(`charge hole:* explosive:${explosive} amount:${kg} stemming:2`).success).toBe(true);
-  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 1500);
+  tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, EXPLOSIVE_DELIVERY_TICKS + 1500);
   expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
 }
 

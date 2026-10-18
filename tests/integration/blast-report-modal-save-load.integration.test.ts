@@ -21,12 +21,13 @@
 // than instantiating the full renderer, matching the established pattern in
 // tests/integration/tutorial-pause.integration.test.ts.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { UIManager } from '../../src/ui/UIManager.js';
 import { MiniMap } from '../../src/ui/MiniMap.js';
-import { BLAST_REPORT_MIN_PLAYBACK_S } from '../../src/core/config/balance.js';
+import { BLAST_REPORT_MIN_PLAYBACK_S, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 import type { BlastPlaybackSnapshot } from '../../src/core/mining/BlastPlayback.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
@@ -48,7 +49,7 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(ctx.state!.plannedDrillHoles.length).toBe(0);
 
@@ -59,11 +60,11 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   ctx.state!.finances.cash = 500_000;
 
   expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
-  for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+  for (let i = 0; i < EXPLOSIVE_DELIVERY_TICKS + 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100; emp.ticksWorked = 0;
     }
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(Object.keys(ctx.state!.plannedChargesByHole).length).toBe(0);
 

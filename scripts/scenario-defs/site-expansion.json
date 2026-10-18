@@ -3,19 +3,19 @@
   "description": "The site grows where play goes: drilling, surveying, building and ramping past the starting square each claim the ground under them, and the whole plan still blasts on the enlarged site (#473).",
   "steps": [
     {
-      "command": "new_game seed:42 size:32 cash:500000 staffed:true",
+      "command": "new_game seed:42 size:32 cash:600000 staffed:true",
       "timeout": 150,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:32 cash:500000 staffed:true"
+          "command": "new_game seed:42 size:32 cash:600000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 500000,
+          "cash": 600000,
           "worldSizeX": 32,
           "worldSizeZ": 32,
           "worldMinX": 0,
@@ -26,12 +26,12 @@
       }
     },
     {
-      "command": "set_policy mode:continuous fatigue:0",
+      "command": "set_policy mode:shift_8h",
       "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
       "interaction": [
         {
           "type": "command",
-          "command": "set_policy mode:continuous fatigue:0"
+          "command": "set_policy mode:shift_8h"
         }
       ],
       "role": "bootstrap"
@@ -306,8 +306,8 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "timeout": 205,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
@@ -322,8 +322,8 @@
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "maxTicks": 3400,
+          "timeoutMs": 200000
         }
       ],
       "role": "setup",

@@ -3,6 +3,7 @@
 // actually reaches executeBlast's wetHoleIds (BlastExecution.ts), not just
 // that the `weather` command reports a state.
 
+import { tickResolvingEvents } from './helpers.js';
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
@@ -10,7 +11,7 @@ import { t } from '../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { forecast, createWeatherCycle } from '../../src/core/weather/WeatherCycle.js';
 import { getAllBiomes } from '../../src/core/world/BiomeCatalog.js';
-import { TICKS_PER_DAY } from '../../src/core/config/balance.js';
+import { TICKS_PER_DAY, EXPLOSIVE_DELIVERY_TICKS } from '../../src/core/config/balance.js';
 
 /**
  * Wages run every tick and the shift policy rests the crew between jobs, so a
@@ -36,7 +37,7 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
       emp.fatigue = 100;
     }
     keepFunded(ctx);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 
@@ -44,13 +45,13 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
  * Ticks until every charge ordered by the last `charge hole:*` has landed in
  * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
  */
-function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
+function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = EXPLOSIVE_DELIVERY_TICKS + 300): void {
   for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
     for (const emp of ctx.state!.employees.employees) {
       emp.fatigue = 100;
     }
     keepFunded(ctx);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
 }
 
@@ -67,7 +68,7 @@ function applyWeather(runner: ConsoleRunner, ctx: GameContext, weather: string):
   if (RAINY.has(weather)) {
     for (let i = 0; i < 4; i++) {
       runner.run(`weather set ${weather}`);
-      runner.run('tick 1');
+      tickResolvingEvents(cmd => runner.run(cmd));
     }
   }
   runner.run(`weather set ${weather}`);
@@ -94,7 +95,7 @@ function clearPatternOfCrew(runner: ConsoleRunner, ctx: GameContext, maxTicks = 
       emp.fatigue = 100;
     }
     keepFunded(ctx);
-    runner.run('tick 1');
+    tickResolvingEvents(cmd => runner.run(cmd));
   }
   expect(isClear(), runner.run('zone status').output).toBe(true);
 }
