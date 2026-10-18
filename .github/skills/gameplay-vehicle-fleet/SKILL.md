@@ -410,3 +410,5 @@ On progression sites (`state.grade !== undefined`) a vehicle climbs at most its 
 - A vehicle order unreachable on a progression site but reachable at 30° keeps `blockedReason: 'target_unreachable'` and gets `PendingAction.blockedDetail` (`order.blocked.ramp_too_steep`) naming the steepest blocking ramp: "Ramp #3 is 30°: too steep for a tier-3 hauler (max 18°)." The detail is cleared once the order is reachable.
 - The ramp inspector shows grade and the tiers that climb it (`describeRampClimb`, `RampGrade.ts`).
 - Console: `employee assign_skill <id> skill:driving.<role> level:N licence:1-3` sets the driver's licence level.
+
+**Decision (#1938): per-step limit, diagonals included.** A diagonal step over an x-graded ramp has grade `atan(tan g / sqrt(2))`, so ramps at least 2 cells wide are climbable by a diagonal zigzag up to about `tan(limit) * sqrt(2)`. The inspector grade is the steepest cardinal step; its tiers line is conservative. Recorded decision (see `gameplay-navmesh`).

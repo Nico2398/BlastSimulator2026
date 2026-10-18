@@ -39,7 +39,7 @@ describe('rampSteepestGradeDegrees', () => {
 describe('steepestBlockingRamp', () => {
   it('returns the 30 degree ramp when a tier-3 limit is asked of it', () => {
     const state = stateWith([30]);
-    expect(steepestBlockingRamp(state, tierSlopeRatio(3))?.id).toBe(1);
+    expect(steepestBlockingRamp(state, tierSlopeRatio(3))?.ramp.id).toBe(1);
   });
 
   it('returns null when every ramp is within the limit', () => {
@@ -49,13 +49,13 @@ describe('steepestBlockingRamp', () => {
 
   it('returns the steepest of several blocking ramps', () => {
     const state = stateWith([25, 30, 15]);
-    expect(steepestBlockingRamp(state, tierSlopeRatio(3))?.id).toBe(2);
+    expect(steepestBlockingRamp(state, tierSlopeRatio(3))?.ramp.id).toBe(2);
   });
 
   it('ignores a ramp the limit allows even when a steeper one blocks', () => {
     const state = stateWith([20, 15]);
     expect(steepestBlockingRamp(state, tierSlopeRatio(2))).toBeNull();
-    expect(steepestBlockingRamp(state, tierSlopeRatio(3))?.id).toBe(1);
+    expect(steepestBlockingRamp(state, tierSlopeRatio(3))?.ramp.id).toBe(1);
   });
 
   it('returns null with no built ramps', () => {

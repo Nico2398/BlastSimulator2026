@@ -33,7 +33,7 @@ import { isChargeDeliveryPending } from '../mining/ExplosiveStock.js';
 import { withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { slopeDegreesForTier, tierSlopeRatio } from '../nav/ClimbLimit.js';
-import { rampSteepestGradeDegrees, steepestBlockingRamp } from '../mining/RampGrade.js';
+import { steepestBlockingRamp } from '../mining/RampGrade.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
 type OrderActorKey = string;
@@ -329,13 +329,13 @@ function rampTooSteepDetail(
 ): PendingAction['blockedDetail'] | undefined {
   const role = action.requiredVehicleRole;
   if (role === null || !reachAtFlatLimit.canReach(orderActorKey(action), action.targetX, action.targetZ)) return undefined;
-  const ramp = steepestBlockingRamp(state, tierSlopeRatio(tier));
-  if (ramp === null || state.navGrid === null) return undefined;
+  const blocking = steepestBlockingRamp(state, tierSlopeRatio(tier));
+  if (blocking === null) return undefined;
   return {
     key: 'order.blocked.ramp_too_steep',
     params: {
-      id: ramp.id,
-      grade: Math.round(rampSteepestGradeDegrees(state.navGrid, ramp) * 10) / 10,
+      id: blocking.ramp.id,
+      grade: Math.round(blocking.gradeDeg * 10) / 10,
       tier,
       role,
       max: slopeDegreesForTier(tier),

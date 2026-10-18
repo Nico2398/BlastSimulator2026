@@ -4,13 +4,19 @@ import { VEHICLE_TIER_MAX_SLOPE_DEGREES } from '../config/balance.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
 
 /** Float slack so a grade exactly at a tier's limit counts as climbable (matches isStepClimbable's epsilon spirit). */
-const GRADE_EPSILON_DEGREES = 1e-6;
+export const GRADE_EPSILON_DEGREES = 1e-6;
 
-const TIERS: readonly VehicleTier[] = [1, 2, 3];
+/** Every vehicle tier, lowest first. */
+export const VEHICLE_TIER_LIST: readonly VehicleTier[] = [1, 2, 3];
 
 /** tan of a slope in degrees. */
 export function slopeRatioForDegrees(deg: number): number {
   return Math.tan(deg * Math.PI / 180);
+}
+
+/** Angle in degrees of a rise/run slope; inverse of `slopeRatioForDegrees`. */
+export function slopeDegreesForRatio(ratio: number): number {
+  return Math.atan(ratio) * 180 / Math.PI;
 }
 
 /** Steepest climbable slope (degrees) for a tier. */
@@ -25,5 +31,5 @@ export function tierSlopeRatio(tier: VehicleTier): number {
 
 /** Tiers able to climb a grade of `gradeDeg` degrees. */
 export function tiersThatClimb(gradeDeg: number): VehicleTier[] {
-  return TIERS.filter(tier => gradeDeg <= slopeDegreesForTier(tier) + GRADE_EPSILON_DEGREES);
+  return VEHICLE_TIER_LIST.filter(tier => gradeDeg <= slopeDegreesForTier(tier) + GRADE_EPSILON_DEGREES);
 }

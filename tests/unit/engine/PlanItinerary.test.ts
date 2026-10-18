@@ -768,7 +768,7 @@ describe('planItinerary — vehicle tier climb limit (#1938)', () => {
     expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p), 5);
   });
 
-  it('a tier-2 hauler refuses 30 degrees but accepts a 20 degree ramp', () => {
+  it('a tier-2 hauler is priced over the 20 degree ramp (24 degree limit), not the 30 degree one', () => {
     const p = pit([30, 20], 2, true);
     const speed = getVehicleDefByTier('debris_hauler', 2).speed;
     expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p, tanDeg(24)), 5);
@@ -793,7 +793,7 @@ describe('planItinerary — vehicle tier climb limit (#1938)', () => {
     expect(driveTicks(pit([30], 3, false))).not.toBeNull();
   });
 
-  it('the estimate fidelity respects the limit as the exact one does', () => {
+  it('the estimate fidelity ignores the slope limit (octile heuristic) yet never undercuts the steep-route cost', () => {
     const p = pit([30, 15], 3, true);
     const exact = driveTicks(p, 'exact')!;
     const estimate = driveTicks(p, 'estimate')!;

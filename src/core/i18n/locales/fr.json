@@ -3440,7 +3440,7 @@
   "notification.order_blocked_no_reaching_vehicle": "{order} nécessite un(e) {role} de niveau {tier} et un(e) chauffeur titulaire du permis correspondant.",
   "notification.order_blocked_licence_level": "{order} nécessite le permis {licence} niveau {level}.",
   "notification.order_blocked_target_unreachable": "La cible de {order} est inaccessible — aucun chemin ne la relie au reste du site.",
-  "order.blocked.ramp_too_steep": "La rampe n°{id} fait {grade}° : trop raide pour le véhicule {role} de niveau {tier} (max {max}°).",
+  "order.blocked.ramp_too_steep": "La rampe n°{id} fait {grade}° : trop raide pour : {role} de niveau {tier} (max {max}°).",
   "notification.order_blocked_in_transit": "{order} : les explosifs sont en route, arrivée {when} (dans {duration}).",
   "notification.order_blocked_in_transit_no_eta": "{order} : les explosifs sont en route, arrivée {when}.",
   "notification.order_blocked_no_warehouse": "{order} nécessite un entrepôt de fret — construisez-en un pour stocker la roche transportée.",

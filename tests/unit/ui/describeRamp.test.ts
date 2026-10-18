@@ -28,26 +28,26 @@ describe('describeRamp', () => {
 
   it('adds the ramp grade to the detail line', () => {
     const plain = describeRamp(RAMP);
-    const withGrade = describeRamp(RAMP, { gradeDeg: 30, tiers: [1], progression: true });
+    const withGrade = describeRamp(RAMP, { gradeDeg: 30, tiers: [1] });
     expect(withGrade.sub).not.toBe(plain.sub);
     expect(withGrade.sub).toContain('30°');
   });
 
   it('names a different climbable set for a gentle ramp than for a steep one', () => {
-    const steep = describeRamp(RAMP, { gradeDeg: 30, tiers: [1], progression: true });
-    const gentle = describeRamp(RAMP, { gradeDeg: 15, tiers: [1, 2, 3], progression: true });
+    const steep = describeRamp(RAMP, { gradeDeg: 30, tiers: [1] });
+    const gentle = describeRamp(RAMP, { gradeDeg: 15, tiers: [1, 2, 3] });
     expect(gentle.sub).not.toBe(steep.sub);
     expect(gentle.sub).toContain('15°');
   });
 
   it('rounds a fractional grade for display', () => {
-    const out = describeRamp(RAMP, { gradeDeg: 17.6, tiers: [1, 2, 3], progression: true });
+    const out = describeRamp(RAMP, { gradeDeg: 17.6, tiers: [1, 2, 3] });
     expect(out.sub).toContain('18°');
     expect(out.sub).not.toContain('17.6');
   });
 
   it('leaves the title alone', () => {
-    expect(describeRamp(RAMP, { gradeDeg: 30, tiers: [1], progression: true }).title).toBe(describeRamp(RAMP).title);
+    expect(describeRamp(RAMP, { gradeDeg: 30, tiers: [1] }).title).toBe(describeRamp(RAMP).title);
   });
 
   it('ships the grade and tier lines in both locales', () => {

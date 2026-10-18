@@ -4,17 +4,16 @@ import { t } from '../core/i18n/I18n.js';
 import type { BuiltRamp } from '../core/state/GameState.js';
 import type { VehicleTier } from '../core/entities/Vehicle.js';
 
-/** Climb facts for a ramp, from core's `describeRampClimb` (#1938). */
+/** Climb facts for a ramp, from core's `describeRampClimb`, which already lists every tier off a progression site (#1938). */
 interface RampClimbText {
   gradeDeg: number;
   tiers: VehicleTier[];
-  progression: boolean;
 }
 
 const TIER_COUNT = 3;
 
-function tiersLine(tiers: readonly VehicleTier[], progression: boolean): string {
-  if (!progression || tiers.length === TIER_COUNT) return t('shell.selection.ramp_tiers_all');
+function tiersLine(tiers: readonly VehicleTier[]): string {
+  if (tiers.length === TIER_COUNT) return t('shell.selection.ramp_tiers_all');
   if (tiers.length === 0) return t('shell.selection.ramp_tiers_none');
   return t('shell.selection.ramp_tiers', { tiers: tiers.join(', ') });
 }
@@ -24,7 +23,7 @@ export function describeRamp(ramp: BuiltRamp, opts?: RampClimbText): { title: st
   const base = t('shell.selection.ramp_sub', { id: ramp.id, width: ramp.width, length: ramp.def.length });
   const climb = opts === undefined ? [] : [
     t('shell.selection.ramp_grade', { grade: Math.round(opts.gradeDeg) }),
-    tiersLine(opts.tiers, opts.progression),
+    tiersLine(opts.tiers),
   ];
   return {
     title: t('shell.selection.ramp_title', { width: ramp.width }),

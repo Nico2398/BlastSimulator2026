@@ -41,7 +41,7 @@ export const rampContent: KindContent = {
     if (!ramp) return null;
     const progression = isProgressionSite(state);
     const desc = describeRamp(ramp, state.navGrid === null ? undefined : {
-      ...describeRampClimb(state.navGrid, ramp, progression), progression,
+      ...describeRampClimb(state.navGrid, ramp, progression),
     });
     const widen = widenState(ramp, state.plannedRamps, state.cash);
     const actions: ActionSpec[] = widen.cost === null ? [] : [{

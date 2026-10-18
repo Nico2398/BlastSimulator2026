@@ -457,7 +457,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid, avoidVehicles,
-    ...(isDrive && { maxSlopeRatio: vehicleMaxSlopeRatio(vehicle!, isProgressionSite(state)) }),
+    ...(isDrive && { maxSlopeRatio: driveLimitsOf(state, vehicle!).maxSlopeRatio }),
     committed: readCommitted(emp),
     ...readMoveHistory(emp),
     mover, occupancy: state.agentOccupancy!,
@@ -774,7 +774,7 @@ function applyReroutedAdvance(
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: 0, isStuck: false,
     path,
-    ...(isDrive && { maxSlopeRatio: vehicleMaxSlopeRatio(vehicle!, isProgressionSite(state)) }),
+    ...(isDrive && { maxSlopeRatio: driveLimitsOf(state, vehicle!).maxSlopeRatio }),
     // A reroute (or a crossing) is trusted immediately — never compared
     // against a stale pre-block route commitment or move history.
     committed: NULL_ROUTE_COMMITMENT,
