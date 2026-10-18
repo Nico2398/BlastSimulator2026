@@ -1,0 +1,88 @@
+{
+  "name": "explosive-delivery-transit-visual",
+  "description": "Explosive delivery wait (#1895), observed: with no warehouse stock a charge order is paid at once and sits in transit; the Charge step shows the in-transit arrival line (delivery-transit) beside the paid-from line.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true cash:150000",
+      "description": "Staffed opening, no warehouse.",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true cash:150000"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:8 diameter:0.089 start:15,15"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:1 max_ticks:300",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ]
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "Order a charge with no stock: paid from cash, delivered later.",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "The Charge step shows the delivery-transit line (arrival tick and remaining ticks) while the order is in transit.",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-info=\"delivery-transit\"]"
+        },
+        {
+          "type": "mousemove",
+          "x": 200,
+          "y": 520
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": 600
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    }
+  ]
+}
