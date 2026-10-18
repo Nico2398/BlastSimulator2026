@@ -29,7 +29,12 @@ export type EventEffectSpec =
   | { type: 'vehicle_breakdown'; hpLoss: number; hours: number }
   | { type: 'building_closed'; hours: number }
   | { type: 'forced_weather'; weather: WeatherState; hours: number }
-  | { type: 'event_weight'; category: EventCategory; factor: number; days: number };
+  | { type: 'event_weight'; category: EventCategory; factor: number; days: number }
+  | { type: 'permit_processing'; action: 'shift'; ticks: number; next?: boolean; safetyMin?: number; ticksBelow?: number }
+  | { type: 'permit_processing'; action: 'approve'; feePct: number };
+
+/** Either permit-processing spec: shifts or approves the pending permit application. */
+export type PermitProcessingSpec = Extract<EventEffectSpec, { type: 'permit_processing' }>;
 
 type ModifierDraft = Omit<ActiveModifier, 'id'>;
 

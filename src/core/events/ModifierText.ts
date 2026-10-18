@@ -6,6 +6,11 @@ import { ALL_WEATHER_STATES } from '../weather/WeatherCycle.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import { t } from '../i18n/I18n.js';
 
+/** A tick count with an explicit sign, e.g. "+48" or "-24". */
+export function signedTicks(n: number): string {
+  return n > 0 ? `+${n}` : String(n);
+}
+
 /** The number or name a modifier's label shows, by kind. */
 function labelValue(m: ActiveModifier): string {
   switch (m.kind) {
@@ -14,6 +19,7 @@ function labelValue(m: ActiveModifier): string {
     case 'forced_weather': return t(`hud.weather.${ALL_WEATHER_STATES[m.magnitude] ?? 'sunny'}`);
     case 'event_weight': return `${t(`ui.event.category.${m.category ?? 'union'}`)} ×${m.magnitude.toFixed(2)}`;
     case 'work_stoppage': case 'blast_ban': case 'haul_pause': case 'drill_ban': case 'out_of_service': return '';
+    case 'permit_delay': return signedTicks(m.magnitude);
     default: return `×${m.magnitude.toFixed(2)}`;
   }
 }
