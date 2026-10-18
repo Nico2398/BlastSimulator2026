@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import {
-  ContractsPanel, deliverableAmountKg, orderOffers, CONTRACT_OFFER_CARD_PX, AVAILABLE_VISIBLE_CARDS, SECTION_GAP_PX,
+  ContractsPanel, deliverableAmountKg, orderOffers, summarizeActive, CONTRACT_OFFER_CARD_PX, AVAILABLE_VISIBLE_CARDS, SECTION_GAP_PX,
 } from '../../../../src/ui/panels/ContractsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { t } from '../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
@@ -1235,5 +1235,210 @@ describe('ContractsPanel layout (#1970)', () => {
       expect(w.style.overflowY).toBe('auto');
       expect(w.style.maxHeight).toMatch(/^\d+px$/);
     }
+  });
+});
+
+describe('summarizeActive (#1983)', () => {
+  it('returns null for an empty list', () => {
+    expect(summarizeActive([], 10)).toBeNull();
+  });
+
+  it('counts contracts and sums penalties', () => {
+    const s = summarizeActive([
+      makeContract({ id: 1, penaltyAmount: 90 }),
+      makeContract({ id: 2, penaltyAmount: 10 }),
+    ], 0);
+    expect(s).not.toBeNull();
+    expect(s!.count).toBe(2);
+    expect(s!.penaltyTotal).toBe(100);
+  });
+
+  it('takes the earliest deadline, in the same hour unit as the card time-left', () => {
+    const s = summarizeActive([
+      makeContract({ id: 1, acceptedAtTick: 0, deadlineTicks: 50 }),
+      makeContract({ id: 2, acceptedAtTick: 10, deadlineTicks: 20 }),
+    ], 12);
+    expect(s!.nextDeadlineHours).toBe(18);
+  });
+
+  it('floors an overdue deadline at 0', () => {
+    const s = summarizeActive([makeContract({ acceptedAtTick: 0, deadlineTicks: 5 })], 99);
+    expect(s!.nextDeadlineHours).toBe(0);
+  });
+
+  it('excludes rubble_disposal penalties; rubble-only totals 0', () => {
+    const rubble = makeContract({ id: 2, type: 'rubble_disposal', materialId: '', penaltyAmount: 500 });
+    expect(summarizeActive([makeContract({ id: 1, penaltyAmount: 90 }), rubble], 0)!.penaltyTotal).toBe(90);
+    const only = summarizeActive([rubble], 0)!;
+    expect(only.penaltyTotal).toBe(0);
+    expect(only.count).toBe(1);
+  });
+});
+
+describe('ContractsPanel — running-contracts summary strip (#1983)', () => {
+  const STRIP = '.bs-contract-active-summary';
+  const stripOf = (panel: ContractsPanel): HTMLElement | null => getBodyEl(panel).querySelector<HTMLElement>(`:scope > ${STRIP}`);
+
+  function runningState(): GameState {
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100;
+    state.tickCount = 10;
+    state.contracts.active.push(
+      makeContract({ id: 21, acceptedAtTick: 0, deadlineTicks: 52, penaltyAmount: 1234 }),
+      makeContract({ id: 22, acceptedAtTick: 0, deadlineTicks: 100, penaltyAmount: 4000 }),
+    );
+    for (let i = 1; i <= 8; i++) state.contracts.available.push(makeContract({ id: i, quantityKg: i % 2 ? 100 : 900 }));
+    return state;
+  }
+
+  it('renders a goto-active button strip as a direct child of the body, before Available header and cards', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const strip = stripOf(panel)!;
+    expect(strip).not.toBeNull();
+    expect(strip.matches('button[data-action="goto-active"]') || strip.querySelector('button[data-action="goto-active"]') !== null).toBe(true);
+    const kids = Array.from(getBodyEl(panel).children) as HTMLElement[];
+    const stripIdx = kids.indexOf(strip);
+    const availHeader = kids.findIndex(k => k.classList.contains('bsx-section') && (k.textContent ?? '').includes(AVAILABLE_LABEL));
+    const firstCard = kids.findIndex(k => k.querySelector('[data-contract-id]') !== null || k.hasAttribute('data-contract-id'));
+    expect(availHeader).toBeGreaterThan(stripIdx);
+    expect(firstCard).toBeGreaterThan(stripIdx);
+  });
+
+  it('is not a section header and sits outside every scroll-keyed section', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const strip = stripOf(panel)!;
+    expect(strip.classList.contains('bsx-section')).toBe(false);
+    expect(strip.closest('[data-scroll-key]')).toBeNull();
+    expect(strip.querySelector('[data-scroll-key]')).toBeNull();
+    expect((Array.from(getBodyEl(panel).children) as HTMLElement[]).filter(c => c.classList.contains('bsx-section'))).toHaveLength(3);
+  });
+
+  it('shows count, hours to the next deadline and the penalty total', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const text = stripOf(panel)!.textContent ?? '';
+    expect(text).toContain('2');
+    expect(text).toContain('42');
+    expect(text).toContain(formatMoney(5234));
+  });
+
+  it('omits penalty text when only rubble contracts run', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 9, type: 'rubble_disposal', materialId: '', penaltyAmount: 777 }));
+    panel.show();
+    panel.update(state);
+    const text = stripOf(panel)!.textContent ?? '';
+    expect(text).not.toContain(formatMoney(777));
+    expect(text).not.toContain(t('ui.contracts.penalty_line', { amount: formatMoney(0) }));
+  });
+
+  it('is absent with nothing running, and the Active empty state still renders', () => {
+    const { panel } = makePanel();
+    panel.show();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 1 }));
+    panel.update(state);
+    expect(stripOf(panel)).toBeNull();
+    expect(panel.root.querySelector(STRIP)).toBeNull();
+    expect(sectionChildren(getBodyEl(panel), ACTIVE_LABEL)).toHaveLength(1);
+    expect(panel.root.textContent).toContain(t('ui.contracts.none_active'));
+  });
+
+  it('leaves Available unchanged with 2 running and 8 offers: cap, count, fillable-first', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const wrapper = panel.root.querySelector<HTMLElement>('[data-scroll-key="available"]')!;
+    expect(parseInt(wrapper.style.maxHeight, 10)).toBeGreaterThanOrEqual(3 * CONTRACT_OFFER_CARD_PX + 2 * SECTION_GAP_PX);
+    expect(wrapper.style.overflowY).toBe('auto');
+    const header = (Array.from(getBodyEl(panel).children) as HTMLElement[]).find(c => c.classList.contains('bsx-section') && (c.textContent ?? '').includes(AVAILABLE_LABEL))!;
+    expect(header.textContent).toContain(t('ui.contracts.available_count', { count: 8 }));
+    const ids = Array.from(wrapper.querySelectorAll<HTMLElement>('[data-contract-id]')).map(n => n.dataset['contractId']);
+    expect(ids).toEqual(['1', '3', '5', '7', '2', '4', '6', '8']);
+  });
+
+  it('updates the hours on a tick without a re-render, keeping typed amount and scrollTop', () => {
+    const { panel } = makePanel();
+    const state = runningState();
+    panel.show();
+    panel.update(state);
+    const strip = stripOf(panel)!;
+    const input = panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!;
+    input.value = '12.5';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const avail = panel.root.querySelector<HTMLElement>('[data-scroll-key="available"]')!;
+    avail.scrollTop = 40;
+
+    state.tickCount += 5;
+    panel.update(state);
+
+    const after = stripOf(panel)!;
+    expect(after.textContent).toContain('37');
+    expect(after.textContent).not.toContain('42');
+    expect(panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!.value).toBe('12.5');
+    expect(panel.root.querySelector<HTMLElement>('[data-scroll-key="available"]')!.scrollTop).toBe(40);
+    void strip;
+  });
+
+  it('click scrolls the Active section header into view without throwing', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const original = Element.prototype.scrollIntoView;
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    try {
+      const target = stripOf(panel)!;
+      const button = target.matches('button') ? target : target.querySelector<HTMLElement>('button[data-action="goto-active"]')!;
+      expect(() => button.click()).not.toThrow();
+      expect(spy).toHaveBeenCalledTimes(1);
+      const scrolled = spy.mock.contexts[0] as HTMLElement;
+      const activeWrapper = panel.root.querySelector<HTMLElement>('[data-scroll-key="active"]')!;
+      const kids = Array.from(getBodyEl(panel).children) as HTMLElement[];
+      const activeHeader = kids[kids.indexOf(activeWrapper) - 1]!;
+      expect(scrolled === activeHeader || scrolled === activeWrapper).toBe(true);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it('click does not throw when scrollIntoView is unavailable (jsdom)', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(runningState());
+    const target = stripOf(panel)!;
+    const button = target.matches('button') ? target : target.querySelector<HTMLElement>('button[data-action="goto-active"]')!;
+    expect(() => button.click()).not.toThrow();
+  });
+
+  it('re-renders the strip in French after refreshLocale', () => {
+    const { panel } = makePanel();
+    const state = runningState();
+    panel.show();
+    panel.update(state);
+    const en = stripOf(panel)!.textContent;
+    try {
+      setLocale('fr');
+      panel.refreshLocale();
+      panel.update(state);
+      const fr = stripOf(panel)!.textContent ?? '';
+      expect(fr).not.toBe(en);
+      expect(fr).toContain('42');
+      expect(fr).toContain(formatMoney(5234));
+      expect(fr).toContain(t('ui.contracts.active_summary', { count: 2, hours: 42 }));
+    } finally {
+      setLocale('en');
+    }
+  });
+
+  it('has an English active_summary key carrying count and hours', () => {
+    setLocale('en');
+    expect(t('ui.contracts.active_summary', { count: 3, hours: 17 })).toBe('Running · 3 · next deadline in 17h');
   });
 });
