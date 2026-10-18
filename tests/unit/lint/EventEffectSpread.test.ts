@@ -97,7 +97,7 @@ describe('event effect spread (#1538)', () => {
 
   it('every catalog kind, and cost_factor survey and research, is used by at least one event (#1958)', () => {
     const specs = events.flatMap(specsOf);
-    const used = new Set(specs.map(s => s.type));
+    const used = new Set<string>(specs.map(s => s.type));
     const unused = [...CATALOG_KINDS].filter(k => !used.has(k));
     expect(unused, `catalog kinds no event uses: ${unused.join(', ')}`).toEqual([]);
     for (const what of ['survey', 'research'] as const) {
