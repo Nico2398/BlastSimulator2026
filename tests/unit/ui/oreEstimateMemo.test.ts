@@ -4,19 +4,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../src/core/mining/BlastValueEstimate.js', () => ({
-  estimateBlastOreValue: vi.fn(() => 42),
+  estimateBlastOre: vi.fn(() => ({ value: 42, coverage: 0.5 })),
 }));
 vi.mock('../../../src/core/mining/WetHoles.js', () => ({
   wetHoleIdsFor: vi.fn(() => new Set<string>()),
 }));
 
 import { OreEstimateMemo } from '../../../src/ui/panels/oreEstimateMemo.js';
-import { estimateBlastOreValue } from '../../../src/core/mining/BlastValueEstimate.js';
+import { estimateBlastOre } from '../../../src/core/mining/BlastValueEstimate.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 
-const estimate = vi.mocked(estimateBlastOreValue);
+const estimate = vi.mocked(estimateBlastOre);
 
 function stateWith(surveys: Array<{ id: number; completedTick: number; stale?: boolean }>): GameState {
   return { surveyResults: surveys, contracts: {} } as unknown as GameState;
@@ -30,7 +30,7 @@ describe('OreEstimateMemo', () => {
   beforeEach(() => { estimate.mockClear(); });
 
   it('returns 0 without a grid and does not estimate', () => {
-    expect(new OreEstimateMemo().get(stateWith([]), planWith(1), null)).toBe(0);
+    expect(new OreEstimateMemo().get(stateWith([]), planWith(1), null)).toEqual({ value: 0, coverage: 0 });
     expect(estimate).not.toHaveBeenCalled();
   });
 
@@ -39,8 +39,8 @@ describe('OreEstimateMemo', () => {
     const grid = new VoxelGrid(16, 16);
     const state = stateWith([]);
     const plan = planWith(1);
-    expect(memo.get(state, plan, grid)).toBe(42);
-    memo.get(state, plan, grid);
+    expect(memo.get(state, plan, grid)).toEqual({ value: 42, coverage: 0.5 });
+    expect(memo.get(state, plan, grid)).toEqual({ value: 42, coverage: 0.5 });
     expect(estimate).toHaveBeenCalledTimes(1);
   });
 
@@ -82,5 +82,24 @@ describe('OreEstimateMemo', () => {
     memo.get(state, plan, new VoxelGrid(16, 16));
     memo.get(state, plan, new VoxelGrid(16, 16));
     expect(estimate).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns the coverage from the estimate, on a fresh compute and a cached read', () => {
+    estimate.mockReturnValueOnce({ value: 7, coverage: 0.25 });
+    const memo = new OreEstimateMemo();
+    const grid = new VoxelGrid(16, 16);
+    const state = stateWith([]);
+    const plan = planWith(1);
+    expect(memo.get(state, plan, grid)).toEqual({ value: 7, coverage: 0.25 });
+    expect(memo.get(state, plan, grid)).toEqual({ value: 7, coverage: 0.25 });
+  });
+
+  it('recomputes coverage when a survey changes while holes stay put', () => {
+    estimate.mockReturnValueOnce({ value: 0, coverage: 0 }).mockReturnValueOnce({ value: 5, coverage: 1 });
+    const memo = new OreEstimateMemo();
+    const grid = new VoxelGrid(16, 16);
+    const plan = planWith(1);
+    expect(memo.get(stateWith([]), plan, grid).coverage).toBe(0);
+    expect(memo.get(stateWith([{ id: 1, completedTick: 3 }]), plan, grid)).toEqual({ value: 5, coverage: 1 });
   });
 });

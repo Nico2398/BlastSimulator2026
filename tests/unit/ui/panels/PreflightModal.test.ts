@@ -8,6 +8,7 @@ import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { readFileSync } from 'node:fs';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
+import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -496,5 +497,61 @@ describe('PreflightModal — button names (#1749)', () => {
     modal.update(state, 'sunny');
     expect(buttonText(modal.root, 'preflight-fire-anyway')).toBe(fireAnyway);
     expect(buttonText(modal.root, 'preflight-cancel-detonation')).toBe(cancel);
+  });
+});
+
+describe('PreflightModal ore estimate coverage (#1960)', () => {
+  function estValueText(modal: PreflightModal): string {
+    const label = [...modal.root.querySelectorAll('*')]
+      .find(n => n.children.length === 0 && n.textContent === t('ui.blast_workshop.preflight.stat_value'));
+    if (!label) throw new Error('no est value stat');
+    return label.nextElementSibling?.textContent ?? label.parentElement?.textContent ?? '';
+  }
+
+  function open(survey: 'none' | 'half' | 'full' | 'stale'): PreflightModal {
+    setLocale('en');
+    const { modal } = makeModal();
+    const grid = makeOreGrid();
+    modal.setGridProvider(() => grid);
+    const state = makeState();
+    addChargedPattern(state, holeCounter);
+    if (survey === 'half') state.surveyResults.push(makeCoverageSurvey(0, 20));
+    if (survey === 'full') state.surveyResults.push(makeCoverageSurvey(0, 39));
+    if (survey === 'stale') state.surveyResults.push({ ...makeCoverageSurvey(0, 39), stale: true });
+    modal.show();
+    modal.update(state, 'sunny');
+    return modal;
+  }
+
+  it('without a survey the est. value reads "No survey", not $0', () => {
+    const modal = open('none');
+    expect(estValueText(modal)).toContain('No survey');
+    expect(estValueText(modal)).not.toMatch(/\$/);
+  });
+
+  it('a stale-only survey reads as "No survey"', () => {
+    expect(estValueText(open('stale'))).toContain('No survey');
+  });
+
+  it('partial coverage shows the dollar value and "N% surveyed"', () => {
+    const text = estValueText(open('half'));
+    expect(text).toMatch(/\$/);
+    expect(text).toMatch(/\b\d{1,2}% surveyed/);
+    expect(text).not.toContain('No survey');
+  });
+
+  it('full coverage shows the dollar value alone', () => {
+    const text = estValueText(open('full'));
+    expect(text).toMatch(/\$[\d,.]+/);
+    expect(text).not.toContain('surveyed');
+    expect(text).not.toContain('No survey');
+  });
+
+  it('plan cost is unchanged by coverage and Detonate stays enabled', () => {
+    for (const s of ['none', 'half', 'full'] as const) {
+      const modal = open(s);
+      expect((modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement).disabled).toBe(false);
+      expect(modal.root.textContent).toContain('$');
+    }
   });
 });
