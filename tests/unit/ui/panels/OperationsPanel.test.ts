@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OperationsPanel, countQueuedByBlock } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { createRunner } from '../../../../src/console-api.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { buildBlockedOrderMessage } from '../../../../src/ui/notify/blockedOrders.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../../../src/core/state/GameState.js';
@@ -1068,6 +1069,129 @@ describe('OperationsPanel — grouped debris queue (#1972)', () => {
     it('renders far fewer DOM nodes at 2,500 orders than one row per order', () => {
       const { panel } = openPanel(debrisState(2000, 500));
       expect(panel.root.querySelectorAll('*').length).toBeLessThan(2500);
+    });
+  });
+});
+
+describe('OperationsPanel — grouped debris queue, review fixes (#1972)', () => {
+  const expandHaul = (panel: OperationsPanel) =>
+    (panel.root.querySelector('[data-debris-toggle="haul_debris"]') as HTMLElement).click();
+
+  it('refreshes "Unclaimed Work" when only a queued rest order appears (not a queue row)', () => {
+    const state = makeState();
+    state.pendingActions.push(makePendingActionFixture({ id: 1 }));
+    const { panel } = openPanel(state);
+    expect(panel.root.textContent).toContain(t('ui.operations.unclaimed_work_count', { count: 1 }));
+    state.pendingActions.push(makePendingActionFixture({ id: 2, type: 'rest' }));
+    panel.update(state);
+    expect(panel.root.textContent).toContain(t('ui.operations.unclaimed_work_count', { count: 2 }));
+  });
+
+  it('an expanded debris row still shows the out-of-reach chip and reason', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 3, 100);
+    state.pendingActions[0]!.blockedReason = 'debris_out_of_reach';
+    const { panel } = openPanel(state);
+    expandHaul(panel);
+    const reason = panel.root.querySelector('[data-blocked-reason="debris_out_of_reach"]');
+    expect(reason).not.toBeNull();
+    expect(reason!.parentElement!.textContent).toContain(t('ui.operations.work_queue_status_stranded'));
+    expect(reason!.textContent).toBe(buildBlockedOrderMessage(state.pendingActions[0]!));
+  });
+
+  it('shows the positive empty state when there are no orders at all', () => {
+    const { panel } = openPanel(makeState());
+    expect(panel.root.textContent).toContain(t('ui.operations.work_queue_empty'));
+  });
+
+  it('re-clamps the expanded page when the last page empties', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 26, 100);
+    const { panel } = openPanel(state);
+    expandHaul(panel);
+    (panel.root.querySelector('[data-debris-page="next"]') as HTMLElement).click();
+    expect(panel.root.querySelector('[data-cancel-action="125"]')).not.toBeNull();
+    state.pendingActions = state.pendingActions.filter(a => a.id !== 125);
+    panel.update(state);
+    expect(panel.root.querySelector('[data-cancel-action="100"]')).not.toBeNull();
+    expect(panel.root.querySelector('[data-cancel-action="124"]')).not.toBeNull();
+    expect((panel.root.querySelector('[data-debris-page="next"]') as HTMLButtonElement).disabled).toBe(true);
+    expect((panel.root.querySelector('[data-debris-page="prev"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('summary counts assigned as working and shows a queued part for open orders', () => {
+    const state = makeState();
+    debrisOrders(state, 'haul_debris', 4, 100);
+    state.pendingActions[0]!.status = 'assigned';
+    state.pendingActions[0]!.holderId = 2;
+    state.pendingActions[1]!.status = 'in_progress';
+    state.pendingActions[1]!.holderId = 3;
+    state.pendingActions[2]!.blockedReason = 'no_vehicle_in_fleet';
+    const { panel } = openPanel(state);
+    const text = summary(panel, 'haul_debris').textContent ?? '';
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_in_progress', { count: 2 }));
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_queued', { count: 1 }));
+    expect(text).toContain(t('ui.operations.work_queue_debris_status_part_blocked', { count: 1 }));
+  });
+
+  it('confirm body names the count and the label', () => {
+    const { panel } = openPanel(debrisState(4, 0));
+    const handler = vi.fn();
+    panel.setConfirmHandler(handler);
+    (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
+    expect(handler.mock.calls[0]![0].body).toBe(
+      t('ui.operations.work_queue_debris_confirm_body', { count: 4, label: t('ui.crew.action_haul_debris') }));
+  });
+
+  describe('cost', () => {
+    function timePerUpdate(state: GameState, panel: OperationsPanel, rounds: number): number {
+      panel.update(state);
+      const t0 = performance.now();
+      for (let i = 0; i < rounds; i++) {
+        const a = state.pendingActions.find(x => x.id === 10000 + i)!;
+        a.status = 'in_progress';
+        a.holderId = 4;
+        panel.update(state);
+      }
+      return (performance.now() - t0) / rounds;
+    }
+
+    it('an update with the group expanded at 2,500 orders is not far above the same update at 50', () => {
+      const big = debrisState(2000, 500);
+      const small = debrisState(40, 10);
+      const bigCtx = openPanel(big);
+      const smallCtx = openPanel(small);
+      expandHaul(bigCtx.panel);
+      expandHaul(smallCtx.panel);
+      timePerUpdate(big, bigCtx.panel, 3);
+      timePerUpdate(small, smallCtx.panel, 3);
+      const bigMs = timePerUpdate(big, bigCtx.panel, 20);
+      const smallMs = timePerUpdate(small, smallCtx.panel, 20);
+      // Measured ~14.6 ms/update at 2,500 orders vs ~13 ms at 50 (jsdom): the floor is the fixed sections, not the orders.
+      expect(bigMs).toBeLessThan(Math.max(smallMs, 0.2) * 100);
+      expect(bigMs).toBeLessThan(100);
+    });
+
+    it('confirming a 2,500-order group cancel through the real console stays within a generous budget', () => {
+      const { runner, ctx } = createRunner();
+      runner.run('new_game mine_type:desert seed:1 size:32');
+      const state = ctx.state!;
+      debrisOrders(state, 'haul_debris', 2500, 10000);
+      const { panel } = makePanel();
+      panel.show();
+      // The browser updates every panel after each command (main.ts afterGameCommand); mirror that here.
+      panel.setGameConsole(cmd => { const r = runner.run(cmd); panel.update(ctx.state!); return r; });
+      panel.update(state);
+      const handler = vi.fn();
+      panel.setConfirmHandler(handler);
+      (panel.root.querySelector('[data-cancel-debris-group="haul_debris"]') as HTMLElement).click();
+      const t0 = performance.now();
+      handler.mock.calls[0]![0].onConfirm();
+      const totalMs = performance.now() - t0;
+      expect(ctx.state!.pendingActions.filter(a => a.type === 'haul_debris').length).toBe(0);
+      expect(panel.root.querySelector('[data-debris-toggle="haul_debris"]')).toBeNull();
+      // Measured ~30 ms with the panel's own repaints suppressed during the loop (~6.3 s when it repainted per command).
+      expect(totalMs).toBeLessThan(2000);
     });
   });
 });

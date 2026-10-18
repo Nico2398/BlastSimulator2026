@@ -2,7 +2,7 @@
 // BlastSimulator2026 — blocked-order wording and classification branches (#1938)
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { buildBlockedOrderMessage, isFailureBlock, isInTransitBlock } from '../../../src/ui/notify/blockedOrders.js';
+import { buildBlockedOrderMessage, isFailureBlock, isInTransitBlock, classifyQueuedBlock } from '../../../src/ui/notify/blockedOrders.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 
@@ -100,5 +100,12 @@ describe('block classification', () => {
   it('isInTransitBlock matches only explosives_in_transit', () => {
     expect(isInTransitBlock({ blockedReason: 'explosives_in_transit' })).toBe(true);
     expect(isInTransitBlock({ blockedReason: 'storage_full' })).toBe(false);
+  });
+
+  it('classifyQueuedBlock sorts a queued order into open, inTransit, blocked or stranded', () => {
+    expect(classifyQueuedBlock({ blockedReason: null })).toBe('open');
+    expect(classifyQueuedBlock({ blockedReason: 'explosives_in_transit' })).toBe('inTransit');
+    expect(classifyQueuedBlock({ blockedReason: 'no_vehicle_in_fleet' })).toBe('blocked');
+    expect(classifyQueuedBlock({ blockedReason: 'debris_out_of_reach' })).toBe('stranded');
   });
 });

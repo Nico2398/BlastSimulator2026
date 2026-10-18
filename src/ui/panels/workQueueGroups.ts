@@ -1,15 +1,18 @@
 /** Pure grouping model for the Operations work queue (#1972): auto-debris orders collapse into one row per type. */
-import type { ActionType, PendingAction } from '../../core/state/GameState.js';
-import { isAutoDebrisAction } from '../../core/economy/HaulDispatch.js';
-import { isFailureBlock, isInTransitBlock } from '../notify/blockedOrders.js';
+import type { PendingAction } from '../../core/state/GameState.js';
+import { isAutoDebrisAction, type AutoDebrisActionType } from '../../core/economy/HaulDispatch.js';
+import { classifyQueuedBlock, isInTransitBlock } from '../notify/blockedOrders.js';
 
 export const DEBRIS_GROUP_PAGE_SIZE = 25;
 
 export interface DebrisGroup {
-  type: 'haul_debris' | 'fragment_debris';
+  type: AutoDebrisActionType;
   ids: number[];
   total: number;
+  /** Every queued order, including the blocked, stranded and in-transit ones counted below. */
   queued: number;
+  /** Queued orders with no block. */
+  open: number;
   assigned: number;
   inProgress: number;
   blocked: number;
@@ -25,17 +28,16 @@ export interface WorkQueueModel {
 /** One pass: splits player orders from auto-debris groups, dropping 'rest'. */
 export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueueModel {
   const player: PendingAction[] = [];
-  const groups = new Map<DebrisGroup['type'], DebrisGroup>();
+  const groups = new Map<AutoDebrisActionType, DebrisGroup>();
   for (const a of actions) {
     if (!isAutoDebrisAction(a.type)) {
       if (a.type !== 'rest') player.push(a);
       continue;
     }
-    const type = a.type as DebrisGroup['type'];
-    let g = groups.get(type);
+    let g = groups.get(a.type);
     if (!g) {
-      g = { type, ids: [], total: 0, queued: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0 };
-      groups.set(type, g);
+      g = { type: a.type, ids: [], total: 0, queued: 0, open: 0, assigned: 0, inProgress: 0, blocked: 0, stranded: 0, inTransit: 0 };
+      groups.set(a.type, g);
     }
     g.ids.push(a.id);
     g.total++;
@@ -43,43 +45,56 @@ export function partitionWorkQueue(actions: readonly PendingAction[]): WorkQueue
     else if (a.status === 'in_progress') g.inProgress++;
     else {
       g.queued++;
-      if (a.blockedReason != null) {
-        if (isInTransitBlock(a)) g.inTransit++;
-        else if (isFailureBlock(a)) g.blocked++;
-        else g.stranded++;
-      }
+      g[classifyQueuedBlock(a)]++;
     }
   }
   const debris = [...groups.values()];
+  // pendingActions is normally id-ordered (already sorted: linear); the sort guarantees ascending ids for paging.
   for (const g of debris) g.ids.sort((x, y) => x - y);
   return { player, debris };
 }
 
 /** Counts-only signature of a group (no ids). */
 export function debrisGroupSignature(group: DebrisGroup): string {
-  return `${group.type}:${group.total}:${group.queued}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}`;
+  return `${group.type}:${group.total}:${group.queued}:${group.open}:${group.assigned}:${group.inProgress}:${group.blocked}:${group.stranded}:${group.inTransit}`;
 }
 
-/** Signature of the player rows; `tick` included for time-dependent display. */
-export function playerRowsSignature(player: readonly PendingAction[], tick: number): string {
+/** Signature of a list of order rows (player orders, or one expanded debris page); `tick` included for time-dependent display. */
+export function orderRowsSignature(rows: readonly PendingAction[], tick: number): string {
   let sig = '';
   let inTransit = false;
-  for (const a of player) {
+  for (const a of rows) {
     sig += `${a.id}:${a.status}:${a.holderId}:${a.blockedReason ?? ''};`;
     if (a.status === 'queued' && isInTransitBlock(a)) inTransit = true;
   }
   return inTransit ? `${sig}@${tick}` : sig;
 }
 
-/** One page (0-based, clamped) of a debris type's orders for the expanded group. */
-export function debrisPage(
-  actions: readonly PendingAction[],
-  type: ActionType,
-  page: number,
-): { rows: PendingAction[]; pageCount: number } {
-  const all = actions.filter(a => a.type === type).sort((x, y) => x.id - y.id);
-  const pageCount = Math.ceil(all.length / DEBRIS_GROUP_PAGE_SIZE);
-  const clamped = Math.min(Math.max(0, Math.trunc(page) || 0), Math.max(0, pageCount - 1));
-  const from = clamped * DEBRIS_GROUP_PAGE_SIZE;
-  return { rows: all.slice(from, from + DEBRIS_GROUP_PAGE_SIZE), pageCount };
+/** Number of pages a group of `total` orders spans. */
+export function debrisPageCount(total: number): number {
+  return Math.ceil(total / DEBRIS_GROUP_PAGE_SIZE);
+}
+
+/** Clamps a 0-based page into [0, last page] of a group of `total` orders. */
+export function clampDebrisPage(page: number, total: number): number {
+  return Math.min(Math.max(0, Math.trunc(page) || 0), Math.max(0, debrisPageCount(total) - 1));
+}
+
+/** The orders of one (already clamped) page of a group, in ascending id order: one pass over `actions`, ids come from the group. */
+export function debrisPageRows(actions: readonly PendingAction[], group: DebrisGroup, page: number): PendingAction[] {
+  const from = page * DEBRIS_GROUP_PAGE_SIZE;
+  const wanted = new Set(group.ids.slice(from, from + DEBRIS_GROUP_PAGE_SIZE));
+  const found = new Map<number, PendingAction>();
+  for (const a of actions) {
+    if (wanted.has(a.id)) {
+      found.set(a.id, a);
+      if (found.size === wanted.size) break;
+    }
+  }
+  const rows: PendingAction[] = [];
+  for (const id of wanted) {
+    const a = found.get(id);
+    if (a) rows.push(a);
+  }
+  return rows;
 }

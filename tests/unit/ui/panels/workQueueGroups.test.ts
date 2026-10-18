@@ -4,8 +4,11 @@ import {
   DEBRIS_GROUP_PAGE_SIZE,
   partitionWorkQueue,
   debrisGroupSignature,
-  playerRowsSignature,
-  debrisPage,
+  orderRowsSignature,
+  debrisPageRows,
+  debrisPageCount,
+  clampDebrisPage,
+  type DebrisGroup,
 } from '../../../../src/ui/panels/workQueueGroups.js';
 import type { ActionType, PendingAction } from '../../../../src/core/state/GameState.js';
 
@@ -84,6 +87,7 @@ describe('partitionWorkQueue', () => {
     expect(g.stranded).toBe(1);
     expect(g.blocked).toBe(2);
     expect(g.inTransit).toBe(1);
+    expect(g.open).toBe(1);
   });
 
   it('ignores a stale blockedReason on a non-queued order', () => {
@@ -145,58 +149,64 @@ describe('debrisGroupSignature', () => {
   });
 });
 
-describe('playerRowsSignature', () => {
+describe('orderRowsSignature', () => {
   it('is stable for equal input', () => {
-    expect(playerRowsSignature([act(1)], 5)).toBe(playerRowsSignature([act(1)], 5));
+    expect(orderRowsSignature([act(1)], 5)).toBe(orderRowsSignature([act(1)], 5));
   });
 
   it('differs for empty vs non-empty', () => {
-    expect(playerRowsSignature([], 0)).not.toBe(playerRowsSignature([act(1)], 0));
+    expect(orderRowsSignature([], 0)).not.toBe(orderRowsSignature([act(1)], 0));
   });
 
   it('changes with status, holder and blocked reason', () => {
-    const base = playerRowsSignature([act(1)], 0);
-    expect(playerRowsSignature([act(1, { status: 'in_progress', holderId: 2 })], 0)).not.toBe(base);
-    expect(playerRowsSignature([act(1, { holderId: 2 })], 0)).not.toBe(base);
-    expect(playerRowsSignature([act(1, { blockedReason: 'no_vehicle_in_fleet' })], 0)).not.toBe(base);
+    const base = orderRowsSignature([act(1)], 0);
+    expect(orderRowsSignature([act(1, { status: 'in_progress', holderId: 2 })], 0)).not.toBe(base);
+    expect(orderRowsSignature([act(1, { holderId: 2 })], 0)).not.toBe(base);
+    expect(orderRowsSignature([act(1, { blockedReason: 'no_vehicle_in_fleet' })], 0)).not.toBe(base);
   });
 
   it('changes with order and with ids', () => {
-    expect(playerRowsSignature([act(1), act(2)], 0)).not.toBe(playerRowsSignature([act(2), act(1)], 0));
+    expect(orderRowsSignature([act(1), act(2)], 0)).not.toBe(orderRowsSignature([act(2), act(1)], 0));
   });
 
   it('includes the tick when an in-transit order shows a time-dependent message', () => {
     const o = act(1, { type: 'charge_hole', blockedReason: 'explosives_in_transit' });
-    expect(playerRowsSignature([o], 10)).not.toBe(playerRowsSignature([o], 11));
+    expect(orderRowsSignature([o], 10)).not.toBe(orderRowsSignature([o], 11));
   });
 });
 
-describe('debrisPage', () => {
+function pageOf(actions: PendingAction[], page: number, type: DebrisGroup['type'] = 'haul_debris') {
+  const g = partitionWorkQueue(actions).debris.find(x => x.type === type);
+  if (!g) return { rows: [] as PendingAction[], pageCount: 0 };
+  return { rows: debrisPageRows(actions, g, clampDebrisPage(page, g.total)), pageCount: debrisPageCount(g.total) };
+}
+
+describe('debris paging', () => {
   it('uses a page size of 25', () => {
     expect(DEBRIS_GROUP_PAGE_SIZE).toBe(25);
   });
 
   it('returns no rows and zero pages when the type has no orders', () => {
-    expect(debrisPage([act(1)], 'haul_debris', 0)).toEqual({ rows: [], pageCount: 0 });
+    expect(pageOf([act(1)], 0)).toEqual({ rows: [], pageCount: 0 });
   });
 
   it('returns exactly one full page for 25 orders', () => {
-    const r = debrisPage(debris(25), 'haul_debris', 0);
+    const r = pageOf(debris(25), 0);
     expect(r.rows.length).toBe(25);
     expect(r.pageCount).toBe(1);
   });
 
   it('spills the 26th order onto a second page', () => {
     const a = debris(26);
-    const p0 = debrisPage(a, 'haul_debris', 0);
-    const p1 = debrisPage(a, 'haul_debris', 1);
+    const p0 = pageOf(a, 0);
+    const p1 = pageOf(a, 1);
     expect(p0.pageCount).toBe(2);
     expect(p0.rows.length).toBe(25);
     expect(p1.rows.map(r => r.id)).toEqual([26]);
   });
 
   it('never returns more than 25 rows out of 2,500', () => {
-    const r = debrisPage(debris(2500), 'haul_debris', 3);
+    const r = pageOf(debris(2500), 3);
     expect(r.rows.length).toBe(25);
     expect(r.pageCount).toBe(100);
     expect(r.rows[0]!.id).toBe(76);
@@ -204,12 +214,21 @@ describe('debrisPage', () => {
 
   it('only includes the requested type, ids ascending', () => {
     const a = [act(8, { type: 'fragment_debris' }), act(5), ...debris(3, 'haul_debris', 20), act(2, { type: 'haul_debris' })];
-    expect(debrisPage(a, 'haul_debris', 0).rows.map(r => r.id)).toEqual([2, 20, 21, 22]);
+    expect(pageOf(a, 0).rows.map(r => r.id)).toEqual([2, 20, 21, 22]);
+  });
+
+  it('returns rows in ascending id order even when the input is not id-ordered', () => {
+    const a = [...debris(3, 'haul_debris', 10)].reverse();
+    expect(pageOf(a, 0).rows.map(r => r.id)).toEqual([10, 11, 12]);
   });
 
   it('clamps an out-of-range page to the last page and a negative page to the first', () => {
+    expect(clampDebrisPage(99, 60)).toBe(2);
+    expect(clampDebrisPage(-4, 60)).toBe(0);
+    expect(clampDebrisPage(Number.NaN, 60)).toBe(0);
+    expect(clampDebrisPage(3, 0)).toBe(0);
     const a = debris(60);
-    expect(debrisPage(a, 'haul_debris', 99).rows.map(r => r.id)[0]).toBe(51);
-    expect(debrisPage(a, 'haul_debris', -4).rows.map(r => r.id)[0]).toBe(1);
+    expect(pageOf(a, 99).rows.map(r => r.id)[0]).toBe(51);
+    expect(pageOf(a, -4).rows.map(r => r.id)[0]).toBe(1);
   });
 });

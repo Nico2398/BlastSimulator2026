@@ -29,10 +29,11 @@ import type { GameState, PendingAction, PendingActionStatus } from '../../core/s
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
-import { isFailureBlock, isInTransitBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
+import { isFailureBlock, isInTransitBlock, classifyQueuedBlock, buildBlockedOrderMessage } from '../notify/blockedOrders.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import {
-  DEBRIS_GROUP_PAGE_SIZE, partitionWorkQueue, debrisGroupSignature, playerRowsSignature, debrisPage,
+  DEBRIS_GROUP_PAGE_SIZE, partitionWorkQueue, debrisGroupSignature, orderRowsSignature, debrisPageRows,
+  debrisPageCount, clampDebrisPage,
   type DebrisGroup, type WorkQueueModel,
 } from './workQueueGroups.js';
 
@@ -41,6 +42,10 @@ const RECENT_INCIDENTS = 10;
 
 /** Shift modes accepted by `set_policy` (mirrors SettingsMenu.ts's own list — SitePolicy.ts doesn't export one). */
 const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
+
+const SMALL_BTN_STYLE = 'height:24px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
+
+const cancelCommand = (id: number): string => `employee cancel ${id}`;
 
 const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
   queued: 'ui.operations.work_queue_status_queued',
@@ -55,10 +60,8 @@ export function countQueuedByBlock(
   const counts = { open: 0, blocked: 0, stranded: 0 };
   for (const a of actions) {
     if (a.status !== 'queued') continue;
-    if (a.blockedReason == null) counts.open++;
-    else if (isInTransitBlock(a)) continue;
-    else if (isFailureBlock(a)) counts.blocked++;
-    else counts.stranded++;
+    const kind = classifyQueuedBlock(a);
+    if (kind !== 'inTransit') counts[kind]++;
   }
   return counts;
 }
@@ -76,7 +79,7 @@ export class OperationsPanel extends PanelBase {
   private activeShift: ShiftMode = 'shift_8h';
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
-  protected onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
+  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   // Work queue (#1972): persistent sections so a debris change never rebuilds the player rows.
   private readonly playerEl = el('div', { attrs: { style: 'display:contents' } });
   private readonly debrisEl = el('div', { attrs: { style: 'display:contents' } });
@@ -85,9 +88,14 @@ export class OperationsPanel extends PanelBase {
   private debrisSig = '';
   private model: WorkQueueModel = { player: [], debris: [] };
   private lastState: GameState | null = null;
+  /** True while a group cancel runs its commands: each one re-updates the UI, and this panel repaints once at the end. */
+  private bulkCancelling = false;
   /** UI-only expansion state of the debris groups. */
   private readonly expanded = new Set<DebrisGroup['type']>();
+  /** Clamped 0-based page per expanded group; clamped once per update, never by the render builders. */
   private readonly pages = new Map<DebrisGroup['type'], number>();
+  /** Visible rows of each expanded group's current page, resolved once per update. */
+  private readonly pageRows = new Map<DebrisGroup['type'], PendingAction[]>();
 
   /** Routes the cancel-all-debris confirmation to a modal (#1972); unset means no confirmation is shown. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
@@ -156,6 +164,7 @@ export class OperationsPanel extends PanelBase {
 
 
   update(state: GameState): void {
+    if (this.bulkCancelling) { this.lastState = state; return; }
     if (!this.policyDirty) {
       this.setActiveShift(state.sitePolicy.shiftMode);
       this.fatigueInput.value = String(state.sitePolicy.fatigueRestThreshold);
@@ -163,10 +172,8 @@ export class OperationsPanel extends PanelBase {
 
     this.lastState = state;
     this.model = partitionWorkQueue(state.pendingActions);
-    for (const type of [...this.expanded]) {
-      if (!this.model.debris.some(g => g.type === type)) { this.expanded.delete(type); this.pages.delete(type); }
-    }
-    const playerSig = `${playerRowsSignature(this.model.player, state.tickCount)}${this.model.debris.length === 0 ? '|empty' : ''}`;
+    this.syncExpandedPages(state);
+    const playerSig = `${orderRowsSignature(this.model.player, state.tickCount)}${this.model.debris.length === 0 ? '|empty' : ''}`;
     const debrisSig = this.debrisSignature(state);
     const signature = JSON.stringify({
       stored: Math.round(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
@@ -176,6 +183,8 @@ export class OperationsPanel extends PanelBase {
       accidents: state.damage.accidents.length,
       injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
       policy: state.sitePolicy.revision,
+      // Feeds "Unclaimed Work": counts queued orders the work queue rows leave out (rest).
+      unclaimed: countQueuedByBlock(state.pendingActions),
     }) + `#${playerSig}#${debrisSig}`;
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -190,13 +199,24 @@ export class OperationsPanel extends PanelBase {
     this.render(state);
   }
 
-  /** Counts per group, plus the visible page rows for expanded groups only. */
+  /** Drops expansion of vanished groups, clamps each expanded page once and resolves its rows (one pass per group). */
+  private syncExpandedPages(state: GameState): void {
+    this.pageRows.clear();
+    for (const type of [...this.expanded]) {
+      const group = this.model.debris.find(g => g.type === type);
+      if (!group) { this.expanded.delete(type); this.pages.delete(type); continue; }
+      const page = clampDebrisPage(this.pages.get(type) ?? 0, group.total);
+      this.pages.set(type, page);
+      this.pageRows.set(type, debrisPageRows(state.pendingActions, group, page));
+    }
+  }
+
+  /** Counts per group, plus the visible (clamped) page rows for expanded groups only. */
   private debrisSignature(state: GameState): string {
     return this.model.debris.map(g => {
       let sig = debrisGroupSignature(g);
       if (this.expanded.has(g.type)) {
-        const rows = debrisPage(state.pendingActions, g.type, this.pages.get(g.type) ?? 0).rows;
-        sig += `|x${this.pages.get(g.type) ?? 0}|${playerRowsSignature(rows, state.tickCount)}`;
+        sig += `|x${this.pages.get(g.type) ?? 0}|${orderRowsSignature(this.pageRows.get(g.type) ?? [], state.tickCount)}`;
       }
       return sig;
     }).join('||');
@@ -302,7 +322,7 @@ export class OperationsPanel extends PanelBase {
       if (count > 0) parts.push(t(`ui.operations.work_queue_debris_status_part_${key}`, { count }));
     };
     part('in_progress', group.inProgress + group.assigned);
-    part('queued', group.queued - group.blocked - group.stranded - group.inTransit);
+    part('queued', group.open);
     part('blocked', group.blocked);
     part('stranded', group.stranded);
     part('in_transit', group.inTransit);
@@ -312,11 +332,11 @@ export class OperationsPanel extends PanelBase {
     const toggle = button('ghost', t(open ? 'ui.operations.work_queue_debris_collapse' : 'ui.operations.work_queue_debris_expand'));
     toggle.dataset['debrisToggle'] = type;
     toggle.setAttribute('aria-expanded', String(open));
-    toggle.style.cssText = 'height:24px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
+    toggle.style.cssText = SMALL_BTN_STYLE;
     toggle.addEventListener('click', () => this.toggleDebris(type));
     const cancel = button('danger', t('ui.operations.work_queue_debris_cancel'));
     cancel.dataset['cancelDebrisGroup'] = type;
-    cancel.style.cssText = 'margin-left:auto;height:24px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
+    cancel.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
     cancel.addEventListener('click', () => this.requestCancelGroup(type, label));
     summary.append(
       el('span', { text: t('ui.operations.work_queue_debris_title', { label, count: group.total }), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
@@ -326,9 +346,9 @@ export class OperationsPanel extends PanelBase {
     wrap.append(summary);
 
     if (open) {
-      const { rows, pageCount } = debrisPage(state.pendingActions, type, this.pages.get(type) ?? 0);
-      const page = Math.min(this.pages.get(type) ?? 0, Math.max(0, pageCount - 1));
-      this.pages.set(type, page);
+      const rows = this.pageRows.get(type) ?? [];
+      const page = this.pages.get(type) ?? 0;
+      const pageCount = debrisPageCount(group.total);
       for (const a of rows) wrap.append(this.makeWorkQueueRow(a, state));
       const prev = button('ghost', t('ui.operations.work_queue_debris_prev'), { disabled: page <= 0 });
       prev.dataset['debrisPage'] = 'prev';
@@ -356,13 +376,14 @@ export class OperationsPanel extends PanelBase {
   }
 
   private setDebrisPage(type: DebrisGroup['type'], page: number): void {
-    this.pages.set(type, Math.max(0, page));
+    this.pages.set(type, page);
     this.refreshDebrisNow();
   }
 
   /** Re-renders only the debris section after a UI-only change (expand/page). */
   private refreshDebrisNow(): void {
     if (!this.lastState) return;
+    this.syncExpandedPages(this.lastState);
     this.debrisSig = this.debrisSignature(this.lastState);
     this.lastSignature = '';
     this.debrisEl.replaceChildren(...this.makeDebrisGroups(this.lastState));
@@ -377,8 +398,23 @@ export class OperationsPanel extends PanelBase {
       title: t('ui.operations.work_queue_debris_confirm_title'),
       body: t('ui.operations.work_queue_debris_confirm_body', { count: ids.length, label }),
       confirmLabel: t('ui.operations.work_queue_debris_confirm_label'),
-      onConfirm: () => { for (const id of ids) this.gameConsole?.(`employee cancel ${id}`); },
+      onConfirm: () => this.cancelOrders(ids),
     });
+  }
+
+  /**
+   * Cancels up to thousands of orders. Measured in jsdom with the real console at 2,500 orders: ~6.3 s when
+   * this panel repaints after every command (~2.5 ms each, the commands themselves ~50 ms in total), so
+   * the panel skips its own repaints during the loop. Other panels still update per command (main.ts).
+   */
+  private cancelOrders(ids: readonly number[]): void {
+    this.bulkCancelling = true;
+    try {
+      for (const id of ids) this.gameConsole?.(cancelCommand(id));
+    } finally {
+      this.bulkCancelling = false;
+    }
+    if (this.lastState) this.update(this.lastState);
   }
 
   private makeWorkQueueRow(action: PendingAction, state: GameState): HTMLElement {
@@ -417,9 +453,9 @@ export class OperationsPanel extends PanelBase {
 
     const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
     const cancelBtn = button('danger', t('ui.operations.work_queue_cancel'));
-    cancelBtn.style.cssText = 'margin-left:auto;height:24px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
+    cancelBtn.style.cssText = `margin-left:auto;${SMALL_BTN_STYLE}`;
     cancelBtn.dataset['cancelAction'] = String(action.id);
-    cancelBtn.addEventListener('click', () => this.gameConsole?.(`employee cancel ${action.id}`));
+    cancelBtn.addEventListener('click', () => this.gameConsole?.(cancelCommand(action.id)));
     footRow.append(
       el('span', { text: holderText, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
       cancelBtn,

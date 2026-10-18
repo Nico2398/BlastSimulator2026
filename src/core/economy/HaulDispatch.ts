@@ -345,8 +345,10 @@ export function findNearbyHaulableFragments(state: GameState, primary: TrackedFr
   return near.map(n => n.tracked);
 }
 
+export type AutoDebrisActionType = 'haul_debris' | 'fragment_debris';
+
 /** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
-export function isAutoDebrisAction(type: ActionType): boolean {
+export function isAutoDebrisAction(type: ActionType): type is AutoDebrisActionType {
   return type === 'haul_debris' || type === 'fragment_debris';
 }
 

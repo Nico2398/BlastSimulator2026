@@ -4330,6 +4330,6 @@
   "ui.operations.work_queue_debris_next": "Next",
   "ui.operations.work_queue_debris_cancel": "Cancel all",
   "ui.operations.work_queue_debris_confirm_title": "Cancel debris orders?",
-  "ui.operations.work_queue_debris_confirm_body": "Cancel {count} {label} orders? Loaded cargo is dropped back on the ground.",
+  "ui.operations.work_queue_debris_confirm_body": "Cancel {count} orders: {label}? Loaded cargo is dropped back on the ground.",
   "ui.operations.work_queue_debris_confirm_label": "Cancel orders"
 }
