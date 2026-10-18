@@ -50,11 +50,11 @@ const EVENT_SOURCE_FILES = [
 ].map(f => join(ROOT, 'src/core/events', `${f}.ts`));
 const RAW_LITERAL = /\b(hours|days|pct|perDay|perHour|amount)\s*:\s*-?\d/;
 
-/** Catalog kinds: the `ui.event.effect.<kind>` keys, minus what.* / pick.* sub-keys, scope_all and the _permanent variant. */
+/** Catalog kinds: the `ui.event.effect.<kind>` keys, minus what.* / pick.* sub-keys, scope_all, the _permanent variant and the _named/_nobody chip texts of employee_leaves (#1908; display keys, not spec types). */
 const CATALOG_KINDS = new Set(
   Object.keys(en)
     .map(k => /^ui\.event\.effect\.([a-z_]+)$/.exec(k)?.[1])
-    .filter((k): k is string => k !== undefined && k !== 'scope_all' && !k.endsWith('_permanent')),
+    .filter((k): k is string => k !== undefined && k !== 'scope_all' && !k.endsWith('_permanent') && !k.endsWith('_named') && !k.endsWith('_nobody')),
 );
 
 const followUpIds = new Set(FOLLOWUP_EVENTS.map(e => e.id));
