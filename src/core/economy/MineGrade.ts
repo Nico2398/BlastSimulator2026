@@ -40,6 +40,10 @@ export interface GradeState {
   rockBrokenM3: number;
   blastsFired: number;
   pending: { toGrade: number; ticksLeft: number } | null;
+  /** Ticks of recent caught over-limit blasts; strikes inside the window count toward suspension. */
+  strikeTicks?: number[];
+  /** Count of inspection rolls made, salting each roll's seed. */
+  inspectionRolls?: number;
 }
 
 export interface GradeTargetStatus {
@@ -60,7 +64,7 @@ const LAST_NAMED_GRADE = 5;
 
 /** Fresh grade state of a progression site: grade 0, nothing tracked. */
 export function createGradeState(): GradeState {
-  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null };
+  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0 };
 }
 
 function isCount(v: unknown): v is number {
@@ -77,11 +81,11 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   const r = raw as Record<string, unknown>;
   const { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending } = r;
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
-  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null };
+  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks: [], inspectionRolls: 0 };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
   if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
-  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] } };
+  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks: [], inspectionRolls: 0 };
 }
 
 /** Definition of a grade: 0 is the start permit, 1-5 are named, above that endless classes. */
