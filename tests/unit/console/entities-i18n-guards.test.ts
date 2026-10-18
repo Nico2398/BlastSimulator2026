@@ -292,7 +292,8 @@ describe('entities.ts — build upgrade ordered message (#1392)', () => {
   }
 
   const NEW_DEF = getBuildingDef('management_office', 2);
-  const TOTAL_COST = NEW_DEF.constructionCost;
+  // In-place upgrade credits 50% of the current tier's cost (#1905).
+  const TOTAL_COST = NEW_DEF.constructionCost - Math.round(getBuildingDef('management_office', 1).constructionCost * 0.5);
 
   it('matches the exact English literal, naming the building id; cash is charged at order time', () => {
     const ctx = makeCtx();
@@ -310,7 +311,7 @@ describe('entities.ts — build upgrade ordered message (#1392)', () => {
     setLocale('fr');
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toBe(`Upgrade of building #${id} to T2 ordered. A builder will raise it in place; it keeps working. Cost: $${getBuildingDef('management_office', 2).constructionCost}.`);
+    expect(result.output).not.toBe(`Upgrade of building #${id} to T2 ordered. A builder will raise it in place; it keeps working. Cost: $${TOTAL_COST}.`);
     expect(result.output).toContain(`#${id}`);
   });
 });

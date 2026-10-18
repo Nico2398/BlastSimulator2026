@@ -4162,7 +4162,7 @@
   "inspector.reason.demolition_ordered": "A demolition is already ordered",
   "inspector.reason.upgrade_ordered": "An upgrade is already ordered",
   "inspector.reason.under_construction": "Still being built",
-  "inspector.tip.upgrade": "Raises the building to the next tier in place, for the next tier's build cost. It keeps working while a builder does the work. Needs the tier's research and room for the bigger footprint.",
+  "inspector.tip.upgrade": "Raises the building to the next tier in place, for the next tier's build cost minus half the current tier's. It keeps working while a builder does the work. Needs the tier's research and room for the bigger footprint.",
   "ui.build.demolish_confirm_loses_ore": "Stored ore ({kg} kg) is lost.",
   "inspector.section.contents": "Contents",
   "inspector.stock_capacity": "{stored} / {capacity} kg",

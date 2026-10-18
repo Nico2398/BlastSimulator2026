@@ -11,7 +11,7 @@ import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
-import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../config/balance.js';
+import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD, BUILDING_UPGRADE_CREDIT_SHARE } from '../config/balance.js';
 
 // ── Building types ──
 
@@ -425,9 +425,17 @@ export function getDemolishCost(building: Building): number {
   return getBuildingDef(building.type, building.tier).demolishCost;
 }
 
-/** Cost to upgrade a building to `nextTier` ($): the next tier's construction cost only; nothing is demolished. */
+/**
+ * Cost to upgrade a building to `nextTier` ($): the next tier's construction
+ * cost minus BUILDING_UPGRADE_CREDIT_SHARE of the previous tier's (#1905),
+ * rounded like getMoveCost. A target tier of 1 has no previous tier and costs
+ * the full price. Nothing is demolished.
+ */
 export function getUpgradeCost(type: BuildingType, nextTier: BuildingTier): number {
-  return getBuildingDef(type, nextTier).constructionCost;
+  const full = getBuildingDef(type, nextTier).constructionCost;
+  if (nextTier <= 1) return full;
+  const credit = Math.round(getBuildingDef(type, (nextTier - 1) as BuildingTier).constructionCost * BUILDING_UPGRADE_CREDIT_SHARE);
+  return full - credit;
 }
 
 /** Cost to relocate a building ($): 50% of its construction cost. */
