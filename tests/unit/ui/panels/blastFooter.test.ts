@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -310,5 +311,46 @@ describe('BlastFooter ore estimate coverage (#1960)', () => {
     const { footer } = setup('none');
     expect(value(footer.root).textContent).toBe(t('ui.blast_workshop.footer.est_ore_unknown'));
     expect(value(footer.root).textContent).not.toBe('No survey');
+  });
+});
+
+describe('BlastFooter delivery wait (#1966)', () => {
+  function inTransitState() {
+    const state = makeState();
+    state.tickCount = 280;
+    state.cash = 100_000;
+    state.finances.cash = 100_000;
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    dispatchChargeAction(state, { id: hole.id, x: 10, z: 10 }, { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+    return { state, hole };
+  }
+
+  it('names the arrival day and hour for an order waiting for delivery, not "Charge still loading"', () => {
+    const { footer } = makeFooter();
+    const { state, hole } = inTransitState();
+    footer.update(state);
+
+    const text = footer.root.textContent ?? '';
+    expect(text).toContain(`${hole.id}: explosives arrive Day 29, 08:00`);
+    expect(text).not.toContain('Charge still loading');
+    expect(text).not.toContain('tick');
+    expect((footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('reads in French with the French clock', () => {
+    setLocale('fr');
+    const { footer } = makeFooter();
+    footer.update(inTransitState().state);
+    expect(footer.root.textContent).toContain('Jour 29, 08h00');
+  });
+
+  it('still reads "Charge still loading" for a hole that is really loading', () => {
+    const { footer } = makeFooter();
+    const state = makeState();
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.plannedChargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    footer.update(state);
+    expect(footer.root.textContent).toContain('Charge still loading');
+    expect(footer.root.textContent).not.toContain('explosives arrive');
   });
 });

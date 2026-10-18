@@ -12,6 +12,9 @@
 // rail's modal carve-out (tutorialGuide.ts's MODAL_SELECTOR) and
 // uiActionProbe's `confirm` region keep resolving it without changes there.
 
+import { chargeDeliveryArrivalByHole } from '../../core/mining/ExplosiveStock.js';
+import { formatGameClock } from '../formatGameClock.js';
+import { formatGameDuration } from '../formatGameDuration.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, statGrid } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -165,8 +168,14 @@ export class PreflightModal {
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);
     const loadingHoleIds = new Set(Object.keys(state.plannedChargesByHole));
-    const validationErrors = validateBlastPlan(plan, loadingHoleIds);
-    const loadingCount = state.drillHoles.filter(h => loadingHoleIds.has(h.id) && !state.chargesByHole[h.id]).length;
+    const deliveryArrivals = chargeDeliveryArrivalByHole(state);
+    const validationErrors = validateBlastPlan(plan, loadingHoleIds, deliveryArrivals);
+    const awaitingArrivals = validationErrors
+      .filter(e => e.issue === 'blast.validation.charge_awaiting_delivery')
+      .flatMap(e => (e.arrivalTick === undefined ? [] : [e.arrivalTick]));
+    const awaitingCount = awaitingArrivals.length;
+    const earliestArrival = awaitingCount > 0 ? Math.min(...awaitingArrivals) : null;
+    const loadingCount = validationErrors.filter(e => e.issue === 'blast.validation.charge_loading').length;
 
     // Warning only, never a detonate gate: firing cancels these drill orders (#1346).
     const undrilledCount = state.plannedDrillHoles.length;
@@ -174,7 +183,7 @@ export class PreflightModal {
     const signature = JSON.stringify({
       undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue, coverage,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
-      phase, protectedCount: protectedHoles.length, loadingCount, errorCount: validationErrors.length,
+      phase, protectedCount: protectedHoles.length, loadingCount, awaitingCount, earliestArrival, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -199,6 +208,16 @@ export class PreflightModal {
         : []),
       ...(loadingCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_charge_loading', { count: loadingCount }) }]
+        : []),
+      ...(earliestArrival !== null
+        ? [{
+          ok: false,
+          text: t('ui.blast_workshop.preflight.warn_charge_awaiting_delivery', {
+            count: awaitingCount,
+            when: formatGameClock(earliestArrival),
+            duration: formatGameDuration(earliestArrival - state.tickCount),
+          }),
+        }]
         : []),
       ...(undrilledCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_undrilled', { count: undrilledCount }) }]

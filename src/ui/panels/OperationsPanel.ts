@@ -144,7 +144,7 @@ export class OperationsPanel extends PanelBase {
       oreReport: state.lastOreReport,
       accidents: state.damage.accidents.length,
       injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
-      unclaimed: state.pendingActions.filter(a => a.status === 'queued').map(a => `${a.id}:${a.blockedReason ?? ''}`),
+      unclaimed: state.pendingActions.filter(a => a.status === 'queued').map(a => `${a.id}:${a.blockedReason ?? ''}${isInTransitBlock(a) ? `@${state.tickCount}` : ''}`),
       // Every live (non-rest) action's id/status/holder — so a claim or a
       // cancellation (#548) triggers a rebuild of the Work Queue section,
       // not just the count already covered by `unclaimed` above.
@@ -289,7 +289,7 @@ export class OperationsPanel extends PanelBase {
     row.append(headRow);
     if (queuedBlocked) {
       row.append(el('span', {
-        text: buildBlockedOrderMessage(action),
+        text: buildBlockedOrderMessage(action, state.tickCount),
         attrs: { 'data-blocked-reason': blockedReason, style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
       }));
     }

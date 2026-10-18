@@ -13,6 +13,8 @@ export interface BlastPlan {
 export interface ValidationError {
   holeId: string;
   issue: string;
+  /** Tick a waiting explosive delivery arrives, when the issue is a delivery wait (#1966). */
+  arrivalTick?: number;
 }
 
 /**
@@ -20,16 +22,24 @@ export interface ValidationError {
  * `loadingHoleIds`, when given, is the set of holes whose charge order has
  * been placed but not yet loaded (#554) — a hole with no landed charge whose
  * id is in this set gets a distinct "still loading" issue instead of the
- * generic "missing charge" one.
+ * generic "missing charge" one. `deliveryArrivalByHole` maps holes whose
+ * explosives are still in transit to their arrival tick (#1966); those get a
+ * delivery-wait issue carrying that tick, ahead of the loading check.
  */
 export function validateBlastPlan(
   plan: BlastPlan,
   loadingHoleIds?: ReadonlySet<string>,
+  deliveryArrivalByHole?: ReadonlyMap<string, number>,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
   for (const hole of plan.holes) {
     if (!plan.charges[hole.id]) {
+      const arrivalTick = deliveryArrivalByHole?.get(hole.id);
+      if (arrivalTick !== undefined) {
+        errors.push({ holeId: hole.id, issue: 'blast.validation.charge_awaiting_delivery', arrivalTick });
+        continue;
+      }
       errors.push({
         holeId: hole.id,
         issue: loadingHoleIds?.has(hole.id)
