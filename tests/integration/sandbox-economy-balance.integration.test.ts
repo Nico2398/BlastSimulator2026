@@ -224,6 +224,35 @@ describe('sandbox economy: richness is bounded across biome and depth', () => {
     }
   });
 
+  it('SANDBOX_MAX_RICHNESS_RATIO is still 10 (#1933: depth grade must not loosen the bound)', () => {
+    expect(SANDBOX_MAX_RICHNESS_RATIO).toBe(10);
+  });
+
+  // #1933: grade rises with depth, so value per m3 climbs band over band. Depth bands are the multiplier's:
+  // 0-10, 10-20, 20-35, 35-55 m. A biome with no ore in a deeper band at all is excluded for that band
+  // (its ores are not placed there), so the comparison runs on the bands that hold ore.
+  it('value per m3 rises strictly band over band (0-10, 10-20, 20-35, 35-55 m) in every biome with ore there', () => {
+    const edges = [0, 10, 20, 35, 55];
+    let compared = 0;
+    for (const [biome, bands] of perBiome) {
+      const means = edges.slice(0, -1).map((from, i) => {
+        const slice = bands.slice(from / BAND_M, edges[i + 1]! / BAND_M);
+        return slice.reduce((a, b) => a + b, 0) / slice.length;
+      });
+      const withOre = means.map((v, i) => ({ v, i })).filter(b => b.v > 0);
+      for (let k = 1; k < withOre.length; k++) {
+        expect(withOre[k]!.v, `${biome} band ${edges[withOre[k]!.i]}-${edges[withOre[k]!.i + 1]} m vs ${edges[withOre[k - 1]!.i]}-${edges[withOre[k - 1]!.i + 1]} m`).toBeGreaterThan(withOre[k - 1]!.v);
+        compared++;
+      }
+    }
+    expect(compared).toBeGreaterThan(0);
+  });
+
+  it('the richest band still pays at most SANDBOX_MAX_RICHNESS_RATIO x desert surface rock', () => {
+    const richest = Math.max(...[...perBiome.values()].flat());
+    expect(richest / desertSurface).toBeLessThanOrEqual(SANDBOX_MAX_RICHNESS_RATIO);
+  });
+
   it('the richest biome/depth still pays more than desert surface rock (progression exists)', () => {
     const richest = Math.max(...[...perBiome.values()].flat());
     expect(richest).toBeGreaterThan(desertSurface);

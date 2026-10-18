@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
+import { OreVeinSampler, oreDepthMultiplier } from '../../../src/core/world/OreVeins.js';
 import type { VoxelRockComposition } from '../../../src/core/world/VoxelGrid.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { getOre, getAllOres } from '../../../src/core/world/OreCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
 import { SEEDS, BLOCK, MAX_DEPTH, sampleSite, blockIndexOf, shareBelow, richestDecileOverMedian, argmax, peakBlockByOre, type SiteOre } from '../../helpers/oreSite.js';
-import { ORE_DEPOSIT_RARITY_COVERAGE } from '../../../src/core/config/balance.js';
+import { ORE_DEPOSIT_RARITY_COVERAGE, ORE_DEPTH_MULTIPLIER_BANDS, ORE_DEPTH_BLEND_M } from '../../../src/core/config/balance.js';
 import { createRunner } from '../../../src/console/createRunner.js';
 
 // cruite: dirtite 0.40 (depth 0-10), rustite 0.15 (depth 0-15). No blingite entry at all.
@@ -376,5 +376,145 @@ describe('ore grade scale (#1932)', () => {
     base.forEach((row, i) => {
       for (const [ore, d] of Object.entries(row)) expect(scaled[i]![ore]!).toBeCloseTo(d * 0.5, 12);
     });
+  });
+});
+
+describe('ore depth multiplier (#1933)', () => {
+  it('uses the configured bands and a 3 m blend', () => {
+    expect(ORE_DEPTH_MULTIPLIER_BANDS.map(b => [b.fromDepth, b.multiplier])).toEqual([[0, 1], [10, 1.4], [20, 1.8], [35, 2.2]]);
+    expect(ORE_DEPTH_BLEND_M).toBe(3);
+  });
+
+  it('is exactly 1 from the surface down to 10 m', () => {
+    for (let d = 0; d <= 10; d += 0.5) expect(oreDepthMultiplier(d), `d${d}`).toBe(1);
+  });
+
+  it('is 1.4 flat from 13 to 20 m, 1.8 from 23 to 35 m, 2.2 from 38 m on', () => {
+    for (let d = 13; d <= 20; d += 0.5) expect(oreDepthMultiplier(d), `d${d}`).toBeCloseTo(1.4, 12);
+    for (let d = 23; d <= 35; d += 0.5) expect(oreDepthMultiplier(d), `d${d}`).toBeCloseTo(1.8, 12);
+    for (let d = 38; d <= 120; d += 0.5) expect(oreDepthMultiplier(d), `d${d}`).toBeCloseTo(2.2, 12);
+  });
+
+  it('ramps by smoothstep: halfway through a blend is the midpoint multiplier', () => {
+    expect(oreDepthMultiplier(11.5)).toBeCloseTo(1.2, 12);
+    expect(oreDepthMultiplier(21.5)).toBeCloseTo(1.6, 12);
+    expect(oreDepthMultiplier(36.5)).toBeCloseTo(2.0, 12);
+    // smoothstep is flat at the ends: a quarter in is below the linear value
+    expect(oreDepthMultiplier(10.75)).toBeLessThan(1 + 0.4 * 0.25);
+    expect(oreDepthMultiplier(10.75)).toBeGreaterThan(1);
+  });
+
+  it('is continuous and non-decreasing: no jump over 0.5 m steps from 0 to 80 m', () => {
+    let prev = oreDepthMultiplier(0);
+    for (let d = 0.5; d <= 80; d += 0.5) {
+      const m = oreDepthMultiplier(d);
+      expect(m, `d${d}`).toBeGreaterThanOrEqual(prev);
+      // steepest smoothstep slope is 1.5 * 0.4 / 3 = 0.2 per m, so 0.1 per 0.5 m
+      expect(m - prev, `d${d}`).toBeLessThanOrEqual(0.1 + 1e-9);
+      prev = m;
+    }
+  });
+
+  it('is 1 for a depth above the surface', () => {
+    expect(oreDepthMultiplier(-3)).toBe(1);
+  });
+});
+
+describe('ore depth multiplier in densitiesAt (#1933)', () => {
+  const ALL_ROCKS: VoxelRockComposition = { rocks: ['cruite', 'sandite', 'molite', 'grumpite', 'clunkite', 'stubite', 'obstiite', 'gnarlite', 'absurdite', 'titanite'].map(rockId => ({ rockId, coefficient: 0.1 })) };
+  const REF_DEPTH = 8;
+  // blingite (5-40 m) spans every band, so one voxel can be read at the reference depth and a deeper one.
+  const ORE = 'blingite';
+
+  /** blingite density per lattice voxel at one depth; null where absent. */
+  function field(sampler: OreVeinSampler, depth: number, richness = 1.0): Array<number | null> {
+    const out: Array<number | null> = [];
+    for (let x = 0; x < 60; x++) for (let z = 0; z < 60; z++) out.push(sampler.densitiesAt(x, 0, z, depth, ALL_ROCKS, richness)[ORE] ?? null);
+    return out;
+  }
+  const expectedBoost = (stored: number, depth: number) => Math.round(Math.min(1, stored * oreDepthMultiplier(depth)) * 100) / 100;
+
+  it('the reference field holds ore to compare', () => {
+    const ref = field(new OreVeinSampler(42, { deposits: true }), REF_DEPTH, 2.0).filter(d => d !== null);
+    expect(ref.length).toBeGreaterThan(50);
+  });
+
+  for (const depth of [15, 18, 25, 33, 40]) {
+    it(`with deposits on, depth ${depth} m density is round(min(1, base x ${depth === 15 || depth === 18 ? 1.4 : depth < 36 ? 1.8 : 2.2}) x 100) / 100`, () => {
+      const sampler = new OreVeinSampler(42, { deposits: true });
+      const base = field(sampler, REF_DEPTH, 2.0);
+      const deep = field(sampler, depth, 2.0);
+      let checked = 0;
+      base.forEach((b, i) => {
+        if (b === null) return;
+        expect(deep[i], `voxel ${i}`).not.toBeNull();
+        expect(deep[i]!).toBeCloseTo(expectedBoost(b, depth), 12);
+        checked++;
+      });
+      expect(checked).toBeGreaterThan(50);
+    });
+  }
+
+  it('a boosted density is clamped at 1 and some voxels reach the clamp', () => {
+    const sampler = new OreVeinSampler(42, { deposits: true });
+    const base = field(sampler, REF_DEPTH, 2.0);
+    const deep = field(sampler, 40, 2.0);
+    expect(base.some(b => b !== null && b * 2.2 > 1)).toBe(true);
+    for (const d of deep) if (d !== null) expect(d).toBeLessThanOrEqual(1);
+    expect(deep.some(d => d === 1)).toBe(true);
+  });
+
+  it('boosting never creates ore: the same voxels hold ore at every depth in the window', () => {
+    const sampler = new OreVeinSampler(42, { deposits: true });
+    const holds = (f: Array<number | null>) => f.map(d => d !== null);
+    const ref = holds(field(sampler, REF_DEPTH, 2.0));
+    for (const depth of [12, 15, 25, 39]) expect(holds(field(sampler, depth, 2.0)), `d${depth}`).toEqual(ref);
+  });
+
+  it('depths 1-9 m (multiplier 1) are untouched: same density as the 5 m reading for ores in both windows', () => {
+    const sampler = new OreVeinSampler(42, { deposits: true });
+    const read = (depth: number) => {
+      const out: Array<number | null> = [];
+      for (let x = 0; x < 40; x++) for (let z = 0; z < 40; z++) out.push(sampler.densitiesAt(x, 0, z, depth, CRUITE_COMPOSITION, 1.0)['rustite'] ?? null);
+      return out;
+    };
+    const ref = read(5);
+    expect(ref.some(d => d !== null)).toBe(true);
+    for (let depth = 1; depth <= 9; depth++) expect(read(depth), `d${depth}`).toEqual(ref);
+  });
+
+  it('deposits off: density does not change with depth (no boost on legacy veins)', () => {
+    const sampler = new OreVeinSampler(7);
+    const read = (depth: number) => {
+      const out: Array<number | null> = [];
+      for (let x = 0; x < 40; x++) for (let z = 0; z < 40; z++) out.push(sampler.densitiesAt(x, 0, z, depth, CRUITE_COMPOSITION, 1.0)['rustite'] ?? null);
+      return out;
+    };
+    expect(read(5).some(d => d !== null)).toBe(true);
+    expect(read(15)).toEqual(read(5));
+    expect(read(12)).toEqual(read(5));
+  });
+
+  it('deposits explicitly false behaves like the legacy sampler at depth', () => {
+    const a = new OreVeinSampler(7, { deposits: false });
+    const b = new OreVeinSampler(7);
+    for (const depth of [15, 25, 40]) expect(scanColumns(a, depth, ALL_ROCKS, 1.0)).toEqual(scanColumns(b, depth, ALL_ROCKS, 1.0));
+    // and blingite there is not boosted relative to its shallow reading
+    const read = (depth: number) => scanColumns(a, depth, ALL_ROCKS, 1.0).map(r => r[ORE] ?? null);
+    expect(read(15)).toEqual(read(8));
+  });
+
+  it('gradeScale applies after the boost: scaled == boosted x scale, unrounded', () => {
+    const boosted = new OreVeinSampler(42, { deposits: true });
+    const scaled = new OreVeinSampler(42, { deposits: true, gradeScale: 0.2 });
+    for (const depth of [15, 25, 40]) {
+      const a = field(boosted, depth, 2.0);
+      const b = field(scaled, depth, 2.0);
+      expect(a.some(d => d !== null)).toBe(true);
+      a.forEach((d, i) => {
+        if (d === null) expect(b[i]).toBeNull();
+        else expect(b[i]!).toBeCloseTo(d * 0.2, 12);
+      });
+    }
   });
 });
