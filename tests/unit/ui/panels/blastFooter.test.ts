@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../helpers/oreSurveyFixture.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
 
 const holeCounter = { nextHoleId: 1 };
@@ -352,5 +353,96 @@ describe('BlastFooter delivery wait (#1966)', () => {
     footer.update(state);
     expect(footer.root.textContent).toContain('Charge still loading');
     expect(footer.root.textContent).not.toContain('explosives arrive');
+  });
+});
+
+// #1925: permit usage row on progression sites.
+describe('BlastFooter — permit usage (#1925)', () => {
+  function permitState(holes: number, kgPerHole: number, progression = true) {
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    for (let i = 0; i < holes; i++) {
+      const hole = addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
+      const r = createCharge('krackle', kgPerHole, 2, hole.depth);
+      if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
+    }
+    expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
+    return state;
+  }
+  const usage = (f: BlastFooter) => f.root.querySelector('[data-role="permit-usage"]') as HTMLElement | null;
+  const warning = (f: BlastFooter) => f.root.querySelector('[data-role="permit-warning"]') as HTMLElement | null;
+  const visible = (e: HTMLElement | null) => !!e && e.style.display !== 'none';
+
+  it('shows kg and holes against the grade-0 limits', () => {
+    const { footer } = makeFooter();
+    footer.update(permitState(9, 8));
+    expect(visible(usage(footer))).toBe(true);
+    expect(usage(footer)!.textContent).toContain('72 / 80 kg');
+    expect(usage(footer)!.textContent).toContain('9 / 9 holes');
+    expect(usage(footer)!.querySelector('[data-role="permit-kg"]')!.textContent).toBe('72 / 80 kg');
+    expect(usage(footer)!.querySelector('[data-role="permit-holes"]')!.textContent).toBe('9 / 9 holes');
+    expect(visible(warning(footer))).toBe(false);
+  });
+
+  it('is not amber and shows no warning within the limit', () => {
+    const { footer } = makeFooter();
+    footer.update(permitState(9, 8));
+    expect(usage(footer)!.dataset['over']).not.toBe('true');
+  });
+
+  it('turns to a warning style and shows the warning line when over the kg limit', () => {
+    const { footer } = makeFooter();
+    footer.update(permitState(9, 10));
+    expect(usage(footer)!.textContent).toContain('90 / 80 kg');
+    expect(usage(footer)!.dataset['over']).toBe('true');
+    expect(visible(warning(footer))).toBe(true);
+    expect(warning(footer)!.textContent!.length).toBeGreaterThan(0);
+  });
+
+  it('warns when over the hole limit alone', () => {
+    const { footer } = makeFooter();
+    footer.update(permitState(10, 1));
+    expect(usage(footer)!.textContent).toContain('10 / 9 holes');
+    expect(visible(warning(footer))).toBe(true);
+  });
+
+  it('FIRE stays enabled and clickable while over the limit', () => {
+    const { footer, fireRequested } = makeFooter();
+    footer.update(permitState(9, 10));
+    const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
+    expect(fireBtn.disabled).toBe(false);
+    fireBtn.click();
+    expect(fireRequested).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates when the plan moves from within to over the limit', () => {
+    const { footer } = makeFooter();
+    const state = permitState(9, 8);
+    footer.update(state);
+    expect(visible(warning(footer))).toBe(false);
+    for (const id of Object.keys(state.chargesByHole)) {
+      const r = createCharge('krackle', 10, 2, state.drillHoles.find(h => String(h.id) === id)!.depth);
+      if ('charge' in r) state.chargesByHole[id] = r.charge;
+    }
+    footer.update(state);
+    expect(usage(footer)!.textContent).toContain('90 / 80 kg');
+    expect(visible(warning(footer))).toBe(true);
+  });
+
+  it('shows no permit row on a non-progression site, even over what a limit would be', () => {
+    const { footer } = makeFooter();
+    footer.update(permitState(9, 10, false));
+    expect(visible(usage(footer))).toBe(false);
+    expect(visible(warning(footer))).toBe(false);
+    expect(footer.root.textContent).not.toContain('/ 80 kg');
+  });
+
+  it('never renders an inspection chance or overshoot', () => {
+    const { footer } = makeFooter();
+    footer.update(permitState(12, 10));
+    const text = footer.root.textContent!.toLowerCase();
+    expect(text).not.toContain('chance');
+    expect(text).not.toContain('overshoot');
+    expect(text).not.toMatch(/\d\s*%/);
   });
 });

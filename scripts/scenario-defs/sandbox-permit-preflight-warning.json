@@ -1,0 +1,438 @@
+{
+  "name": "sandbox-permit-preflight-warning",
+  "description": "Permit preview (#1925): a player plans a 3x3 at 10 kg (90 kg, over the 80 kg grade-0 limit) in the workshop, sees the permit usage and warning in the footer and the fee, strikes and warning in the preflight, and fires anyway (the limit is soft).",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42"
+        }
+      ],
+      "description": "Progression site at grade 0: the Backyard Dig Permit allows 80 kg and 9 holes per blast.",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 0,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Grade 0 permit: limits 80 kg / 9 holes and the $250 notification fee are listed."
+    },
+    {
+      "command": "build explosive_warehouse at:8,8",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 8,
+          "z": 8
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Stock explosives up front: the crew idles on payroll during a 400-tick delivery wait, which the starting cash cannot pay for twice.",
+      "role": "player"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:400",
+      "role": "setup",
+      "description": "The explosive warehouse is built.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "buy explosive:krackle kg:100",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"stock-buy\"]"
+        }
+      ],
+      "description": "Buy 100 kg of krackle into the warehouse stock: 90 kg for the first shot, 10 kg for the second.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:7 start:36,30",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 7
+        },
+        {
+          "type": "dragTiles",
+          "x1": 36,
+          "z1": 30,
+          "x2": 42,
+          "z2": 36
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Plan a 3x3 pattern in the Blast Workshop.",
+      "role": "player"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "description": "the driller lands every ordered hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:10 stemming:2",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 10
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Charge every hole with 10 kg: 90 kg in all against the 80 kg limit.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "description": "the blaster loads every charge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 90,
+      "description": "Footer shows 90 / 80 kg and 9 / 9 holes in the warning style with the satirical warning line; FIRE stays usable.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 3
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"permit-usage\"][data-over=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-role=\"permit-usage\"] [data-role=\"permit-kg\"]",
+          "property": "textContent",
+          "expectedValue": "90 / 80 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-role=\"permit-usage\"] [data-role=\"permit-holes\"]",
+          "property": "textContent",
+          "expectedValue": "9 / 9 holes"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"permit-warning\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"execute\"]"
+      }
+    },
+    {
+      "command": "blast detonate",
+      "role": "player",
+      "timeout": 90,
+      "description": "Open the preflight: the notification fee and strikes lines and the over-limit warning are listed.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-role=\"preflight-permit-fee\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-role=\"preflight-permit-strikes\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-role=\"preflight-permit-warning\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "expect": {
+        "usable": "[data-action=\"preflight-cancel\"], [data-action=\"preflight-cancel-detonation\"]"
+      }
+    },
+    {
+      "command": "blast",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"preflight-detonate\"]",
+          "timeoutMs": 3000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        }
+      ],
+      "description": "Fire from the preflight (DETONATE, or Blast anyway when crew is still inside): the limit is soft, the sequence fires."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either",
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "description": "The sequence fires anyway: holes consumed, notification fee booked.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "holeCount": 0,
+          "blastBanned": false
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 60,
+      "description": "Dismiss the blast report.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ]
+    },
+    {
+      "command": "permit status",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "permit status"
+        }
+      ],
+      "description": "Status lists the strikes, never a chance."
+    }
+  ]
+}

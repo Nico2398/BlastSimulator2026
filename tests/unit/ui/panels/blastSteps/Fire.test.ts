@@ -5,6 +5,8 @@ import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { readFileSync } from 'node:fs';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
+import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
+import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../../../src/core/entities/Employee.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
@@ -256,5 +258,59 @@ describe('FireStep — no Horn button (#1362)', () => {
       expect(loc['ui.blast_workshop.fire.sound_horn']).toBeUndefined();
       expect(loc['ui.blast_workshop.fire.sound_horn_note']).toBeUndefined();
     }
+  });
+});
+
+// #1925: "Within permit" checklist row, progression sites only; never blocks.
+describe('FireStep — within-permit checklist (#1925)', () => {
+  function permitState(holes: number, kgPerHole: number, progression = true): GameState {
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    for (let i = 0; i < holes; i++) {
+      const hole = addHole(holeCounter, state.drillHoles, 20 + i * 3, 20, 8, 0.15);
+      const r = createCharge('krackle', kgPerHole, 2, hole.depth);
+      if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
+    }
+    expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
+    return state;
+  }
+  const row = (s: FireStep) => s.root.querySelector('[data-role="permit-check"]') as HTMLElement | null;
+
+  it('shows a Within permit row as ok within the limit', () => {
+    const { step } = makeStep();
+    step.update(permitState(9, 8), 'sunny');
+    expect(row(step)).not.toBeNull();
+    expect(row(step)!.dataset['ok']).toBe('true');
+    expect(row(step)!.textContent).toContain('72 / 80 kg');
+  });
+
+  it('shows the row as a warning when over the limit', () => {
+    const { step } = makeStep();
+    step.update(permitState(9, 10), 'sunny');
+    expect(row(step)).not.toBeNull();
+    expect(row(step)!.dataset['ok']).toBe('false');
+  });
+
+  it('is absent on a non-progression site', () => {
+    const { step } = makeStep();
+    step.update(permitState(9, 10, false), 'sunny');
+    expect(row(step)).toBeNull();
+    expect(step.root.textContent).not.toContain('permit');
+  });
+
+  it('is absent without a plan', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.grade = createGradeState();
+    step.update(state, 'sunny');
+    expect(row(step)).toBeNull();
+  });
+
+  it('never renders an inspection chance or overshoot', () => {
+    const { step } = makeStep();
+    step.update(permitState(12, 10), 'sunny');
+    const text = step.root.textContent!.toLowerCase();
+    expect(text).not.toContain('chance');
+    expect(text).not.toContain('overshoot');
   });
 });

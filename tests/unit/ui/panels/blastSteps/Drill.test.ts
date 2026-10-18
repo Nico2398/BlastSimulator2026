@@ -7,6 +7,8 @@ import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
 import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
+import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
+import { gridHoleLimitWarning } from '../../../../../src/ui/panels/permitPreview.js';
 import type { ConfirmModalConfig } from '../../../../../src/ui/panels/ConfirmModal.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
@@ -674,5 +676,42 @@ describe('DrillStep — depth stepper capped at fleet reach (#1679)', () => {
     expect(reason).not.toMatch(/depth_reach/);
     expect(reason).toContain('12');
     expect(JSON.stringify(strip.show.mock.calls.at(-1)![0])).toContain(reason);
+  });
+});
+
+describe('DrillStep — permit hole-limit warning (#1925)', () => {
+  function sized(progression: boolean, x2: number, z2: number) {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    step.update(state, 'sunny');
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2, z2 });
+    return { arg: lastStripArg(strip), strip };
+  }
+  const textOf = (a: unknown) => JSON.stringify(a).toLowerCase();
+
+  it('a 4x4 grid over the nine-hole limit shows a warning in the strip, confirm stays enabled', () => {
+    // spacing 4: 12m x 12m -> 4 x 4 = 16 holes
+    const { arg } = sized(true, 22, 22);
+    expect(arg.confirmEnabled).toBe(true);
+    expect(textOf(arg)).toContain(gridHoleLimitWarning(createGradeState(), 16)!.toLowerCase());
+    // Literal check so the assertion does not merely echo the helper under test.
+    expect(textOf(arg)).toContain('(9)');
+  });
+
+  it('a 3x3 grid at the limit shows no warning', () => {
+    const { arg } = sized(true, 18, 18);
+    expect(arg.confirmEnabled).toBe(true);
+    expect(gridHoleLimitWarning(createGradeState(), 9)).toBeNull();
+    expect(textOf(arg)).not.toContain('permit');
+  });
+
+  it('the same oversize grid on a non-progression site shows no warning', () => {
+    const { arg } = sized(false, 22, 22);
+    expect(arg.confirmEnabled).toBe(true);
+    expect(textOf(arg)).not.toContain('permit');
   });
 });
