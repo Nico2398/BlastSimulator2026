@@ -23,6 +23,10 @@ import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
 import { octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { findBuildingApproachCell } from '../../../src/core/nav/BuildingApproach.js';
+import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
+import { installGradedRamps, bandCentreZ } from '../../helpers/gradedRamps.js';
 
 const SEED = 42;
 
@@ -708,5 +712,128 @@ describe('hole-work legs are locked against destination-spreading (#1291)', () =
     const reposition = planItinerary(state, employee, { kind: 'reposition', x: 20, z: 0 }, 'exact');
     expect(work!.legs.every(l => !l.neverSpread)).toBe(true);
     expect(reposition!.legs.every(l => !l.neverSpread)).toBe(true);
+  });
+});
+
+
+// ── Per-tier climb limit on progression sites (#1938) ──────────────────────────
+
+describe('planItinerary — vehicle tier climb limit (#1938)', () => {
+  const tanDeg = (d: number): number => Math.tan(d * Math.PI / 180);
+  const TARGET = { x: 20, z: bandCentreZ(0) };
+
+  /** Floor-to-plateau pit with one ramp per entry of `degrees`; a mounted tier-`tier` hauler at the floor. */
+  function pit(degrees: number[], tier: 1 | 2 | 3, progression: boolean) {
+    const state = createGame({ seed: SEED });
+    installGradedRamps(state, degrees);
+    if (progression) state.grade = createGradeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 1, bandCentreZ(0));
+    employee.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED.debris_hauler)!.licenceLevel = 3;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 1, bandCentreZ(0), tier);
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.occupantIds = [employee.id];
+    const action = makeAction({ id: 1, requiredVehicleRole: 'debris_hauler', targetX: TARGET.x, targetZ: TARGET.z });
+    state.pendingActions.push(action);
+    return { state, employee, vehicle, action };
+  }
+
+  const driveTicks = (p: ReturnType<typeof pit>, mode: 'exact' | 'estimate' = 'exact'): number | null => {
+    const plan = planItinerary(p.state, p.employee, { kind: 'work', actionId: p.action.id }, mode);
+    return plan === null ? null : plan.legs.filter(l => l.mode === 'drive').reduce((n, l) => n + l.estTicks, 0);
+  };
+
+  /** Cost findPath puts on the drive, with the given climb limit. */
+  const pathCost = (p: ReturnType<typeof pit>, maxSlopeRatio?: number): number => {
+    const r = findPath(p.state.navGrid!, {
+      agentId: p.employee.id, fromX: p.vehicle.x, fromZ: p.vehicle.z, toX: TARGET.x, toZ: TARGET.z, avoidVehicles: false,
+      requiredClearance: NAV_CLEARANCE_VEHICLE_CELLS, ...(maxSlopeRatio !== undefined && { maxSlopeRatio }),
+    });
+    expect(r.found).toBe(true);
+    return r.totalCost;
+  };
+
+  it('a tier-3 hauler on a progression site is planned over the gentler of two ramps (cost matches an 18 degree path)', () => {
+    const p = pit([30, 15], 3, true);
+    const speed = getVehicleDefByTier('debris_hauler', 3).speed;
+    const ticks = driveTicks(p);
+    expect(ticks).not.toBeNull();
+    expect(ticks! * speed).toBeCloseTo(pathCost(p, tanDeg(18)), 5);
+    // The detour to the gentle ramp is real: longer than the steep route.
+    expect(pathCost(p, tanDeg(18))).toBeGreaterThan(pathCost(p));
+  });
+
+  it('a tier-1 hauler on the same progression site takes the steep short ramp', () => {
+    const p = pit([30, 15], 1, true);
+    const speed = getVehicleDefByTier('debris_hauler', 1).speed;
+    expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p), 5);
+  });
+
+  it('a tier-2 hauler refuses 30 degrees but accepts a 20 degree ramp', () => {
+    const p = pit([30, 20], 2, true);
+    const speed = getVehicleDefByTier('debris_hauler', 2).speed;
+    expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p, tanDeg(24)), 5);
+    expect(pathCost(p, tanDeg(24))).toBeGreaterThan(pathCost(p));
+  });
+
+  it('without a grade (campaign site) a tier-3 hauler still uses the steep ramp', () => {
+    const p = pit([30, 15], 3, false);
+    const speed = getVehicleDefByTier('debris_hauler', 3).speed;
+    expect(driveTicks(p)! * speed).toBeCloseTo(pathCost(p), 5);
+  });
+
+  it('a tier-3 hauler with only a 30 degree ramp has no itinerary, in exact and estimate fidelity', () => {
+    const p = pit([30], 3, true);
+    expect(driveTicks(p, 'exact')).toBeNull();
+    expect(driveTicks(p, 'estimate')).toBeNull();
+  });
+
+  it('the same single steep ramp is fine for tier 1, and for tier 3 off a progression site', () => {
+    expect(driveTicks(pit([30], 1, true))).not.toBeNull();
+    expect(driveTicks(pit([30], 3, false))).not.toBeNull();
+  });
+
+  it('the estimate fidelity respects the limit as the exact one does', () => {
+    const p = pit([30, 15], 3, true);
+    const exact = driveTicks(p, 'exact')!;
+    const estimate = driveTicks(p, 'estimate')!;
+    // Estimates may use a coarser heuristic but must not undercut the steep-route cost.
+    const steepTicks = pathCost(p) / getVehicleDefByTier('debris_hauler', 3).speed;
+    expect(exact).toBeGreaterThan(steepTicks);
+    expect(estimate).toBeGreaterThan(steepTicks - 1e-9);
+  });
+
+  describe('executor equivalence (Locomotion drives the route the planner priced)', () => {
+    /** Drive the planned itinerary tick by tick, recording where the vehicle was each tick. */
+    function drive(p: ReturnType<typeof pit>) {
+      p.action.status = 'assigned';
+      p.action.holderId = p.employee.id;
+      p.employee.activeActionId = p.action.id;
+      p.employee.itinerary = planItinerary(p.state, p.employee, { kind: 'work', actionId: p.action.id }, 'exact', { action: p.action });
+      expect(p.employee.itinerary).not.toBeNull();
+      const planned = p.employee.itinerary!.legs.reduce((n, l) => n + l.estTicks, 0);
+      const visited: Array<{ x: number; z: number }> = [];
+      let ticks = 0;
+      for (; ticks < 120 && p.employee.itinerary !== null; ticks++) {
+        tickLocomotion(p.state);
+        visited.push({ x: Math.round(p.vehicle.x), z: Math.round(p.vehicle.z) });
+      }
+      return { visited, ticks, planned };
+    }
+    const onSteepRamp = (v: { x: number; z: number }) => v.x >= 4 && v.x <= 8 && v.z <= 3;
+
+    it('a tier-3 hauler arrives without ever crossing the 30 degree corridor, in about the planned ticks', () => {
+      const p = pit([30, 15], 3, true);
+      const { visited, ticks, planned } = drive(p);
+      expect(visited.some(onSteepRamp)).toBe(false);
+      expect(Math.hypot(p.vehicle.x - TARGET.x, p.vehicle.z - TARGET.z)).toBeLessThan(3);
+      expect(Math.abs(ticks - planned)).toBeLessThanOrEqual(2);
+    });
+
+    it('a tier-1 hauler crosses the 30 degree corridor and arrives', () => {
+      const p = pit([30, 15], 1, true);
+      const { visited } = drive(p);
+      expect(visited.some(onSteepRamp)).toBe(true);
+      expect(Math.hypot(p.vehicle.x - TARGET.x, p.vehicle.z - TARGET.z)).toBeLessThan(3);
+    });
   });
 });
