@@ -202,3 +202,15 @@ export function getResearchProgress(task: ResearchTask): { elapsed: number; tota
   const fraction = total <= 0 ? 1 : Math.min(1, Math.max(0, elapsed / total));
   return { elapsed, total, fraction };
 }
+
+/** Speed and parallel slots of the state's active Research Center, or undefined when it has none. */
+export function getResearchCenterProfile(_state: BuildingState): { speed: number; slots: number } | undefined {
+  // TODO: implement
+  return undefined;
+}
+
+/** Queued research tasks currently being worked on (at most the Research Center's slot count). */
+export function getActiveResearchTasks(_state: BuildingState): ResearchTask[] {
+  // TODO: implement
+  return [];
+}

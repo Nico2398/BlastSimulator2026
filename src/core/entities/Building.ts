@@ -674,6 +674,7 @@ export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
 export {
   queueResearchTask, tickResearch, getResearchProgress, isTierUnlocked,
   hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,
+  getResearchCenterProfile, getActiveResearchTasks,
   type QueueBlockCode, type CancelledResearch,
 } from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
