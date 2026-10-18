@@ -5,6 +5,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { ContractType } from './Contract.js';
 import { deductExpense } from './Finance.js';
+import { parseColumnKey } from '../mining/SurveyColumn.js';
 import {
   MINE_GRADES,
   MINE_GRADE_CLASS_ORE_FACTOR,
@@ -12,9 +13,10 @@ import {
   MINE_GRADE_CLASS_ROCK_FACTOR,
   MINE_GRADE_CLASS_FEE_FACTOR,
   MINE_GRADE_CLASS_PROCESSING_TICKS,
+  type MineGradeTargetConfig,
 } from '../config/balance.js';
 
-export type GradeTargetKind = 'ore_kg' | 'blasts' | 'depth_m' | 'rock_m3' | 'safety' | 'ecology' | 'neighbours' | 'no_death';
+export type GradeTargetKind = MineGradeTargetConfig['kind'];
 
 interface GradeTargetDef {
   kind: GradeTargetKind;
@@ -152,9 +154,7 @@ export function recordGradeBlast(grade: GradeState | undefined, deepestM: number
 export function blastPitDepthM(grid: VoxelGrid, clearedColumns: readonly string[]): number {
   let deepest = 0;
   for (const key of clearedColumns) {
-    const [xs, zs] = key.split(',');
-    const x = Number(xs);
-    const z = Number(zs);
+    const { x, z } = parseColumnKey(key);
     const natural = grid.generatorSurfaceHeightAt(x, z);
     if (natural === undefined) continue;
     const current = computeVoxelColumnSurfaceHeight(grid, x, z);

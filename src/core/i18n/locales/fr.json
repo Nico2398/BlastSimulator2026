@@ -2292,7 +2292,7 @@
   "permit.no_ladder": "Ce site n'a pas d'échelle de permis. Le Ministère des Trous ignore votre existence, et ça lui convient très bien.",
   "permit.refusal.insufficient_funds": "Demande refusée : les frais sont de ${fee} et vous avez ${cash}. Le Ministère ne fait pas de facilités de paiement.",
   "permit.refusal.pending": "Une demande est déjà dans la pile. En ajouter une deuxième ne ferait que fâcher la pile.",
-  "permit.refusal.unmet_targets": "Demande refusée : le Ministère n'est pas convaincu par votre {targets}.",
+  "permit.refusal.unmet_targets": "Demande refusée : le Ministère n'est pas convaincu sur ces points : {targets}.",
   "permit.status.grade": "Permis de niveau {grade} : {name}",
   "permit.status.next": "Prochain : {name} (frais ${fee}, {ticks} ticks de paperasse)",
   "permit.status.pending": "La demande pour {name} est dans la pile : {ticks} ticks avant qu'on la tamponne.",
