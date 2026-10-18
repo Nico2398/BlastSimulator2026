@@ -9,8 +9,9 @@ import {
   selectEvent,
   incrementActionCount,
   CATEGORY_PREREQUISITE,
+  unionCooldownOpen,
 } from '../../../src/core/events/EventSystem.js';
-import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX, MIN_EVENT_INTERVAL_TICKS, UNION_GRIEVANCE_STRIKE_THRESHOLD } from '../../../src/core/config/balance.js';
+import { CANDIDATE_UNION_CHANCE, UNION_EVENT_MIN_INTERVAL_TICKS, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE, ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX, MIN_EVENT_INTERVAL_TICKS, UNION_GRIEVANCE_STRIKE_THRESHOLD } from '../../../src/core/config/balance.js';
 import { UNION_EVENTS_1 } from '../../../src/core/events/UnionEvents1.js';
 import { UNION_EVENTS_2 } from '../../../src/core/events/UnionEvents2.js';
 import { LAWSUIT_EVENTS_1 } from '../../../src/core/events/LawsuitEvents1.js';
@@ -719,7 +720,7 @@ describe('hasEnvironmentalCause (#1412)', () => {
   });
 });
 
-describe('union stretch applies to every category cooldown (#1890)', () => {
+describe('union events keep their own cooldown clock (#1907)', () => {
   beforeEach(() => {
     clearEvents();
     registerEvents([
@@ -731,10 +732,19 @@ describe('union stretch applies to every category cooldown (#1890)', () => {
     ]);
   });
 
-  /** Politics timer expires next tick with exactly the unstretched cooldown elapsed. */
-  function politicsAttempt(unionMemberCount: number | undefined) {
+  const CACHED = UNION_EVENT_MIN_INTERVAL_TICKS + 30;
+  const SENTINEL_SHARED = 77;
+
+  /** Only the given category's timer expires next tick. */
+  function armed(category: string) {
     const state = createEventSystemState();
-    for (const t of state.timers) t.remaining = t.category === 'politics' ? 1 : 100000;
+    for (const t of state.timers) t.remaining = t.category === category ? 1 : 100000;
+    return state;
+  }
+
+  /** Politics attempt with the shared cooldown exactly elapsed. */
+  function politicsAttempt(unionMemberCount: number | undefined) {
+    const state = armed('politics');
     state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS;
     state.lastEventTick = 0;
     state.actionCountSinceEvent = 100;
@@ -745,37 +755,174 @@ describe('union stretch applies to every category cooldown (#1890)', () => {
     return tickEventSystem(state, ctx, new Random(7));
   }
 
-  it('a politics event fires for an all-member crew at the unstretched interval', () => {
-    expect(politicsAttempt(10)?.eventId).toBe('pol_ev');
-  });
-  it('the same politics event is held back for a zero-member crew', () => {
-    expect(politicsAttempt(0)).toBeNull();
-  });
-  it('an undefined member count keeps the legacy, unstretched cooldown', () => {
-    expect(politicsAttempt(undefined)?.eventId).toBe('pol_ev');
+  /** Union attempt `elapsed` ticks after the last union event, shared clock and action gate deliberately fresh. */
+  function unionAttempt(elapsed: number, unionMemberCount: number | undefined, employeeCount = 10) {
+    const state = armed('union');
+    state.unionCooldownMinIntervalTicks = CACHED;
+    state.lastUnionEventTick = 0;
+    state.lastEventTick = elapsed; // shared cooldown just reset: must not matter
+    state.actionCountSinceEvent = 0; // below MIN_EVENT_INTERVAL_ACTIONS: must not matter
+    state.cooldownMinIntervalTicks = SENTINEL_SHARED;
+    const ctx = makeCtx({
+      tickCount: elapsed, employeeCount,
+      ...(unionMemberCount === undefined ? {} : { unionMemberCount }),
+    });
+    const fired = tickEventSystem(state, ctx, new Random(7));
+    return { state, fired };
+  }
+
+  describe('shared cooldown is no longer stretched by membership', () => {
+    it('a politics event fires for an all-member crew at the shared interval', () => {
+      expect(politicsAttempt(10)?.eventId).toBe('pol_ev');
+    });
+    it('the same politics event fires for a zero-member crew', () => {
+      expect(politicsAttempt(0)?.eventId).toBe('pol_ev');
+    });
+    it('the same politics event fires for an undefined member count', () => {
+      expect(politicsAttempt(undefined)?.eventId).toBe('pol_ev');
+    });
   });
 
-  it('over the same seed and ticks a zero-member crew draws fewer events in total, none extra outside union', () => {
-    const run = (unionMemberCount: number) => {
+  describe('union event cooldown', () => {
+    it('all members: fires at the cached interval', () => {
+      expect(unionAttempt(CACHED, 10).fired?.eventId).toBe('union_ev');
+    });
+    it('all members: held back one tick before the cached interval', () => {
+      expect(unionAttempt(CACHED - 1, 10).fired).toBeNull();
+    });
+    it('zero members: not open at the cached interval', () => {
+      expect(unionAttempt(CACHED, 0).fired).toBeNull();
+    });
+    it('zero members: held back one tick short of four times the cached interval', () => {
+      expect(unionAttempt(CACHED * 4 - 1, 0).fired).toBeNull();
+    });
+    it('zero members: fires at four times the cached interval', () => {
+      expect(unionAttempt(CACHED * 4, 0).fired?.eventId).toBe('union_ev');
+    });
+    it('undefined member count: stretch 1', () => {
+      expect(unionAttempt(CACHED, undefined).fired?.eventId).toBe('union_ev');
+      expect(unionAttempt(CACHED - 1, undefined).fired).toBeNull();
+    });
+    it('no living employees: stretch 1', () => {
+      expect(unionAttempt(CACHED, 0, 0).fired?.eventId).toBe('union_ev');
+    });
+    it('a union event is not gated by MIN_EVENT_INTERVAL_ACTIONS', () => {
+      expect(MIN_EVENT_INTERVAL_ACTIONS).toBeGreaterThan(0);
+      const { state, fired } = unionAttempt(CACHED, 10);
+      expect(fired?.eventId).toBe('union_ev');
+      expect(state.actionCountSinceEvent).toBe(0);
+    });
+  });
+
+  describe('state bookkeeping', () => {
+    it('a union fire stamps lastUnionEventTick and clears the cached draw', () => {
+      const { state } = unionAttempt(CACHED + 5, 10);
+      expect(state.lastUnionEventTick).toBe(CACHED + 5);
+      expect(state.unionCooldownMinIntervalTicks).toBeNull();
+    });
+    it('a union fire leaves the shared cooldown state untouched', () => {
+      const elapsed = CACHED + 5;
+      const { state } = unionAttempt(elapsed, 10);
+      expect(state.lastEventTick).toBe(elapsed);
+      expect(state.actionCountSinceEvent).toBe(0);
+      expect(state.cooldownMinIntervalTicks).toBe(SENTINEL_SHARED);
+    });
+    it('a non-union fire leaves lastUnionEventTick unchanged', () => {
+      const state = armed('politics');
+      state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS;
+      state.lastEventTick = 0;
+      state.lastUnionEventTick = 13;
+      state.unionCooldownMinIntervalTicks = CACHED;
+      state.actionCountSinceEvent = 100;
+      const fired = tickEventSystem(state, makeCtx({ tickCount: MIN_EVENT_INTERVAL_TICKS, employeeCount: 10, unionMemberCount: 10 }), new Random(7));
+      expect(fired?.eventId).toBe('pol_ev');
+      expect(state.lastUnionEventTick).toBe(13);
+      expect(state.unionCooldownMinIntervalTicks).toBe(CACHED);
+    });
+  });
+
+  describe('union draw is cached once per window (#597)', () => {
+    it('a blocked union attempt draws UNION_EVENT_MIN_INTERVAL_TICKS + nextInt(0, RANGE)', () => {
+      const state = armed('union');
+      state.lastUnionEventTick = 0;
+      const rng = new Random(321);
+      const expected = UNION_EVENT_MIN_INTERVAL_TICKS + new Random(321).nextInt(0, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE);
+      expect(tickEventSystem(state, makeCtx({ tickCount: 1, employeeCount: 10, unionMemberCount: 10 }), rng)).toBeNull();
+      expect(state.unionCooldownMinIntervalTicks).toBe(expected);
+    });
+    it('rechecks of a blocked union event reuse the cached draw and consume no further rng', () => {
+      const state = armed('union');
+      state.lastUnionEventTick = 0;
+      const rng = new Random(321);
+      const ref = new Random(321);
+      ref.nextInt(0, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE);
+      const ctx = (tickCount: number) => makeCtx({ tickCount, employeeCount: 10, unionMemberCount: 10 });
+      tickEventSystem(state, ctx(1), rng);
+      const cached = state.unionCooldownMinIntervalTicks;
+      for (let tick = 2; tick <= 6; tick++) {
+        for (const t of state.timers) t.remaining = t.category === 'union' ? 1 : 100000;
+        expect(tickEventSystem(state, ctx(tick), rng)).toBeNull();
+        expect(state.unionCooldownMinIntervalTicks).toBe(cached);
+      }
+      expect(rng.nextInt(0, 1_000_000)).toBe(ref.nextInt(0, 1_000_000));
+    });
+  });
+
+  describe('unionCooldownOpen', () => {
+    it('is closed before the cached interval and open at it (all members)', () => {
       const state = createEventSystemState();
-      const rng = new Random(99);
-      const counts: Record<string, number> = {};
+      state.unionCooldownMinIntervalTicks = CACHED;
+      state.lastUnionEventTick = 10;
+      expect(unionCooldownOpen(state, 10 + CACHED - 1, 10, 10, new Random(1))).toBe(false);
+      expect(unionCooldownOpen(state, 10 + CACHED, 10, 10, new Random(1))).toBe(true);
+    });
+    it('stretches fourfold for zero members', () => {
+      const state = createEventSystemState();
+      state.unionCooldownMinIntervalTicks = CACHED;
+      expect(unionCooldownOpen(state, CACHED * 4 - 1, 0, 10, new Random(1))).toBe(false);
+      expect(unionCooldownOpen(state, CACHED * 4, 0, 10, new Random(1))).toBe(true);
+    });
+    it('draws and caches the interval when none is cached', () => {
+      const state = createEventSystemState();
+      const open = unionCooldownOpen(state, 1, 10, 10, new Random(5));
+      expect(open).toBe(false);
+      expect(state.unionCooldownMinIntervalTicks).toBe(
+        UNION_EVENT_MIN_INTERVAL_TICKS + new Random(5).nextInt(0, UNION_EVENT_MIN_INTERVAL_RANDOM_RANGE));
+    });
+  });
+
+  describe('statistical totals over seeds', () => {
+    const STARTING_CREW_MEMBERS = Math.round(10 * CANDIDATE_UNION_CHANCE);
+    const run = (seed: number, unionMemberCount: number) => {
+      const state = createEventSystemState();
+      const rng = new Random(seed);
+      let union = 0;
+      let other = 0;
       for (let tick = 1; tick <= 6000; tick++) {
         state.actionCountSinceEvent = Math.max(state.actionCountSinceEvent, 100);
         const f = tickEventSystem(state, makeCtx({ tickCount: tick, employeeCount: 10, unionMemberCount, corruptionLevel: 100 }), rng);
-        if (f) counts[f.eventId] = (counts[f.eventId] ?? 0) + 1;
+        if (f) { if (f.eventId === 'union_ev') union++; else other++; }
         state.pendingEvent = null;
         state.firedEventIds = []; // fired ids are one-shot; reset so draws keep counting
       }
-      return counts;
+      return { union, other };
     };
-    const all = run(10);
-    const none = run(0);
-    const total = (c: Record<string, number>) => Object.values(c).reduce((a, b) => a + b, 0);
-    for (const id of ['pol_ev', 'law_ev', 'weather_ev', 'mafia_ev']) {
-      expect(none[id] ?? 0).toBeLessThanOrEqual(all[id] ?? 0);
+
+    for (const seed of [99, 7, 42, 1234]) {
+      it(`seed ${seed}: membership only moves union events`, () => {
+        const all = run(seed, 10);
+        const crew = run(seed, STARTING_CREW_MEMBERS);
+        const none = run(seed, 0);
+        const others = [all.other, crew.other, none.other];
+        expect(Math.max(...others)).toBeLessThanOrEqual(Math.min(...others) * 1.25);
+        expect(crew.other).toBeGreaterThanOrEqual(all.other * 0.99);
+        expect(none.other).toBeGreaterThanOrEqual(all.other * 0.99);
+        expect(none.other).toBeLessThanOrEqual(all.other * 1.25);
+        expect(all.union).toBeGreaterThan(none.union);
+        expect(crew.union).toBeGreaterThanOrEqual(none.union);
+        expect(crew.union).toBeLessThanOrEqual(all.union);
+      });
     }
-    expect(total(none)).toBeLessThan(total(all));
   });
 });
 
