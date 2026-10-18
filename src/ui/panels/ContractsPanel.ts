@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Contracts panel (redesign P5)
-// Storage strip, ACTIVE contracts (progress + MAX-capped deliver), OFFERED
-// contracts (Accept/Negotiate/Decline, negotiate result inline), CLOSED
-// history. Replaces ContractUI.ts's role (deleted in the P5 cleanup task).
+// Section order: storage strip, AVAILABLE offers (fillable first, sized to
+// three cards before scrolling; Accept/Negotiate/Decline, negotiate result
+// inline), ACTIVE contracts (progress + MAX-capped deliver), CLOSED history. Replaces ContractUI.ts's role (deleted in the P5 cleanup task).
 //
 // Root id and the accept/deliver/amount classes are preserved from the old
 // panel so tutorialStages.ts and the tutorial scenario defs keep
@@ -58,6 +58,8 @@ const NEGOTIATE_KEY: Record<NegotiationField, { improved: string; worsened: stri
 export const CONTRACT_OFFER_CARD_PX = 190;
 /** Offer cards the Available section shows before it scrolls. */
 export const AVAILABLE_VISIBLE_CARDS = 3;
+const SECTION_GAP_PX = 10;
+const AVAILABLE_SECTION_MAX_PX = AVAILABLE_VISIBLE_CARDS * CONTRACT_OFFER_CARD_PX + (AVAILABLE_VISIBLE_CARDS - 1) * SECTION_GAP_PX;
 
 /** Available offers in display order (fillable first). */
 export function orderOffers(
@@ -65,10 +67,8 @@ export function orderOffers(
   collectedOre: Readonly<Record<string, number>>,
   rubbleStockKg: number,
 ): Contract[] {
-  // TODO: implement fillable-first partition
-  void collectedOre;
-  void rubbleStockKg;
-  return [...available];
+  const fillable = (c: Contract): boolean => isFillableSaleOffer(c, collectedOre, rubbleStockKg);
+  return [...available.filter(fillable), ...available.filter(c => !fillable(c))];
 }
 
 /** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
@@ -143,21 +143,21 @@ export class ContractsPanel extends PanelBase {
     const siteOres = resolveContractOres(state);
     const sections: HTMLElement[] = [
       this.makeStorageStrip(state),
-      sectionHeader(t('ui.contracts.active')),
+      sectionHeader(t('ui.contracts.available_count', { count: state.contracts.available.length })),
+      scrollBoundedSection(
+        state.contracts.available.length > 0
+          ? orderOffers(state.contracts.available, state.collectedOre, stateRubbleStockKg(state)).map(c => this.makeOfferedCard(c, state, managerLevel, siteOres))
+          : [emptyState(t('ui.contracts.none'))],
+        AVAILABLE_SECTION_MAX_PX,
+        { gap: SECTION_GAP_PX, scrollKey: 'available' },
+      ),
+      sectionHeader(t('ui.contracts.active_count', { count: state.contracts.active.length })),
       scrollBoundedSection(
         state.contracts.active.length > 0
           ? state.contracts.active.map(c => this.makeActiveCard(c, state))
           : [emptyState(t('ui.contracts.none_active'))],
         200,
-        { gap: 10, scrollKey: 'active' },
-      ),
-      sectionHeader(t('ui.contracts.available')),
-      scrollBoundedSection(
-        state.contracts.available.length > 0
-          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel, siteOres))
-          : [emptyState(t('ui.contracts.none'))],
-        200,
-        { gap: 10, scrollKey: 'available' },
+        { gap: SECTION_GAP_PX, scrollKey: 'active' },
       ),
       sectionHeader(t('ui.contracts.closed')),
       scrollBoundedSection(
@@ -165,7 +165,7 @@ export class ContractsPanel extends PanelBase {
           ? [...state.contracts.completedHistory].reverse().map(c => this.makeHistoryRow(c))
           : [emptyState(t('ui.contracts.none_closed'))],
         200,
-        { gap: 10, scrollKey: 'closed' },
+        { gap: SECTION_GAP_PX, scrollKey: 'closed' },
       ),
     ];
     replaceChildrenKeepingScroll(this.bodyEl, sections);
