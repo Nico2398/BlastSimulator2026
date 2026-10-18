@@ -12,8 +12,10 @@ import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.
 import { TRAFFIC_JAM_EFFECTS, type EventWorld, type EffectOutcome } from './TrafficJamEffects.js';
 import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
+import { getLivingEmployees } from '../entities/Employee.js';
 import { applyEventEffects } from './EventEffectCatalog.js';
 import { applyUnionDecision } from './UnionGrievance.js';
+import { leaverLabel } from './EventLeavers.js';
 import { effectChips, type EventEffectChip } from './EventEffectText.js';
 
 // ── Resolution result ──
@@ -66,7 +68,12 @@ export function resolveEvent(
   if (!option) return null;
 
   // Resolve probabilistic consequence
+  const pendingBefore = eventSystem.pendingEvent;
   const { consequence: resolved, isAlt } = resolveConsequence(consequence, rng);
+
+  // The leaver drawn at fire time (#1908); read before the pending event is cleared.
+  const storedLeaver = eventSystem.pendingEvent.leavers?.find(d => d.optionIndex === optionIndex);
+  const leaverId = storedLeaver?.employeeId;
 
   // Apply effects
   const result = applyConsequence(
@@ -94,8 +101,9 @@ export function resolveEvent(
 
   // Declarative effects (#1414): modifiers, hires, bans, ... the sentence promised.
   if (world && resolved.effects?.length) {
-    mergeOutcome(result, applyEventEffects(resolved.effects, world, tick, rng));
-    result.effectChips = effectChips(resolved.effects);
+    mergeOutcome(result, applyEventEffects(resolved.effects, world, tick, rng, leaverId));
+    const living = getLivingEmployees(world.state.employees.employees);
+    result.effectChips = effectChips(resolved.effects, leaverLabel(pendingBefore, optionIndex, living));
   }
 
   if (world && resolved.exposureDelta) {

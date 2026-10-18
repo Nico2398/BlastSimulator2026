@@ -21,6 +21,8 @@ import type { GameState } from '../../core/state/GameState.js';
 import { getEventById, getOptionEffectHints, type EventCategory, type EventDef, type EventOptionEffectHint } from '../../core/events/EventPool.js';
 import type { EventEffect } from '../../core/events/EventSystem.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import { leaverLabel, type LeaverLabel } from '../../core/events/EventLeavers.js';
+import { getLivingEmployees } from '../../core/entities/Employee.js';
 import { effectChipText, effectChips } from '../../core/events/EventEffectText.js';
 import { createModifierChips } from '../shell/ModifierChips.js';
 
@@ -90,11 +92,11 @@ function hintName(hint: EventOptionEffectHint): string {
 }
 
 /** Choose-phase hint chip: the exact amount or lasting effect when certain, direction only (with "?") when risky. */
-function hintChip(hint: EventOptionEffectHint): HTMLElement {
+function hintChip(hint: EventOptionEffectHint, leaver?: LeaverLabel): HTMLElement {
   const tone: ChipTone = hint.risky
     ? 'warn'
     : hint.direction === 'positive' ? 'positive' : hint.direction === 'negative' ? 'critical' : 'neutral';
-  if (hint.spec) return chip(effectChipText(effectChips([hint.spec])[0]!) ?? hint.key, tone);
+  if (hint.spec) return chip(effectChipText(effectChips([hint.spec], leaver)[0]!) ?? hint.key, tone);
   if (hint.amount !== undefined && !hint.risky) return chip(amountLabel(hint.kind, hint.key, hint.amount), tone);
   const sign = hint.direction === 'positive' ? '+' : hint.direction === 'negative' ? '-' : '';
   // An unnamed 'other' key is a lasting effect whose spec is hidden because the outcome is risky.
@@ -278,7 +280,9 @@ export class EventModal {
       const hints = getOptionEffectHints(option, consequence);
       if (hints.length > 0) {
         const hintRow = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex:0 1 auto;min-width:0;max-width:60%' } });
-        hintRow.append(...hints.map(hintChip));
+        const staff = getLivingEmployees(state.employees.employees);
+        const leaver = leaverLabel(state.events.pendingEvent, i, staff);
+        hintRow.append(...hints.map(h => hintChip(h, h.spec?.type === 'employee_leaves' ? leaver : undefined)));
         btn.appendChild(hintRow);
       }
       const idx = i;

@@ -2755,6 +2755,8 @@
   "ui.event.effect.morale_shift": "Le moral varie de {perHour} par heure pendant {hours} h.",
   "ui.event.effect.fatigue_relief": "Tout le monde est reposé.",
   "ui.event.effect.employee_leaves": "Un employé quitte l'équipe ({pick}).",
+  "ui.event.effect.employee_leaves_named": "{name} ({role}) quitte l'équipe.",
+  "ui.event.effect.employee_leaves_nobody": "Personne ne reste pour partir.",
   "ui.event.effect.employee_joins": "Un nouveau {role} rejoint l'équipe gratuitement.",
   "ui.event.effect.employee_injured": "Un employé est blessé.",
   "ui.event.effect.salary": "Les salaires varient de {pct} % pendant {days} jours ({scope}).",

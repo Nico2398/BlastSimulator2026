@@ -10,8 +10,13 @@ import type { FiredEvent } from './EventSystem.js';
 export function pickLeaver(
   spec: Extract<EventEffectSpec, { type: 'employee_leaves' }>, staff: readonly Employee[], rng: Random,
 ): Employee | undefined {
-  void spec; void staff; void rng;
-  return undefined;
+  const pool = spec.pick === 'role' ? staff.filter(e => e.role === spec.role) : staff;
+  if (pool.length === 0) return undefined;
+  if (spec.pick === 'junior') {
+    // Most recently hired; ids only grow, so the highest id breaks a same-tick tie.
+    return pool.reduce((a, b) => ((b.hiredAtTick ?? 0) > (a.hiredAtTick ?? 0) || ((b.hiredAtTick ?? 0) === (a.hiredAtTick ?? 0) && b.id > a.id) ? b : a));
+  }
+  return pool[rng.nextInt(0, pool.length - 1)];
 }
 
 /** The leaver drawn for one option; employeeId is null when nobody matched. */
@@ -22,15 +27,21 @@ export interface LeaverDraw {
 
 /** One draw per option holding an employee_leaves spec. */
 export function drawLeavers(def: EventDef, staff: readonly Employee[], rng: Random): LeaverDraw[] {
-  void def; void staff; void rng;
-  return [];
+  const draws: LeaverDraw[] = [];
+  def.consequences.forEach((consequence, optionIndex) => {
+    const spec = consequence.effects?.find((e): e is Extract<EventEffectSpec, { type: 'employee_leaves' }> => e.type === 'employee_leaves');
+    if (spec) draws.push({ optionIndex, employeeId: pickLeaver(spec, staff, rng)?.id ?? null });
+  });
+  return draws;
 }
 
 /** Draws the leavers for def and stores them on the pending event. No-op without both. */
 export function storeLeavers(
   pending: FiredEvent | null, def: EventDef | undefined, staff: readonly Employee[], rng: Random,
 ): void {
-  void pending; void def; void staff; void rng;
+  if (!pending || !def) return;
+  const draws = drawLeavers(def, staff, rng);
+  if (draws.length > 0) pending.leavers = draws;
 }
 
 /** Who an option takes: a named employee, or 'nobody' when no one matched. */
@@ -40,6 +51,8 @@ export type LeaverLabel = { name: string; role: EmployeeRole } | 'nobody';
 export function leaverLabel(
   pending: FiredEvent | null, optionIndex: number, staff: readonly Employee[],
 ): LeaverLabel | undefined {
-  void pending; void optionIndex; void staff;
-  return undefined;
+  const draw = pending?.leavers?.find(d => d.optionIndex === optionIndex);
+  if (!draw) return undefined;
+  const who = draw.employeeId === null ? undefined : staff.find(e => e.id === draw.employeeId);
+  return who ? { name: who.name, role: who.role } : 'nobody';
 }

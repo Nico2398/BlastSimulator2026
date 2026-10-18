@@ -83,7 +83,6 @@ function assetModifier(spec: EventEffectSpec, world: EventWorld, tick: number, r
 export function applyEventEffects(
   specs: readonly EventEffectSpec[] | undefined, world: EventWorld, tick: number, rng: Random, leaverId?: number | null,
 ): EffectOutcome {
-  void leaverId; // TODO: implement (#1908)
   const total: EffectOutcome = { effects: [], cashChange: 0, cashSettled: 0, scoreChanges: {}, resultKeySuffix: '' };
   const events = world.state.events;
   const base = { sourceEventId: events.pendingEvent?.eventId ?? '' };
@@ -96,7 +95,7 @@ export function applyEventEffects(
       const id = addModifier(events.activeModifiers, draft, events.nextModifierId);
       if (id === events.nextModifierId) events.nextModifierId++;
     } else {
-      const out = applyInstantEffect(spec, world, tick, rng);
+      const out = applyInstantEffect(spec, world, tick, rng, leaverId);
       total.cashChange += out.cashChange;
       total.cashSettled += out.cashSettled;
       for (const [k, d] of Object.entries(out.scoreChanges) as [keyof typeof out.scoreChanges, number][]) {
