@@ -4,7 +4,7 @@
 // survey's reading at that voxel's depth. It never reads the grid's real ore.
 
 import { describe, it, expect, vi } from 'vitest';
-import { estimateBlastOreValue } from '../../../src/core/mining/BlastValueEstimate.js';
+import { estimateBlastOre, estimateBlastOreValue } from '../../../src/core/mining/BlastValueEstimate.js';
 import type { BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -456,5 +456,102 @@ describe('estimateBlastOreValue market (#1681)', () => {
 
   it('still returns 0 for an unsurveyed plan in production', () => {
     expect(estimateBlastOreValue(PLAN, [], grid, new Set(), 'production')).toBe(0);
+  });
+});
+
+describe('estimateBlastOre — value and survey coverage (#1960)', () => {
+  const grid = makeGrid();
+
+  it('value equals estimateBlastOreValue for the same inputs', () => {
+    const surveys = [makeSurvey()];
+    expect(estimateBlastOre(PLAN, surveys, grid).value).toBeCloseTo(estimateBlastOreValue(PLAN, surveys, grid), 6);
+    expect(estimateBlastOre(PLAN, surveys, grid).value).toBeGreaterThan(0);
+  });
+
+  it('value equals estimateBlastOreValue with wet holes and a production market', () => {
+    const surveys = [makeSurvey()];
+    const wet = new Set(['H1']);
+    expect(estimateBlastOre(PLAN, surveys, grid, wet, 'production').value)
+      .toBeCloseTo(estimateBlastOreValue(PLAN, surveys, grid, wet, 'production'), 6);
+  });
+
+  it('coverage is 0 with no surveys', () => {
+    expect(estimateBlastOre(PLAN, [], grid)).toEqual({ value: 0, coverage: 0 });
+  });
+
+  it('coverage is 0 when every survey is stale', () => {
+    const stale = { ...makeSurvey(), stale: true };
+    const r = estimateBlastOre(PLAN, [stale], grid);
+    expect(r.coverage).toBe(0);
+    expect(r.value).toBe(0);
+  });
+
+  it('coverage is 0 (not NaN) for an empty plan', () => {
+    const r = estimateBlastOre(assembleBlastPlan([], {}), [makeSurvey()], grid);
+    expect(r).toEqual({ value: 0, coverage: 0 });
+  });
+
+  it('coverage is 0 (not NaN) for uncharged holes, where nothing breaks', () => {
+    const r = estimateBlastOre({ holes: [HOLE], charges: {} }, [makeSurvey()], grid);
+    expect(r.coverage).toBe(0);
+    expect(Number.isNaN(r.coverage)).toBe(false);
+  });
+
+  it('coverage is 1 under a survey covering the whole blast', () => {
+    expect(estimateBlastOre(PLAN, [makeSurvey()], grid).coverage).toBe(1);
+  });
+
+  it('coverage is 0 when the survey covers no blast column', () => {
+    expect(estimateBlastOre(PLAN, [makeSurvey({ min: 0, max: 3 })], grid).coverage).toBe(0);
+  });
+
+  it('coverage is strictly between 0 and 1 when the survey covers part of the broken volume', () => {
+    const r = estimateBlastOre(PLAN, [makeSurvey({ min: 20, max: 39 })], grid);
+    expect(r.coverage).toBeGreaterThan(0);
+    expect(r.coverage).toBeLessThan(1);
+  });
+
+  it('a survey over half of a pattern reports partial coverage and a value below the full survey', () => {
+    const holes: DrillHole[] = [];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) holes.push(makeHole(`H${r}${c}`, 12 + 8 * c, 20 + 2 * r));
+    const plan = chargedPlan(holes);
+    const half = estimateBlastOre(plan, [makeSurvey({ min: 0, max: 20 })], grid);
+    const full = estimateBlastOre(plan, [makeSurvey()], grid);
+    expect(half.coverage).toBeGreaterThan(0);
+    expect(half.coverage).toBeLessThan(1);
+    expect(full.coverage).toBe(1);
+    expect(half.value).toBeLessThan(full.value);
+  });
+
+  it('coverage counts covered columns regardless of depth: a survey that located no ore at the broken depth still covers it', () => {
+    const deepOnly = makeSurvey({ bands: [{ fromM: 20, toM: 25, ores: { blingite: 0.9 } }] });
+    const r = estimateBlastOre(PLAN, [deepOnly], grid);
+    expect(r.value).toBe(0);
+    expect(r.coverage).toBe(1);
+  });
+
+  it('an ore-free survey still gives full coverage with zero value', () => {
+    const r = estimateBlastOre(PLAN, [makeSurvey({ bands: [{ fromM: 0, toM: 25, ores: {} }], density: 0 })], grid);
+    expect(r.coverage).toBe(1);
+    expect(r.value).toBe(0);
+  });
+
+  it('an aerial survey covers the whole blast column set even though it values the top 2 m only', () => {
+    const aerial = makeSurvey({ method: 'aerial', bands: null, surfaceY: SURFACE_Y + 1, density: 0.3 });
+    expect(estimateBlastOre(PLAN, [aerial], grid).coverage).toBe(1);
+  });
+
+  it('a stale survey is ignored but an older fresh survey over the same columns still covers', () => {
+    const older = makeSurvey({ id: 1, completedTick: 10 });
+    const newerStale = { ...makeSurvey({ id: 2, completedTick: 20 }), stale: true };
+    expect(estimateBlastOre(PLAN, [older, newerStale], grid).coverage).toBe(1);
+  });
+
+  it('coverage stays within 0..1', () => {
+    for (const surveys of [[], [makeSurvey()], [makeSurvey({ min: 20, max: 39 })]]) {
+      const c = estimateBlastOre(PLAN, surveys, grid).coverage;
+      expect(c).toBeGreaterThanOrEqual(0);
+      expect(c).toBeLessThanOrEqual(1);
+    }
   });
 });
