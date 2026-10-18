@@ -2559,6 +2559,17 @@
       "role": "setup"
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "#1907: the tick pad above stops at the Celebrity Protest event (tick 300) with its dialog open. A player resolves it before hiring; left pending, the first hire click resolved it through the covered-by-div retry and its cash payout swamped the hire cost. Resolving it here costs no ticks, so the timeline is unchanged.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "employee hire role:driver",
       "interaction": [
         {
