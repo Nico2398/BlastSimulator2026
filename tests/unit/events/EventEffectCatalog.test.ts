@@ -28,6 +28,8 @@ const ALL_SPECS: EventEffectSpec[] = [
   { type: 'building_closed', hours: 12 },
   { type: 'forced_weather', weather: 'storm', hours: 6 },
   { type: 'event_weight', category: 'union', factor: 2, days: 4 },
+  { type: 'permit_processing', action: 'shift', ticks: 24 },
+  { type: 'permit_processing', action: 'approve', feePct: 25 },
 ];
 
 describe('applyEventEffects', () => {
@@ -45,7 +47,7 @@ describe('applyEventEffects', () => {
   });
 
   it('every EventEffectSpec kind is covered by the fixture list', () => {
-    expect(new Set(ALL_SPECS.map(s => s.type)).size).toBe(19);
+    expect(new Set(ALL_SPECS.map(s => s.type)).size).toBe(20);
   });
 
   describe('timed modifiers', () => {
