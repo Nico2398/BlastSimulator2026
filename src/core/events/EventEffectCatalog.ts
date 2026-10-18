@@ -5,7 +5,7 @@ import type { EmployeeRole } from '../entities/Employee.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { EventCategory } from './EventPool.js';
 import type { EffectOutcome, EventWorld } from './TrafficJamEffects.js';
-import { addModifier, holdForcedWeather, type ActiveModifier, type ModifierKind } from './ActiveModifiers.js';
+import { pushModifier, holdForcedWeather, type ActiveModifier, type ModifierKind } from './ActiveModifiers.js';
 import { applyInstantEffect } from './EventEffectInstant.js';
 import { ALL_WEATHER_STATES } from '../weather/WeatherCycle.js';
 import { EVENT_EFFECT_BUILDING_HP_LOSS, TICKS_PER_DAY } from '../config/balance.js';
@@ -92,8 +92,7 @@ export function applyEventEffects(
     if (draft === 'none') {
       total.resultKeySuffix = '_alt';
     } else if (draft !== null) {
-      const id = addModifier(events.activeModifiers, draft, events.nextModifierId);
-      if (id === events.nextModifierId) events.nextModifierId++;
+      pushModifier(events, draft);
     } else {
       const out = applyInstantEffect(spec, world, tick, rng, leaverId);
       total.cashChange += out.cashChange;

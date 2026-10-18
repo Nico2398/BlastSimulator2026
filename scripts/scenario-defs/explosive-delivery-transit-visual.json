@@ -51,7 +51,7 @@
     },
     {
       "command": "state",
-      "description": "The Charge step shows the delivery-transit line (arrival tick and remaining ticks) while the order is in transit.",
+      "description": "The Charge step shows the delivery-transit line (arrival day and hour, and time remaining) while the order is in transit.",
       "role": "observe",
       "interaction": [
         {

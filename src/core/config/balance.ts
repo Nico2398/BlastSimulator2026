@@ -3019,3 +3019,37 @@ export const MINE_GRADE_CLASS_ROCK_FACTOR = 2;
 export const MINE_GRADE_CLASS_FEE_FACTOR = 2;
 /** Processing ticks of every endless class. */
 export const MINE_GRADE_CLASS_PROCESSING_TICKS = 144;
+
+/** Blast limits and filing fee of one permit grade. */
+export interface PermitLimitConfig {
+  maxChargeKg: number;
+  maxHoles: number;
+  fee: number;
+}
+/** Per-blast limits of grades 0-5, keyed by grade number. */
+export const PERMIT_LIMITS: Readonly<Record<number, PermitLimitConfig>> = {
+  0: { maxChargeKg: 80, maxHoles: 9, fee: 250 },
+  1: { maxChargeKg: 250, maxHoles: 16, fee: 1_000 },
+  2: { maxChargeKg: 800, maxHoles: 36, fee: 3_000 },
+  3: { maxChargeKg: 2_500, maxHoles: 81, fee: 8_000 },
+  4: { maxChargeKg: 8_000, maxHoles: 196, fee: 20_000 },
+  5: { maxChargeKg: 25_000, maxHoles: 400, fee: 50_000 },
+};
+/** Charge-limit multiplier per endless class above the last named grade. */
+export const PERMIT_CLASS_CHARGE_FACTOR = 1.6;
+/** Hole-limit multiplier per endless class. */
+export const PERMIT_CLASS_HOLES_FACTOR = 1.4;
+/** Fee multiplier per endless class. */
+export const PERMIT_CLASS_FEE_FACTOR = 1.5;
+/** Inspection chance at full (100%) overshoot. */
+export const PERMIT_INSPECTION_BASE_CHANCE = 0.25;
+/** Fine = fee x this x overshoot. */
+export const PERMIT_FINE_FEE_MULTIPLIER = 10;
+/** Neighbour-relations penalty when caught. */
+export const PERMIT_CAUGHT_NEIGHBOUR_PENALTY = 5;
+/** Strikes inside the window that suspend the permit. */
+export const PERMIT_STRIKES_TO_SUSPEND = 3;
+/** Window (ticks) in which strikes count. */
+export const PERMIT_STRIKE_WINDOW_TICKS = 2000;
+/** Ticks a suspension lasts. */
+export const PERMIT_SUSPENSION_TICKS = 72;

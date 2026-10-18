@@ -80,6 +80,14 @@ export function addModifier(
   return nextId;
 }
 
+/** Adds a modifier to the event state via addModifier, owning the nextModifierId bookkeeping. */
+export function pushModifier(
+  events: { activeModifiers: ActiveModifier[]; nextModifierId: number }, m: Omit<ActiveModifier, 'id'>,
+): void {
+  const id = addModifier(events.activeModifiers, m, events.nextModifierId);
+  if (id === events.nextModifierId) events.nextModifierId++;
+}
+
 /** Drops modifiers whose endTick has passed. */
 export function pruneExpired(list: ActiveModifier[], tick: number): void {
   for (let i = list.length - 1; i >= 0; i--) {

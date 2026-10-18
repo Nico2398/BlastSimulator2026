@@ -248,7 +248,7 @@ export class NotificationCenter {
       this.transitWarned = false;
     } else if (!this.transitWarned) {
       this.transitWarned = true;
-      this.notify({ severity: 'info', icon: 'clock', title: t('notification.title.order_blocked'), body: buildBlockedOrderMessage(firstInTransit) });
+      this.notify({ severity: 'info', icon: 'clock', title: t('notification.title.order_blocked'), body: buildBlockedOrderMessage(firstInTransit, state.tickCount) });
     }
     // A ramp's layers are judged together (#1306), so one unreachable ramp
     // would otherwise toast once per layer: warn once per ramp instead.
@@ -269,7 +269,7 @@ export class NotificationCenter {
         severity: 'warn',
         icon: 'warn',
         title: t('notification.title.order_blocked'),
-        body: buildBlockedOrderMessage(action),
+        body: buildBlockedOrderMessage(action, state.tickCount),
       });
     }
     if (this.warnedBlockedOrders.size > 0) {

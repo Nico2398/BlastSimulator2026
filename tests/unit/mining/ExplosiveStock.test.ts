@@ -8,7 +8,7 @@ import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { EXPLOSIVE_BULK_PRICE_FACTOR, EXPLOSIVE_DELIVERY_TICKS } from '../../../src/core/config/balance.js';
 import {
   bulkPricePerKg, drawStockForOrder, buyExplosiveStock, returnOrderStock, explosivePriceFactor, buyStockBlockReason,
-  orderDeliveryTicks, readOrderDeliveryTick, isChargeDeliveryPending,
+  orderDeliveryTicks, readOrderDeliveryTick, isChargeDeliveryPending, chargeDeliveryArrivalByHole,
 } from '../../../src/core/mining/ExplosiveStock.js';
 
 function makeState(cash = 100_000, warehouses = 1, tier: 1 | 2 | 3 = 1): GameState {
@@ -328,5 +328,47 @@ describe('isChargeDeliveryPending (#1895)', () => {
   it('is false without an arrival tick or for other action types', () => {
     expect(isChargeDeliveryPending({ type: 'charge_hole', payload: {} }, 0)).toBe(false);
     expect(isChargeDeliveryPending({ type: 'drill_hole', payload: { deliveryArrivalTick: 450 } }, 0)).toBe(false);
+  });
+});
+
+describe('chargeDeliveryArrivalByHole (#1966)', () => {
+  function order(id: number, payload: Record<string, unknown>, type = 'charge_hole'): GameState['pendingActions'][number] {
+    return { id, type, payload } as unknown as GameState['pendingActions'][number];
+  }
+
+  it('maps each hole with an in-transit charge order to its arrival tick', () => {
+    const map = chargeDeliveryArrivalByHole({
+      tickCount: 100,
+      pendingActions: [order(1, { holeId: 'H1', deliveryArrivalTick: 500 }), order(2, { holeId: 'H2', deliveryArrivalTick: 520 })],
+    });
+    expect(map.get('H1')).toBe(500);
+    expect(map.get('H2')).toBe(520);
+    expect(map.size).toBe(2);
+  });
+
+  it('is empty with no pending actions', () => {
+    expect(chargeDeliveryArrivalByHole({ tickCount: 0, pendingActions: [] }).size).toBe(0);
+  });
+
+  it('ignores an order whose delivery already arrived', () => {
+    const map = chargeDeliveryArrivalByHole({
+      tickCount: 500,
+      pendingActions: [order(1, { holeId: 'H1', deliveryArrivalTick: 500 }), order(2, { holeId: 'H2', deliveryArrivalTick: 501 })],
+    });
+    expect(map.has('H1')).toBe(false);
+    expect(map.get('H2')).toBe(501);
+  });
+
+  it('ignores an order without an arrival tick (stock-covered) and non-charge actions', () => {
+    const map = chargeDeliveryArrivalByHole({
+      tickCount: 0,
+      pendingActions: [order(1, { holeId: 'H1' }), order(2, { holeId: 'H2', deliveryArrivalTick: 400 }, 'drill_hole')],
+    });
+    expect(map.size).toBe(0);
+  });
+
+  it('ignores an order without a holeId', () => {
+    const map = chargeDeliveryArrivalByHole({ tickCount: 0, pendingActions: [order(1, { deliveryArrivalTick: 400 })] });
+    expect(map.size).toBe(0);
   });
 });
