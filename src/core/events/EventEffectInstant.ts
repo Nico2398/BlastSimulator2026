@@ -7,6 +7,7 @@ import type { EffectOutcome, EventWorld } from './TrafficJamEffects.js';
 import { getLivingEmployees, hireEmployee, injureEmployee } from '../entities/Employee.js';
 import { poolNames } from '../entities/HiringPool.js';
 import { hireSpawnPoint } from '../entities/HireSpawn.js';
+import { applyPermitProcessing } from './PermitProcessingEffect.js';
 import { pickLeaver } from './EventLeavers.js';
 import { fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import { offerSpecialContract, outstandingPenalty } from '../economy/Contract.js';
@@ -74,6 +75,8 @@ export function applyInstantEffect(
       chargeFine(state, penalty, 'Cancelled contract penalty', tick);
       return outcome({ cashSettled: -penalty });
     }
+    case 'permit_processing':
+      return applyPermitProcessing(spec, world, tick);
     default:
       return outcome();
   }

@@ -2,7 +2,8 @@
 
 import type { EventEffect } from './EventSystem.js';
 import type { LeaverLabel } from './EventLeavers.js';
-import type { EventEffectSpec } from './EventEffectCatalog.js';
+import type { EventEffectSpec, PermitProcessingSpec } from './EventEffectCatalog.js';
+import { signedTicks } from './ModifierText.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import { t } from '../i18n/I18n.js';
 import { EVENT_EFFECT_JOIN_DEFAULT_ROLE } from '../config/balance.js';
@@ -27,6 +28,17 @@ const MONEY_PARAMS: ReadonlySet<string> = new Set(['amount', 'perDay']);
 /** Specs whose role field narrows who they hit; absent means everyone. */
 const SCOPED_TYPES: ReadonlySet<EventEffectSpec['type']> = new Set(['work_stoppage', 'work_rate', 'salary']);
 
+/** Permit-processing chip: a shift reads as plain, next-application or safety-gated; an approve as its own sentence. */
+function permitChip(spec: PermitProcessingSpec, params: Record<string, string | number>): EventEffectChip {
+  let suffix = '_approve';
+  if (spec.action === 'shift') {
+    params['ticks'] = signedTicks(spec.ticks);
+    if (spec.ticksBelow !== undefined) params['ticksBelow'] = signedTicks(spec.ticksBelow);
+    suffix = spec.safetyMin !== undefined ? '_by_safety' : spec.next ? '_next' : '';
+  }
+  return { kind: 'other', key: spec.type, delta: 0, textKey: `ui.event.effect.permit_processing${suffix}`, params };
+}
+
 function chipOf(spec: EventEffectSpec, leaver?: LeaverLabel): EventEffectChip {
   const params: Record<string, string | number> = {};
   for (const [k, v] of Object.entries(spec)) {
@@ -39,6 +51,7 @@ function chipOf(spec: EventEffectSpec, leaver?: LeaverLabel): EventEffectChip {
       ? { kind: 'other', key: spec.type, delta: 0, textKey: 'ui.event.effect.employee_leaves_nobody' }
       : { kind: 'other', key: spec.type, delta: 0, textKey: 'ui.event.effect.employee_leaves_named', params: { name: leaver.name, role: leaver.role } };
   }
+  if (spec.type === 'permit_processing') return permitChip(spec, params);
   const permanent = spec.type === 'salary' && spec.days === null;
   return {
     kind: 'other', key: spec.type, delta: 0,

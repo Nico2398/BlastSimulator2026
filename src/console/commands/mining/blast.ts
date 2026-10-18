@@ -21,7 +21,7 @@ import { processProjections, bookEmployeeDeath, type AccidentRecord } from '../.
 import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
-import { blastPitDepthM, recordGradeBlast } from '../../../core/economy/MineGrade.js';
+import { blastPitDepthM, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
 import { preFireCheck, resolveOvershoot, type InspectionVerdict } from '../../../core/economy/PermitLimits.js';
 import { deductExpense } from '../../../core/economy/Finance.js';
 import { recordBlastResult, snapshotStats, updateDepth } from '../../../core/campaign/SuccessTracker.js';
@@ -139,6 +139,7 @@ export function* fireBlastSteps(
   const grade = ctx.state!.grade;
   if (grade) {
     const check = preFireCheck(grade.grade, plan.charges, plan.holes.length);
+    recordBlastChargeShare(grade, check.planKg, check.limits.maxChargeKg);
     deductExpense(ctx.state!, check.fee, 'permits', 'Blast Notification Form B-52');
     permitLines.push(t('mining.blast.permit_fee', { fee: formatMoney(check.fee) }));
     if (check.over) {

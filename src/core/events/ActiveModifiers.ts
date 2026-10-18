@@ -211,8 +211,13 @@ export function researchCostFor(base: number, list: readonly ActiveModifier[], t
   return scaledCost(base, factorFor(list, 'research_cost', tick));
 }
 
-/** Total extra ticks the live permit_delay modifiers add to a new application (#1927). */
-export function takePermitDelay(list: readonly ActiveModifier[]): number {
-  void list; // TODO: implement
-  return undefined as unknown as number;
+/** Total extra ticks the permit_delay modifiers add to a new application; consumed, so each delay applies once (#1927). */
+export function takePermitDelay(list: ActiveModifier[]): number {
+  let total = 0;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i]!.kind !== 'permit_delay') continue;
+    total += list[i]!.magnitude;
+    list.splice(i, 1);
+  }
+  return total;
 }

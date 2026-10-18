@@ -5,6 +5,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { computeVoxelColumnSurfaceHeight, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { ContractType } from './Contract.js';
 import { deductExpense } from './Finance.js';
+import { takePermitDelay } from '../events/ActiveModifiers.js';
 import { parseColumnKey } from '../mining/SurveyColumn.js';
 import {
   MINE_GRADES,
@@ -71,7 +72,7 @@ export function formatGradeAmount(n: number): string {
 
 /** Fresh grade state of a progression site: grade 0, nothing tracked. */
 export function createGradeState(): GradeState {
-  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0 };
+  return { grade: 0, oreDeliveredKg: 0, deepestPitM: 0, rockBrokenM3: 0, blastsFired: 0, pending: null, strikeTicks: [], inspectionRolls: 0, lastBlastChargeShare: 0 };
 }
 
 function isCount(v: unknown): v is number {
@@ -90,11 +91,12 @@ export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
   const strikeTicks = Array.isArray(r['strikeTicks']) && r['strikeTicks'].every(isWholeCount) ? [...r['strikeTicks'] as number[]] : [];
   const inspectionRolls = isWholeCount(r['inspectionRolls']) ? r['inspectionRolls'] : 0;
-  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls };
+  const lastBlastChargeShare = typeof r['lastBlastChargeShare'] === 'number' && Number.isFinite(r['lastBlastChargeShare']) ? r['lastBlastChargeShare'] : 0;
+  if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null, strikeTicks, inspectionRolls, lastBlastChargeShare };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
   if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
-  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls };
+  return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] }, strikeTicks, inspectionRolls, lastBlastChargeShare };
 }
 
 /** Definition of a grade: 0 is the start permit, 1-5 are named, above that endless classes. */
@@ -202,7 +204,7 @@ export function applyForGrade(state: GameState): GradeApplyResult {
   const toGrade = g.grade + 1;
   const def = gradeDef(toGrade);
   deductExpense(state, def.fee, 'permits', `Permit fee: grade ${toGrade}`);
-  g.pending = { toGrade, ticksLeft: def.processingTicks };
+  g.pending = { toGrade, ticksLeft: Math.max(1, def.processingTicks + takePermitDelay(state.events.activeModifiers)) };
   return { ok: true, fee: def.fee, toGrade };
 }
 
@@ -212,24 +214,27 @@ export function advanceGradeApplication(state: GameState, emitter: EventEmitter)
   if (!g?.pending) return;
   g.pending.ticksLeft--;
   if (g.pending.ticksLeft > 0) return;
-  g.grade = g.pending.toGrade;
-  g.pending = null;
-  emitter.emit('progression:grade_approved', { grade: g.grade });
+  approvePendingApplication(g, emitter);
 }
 
 /** Shifts a pending application's remaining processing ticks (negative = faster, floored at 1); false without one (#1927). */
 export function shiftPendingApplication(g: GradeState, ticks: number): boolean {
-  void g; void ticks; // TODO: implement
-  return undefined as unknown as boolean;
+  if (!g.pending) return false;
+  g.pending.ticksLeft = Math.max(1, g.pending.ticksLeft + ticks);
+  return true;
 }
 
 /** Approves a pending application at once, granting the grade; false without one (#1927). */
 export function approvePendingApplication(g: GradeState, emitter: EventEmitter): boolean {
-  void g; void emitter; // TODO: implement
-  return undefined as unknown as boolean;
+  if (!g.pending) return false;
+  g.grade = g.pending.toGrade;
+  g.pending = null;
+  emitter.emit('progression:grade_approved', { grade: g.grade });
+  return true;
 }
 
 /** Records the last blast's charge as a share of the grade's charge cap (#1927). */
 export function recordBlastChargeShare(g: GradeState | undefined, planKg: number, maxChargeKg: number): void {
-  void g; void planKg; void maxChargeKg; // TODO: implement
+  if (!g || !(maxChargeKg > 0)) return;
+  g.lastBlastChargeShare = planKg / maxChargeKg;
 }
