@@ -157,7 +157,7 @@ export class PreflightModal {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
-    const estValue = this.estimateMemo.get(state, plan, this.gridProvider());
+    const estValue = this.estimateMemo.get(state, plan, this.gridProvider()).value;
 
     const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);

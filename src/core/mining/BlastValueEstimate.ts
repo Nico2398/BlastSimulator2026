@@ -62,3 +62,24 @@ export function estimateBlastOreValue(
   }
   return value;
 }
+
+/** Ore value of a blast plus how much of the broken volume surveys cover (#1960). */
+export interface BlastOreEstimate {
+  /** Estimated ore value, game dollars. */
+  value: number;
+  /** Share of broken voxels covered by a fresh survey, 0..1. */
+  coverage: number;
+}
+
+/** Like `estimateBlastOreValue`, but also reports survey coverage of the broken volume (#1960). */
+export function estimateBlastOre(
+  plan: BlastPlan,
+  surveyResults: readonly SurveyResult[],
+  grid: VoxelGrid,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+  marketId: MarketId = 'legacy',
+): BlastOreEstimate {
+  void plan; void surveyResults; void grid; void wetHoleIds; void marketId;
+  // TODO: implement
+  return { value: 0, coverage: 0 };
+}

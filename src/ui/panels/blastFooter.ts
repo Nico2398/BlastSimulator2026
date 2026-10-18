@@ -94,7 +94,7 @@ export class BlastFooter {
     const fireOk = hasHoles && errors.length === 0;
 
     const planCost = recordedChargesCost(state.chargesByHole).cashCost;
-    const estValue = this.estimateMemo.get(state, plan, this.gridProvider());
+    const estValue = this.estimateMemo.get(state, plan, this.gridProvider()).value;
     const margin = estValue - planCost;
 
     // Undrilled (ordered, not yet landed) holes are a PreflightModal warning

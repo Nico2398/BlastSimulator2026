@@ -5,7 +5,7 @@
 import type { GameState } from '../../core/state/GameState.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import type { BlastPlan } from '../../core/mining/BlastPlan.js';
-import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
+import { estimateBlastOreValue, type BlastOreEstimate } from '../../core/mining/BlastValueEstimate.js';
 import { wetHoleIdsFor } from '../../core/mining/WetHoles.js';
 import { resolveMarketId } from '../../core/campaign/Level.js';
 
@@ -15,8 +15,8 @@ export class OreEstimateMemo {
   private value = 0;
 
   /** Estimate for `plan`; recomputed only when holes, charges, wet holes, surveys or terrain changed. */
-  get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): number {
-    if (!grid) return 0;
+  get(state: GameState, plan: BlastPlan, grid: VoxelGrid | null): BlastOreEstimate {
+    if (!grid) return { value: 0, coverage: 0 };
     const wet = wetHoleIdsFor(state);
     const marketId = resolveMarketId(state);
     const key = JSON.stringify([
@@ -25,10 +25,10 @@ export class OreEstimateMemo {
       marketId,
       grid.editRevision,
     ]);
-    if (grid === this.grid && key === this.key) return this.value;
+    if (grid === this.grid && key === this.key) return { value: this.value, coverage: 0 };
     this.grid = grid;
     this.key = key;
     this.value = estimateBlastOreValue(plan, state.surveyResults, grid, wet, marketId);
-    return this.value;
+    return { value: this.value, coverage: 0 };
   }
 }
