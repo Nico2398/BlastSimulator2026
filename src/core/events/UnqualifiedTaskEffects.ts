@@ -16,7 +16,7 @@ import { addExpense, addIncome } from '../economy/Finance.js';
 import { Random } from '../math/Random.js';
 import { EventEmitter } from '../state/EventEmitter.js';
 import { UNQUALIFIED_CONTRACTOR_FEE } from '../config/balance.js';
-import type { EffectOutcome, EventWorld } from './TrafficJamEffects.js';
+import { alt, outcome, type EffectOutcome, type EventWorld } from './TrafficJamEffects.js';
 
 /** Resolves an unqualified_task event choice for the actions it concerns. */
 type UnqualifiedEffectHandler = (
@@ -24,17 +24,6 @@ type UnqualifiedEffectHandler = (
   world: EventWorld,
   tick: number,
 ) => EffectOutcome;
-
-const outcome = (over: Partial<EffectOutcome> = {}): EffectOutcome => ({
-  effects: [],
-  cashChange: 0,
-  cashSettled: 0,
-  scoreChanges: {},
-  resultKeySuffix: '',
-  ...over,
-});
-
-const alt = (): EffectOutcome => outcome({ resultKeySuffix: '_alt' });
 
 function pendingActionsOf(world: EventWorld, ids: readonly number[]): PendingAction[] {
   const found: PendingAction[] = [];

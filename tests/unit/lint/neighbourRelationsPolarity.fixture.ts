@@ -18,6 +18,9 @@ export interface PolarityEntry {
 }
 
 export const NEIGHBOUR_POLARITY: readonly PolarityEntry[] = [
+  { eventId: 'permit_neighbours_petition', option: 0, effect: 'pleases' },
+  { eventId: 'permit_neighbours_petition', option: 1, effect: 'pleases' },
+  { eventId: 'permit_neighbours_petition', option: 2, effect: 'annoys' },
   { eventId: 'union_karaoke_demand', option: 0, effect: 'annoys' },
   { eventId: 'union_talent_show', option: 0, effect: 'annoys' },
   { eventId: 'union_mascot', option: 2, effect: 'annoys' },

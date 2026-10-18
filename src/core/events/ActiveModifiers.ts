@@ -16,7 +16,7 @@ export type ModifierKind =
   | 'work_stoppage' | 'work_rate' | 'morale_drift' | 'salary_factor' | 'recurring_charge'
   | 'blast_ban' | 'haul_pause' | 'drill_ban' | 'survey_cost' | 'research_cost'
   | 'contract_price' | 'explosive_price' | 'upkeep_surcharge' | 'forced_weather'
-  | 'event_weight' | 'out_of_service';
+  | 'event_weight' | 'out_of_service' | 'permit_delay';
 
 export interface ActiveModifier {
   id: number;
@@ -209,4 +209,15 @@ export function scaledCost(base: number, factor: number): number {
 /** Research price after live research_cost modifiers. */
 export function researchCostFor(base: number, list: readonly ActiveModifier[], tick: number): number {
   return scaledCost(base, factorFor(list, 'research_cost', tick));
+}
+
+/** Total extra ticks the permit_delay modifiers add to a new application; consumed, so each delay applies once (#1927). */
+export function takePermitDelay(list: ActiveModifier[]): number {
+  let total = 0;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i]!.kind !== 'permit_delay') continue;
+    total += list[i]!.magnitude;
+    list.splice(i, 1);
+  }
+  return total;
 }
