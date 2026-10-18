@@ -2955,3 +2955,40 @@ export const DISMISSAL_CREW_MORALE_DENT = 6;
 export const EVENT_BALANCE_PERMANENT_DAYS = 365;
 /** Reference crew size used to turn per-employee event effects into totals when comparing options. */
 export const EVENT_BALANCE_REFERENCE_CREW = 5;
+
+// ── Mine grades (#1921) ──────────────────────────────────────────────────────
+/** One target a grade asks for; `no_death` value is the look-back window in ticks. */
+export interface MineGradeTargetConfig {
+  kind: 'ore_kg' | 'blasts' | 'depth_m' | 'rock_m3' | 'safety' | 'ecology' | 'neighbours' | 'no_death';
+  value: number;
+}
+/** One named grade of the permit ladder. */
+export interface MineGradeConfig {
+  nameKey: string;
+  fee: number;
+  processingTicks: number;
+  targets: readonly MineGradeTargetConfig[];
+}
+/** Named grades 1-5, keyed by grade number (v1 defaults, re-tuned by calibration tasks). */
+export const MINE_GRADES: Readonly<Record<number, MineGradeConfig>> = {
+  1: { nameKey: 'permit.grade.1', fee: 20_000, processingTicks: 48, targets: [
+    { kind: 'ore_kg', value: 5_000 }, { kind: 'blasts', value: 2 } ] },
+  2: { nameKey: 'permit.grade.2', fee: 75_000, processingTicks: 72, targets: [
+    { kind: 'ore_kg', value: 30_000 }, { kind: 'depth_m', value: 10 }, { kind: 'safety', value: 40 } ] },
+  3: { nameKey: 'permit.grade.3', fee: 250_000, processingTicks: 96, targets: [
+    { kind: 'ore_kg', value: 150_000 }, { kind: 'depth_m', value: 20 }, { kind: 'neighbours', value: 35 }, { kind: 'no_death', value: 1_000 } ] },
+  4: { nameKey: 'permit.grade.4', fee: 800_000, processingTicks: 120, targets: [
+    { kind: 'ore_kg', value: 600_000 }, { kind: 'depth_m', value: 30 }, { kind: 'safety', value: 50 }, { kind: 'ecology', value: 30 } ] },
+  5: { nameKey: 'permit.grade.5', fee: 2_500_000, processingTicks: 144, targets: [
+    { kind: 'ore_kg', value: 2_500_000 }, { kind: 'depth_m', value: 40 }, { kind: 'neighbours', value: 40 }, { kind: 'no_death', value: 2_000 } ] },
+};
+/** Ore target multiplier per endless class above the last named grade. */
+export const MINE_GRADE_CLASS_ORE_FACTOR = 2.5;
+/** Rock-broken target (m³) of endless class 1. */
+export const MINE_GRADE_CLASS_ROCK_BASE_M3 = 60_000;
+/** Rock-broken target multiplier per further class. */
+export const MINE_GRADE_CLASS_ROCK_FACTOR = 2;
+/** Fee multiplier per further class. */
+export const MINE_GRADE_CLASS_FEE_FACTOR = 2;
+/** Processing ticks of every endless class. */
+export const MINE_GRADE_CLASS_PROCESSING_TICKS = 144;
