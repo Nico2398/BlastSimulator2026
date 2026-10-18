@@ -357,7 +357,7 @@ export class BuildMenu extends PanelBase {
     this.refreshCatalogButtons(this.lastCash);
     return {
       ok: true,
-      message: task ? t('ui.build.research_queued', { ticks: task.ticksRemaining }) : t('ui.build.research_queued_generic'),
+      message: task ? t('ui.build.research_queued', { ticks: Math.ceil(task.ticksRemaining) }) : t('ui.build.research_queued_generic'),
     };
   }
 
@@ -794,7 +794,7 @@ export class BuildMenu extends PanelBase {
       }
       progressEl.textContent = t('ui.build.research_progress', {
         percent: Math.round(fraction * 100),
-        remaining: task.ticksRemaining,
+        remaining: Math.ceil(task.ticksRemaining),
       });
     } else {
       existing?.remove();

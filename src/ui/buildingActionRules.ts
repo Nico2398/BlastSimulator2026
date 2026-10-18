@@ -123,7 +123,7 @@ function upgradeRules(
         cost: researchCostFor(def.cost, state.events.activeModifiers, state.tickCount),
         duration: def.ticks,
         blocked: task ? null : researchBlock(state, b.type, nextTier),
-        queued: task ? { fraction: getResearchProgress(task).fraction, remaining: task.ticksRemaining } : null,
+        queued: task ? { fraction: getResearchProgress(task).fraction, remaining: Math.ceil(task.ticksRemaining) } : null,
       },
     };
   }

@@ -3,7 +3,7 @@
 
 import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './Building.js';
 import { isOperating } from './Building.js';
-import { getResearchTaskDef } from '../config/balance.js';
+import { getResearchTaskDef, RESEARCH_CENTER_SPEED_BY_TIER, RESEARCH_CENTER_SLOTS_BY_TIER } from '../config/balance.js';
 import { scaledCost } from '../events/ActiveModifiers.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 
@@ -154,12 +154,16 @@ export function tickResearch(
     return cancelled;
   }
   // hasResearchCenter ignores event closures: a closed centre pauses progress, only losing it cancels the task.
-  if (!hasActiveResearchCenter(state)) return undefined;
-  task.ticksRemaining -= 1;
-  if (task.ticksRemaining <= 0) {
-    state.unlockedTiers[task.targetType] = task.targetTier;
-    state.researchQueue.shift();
-    emitter?.emit('research:completed', { targetType: task.targetType, targetTier: task.targetTier });
+  const profile = getResearchCenterProfile(state);
+  if (!profile) return undefined;
+  const active = getActiveResearchTasks(state);
+  for (const t of active) t.ticksRemaining -= profile.speed;
+  const done = active.filter((t) => t.ticksRemaining <= 0);
+  if (done.length === 0) return undefined;
+  state.researchQueue = state.researchQueue.filter((t) => !done.includes(t));
+  for (const t of done) {
+    state.unlockedTiers[t.targetType] = t.targetTier;
+    emitter?.emit('research:completed', { targetType: t.targetType, targetTier: t.targetTier });
   }
   return undefined;
 }
@@ -204,13 +208,18 @@ export function getResearchProgress(task: ResearchTask): { elapsed: number; tota
 }
 
 /** Speed and parallel slots of the state's active Research Center, or undefined when it has none. */
-export function getResearchCenterProfile(_state: BuildingState): { speed: number; slots: number } | undefined {
-  // TODO: implement
-  return undefined;
+export function getResearchCenterProfile(state: BuildingState): { speed: number; slots: number } | undefined {
+  let best = 0;
+  for (const b of state.buildings) {
+    if (b.type === 'research_center' && isOperating(b) && b.tier > best) best = b.tier;
+  }
+  if (best === 0) return undefined;
+  const tier = best as 1 | 2 | 3;
+  return { speed: RESEARCH_CENTER_SPEED_BY_TIER[tier], slots: RESEARCH_CENTER_SLOTS_BY_TIER[tier] };
 }
 
 /** Queued research tasks currently being worked on (at most the Research Center's slot count). */
-export function getActiveResearchTasks(_state: BuildingState): ResearchTask[] {
-  // TODO: implement
-  return [];
+export function getActiveResearchTasks(state: BuildingState): ResearchTask[] {
+  const profile = getResearchCenterProfile(state);
+  return profile ? state.researchQueue.slice(0, profile.slots) : [];
 }
