@@ -252,8 +252,8 @@
           "type": "focusTile",
           "x": 19,
           "z": 9,
-          "distance": 30,
-          "pitch": 75
+          "distance": 18,
+          "pitch": 85
         },
         {
           "type": "dragTiles",
