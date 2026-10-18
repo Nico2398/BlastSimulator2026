@@ -58,6 +58,7 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   install_tubing: { otherwise: ORDER },
   zone: { subs: { clear: ORDER, status: null }, otherwise: null },
   research: { subs: { queue: ORDER, status: null }, otherwise: null },
+  permit: { subs: { apply: CONFIRM, status: null }, otherwise: null },
 
   // ── Blasting: the blast director voices the blast itself, a refusal still gets its denial ──
   blast: { subs: { status: null }, otherwise: DENY_ONLY },

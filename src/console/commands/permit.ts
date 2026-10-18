@@ -20,7 +20,7 @@ function targetLine(s: GradeTargetStatus): string {
 function permitStatus(ctx: GameContext): CommandResult {
   const state = ctx.state!;
   const g = state.grade;
-  if (!g) return { success: true, output: t('permit.no_ladder') };
+  if (!g) return { success: false, output: t('permit.no_ladder') };
 
   const current = gradeDef(g.grade);
   const next = gradeDef(g.grade + 1);

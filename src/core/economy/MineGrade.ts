@@ -14,7 +14,7 @@ import {
   MINE_GRADE_CLASS_PROCESSING_TICKS,
 } from '../config/balance.js';
 
-type GradeTargetKind = 'ore_kg' | 'blasts' | 'depth_m' | 'rock_m3' | 'safety' | 'ecology' | 'neighbours' | 'no_death';
+export type GradeTargetKind = 'ore_kg' | 'blasts' | 'depth_m' | 'rock_m3' | 'safety' | 'ecology' | 'neighbours' | 'no_death';
 
 interface GradeTargetDef {
   kind: GradeTargetKind;
@@ -65,16 +65,20 @@ function isCount(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v >= 0;
 }
 
+function isWholeCount(v: unknown): v is number {
+  return isCount(v) && Number.isInteger(v);
+}
+
 /** Validate a loaded grade sub-state; undefined when malformed. */
 export function sanitizeGradeState(raw: unknown): GradeState | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
   const r = raw as Record<string, unknown>;
   const { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending } = r;
-  if (!isCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isCount(blastsFired)) return undefined;
+  if (!isWholeCount(grade) || !isCount(oreDeliveredKg) || !isCount(deepestPitM) || !isCount(rockBrokenM3) || !isWholeCount(blastsFired)) return undefined;
   if (pending === null) return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: null };
   if (typeof pending !== 'object' || Array.isArray(pending)) return undefined;
   const p = pending as Record<string, unknown>;
-  if (!isCount(p['toGrade']) || !isCount(p['ticksLeft'])) return undefined;
+  if (!isWholeCount(p['toGrade']) || !isWholeCount(p['ticksLeft'])) return undefined;
   return { grade, oreDeliveredKg, deepestPitM, rockBrokenM3, blastsFired, pending: { toGrade: p['toGrade'], ticksLeft: p['ticksLeft'] } };
 }
 
