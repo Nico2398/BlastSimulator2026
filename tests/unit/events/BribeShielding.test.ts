@@ -194,7 +194,14 @@ describe('protection granted the tick an event fires (#1816)', () => {
     state.lastEventTick = T0;
     state.actionCountSinceEvent = 0;
     state.cooldownMinIntervalTicks = LONGEST_ROLL;
+    // Union events run on their own clock (#1907): same worst case, same T0 start.
+    state.lastUnionEventTick = T0;
     return state;
+  }
+
+  /** Open or shut the union cooldown window: union events ignore the action gate (#1907). */
+  function setUnionGate(state: ReturnType<typeof justFired>, open: boolean): void {
+    state.unionCooldownMinIntervalTicks = open ? 1 : 1_000_000_000;
   }
 
   /** Force the category timer to be due on the next tick. */
@@ -209,6 +216,7 @@ describe('protection granted the tick an event fires (#1816)', () => {
   ): void {
     for (let tick = from + 1; tick <= to; tick++) {
       if (tick >= gateOpensAt) state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+      setUnionGate(state, tick >= gateOpensAt);
       arm(state, category);
       tickEventSystem(state, makeCtx({ protections, tickCount: tick }), new Random(tick));
       if (state.pendingEvent) return;
@@ -288,6 +296,7 @@ describe('protection granted the tick an event fires (#1816)', () => {
         expect(protections).toHaveLength(1);
         expect(protections[0]!.shielded).toBe(false);
         state.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+        setUnionGate(state, true);
         arm(state, category);
         tickEventSystem(state, makeCtx({ protections, tickCount: capTick }), new Random(1));
         expect(protections).toHaveLength(0);
