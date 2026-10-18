@@ -8,7 +8,9 @@ import {
   VEHICLE_TIER_MULTIPLIERS,
   VEHICLE_SCRAP_RESIDUAL_FRACTION,
   NAV_CLEARANCE_VEHICLE_CELLS,
+  NAV_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
+import { tierSlopeRatio } from '../nav/ClimbLimit.js';
 import type { Employee } from './Employee.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
@@ -364,6 +366,5 @@ export function canReleaseDriver(
 
 /** Steepest rise/run this vehicle climbs; progression sites use its tier's limit (#1938). */
 export function vehicleMaxSlopeRatio(vehicle: Pick<Vehicle, 'tier'>, progression: boolean): number {
-  void vehicle; void progression;
-  return 0; // TODO: implement
+  return progression ? tierSlopeRatio(vehicle.tier) : NAV_MAX_SLOPE_RATIO;
 }

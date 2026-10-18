@@ -569,8 +569,9 @@ export class NavGrid {
     anchorX: number,
     anchorZ: number,
     requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+    maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
   ): reachability.ReachableSet {
-    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ, requiredClearance);
+    return reachability.computeClimbReachableSet(navGrid, anchorX, anchorZ, requiredClearance, maxSlopeRatio);
   }
 
   /**

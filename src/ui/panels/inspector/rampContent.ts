@@ -3,7 +3,8 @@ import { t } from '../../../core/i18n/I18n.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { computeRampCost } from '../../../core/mining/Ramp.js';
 import { nextRampWidth } from '../../../core/mining/RampWidening.js';
-import type { BuiltRamp, PlannedRamp } from '../../../core/state/GameState.js';
+import { describeRampClimb } from '../../../core/mining/RampGrade.js';
+import { isProgressionSite, type BuiltRamp, type PlannedRamp } from '../../../core/state/GameState.js';
 import { describeRamp } from '../../describeRamp.js';
 import type { ActionSpec, KindContent } from './InspectorContent.js';
 import { kindLabel, sectionOf, syncSection, valueRow } from './inspectorWidgets.js';
@@ -38,7 +39,10 @@ export const rampContent: KindContent = {
   view(entity, state) {
     const ramp = state.builtRamps.find(r => r.id === entity.id);
     if (!ramp) return null;
-    const desc = describeRamp(ramp);
+    const progression = isProgressionSite(state);
+    const desc = describeRamp(ramp, state.navGrid === null ? undefined : {
+      ...describeRampClimb(state.navGrid, ramp, progression), progression,
+    });
     const widen = widenState(ramp, state.plannedRamps, state.cash);
     const actions: ActionSpec[] = widen.cost === null ? [] : [{
       action: 'widen', labelKey: 'inspector.ramp.widen', icon: 'up', variant: 'ghost',

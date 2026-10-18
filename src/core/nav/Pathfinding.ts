@@ -3,7 +3,7 @@
 
 import { NavGrid, isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
@@ -464,6 +464,7 @@ export function directLineWalk(
   requiredClearance: number,
   startPocket: Set<number> | null,
   goalPocket: Set<number> | null,
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): PathResult | null {
   const dx = x1 - x0;
   const dz = z1 - z0;
@@ -500,7 +501,7 @@ export function directLineWalk(
     if (i > 0) {
       const stepDx = clampedX - prevX;
       const stepDz = clampedZ - prevZ;
-      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz))) return null;
+      if (!isStepClimbable(prevCell?.surfaceY, cell.surfaceY, Math.hypot(stepDx, stepDz), maxSlopeRatio)) return null;
       const isDiagonal = stepDx !== 0 && stepDz !== 0;
       // Only a genuine single-cell diagonal move needs the corner check (#1197)
       // — a DDA step that jumps more than one cell (rounding artifact) is out
@@ -529,7 +530,7 @@ export function getBenchLevel(grid: NavGrid, x: number, z: number): number {
   return grid.cellAt(clamped.x, clamped.z)!.benchLevel;
 }
 
-export function findRampConnections(grid: NavGrid): RampConnection[] {
+export function findRampConnections(grid: NavGrid, maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO): RampConnection[] {
   const connections: RampConnection[] = [];
 
   for (let z = grid.originZ; z < grid.maxZ; z++) {
@@ -546,7 +547,7 @@ export function findRampConnections(grid: NavGrid): RampConnection[] {
         const neighbor = grid.cellAt(nx, nz);
         if (!neighbor || neighbor.type === 'blocked' || neighbor.type === 'void') continue;
         // A cliff-adjacent ramp cell is no connection: the step must be walkable.
-        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, Math.hypot(dx, dz))) continue;
+        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
 
         const level = neighbor.benchLevel;
         // Keep first neighbor per level for determinism
@@ -656,6 +657,7 @@ function findSingleHopRoute(
   agentId: number,
   avoidVehicles: boolean,
   requiredClearance: number,
+  maxSlopeRatio: number,
 ): PathResult | null {
   const candidateRamps = filterRampsForLevels(ramps, startLevel, goalLevel);
   if (candidateRamps.length === 0) return null;
@@ -690,6 +692,7 @@ function findSingleHopRoute(
       toZ: entrance.z,
       avoidVehicles,
       requiredClearance,
+      maxSlopeRatio,
     });
     if (!route1.found) continue;
 
@@ -702,6 +705,7 @@ function findSingleHopRoute(
       toZ: gz,
       avoidVehicles,
       requiredClearance,
+      maxSlopeRatio,
     });
     if (!route2.found) continue;
 
@@ -801,6 +805,7 @@ function findChainedRoute(
   agentId: number,
   avoidVehicles: boolean,
   requiredClearance: number,
+  maxSlopeRatio: number,
 ): PathResult {
   let cur = { x: sx, z: sz };
   let waypoints: Array<{ x: number; z: number }> = [];
@@ -809,7 +814,7 @@ function findChainedRoute(
   for (const hop of hopSequence) {
     const { entrance, exit } = rampEndpoints(hop.ramp, hop.fromLevel);
 
-    const segment = findPath(grid, { agentId, fromX: cur.x, fromZ: cur.z, toX: entrance.x, toZ: entrance.z, avoidVehicles, requiredClearance });
+    const segment = findPath(grid, { agentId, fromX: cur.x, fromZ: cur.z, toX: entrance.x, toZ: entrance.z, avoidVehicles, requiredClearance, maxSlopeRatio });
     if (!segment.found) return { found: false, waypoints: [], totalCost: 0 };
 
     waypoints = appendWaypoints(waypoints, segment.waypoints);
@@ -821,7 +826,7 @@ function findChainedRoute(
     cur = exit;
   }
 
-  const finalLeg = findPath(grid, { agentId, fromX: cur.x, fromZ: cur.z, toX: gx, toZ: gz, avoidVehicles, requiredClearance });
+  const finalLeg = findPath(grid, { agentId, fromX: cur.x, fromZ: cur.z, toX: gx, toZ: gz, avoidVehicles, requiredClearance, maxSlopeRatio });
   if (!finalLeg.found) return { found: false, waypoints: [], totalCost: 0 };
   waypoints = appendWaypoints(waypoints, finalLeg.waypoints);
   totalCost += finalLeg.totalCost;
@@ -829,7 +834,7 @@ function findChainedRoute(
   return { found: true, waypoints, totalCost };
 }
 
-function findMultiLevelPath(grid: NavGrid, request: PathRequest, requiredClearance: number): PathResult {
+function findMultiLevelPath(grid: NavGrid, request: PathRequest, requiredClearance: number, maxSlopeRatio: number): PathResult {
   const start = clampToGrid(grid, request.fromX, request.fromZ);
   const goal = clampToGrid(grid, request.toX, request.toZ);
   const sx = start.x, sz = start.z, gx = goal.x, gz = goal.z;
@@ -843,9 +848,9 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest, requiredClearan
     return findPath(grid, request);
   }
 
-  const ramps = findRampConnections(grid);
+  const ramps = findRampConnections(grid, maxSlopeRatio);
 
-  const directRoute = findSingleHopRoute(grid, ramps, startLevel, goalLevel, sx, sz, gx, gz, agentId, avoidVehicles, requiredClearance);
+  const directRoute = findSingleHopRoute(grid, ramps, startLevel, goalLevel, sx, sz, gx, gz, agentId, avoidVehicles, requiredClearance, maxSlopeRatio);
   if (directRoute !== null) return directRoute;
 
   // No single ramp connects startLevel and goalLevel directly (#1166
@@ -857,7 +862,7 @@ function findMultiLevelPath(grid: NavGrid, request: PathRequest, requiredClearan
     return { found: false, waypoints: [], totalCost: 0 };
   }
 
-  return findChainedRoute(grid, hopSequence, sx, sz, gx, gz, agentId, avoidVehicles, requiredClearance);
+  return findChainedRoute(grid, hopSequence, sx, sz, gx, gz, agentId, avoidVehicles, requiredClearance, maxSlopeRatio);
 }
 
 // Cost of a single step from a to b (must be neighbours, otherwise Infinity).
@@ -891,6 +896,7 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
 
   const { avoidVehicles } = request;
   const requiredClearance = request.requiredClearance ?? NAV_CLEARANCE_EMPLOYEE_CELLS;
+  const maxSlopeRatio = request.maxSlopeRatio ?? NAV_MAX_SLOPE_RATIO;
 
   // Computed once per call and threaded through every clearance check below
   // (start/goal pre-checks, the direct-line walk, and A*'s own neighbour
@@ -942,14 +948,14 @@ export function findPath(grid: NavGrid, request: PathRequest): PathResult {
   //    cycling through the same handful of cells for 20+ ticks while
   //    findMultiLevelPath kept returning a *found* path every tick, just a
   //    detour nowhere near the goal.
-  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket);
+  const ordinary = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, undefined, maxSlopeRatio);
   if (ordinary.found) return ordinary;
 
   // 6. Ordinary search found no connection at all — if start and goal sit on
   //    different bench levels, a genuine wall (not just relief) may separate
   //    them, so fall back to ramp-based multi-level routing before giving up.
   if (getBenchLevel(grid, sx, sz) !== getBenchLevel(grid, gx, gz)) {
-    return findMultiLevelPath(grid, request, requiredClearance);
+    return findMultiLevelPath(grid, request, requiredClearance, maxSlopeRatio);
   }
 
   return ordinary;
@@ -994,11 +1000,12 @@ function findOrdinaryPath(
   startPocket: Set<number> | null,
   goalPocket: Set<number> | null,
   budget: number = pathfindingNodeBudget(grid.width, grid.height),
+  maxSlopeRatio: number = NAV_MAX_SLOPE_RATIO,
 ): PathResult {
   // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
   //    If directLine is more than 10% above heuristic, it's suboptimal — use A*.
-  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket);
+  const directLine = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, maxSlopeRatio);
   if (directLine !== null) {
     const heuristicLowerBound = octileHeuristic(sx, sz, gx, gz) * MIN_WALKABLE_COST;
     if (directLine.totalCost <= heuristicLowerBound * DIRECT_LINE_TOLERANCE) return directLine;
@@ -1054,7 +1061,7 @@ function findOrdinaryPath(
       if (!neighborCell || isImpassable(neighborCell, avoidVehicles, false, requiredClearance, skipClearance)) continue;
       if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(grid, cx, cz, nx, nz)) continue;
       const currentCell = grid.cellAt(cx, cz)!;
-      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz))) continue;
+      if (!isStepClimbable(currentCell.surfaceY, neighborCell.surfaceY, Math.hypot(dx, dz), maxSlopeRatio)) continue;
 
       // Move cost
       const isDiagonal = dx !== 0 && dz !== 0;
@@ -1079,13 +1086,13 @@ function findOrdinaryPath(
   // can need more nodes than the base budget, so retry once with a bigger one.
   const retryBudget = pathfindingRetryNodeBudget(grid.width, grid.height);
   if (openHeap.size > 0 && budget < retryBudget) {
-    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget);
+    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget, maxSlopeRatio);
     // The retry already ran the direct-line fallback on exhaustion.
     return retried;
   }
 
   // Budget exceeded or open set empty — try direct-line fallback
-  const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket);
+  const fallback = directLineWalk(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, maxSlopeRatio);
   if (fallback !== null) return fallback;
 
   return { found: false, waypoints: [], totalCost: 0 };

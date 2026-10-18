@@ -10,14 +10,14 @@
 // escalation logic is absorbed below. An employee with no itinerary does not
 // move (#1178, single-mover unification) — every walk goes through moveTo.
 
-import type { GameState } from '../state/GameState.js';
+import { isProgressionSite, type GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
-import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
-import { findPath, findFootPathWithVehicleFallback, type PathResult } from '../nav/Pathfinding.js';
+import { findPath, findFootPathWithVehicleFallback, type PathResult, type PathRequest } from '../nav/Pathfinding.js';
 import { isStepClimbable, hasClearance, type NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, inFlightHopOrigin, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { pickYieldCell } from '../nav/IdleYield.js';
@@ -430,7 +430,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
       path = state.navGrid
         ? findPath(state.navGrid, {
             agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
-            requiredClearance: vehicleRequiredClearanceCells(vehicle!),
+            ...driveLimitsOf(state, vehicle!),
           })
         : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
     } else if (state.navGrid) {
@@ -457,6 +457,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: emp.moveConsecutiveFailures, isStuck: emp.isMoveStuck,
     path, navGrid: state.navGrid, avoidVehicles,
+    ...(isDrive && { maxSlopeRatio: vehicleMaxSlopeRatio(vehicle!, isProgressionSite(state)) }),
     committed: readCommitted(emp),
     ...readMoveHistory(emp),
     mover, occupancy: state.agentOccupancy!,
@@ -773,6 +774,7 @@ function applyReroutedAdvance(
     destinationX: leg.destX, destinationZ: leg.destZ,
     consecutiveFailures: 0, isStuck: false,
     path,
+    ...(isDrive && { maxSlopeRatio: vehicleMaxSlopeRatio(vehicle!, isProgressionSite(state)) }),
     // A reroute (or a crossing) is trusted immediately — never compared
     // against a stale pre-block route commitment or move history.
     committed: NULL_ROUTE_COMMITMENT,
@@ -825,18 +827,29 @@ function noteBlockEpisodeStep(emp: Employee, leg: Leg): number {
   return count;
 }
 
+/** Per-vehicle pathing limits a drive leg's routes carry; empty for a foot leg. */
+type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio'>;
+
+/** Clearance and climb limit of `vehicle`, the same pair the planner's drive-leg estimate uses (#1938). */
+function driveLimitsOf(state: GameState, vehicle: Vehicle): DriveLimits {
+  return {
+    requiredClearance: vehicleRequiredClearanceCells(vehicle),
+    maxSlopeRatio: vehicleMaxSlopeRatio(vehicle, isProgressionSite(state)),
+  };
+}
+
 /** True when there is no free cell at all or `cell` lies on the route (`routeCells` is computed on demand). */
 function isOnRoute(cell: { x: number; z: number } | null, routeCells: () => ReadonlySet<string>): boolean {
   return cell === null || routeCells().has(`${cell.x},${cell.z}`);
 }
 
 /** Cells ("x,z") of the mover's remaining direct route to its leg destination; empty when none is found. */
-function remainingRouteCells(state: GameState, emp: Employee, leg: Leg, requiredClearance: number | undefined): Set<string> {
+function remainingRouteCells(state: GameState, emp: Employee, leg: Leg, driveLimits: DriveLimits): Set<string> {
   const cells = new Set<string>();
   if (!state.navGrid) return cells;
   const route = findPath(state.navGrid, {
     agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
-    avoidVehicles: false, ...(requiredClearance !== undefined && { requiredClearance }),
+    avoidVehicles: false, ...driveLimits,
   });
   for (const w of route.waypoints) cells.add(`${w.x},${w.z}`);
   cells.add(`${leg.destX},${leg.destZ}`);
@@ -920,7 +933,7 @@ function handleAgentOccupancyBlock(
   if (isDrive && !vehicle) return 'blocked';
 
   const speed = isDrive ? getVehicleDefByTier(vehicle!.type, vehicle!.tier).speed : AGENT_WALK_SPEED;
-  const requiredClearance = isDrive ? vehicleRequiredClearanceCells(vehicle!) : undefined;
+  const driveLimits: DriveLimits = isDrive ? driveLimitsOf(state, vehicle!) : {};
   // Whether the leg's own destination cell is currently held by SOME OTHER
   // occupant — not merely whether THIS tick's blocked hop happens to be it.
   // A mover several cells away from its destination can be blocked at an
@@ -950,7 +963,7 @@ function handleAgentOccupancyBlock(
   // a live vehicle-position scan.
   let cachedRouteCells: Set<string> | undefined;
   const routeCells = (): ReadonlySet<string> =>
-    cachedRouteCells ??= remainingRouteCells(state, emp, leg, requiredClearance);
+    cachedRouteCells ??= remainingRouteCells(state, emp, leg, driveLimits);
   if (destinationHeldByOther
     && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, result, false, routeCells)) {
     return 'blocked';
@@ -1012,7 +1025,7 @@ function handleAgentOccupancyBlock(
       && state.navGrid) {
       const direct = findPath(state.navGrid, {
         agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
-        avoidVehicles: true, ...(requiredClearance !== undefined && { requiredClearance }),
+        avoidVehicles: true, ...driveLimits,
       });
       if (direct.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result);
@@ -1033,7 +1046,7 @@ function handleAgentOccupancyBlock(
       && idleParkedVehicleOf(state, occupancy.holderOf(blockedStep.x, blockedStep.z)) !== undefined;
     const reroute = crossesParkedBlocker
       ? undefined
-      : findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
+      : findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, driveLimits);
     if (reroute?.found) {
       return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, reroute, occupancy, result);
     }
@@ -1126,7 +1139,7 @@ function handleAgentOccupancyBlock(
       if (state.navGrid) {
         const direct = findPath(state.navGrid, {
           agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
-          avoidVehicles: false, ...(requiredClearance !== undefined && { requiredClearance }),
+          avoidVehicles: false, ...driveLimits,
         });
         if (direct.found) {
           return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result, blocker!);
@@ -1134,7 +1147,7 @@ function handleAgentOccupancyBlock(
       }
       // No direct route: avoid every other occupied cell, crossing only this blocker.
       const crossing = findPathAvoidingOccupiedCells(
-        state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
+        state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, driveLimits, blocker!,
       );
       if (crossing.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
@@ -1172,7 +1185,7 @@ function handleAgentOccupancyBlock(
       // own passing tests) is untouched.
       const crossing = findPath(state.navGrid, {
         agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
-        avoidVehicles: true, ...(requiredClearance !== undefined && { requiredClearance }),
+        avoidVehicles: true, ...driveLimits,
       });
       if (crossing.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
@@ -1570,7 +1583,7 @@ function findPathAvoidingOccupiedCells(
   fromZ: number,
   destX: number,
   destZ: number,
-  requiredClearance: number | undefined,
+  driveLimits: DriveLimits,
   exemptOccupant?: Occupant,
 ): PathResult {
   const grid = state.navGrid!;
@@ -1609,7 +1622,7 @@ function findPathAvoidingOccupiedCells(
 
     return withFragmentsUnmarked(state, grid, () => findPath(grid, {
       agentId: emp.id, fromX, fromZ, toX: destX, toZ: destZ, avoidVehicles: true,
-      ...(requiredClearance !== undefined && { requiredClearance }),
+      ...driveLimits,
     }));
   } finally {
     for (const mark of marked) {

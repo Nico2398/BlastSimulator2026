@@ -8,7 +8,10 @@ import {
   hireEmployee,
   giveRaise,
   assignSkill,
+  isLicenceSkill,
+  calculateSalary,
   HIRING_COSTS,
+  type LicenceLevel,
   type EmployeeRole,
   type SkillCategory,
 } from '../../core/entities/Employee.js';
@@ -155,7 +158,21 @@ export function employeeCommand(
       if (!emp) return { success: false, output: t('employees.employee_not_found', { id }) };
       if (!emp.alive) return { success: false, output: t('employees.assign_skill_dead', { id }) };
 
+      // Optional `licence:1-3` (or `licence=N`) sets a driving licence's level, so a driver can hold tier 2/3 (#1938).
+      const licenceRaw = named['licence'] ?? args.find(a => a.startsWith('licence='))?.slice('licence='.length);
+      const licence = licenceRaw === undefined ? undefined : parseInt(licenceRaw, 10);
+      if (licence !== undefined && (!isLicenceSkill(skillRaw as SkillCategory) || ![1, 2, 3].includes(licence))) {
+        return { success: false, output: usageMsg };
+      }
+
       assignSkill(state.employees, id, skillRaw as SkillCategory, level as 1 | 2 | 3 | 4 | 5);
+      if (licence !== undefined) {
+        const held = emp.qualifications.find(q => q.category === skillRaw);
+        if (held) {
+          held.licenceLevel = licence as LicenceLevel;
+          emp.salary = calculateSalary(emp);
+        }
+      }
       return {
         success: true,
         output: t('employees.assign_skill_success', { id, skill: skillRaw, level }),

@@ -857,6 +857,5 @@ export function syncWorldBounds(state: GameState, voxelGrid: VoxelGrid): void {
 
 /** True when the site runs the mine-grade permit ladder (#1938). */
 export function isProgressionSite(state: Pick<GameState, 'grade'>): boolean {
-  void state;
-  return false; // TODO: implement
+  return state.grade !== undefined;
 }
