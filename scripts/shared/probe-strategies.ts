@@ -73,6 +73,8 @@ const RE_FIRE_CASH_CUSHION = 5_000;
 const SHOT = { rows: 3, cols: 3, spacing: 4, depth: 8, explosive: 'krackle', kg: 8, stemming: 2.5 } as const;
 /** Footprint side of the shot in tiles, first hole to last. */
 const SHOT_SPAN = (SHOT.cols - 1) * SHOT.spacing;
+/** Explosive one shot consumes, in kg. */
+const SHOT_EXPLOSIVE_KG = SHOT.rows * SHOT.cols * SHOT.kg;
 /** Deposit candidates tried (best first) before the opening gives up on `drill_plan`. */
 const DEPOSIT_CANDIDATES_TRIED = 12;
 /** Candidate pattern origins are sampled this many tiles apart. */
@@ -197,14 +199,18 @@ interface Shot {
  * which the opening crew cannot afford on payroll; the stock is paid for, not granted. Holes drilled
  * after the charge order are charged automatically. Null when no deposit or no stock is available.
  */
+function overlapsShot(c: Pattern, o: Pattern): boolean {
+  return Math.abs(c.x - o.x) <= SHOT_SPAN && Math.abs(c.z - o.z) <= SHOT_SPAN;
+}
+
 function orderShot(s: ProbeSession, earlier: readonly Pattern[] = []): Shot | null {
   const ranked = rankDeposits(s.grid)
-    .filter(c => !earlier.some(o => Math.abs(c.x - o.x) <= SHOT_SPAN && Math.abs(c.z - o.z) <= SHOT_SPAN))
+    .filter(c => !earlier.some(o => overlapsShot(c, o)))
     .slice(0, DEPOSIT_CANDIDATES_TRIED);
   for (const c of ranked) {
     const cmd = `drill_plan grid rows:${SHOT.rows} cols:${SHOT.cols} spacing:${SHOT.spacing} depth:${SHOT.depth} start:${c.x},${c.z}`;
     if (!s.run(cmd).success) continue;
-    if (!stockWarehouse(s.run, s.state, SHOT.explosive, SHOT.rows * SHOT.cols * SHOT.kg).success) return null;
+    if (!stockWarehouse(s.run, s.state, SHOT.explosive, SHOT_EXPLOSIVE_KG).success) return null;
     const charge = `charge hole:* explosive:${SHOT.explosive} amount:${SHOT.kg} stemming:${SHOT.stemming}`;
     if (!s.run(charge).success) return null;
     return { at: { x: c.x, z: c.z }, startedTick: s.state.tickCount };
@@ -290,7 +296,11 @@ interface ReinvestMemory {
   origins: Pattern[];
   /** Haulable ore (kg) measured after the last blast resolved; the reload gate's yardstick. */
   lastYieldKg: number;
-  /** A blast was fired and its yield is not yet measured. */
+  /**
+   * A blast was fired and its yield is not yet measured. It is measured on the next decision
+   * interval (DECISION_INTERVAL_TICKS later), so it is approximate: haulers may already have
+   * moved ore. The initial lastYieldKg is approximate for the same reason.
+   */
   yieldPending: boolean;
   researchOrdered: boolean;
   retryAt: Record<string, number>;
@@ -328,7 +338,7 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
   if (!shot) {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
-    const shotCost = SHOT.rows * SHOT.cols * SHOT.kg + RE_FIRE_CASH_CUSHION;
+    const shotCost = SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION;
     if (idle && spendable(s) >= shotCost && shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg)) {
       m.shot = orderShotOnce(s, m);
     }
