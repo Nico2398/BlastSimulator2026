@@ -42,10 +42,10 @@ describe('buildBlockedOrderMessage', () => {
   });
 
   it('target_unreachable with malformed detail falls back to the generic text', () => {
-    const bad = { key: 5, params: null } as unknown as PendingAction['blockedDetail'];
+    const bad = { key: 5, params: null } as unknown as NonNullable<PendingAction['blockedDetail']>;
     expect(buildBlockedOrderMessage(action({ blockedReason: 'target_unreachable', blockedDetail: bad })))
       .toContain("can't reach its target");
-    const noParams = { key: 'order.blocked.ramp_too_steep', params: null } as unknown as PendingAction['blockedDetail'];
+    const noParams = { key: 'order.blocked.ramp_too_steep', params: null } as unknown as NonNullable<PendingAction['blockedDetail']>;
     expect(buildBlockedOrderMessage(action({ blockedReason: 'target_unreachable', blockedDetail: noParams })))
       .toContain("can't reach its target");
   });

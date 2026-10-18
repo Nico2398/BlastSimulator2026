@@ -1431,7 +1431,7 @@ describe('unreachable vehicle orders name the blocking ramp (#1938)', () => {
     const state = pit([30]);
     purchaseVehicle(state.vehicles, 'drill_rig', FLOOR.x, FLOOR.z, 3);
     const id = orderOn(state);
-    state.pendingActions.find(a => a.id === id)!.blockedDetail = undefined;
+    delete state.pendingActions.find(a => a.id === id)!.blockedDetail;
     classifyNewOrder(state, id);
     expect(actionOf(state, id).blockedDetail?.key).toBe('order.blocked.ramp_too_steep');
   });
