@@ -10,6 +10,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import * as TopBarModule from '../../../src/ui/shell/TopBar.js';
+import { createBoardState } from '../../../src/core/economy/Board.js';
 import { createGradeState, gradeDef } from '../../../src/core/economy/MineGrade.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
@@ -873,5 +874,75 @@ describe('TopBar grade chip (#1924)', () => {
     topBar.update(s, center);
     expect(chip()!.dataset['pulse']).not.toBe('true');
     topBar.dispose();
+  });
+});
+
+describe('TopBar board chip (#1946)', () => {
+  const CHIP = '[data-action="open-board"]';
+  function mountBar() {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const topBar = new TopBar(container);
+    const center = new NotificationCenter();
+    const chip = () => container.querySelector<HTMLElement>(CHIP);
+    return { topBar, center, chip, container };
+  }
+  /** Quarter 2 of a 720-tick quarter with 12 days (288 ticks) left, confidence 75. */
+  function boardState() {
+    const s = makeState();
+    s.board = createBoardState({ quarterTicks: 720, oreTargetT: 20, profitTarget: 5000 }, 0);
+    s.board.quarter = 2;
+    s.board.confidence = 75;
+    s.tickCount = 720 - 288;
+    return s;
+  }
+  afterEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+
+  it('is hidden without a board', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    topBar.update(makeState(), center);
+    const el = chip();
+    expect(el === null || el.style.display === 'none').toBe(true);
+    topBar.dispose();
+  });
+
+  it('shows the quarter, the days left and the confidence', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    topBar.update(boardState(), center);
+    expect(chip()).not.toBeNull();
+    expect(chip()!.style.display).not.toBe('none');
+    expect(chip()!.textContent).toContain('Q2 · 12d · 75%');
+    topBar.dispose();
+  });
+
+  it('follows the board as the quarter advances', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    const s = boardState();
+    topBar.update(s, center);
+    s.tickCount += 24 * 2;
+    s.board!.confidence = 50;
+    topBar.update(s, center);
+    expect(chip()!.textContent).toContain('Q2 · 10d · 50%');
+    topBar.dispose();
+  });
+
+  it('hides again when the board is gone (keep playing)', () => {
+    setLocale('en');
+    const { topBar, center, chip } = mountBar();
+    const s = boardState();
+    topBar.update(s, center);
+    delete s.board;
+    topBar.update(s, center);
+    const el = chip();
+    expect(el === null || el.style.display === 'none').toBe(true);
+    topBar.dispose();
+  });
+
+  it('has the shell.topbar.board key in both locales', () => {
+    expect(Object.keys(en)).toContain('shell.topbar.board');
+    expect(Object.keys(fr)).toContain('shell.topbar.board');
   });
 });

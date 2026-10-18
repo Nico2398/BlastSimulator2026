@@ -7,6 +7,7 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
 import { STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
+import { createBoardState } from '../../../src/core/economy/Board.js';
 
 describe('Level completion counts operating profit (#1363)', () => {
   function started() {
@@ -506,5 +507,38 @@ describe('convertWinToFreePlay (#1647)', () => {
     const s = wonState();
     expect(convertWinToFreePlay(s).success).toBe(true);
     expect(convertWinToFreePlay(s).success).toBe(false);
+  });
+});
+
+describe('convertWinToFreePlay — board of directors (#1946)', () => {
+  it('deletes the board key when a won level goes to free play', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.board = createBoardState({ quarterTicks: 48, oreTargetT: 1, profitTarget: 1000 });
+    s.campaign.activeLevelId = 'dusty_hollow';
+    s.levelEnded = true;
+    s.levelEndReason = 'completed';
+
+    expect(convertWinToFreePlay(s).success).toBe(true);
+
+    expect('board' in s).toBe(false);
+    expect(s.board).toBeUndefined();
+  });
+
+  it('keeps the board when the conversion is refused', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.board = createBoardState({ quarterTicks: 48, oreTargetT: 1, profitTarget: 1000 });
+    s.levelEnded = true;
+    s.levelEndReason = 'fired';
+
+    expect(convertWinToFreePlay(s).success).toBe(false);
+    expect(s.board).toBeDefined();
+  });
+
+  it('is fine on a game that never had a board', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.levelEnded = true;
+    s.levelEndReason = 'completed';
+    expect(convertWinToFreePlay(s).success).toBe(true);
+    expect('board' in s).toBe(false);
   });
 });
