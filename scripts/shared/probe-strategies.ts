@@ -17,16 +17,17 @@
 //            DECISION_INTERVAL_TICKS. In this order, each only if cash minus
 //            REINVEST_CASH_RESERVE covers it:
 //            a. accept and fill fillable contracts (free)
-//            b. fire the next blast when haulable ore on the ground is under
-//               RELOAD_THRESHOLD_KG and no blast is in progress
+//            b. fire the next blast when haulable ore on the ground has fallen under
+//               RELOAD_FRACTION of the last blast's yield (shouldReload), the drill is idle
+//                and cash covers the shot; footprints keep SHOT_SPAN clear of earlier shots
 //            c. buy a Research Center
 //            d. research and order the tier-2 Freight Warehouse upgrade
 //            e. buy a second hauler and hire its driver
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
 //            Calibration tasks extend this list; keep each rule one short block.
-//            The blast rule is gated (threshold, nothing queued), so reinvest rarely
-//            re-fires a blast; deposits are ranked on ground-truth ore, not a survey.
+//            A buy rule that cannot act (unaffordable, cooling down, failed) falls through to the
+//            next. Deposits are ranked on ground-truth ore, not a survey.
 
 import { createGameEngine } from './command-runner.js';
 import { runCommand } from '../../src/console/createRunner.js';
@@ -48,8 +49,16 @@ import { expandMatrix } from './probe-config.js';
 const DECISION_INTERVAL_TICKS = 10;
 /** Cash the reinvest policy never spends below: payroll and upkeep keep running. */
 const REINVEST_CASH_RESERVE = 50_000;
-/** Haulable ore (kg) left on the ground under which reinvest fires the next blast. */
-const RELOAD_THRESHOLD_KG = 40_000;
+/** Fraction of the last blast's haulable yield under which reinvest fires the next blast. */
+export const RELOAD_FRACTION = 0.5;
+
+/**
+ * Reload gate: true when a prior yield exists (`lastYieldKg > 0`) and the haulable ore left on
+ * the ground has fallen under `RELOAD_FRACTION` of it.
+ */
+export function shouldReload(haulableKg: number, lastYieldKg: number): boolean {
+  return lastYieldKg > 0 && haulableKg < RELOAD_FRACTION * lastYieldKg;
+}
 
 /** Ticks one opening step may take before the run is reported as `opening_failed:<step>`. */
 const OPENING_STEP_MAX_TICKS = 3000;
@@ -58,9 +67,14 @@ const STALL_TICKS = 3;
 /** Ticks before a failed placement is tried again by the reinvest policy. */
 const PLACEMENT_RETRY_TICKS = 200;
 
+/** Cash above the reserve a re-fire keeps for drilling and charging, on top of the explosive. */
+const RE_FIRE_CASH_CUSHION = 5_000;
+
 const SHOT = { rows: 3, cols: 3, spacing: 4, depth: 8, explosive: 'krackle', kg: 8, stemming: 2.5 } as const;
 /** Footprint side of the shot in tiles, first hole to last. */
 const SHOT_SPAN = (SHOT.cols - 1) * SHOT.spacing;
+/** Explosive one shot consumes, in kg. */
+const SHOT_EXPLOSIVE_KG = SHOT.rows * SHOT.cols * SHOT.kg;
 /** Deposit candidates tried (best first) before the opening gives up on `drill_plan`. */
 const DEPOSIT_CANDIDATES_TRIED = 12;
 /** Candidate pattern origins are sampled this many tiles apart. */
@@ -185,12 +199,18 @@ interface Shot {
  * which the opening crew cannot afford on payroll; the stock is paid for, not granted. Holes drilled
  * after the charge order are charged automatically. Null when no deposit or no stock is available.
  */
-function orderShot(s: ProbeSession): Shot | null {
-  const ranked = rankDeposits(s.grid).slice(0, DEPOSIT_CANDIDATES_TRIED);
+function overlapsShot(c: Pattern, o: Pattern): boolean {
+  return Math.abs(c.x - o.x) <= SHOT_SPAN && Math.abs(c.z - o.z) <= SHOT_SPAN;
+}
+
+function orderShot(s: ProbeSession, earlier: readonly Pattern[] = []): Shot | null {
+  const ranked = rankDeposits(s.grid)
+    .filter(c => !earlier.some(o => overlapsShot(c, o)))
+    .slice(0, DEPOSIT_CANDIDATES_TRIED);
   for (const c of ranked) {
     const cmd = `drill_plan grid rows:${SHOT.rows} cols:${SHOT.cols} spacing:${SHOT.spacing} depth:${SHOT.depth} start:${c.x},${c.z}`;
     if (!s.run(cmd).success) continue;
-    if (!stockWarehouse(s.run, s.state, SHOT.explosive, SHOT.rows * SHOT.cols * SHOT.kg).success) return null;
+    if (!stockWarehouse(s.run, s.state, SHOT.explosive, SHOT_EXPLOSIVE_KG).success) return null;
     const charge = `charge hole:* explosive:${SHOT.explosive} amount:${SHOT.kg} stemming:${SHOT.stemming}`;
     if (!s.run(charge).success) return null;
     return { at: { x: c.x, z: c.z }, startedTick: s.state.tickCount };
@@ -272,6 +292,16 @@ function playOut(s: ProbeSession, onInterval?: () => void): never {
 
 interface ReinvestMemory {
   shot: Shot | null;
+  /** Origins of every shot fired so far; later footprints keep SHOT_SPAN clear of them. */
+  origins: Pattern[];
+  /** Haulable ore (kg) measured after the last blast resolved; the reload gate's yardstick. */
+  lastYieldKg: number;
+  /**
+   * A blast was fired and its yield is not yet measured. It is measured on the next decision
+   * interval (DECISION_INTERVAL_TICKS later), so it is approximate: haulers may already have
+   * moved ore. The initial lastYieldKg is approximate for the same reason.
+   */
+  yieldPending: boolean;
   researchOrdered: boolean;
   retryAt: Record<string, number>;
 }
@@ -295,22 +325,30 @@ function tryOnce(s: ProbeSession, m: ReinvestMemory, key: string, attempt: () =>
 /** Order the next shot unless a recent attempt failed; null when none was ordered. */
 function orderShotOnce(s: ProbeSession, m: ReinvestMemory): Shot | null {
   let ordered: Shot | null = null;
-  tryOnce(s, m, 'shot', () => (ordered = orderShot(s)) !== null);
+  tryOnce(s, m, 'shot', () => (ordered = orderShot(s, m.origins)) !== null);
   return ordered as Shot | null; // assigned inside the closure, which TS narrowing cannot see
 }
 
 function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
+  if (m.yieldPending) { // the blast resolved on the first command after it fired
+    m.lastYieldKg = haulableOreOnGroundKg(s.state);
+    m.yieldPending = false;
+  }
   const shot = m.shot;
   if (!shot) {
     const idle = s.state.plannedDrillHoles.length === 0 && Object.keys(s.state.plannedChargesByHole).length === 0
       && s.state.drillHoles.length === 0;
-    if (idle && haulableOreOnGroundKg(s.state) < RELOAD_THRESHOLD_KG) {
+    const shotCost = SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION;
+    if (idle && spendable(s) >= shotCost && shouldReload(haulableOreOnGroundKg(s.state), m.lastYieldKg)) {
       m.shot = orderShotOnce(s, m);
     }
     return;
   }
   if (shotReady(s.state)) {
-    fireShot(s);
+    if (fireShot(s)) {
+      m.origins.push(shot.at);
+      m.yieldPending = true;
+    }
     m.shot = null;
   } else if (s.state.tickCount - shot.startedTick > OPENING_STEP_MAX_TICKS) {
     m.shot = null;
@@ -318,11 +356,12 @@ function reinvestShot(s: ProbeSession, m: ReinvestMemory): void {
   }
 }
 
+/** Each rule returns only when it acted; an unaffordable, cooling-down or failed rule falls through. */
 function reinvestBuy(s: ProbeSession, m: ReinvestMemory): void {
   const { state } = s;
   if (countOf(s, 'research_center') === 0 && !state.plannedBuildings.some(p => p.type === 'research_center')
-    && spendable(s) >= getBuildingDef('research_center', 1).constructionCost) {
-    tryOnce(s, m, 'research_center', () => placeBuilding(s, 'research_center', rallyOf(s), null) !== null);
+    && spendable(s) >= getBuildingDef('research_center', 1).constructionCost
+    && tryOnce(s, m, 'research_center', () => placeBuilding(s, 'research_center', rallyOf(s), null) !== null)) {
     return;
   }
   const warehouse = state.buildings.buildings.find(b => b.type === 'freight_warehouse');
@@ -330,8 +369,7 @@ function reinvestBuy(s: ProbeSession, m: ReinvestMemory): void {
     && !state.plannedBuildings.some(p => p.buildingId === warehouse.id)
     && spendable(s) >= getUpgradeCost('freight_warehouse', 2)) {
     if (!m.researchOrdered) m.researchOrdered = s.run('research queue type:freight_warehouse tier:2').success;
-    tryOnce(s, m, 'warehouse', () => s.run(`build upgrade ${warehouse.id}`).success);
-    return;
+    if (tryOnce(s, m, 'warehouse', () => s.run(`build upgrade ${warehouse.id}`).success)) return;
   }
   const haulers = state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
   const haulerCost = getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver;
@@ -352,8 +390,11 @@ function reinvestPermit(s: ProbeSession): void {
 }
 
 function runReinvest(s: ProbeSession): void {
-  runOpening(s);
-  const m: ReinvestMemory = { shot: null, researchOrdered: false, retryAt: {} };
+  const first = runOpening(s);
+  const m: ReinvestMemory = {
+    shot: null, origins: [first], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
+    researchOrdered: false, retryAt: {},
+  };
   playOut(s, () => {
     reinvestShot(s, m);
     reinvestBuy(s, m);

@@ -74,6 +74,14 @@ describe('progression probe integration', () => {
     expectFiniteOrAllowedNull(r, 600);
   }, 60000);
 
+  it('reinvest fires strictly more blasts than the opening on the same setup (#1974)', () => {
+    const base = { seed: 42, biome: 'desert_badlands', kit: 'digger', horizon: 6000 } as const;
+    const opening = runProbe({ ...base, strategy: 'opening' });
+    const reinvest = runProbe({ ...base, strategy: 'reinvest' });
+    expectFiniteOrAllowedNull(reinvest, 6000);
+    expect(reinvest.metrics.blastsFired).toBeGreaterThan(opening.metrics.blastsFired);
+  }, 300000);
+
   it('never crashes on failure: endReason is null or a reason the run loop produces', () => {
     const r = runProbe({
       seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'opening', horizon: 300,

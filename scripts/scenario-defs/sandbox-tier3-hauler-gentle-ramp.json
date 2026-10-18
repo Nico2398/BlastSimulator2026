@@ -217,9 +217,9 @@
       }
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:19,9",
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:21,9",
       "role": "player",
-      "description": "Order a hole on the pit floor at the foot of ramp A. The tier-3 rig is on the surface and ramp A is about 27 degrees (tier-3 limit 18), so no vehicle able to do this order can reach it: the ghost reads red, and the order names Ramp #1 as too steep for a tier-3 rig (max 18 degrees). Wording and parameters are asserted in OrderReachability.test.ts.",
+      "description": "Order a hole on the pit floor near the foot of ramp A, two tiles clear of (19, 9) where the idle digger parks and would occlude the click. The tier-3 rig is on the surface and ramp A is about 27 degrees (tier-3 limit 18), so no vehicle able to do this order can reach it: the ghost reads red, and the order names Ramp #1 as too steep for a tier-3 rig (max 18 degrees). Wording and parameters are asserted in OrderReachability.test.ts.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -250,16 +250,16 @@
         },
         {
           "type": "focusTile",
-          "x": 19,
+          "x": 21,
           "z": 9,
           "distance": 18,
           "pitch": 85
         },
         {
           "type": "dragTiles",
-          "x1": 19,
+          "x1": 21,
           "z1": 9,
-          "x2": 19,
+          "x2": 21,
           "z2": 9
         },
         {
