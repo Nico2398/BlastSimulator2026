@@ -22,6 +22,7 @@ import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
 import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
+import { gridHoleLimitWarning } from '../permitPreview.js';
 import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
@@ -367,6 +368,7 @@ export class DrillStep {
       const rows = sel ? Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1) : 0;
       const coveredCount = sel ? this.coveredGridCount(sel, rows, cols) : 0;
       const allCovered = sel !== null && rows * cols > 0 && coveredCount >= rows * cols;
+      const permitWarning = sel ? gridHoleLimitWarning(this.lastState?.grade, cols * rows) : null;
       const refusal = hoverRefusal(controller, allCovered ? t('mining.drill_plan.grid_all_blocked') : null);
       strip.show({
         icon: 'grid',
@@ -377,7 +379,7 @@ export class DrillStep {
           this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', DRILL_HOLE_MIN_DEPTH_M, this.reachM(), refresh),
         ],
         result: sel
-          ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}${coveredCount > 0 ? ` — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: coveredCount })}` : ''}`
+          ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}${coveredCount > 0 ? ` — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: coveredCount })}` : ''}${permitWarning ? ` — ${permitWarning}` : ''}`
           : '—',
         confirmEnabled: controller.canConfirm && !allCovered,
         confirmDisabledReason: refusal.reason,

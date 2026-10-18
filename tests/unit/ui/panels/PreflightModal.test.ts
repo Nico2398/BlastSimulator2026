@@ -12,6 +12,7 @@ import { addChargedPattern, makeCoverageSurvey, makeOreGrid } from '../../../hel
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { dispatchChargeAction } from '../../../../src/core/mining/ChargeOrder.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
+import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -612,5 +613,83 @@ describe('PreflightModal delivery wait (#1966)', () => {
     modal.show();
     modal.update(inTransitState(), 'sunny');
     expect(modal.root.textContent).toContain('Jour 29, 08h00');
+  });
+});
+
+// #1925: permit fee, strikes and over-limit warning on progression sites.
+describe('PreflightModal — permit lines (#1925)', () => {
+  function permitState(holes: number, kgPerHole: number, progression = true): GameState {
+    const state = makeState();
+    if (progression) state.grade = createGradeState();
+    for (let i = 0; i < holes; i++) {
+      const hole = addHole(holeCounter, state.drillHoles, 10 + i * 3, 10, 8, 0.15);
+      const r = createCharge('krackle', kgPerHole, 2, hole.depth);
+      if ('charge' in r) state.chargesByHole[hole.id] = r.charge;
+    }
+    expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
+    return state;
+  }
+  const q = (m: PreflightModal, role: string) => m.root.querySelector(`[data-role="${role}"]`) as HTMLElement | null;
+  const detonate = (m: PreflightModal) => m.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement;
+
+  it('lists the notification fee on a progression site', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(permitState(9, 8), 'sunny');
+    expect(q(modal, 'preflight-permit-fee')).not.toBeNull();
+    expect(q(modal, 'preflight-permit-fee')!.textContent).toContain('250');
+  });
+
+  it('lists the strikes so far', () => {
+    const { modal } = makeModal();
+    const state = permitState(9, 8);
+    state.grade!.strikeTicks = [state.tickCount];
+    modal.show();
+    modal.update(state, 'sunny');
+    expect(q(modal, 'preflight-permit-strikes')).not.toBeNull();
+    expect(q(modal, 'preflight-permit-strikes')!.textContent).toContain('1');
+  });
+
+  it('puts no over-limit warning in the list within the limit', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(permitState(9, 8), 'sunny');
+    expect(q(modal, 'preflight-permit-warning')).toBeNull();
+  });
+
+  it('adds the over-limit warning to the warnings list when over', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(permitState(9, 10), 'sunny');
+    const w = q(modal, 'preflight-permit-warning');
+    expect(w).not.toBeNull();
+    expect(w!.textContent!.length).toBeGreaterThan(0);
+  });
+
+  it('DETONATE stays enabled and fires while over the limit', () => {
+    const { modal, gameConsole } = makeModal();
+    modal.show();
+    modal.update(permitState(9, 10), 'sunny');
+    expect(detonate(modal).disabled).toBe(false);
+    detonate(modal).click();
+    expect(gameConsole).toHaveBeenCalledWith('blast detonate');
+  });
+
+  it('shows no permit fee, strikes or warning on a non-progression site', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(permitState(9, 10, false), 'sunny');
+    expect(q(modal, 'preflight-permit-fee')).toBeNull();
+    expect(q(modal, 'preflight-permit-strikes')).toBeNull();
+    expect(q(modal, 'preflight-permit-warning')).toBeNull();
+  });
+
+  it('never renders an inspection chance or overshoot', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(permitState(12, 10), 'sunny');
+    const text = modal.root.textContent!.toLowerCase();
+    expect(text).not.toContain('chance');
+    expect(text).not.toContain('overshoot');
   });
 });

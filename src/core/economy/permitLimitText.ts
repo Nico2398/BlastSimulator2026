@@ -9,11 +9,16 @@ interface PermitLimitTexts {
   strikes: string;
 }
 
+/** Localised live-strike line for the strike ticks at `tick`. */
+export function permitStrikesText(strikeTicks: readonly number[], tick: number): string {
+  return t('permit.status.strikes', { count: liveStrikes(strikeTicks, tick).length });
+}
+
 /** Localised "per blast" limits line and live-strike line of the permit `grade`. */
 export function permitLimitTexts(grade: number, strikeTicks: readonly number[], tick: number): PermitLimitTexts {
   const limits = permitLimitsFor(grade);
   return {
     limits: t('permit.status.limits', { kg: limits.maxChargeKg, holes: limits.maxHoles, fee: formatMoney(limits.fee) }),
-    strikes: t('permit.status.strikes', { count: liveStrikes(strikeTicks, tick).length }),
+    strikes: permitStrikesText(strikeTicks, tick),
   };
 }
