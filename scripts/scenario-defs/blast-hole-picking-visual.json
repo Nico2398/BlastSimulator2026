@@ -167,13 +167,8 @@
     {
       "command": "charge hole:* explosive:boomite amount:6 stemming:2",
       "timeout": 60,
-      "description": "Charge the hole through the Blast Workshop (the inspector only reads it): step tab Charge, amount and stemming steppers, charge-all.",
+      "description": "Charge the hole through the Blast Workshop (the inspector only reads it): step tab Charge, amount and stemming steppers, charge-all. The hole inspector from the previous step is deliberately left open (#1895).",
       "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
         {
           "type": "ensurePanel",
           "panel": "blast"
@@ -228,27 +223,11 @@
     {
       "command": "state",
       "timeout": 60,
-      "description": "Re-click the hole — the inspector now reads it as charged, with the explosive, kg and stemming.",
+      "description": "The still-open hole inspector now reads the hole as charged, with the explosive, kg and stemming — it follows the live game state. Not a re-click (#1895): once the delivery wait has passed, the charging crew and drill rig stand on the hole, so a click on it selects the employee or rig instead.",
       "interaction": [
         {
           "type": "command",
           "command": "state"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-blast-panel [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "cameraFocus",
-          "x": 10,
-          "z": 10,
-          "distance": 8
-        },
-        {
-          "type": "click",
-          "x": 640,
-          "y": 360
         },
         {
           "type": "awaitUsable",

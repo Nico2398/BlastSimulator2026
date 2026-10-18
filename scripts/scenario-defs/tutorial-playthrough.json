@@ -1032,7 +1032,7 @@
     },
     {
       "command": "set_policy mode:shift_8h fatigue:60",
-      "description": "Rally point (#1772 CI): the click now selects the shift_8h mode button before Apply. It used to press Apply alone, which re-applied the panel's current selection -- the continuous mode the bootstrap step at the top of this file set -- so the browser ran the rest of the file under continuous while command mode switched to shift_8h. Every figure after this step drifted apart from there (the second drill pattern landed 8 ticks apart), and with the crew now gathered around the rally flag the drift reached blast 2's casualty count: 5 in the browser, 4 in command mode. The fatigue input is left as the panel shows it (0), matching the command, which sets no threshold. #1895: fatigue:60 restores the default rest threshold the file's earlier fatigue:0 had zeroed, so the idle crew rests through the second explosives delivery wait instead of sliding into a revolt.",
+      "description": "Rally point (#1772 CI): the click now selects the shift_8h mode button before Apply. It used to press Apply alone, which re-applied the panel's current selection -- the continuous mode the bootstrap step at the top of this file set -- so the browser ran the rest of the file under continuous while command mode switched to shift_8h. Every figure after this step drifted apart from there (the second drill pattern landed 8 ticks apart), and with the crew now gathered around the rally flag the drift reached blast 2's casualty count: 5 in the browser, 4 in command mode. #1895: the fatigue input is now set to 60 as well, matching the command's fatigue:60 (it used to be left at the panel's 0 while the command set 60, so the browser's crew never rested through the second delivery wait and the level ended in a worker revolt); fatigue:60 restores the default rest threshold the file's earlier fatigue:0 had zeroed, so the idle crew rests through the second explosives delivery wait instead of sliding into a revolt.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1041,6 +1041,11 @@
         {
           "type": "clickSelector",
           "selector": "#bs-operations-panel [data-shift-mode=\"shift_8h\"]"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-policy-fatigue",
+          "value": "60"
         },
         {
           "type": "clickSelector",
