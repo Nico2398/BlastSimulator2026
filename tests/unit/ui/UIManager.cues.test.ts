@@ -114,3 +114,19 @@ describe('UIManager cue forwarding', () => {
     expect(volumeAdjusted).toHaveBeenCalledWith('master');
   });
 });
+
+describe('UIManager permits panel (#1924)', () => {
+  it('showPanel("permits") shows #bs-permit-panel', () => {
+    const panel = container.querySelector<HTMLElement>('#bs-permit-panel');
+    expect(panel).not.toBeNull();
+    expect(panel!.style.display).not.toBe('flex');
+    ui.showPanel('permits');
+    expect(container.querySelector<HTMLElement>('#bs-permit-panel')!.style.display).toBe('flex');
+  });
+
+  it('opening another panel closes the permits panel', () => {
+    ui.showPanel('permits');
+    ui.showPanel('finances');
+    expect(container.querySelector<HTMLElement>('#bs-permit-panel')!.style.display).toBe('none');
+  });
+});

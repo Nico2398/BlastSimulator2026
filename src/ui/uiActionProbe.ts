@@ -45,6 +45,7 @@ const REGIONS: Array<[string, string]> = [
   ['#bs-employee-panel', 'crew'],
   ['#bs-survey-panel', 'survey'],
   ['#bs-shady-panel', 'shady'],
+  ['#bs-permit-panel', 'permits'],
   ['#bs-settings-panel', 'settings'],
   ['#bs-event-dialog', 'event'],
   // Blast confirmation and similar one-off modals. Excluded from the event
